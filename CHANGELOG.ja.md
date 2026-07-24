@@ -2683,7 +2683,7 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **検証:** 記載した数値は実装と突き合わせた（manifest の cases = 220、段 A = 80 = 10 道具 × 8 図形、
   `render_engine_version` = `"10"`）。コードは 1 行も変えていないため pytest / cli / ruff は v2.4.5 と同一。
 
-### Android `2.0.0-android.1` — 描画コアが render engine 10 へ到達（Phase 1〜2f、android Build 148077、2026-07-23）
+### Android `2.0.0-android.1` — 描画コアが render engine 10 へ到達し、11 まで追随（Phase 1〜3a・2h、android Build 148077〜148081、2026-07-23〜24）
 
 **記載方針**: Android の移植は段ごとに版を起こさず、**engine 10 到達をもって 1 件にまとめる**（web/server とは版の名前空間が別で、`android/VERSION` / `android/BUILD_NUMBER` が正本）。以下は Phase 1 から 2f までの通し記録である。
 
@@ -2711,7 +2711,13 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **検証:** `gradle :app:testDebugUnitTest --rerun-tasks` を main で独立実行し **54 件 / failures 0 / errors 0**（XML 自力集計）。`cloudform_contour` 14 ケースの全 49 点が **1e-9 以内**かつ `path_d` **文字列一致**、参照 SVG `11`〜`14` の `<path d>` も**文字列完全一致**。`14_region_then_relation` は region `[0.55,0.55,0.95,0.95]` に対し最終 center が **region の外**（x = 0.35）に着地することで v1.94 の順序を固定している（`relation` は解決後も却下後も `null` になるため `center` でしか判定できない）
 
 - **Phase 3a（merge `642a476`、android Build 148081）＝ Stage 1.5 展開層の中核:** 展開フィルタ本体（変奏・添景・focus・プラグイン展開）を移植した。`ddl` と `context_text` の使い分け、**`vary_seed` は `context_text` にだけ効く**（`variation_seed` とは別物）ところまで含む。**3b〜3d 用の引数は受け取るところまで作らせ、無視していることをテストで明示させた**（後段で「引数はあるが読んでいない」が無言で残らないように）。期待値 `ddl_expand.json` 39 ケースは**契約に先出し**してある。`A-*` 15 件は server 正本 `server/reference/ddl-engine-1/a_expand/` と同じ入力で、**末尾改行 1 文字を除いて出力もバイト一致**する（照合スクリプトは `rstrip("\n")` が要る）。検証: `testDebugUnitTest --rerun-tasks` を XML 自力集計で **58 件 / failures 0 / errors 0**（ベースライン 54 + 新規 4）、契約 §5 の 7 ケースが `assertEquals` で完全一致。変更は `android/` 6 ファイルのみ。**`render_engine_version` は `"10"` のまま**で `android/VERSION` も `2.0.0-android.1` を維持する。
-- **engine 11 で parity fixture が古くなる（申し送り）:** web/server が v2.4.8 で `path d` を`.3f` から 6 桁固定へ変えたため、`server_reference/` の SVG 比較は**そのままでは全滅する**。Stage 1.5 の Phase 3b〜3d とは別軸なので、**描画層の追随は Phase 2h として別契約**にする。
+- **engine 11 で parity fixture が古くなる（申し送り。Phase 2h で処理済み）:** web/server が v2.4.8 で `path d` を`.3f` から 6 桁固定へ変えたため、`server_reference/` の SVG 比較は**そのままでは全滅する**。Stage 1.5 の Phase 3b〜3d とは別軸なので、**描画層の追随は Phase 2h として別契約**にした。
+- **Phase 2h（merge `eeb9bd7`、android Build 148081 据え置き）＝ マスターグリッドへの追随・engine 11:** 書き出す数値をすべて小数 6 桁固定のグリッドへ載せ、`render_engine_version` を **`"10"` → `"11"`**。**幾何は 1 行も変えていない。変えたのは数値を文字列にする箇所だけである。** `ServerRendererGeometry` に `MASTER_GRID_DECIMALS = 6` を宣言し、同一実装の重複だった `fmt3` を削除、組み上げた SVG に対して `applyMasterGrid` を一度だけ当てる（server の `renderer.py::_apply_master_grid` と同じ構えで、除外は `version` / `class` / `id` の 3 つ）。**Kotlin の `Double.toString()` は素で埋め込むと `1.0E-5` のような指数表記を出す**ため、この保険が無いとそこだけグリッドから外れる。
+- **server 側の癖まで写した 2 箇所:** ① `class="hatch-spacing-…"` は識別子であって座標ではないので **3 桁のまま**（`renderer.py:2190` と同じ）② 雲形の輪郭 `closedCatmullRomPath` は **server の `cloudform.py:134,143` が内部で `.3f` に量子化している**ため、局所の 3 桁整形を保ったうえで `applyMasterGrid` に 6 桁へ整えさせる。**ここを 6 桁で直に書くと server と 1 桁ずれる。**
+- **判別テスト 3 本を新設し、3 本とも「意図したテストが落ちる」ことを摂動で確認した**（git 管理セッションが受け入れ時に独立実行）: ① `MASTER_GRID_DECIMALS` を 6 → 5 にすると `testEveryEmittedNumberSitsOnMasterGrid` が落ちる ② 整数もグリッドに載せると `testIntegersRemainIntegers` が落ちる ③ `Locale.US` を外すと `testLocaleIndependence` が落ちる。**着手時点で赤だった 12 件はすべて緑になり、その 12 件の assert は 1 つも書き換えていない**（緩めて通した箇所が無いことの証明）。
+- **整形の忠実性を実測した:** `String.format(Locale.US, "%.6f", v)` と、二進値そのものを見る `BigDecimal(v).setScale(6, HALF_EVEN)`（＝ Python の `f"{v:.6f}"` と同じ意味）を 0〜1000 の乱数 **200 万件**で突き合わせ、**不一致 0 件**。JVM の整形が Python と食い違いうる懸念（短縮表記経由の丸め）は、6 桁・この範囲では現れない。
+- **検証:** `gradle :app:testDebugUnitTest --rerun-tasks` を main で独立実行し **61 件 / failures 0 / errors 0**（XML 自力集計。ベースライン 58 + 判別 3）。`android/VERSION` は `2.0.0-android.1` 据え置き、`android/BUILD_NUMBER` も `148081` のまま。変更は `android/` のみで、**web/server の描画結果・`APP_VERSION` / `web/BUILD_NUMBER` は動かしていない**。pentala 反映も不要。
+- **申し送り:** Phase 3b〜3d（Stage 1.5 の残り）が次の段。本 Phase でブロックが外れた。
 
 ### v2.4.7 — 決定的な DDL 層を凍結する（DDL 参照コーパスと `ddl_version` / `ddl_engine_version`）（Build 697、2026-07-24）
 

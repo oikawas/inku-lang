@@ -3,11 +3,12 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-07-23。
+最終更新: 2026-07-24。
 
-**追随状況**: Android は `1.48.0-android.1` / render engine version `2` の世代にある。
-master の web/server は v2.4.2 / engine 10。差分の追随は段階的に行う（末尾
-「2026-07-23 web/server v2 追随 Phase 1」を参照）。
+**追随状況**: Android は `2.0.0-android.1` / **render engine version `11`** の世代にある。
+master の web/server は v2.4.8 / engine 11 で、**描画層は追いついている**。
+Stage 1.5 展開層は Phase 3a まで移植済みで、3b〜3d が残っている。
+差分の追随は段階的に行う（末尾の各 Phase 節を参照）。
 
 ## 更新ルール
 
@@ -1351,3 +1352,50 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 
 
 
+
+## 2026-07-24 web/server v2.4.8 追随 Phase 2h (マスターグリッド・render engine 11)
+
+契約 `antigravity-android-phase2h-master-grid.md` に基づき、web/server が engine 11 で宣言した
+**書き出しのマスターグリッド**（小数 6 桁固定）へ Android の数値整形を追随させた。
+**幾何の計算は一切変えていない。変えたのは数値を文字列にする箇所だけである。**
+
+### 実装の詳細
+
+1. **グリッドの宣言 (`ServerRendererGeometry.kt`)**:
+   - `MASTER_GRID_DECIMALS = 6` を定数として宣言し、`fmt` を `"%.3f"` から
+     `"%.${MASTER_GRID_DECIMALS}f"`（`Locale.US` 明示）へ変更。**末尾のゼロは詰めない。**
+   - `-0.000000` を `0.000000` へ寄せる（server の `master_grid.py` が明示的に潰している符号付きゼロ）。
+2. **重複の削除 (`DefaultSvgRenderer.kt`)**:
+   - 同一実装だった `fmt3` を削除し、`fmt` へ寄せた。**重複を残すと呼び忘れが無言で通る。**
+   - `class="hatch-spacing-%.3f"` は識別子であり座標ではないので、3 桁表記のまま残す
+     （server `renderer.py:2190` と同じ）。
+3. **単一地点での強制 (`DefaultSvgRenderer.kt`)**:
+   - `buildString` で組み上げた SVG に対し `applyMasterGrid` を一度だけ当てる。
+     server の `renderer.py::_apply_master_grid` と同じ構えで、除外属性も同じ
+     `version` / `class` / `id` の 3 つ。
+   - **Kotlin の `Double.toString()` は素で埋め込むと `1.0E-5` のような指数表記を出す**ため、
+     この保険が無いとそこだけグリッドから外れる。
+4. **ストロークの座標 (`ServerStrokeEngine.kt`)**:
+   - `formatCoord` の `BigDecimal.setScale(3, HALF_EVEN)` を `ServerRendererGeometry.fmt` へ差し替え、
+     `path d` を 6 桁固定へ同期。
+5. **雲形の輪郭 (`ServerRendererGeometry.kt`)**:
+   - `closedCatmullRomPath` は **server の `cloudform.py:134,143` が内部で `.3f` に量子化している**
+     仕様をそのまま写し、局所の 3 桁整形を保ったうえで `applyMasterGrid` が 6 桁へ整える。
+     ここを 6 桁で直に書くと server と 1 桁ずれる。
+6. **版の申告**: `render_engine_version` を `"10"` → `"11"`。
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計で **61 件 / failures 0 / errors 0**
+  （ベースライン 58 件 + 判別テスト 3 件）。着手時点で赤だった 12 件はすべて緑になり、
+  **その 12 件の assert は 1 つも書き換えていない**。
+- **判別テスト 3 本は、それぞれ意図した摂動で落ちることを確認済み**:
+  ① `MASTER_GRID_DECIMALS` を 6 → 5 にすると `testEveryEmittedNumberSitsOnMasterGrid` が落ちる
+  ② 整数もグリッドに載せると `testIntegersRemainIntegers` が落ちる
+  ③ `Locale.US` を外すと `testLocaleIndependence` が落ちる。
+- **整形の忠実性を実測**: `String.format(Locale.US, "%.6f", v)` と、二進値そのものを見る
+  `BigDecimal(v).setScale(6, HALF_EVEN)`（Python の `f"{v:.6f}"` と同じ意味）を
+  0〜1000 の乱数 200 万件で突き合わせ、**不一致 0 件**。JVM の整形が Python と食い違わないことを
+  この範囲で確認した。
+- `android/VERSION` は `2.0.0-android.1` を維持、`android/BUILD_NUMBER` は `148081` のまま
+  （Gradle の自動採番は動いていない）。変更は `android/` のみで、server / web / cli / shared は無変更。

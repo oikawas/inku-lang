@@ -4,12 +4,12 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-07-23.
+Last updated: 2026-07-24.
 
-**Catch-up status**: Android sits at generation `1.48.0-android.1` with render engine
-version `2`. The master web/server implementation is at v2.4.2 with engine 10. The port
-proceeds in phases; see "2026-07-23 Catching Up With web/server v2, Phase 1" at the end
-of this document.
+**Catch-up status**: Android sits at generation `2.0.0-android.1` with **render engine
+version `11`**. The master web/server implementation is at v2.4.8 with engine 11, so the
+drawing layer has caught up. The Stage 1.5 expander is ported through Phase 3a; 3b-3d
+remain. The port proceeds in phases; see the phase sections at the end of this document.
 
 ## Specification Update Workflow
 
@@ -1771,3 +1771,52 @@ In accordance with contract `antigravity-android-phase3-expander.md` §8 Phase 3
 
 
 
+
+## 2026-07-24 web/server v2.4.8 Alignment Phase 2h (Master Grid, Render Engine 11)
+
+Following the contract `antigravity-android-phase2h-master-grid.md`, Android now writes
+every number on the **master grid** that web/server declared at engine 11: six decimal
+places, fixed. **No geometry changed. Only the places that turn a number into a string.**
+
+### Implementation
+
+1. **Declaring the grid (`ServerRendererGeometry.kt`)**:
+   - `MASTER_GRID_DECIMALS = 6` as a constant; `fmt` moves from `"%.3f"` to
+     `"%.${MASTER_GRID_DECIMALS}f"` with an explicit `Locale.US`. **Trailing zeros are kept.**
+   - `-0.000000` collapses to `0.000000`, matching the signed-zero case that
+     `master_grid.py` handles explicitly on the server.
+2. **Removing the duplicate (`DefaultSvgRenderer.kt`)**:
+   - `fmt3` was an identical second implementation and is gone. **A duplicate lets a
+     missed call site pass in silence.**
+   - `class="hatch-spacing-%.3f"` stays at three digits: it is an identifier, not a
+     coordinate (same as `renderer.py:2190`).
+3. **Forcing the grid at one point (`DefaultSvgRenderer.kt`)**:
+   - `applyMasterGrid` runs once over the assembled SVG, mirroring
+     `renderer.py::_apply_master_grid`, with the same three exempt attributes
+     (`version` / `class` / `id`).
+   - **Kotlin's `Double.toString()` emits exponent forms such as `1.0E-5`** when a value
+     is interpolated directly, so without this pass those numbers would sit off the grid.
+4. **Stroke coordinates (`ServerStrokeEngine.kt`)**: `formatCoord` drops
+   `BigDecimal.setScale(3, HALF_EVEN)` in favour of `ServerRendererGeometry.fmt`, so
+   `path d` lands on the same grid.
+5. **Cloudform contours (`ServerRendererGeometry.kt`)**: `closedCatmullRomPath` keeps a
+   local three-digit format because **the server quantises there too**
+   (`cloudform.py:134,143`); `applyMasterGrid` then pads it to six. Writing six digits
+   directly here would diverge from the server by one digit.
+6. **Version claim**: `render_engine_version` moves from `"10"` to `"11"`.
+
+### Verification
+
+- Counting `app/build/test-results/testDebugUnitTest/*.xml` by hand: **61 tests,
+  0 failures, 0 errors** (58 baseline + 3 discriminating). All 12 tests that were red at
+  the start are green, and **not one of their assertions was rewritten**.
+- **Each discriminating test was shown to fail under a targeted perturbation**:
+  (1) `MASTER_GRID_DECIMALS` 6 -> 5 fails `testEveryEmittedNumberSitsOnMasterGrid`;
+  (2) gridding integers as well fails `testIntegersRemainIntegers`;
+  (3) dropping `Locale.US` fails `testLocaleIndependence`.
+- **Formatting fidelity measured**: `String.format(Locale.US, "%.6f", v)` was compared
+  against `BigDecimal(v).setScale(6, HALF_EVEN)` — which is what Python's `f"{v:.6f}"`
+  means — over two million random values in 0..1000, with **zero mismatches**. Within
+  that range the JVM formatter does not diverge from Python.
+- `android/VERSION` stays `2.0.0-android.1` and `android/BUILD_NUMBER` stays `148081`.
+  Only `android/` changed; server, web, cli and shared are untouched.

@@ -1324,6 +1324,77 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert me.json()["image_generation_count"] == 1
 
 
+def test_paint_prompt_digests_round_trip_without_changing_rh3(
+    monkeypatch, auth_context
+):
+    headers, user, _ = auth_context
+
+    def fake_interpret(text: str, prompt_metadata=None, **kwargs):
+        prompt_metadata.update(
+            {
+                "stage1_prompt_digest": "1111111111111111",
+                "stage1_prompt_base_digest": "2222222222222222",
+            }
+        )
+        return "黒い円を置く。", None, 1, 2
+
+    fake_score = Score.model_validate(
+        {
+            "instructions": [
+                {
+                    "primitive": "circle",
+                    "center": [0.5, 0.5],
+                    "radius": 0.1,
+                }
+            ]
+        }
+    )
+
+    def fake_compose(ddl: str, prompt_metadata=None, **kwargs):
+        prompt_metadata["stage2_prompt_digest"] = "3333333333333333"
+        return fake_score, 3, 4
+
+    monkeypatch.setattr(api_module, "interpret_detail", fake_interpret)
+    monkeypatch.setattr(api_module, "compose", fake_compose)
+
+    response = client.post(
+        "/api/paint",
+        json={
+            "text": "一滴の墨",
+            "save_history": True,
+            "save_artifacts": False,
+            "count_generation": False,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["stage1_prompt_digest"] == "1111111111111111"
+    assert data["stage1_prompt_base_digest"] == "2222222222222222"
+    assert data["stage2_prompt_digest"] == "3333333333333333"
+
+    history = client.get("/api/history", headers=headers).json()["items"]
+    item = next(entry for entry in history if entry["id"] == data["history_id"])
+    assert item["stage1_prompt_digest"] == "1111111111111111"
+    assert item["stage1_prompt_base_digest"] == "2222222222222222"
+    assert item["stage2_prompt_digest"] == "3333333333333333"
+
+    without_digests = {
+        key: value
+        for key, value in item.items()
+        if key
+        not in {
+            "stage1_prompt_digest",
+            "stage1_prompt_base_digest",
+            "stage2_prompt_digest",
+        }
+    }
+    assert db.render_hash_for_item(item) == db.render_hash_for_item(without_digests)
+
+    db.delete_items(user["id"], [data["history_id"]])
+
+
 def _stream_events(response) -> list[dict]:
     return [json.loads(line) for line in response.text.splitlines() if line.strip()]
 
@@ -2125,6 +2196,9 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
             "render_canvas_aspect_ratio": 1.0,
             "render_hash": "a" * 64,
             "render_hash_short": "AAAA",
+            "stage1_prompt_digest": "1111111111111111",
+            "stage1_prompt_base_digest": "2222222222222222",
+            "stage2_prompt_digest": "3333333333333333",
         },
         {
             "stage1_model": "stage1",
@@ -2150,6 +2224,9 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     assert saved_score["render_canvas_aspect_ratio"] == 1.0
     assert saved_score["render_hash"] == "a" * 64
     assert saved_score["render_hash_short"] == "AAAA"
+    assert saved_score["stage1_prompt_digest"] == "1111111111111111"
+    assert saved_score["stage1_prompt_base_digest"] == "2222222222222222"
+    assert saved_score["stage2_prompt_digest"] == "3333333333333333"
     assert saved_score["score"] == {"instructions": []}
     assert (tmp_path / "out" / "sample_output.svg").read_text(encoding="utf-8") == "<svg></svg>"
     assert not (tmp_path / "out" / "sample_output.png").exists()

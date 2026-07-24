@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -791,6 +792,15 @@ def _submit_tool() -> dict[str, Any]:
     }
 
 
+def _prompt_digest(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _stage2_prompt_digest(system_prompt: str) -> str:
+    tool_json = json.dumps(_submit_tool(), ensure_ascii=False, sort_keys=True)
+    return _prompt_digest(system_prompt + "\n" + tool_json)
+
+
 def _get_provider(model: str) -> str:
     if ":" in model:
         prefix, _ = model.split(":", 1)
@@ -1286,6 +1296,7 @@ def compose(
     system_prompt: str | None = None,
     lang: str = "ja",
     trace_sink: list[dict] | None = None,
+    prompt_metadata: dict[str, str] | None = None,
 ) -> tuple[Score, int | None, int | None]:
     """(score, tokens_in, tokens_out) を返す。system_prompt 指定時はスナップショット使用。
 
@@ -1299,6 +1310,8 @@ def compose(
         effective_prompt = SYSTEM_PROMPT_EN
     else:
         effective_prompt = SYSTEM_PROMPT
+    if prompt_metadata is not None:
+        prompt_metadata["stage2_prompt_digest"] = _stage2_prompt_digest(effective_prompt)
     settings = _current_model_settings()
     if model:
         provider, model_id = provider_for_model(

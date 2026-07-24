@@ -13,10 +13,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import urllib.request
-import json
 
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
@@ -1246,14 +1247,18 @@ _TENKEI_NORMS_EN = {
 }
 
 
-def _build_system_prompt(
+def _prompt_digest(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _build_system_prompt_parts(
     text: str,
     k: int = 5,
     prefix_override: str | None = None,
     lang: str = "ja",
     tenkei: str = "auto",
-) -> str:
-    """推論ごとのシステムプロンプトを構築する (PREFIX + 動的例 k 件)。"""
+) -> tuple[str, str]:
+    """Return the actual Stage 1 prompt and its example-free base."""
     examples = _select_examples(text, k=k, lang=lang)
     if prefix_override is not None:
         prefix = prefix_override
@@ -1285,7 +1290,26 @@ def _build_system_prompt(
                 "名前空間付き語が明示された場合、または列挙された発火語が指示対象として明示された"
                 "場合だけ名前空間付き語へ解決する。比喩や未知対象から推測せず、プラグイン語を創作しない。"
             )
-    return prefix + plugin_section + tenkei_section + "\n\n" + section_header + examples
+    base_prompt = prefix + plugin_section + tenkei_section
+    return base_prompt + "\n\n" + section_header + examples, base_prompt
+
+
+def _build_system_prompt(
+    text: str,
+    k: int = 5,
+    prefix_override: str | None = None,
+    lang: str = "ja",
+    tenkei: str = "auto",
+) -> str:
+    """推論ごとのシステムプロンプトを構築する (PREFIX + 動的例 k 件)。"""
+    prompt, _ = _build_system_prompt_parts(
+        text,
+        k=k,
+        prefix_override=prefix_override,
+        lang=lang,
+        tenkei=tenkei,
+    )
+    return prompt
 
 
 def _get_provider(model: str) -> str:
@@ -1359,14 +1383,18 @@ def interpret_detail(
     lang: str = "ja",
     trace_sink: list[str] | None = None,
     tenkei: str = "auto",
+    prompt_metadata: dict[str, str] | None = None,
 ) -> tuple[str, str | None, int | None, int | None]:
     """(ddl, thinking, tokens_in, tokens_out) を返す。
 
     trace_sink 指定時は、サニタイズ前の Stage 1 生 DDL を append する (観測のみ)。
     """
-    system_prompt = _build_system_prompt(
+    system_prompt, base_prompt = _build_system_prompt_parts(
         text, prefix_override=system_prompt_prefix, lang=lang, tenkei=tenkei
     )
+    if prompt_metadata is not None:
+        prompt_metadata["stage1_prompt_digest"] = _prompt_digest(system_prompt)
+        prompt_metadata["stage1_prompt_base_digest"] = _prompt_digest(base_prompt)
 
     settings = _current_model_settings()
     if model:

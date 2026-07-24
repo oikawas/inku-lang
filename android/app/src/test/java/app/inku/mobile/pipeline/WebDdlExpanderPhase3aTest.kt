@@ -108,17 +108,17 @@ class WebDdlExpanderPhase3aTest {
     }
 
     @Test
-    fun testPhase3b3c3dParametersAcceptedSafelyInPhase3a() {
+    fun testPhase3bVariationParametersActiveInPhase3b() {
         val ddl = "中心に黒い四角を置く。白い横線を三本引く。"
         val baseOutput = WebDdlExpander.expandIntermediateDdl(ddl)
 
-        val outputWithUnusedParams = WebDdlExpander.expandIntermediateDdl(
+        val outputWithVariation = WebDdlExpander.expandIntermediateDdl(
             ddl = ddl,
             variationAmplitude = "small",
             variationSeed = 12345L,
             enablePlugins = true,
         )
 
-        assertEquals(baseOutput, outputWithUnusedParams)
+        assertNotEquals(baseOutput, outputWithVariation)
     }
 }

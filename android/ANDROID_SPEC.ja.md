@@ -7,7 +7,7 @@
 
 **追随状況**: Android は `2.0.0-android.1` / **render engine version `11`** の世代にある。
 master の web/server は v2.4.8 / engine 11 で、**描画層は追いついている**。
-Stage 1.5 展開層は Phase 3a まで移植済みで、3b〜3d が残っている。
+Stage 1.5 展開層は Phase 3b まで移植済みで、3c〜3d が残っている。
 差分の追随は段階的に行う（末尾の各 Phase 節を参照）。
 
 ## 更新ルール
@@ -1399,3 +1399,29 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
   この範囲で確認した。
 - `android/VERSION` は `2.0.0-android.1` を維持、`android/BUILD_NUMBER` は `148081` のまま
   （Gradle の自動採番は動いていない）。変更は `android/` のみで、server / web / cli / shared は無変更。
+
+## 2026-07-24 web/server v2 追随 Phase 3b (Stage 1.5 変奏 Variation の追随)
+
+契約 `antigravity-android-phase3-expander.md` §8 Phase 3b に基づき、Stage 1.5 変奏機能（`build_variation_plan`, `_variation_ranked_axes`, `_variation_base_offset`, `_shift_*`, `_apply_count_axes`, `_variation_moved_axes`, `_resolve_focus_id`）の Android 移植を完了した。
+
+### 実装および追随の詳細
+
+1. **変奏構造と定数・軸の定義 (`WebDdlExpander.kt`)**:
+   - `VariationPlan` データクラスおよび変奏強度 (`small`, `medium`, `large`)、7 軸 (`type_swap`, `count`, `touch`, `focus`, `color`, `composition`, `type_family`) と階層 Tier、強度別軸範囲のマップを定義。
+   - `buildVariationPlan` / `variationRankedAxes` / `variationBaseOffset` による決定的な変奏プラン生成を実装。
+2. **符号なし 64-bit シードハッシュのキー固定**:
+   - シード値の文字列化（ハッシュキー `$amplitude:${java.lang.Long.toUnsignedString(seed)}` 等）に `java.lang.Long.toUnsignedString` を使用し、2^63 以上の符号なし整数で負の数印字によりキーがずれる問題を完全防止。
+3. **実効変奏プランと決定点シフト適用**:
+   - `effectiveVariationPlan` による実出力差分比較と決定論的オフセット調整・代替軸探索を移植。
+   - 各決定点 (`AXIS_COLOR`, `AXIS_TOUCH`, `AXIS_COMPOSITION`, `AXIS_TYPE_SWAP`, `AXIS_COUNT`, `AXIS_TYPE_FAMILY`, `AXIS_FOCUS`) において `shiftChoice` / `shiftCategoryCount` / `shiftCategoryFamily` / `resolveFocusId` を適用。
+4. **`variation_report` の動的生成**:
+   - 出力に実際に変化を生じた軸のみを検出・抽出する `variationMovedAxes` を移植し、`variationReport` マップに `moved_axes` および `resolved_focus` を設定。
+5. **Phase 3b コーパステスト基盤 (`WebDdlExpanderPhase3bTest.kt`)**:
+   - 参照コーパス `ddl_expand.json` の 3b 対象 16 ケース（`A-variation-*` 8件, `B-variation-*` 3件, `B-focus-*` 5件）において出力文字列が完全一致（`assertEquals`）し、`variation_report` の `moved_axes` / `resolved_focus` が期待値と一致することを自動検証。
+
+### 検証結果
+
+- `render_engine_version` は `"11"` を維持（本 Phase は Stage 1.5 のため描画層には触れない）。
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 62 件の単体テスト（既存 61 件 + Phase 3b 新設 1 件 [16ケース内包]）が 100% 通過 (PASS / Failures 0 / Errors 0)。
+- `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148082` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
+

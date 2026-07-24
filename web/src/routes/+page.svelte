@@ -88,6 +88,8 @@
 		render_color_profile?: Record<string, string> | null;
 		render_engine_id?: string | null;
 		render_engine_version?: string | null;
+		ddl_version?: string | null;
+		ddl_engine_version?: string | null;
 		render_hash?: string | null;
 		render_hash_short?: string | null;
 		render_color_catalog_id?: string | null;
@@ -331,6 +333,7 @@
 	// ── Replay ──────────────────────────────────────────────
 	let reloading   = $state(false);
 	let reloadError = $state<string | null>(null);
+	let replayVersionNotice = $state<string | null>(null);
 
 	// ── Result ──────────────────────────────────────────────
 	let ddl      = $state<string | null>(null);
@@ -482,6 +485,7 @@
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
+	let currentRenderEngineVersion = $state<string | null>(null);
 	let showKiwi = $state(true);
 	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
@@ -1945,14 +1949,18 @@
 	}
 
 	async function loadPublicAppInfo() {
+		currentRenderEngineVersion = null;
 		try {
 			const r = await fetch('/api/info', {
 				cache: 'no-store',
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean };
+			const data = await r.json() as { developer_mode?: boolean; render_engine_version?: string };
 			developerMode = data.developer_mode === true;
+			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
+				? data.render_engine_version
+				: null;
 		} catch (error) {
 			console.warn('failed to load public app info', error);
 		}
@@ -4186,6 +4194,13 @@ if (unreadWords.length > 0) {
 			if (contextVersion !== targetContextVersion) return;
 			loadIterationItem({ ...it, svg });
 			result = result ? { ...result, svg, render_hash: it.render_hash, render_hash_short: it.render_hash_short } : result;
+			if (currentRenderEngineVersion) {
+				replayVersionNotice = it.render_engine_version
+					? (it.render_engine_version === currentRenderEngineVersion
+						? null
+						: t().historyReplayVersionMismatch(it.render_engine_version, currentRenderEngineVersion))
+					: t().historyReplayVersionNotRecorded(currentRenderEngineVersion);
+			}
 			outputTab = 'canvas';
 			fitCanvasZoom();
 		} catch (e) {
@@ -4577,6 +4592,7 @@ $effect(() => {
 
 		interpretationDiffParts = [];
 		reloadError = null;
+		replayVersionNotice = null;
 		if (lineageIntermediateNoticeTimer !== null) {
 			window.clearTimeout(lineageIntermediateNoticeTimer);
 			lineageIntermediateNoticeTimer = null;
@@ -4627,6 +4643,8 @@ $effect(() => {
 			render_color_profile: it.render_color_profile,
 			render_engine_id: it.render_engine_id,
 			render_engine_version: it.render_engine_version,
+			ddl_version: it.ddl_version,
+			ddl_engine_version: it.ddl_engine_version,
 			render_color_catalog_id: it.render_color_catalog_id,
 			render_color_catalog_name: it.render_color_catalog_name,
 			render_color_catalog_sub: it.render_color_catalog_sub,
@@ -6118,6 +6136,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onOpenNearbyHistory={openNearbyHistory}
 				{unsavedRefinementPreview}
 				{lineageIntermediateNotice}
+				{replayVersionNotice}
 				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
 				{currentRenderedAt}
 				{nextDisabled}

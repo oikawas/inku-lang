@@ -1170,6 +1170,10 @@ class AppInfoResponse(BaseModel):
     version: str
     build_number: str | None = None
     developer_mode: bool = False
+    render_engine_id: str
+    render_engine_version: str
+    ddl_version: str
+    ddl_engine_version: str
 
 
 class ColorCatalogsResponse(BaseModel):
@@ -1661,11 +1665,16 @@ def health() -> dict[str, bool]:
 
 @app.get("/api/info", response_model=AppInfoResponse)
 def api_info() -> AppInfoResponse:
+    engine = current_render_engine()
     return AppInfoResponse(
         name="inku-server",
         version=_APP_VERSION,
         build_number=_build_number(),
         developer_mode=_env_flag("INKU_DEVELOPER_MODE"),
+        render_engine_id=engine.id,
+        render_engine_version=engine.version,
+        ddl_version=DDL_VERSION,
+        ddl_engine_version=DDL_ENGINE_VERSION,
     )
 
 

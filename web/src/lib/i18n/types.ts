@@ -640,6 +640,10 @@ export interface LangPack {
 	historyReplay: string;
 	historyReplayTitle: string;
 	historyReplayMissingSeed: string;
+	historyReplayVersionMismatch: (recorded: string, current: string) => string;
+	historyReplayVersionNotRecorded: (current: string) => string;
+	historyVersionNotRecorded: string;
+	generationDdlVersions: string;
 	historyCreatedAtHeader: string;
 	historyCanvasHeader: string;
 	historyModelHeader: string;

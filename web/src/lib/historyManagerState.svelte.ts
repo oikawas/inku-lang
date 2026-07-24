@@ -44,6 +44,8 @@ export type HistoryItem = {
 	render_color_profile?: Record<string, string> | null;
 	render_engine_id?: string | null;
 	render_engine_version?: string | null;
+	ddl_version?: string | null;
+	ddl_engine_version?: string | null;
 	render_color_catalog_id?: string | null;
 	render_color_catalog_name?: string | null;
 	render_color_catalog_sub?: string | null;

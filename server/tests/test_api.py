@@ -133,10 +133,25 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["version"] == importlib.metadata.version("inku-server")
     assert data["build_number"]
     assert data["developer_mode"] is False
+    assert data["render_engine_id"] == "default"
+    assert data["render_engine_version"] == "11"
+    assert data["ddl_version"] == "1"
+    assert data["ddl_engine_version"] == "1"
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     enabled = client.get("/api/info")
     assert enabled.json()["developer_mode"] is True
+
+
+def test_info_reads_current_render_engine_at_request_time(monkeypatch):
+    engine = types.SimpleNamespace(id="test-engine", version="test-version")
+    monkeypatch.setattr(api_module, "current_render_engine", lambda: engine)
+
+    r = client.get("/api/info")
+
+    assert r.status_code == 200
+    assert r.json()["render_engine_id"] == "test-engine"
+    assert r.json()["render_engine_version"] == "test-version"
 
 
 def test_color_catalogs_are_served_by_api():

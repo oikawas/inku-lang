@@ -647,6 +647,7 @@ export interface LangPack {
 	replayComparisonTitle: string;
 	replayComparisonOriginal: string;
 	replayComparisonCurrent: string;
+	replayComparisonProvisionalSeed: (seed: number) => string;
 	generationDdlVersions: string;
 	historyCreatedAtHeader: string;
 	historyCanvasHeader: string;

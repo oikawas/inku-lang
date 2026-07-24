@@ -144,6 +144,7 @@
 		recordedVersion: string | null;
 		currentVersion: string | null;
 		versionMessage: string | null;
+		provisionalSeed: number | null;
 	};
 	type BatchFailure = {
 		line: number;
@@ -4179,10 +4180,10 @@ if (unreadWords.length > 0) {
 	async function replayHistoryItem(it: Iteration, source: ReplaySource = outputTab) {
 		if (demoRunning || reloading) return;
 		const contextVersion = targetContextVersion;
-		if (it.render_seed == null) {
-			reloadError = t().historyReplayMissingSeed;
-			return;
-		}
+		const hasRecordedSeed = it.render_seed != null;
+		const hasSeedText = Boolean(it.seed_text?.trim());
+		const provisionalSeed = !hasRecordedSeed && !hasSeedText ? 0 : null;
+		const replaySeed = hasRecordedSeed ? Number(it.render_seed) : provisionalSeed;
 		reloading = true;
 		reloadError = null;
 		try {
@@ -4195,7 +4196,7 @@ if (unreadWords.length > 0) {
 					score: it.score,
 					catalog_id: catalogId,
 					canvas_aspect: canvasId,
-					render_seed: Number(it.render_seed),
+					render_seed: replaySeed,
 					seed_text: it.seed_text,
 				})
 			});
@@ -4216,6 +4217,7 @@ if (unreadWords.length > 0) {
 				recordedVersion: it.render_engine_version ?? null,
 				currentVersion: currentRenderEngineVersion,
 				versionMessage,
+				provisionalSeed,
 			};
 		} catch (e) {
 			if (contextVersion === targetContextVersion) reloadError = e instanceof Error ? e.message : String(e);
@@ -6216,7 +6218,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onReplayCurrent={() => {
 					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
 				}}
-				replayDisabled={!replayableStatusHistoryItem || replayableStatusHistoryItem.render_seed == null || reloading}
+				replayDisabled={!replayableStatusHistoryItem || reloading}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
 				onVaryPerformance={varyPerformance}
@@ -6617,6 +6619,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		recordedVersion={replayComparison.recordedVersion}
 		currentVersion={replayComparison.currentVersion}
 		versionMessage={replayComparison.versionMessage}
+		provisionalSeed={replayComparison.provisionalSeed}
 		onClose={closeReplayComparison}
 	/>
 {/if}

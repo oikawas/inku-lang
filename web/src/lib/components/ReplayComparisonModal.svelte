@@ -7,6 +7,7 @@
 		recordedVersion: string | null;
 		currentVersion: string | null;
 		versionMessage: string | null;
+		provisionalSeed: number | null;
 		onClose: () => void;
 	};
 
@@ -16,6 +17,7 @@
 		recordedVersion,
 		currentVersion,
 		versionMessage,
+		provisionalSeed,
 		onClose,
 	}: Props = $props();
 </script>
@@ -37,6 +39,9 @@
 			<button type="button" class="ghost-btn" onclick={onClose}>{t().closeLabel}</button>
 		</header>
 
+		{#if provisionalSeed !== null}
+			<div class="version-message provisional-seed-message" role="status">{t().replayComparisonProvisionalSeed(provisionalSeed)}</div>
+		{/if}
 		{#if versionMessage}
 			<div class="version-message" role="status">{versionMessage}</div>
 		{/if}

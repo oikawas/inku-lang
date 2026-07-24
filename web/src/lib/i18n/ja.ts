@@ -645,6 +645,7 @@ export const ja: LangPack = {
 	replayComparisonTitle: '再現 — オリジナルRendererと現行Rendererの比較',
 	replayComparisonOriginal: 'オリジナル',
 	replayComparisonCurrent: '現行エンジンによる描き直し',
+	replayComparisonProvisionalSeed: (seed) => "Seedを補完した暫定表示（seed: " + seed + "）",
 	generationDdlVersions: 'DDL 仕様 / 変換層',
 	historyCreatedAtHeader: '作成日時',
 	historyCanvasHeader: 'キャンバス',

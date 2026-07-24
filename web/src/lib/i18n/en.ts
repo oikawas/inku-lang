@@ -645,6 +645,7 @@ export const en: LangPack = {
 	replayComparisonTitle: 'Replay — Original Renderer and Current Renderer',
 	replayComparisonOriginal: 'Original',
 	replayComparisonCurrent: 'Re-rendered with the current engine',
+	replayComparisonProvisionalSeed: (seed) => "Provisional display with a supplemented seed (seed: " + seed + ")",
 	generationDdlVersions: 'DDL specification / transform layer',
 	historyCreatedAtHeader: 'Created',
 	historyCanvasHeader: 'Canvas',

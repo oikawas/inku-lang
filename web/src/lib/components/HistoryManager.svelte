@@ -911,7 +911,7 @@
 	.history-table-wrap { overflow: auto; }
 	.history-thumb-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
 		gap: 8px;
 		align-items: start;
 	}
@@ -1089,8 +1089,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-		height: 58px;
-		overflow: hidden;
+		min-height: 64px;
+		height: auto;
+		overflow: visible;
 		margin-top: 5px;
 		min-width: 0;
 		position: relative;
@@ -1100,8 +1101,8 @@
 	.manager-thumb-actions .danger-btn {
 		flex: 0 0 auto;
 		margin-left: auto;
-		font-size: 10px;
-		padding: 3px 7px;
+		font-size: var(--btn-sm-font-size);
+		padding: var(--btn-sm-padding);
 	}
 	.history-table {
 		width: 100%;

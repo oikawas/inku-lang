@@ -136,7 +136,9 @@
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
+	type ReplaySource = 'history-manager' | 'canvas' | 'refine' | 'lineage';
 	type ReplayComparison = {
+		source: ReplaySource;
 		originalSvg: string;
 		replayedSvg: string;
 		recordedVersion: string | null;
@@ -4174,7 +4176,7 @@ if (unreadWords.length > 0) {
 		}
 	}
 
-	async function replayHistoryItem(it: Iteration) {
+	async function replayHistoryItem(it: Iteration, source: ReplaySource = outputTab) {
 		if (demoRunning || reloading) return;
 		const contextVersion = targetContextVersion;
 		if (it.render_seed == null) {
@@ -4208,6 +4210,7 @@ if (unreadWords.length > 0) {
 					: t().historyReplayVersionNotRecorded(currentRenderEngineVersion))
 				: null;
 			replayComparison = {
+				source,
 				originalSvg: it.svg,
 				replayedSvg: svg,
 				recordedVersion: it.render_engine_version ?? null,
@@ -4219,6 +4222,17 @@ if (unreadWords.length > 0) {
 		} finally {
 			reloading = false;
 		}
+	}
+
+	function closeReplayComparison() {
+		const source = replayComparison?.source;
+		replayComparison = null;
+		if (!source) return;
+		if (source === 'history-manager') {
+			historyManager.open = true;
+			return;
+		}
+		outputTab = source;
 	}
 
 async function fetchLineage(nodeId: string, force = false, descendantDepth = 3): Promise<void> {
@@ -5611,6 +5625,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (inputMode === 'demo' || activeRunMode === 'demo') return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
+	const replayableStatusHistoryItem = $derived(
+		statusHistoryItem && "render_seed" in statusHistoryItem && "svg" in statusHistoryItem
+			? statusHistoryItem as Iteration
+			: null
+	);
 	const targetTenkei = $derived(normalizeTenkei(displayedHistoryItem?.tenkei) ?? DEFAULT_TENKEI);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
@@ -6194,6 +6213,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onCopyPromptText={copyPromptText}
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
+				onReplayCurrent={() => {
+					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
+				}}
+				replayDisabled={!replayableStatusHistoryItem || replayableStatusHistoryItem.render_seed == null || reloading}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
 				onVaryPerformance={varyPerformance}
@@ -6573,7 +6596,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onAskPermanentDelete={askPermanentDelete}
 		onToggleSelection={toggleHistorySelection}
 		onLoadItem={loadIterationItem}
-		onReplayItem={replayHistoryItem}
+		onReplayItem={(item) => replayHistoryItem(item, 'history-manager')}
 		onToggleStar={toggleHistoryStar}
 		{historyModelSummary}
 		{formatHistoryDate}
@@ -6594,7 +6617,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		recordedVersion={replayComparison.recordedVersion}
 		currentVersion={replayComparison.currentVersion}
 		versionMessage={replayComparison.versionMessage}
-		onClose={() => (replayComparison = null)}
+		onClose={closeReplayComparison}
 	/>
 {/if}
 

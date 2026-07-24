@@ -86,6 +86,8 @@
 		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
+		onReplayCurrent: () => void | Promise<void>;
+		replayDisabled: boolean;
 		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
 		onDownloadPNG: (size: number) => void | Promise<void>;
 		onVaryPerformance: () => void | Promise<void>;
@@ -237,6 +239,8 @@
 		onCopyPromptText,
 		onCopyStatusHash,
 		onToggleStar,
+		onReplayCurrent,
+		replayDisabled,
 		onDownloadSVG,
 		onDownloadPNG,
 		onVaryPerformance,
@@ -1085,6 +1089,14 @@
 				</button>
 			</Tooltip>
 		{/if}
+		<Tooltip placement="top" text={t().historyReplayTitle}>
+			<button
+				type="button"
+				class="generation-info-button"
+				disabled={replayDisabled}
+				onclick={onReplayCurrent}
+			>{t().historyReplay}</button>
+		</Tooltip>
 		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show generation details, prompts, and JSON for the selected artwork'}>
 			<button
 				type="button"
@@ -2053,12 +2065,12 @@
 	.generation-info-button {
 		flex: 0 0 auto;
 		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		padding: 5px 9px;
+		border-radius: var(--btn-sm-radius);
+		padding: var(--btn-sm-padding);
 		background: var(--panel);
 		color: var(--fg2);
 		font: inherit;
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		white-space: nowrap;
 		cursor: pointer;
 	}

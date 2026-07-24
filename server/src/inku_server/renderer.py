@@ -2984,18 +2984,28 @@ def _line_direction(
 
 
 def _offset_polyline(
-    points: list[tuple[float, float]], amount: float
+    points: list[tuple[float, float]],
+    amount: float,
+    *,
+    wander: float = 0.0,
+    wander_period: float = 1.0,
+    seed: int = 0,
 ) -> list[tuple[float, float]]:
     """Offset an open polyline by `amount` along per-vertex normals.
 
     The material outline layers used to be straight start->end lines. Once the
     stroke centreline gained a gesture they had to follow that same curve, or the
     straight remnants read as a faint line joining the endpoints.
+
+    `wander` adds a low-frequency drift to the offset along the arc length so the
+    strata are not perfectly parallel rails — one of the cues the eye reads as a
+    repeating pattern.
     """
     n = len(points)
     if n < 2:
         return list(points)
     out: list[tuple[float, float]] = []
+    arc = 0.0
     for i in range(n):
         if i == 0:
             tx, ty = points[1][0] - points[0][0], points[1][1] - points[0][1]
@@ -3005,8 +3015,30 @@ def _offset_polyline(
             tx, ty = points[i + 1][0] - points[i - 1][0], points[i + 1][1] - points[i - 1][1]
         length = math.hypot(tx, ty) or 1.0
         nx, ny = -ty / length, tx / length
-        out.append((points[i][0] + nx * amount, points[i][1] + ny * amount))
+        off = amount
+        if wander:
+            off += wander * (_value_noise_1d(arc / max(1e-6, wander_period), seed) * 2 - 1)
+        out.append((points[i][0] + nx * off, points[i][1] + ny * off))
+        if i < n - 1:
+            arc += math.hypot(
+                points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]
+            )
     return out
+
+
+def _varied_dash_pattern(dash_units: float, mark: float, gap: float, seed: int) -> str:
+    """A long, seed-varied dash pattern (unscaled) whose period spans the whole
+    line, so no repeating dash cadence is visible. Pairs vary per index and per
+    stratum seed; feed through `_scale_dash` to size and format it."""
+    period = max(1.0, mark + gap)
+    count = max(6, min(28, int(dash_units / period) + 3))
+    vals: list[str] = []
+    for i in range(count):
+        m = mark * (0.5 + 1.3 * _hash01(i, seed, "dash-mark"))
+        g = gap * (0.45 + 1.5 * _hash01(i, seed, "dash-gap"))
+        vals.append(f"{m:.3f}")
+        vals.append(f"{g:.3f}")
+    return ",".join(vals)
 
 
 def _polyline_sample(
@@ -3054,7 +3086,9 @@ def _add_powder_specks(
     color = attrs.get("stroke", "#111111")
     min_radius = 0.35 * _unit_scale(canvas)
     for idx in range(count):
-        t = (idx + 0.5) / count
+        # Non-uniform spacing: jitter each speck within its slot so the powder
+        # does not sit on an even grid.
+        t = min(1.0, max(0.0, (idx + 0.5 + (_hash01(idx, seed, "speck-t") - 0.5)) / count))
         (px, py), (ux, uy) = _polyline_sample(centerline, t)
         perp = _hash_to_unit(idx, seed) * spread
         ox, oy = -uy * perp, ux * perp
@@ -3427,25 +3461,49 @@ def _material_line_group(
     def _layer_offset(amount: float) -> float:
         return _outline_offset_px(amount * scale * offset_gain, canvas)
 
-    def _emit_layer(amount: float, layer_attrs: dict) -> None:
+    dash_units = length / max(1e-6, scale)
+
+    def _emit_layer(
+        amount: float, layer_attrs: dict, mark: float, gap: float, k: int
+    ) -> None:
+        # Each stratum gets its own seed, so its weave and its dash pattern are
+        # out of step with the others; the pattern is long enough to span the
+        # line, so no repeating dash cadence is visible.
         la = _copy_attrs(layer_attrs)
         la["fill"] = "none"
-        group.add(dwg.polyline(points=_offset_polyline(path, _layer_offset(amount)), **la))
+        la["class_"] = "material-outline"
+        off_px = _layer_offset(amount)
+        layer_seed = seed + k * 7919
+        wander = 0.35 * abs(off_px) + 0.6 * scale
+        pts = _offset_polyline(
+            path, off_px, wander=wander, wander_period=60.0 * scale, seed=layer_seed
+        )
+        la["stroke_dasharray"] = _scale_dash(
+            _varied_dash_pattern(dash_units, mark, gap, layer_seed), scale
+        )
+        group.add(dwg.polyline(points=pts, **la))
 
     if include_base:
         base = _copy_attrs(attrs)
         base["fill"] = "none"
-        group.add(dwg.polyline(points=path, **base))
+        base["class_"] = "material-outline"
+        group.add(
+            dwg.polyline(
+                points=_offset_polyline(
+                    path, 0.0, wander=0.5 * scale, wander_period=70.0 * scale, seed=seed
+                ),
+                **base,
+            )
+        )
 
     if ins.weight == "pencil":
-        for amount in (-0.9, 1.1):
+        for k, amount in enumerate((-0.9, 1.1)):
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = 0.45 * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.26)
-            layer_attrs["stroke_dasharray"] = _scale_dash("1,7", scale)
             if use_filters:
                 layer_attrs["filter"] = "url(#texture-pencil)"
-            _emit_layer(amount, layer_attrs)
+            _emit_layer(amount, layer_attrs, 1.0, 7.0, k)
         _add_powder_specks(
             dwg,
             group,
@@ -3459,12 +3517,11 @@ def _material_line_group(
             opacity=_speck_opacity(0.20),
         )
     elif ins.weight == "chalk":
-        for amount in (-3.0, 3.4):
+        for k, amount in enumerate((-3.0, 3.4)):
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = 1.1 * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.28)
-            layer_attrs["stroke_dasharray"] = _scale_dash("8,12,1,8", scale)
-            _emit_layer(amount, layer_attrs)
+            _emit_layer(amount, layer_attrs, 8.0, 11.0, k)
         _add_powder_specks(
             dwg,
             group,
@@ -3478,15 +3535,15 @@ def _material_line_group(
             opacity=_speck_opacity(0.26),
         )
     elif ins.weight == "brush_thin":
-        for idx, amount in enumerate((-1.4, 1.8)):
+        for k, amount in enumerate((-1.4, 1.8)):
             layer_attrs = _copy_attrs(attrs)
-            layer_attrs["stroke_width"] = (0.9 + idx * 0.5) * scale
+            layer_attrs["stroke_width"] = (0.9 + k * 0.5) * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.32)
-            layer_attrs["stroke_dasharray"] = _scale_dash("22,9", scale)
-            _emit_layer(amount, layer_attrs)
+            _emit_layer(amount, layer_attrs, 22.0, 9.0, k)
     else:
         amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
-        for amount in amounts:
+        mark, gap = (6.0, 6.0) if ins.weight == "crayon" else (14.0, 9.0)
+        for k, amount in enumerate(amounts):
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = max(
                 0.8 * scale,
@@ -3496,10 +3553,7 @@ def _material_line_group(
             layer_attrs["stroke_opacity"] = _layer_opacity(
                 0.24 if ins.weight == "crayon" else 0.38
             )
-            layer_attrs["stroke_dasharray"] = _scale_dash(
-                "2,5,9,7" if ins.weight == "crayon" else "18,7,3,11", scale
-            )
-            _emit_layer(amount, layer_attrs)
+            _emit_layer(amount, layer_attrs, mark, gap, k)
         if ins.weight == "crayon":
             _add_powder_specks(
                 dwg,

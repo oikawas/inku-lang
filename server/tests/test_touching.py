@@ -262,6 +262,7 @@ def _svg_arcs(svg: str) -> list[dict[str, object]]:
         if (
             element.tag.endswith("polyline")
             and points_attribute
+            and not is_material
             and stroke_opacity >= 0.45
         ):
             points = [

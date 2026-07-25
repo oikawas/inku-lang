@@ -2828,3 +2828,18 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **積み残さなかったもの（明示）:** Android への追随は行っていない（engine `"11"` のまま）。てざわりへの「コンピュータ」追加は着手していない（設計の裁定のみ済み）。`cloudform` をストローク合成へ載せる修正は行っていない（事実として記録しただけ）。過去エンジンの保持・選択は実装していない（§15.8 のまま）。保存済み SVG は差し替えていない。既存履歴の `render_wild` は backfill していない（NULL のまま＝記録前と OFF を区別する）。
 - **SPEC:** §13.4 に「暴れる」の節、§15.6 に版を上げる条件の拡張と `rh3` の材料の注記、§15.7 に engine 12 の実測（199/21 の内訳）を追記した。
 - **検証:** pytest **1066 passed / 30 skipped**（+7 = engine 12 で再ベースラインした golden 6 件と、遡り解決の新テスト 1 件）、cli 68 passed、ruff clean、`npm run check` **0 errors / 2 warnings**（217 files）。再ベースラインした 6 件は `_swell` を 1e-6 だけ動かすと全件落ちることを確認した（判別力の実測）。コーパス生成器は 2 回連続実行で tracked 差分ゼロ。
+
+---
+
+### Android Phase 3d — 組み込み Nature プラグイン展開の追随（android Build 148083、2026-07-25）
+
+**Stage 1.5 展開層の移植が Phase 3d で完了した。** Android の展開層は web/server と同じ入力に対して同じ文字列を返すようになり、**残る遅れは描画層（engine 11 のまま）だけになった**。
+
+- **移植内容:** `NATURE_PLUGIN_RE`（`Nature.(風|うねり|無風|wind|undulation|stillness|calm)`）と `naturePluginTerms` によるタグ抽出、`dropNaturePluginSentences` によるプラグイン文の除去、`applyNaturePluginMacros` によるマクロ文の決定的挿入を `WebDdlExpander.kt` へ写した。**呼び出し順序は server 正本と同じ**（`_sanitize_placement_words` → `_avoid_gray_background` → `_apply_nature_plugin_macros`）。
+- **語の対応:** 「風」/`wind` → 横の帯 + ゆっくり揺れる、「うねり」/`undulation` → 波打つ軌跡 + 大きくゆっくり、「無風」/`stillness`/`calm` → 揺らぎなし + 静止。**`stillness` があるときは他の語より優先し、風とうねりのマクロを出さない**（server と同じ分岐）。
+- **検証:** `testDebugUnitTest --rerun-tasks` を XML 自力集計で **64 件 / failures 0 / errors 0 / skipped 0**（ベースライン 62 + 新規 2）。参照コーパス `ddl_expand.json` の 3 ケース（`A-plugin-enabled` / `A-plugin-disabled` / `B-plugin-instructions-present`）が `assertEquals` で完全一致し、**この 3 件の期待値は現行 server 実装で再計算しても一致する**（受け入れ時に照合）。恒真回避テスト（`enablePlugins=false` で出力が変わること）も併せて通る。
+- **判別力の実測（受け入れ側）:** うねりマクロの文言を 1 語だけ変える摂動を入れると `WebDdlExpanderPhase3dTest` が `ComparisonFailure` で落ちることを確認した。**通っていること自体ではなく、落ちることを確認している。**
+- **英語版 `ANDROID_SPEC.md` の退行を受け入れ時に修正した:** 実装セッションが英語版を**日本語版の内容で丸ごと上書き**しており（en と ja の内容 SHA が一致・英語 1848 行が消失）、マージ後に英語本文を復元したうえで Phase 3d 節を英語で追記した。両版の冒頭「追随状況」も現状（master は v2.5.0 / engine 12、Android は engine 11、展開層は 3d まで）へ改めた。
+- **積み残さなかったもの（明示）:** engine 12 への描画層追随は行っていない（`render_engine_version` は `"11"` のまま）。葉プラグイン文書 `nature-leaves.inku-plugin.md` の読み込みと `saijiki.py` 相当は移植していない（作者裁定によりスコープ外・3e 以降）。`android/VERSION` は `2.0.0-android.1` のまま。web/server/cli/shared のコードは変更していない。
+- **採番:** Android のみの変更のため `APP_VERSION` と `web/BUILD_NUMBER` は動かしていない（`android/BUILD_NUMBER` のみ 148082 → 148083、Gradle 自動採番）。
+- **検証（master 側の退行確認）:** pytest 1066 passed / 30 skipped、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（217 files）。

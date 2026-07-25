@@ -414,24 +414,5 @@ internal object ServerRendererMaterial {
         }
         return out.toString()
     }
-
-    private fun ropeTwists(x1: Double, y1: Double, x2: Double, y2: Double, attrs: SvgAttrs, seed: String, unit: Double): String {
-        val scale = unit / 1000.0
-        val out = StringBuilder()
-        val (ux, uy) = ServerRendererGeometry.lineDirection(x1, y1, x2, y2)
-        val px = -uy
-        val py = ux
-        val twistAttrs = attrs.copy(strokeWidth = 1.2 * scale, strokeOpacity = 0.42, dash = null, filter = null)
-        for (idx in 0 until 13) {
-            val t = (idx + 0.5) / 13.0
-            val cx = x1 + (x2 - x1) * t
-            val cy = y1 + (y2 - y1) * t
-            val phase = if (idx % 2 == 0) 1.0 else -1.0
-            val span = (8.0 + kotlin.math.abs(ServerRendererGeometry.signedHash(idx, seed)) * 2.5) * scale
-            val halfU = 3.0 * scale
-            out.append(lineElement(cx - ux * halfU + px * span * phase, cy - uy * halfU + py * span * phase, cx + ux * halfU - px * span * phase, cy + uy * halfU - py * span * phase, twistAttrs))
-        }
-        return out.toString()
-    }
 }
 

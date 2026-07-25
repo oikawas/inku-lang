@@ -4771,7 +4771,6 @@ private fun firstSvgFillColor(svgText: String): Color? {
 
 private fun strokeWidthPx(weight: String): Float = when (weight) {
     "brush_thick" -> 8f
-    "rope" -> 10f
     "crayon" -> 4f
     "chalk", "brush_thin" -> 3f
     "pencil" -> 1.5f

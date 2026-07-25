@@ -158,6 +158,29 @@ def test_computer_bleed_cells_sit_on_the_lattice_with_graded_tone() -> None:
         assert abs(cx / step - round(cx / step)) < 1e-9
         assert abs(cy / step - round(cy / step)) < 1e-9
 
+    # A closed contour is the case that proves the cells are snapped rather
+    # than copied: the seam correction ramps the samples off the lattice, so
+    # cells taken straight from the sample positions would sit up to half a
+    # cell away. The tolerance here is master-grid rounding (six decimals),
+    # not slack: without the snap these land ~11px out.
+    circle = _bleed_cells(
+        _shape_score(
+            {
+                "primitive": "circle",
+                "center": [0.5, 0.5],
+                "radius": 0.2,
+                "weight": "computer",
+            }
+        )
+    )
+    circle_step = float(circle[0]["width"])
+    for cell in circle:
+        for value in (
+            float(cell["x"]) + circle_step / 2,
+            float(cell["y"]) + circle_step / 2,
+        ):
+            assert abs(value - round(value / circle_step) * circle_step) < 1e-5
+
     head = [
         (round(cx, 6), round(cy, 6), cell["fill-opacity"])
         for (cx, cy), cell in zip(centres[:5], cells[:5])

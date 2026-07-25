@@ -25,14 +25,15 @@ ENGINE_VERSION = ENGINE.version
 OUTPUT_DIR = REFERENCE_ROOT / f"render-engine-{ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
-CORPUS_FORMAT_VERSION = "1"
+CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-07-25"
 REASON = (
-    "Add the computer touch: its width and path fall onto fixed steps and a grid, "
-    "its cycles repeat independently of render seed, and its material layer is the "
-    "remainder of that sampling — one lattice cell per rounded sample, toned by the "
-    "residual the grid discarded."
+    "One drawing, one lattice: the quantized grid is now the canvas's paper, so its "
+    "pitch no longer follows the length of what is drawn on it. The wild toggle "
+    "reaches past straight lines to contours, arcs, fills and hatches, and where it "
+    "does, the material outline is drawn from the performed centreline instead of "
+    "the geometry it left behind."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -114,7 +115,8 @@ def _score(instruction: dict[str, Any], *, aspect: str = "square", ground: dict[
 def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str, Any], *,
           aspect: str = "square", ground: dict[str, Any] | None = None,
           render_seed: int = DEFAULT_RENDER_SEED,
-          color_map: dict[str, str] = DEFAULT_COLOR_MAP) -> None:
+          color_map: dict[str, str] = DEFAULT_COLOR_MAP,
+          wild: bool = False) -> None:
     if case_id in cases:
         raise ValueError(f"duplicate case ID: {case_id}")
     cases[case_id] = {
@@ -122,6 +124,7 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
         "render_seed": render_seed,
         "color_map": copy.deepcopy(color_map),
         "svg_profile": SVG_PROFILE,
+        "wild": wild,
     }
 
 
@@ -194,9 +197,30 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         _case(cases, f"D-unsigned-seed-{seed}",
               _instruction("arc", weight="drypoint"), render_seed=seed)
 
-    expected = {"A": 88, "B": 72, "C": 40, "D": 28}
+    # E: the unleashed performance. Paired with A (every tool x primitive), the
+    # C fills and the C surfaces, because those are the paths the toggle reaches
+    # for the first time in engine 14.
+    for tool in TOOLS:
+        for primitive in PRIMITIVES:
+            _case(cases, f"E-wild-{tool}-{primitive}",
+                  _instruction(primitive, weight=tool), wild=True)
+
+    for primitive in ("circle", "ellipse", "triangle", "square", "polygon"):
+        for tool in ("pencil", "crayon", "brush_thick"):
+            _case(cases, f"E-wild-fill-{primitive}-{tool}",
+                  _instruction(primitive, weight=tool, filled=True), wild=True)
+
+    for texture in ("stipple", "hatch", "crosshatch", "aquatint", "grain", "wash", "bleed", "paper_grain"):
+        for tool in ("pen", "pencil"):
+            surface = copy.deepcopy(BASE_SURFACE)
+            surface["texture"] = texture
+            _case(cases, f"E-wild-surface-{texture}-{tool}",
+                  _instruction("square", weight=tool, filled=False, surface=surface),
+                  wild=True)
+
+    expected = {"A": 88, "B": 72, "C": 40, "D": 28, "E": 119}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 228:
+    if actual != expected or len(cases) != 347:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 
@@ -243,7 +267,7 @@ def generate() -> None:
     for case_id, render_input in sorted(inputs.items()):
         svg = render(Score.model_validate(render_input["score"]),
                      color_map=render_input["color_map"], render_seed=render_input["render_seed"],
-                     svg_profile=render_input["svg_profile"])
+                     svg_profile=render_input["svg_profile"], wild=render_input["wild"])
         rendered[case_id] = svg
         cases[case_id] = {
             "input": render_input,

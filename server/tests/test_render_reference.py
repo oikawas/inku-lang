@@ -32,11 +32,11 @@ def _manifest() -> dict:
 
 def test_render_reference_case_counts() -> None:
     cases = _manifest()["cases"]
-    assert len(cases) == 228
+    assert len(cases) == 347
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
-        for prefix in ("A", "B", "C", "D")
-    } == {"A": 88, "B": 72, "C": 40, "D": 28}
+        for prefix in ("A", "B", "C", "D", "E")
+    } == {"A": 88, "B": 72, "C": 40, "D": 28, "E": 119}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -56,6 +56,27 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
         assert set(case["color_map"]) == set(generator.DEFAULT_COLOR_MAP)
         assert case["svg_profile"] == "editable"
         assert isinstance(case["render_seed"], int)
+        assert isinstance(case["wild"], bool)
+
+
+def test_engine_14_moved_only_the_quantized_tool_among_the_frozen_cases() -> None:
+    """一枚の方眼は computer の 7 件しか動かさない。
+
+    格子は `grammar.quantize > 0` の道具にしか効かないので、手の 10 道具の演奏が
+    1 件でも動いていたら、目盛の変更が別の経路へ漏れている。`cloudform` が入って
+    いないのは `stroke_engine` を通らないため (SPEC §15.7 の既知の穴)。
+    """
+    manifest = _manifest()
+    moved = {
+        case_id
+        for case_id in manifest["changed_from_previous"]
+        if not case_id.startswith("E-")
+    }
+    assert moved == {
+        f"A-computer-{primitive}"
+        for primitive in ("arc", "circle", "ellipse", "line", "polygon", "square", "triangle")
+    }
+    assert "A-computer-cloudform" not in manifest["changed_from_previous"]
 
 
 def test_render_reference_discriminator_cases() -> None:

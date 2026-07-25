@@ -1,4 +1,4 @@
-"""Render engine 13 contracts for the computer touch."""
+"""Contracts for the computer touch (engine 13), re-based onto engine 14's lattice."""
 
 from __future__ import annotations
 
@@ -146,7 +146,9 @@ def test_computer_bleed_cells_sit_on_the_lattice_with_graded_tone() -> None:
         )
     )
     step = float(cells[0]["width"])
-    assert step == 15.120000
+    # canvas.unit (1000) * quantize (0.018). The side does not depend on how
+    # long this line is; see test_one_lattice.py for the discriminating check.
+    assert step == 18.000000
     assert {cell["height"] for cell in cells} == {cells[0]["width"]}
 
     centres = [
@@ -186,19 +188,19 @@ def test_computer_bleed_cells_sit_on_the_lattice_with_graded_tone() -> None:
         for (cx, cy), cell in zip(centres[:5], cells[:5])
     ]
     assert head == [
-        (105.840000, 514.080000, "0.283154"),
-        (151.200000, 529.200000, "0.140918"),
-        (181.440000, 544.320000, "0.235045"),
-        (196.560000, 544.320000, "0.450000"),
-        (211.680000, 544.320000, "0.359455"),
+        (108.000000, 522.000000, "0.325475"),
+        (144.000000, 522.000000, "0.450000"),
+        (180.000000, 540.000000, "0.174222"),
+        (198.000000, 540.000000, "0.450000"),
+        (216.000000, 558.000000, "0.450000"),
     ]
 
     # The tone is the size of the discarded residual, so it is graded, and the
     # ceiling is reached only where the rounding moved half a cell.
     tones = [float(cell["fill-opacity"]) for cell in cells]
-    assert min(tones) == 0.029548
+    assert min(tones) == 0.120743
     assert max(tones) == 0.450000
-    assert round(sum(tones) / len(tones), 6) == 0.276556
+    assert round(sum(tones) / len(tones), 6) == 0.346561
 
 
 def test_computer_has_no_material_outline_layer() -> None:

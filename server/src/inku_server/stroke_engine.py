@@ -26,6 +26,11 @@ class ToolGrammar:
     # Exact repetition belongs to the computer tool. The zero defaults keep the
     # existing hand-tool grammars on their unchanged path.
     periodic: bool = False
+    # Lattice pitch as a fraction of the canvas short side, not of the stroke.
+    # The grid is the paper the tool works on, so one drawing has one grid: a
+    # short line and a long one land on the same cells. The caller turns this
+    # into px (`canvas.unit * quantize`) and passes it in as `grid_step`,
+    # because this module does not know the canvas.
     quantize: float = 0.0
     width_steps: int = 0
 
@@ -230,7 +235,13 @@ def synthesize_stroke(
     samples: int = 49,
     *,
     wild: bool = False,
+    grid_step: float = 0.0,
 ) -> StrokeResult:
+    """Synthesize one straight stroke.
+
+    `grid_step` is the side of one lattice cell in px, already resolved against
+    the canvas by the caller. Zero means the tool does not quantize.
+    """
     grammar = GRAMMARS[weight]
     dx, dy = end[0] - start[0], end[1] - start[1]
     length = max(1e-6, math.hypot(dx, dy))
@@ -311,9 +322,8 @@ def synthesize_stroke(
         x = position[0] + nx * lateral + gx
         y = position[1] + ny * lateral + gy
         residual = 0.0
-        if grammar.quantize:
-            step = length * grammar.quantize
-            qx, qy = _quantize(x, step), _quantize(y, step)
+        if grid_step > 0:
+            qx, qy = _quantize(x, grid_step), _quantize(y, grid_step)
             residual = math.hypot(x - qx, y - qy)
             x, y = qx, qy
         if grammar.width_steps:
@@ -339,7 +349,7 @@ def synthesize_stroke(
         len(events),
         side,
         min(0.35, burr_opacity),
-        length * grammar.quantize,
+        grid_step,
     )
 
 
@@ -431,6 +441,8 @@ def synthesize_along(
     *,
     closed: bool,
     anchors: frozenset[int] = frozenset(),
+    grid_step: float = 0.0,
+    wild: bool = False,
 ) -> ContourStrokeResult:
     """Synthesize one stroke that follows an arbitrary intended centerline.
 
@@ -444,6 +456,13 @@ def synthesize_along(
     between two strokes. A closed centerline with no anchors is instead closed
     by ramping the accumulated deviation back to its seam value, so the loop
     meets itself without a kink.
+
+    `grid_step` is the side of one lattice cell in px, already resolved against
+    the canvas by the caller. Zero means the tool does not quantize.
+
+    `wild` unleashes the same centreline gesture the straight-line synthesizer
+    carries, so the toggle reaches contours, arcs, fills and hatches rather than
+    lines alone. With it off the amplitude is zero and nothing moves.
     """
     points = list(centerline)
     count = len(points)
@@ -456,17 +475,33 @@ def synthesize_along(
 
     normals = centerline_normals(points, closed)
     parameters = _arc_length_parameters(points, closed)
-    total_length = max(
-        1e-6,
-        sum(
-            math.hypot(
-                points[index + 1][0] - points[index][0],
-                points[index + 1][1] - points[index][1],
-            )
-            for index in range(count - 1)
-        ),
-    )
     events = _event_map(seed, grammar.event_rate, count)
+    gesture_amp = 0.0
+    if wild and not grammar.periodic:
+        total_length = max(
+            1e-6,
+            sum(
+                math.hypot(
+                    points[index + 1][0] - points[index][0],
+                    points[index + 1][1] - points[index][1],
+                )
+                for index in range(count - 1)
+            ),
+        )
+        # A loop is measured by the radius its perimeter implies, not by the
+        # perimeter: scaling the gesture by arc length makes a polygon a star
+        # and flattens a circle, because a circumference is not a size.
+        size = total_length / math.tau if closed else total_length
+        gesture_amp = size * grammar.gesture * WILD_GAIN
+    gestures = [0.0] * count
+    if gesture_amp:
+        gestures = [_gesture_wave(t, seed, "gesture-lat") for t in parameters]
+        if closed:
+            # How big the figure is belongs to the Score, not to the
+            # performance. A gesture with a non-zero mean would inflate or
+            # shrink the whole loop, so it is centred before it is applied.
+            mean = sum(gestures) / count
+            gestures = [value - mean for value in gestures]
     position = [points[0][0], points[0][1]]
     velocity = [0.0, 0.0]
     samples: list[StrokeSample] = []
@@ -529,12 +564,23 @@ def synthesize_along(
             * (1 + grammar.energy_width * energy * 0.45)
             * event_width,
         )
+        gesture = 0.0
+        if gesture_amp:
+            win = 1.0 if closed else _edge_window(t)
+            if anchors:
+                # A corner is a joint the tool has to reach exactly. A gesture
+                # on the vertices beside it reads as a spike, so the window
+                # closes before the anchor and opens again after it.
+                win *= min(
+                    1.0, min(abs(index - anchor) for anchor in anchors) / 12.0
+                )
+            gesture = gesture_amp * win * gestures[index]
         nx, ny = normals[index]
-        x, y = position[0] + nx * lateral, position[1] + ny * lateral
+        x = position[0] + nx * (lateral + gesture)
+        y = position[1] + ny * (lateral + gesture)
         residual = 0.0
-        if grammar.quantize:
-            step = total_length * grammar.quantize
-            qx, qy = _quantize(x, step), _quantize(y, step)
+        if grid_step > 0:
+            qx, qy = _quantize(x, grid_step), _quantize(y, grid_step)
             residual = math.hypot(x - qx, y - qy)
             x, y = qx, qy
         if grammar.width_steps:
@@ -575,7 +621,7 @@ def synthesize_along(
         side,
         min(0.35, burr_opacity),
         closed,
-        total_length * grammar.quantize,
+        grid_step,
     )
 
 

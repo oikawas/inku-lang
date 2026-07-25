@@ -2913,3 +2913,18 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **SPEC:** §15.10 を新設（英語は §12.7）、§13.4 の暴れるに到達範囲の経緯、§15.9 の格子記述、§15.6 の版数と §15.7 のコーパス表を更新。**英語版の「Unleashed」を UI に合わせて「Wild」へ揃えた**（v2.6.1 で作った食い違いの一部解消。README と `manual/en/` はまだ残っている）。
 - **検証:** pytest **1100 passed / 30 skipped**（+9 = `test_one_lattice.py` 3 / `test_wild_reach.py` 5 / コーパス 1）、cli 68 passed、ruff clean、`npm run check` 0 errors / 2 warnings（217 files）。コーパスは 2 回連続生成で差分ゼロ。**`android/` に差分が無いので Android のテストは回していない。**
 - **積み残さなかったもの（明示）:** `cloudform` のストローク化、死にフィールド（`absorbency` / `contact` / `thickness`）、SPEC §17.A の `thickness` / `angle` / `rotation` / `length` dimension、過去エンジンの保持機構、既存履歴の backfill、`gen_android_reference.py` への波及はいずれも行っていない。**Android は engine 12 のままで、遅れが 2 版に広がった。**
+
+---
+
+### v2.7.1 — 英語用語の正本と、それを強制する lint（Build 710、2026-07-26）
+
+**v2.6.1 は英語 UI を辞書へ揃えたが、揃った状態を保つものを残していなかった。** 文字列を 1 つ足すだけで禁止語が戻り、同じ概念に 2 つ目の英語が当たる。**規則の正本を文字列の隣に置き、それを機械で検査する番人を付けた。**
+
+- **`web/src/lib/i18n/GLOSSARY.md`（200 行）が英語用語の正本。** 英語表示が 3 系統あること（`en.ts` 641 / 三項式 132 / `getLang()` 分岐 15）、コア用語の対応、五つの推敲操作と変奏の強度の固定値、文体規則、禁止語と**許容される例外**、触ってはいけない経路（`saijiki.py` の `surface_en` / `name_en`、`saijiki.ts`、`ja.ts`、三項式の日本語側）、新しい文字列を足すときの手順、検査が何を見ているか、まだ揃っていない食い違いまでを書いてある。出典は Fable の翻訳辞書と 2026-07-25 の作者裁定。
+- **`web/scripts/i18n-lint.mjs`（221 行）が規則を機械で検査する。** `npm run lint:i18n`。**英語表示 788 文字列を走査し、許容例外 36 件を名前で通す。** `--list` で通した例外も出る。
+- **文面と検査は一対**である。片方を変えたら同じ commit でもう片方も変える、と正本に書いてある。
+- **「残存ゼロ」を条件にしない設計。** `generation`（世代）・`prompt`（LLM プロンプトの表示）・`created`（完了・日時）・`image`（Vision が実際に見る画像）・`render`（サーバー技術設定）は正当な用法があるので、**どこにも書いてはいけない語**と**決められた場所にだけ許される語**を分けてある。
+- **判別力を受け入れ側で実測した。** `colorCatalogTitle` を `Color palette` に変えると `ERROR en.ts colorCatalogTitle: "palette" — use "color catalog" — palette is a different concept in inku` で 1 件落ち、戻すと 0 errors に戻る。
+- あわせて `en.ts` の 1 項目を Sentence case へ是正した（`Instructions (Normalized DDL)` → `Instructions (normalized DDL)`）。**これは lint を通すために見つかった取りこぼしである。**
+- **検証:** `npm run check` 0 errors / 2 warnings（217 files）、`npm run lint:i18n` **788 文字列 / 36 例外 / 0 errors**、pytest 1100 passed / 30 skipped、cli 68 passed、ruff clean。**`android/` に差分が無いので Android のテストは回していない。**
+- **積み残し（明示）:** 英語ドキュメント（`README.md` / `manual/en/`、`SPEC.md` の残り）の用語追随は行っていない。**lint は `web/` の表示文字列だけを見ており、ドキュメントは見ていない。**

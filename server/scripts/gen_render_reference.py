@@ -30,8 +30,9 @@ SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-07-25"
 REASON = (
     "Add the computer touch: its width and path fall onto fixed steps and a grid, "
-    "its cycles repeat independently of render seed, and its ruled material "
-    "outlines use one exact dash pattern without following the performed centreline."
+    "its cycles repeat independently of render seed, and its material layer is the "
+    "remainder of that sampling — one lattice cell per rounded sample, toned by the "
+    "residual the grid discarded."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345

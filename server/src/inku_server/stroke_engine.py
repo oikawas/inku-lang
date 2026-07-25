@@ -51,7 +51,7 @@ GRAMMARS: dict[str, ToolGrammar] = {
         0.0,
         0.06,
         periodic=True,
-        quantize=0.012,
+        quantize=0.018,
         width_steps=4,
     ),
 }
@@ -71,6 +71,10 @@ class StrokeSample:
     energy: float
     lateral: float
     event: str | None = None
+    # Distance between the intended position and the grid point it was rounded
+    # to. Zero for every tool that does not quantize. This is what the computer
+    # throws away when it samples, and what its material layer gives back.
+    residual: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -80,6 +84,8 @@ class StrokeResult:
     event_count: int
     burr_side: int
     burr_opacity: float
+    # Side of one lattice cell, in px. Zero unless the tool quantizes.
+    grid_step: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -98,6 +104,8 @@ class ContourStrokeResult:
     burr_side: int
     burr_opacity: float
     closed: bool
+    # Side of one lattice cell, in px. Zero unless the tool quantizes.
+    grid_step: float = 0.0
 
 
 def _unit(seed: int, label: str, index: int) -> float:
@@ -171,6 +179,15 @@ def _gesture_wave(t: float, seed: int, salt: str) -> float:
 
 def _quantize(value: float, step: float) -> float:
     return value if step <= 0 else round(value / step) * step
+
+
+def grid_point(value: float, step: float) -> float:
+    """The lattice point a value rounds to, for callers outside this module.
+
+    The renderer places the computer's material cells on the same lattice the
+    geometry was rounded onto, so both must round by one rule.
+    """
+    return _quantize(value, step)
 
 
 def _machine_energy(t: float) -> float:
@@ -293,13 +310,16 @@ def synthesize_stroke(
             gy = gesture_amp * win * (ny * g_lat + uy * g_lon)
         x = position[0] + nx * lateral + gx
         y = position[1] + ny * lateral + gy
+        residual = 0.0
         if grammar.quantize:
             step = length * grammar.quantize
-            x, y = _quantize(x, step), _quantize(y, step)
+            qx, qy = _quantize(x, step), _quantize(y, step)
+            residual = math.hypot(x - qx, y - qy)
+            x, y = qx, qy
         if grammar.width_steps:
             width = max(0.015, _quantize(width, base_width / grammar.width_steps))
         result.append(
-            StrokeSample(t, x, y, width, energy, lateral, event)
+            StrokeSample(t, x, y, width, energy, lateral, event, residual)
         )
     # Pin intention endpoints. Width still carries the entry/exit profile.
     result[0] = StrokeSample(
@@ -314,7 +334,12 @@ def synthesize_stroke(
     slow_energy = sum(p.energy for p in result) / len(result)
     burr_opacity = 0.15 + 0.12 * (1 - slow_energy) + 0.08 * _unit(seed, "burr-ink", 0)
     return StrokeResult(
-        tuple(result), tuple(left + right), len(events), side, min(0.35, burr_opacity)
+        tuple(result),
+        tuple(left + right),
+        len(events),
+        side,
+        min(0.35, burr_opacity),
+        length * grammar.quantize,
     )
 
 
@@ -506,15 +531,19 @@ def synthesize_along(
         )
         nx, ny = normals[index]
         x, y = position[0] + nx * lateral, position[1] + ny * lateral
+        residual = 0.0
         if grammar.quantize:
             step = total_length * grammar.quantize
-            x, y = _quantize(x, step), _quantize(y, step)
+            qx, qy = _quantize(x, step), _quantize(y, step)
+            residual = math.hypot(x - qx, y - qy)
+            x, y = qx, qy
         if grammar.width_steps:
             width = max(0.015, _quantize(width, base_width / grammar.width_steps))
         if index in anchors:
             x, y, lateral, event = target[0], target[1], 0.0, None
             position = [target[0], target[1]]
-        samples.append(StrokeSample(t, x, y, width, energy, lateral, event))
+            residual = 0.0
+        samples.append(StrokeSample(t, x, y, width, energy, lateral, event, residual))
 
     if not closed:
         # Pin intention endpoints, as the straight-line synthesizer does.
@@ -546,6 +575,7 @@ def synthesize_along(
         side,
         min(0.35, burr_opacity),
         closed,
+        total_length * grammar.quantize,
     )
 
 
@@ -574,6 +604,7 @@ def _closed_seam_correction(
                 sample.energy,
                 sample.lateral,
                 sample.event,
+                sample.residual,
             )
         )
     return corrected

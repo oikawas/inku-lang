@@ -6,8 +6,8 @@
   "schema_version": "0.1.0",
   "color_map_digest": "62f75a7d1219b9a4895f314b2570319a",
   "frozen_at": "2026-07-25",
-  "commit": "45fe2939e4ca4fa92c1197624240c93117a06e24",
-  "reason": "Add the computer touch: its width and path fall onto fixed steps and a grid, its cycles repeat independently of render seed, and its ruled material outlines use one exact dash pattern without following the performed centreline.",
+  "commit": "b90700f45f9f38e1356a142ad0e7085da44334b1",
+  "reason": "Add the computer touch: its width and path fall onto fixed steps and a grid, its cycles repeat independently of render seed, and its material layer is the remainder of that sampling — one lattice cell per rounded sample, toned by the residual the grid discarded.",
   "changed_from_previous": [
     "A-computer-arc",
     "A-computer-circle",
@@ -2322,21 +2322,21 @@
         },
         "svg_profile": "editable"
       },
-      "digest": "bc99094549ab758115f2e794b8eb9efd",
-      "bytes": 4406,
+      "digest": "0e2147456bf714b0c81e39d98a28cb04",
+      "bytes": 12840,
       "counts": {
-        "path": 4,
+        "path": 2,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
         "ellipse": 0,
         "line": 0,
-        "rect": 1,
+        "rect": 61,
         "g": 6
       },
       "classes": [
         "arc-stroke-v1 controls-62 events-0",
-        "material-outline"
+        "raster-bleed"
       ]
     },
     "A-computer-circle": {
@@ -2391,21 +2391,21 @@
         },
         "svg_profile": "editable"
       },
-      "digest": "d45645437dda214e16ad137981d2823f",
-      "bytes": 4928,
+      "digest": "2ff181423c51a456fb8d0cf875ad5430",
+      "bytes": 15510,
       "counts": {
         "path": 1,
         "polyline": 0,
         "polygon": 0,
-        "circle": 3,
+        "circle": 1,
         "ellipse": 0,
         "line": 0,
-        "rect": 1,
+        "rect": 75,
         "g": 7
       },
       "classes": [
         "contour-stroke-v1 controls-74 events-0",
-        "material-outline"
+        "raster-bleed"
       ]
     },
     "A-computer-cloudform": {
@@ -2534,21 +2534,21 @@
         },
         "svg_profile": "editable"
       },
-      "digest": "d9fbde4ef84dbb95f14a9f2ccad09400",
-      "bytes": 4360,
+      "digest": "184fffd55d7aa88841c56e00e3777183",
+      "bytes": 12969,
       "counts": {
         "path": 1,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
-        "ellipse": 3,
+        "ellipse": 1,
         "line": 0,
-        "rect": 1,
+        "rect": 62,
         "g": 7
       },
       "classes": [
         "contour-stroke-v1 controls-61 events-0",
-        "material-outline"
+        "raster-bleed"
       ]
     },
     "A-computer-line": {
@@ -2606,20 +2606,20 @@
         },
         "svg_profile": "editable"
       },
-      "digest": "0d27782b742d1f975f7cdd75ffa51712",
-      "bytes": 2784,
+      "digest": "dce4e848a03bd461887a7b3791a7578d",
+      "bytes": 6624,
       "counts": {
         "path": 1,
         "polyline": 0,
         "polygon": 0,
         "circle": 0,
         "ellipse": 0,
-        "line": 2,
-        "rect": 1,
-        "g": 7
+        "line": 0,
+        "rect": 30,
+        "g": 6
       },
       "classes": [
-        "material-outline",
+        "raster-bleed",
         "stroke-engine-v1 controls-31 events-0"
       ]
     },
@@ -2675,8 +2675,8 @@
         },
         "svg_profile": "editable"
       },
-      "digest": "24f88b9397bb6283864814663964ddde",
-      "bytes": 6764,
+      "digest": "9edb21e0bdad8c2a0a77b3f661b2e5a3",
+      "bytes": 23452,
       "counts": {
         "path": 1,
         "polyline": 0,
@@ -2684,11 +2684,12 @@
         "circle": 0,
         "ellipse": 0,
         "line": 0,
-        "rect": 1,
+        "rect": 113,
         "g": 7
       },
       "classes": [
-        "contour-stroke-v1 controls-119 events-0"
+        "contour-stroke-v1 controls-119 events-0",
+        "raster-bleed"
       ]
     },
     "A-computer-square": {
@@ -2746,8 +2747,8 @@
         },
         "svg_profile": "editable"
       },
-      "digest": "382576479c31658bf6a3ee5ba323f157",
-      "bytes": 5660,
+      "digest": "0006e930a667188bbaa531fceeac4297",
+      "bytes": 17692,
       "counts": {
         "path": 1,
         "polyline": 0,
@@ -2755,12 +2756,12 @@
         "circle": 0,
         "ellipse": 0,
         "line": 0,
-        "rect": 4,
+        "rect": 86,
         "g": 7
       },
       "classes": [
         "contour-stroke-v1 controls-88 events-0",
-        "material-outline"
+        "raster-bleed"
       ]
     },
     "A-computer-triangle": {
@@ -2818,8 +2819,8 @@
         },
         "svg_profile": "editable"
       },
-      "digest": "b7392b302658389e1ee994be360c3c61",
-      "bytes": 4325,
+      "digest": "27ba00c9dfc7758413244f356f525d1b",
+      "bytes": 14308,
       "counts": {
         "path": 1,
         "polyline": 0,
@@ -2827,11 +2828,12 @@
         "circle": 0,
         "ellipse": 0,
         "line": 0,
-        "rect": 1,
+        "rect": 68,
         "g": 7
       },
       "classes": [
-        "contour-stroke-v1 controls-70 events-0"
+        "contour-stroke-v1 controls-70 events-0",
+        "raster-bleed"
       ]
     },
     "A-crayon-arc": {

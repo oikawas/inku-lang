@@ -77,24 +77,123 @@ def test_computer_is_immune_to_wild_while_pencil_is_not() -> None:
     )
 
 
-def test_computer_material_layers_are_straight_and_share_one_dash() -> None:
+def _bleed_cells(score: Score, *, render_seed: int = 12345) -> list[dict[str, str]]:
+    root = ElementTree.fromstring(
+        render(score, render_seed=render_seed, svg_profile="editable")
+    )
+    return [
+        node.attrib
+        for node in root.iter()
+        if node.attrib.get("class") == "raster-bleed"
+    ]
+
+
+def _shape_score(instruction: dict) -> Score:
+    return Score.model_validate({"instructions": [instruction]})
+
+
+# The counts come from the geometry, not from the material code: one cell per
+# sample the rounding moved. Endpoints are pinned to the intention and polygon
+# corners are anchored, so those samples carry no residual and emit no cell —
+# which is why a line gives 39 cells for 41 samples and a square 76 for 80.
+BLEED_COUNTS = (
+    ({"primitive": "line", "from": [0.08, 0.5], "to": [0.92, 0.5]}, 39),
+    ({"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2}, 62),
+    ({"primitive": "square", "position": [0.3, 0.3], "size": [0.4, 0.4]}, 76),
+    (
+        {
+            "primitive": "arc",
+            "center": [0.5, 0.5],
+            "radius": 0.27,
+            "angle_start": 15,
+            "angle_end": 285,
+        },
+        60,
+    ),
+)
+
+
+def test_computer_bleeds_one_lattice_cell_per_rounded_sample() -> None:
+    for instruction, expected in BLEED_COUNTS:
+        cells = _bleed_cells(_shape_score({**instruction, "weight": "computer"}))
+        assert len(cells) == expected, instruction["primitive"]
+
+    for weight in ("pencil", "rotring"):
+        assert (
+            _bleed_cells(
+                _shape_score(
+                    {
+                        "primitive": "line",
+                        "from": [0.08, 0.5],
+                        "to": [0.92, 0.5],
+                        "weight": weight,
+                    }
+                )
+            )
+            == []
+        )
+
+
+def test_computer_bleed_cells_sit_on_the_lattice_with_graded_tone() -> None:
+    cells = _bleed_cells(
+        _shape_score(
+            {
+                "primitive": "line",
+                "from": [0.08, 0.5],
+                "to": [0.92, 0.5],
+                "weight": "computer",
+            }
+        )
+    )
+    step = float(cells[0]["width"])
+    assert step == 15.120000
+    assert {cell["height"] for cell in cells} == {cells[0]["width"]}
+
+    centres = [
+        (float(cell["x"]) + step / 2, float(cell["y"]) + step / 2) for cell in cells
+    ]
+    # Every cell is the lattice point the ink was rounded into, never the
+    # intended position: each centre is an exact multiple of the step.
+    for cx, cy in centres:
+        assert abs(cx / step - round(cx / step)) < 1e-9
+        assert abs(cy / step - round(cy / step)) < 1e-9
+
+    head = [
+        (round(cx, 6), round(cy, 6), cell["fill-opacity"])
+        for (cx, cy), cell in zip(centres[:5], cells[:5])
+    ]
+    assert head == [
+        (105.840000, 514.080000, "0.283154"),
+        (151.200000, 529.200000, "0.140918"),
+        (181.440000, 544.320000, "0.235045"),
+        (196.560000, 544.320000, "0.450000"),
+        (211.680000, 544.320000, "0.359455"),
+    ]
+
+    # The tone is the size of the discarded residual, so it is graded, and the
+    # ceiling is reached only where the rounding moved half a cell.
+    tones = [float(cell["fill-opacity"]) for cell in cells]
+    assert min(tones) == 0.029548
+    assert max(tones) == 0.450000
+    assert round(sum(tones) / len(tones), 6) == 0.276556
+
+
+def test_computer_has_no_material_outline_layer() -> None:
     root = ElementTree.fromstring(
         render(_line_score("computer", count=4), render_seed=77)
     )
-    material = [
+    assert not [
         node for node in root.iter() if node.attrib.get("class") == "material-outline"
     ]
-    assert len(material) == 8
-    assert all(node.tag.endswith("line") for node in material)
-    assert not any(node.tag.endswith("polyline") for node in material)
-    assert {node.attrib["stroke-dasharray"] for node in material} == {
-        "22.000000,9.000000"
-    }
-    assert {node.attrib["stroke-width"] for node in material} == {"0.900000"}
-    assert {node.attrib["stroke-opacity"] for node in material} == {"0.576000"}
-    assert all(node.attrib["y1"] == node.attrib["y2"] for node in material)
     assert not any(node.tag.endswith("circle") for node in root.iter())
     assert "texture-computer" not in ElementTree.tostring(root, encoding="unicode")
+
+    # The hand tools keep theirs: removing the computer's ruled layer must not
+    # reach into `_MATERIAL_OUTLINE_SPECS` for anyone else.
+    pencil = ElementTree.fromstring(render(_line_score("pencil"), render_seed=77))
+    assert [
+        node for node in pencil.iter() if node.attrib.get("class") == "material-outline"
+    ]
 
 
 def test_touch_score_values_match_weight_and_stroke_grammars() -> None:

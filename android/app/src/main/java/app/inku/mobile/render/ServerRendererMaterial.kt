@@ -263,6 +263,57 @@ internal object ServerRendererMaterial {
         return out.toString()
     }
 
+    fun offsetPerformedPath(
+        path: List<Pair<Double, Double>>,
+        offset: Double,
+        closed: Boolean,
+        center: Pair<Double, Double>
+    ): List<Pair<Double, Double>> {
+        val normals = ServerStrokeEngine.centerlineNormals(path, closed)
+        var votes = 0
+        for (i in path.indices) {
+            val (x, y) = path[i]
+            val (nx, ny) = normals[i]
+            if (nx * (x - center.first) + ny * (y - center.second) >= 0.0) votes++ else votes--
+        }
+        val sign = if (votes >= 0) 1.0 else -1.0
+        return path.indices.map { i ->
+            val (x, y) = path[i]
+            val (nx, ny) = normals[i]
+            Pair(x + nx * offset * sign, y + ny * offset * sign)
+        }
+    }
+
+    fun performedOutline(
+        ins: JSONObject,
+        attrs: SvgAttrs,
+        path: List<Pair<Double, Double>>,
+        unit: Double,
+        closed: Boolean,
+        pathLenPx: Double,
+        center: Pair<Double, Double>,
+        renderSeed: Long? = null
+    ): String {
+        val weight = ins.optString("weight", "pen")
+        val seedStr = ServerRendererGeometry.seedForInstruction(ins, renderSeed)
+        val out = StringBuilder()
+        materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
+            val pts = offsetPerformedPath(path, offset, closed, center)
+            val ptsStr = pts.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
+            val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
+            val tag = if (closed) "polygon" else "polyline"
+            out.append("""<$tag points="$ptsStr" ${outline.toSvgAttributes()} class="material-outline"/>""")
+        }
+        val spec = speckProfile(weight, pathLenPx, unit)
+        if (spec != null && spec.count > 0 && path.isNotEmpty()) {
+            val resampled = (0 until spec.count).map { idx ->
+                path[minOf(path.size - 1, (idx * path.size) / spec.count)]
+            }
+            out.append(specksAtPoints(resampled, attrs, seedStr.toString(), spec))
+        }
+        return out.toString()
+    }
+
 
     private fun materialOutlineProfile(weight: String, unit: Double): List<OutlineProfile> {
         val scale = unit / 1000.0

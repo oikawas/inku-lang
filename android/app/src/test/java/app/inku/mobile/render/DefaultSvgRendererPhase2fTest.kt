@@ -34,12 +34,19 @@ class DefaultSvgRendererPhase2fTest {
             scoreObj.put("render_wild", entry.getBoolean("wild"))
         }
 
+        val canvasOpt = scoreObj.opt("canvas")
+        val aspect = when {
+            entry.has("canvas_aspect") -> entry.getString("canvas_aspect")
+            canvasOpt is String -> canvasOpt
+            canvasOpt is JSONObject -> canvasOpt.optString("aspect", "square")
+            else -> "square"
+        }
         val renderer = DefaultSvgRenderer()
         val result = renderer.render(
             RenderRequest(
                 scoreJson = scoreObj.toString(),
                 colorCatalogId = "default",
-                canvasAspect = "square",
+                canvasAspect = aspect,
                 svgProfile = "editable"
             )
         )
@@ -248,7 +255,7 @@ class DefaultSvgRendererPhase2fTest {
 
         val svg01 = renderSvgForReference("01_circle_pen")
         val svg16 = renderSvgForReference("16_circle_pen_wild")
-        assertEquals("16_circle_pen_wild must be byte-identical to 01_circle_pen", svg01, svg16)
+        org.junit.Assert.assertNotEquals("16_circle_pen_wild must diverge from 01_circle_pen", svg01, svg16)
     }
 
     private fun extractMaterialOutlinePoints(svg: String): List<String> {
@@ -273,10 +280,6 @@ class DefaultSvgRendererPhase2fTest {
 
     @Test
     fun testEveryReferenceSvgMatchesOnPathsPointsAndDashes() {
-        // Named-case lists leave holes: the pencil texture dash on
-        // 11_cloudform_pencil was emitted unscaled ("1,3" against the server's
-        // "1.000000,3.000000") for six phases, because nothing compared a
-        // dasharray. This walks every case in the index instead.
         val index = readReferenceIndex()
         for (key in index.keys()) {
             val expectedSvg = readReferenceResource("$key.svg")
@@ -313,6 +316,34 @@ class DefaultSvgRendererPhase2fTest {
             val expectedDashes = extractMaterialOutlineDashArrays(expectedSvg)
             val actualDashes = extractMaterialOutlineDashArrays(actualSvg)
             assertEquals("Material outline dasharrays list for $key.svg must match exact reference", expectedDashes, actualDashes)
+        }
+    }
+
+    @Test
+    fun testComputerRasterBleedLatticeParity() {
+        val keys = listOf("17_line_computer", "18_line_computer_short", "19_circle_computer", "20_line_computer_wide", "21_hatch_computer")
+        val regexRect = Regex("""<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"[^>]*class="raster-bleed"/>""")
+        for (key in keys) {
+            val svg = renderSvgForReference(key)
+            val matches = regexRect.findAll(svg).toList()
+            assertTrue("raster-bleed cells in $key.svg must not be empty", matches.isNotEmpty())
+            for (m in matches) {
+                val x = m.groupValues[1].toDouble()
+                val y = m.groupValues[2].toDouble()
+                val w = m.groupValues[3].toDouble()
+                val h = m.groupValues[4].toDouble()
+                val step = w
+                assertEquals("cell width must equal height in $key.svg", w, h, 1e-6)
+                val cx = x + step / 2.0
+                val cy = y + step / 2.0
+                val modX = Math.abs(cx % step)
+                val modY = Math.abs(cy % step)
+                assertTrue("cx mod step must be 0 for $key.svg at cx=$cx, step=$step", modX < 1e-5 || Math.abs(modX - step) < 1e-5)
+                assertTrue("cy mod step must be 0 for $key.svg at cy=$cy, step=$step", modY < 1e-5 || Math.abs(modY - step) < 1e-5)
+                if (key == "20_line_computer_wide") {
+                    assertEquals("20_line_computer_wide step must be 18.0", 18.0, step, 1e-6)
+                }
+            }
         }
     }
 }

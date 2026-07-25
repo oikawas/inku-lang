@@ -23,6 +23,11 @@ class ToolGrammar:
     # distinct from `energy_lateral` which is scaled by pen width. Multiplied by
     # WILD_GAIN when the performance is unleashed. rotring keeps the machine pole.
     gesture: float
+    # Exact repetition belongs to the computer tool. The zero defaults keep the
+    # existing hand-tool grammars on their unchanged path.
+    periodic: bool = False
+    quantize: float = 0.0
+    width_steps: int = 0
 
 
 GRAMMARS: dict[str, ToolGrammar] = {
@@ -36,6 +41,19 @@ GRAMMARS: dict[str, ToolGrammar] = {
     "brush_thick": ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13),
     "burin": ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018),
     "drypoint": ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05),
+    "computer": ToolGrammar(
+        1.0,
+        1.0,
+        0.30,
+        0.34,
+        0.0,
+        0.0,
+        0.0,
+        0.06,
+        periodic=True,
+        quantize=0.012,
+        width_steps=4,
+    ),
 }
 
 # The performance ceiling. OFF (predictable): tool-habit gesture only. ON
@@ -151,6 +169,26 @@ def _gesture_wave(t: float, seed: int, salt: str) -> float:
     return max(-1.0, min(1.0, a * 0.7 + b * 0.35))
 
 
+def _quantize(value: float, step: float) -> float:
+    return value if step <= 0 else round(value / step) * step
+
+
+def _machine_energy(t: float) -> float:
+    # Commensurate, fixed frequencies: every computer stroke repeats the same
+    # figure, independently of its render seed.
+    return 0.72 * math.sin(t * math.tau * 5) + 0.28 * math.sin(t * math.tau * 10)
+
+
+def _machine_swell(t: float) -> float:
+    # The selectable symmetric envelope formerly imposed by engine 11.
+    return 0.45 + 0.55 * math.sin(math.pi * t)
+
+
+def _machine_gesture(t: float) -> float:
+    # Whole cycles pin both endpoints without a separate edge window.
+    return math.sin(t * math.tau * 2)
+
+
 def _event_map(seed: int, rate: float, count: int) -> dict[int, str]:
     events: dict[int, str] = {}
     # Bernoulli approximation to sparse Poisson arrivals; endpoint anchors excluded.
@@ -184,7 +222,9 @@ def synthesize_stroke(
     events = _event_map(seed, grammar.event_rate, samples)
     position = [start[0], start[1]]
     velocity = [dx / (samples - 1), dy / (samples - 1)]
-    gesture_amp = length * grammar.gesture * (WILD_GAIN if wild else 1.0)
+    gesture_amp = length * grammar.gesture
+    if wild and not grammar.periodic:
+        gesture_amp *= WILD_GAIN
     result: list[StrokeSample] = []
     for i in range(samples):
         t = i / (samples - 1)
@@ -201,8 +241,12 @@ def synthesize_stroke(
             )
             position[0] += velocity[0] * 0.72
             position[1] += velocity[1] * 0.72
-        energy = latent_energy(t, seed)
-        envelope = _edge_window(t) * _swell(t, seed)
+        if grammar.periodic:
+            energy = _machine_energy(t)
+            envelope = _machine_swell(t)
+        else:
+            energy = latent_energy(t, seed)
+            envelope = _edge_window(t) * _swell(t, seed)
         lateral = (
             energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope)
         )
@@ -235,21 +279,27 @@ def synthesize_stroke(
         # fold and cross itself.
         gx = gy = 0.0
         if gesture_amp:
-            win = _edge_window(t)
-            g_lat = _gesture_wave(t, seed, "gesture-lat")
-            g_lon = _gesture_wave(t, seed, "gesture-lon")
+            if grammar.periodic:
+                # A machine repeats laterally but does not hesitate or reverse
+                # along its direction of travel.
+                win = 1.0
+                g_lat = _machine_gesture(t)
+                g_lon = 0.0
+            else:
+                win = _edge_window(t)
+                g_lat = _gesture_wave(t, seed, "gesture-lat")
+                g_lon = _gesture_wave(t, seed, "gesture-lon")
             gx = gesture_amp * win * (nx * g_lat + ux * g_lon)
             gy = gesture_amp * win * (ny * g_lat + uy * g_lon)
+        x = position[0] + nx * lateral + gx
+        y = position[1] + ny * lateral + gy
+        if grammar.quantize:
+            step = length * grammar.quantize
+            x, y = _quantize(x, step), _quantize(y, step)
+        if grammar.width_steps:
+            width = max(0.015, _quantize(width, base_width / grammar.width_steps))
         result.append(
-            StrokeSample(
-                t,
-                position[0] + nx * lateral + gx,
-                position[1] + ny * lateral + gy,
-                width,
-                energy,
-                lateral,
-                event,
-            )
+            StrokeSample(t, x, y, width, energy, lateral, event)
         )
     # Pin intention endpoints. Width still carries the entry/exit profile.
     result[0] = StrokeSample(
@@ -381,6 +431,16 @@ def synthesize_along(
 
     normals = centerline_normals(points, closed)
     parameters = _arc_length_parameters(points, closed)
+    total_length = max(
+        1e-6,
+        sum(
+            math.hypot(
+                points[index + 1][0] - points[index][0],
+                points[index + 1][1] - points[index][1],
+            )
+            for index in range(count - 1)
+        ),
+    )
     events = _event_map(seed, grammar.event_rate, count)
     position = [points[0][0], points[0][1]]
     velocity = [0.0, 0.0]
@@ -407,13 +467,17 @@ def synthesize_along(
             )
             position[0] += step[0] + velocity[0] * 0.72
             position[1] += step[1] + velocity[1] * 0.72
-        energy = latent_energy(t, seed)
-        if closed:
+        if grammar.periodic:
+            energy = _machine_energy(t)
+            envelope = 1.0 if closed else _machine_swell(t)
+        elif closed:
             # A loop has no endpoints, so no edge taper: the old sine imposed a
             # spurious thin seam opposite a fat middle. The swell alone (floored)
             # keeps the loop unbroken while letting the fullness wander.
+            energy = latent_energy(t, seed)
             envelope = _swell(t, seed)
         else:
+            energy = latent_energy(t, seed)
             envelope = _edge_window(t) * _swell(t, seed)
         lateral = (
             energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope)
@@ -442,6 +506,11 @@ def synthesize_along(
         )
         nx, ny = normals[index]
         x, y = position[0] + nx * lateral, position[1] + ny * lateral
+        if grammar.quantize:
+            step = total_length * grammar.quantize
+            x, y = _quantize(x, step), _quantize(y, step)
+        if grammar.width_steps:
+            width = max(0.015, _quantize(width, base_width / grammar.width_steps))
         if index in anchors:
             x, y, lateral, event = target[0], target[1], 0.0, None
             position = [target[0], target[1]]

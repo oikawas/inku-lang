@@ -272,6 +272,34 @@ class DefaultSvgRendererPhase2fTest {
     }
 
     @Test
+    fun testEveryReferenceSvgMatchesOnPathsPointsAndDashes() {
+        // Named-case lists leave holes: the pencil texture dash on
+        // 11_cloudform_pencil was emitted unscaled ("1,3" against the server's
+        // "1.000000,3.000000") for six phases, because nothing compared a
+        // dasharray. This walks every case in the index instead.
+        val index = readReferenceIndex()
+        for (key in index.keys()) {
+            val expectedSvg = readReferenceResource("$key.svg")
+            val actualSvg = renderSvgForReference(key)
+            assertEquals(
+                "path d list for $key.svg must match",
+                Regex(" d=\"([^\"]*)\"").findAll(expectedSvg).map { it.groupValues[1] }.toList(),
+                Regex(" d=\"([^\"]*)\"").findAll(actualSvg).map { it.groupValues[1] }.toList(),
+            )
+            assertEquals(
+                "points list for $key.svg must match",
+                Regex(" points=\"([^\"]*)\"").findAll(expectedSvg).map { it.groupValues[1] }.toList(),
+                Regex(" points=\"([^\"]*)\"").findAll(actualSvg).map { it.groupValues[1] }.toList(),
+            )
+            assertEquals(
+                "stroke-dasharray list for $key.svg must match",
+                Regex(" stroke-dasharray=\"([^\"]*)\"").findAll(expectedSvg).map { it.groupValues[1] }.toList(),
+                Regex(" stroke-dasharray=\"([^\"]*)\"").findAll(actualSvg).map { it.groupValues[1] }.toList(),
+            )
+        }
+    }
+
+    @Test
     fun testMaterialOutlinePointsAndDashArrayExactParity() {
         val keys = listOf("02_line_brush", "09_line_white", "14_region_then_relation", "15_line_brush_wild")
         for (key in keys) {

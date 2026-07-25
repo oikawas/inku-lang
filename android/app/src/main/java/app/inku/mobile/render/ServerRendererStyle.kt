@@ -78,8 +78,12 @@ internal object ServerRendererStyle {
         if (hint.containsAny("reflection", "反射", "映り")) {
             strokeOpacity = min(strokeOpacity, 0.52)
         }
-        val styleDash = dashValue(ins.optString("style", "solid"))
-        val textureDash = textureDash(weight)
+        // Both dash patterns are px constants and must be mapped onto the canvas
+        // unit exactly as `_stroke_attrs` does with `_scale_dash`, or a pillar
+        // canvas keeps a square canvas's dash lengths.
+        val scale = unit / 1000.0
+        val styleDash = ServerRendererMaterial.scaleDash(dashValue(ins.optString("style", "solid")), scale)
+        val textureDash = ServerRendererMaterial.scaleDash(textureDash(weight), scale)
         val filter = when {
             weight in setOf("pencil", "crayon", "chalk", "brush_thick") -> "url(#texture-$weight)"
             else -> null
@@ -152,7 +156,6 @@ internal object ServerRendererStyle {
         "pencil" -> "1,3"
         "crayon" -> "10,3,2,3"
         "chalk" -> "7,5,1,4"
-        "rope" -> "14,5"
         else -> null
     }
 

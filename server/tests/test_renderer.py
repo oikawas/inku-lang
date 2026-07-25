@@ -1610,11 +1610,13 @@ def test_legacy_arrangement_layouts_keep_golden_output():
         rendered.append(render(score, svg_profile="compat", render_seed=123))
 
     digest = hashlib.sha256("".join(rendered).encode()).hexdigest()
-    # engine 11 (マスターグリッド宣言) で再採取。座標の書き出しが 3 桁から 6 桁へ
-    # 上がった分だけ値が動く。数値の個数は 1528 個で不変、最大変化量は 5e-4 未満。
+    # engine 12 (エンベロープの脱・規則化 + 中心線ジェスチャ) で再採取。
+    # 幅エンベロープが sin(pi t) の対称な山から _edge_window * _swell へ変わり、
+    # 中心線に低周波のジェスチャが乗った分だけ値が動く。書き出される数値の個数は
+    # engine 11 と同じ 1444 個で、動いたのは値だけである。
     # engine 10 まではこのダイジェストが素のバイト列だったため macOS でしか通らな
     # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
-    assert digest == "f9769fbadba259de260dcd2cdaf19f3e4038f9353296646c9f7aaeed74b9397e"
+    assert digest == "75afbfb92840cc922e87edd598c25b45937e7d651aaf6d9c806ade157636f33e"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

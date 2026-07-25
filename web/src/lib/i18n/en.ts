@@ -23,7 +23,7 @@ export const en: LangPack = {
 	appInfoVocabRows: [
 		{ term: 'Description', meaning: 'Your poem-like input — the top, authored layer (inku\'s own).' },
 		{ term: 'Interpret', meaning: 'The Stage 1 act of reading a description into instructions.' },
-		{ term: 'Instructions (Normalized DDL)', meaning: 'The executable spec interpretation produces — LeWitt\'s instruction sheet.' },
+		{ term: 'Instructions (normalized DDL)', meaning: 'The executable spec interpretation produces — LeWitt\'s instruction sheet.' },
 		{ term: 'Score (JSON Score)', meaning: 'The structured, deterministically saved intermediate.' },
 		{ term: 'Performance (SVG)', meaning: 'The one-time drawing of a score.' },
 		{ term: 'Headnote', meaning: 'The description raised beside the finished work — kotobagaki, the note set beside a poem.' },

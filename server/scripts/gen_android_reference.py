@@ -129,19 +129,26 @@ def stroke_engine_fixtures() -> None:
         _stroke("line_pencil_two_events", (100.0, 500.0), (900.0, 500.0), 6.0, "pencil", 12),
         _stroke("line_chalk_event_cap", (100.0, 500.0), (900.0, 500.0), 6.0, "chalk", 21),
         _stroke("line_short_pencil", (400.0, 400.0), (600.0, 400.0), 3.0, "pencil", 31, samples=17),
+        # engine 12: the centreline gesture. `rotring` has gesture 0.0, so its
+        # pair is byte-identical in both states — a port that scales the wrong
+        # term passes the OFF cases and fails only these.
+        _stroke("line_pencil_gesture_off", (100.0, 500.0), (900.0, 500.0), 6.0, "pencil", 12345),
+        _stroke("line_pencil_gesture_wild", (100.0, 500.0), (900.0, 500.0), 6.0, "pencil", 12345, wild=True),
+        _stroke("line_brush_thick_wild", (200.0, 200.0), (800.0, 800.0), 8.0, "brush_thick", 999, wild=True),
+        _stroke("line_rotring_wild", (100.0, 500.0), (900.0, 500.0), 6.0, "rotring", 12345, wild=True),
     ]
     (OUT / "stroke_engine_synthesize_stroke.json").write_text(json.dumps(straight, ensure_ascii=False, indent=2))
 
     primitive_fixtures()
 
 
-def _stroke(name, start, end, base_width, weight, seed, samples=49):
-    result = se.synthesize_stroke(start, end, base_width, weight, seed, samples=samples)
+def _stroke(name, start, end, base_width, weight, seed, samples=49, wild=False):
+    result = se.synthesize_stroke(start, end, base_width, weight, seed, samples=samples, wild=wild)
     return {
         "name": name,
         "input": {
             "start": list(start), "end": list(end), "base_width": base_width,
-            "weight": weight, "seed": seed, "samples": samples,
+            "weight": weight, "seed": seed, "samples": samples, "wild": wild,
         },
         "samples": _samples(result.samples),
         "outline": [[round(x, 6), round(y, 6)] for x, y in result.outline],
@@ -221,18 +228,54 @@ def primitive_fixtures() -> None:
         )
     ]
 
+    # engine 12 primitives. `_edge_window` replaces the old `max(0, sin(pi t))`
+    # envelope and has no peak in the middle; `_swell` is where the widest point
+    # of a stroke now comes from, so it moves per seed. `_smooth_noise_salted`
+    # is a FOURTH noise construction (explicit salt plus an explicit frequency)
+    # and `_gesture_wave` is built on top of it with one and two cycles.
+    edge_window = [
+        {"t": t, "value": round(se._edge_window(t), 12)}
+        for t in (0.0, 0.05, 0.08, 0.16, 0.3, 0.5, 0.7, 0.84, 0.92, 0.95, 1.0)
+    ]
+    swell = [
+        {"t": t, "seed": seed, "value": round(se._swell(t, seed), 12)}
+        for seed in (1, 12345, 999)
+        for t in (0.0, 0.25, 0.5, 0.75, 1.0)
+    ]
+    salted = [
+        {
+            "t": t, "seed": seed, "salt": salt, "frequency": frequency,
+            "value": round(se._smooth_noise_salted(t, seed, salt, frequency), 12),
+        }
+        for seed in (12345, 999)
+        for salt, frequency in (("swell", 1.0), ("gesture-lat", 1.0), ("gesture-lon", 2.0))
+        for t in (0.0, 0.25, 0.5, 1.0)
+    ]
+    gesture = [
+        {"t": t, "seed": seed, "salt": salt, "value": round(se._gesture_wave(t, seed, salt), 12)}
+        for seed in (1, 12345)
+        for salt in ("gesture-lat", "gesture-lon")
+        for t in (0.0, 0.25, 0.5, 0.75, 1.0)
+    ]
+
     (OUT / "stroke_engine_primitives.json").write_text(json.dumps({
         "grammars": {
             weight: {
                 "stiffness": g.stiffness, "damping": g.damping,
                 "energy_width": g.energy_width, "energy_lateral": g.energy_lateral,
                 "event_rate": g.event_rate, "taper": g.taper, "bulge": g.bulge,
+                "gesture": g.gesture,
             }
             for weight, g in se.GRAMMARS.items()
         },
-        "closed_envelope_floor": se.CLOSED_ENVELOPE_FLOOR,
+        "wild_gain": se.WILD_GAIN,
+        "gesture_edge": se._GESTURE_EDGE,
         "unit": unit,
         "smooth_noise": smooth,
+        "edge_window": edge_window,
+        "swell": swell,
+        "smooth_noise_salted": salted,
+        "gesture_wave": gesture,
         "event_map": events,
         "centerline": normals,
     }, ensure_ascii=False, indent=2))
@@ -247,22 +290,39 @@ SCORES: dict[str, dict] = {
     "06_surface_hatch": {"instructions": [{"primitive": "square", "position": [0.25, 0.25], "size": [0.5, 0.5], "weight": "pen", "surface": {"texture": "hatch", "density": 0.5, "direction": "diagonal_rising"}}]},
 }
 
+# engine 12: `wild` reaches only `synthesize_stroke`, which the renderer calls
+# for the `line` primitive alone. Each of these repeats the Score of a tracked
+# OFF render, so the pair is the test: 15 must differ from 02, and 16 must be
+# byte-identical to 01. A port that wires `wild` into the contour path passes
+# the first and fails the second.
+WILD_SCORES: dict[str, str] = {
+    "15_line_brush_wild": "02_line_brush",
+    "16_circle_pen_wild": "01_circle_pen",
+}
+
 TAGS = ("path", "polyline", "polygon", "circle", "ellipse", "line", "rect", "g")
 
 
 def svg_fixtures() -> None:
     index: dict[str, dict] = {}
-    for name, raw in SCORES.items():
-        svg = renderer.render(Score.model_validate(raw), render_seed=RENDER_SEED, svg_profile=SVG_PROFILE)
+    cases = [(name, raw, False, None) for name, raw in SCORES.items()]
+    cases += [(name, SCORES[source], True, source) for name, source in WILD_SCORES.items()]
+    for name, raw, wild, source in cases:
+        svg = renderer.render(
+            Score.model_validate(raw), render_seed=RENDER_SEED, svg_profile=SVG_PROFILE, wild=wild
+        )
         (OUT / f"{name}.svg").write_text(svg)
         index[name] = {
             "score": raw,
             "render_seed": RENDER_SEED,
             "svg_profile": SVG_PROFILE,
+            "wild": wild,
             "bytes": len(svg),
             "counts": {tag: len(re.findall(f"<{tag}[ />]", svg)) for tag in TAGS},
             "classes": sorted(set(re.findall(r'class="([^"]+)"', svg))),
         }
+        if source is not None:
+            index[name]["wild_off_twin"] = source
     (OUT / "svg_index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2))
 
 

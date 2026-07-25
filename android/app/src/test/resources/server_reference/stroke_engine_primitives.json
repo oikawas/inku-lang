@@ -7,7 +7,8 @@
       "energy_lateral": 0.05,
       "event_rate": 0.04,
       "taper": 0.05,
-      "bulge": 0.02
+      "bulge": 0.02,
+      "gesture": 0.012
     },
     "pencil": {
       "stiffness": 0.58,
@@ -16,7 +17,8 @@
       "energy_lateral": 0.42,
       "event_rate": 0.55,
       "taper": 0.12,
-      "bulge": 0.14
+      "bulge": 0.14,
+      "gesture": 0.05
     },
     "pen": {
       "stiffness": 0.82,
@@ -25,7 +27,8 @@
       "energy_lateral": 0.12,
       "event_rate": 0.12,
       "taper": 0.08,
-      "bulge": 0.06
+      "bulge": 0.06,
+      "gesture": 0.022
     },
     "rotring": {
       "stiffness": 1.0,
@@ -34,7 +37,8 @@
       "energy_lateral": 0.0,
       "event_rate": 0.0,
       "taper": 0.0,
-      "bulge": 0.0
+      "bulge": 0.0,
+      "gesture": 0.0
     },
     "crayon": {
       "stiffness": 0.48,
@@ -43,7 +47,8 @@
       "energy_lateral": 0.34,
       "event_rate": 0.75,
       "taper": 0.14,
-      "bulge": 0.18
+      "bulge": 0.18,
+      "gesture": 0.06
     },
     "chalk": {
       "stiffness": 0.42,
@@ -52,7 +57,8 @@
       "energy_lateral": 0.38,
       "event_rate": 0.9,
       "taper": 0.18,
-      "bulge": 0.2
+      "bulge": 0.2,
+      "gesture": 0.07
     },
     "brush_thin": {
       "stiffness": 0.36,
@@ -61,7 +67,8 @@
       "energy_lateral": 0.48,
       "event_rate": 0.48,
       "taper": 0.88,
-      "bulge": 0.28
+      "bulge": 0.28,
+      "gesture": 0.1
     },
     "brush_thick": {
       "stiffness": 0.3,
@@ -70,7 +77,8 @@
       "energy_lateral": 0.55,
       "event_rate": 0.58,
       "taper": 0.92,
-      "bulge": 0.34
+      "bulge": 0.34,
+      "gesture": 0.13
     },
     "burin": {
       "stiffness": 0.91,
@@ -79,7 +87,8 @@
       "energy_lateral": 0.09,
       "event_rate": 0.08,
       "taper": 0.98,
-      "bulge": 1.0
+      "bulge": 1.0,
+      "gesture": 0.018
     },
     "drypoint": {
       "stiffness": 0.68,
@@ -88,10 +97,12 @@
       "energy_lateral": 0.2,
       "event_rate": 0.45,
       "taper": 0.55,
-      "bulge": 0.48
+      "bulge": 0.48,
+      "gesture": 0.05
     }
   },
-  "closed_envelope_floor": 0.35,
+  "wild_gain": 3.5,
+  "gesture_edge": 0.16,
   "unit": [
     {
       "seed": 1,
@@ -574,6 +585,421 @@
       "seed": 999,
       "octave": 6,
       "value": 0.765969506596
+    }
+  ],
+  "edge_window": [
+    {
+      "t": 0.0,
+      "value": 0.0
+    },
+    {
+      "t": 0.05,
+      "value": 0.22221488349
+    },
+    {
+      "t": 0.08,
+      "value": 0.5
+    },
+    {
+      "t": 0.16,
+      "value": 1.0
+    },
+    {
+      "t": 0.3,
+      "value": 1.0
+    },
+    {
+      "t": 0.5,
+      "value": 1.0
+    },
+    {
+      "t": 0.7,
+      "value": 1.0
+    },
+    {
+      "t": 0.84,
+      "value": 1.0
+    },
+    {
+      "t": 0.92,
+      "value": 0.5
+    },
+    {
+      "t": 0.95,
+      "value": 0.22221488349
+    },
+    {
+      "t": 1.0,
+      "value": 0.0
+    }
+  ],
+  "swell": [
+    {
+      "t": 0.0,
+      "seed": 1,
+      "value": 0.833159069735
+    },
+    {
+      "t": 0.25,
+      "seed": 1,
+      "value": 0.753445921005
+    },
+    {
+      "t": 0.5,
+      "seed": 1,
+      "value": 0.620590673121
+    },
+    {
+      "t": 0.75,
+      "seed": 1,
+      "value": 0.582769221464
+    },
+    {
+      "t": 1.0,
+      "seed": 1,
+      "value": 0.599181835059
+    },
+    {
+      "t": 0.0,
+      "seed": 12345,
+      "value": 0.487715249845
+    },
+    {
+      "t": 0.25,
+      "seed": 12345,
+      "value": 0.510825663553
+    },
+    {
+      "t": 0.5,
+      "seed": 12345,
+      "value": 0.549343019734
+    },
+    {
+      "t": 0.75,
+      "seed": 12345,
+      "value": 0.570884325028
+    },
+    {
+      "t": 1.0,
+      "seed": 12345,
+      "value": 0.678617449735
+    },
+    {
+      "t": 0.0,
+      "seed": 999,
+      "value": 0.499402572454
+    },
+    {
+      "t": 0.25,
+      "seed": 999,
+      "value": 0.532763982947
+    },
+    {
+      "t": 0.5,
+      "seed": 999,
+      "value": 0.588366333768
+    },
+    {
+      "t": 0.75,
+      "seed": 999,
+      "value": 0.616962628484
+    },
+    {
+      "t": 1.0,
+      "seed": 999,
+      "value": 0.745891566667
+    }
+  ],
+  "smooth_noise_salted": [
+    {
+      "t": 0.0,
+      "seed": 12345,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.862853636927
+    },
+    {
+      "t": 0.25,
+      "seed": 12345,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.821353455184
+    },
+    {
+      "t": 0.5,
+      "seed": 12345,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.730053055348
+    },
+    {
+      "t": 1.0,
+      "seed": 12345,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.597252473769
+    },
+    {
+      "t": 0.0,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": 0.767985331897
+    },
+    {
+      "t": 0.25,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": 0.537483430393
+    },
+    {
+      "t": 0.5,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": 0.030379247083
+    },
+    {
+      "t": 1.0,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": -0.707226837731
+    },
+    {
+      "t": 0.0,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": 0.745870797658
+    },
+    {
+      "t": 0.25,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": 0.645371087042
+    },
+    {
+      "t": 0.5,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": 0.544871376425
+    },
+    {
+      "t": 1.0,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": -0.832302158458
+    },
+    {
+      "t": 0.0,
+      "seed": 999,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.820354281984
+    },
+    {
+      "t": 0.25,
+      "seed": 999,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.760446025207
+    },
+    {
+      "t": 0.5,
+      "seed": 999,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.628647860299
+    },
+    {
+      "t": 1.0,
+      "seed": 999,
+      "salt": "swell",
+      "frequency": 1.0,
+      "value": -0.436941438614
+    },
+    {
+      "t": 0.0,
+      "seed": 999,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": -0.131433417848
+    },
+    {
+      "t": 0.25,
+      "seed": 999,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": 0.031314504578
+    },
+    {
+      "t": 0.5,
+      "seed": 999,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": 0.389359933915
+    },
+    {
+      "t": 1.0,
+      "seed": 999,
+      "salt": "gesture-lat",
+      "frequency": 1.0,
+      "value": 0.910153285678
+    },
+    {
+      "t": 0.0,
+      "seed": 999,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": -0.227303649421
+    },
+    {
+      "t": 0.25,
+      "seed": 999,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": -0.451496978834
+    },
+    {
+      "t": 0.5,
+      "seed": 999,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": -0.675690308246
+    },
+    {
+      "t": 1.0,
+      "seed": 999,
+      "salt": "gesture-lon",
+      "frequency": 2.0,
+      "value": -0.744243074136
+    }
+  ],
+  "gesture_wave": [
+    {
+      "t": 0.0,
+      "seed": 1,
+      "salt": "gesture-lat",
+      "value": 0.426201284971
+    },
+    {
+      "t": 0.25,
+      "seed": 1,
+      "salt": "gesture-lat",
+      "value": 0.333446251123
+    },
+    {
+      "t": 0.5,
+      "seed": 1,
+      "salt": "gesture-lat",
+      "value": 0.197881201653
+    },
+    {
+      "t": 0.75,
+      "seed": 1,
+      "salt": "gesture-lat",
+      "value": -0.060867723222
+    },
+    {
+      "t": 1.0,
+      "seed": 1,
+      "salt": "gesture-lat",
+      "value": -0.276806632476
+    },
+    {
+      "t": 0.0,
+      "seed": 1,
+      "salt": "gesture-lon",
+      "value": -0.695770006785
+    },
+    {
+      "t": 0.25,
+      "seed": 1,
+      "salt": "gesture-lon",
+      "value": -0.370444067716
+    },
+    {
+      "t": 0.5,
+      "seed": 1,
+      "salt": "gesture-lon",
+      "value": 0.105032304769
+    },
+    {
+      "t": 0.75,
+      "seed": 1,
+      "salt": "gesture-lon",
+      "value": 0.276529067886
+    },
+    {
+      "t": 1.0,
+      "seed": 1,
+      "salt": "gesture-lon",
+      "value": 0.297875397587
+    },
+    {
+      "t": 0.0,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "value": 0.806384598492
+    },
+    {
+      "t": 0.25,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "value": 0.386871137754
+    },
+    {
+      "t": 0.5,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "value": -0.226263920248
+    },
+    {
+      "t": 0.75,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "value": -0.590252989427
+    },
+    {
+      "t": 1.0,
+      "seed": 12345,
+      "salt": "gesture-lat",
+      "value": -0.760620461342
+    },
+    {
+      "t": 0.0,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "value": 0.783164337541
+    },
+    {
+      "t": 0.25,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "value": 0.726005127128
+    },
+    {
+      "t": 0.5,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "value": 0.642464742678
+    },
+    {
+      "t": 0.75,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "value": 0.353093888339
+    },
+    {
+      "t": 1.0,
+      "seed": 12345,
+      "salt": "gesture-lon",
+      "value": 0.090104208037
     }
   ],
   "event_map": [

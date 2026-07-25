@@ -15,6 +15,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 3903,
     "counts": {
       "path": 1,
@@ -49,18 +50,20 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
-    "bytes": 3389,
+    "wild": false,
+    "bytes": 7404,
     "counts": {
       "path": 1,
-      "polyline": 0,
+      "polyline": 3,
       "polygon": 0,
       "circle": 0,
       "ellipse": 0,
-      "line": 3,
+      "line": 0,
       "rect": 1,
       "g": 7
     },
     "classes": [
+      "material-outline",
       "stroke-engine-v1 controls-39 events-2"
     ]
   },
@@ -84,6 +87,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 58533,
     "counts": {
       "path": 49,
@@ -119,6 +123,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 9587,
     "counts": {
       "path": 5,
@@ -151,6 +156,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 858,
     "counts": {
       "path": 0,
@@ -188,6 +194,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 98645,
     "counts": {
       "path": 42,
@@ -229,6 +236,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 11881,
     "counts": {
       "path": 1,
@@ -268,6 +276,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 11881,
     "counts": {
       "path": 1,
@@ -310,18 +319,20 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
-    "bytes": 8218,
+    "wild": false,
+    "bytes": 12719,
     "counts": {
       "path": 1,
-      "polyline": 0,
+      "polyline": 2,
       "polygon": 0,
       "circle": 30,
       "ellipse": 0,
-      "line": 2,
+      "line": 0,
       "rect": 1,
       "g": 7
     },
     "classes": [
+      "material-outline",
       "stroke-engine-v1 controls-39 events-0"
     ]
   },
@@ -351,6 +362,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 7502,
     "counts": {
       "path": 1,
@@ -385,6 +397,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 4261,
     "counts": {
       "path": 1,
@@ -419,6 +432,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 4226,
     "counts": {
       "path": 1,
@@ -467,6 +481,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 4190,
     "counts": {
       "path": 4,
@@ -523,6 +538,7 @@
     },
     "render_seed": 12345,
     "svg_profile": "editable",
+    "wild": false,
     "bytes": 7636,
     "counts": {
       "path": 8,
@@ -539,5 +555,75 @@
       "arc-stroke-v1 controls-22 events-2",
       "material-outline"
     ]
+  },
+  "15_line_brush_wild": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "line",
+          "from": [
+            0.1,
+            0.5
+          ],
+          "to": [
+            0.9,
+            0.5
+          ],
+          "weight": "brush_thick"
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": true,
+    "bytes": 7391,
+    "counts": {
+      "path": 1,
+      "polyline": 3,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 7
+    },
+    "classes": [
+      "material-outline",
+      "stroke-engine-v1 controls-39 events-2"
+    ],
+    "wild_off_twin": "02_line_brush"
+  },
+  "16_circle_pen_wild": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.2,
+          "weight": "pen"
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": true,
+    "bytes": 3903,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 1,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 7
+    },
+    "classes": [
+      "contour-stroke-v1 controls-62 events-1"
+    ],
+    "wild_off_twin": "01_circle_pen"
   }
 }

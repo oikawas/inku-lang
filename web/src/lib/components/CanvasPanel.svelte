@@ -752,7 +752,7 @@
 									{#if refineKind === 'touch'}
 										<label class="touch-seed-field">
 											<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={variationBusy || variationGridBusy} />
-											<small>{isJapanese ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be generated.'}</small>
+											<small>{isJapanese ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.'}</small>
 										</label>
 									{/if}
 								</section>

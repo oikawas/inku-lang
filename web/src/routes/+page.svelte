@@ -5298,7 +5298,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			return;
 		}
 		if (kind === 'touch' && count === 4) {
-			variationGridStatus = getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be generated.';
+			variationGridStatus = getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.';
 			return;
 		}
 		const contextVersion = targetContextVersion;

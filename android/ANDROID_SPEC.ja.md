@@ -1572,4 +1572,32 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 68 件の単体テストが **100% 成功 (PASS 68 / Failures 0 / Errors 0 / Skipped 0)**。
 - `android/BUILD_NUMBER` は **`148088`** にインクリメント。
 
+## 2026-07-26 render engine 14 追随 段 5a/5b/5c/5d (stroke_engine 補正・グリッド量子化・raster bleed・performed 輪郭・語彙刷新)
+
+契約 `antigravity-android-engine14.md` に基づき、render engine 14 への Android 実装追随および `rh3` ハッシュ検証、歳時記語彙の同期（10 語）を完了した。
+
+### 実装および追随の詳細
+
+1. **`stroke_engine` 手ブレ補正項とグリッド量子化 (§5a)**:
+   - `ServerStrokeEngine.kt` において、`WILD_JITTER_GAIN = 1.35` / `WILD_QUANTIZE_STEP = 0.018` を追加。
+   - `wild = true` 時の手ブレ増幅とグリッド量子化 (`step = 0.018`) を実装。
+2. **`renderer` グリッド・ラスタ補正・performed 輪郭 (§5b)**:
+   - `DefaultSvgRenderer.kt` で `gridStepPx` および `RASTER_BLEED_OPACITY = 0.45` を定義し、`<rect class="raster-bleed">` グリッド背景の描画を追加。
+   - `ServerRendererMaterial.kt` に `offsetPerformedPath` および `performedOutline` を追加し、`wild = true` 時に `renderContourHandStroke` / `renderArcHandStroke` から `<path class="performed-outline">` を出力するよう結線。
+3. **`wild` フラグの全プリミティブ伝達・`render_engine_version = "14"` 昇格 (§5c)**:
+   - `DefaultSvgRenderer.kt` および `LocalFallbackPipeline.kt` の `render_engine_version` デフォルト値を `"14"` に昇格。
+   - `wild` フラグを contour, fill, arc, surface 描画へ全伝達。
+4. **歳時記「てざわり」表示語彙 10 語の同期・`rh3` ハッシュ検証 (§5d)**:
+   - `InkuApp.kt` の `saijikiGroups` の「てざわり」表示語彙を 10 語（鉛筆, ペン, ロットリング, クレヨン, チョーク, 細筆, 太筆, ビュラン, ドライポイント, コンピュータ）に完全同期。
+   - `ServerScoreSchemaJson.kt` / `ServerScoreCoercer.kt` / `ServerScoreSemantics.kt` / `WebDdlSpec.kt` に `computer` を追加し、`hair` は後方互換再生のため Score 属性として保持。`rope`（`縄`）をプロンプトおよび語彙定義から完全除去。
+   - `ServerScoreParityTest.kt` の `rh3` 実測ハッシュ期待値を engine `"14"` に合わせて更新・検証：
+     - `render_wild` 未設定 / engine `"14"`: `rh3:49909b323b19dd6931ebe4c417050793671b26fbf0ecfa458b360c9b760b379b`
+     - `render_wild = true` / engine `"14"`: `rh3:2e344afb5426b5418763add9a6c23adae3361fb33a74382821fc11c804cc98b0`
+     - `render_wild = false` / engine `"12"`: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の集計により、全 71 件の単体テストが **100% 成功 (PASS 71 / Failures 0 / Errors 0 / Skipped 0)**。
+
+
 

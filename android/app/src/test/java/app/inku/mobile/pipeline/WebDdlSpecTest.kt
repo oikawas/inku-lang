@@ -39,4 +39,36 @@ class WebDdlSpecTest {
             assertTrue("LiteRT prompt fixture mismatch for $input", liteRt.contains(expectedOutput))
         }
     }
+
+    @Test
+    fun testStage5dDisplayVocabulary10TermsExactOrder() {
+        val expected = listOf("鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ")
+        val touchGroup = app.inku.mobile.ui.saijikiGroups.firstOrNull { it.label == "てざわり" }
+        org.junit.Assert.assertNotNull("てざわり group must exist", touchGroup)
+        org.junit.Assert.assertEquals("てざわり display terms must match section 3.9 exactly", expected, touchGroup!!.words)
+    }
+
+    @Test
+    fun testComputerWeightDetectionHairRetentionAndRopeRemoval() {
+        // 1. Computer weight detection
+        org.junit.Assert.assertEquals("computer", ServerScoreSemantics.detectWeightKey("コンピュータの直線を引く"))
+
+        // 2. Hair weight retention (backward compatibility)
+        val sourceJson = org.json.JSONObject("""{"primitive":"line","weight":"hair"}""")
+        val coerced = ServerScoreCoercer.coerceInstruction(
+            source = sourceJson,
+            ddl = "髪の毛",
+            background = "white",
+            detectColorKey = ServerScoreSemantics::detectColorKey,
+            detectWeightKey = ServerScoreSemantics::detectWeightKey,
+            visibleForeground = ServerScoreSemantics::visibleForeground
+        )
+        org.junit.Assert.assertEquals("hair weight must be preserved for legacy score playback", "hair", coerced.getString("weight"))
+
+        // 3. Rope / 縄 removal verification
+        val fullPrompt = WebDdlSpec.buildStage1SystemPrompt("テスト")
+        org.junit.Assert.assertFalse("rope must not appear in prompt", fullPrompt.contains("rope"))
+        org.junit.Assert.assertFalse("縄 must not appear in prompt", fullPrompt.contains("縄"))
+        org.junit.Assert.assertFalse("rope must not be detected", ServerScoreSemantics.detectWeightKey("縄の太い線") == "rope")
+    }
 }

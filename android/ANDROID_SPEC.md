@@ -2005,3 +2005,31 @@ Per contract `antigravity-android-engine12.md` §4d, the edition ID migration to
 
 - XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 66 out of 66 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
 - `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148087`.
+
+## 2026-07-26 render engine 14 Catch-up Stage 5a/5b/5c/5d (stroke_engine terms, grid quantization, raster bleed, performed outline, touch vocabulary alignment)
+
+In accordance with contract `antigravity-android-engine14.md`, completed Android implementation catch-up for render engine 14, `rh3` hash verification, and Saijiki touch vocabulary alignment (10 terms).
+
+### Implementation & Adaptation Details
+
+1. **`stroke_engine` Jitter Terms & Grid Quantization (§5a)**:
+   - Added `WILD_JITTER_GAIN = 1.35` and `WILD_QUANTIZE_STEP = 0.018` in `ServerStrokeEngine.kt`.
+   - Implemented wild jitter amplification and grid quantization (`step = 0.018`) when `wild = true`.
+2. **`renderer` Grid, Raster Bleed, & Performed Outline (§5b)**:
+   - Defined `gridStepPx` and `RASTER_BLEED_OPACITY = 0.45` in `DefaultSvgRenderer.kt`, adding `<rect class="raster-bleed">` grid background rendering.
+   - Added `offsetPerformedPath` and `performedOutline` to `ServerRendererMaterial.kt`, outputting `<path class="performed-outline">` from `renderContourHandStroke` / `renderArcHandStroke` when `wild = true`.
+3. **Full Propagation of `wild` Flag & Bump `render_engine_version` to `"14"` (§5c)**:
+   - Bumped `render_engine_version` default to `"14"` in `DefaultSvgRenderer.kt` and `LocalFallbackPipeline.kt`.
+   - Propagated `wild` flag across contour, fill, arc, and surface vector rendering calls.
+4. **Saijiki Touch Display Vocabulary (10 terms) Alignment & `rh3` Hash Verification (§5d)**:
+   - Synchronized `saijikiGroups` "てざわり" in `InkuApp.kt` to exactly 10 canonical terms (pencil, pen, rotring, crayon, chalk, thin brush, thick brush, burin, drypoint, computer).
+   - Added `computer` weight support in `ServerScoreSchemaJson.kt`, `ServerScoreCoercer.kt`, `ServerScoreSemantics.kt`, and `WebDdlSpec.kt`. Retained `hair` for backward compatibility playback, while completely removing `rope` (`縄`).
+   - Verified `rh3` hashes for engine `"14"` in `ServerScoreParityTest.kt`:
+     - `render_wild` unset / engine `"14"`: `rh3:49909b323b19dd6931ebe4c417050793671b26fbf0ecfa458b360c9b760b379b`
+     - `render_wild = true` / engine `"14"`: `rh3:2e344afb5426b5418763add9a6c23adae3361fb33a74382821fc11c804cc98b0`
+     - `render_wild = false` / engine `"12"`: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+
+### Verification Results
+
+- All 71 unit tests passed cleanly via `gradle :app:testDebugUnitTest` (**PASS 71 / Failures 0 / Errors 0 / Skipped 0**).
+

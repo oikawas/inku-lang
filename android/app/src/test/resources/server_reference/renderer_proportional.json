@@ -46,7 +46,8 @@
       "brush_thin": 3.0,
       "brush_thick": 8.0,
       "burin": 3.2,
-      "drypoint": 2.6
+      "drypoint": 2.6,
+      "computer": 2.0
     }
   },
   "canvases": {
@@ -1484,6 +1485,11 @@
     },
     {
       "aspect": "square",
+      "weight": "computer",
+      "value": 2.0
+    },
+    {
+      "aspect": "square",
       "weight": "crayon",
       "value": 4.0
     },
@@ -1531,6 +1537,11 @@
       "aspect": "wide",
       "weight": "chalk",
       "value": 3.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "computer",
+      "value": 2.0
     },
     {
       "aspect": "wide",
@@ -1584,6 +1595,11 @@
     },
     {
       "aspect": "pillar",
+      "weight": "computer",
+      "value": 0.4
+    },
+    {
+      "aspect": "pillar",
       "weight": "crayon",
       "value": 0.8
     },
@@ -1631,6 +1647,11 @@
       "aspect": "vertical",
       "weight": "chalk",
       "value": 1.6860000000000002
+    },
+    {
+      "aspect": "vertical",
+      "weight": "computer",
+      "value": 1.124
     },
     {
       "aspect": "vertical",

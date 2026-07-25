@@ -8,7 +8,10 @@
       "event_rate": 0.04,
       "taper": 0.05,
       "bulge": 0.02,
-      "gesture": 0.012
+      "gesture": 0.012,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "pencil": {
       "stiffness": 0.58,
@@ -18,7 +21,10 @@
       "event_rate": 0.55,
       "taper": 0.12,
       "bulge": 0.14,
-      "gesture": 0.05
+      "gesture": 0.05,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "pen": {
       "stiffness": 0.82,
@@ -28,7 +34,10 @@
       "event_rate": 0.12,
       "taper": 0.08,
       "bulge": 0.06,
-      "gesture": 0.022
+      "gesture": 0.022,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "rotring": {
       "stiffness": 1.0,
@@ -38,7 +47,10 @@
       "event_rate": 0.0,
       "taper": 0.0,
       "bulge": 0.0,
-      "gesture": 0.0
+      "gesture": 0.0,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "crayon": {
       "stiffness": 0.48,
@@ -48,7 +60,10 @@
       "event_rate": 0.75,
       "taper": 0.14,
       "bulge": 0.18,
-      "gesture": 0.06
+      "gesture": 0.06,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "chalk": {
       "stiffness": 0.42,
@@ -58,7 +73,10 @@
       "event_rate": 0.9,
       "taper": 0.18,
       "bulge": 0.2,
-      "gesture": 0.07
+      "gesture": 0.07,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "brush_thin": {
       "stiffness": 0.36,
@@ -68,7 +86,10 @@
       "event_rate": 0.48,
       "taper": 0.88,
       "bulge": 0.28,
-      "gesture": 0.1
+      "gesture": 0.1,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "brush_thick": {
       "stiffness": 0.3,
@@ -78,7 +99,10 @@
       "event_rate": 0.58,
       "taper": 0.92,
       "bulge": 0.34,
-      "gesture": 0.13
+      "gesture": 0.13,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "burin": {
       "stiffness": 0.91,
@@ -88,7 +112,10 @@
       "event_rate": 0.08,
       "taper": 0.98,
       "bulge": 1.0,
-      "gesture": 0.018
+      "gesture": 0.018,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
     },
     "drypoint": {
       "stiffness": 0.68,
@@ -98,11 +125,361 @@
       "event_rate": 0.45,
       "taper": 0.55,
       "bulge": 0.48,
-      "gesture": 0.05
+      "gesture": 0.05,
+      "periodic": false,
+      "quantize": 0.0,
+      "width_steps": 0
+    },
+    "computer": {
+      "stiffness": 1.0,
+      "damping": 1.0,
+      "energy_width": 0.3,
+      "energy_lateral": 0.34,
+      "event_rate": 0.0,
+      "taper": 0.0,
+      "bulge": 0.0,
+      "gesture": 0.06,
+      "periodic": true,
+      "quantize": 0.018,
+      "width_steps": 4
     }
   },
   "wild_gain": 3.5,
   "gesture_edge": 0.16,
+  "raster_bleed_opacity": 0.45,
+  "machine": [
+    {
+      "t": 0.0,
+      "energy": 0.0,
+      "swell": 0.45,
+      "gesture": 0.0
+    },
+    {
+      "t": 0.125,
+      "energy": -0.229116882454,
+      "swell": 0.660475887801,
+      "gesture": 1.0
+    },
+    {
+      "t": 0.25,
+      "energy": 0.72,
+      "swell": 0.838908729653,
+      "gesture": 0.0
+    },
+    {
+      "t": 0.375,
+      "energy": -0.789116882454,
+      "swell": 0.958133742881,
+      "gesture": -1.0
+    },
+    {
+      "t": 0.5,
+      "energy": 0.0,
+      "swell": 1.0,
+      "gesture": -0.0
+    },
+    {
+      "t": 0.625,
+      "energy": 0.789116882454,
+      "swell": 0.958133742881,
+      "gesture": 1.0
+    },
+    {
+      "t": 0.75,
+      "energy": -0.72,
+      "swell": 0.838908729653,
+      "gesture": 0.0
+    },
+    {
+      "t": 0.875,
+      "energy": 0.229116882454,
+      "swell": 0.660475887801,
+      "gesture": -1.0
+    },
+    {
+      "t": 1.0,
+      "energy": -0.0,
+      "swell": 0.45,
+      "gesture": -0.0
+    }
+  ],
+  "grid_point": [
+    {
+      "value": 0.0,
+      "step": 0.0,
+      "point": 0.0
+    },
+    {
+      "value": 8.9,
+      "step": 0.0,
+      "point": 8.9
+    },
+    {
+      "value": 9.0,
+      "step": 0.0,
+      "point": 9.0
+    },
+    {
+      "value": 9.1,
+      "step": 0.0,
+      "point": 9.1
+    },
+    {
+      "value": 17.999,
+      "step": 0.0,
+      "point": 17.999
+    },
+    {
+      "value": 18.0,
+      "step": 0.0,
+      "point": 18.0
+    },
+    {
+      "value": 27.0,
+      "step": 0.0,
+      "point": 27.0
+    },
+    {
+      "value": 500.0,
+      "step": 0.0,
+      "point": 500.0
+    },
+    {
+      "value": -9.0,
+      "step": 0.0,
+      "point": -9.0
+    },
+    {
+      "value": -27.0,
+      "step": 0.0,
+      "point": -27.0
+    },
+    {
+      "value": -500.5,
+      "step": 0.0,
+      "point": -500.5
+    },
+    {
+      "value": 0.0,
+      "step": 18.0,
+      "point": 0.0
+    },
+    {
+      "value": 8.9,
+      "step": 18.0,
+      "point": 0.0
+    },
+    {
+      "value": 9.0,
+      "step": 18.0,
+      "point": 0.0
+    },
+    {
+      "value": 9.1,
+      "step": 18.0,
+      "point": 18.0
+    },
+    {
+      "value": 17.999,
+      "step": 18.0,
+      "point": 18.0
+    },
+    {
+      "value": 18.0,
+      "step": 18.0,
+      "point": 18.0
+    },
+    {
+      "value": 27.0,
+      "step": 18.0,
+      "point": 36.0
+    },
+    {
+      "value": 500.0,
+      "step": 18.0,
+      "point": 504.0
+    },
+    {
+      "value": -9.0,
+      "step": 18.0,
+      "point": 0.0
+    },
+    {
+      "value": -27.0,
+      "step": 18.0,
+      "point": -36.0
+    },
+    {
+      "value": -500.5,
+      "step": 18.0,
+      "point": -504.0
+    },
+    {
+      "value": 0.0,
+      "step": 7.5,
+      "point": 0.0
+    },
+    {
+      "value": 8.9,
+      "step": 7.5,
+      "point": 7.5
+    },
+    {
+      "value": 9.0,
+      "step": 7.5,
+      "point": 7.5
+    },
+    {
+      "value": 9.1,
+      "step": 7.5,
+      "point": 7.5
+    },
+    {
+      "value": 17.999,
+      "step": 7.5,
+      "point": 15.0
+    },
+    {
+      "value": 18.0,
+      "step": 7.5,
+      "point": 15.0
+    },
+    {
+      "value": 27.0,
+      "step": 7.5,
+      "point": 30.0
+    },
+    {
+      "value": 500.0,
+      "step": 7.5,
+      "point": 502.5
+    },
+    {
+      "value": -9.0,
+      "step": 7.5,
+      "point": -7.5
+    },
+    {
+      "value": -27.0,
+      "step": 7.5,
+      "point": -30.0
+    },
+    {
+      "value": -500.5,
+      "step": 7.5,
+      "point": -502.5
+    }
+  ],
+  "grid_step_px": [
+    {
+      "weight": "computer",
+      "aspect": "square",
+      "canvas": [
+        1000,
+        1000
+      ],
+      "value": 18.0
+    },
+    {
+      "weight": "pen",
+      "aspect": "square",
+      "canvas": [
+        1000,
+        1000
+      ],
+      "value": 0.0
+    },
+    {
+      "weight": "rotring",
+      "aspect": "square",
+      "canvas": [
+        1000,
+        1000
+      ],
+      "value": 0.0
+    },
+    {
+      "weight": "computer",
+      "aspect": "wide",
+      "canvas": [
+        2350,
+        1000
+      ],
+      "value": 18.0
+    },
+    {
+      "weight": "pen",
+      "aspect": "wide",
+      "canvas": [
+        2350,
+        1000
+      ],
+      "value": 0.0
+    },
+    {
+      "weight": "rotring",
+      "aspect": "wide",
+      "canvas": [
+        2350,
+        1000
+      ],
+      "value": 0.0
+    },
+    {
+      "weight": "computer",
+      "aspect": "pillar",
+      "canvas": [
+        200,
+        1000
+      ],
+      "value": 3.6
+    },
+    {
+      "weight": "pen",
+      "aspect": "pillar",
+      "canvas": [
+        200,
+        1000
+      ],
+      "value": 0.0
+    },
+    {
+      "weight": "rotring",
+      "aspect": "pillar",
+      "canvas": [
+        200,
+        1000
+      ],
+      "value": 0.0
+    },
+    {
+      "weight": "computer",
+      "aspect": "vertical",
+      "canvas": [
+        562,
+        1000
+      ],
+      "value": 10.116
+    },
+    {
+      "weight": "pen",
+      "aspect": "vertical",
+      "canvas": [
+        562,
+        1000
+      ],
+      "value": 0.0
+    },
+    {
+      "weight": "rotring",
+      "aspect": "vertical",
+      "canvas": [
+        562,
+        1000
+      ],
+      "value": 0.0
+    }
+  ],
   "unit": [
     {
       "seed": 1,

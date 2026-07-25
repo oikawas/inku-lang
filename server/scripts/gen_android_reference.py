@@ -1,6 +1,6 @@
 """Generate the server-side reference corpus the Android port is verified against.
 
-The Android renderer is being caught up from engine 2 to engine 10. Parity is
+The Android renderer is being caught up from engine 12 to engine 14. Parity is
 checked against fixtures produced here, so the expected values always come from
 the server implementation rather than from the port's own behavior.
 
@@ -65,13 +65,21 @@ def _samples(samples) -> list[dict]:
             "energy": round(s.energy, 9),
             "lateral": round(s.lateral, 9),
             "event": s.event,
+            # engine 13: the distance the lattice moved the sample. Zero for
+            # every tool that does not quantize; the renderer turns it into the
+            # opacity of one raster-bleed cell.
+            "residual": round(s.residual, 9),
         }
         for s in samples
     ]
 
 
-def _along(name, centerline, base_width, weight, seed, closed, anchors=frozenset()):
-    result = se.synthesize_along(centerline, base_width, weight, seed, closed=closed, anchors=anchors)
+def _along(name, centerline, base_width, weight, seed, closed, anchors=frozenset(),
+           grid_step=0.0, wild=False):
+    result = se.synthesize_along(
+        centerline, base_width, weight, seed, closed=closed, anchors=anchors,
+        grid_step=grid_step, wild=wild,
+    )
     return {
         "name": name,
         "input": {
@@ -81,6 +89,8 @@ def _along(name, centerline, base_width, weight, seed, closed, anchors=frozenset
             "seed": seed,
             "closed": closed,
             "anchors": sorted(anchors),
+            "grid_step": grid_step,
+            "wild": wild,
         },
         "samples": _samples(result.samples),
         "left": [[round(x, 6), round(y, 6)] for x, y in result.left],
@@ -105,6 +115,18 @@ def stroke_engine_fixtures() -> None:
         # Closed, no anchors, with events: the seam correction and the event
         # branches have to hold at the same time.
         _along("closed_circle_chalk_events", circle, 5.0, "chalk", 12, True),
+        # engine 14: `wild` now reaches the contour path, not only straight
+        # strokes. A port that left `synthesize_along` on the engine 12 wiring
+        # produces the OFF result here and passes everything else.
+        _along("closed_circle_pencil_wild", circle, 5.0, "pencil", 4242, True, wild=True),
+        # engine 13/14: the computer on the canvas-wide lattice. 18.0 px is
+        # `canvas.unit * 0.018` for every square canvas.
+        _along("closed_circle_computer_grid", circle, 5.0, "computer", 4242, True,
+               grid_step=18.0),
+        # The same contour with `wild` ON. A periodic grammar ignores `wild`, so
+        # this must equal `closed_circle_computer_grid` value for value.
+        _along("closed_circle_computer_grid_wild", circle, 5.0, "computer", 4242, True,
+               grid_step=18.0, wild=True),
     ]
     (OUT / "stroke_engine_synthesize_along.json").write_text(json.dumps(cases, ensure_ascii=False, indent=2))
 
@@ -136,19 +158,46 @@ def stroke_engine_fixtures() -> None:
         _stroke("line_pencil_gesture_wild", (100.0, 500.0), (900.0, 500.0), 6.0, "pencil", 12345, wild=True),
         _stroke("line_brush_thick_wild", (200.0, 200.0), (800.0, 800.0), 8.0, "brush_thick", 999, wild=True),
         _stroke("line_rotring_wild", (100.0, 500.0), (900.0, 500.0), 6.0, "rotring", 12345, wild=True),
+        # engine 13: the computer. Its energy, swell and gesture come from fixed
+        # commensurate frequencies, so the figure repeats independently of the
+        # seed — the pair below differs only in `seed` and must agree sample for
+        # sample. Width lands on `base_width / width_steps` steps.
+        _stroke("line_computer_plain", (100.0, 500.0), (900.0, 500.0), 6.0, "computer", 12345),
+        _stroke("line_computer_other_seed", (100.0, 500.0), (900.0, 500.0), 6.0, "computer", 999),
+        # engine 14: one canvas-wide lattice. Both of these carry the SAME
+        # `grid_step`, so the short stroke lands on the same cells as the long
+        # one. A port that keeps the engine 13 rule (pitch as a fraction of the
+        # stroke) passes the long case and fails the short one.
+        _stroke("line_computer_grid", (100.0, 500.0), (900.0, 500.0), 6.0, "computer", 12345,
+                grid_step=18.0),
+        _stroke("line_computer_grid_short", (450.0, 500.0), (550.0, 500.0), 6.0, "computer", 12345,
+                grid_step=18.0, samples=17),
+        # `wild` is ignored by a periodic grammar: this must equal
+        # `line_computer_grid` value for value, including `residual`.
+        _stroke("line_computer_grid_wild", (100.0, 500.0), (900.0, 500.0), 6.0, "computer", 12345,
+                grid_step=18.0, wild=True),
+        # A hand tool on the same lattice. The renderer never does this (only
+        # quantizing tools get a non-zero step), but it separates "quantize when
+        # the grammar says so" from "quantize when the caller passes a step":
+        # the second is the implementation.
+        _stroke("line_pencil_grid", (100.0, 500.0), (900.0, 500.0), 6.0, "pencil", 12345,
+                grid_step=18.0),
     ]
     (OUT / "stroke_engine_synthesize_stroke.json").write_text(json.dumps(straight, ensure_ascii=False, indent=2))
 
     primitive_fixtures()
 
 
-def _stroke(name, start, end, base_width, weight, seed, samples=49, wild=False):
-    result = se.synthesize_stroke(start, end, base_width, weight, seed, samples=samples, wild=wild)
+def _stroke(name, start, end, base_width, weight, seed, samples=49, wild=False, grid_step=0.0):
+    result = se.synthesize_stroke(
+        start, end, base_width, weight, seed, samples=samples, wild=wild, grid_step=grid_step
+    )
     return {
         "name": name,
         "input": {
             "start": list(start), "end": list(end), "base_width": base_width,
             "weight": weight, "seed": seed, "samples": samples, "wild": wild,
+            "grid_step": grid_step,
         },
         "samples": _samples(result.samples),
         "outline": [[round(x, 6), round(y, 6)] for x, y in result.outline],
@@ -258,6 +307,41 @@ def primitive_fixtures() -> None:
         for t in (0.0, 0.25, 0.5, 0.75, 1.0)
     ]
 
+    # engine 13: the machine terms. They take no seed at all, which is the whole
+    # point — a computer stroke repeats exactly. A port that salts them with the
+    # seed passes the shape tests and fails the two-seed identity above.
+    machine = [
+        {
+            "t": t,
+            "energy": round(se._machine_energy(t), 12),
+            "swell": round(se._machine_swell(t), 12),
+            "gesture": round(se._machine_gesture(t), 12),
+        }
+        for t in (0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0)
+    ]
+    # engine 14: rounding onto the lattice. Negative values and exact half steps
+    # are where `round` and `floor(x+0.5)` part company.
+    grid = [
+        {"value": v, "step": step, "point": round(se.grid_point(v, step), 12)}
+        for step in (0.0, 18.0, 7.5)
+        for v in (0.0, 8.9, 9.0, 9.1, 17.999, 18.0, 27.0, 500.0, -9.0, -27.0, -500.5)
+    ]
+    # engine 14: the pitch itself. It is `min(width, height) * quantize`, so the
+    # non-square canvases below all keep the square canvas's step. A port that
+    # reads the long side (or the stroke length) diverges here first.
+    from inku_server.plugins import canvas_size_for_aspect
+
+    grid_step_px = [
+        {
+            "weight": w,
+            "aspect": aspect,
+            "canvas": [canvas_size_for_aspect(aspect).width, canvas_size_for_aspect(aspect).height],
+            "value": round(renderer._grid_step_px(w, canvas_size_for_aspect(aspect)), 12),
+        }
+        for aspect in ("square", "wide", "pillar", "vertical")
+        for w in ("computer", "pen", "rotring")
+    ]
+
     (OUT / "stroke_engine_primitives.json").write_text(json.dumps({
         "grammars": {
             weight: {
@@ -265,11 +349,19 @@ def primitive_fixtures() -> None:
                 "energy_width": g.energy_width, "energy_lateral": g.energy_lateral,
                 "event_rate": g.event_rate, "taper": g.taper, "bulge": g.bulge,
                 "gesture": g.gesture,
+                # engine 13: exact repetition, the lattice pitch as a fraction of
+                # the canvas short side, and the number of width steps.
+                "periodic": g.periodic, "quantize": g.quantize,
+                "width_steps": g.width_steps,
             }
             for weight, g in se.GRAMMARS.items()
         },
         "wild_gain": se.WILD_GAIN,
         "gesture_edge": se._GESTURE_EDGE,
+        "raster_bleed_opacity": renderer.RASTER_BLEED_OPACITY,
+        "machine": machine,
+        "grid_point": grid,
+        "grid_step_px": grid_step_px,
         "unit": unit,
         "smooth_noise": smooth,
         "edge_window": edge_window,
@@ -288,16 +380,34 @@ SCORES: dict[str, dict] = {
     "04_arc_crayon": {"instructions": [{"primitive": "arc", "center": [0.5, 0.5], "radius": 0.3, "angle_start": 0, "angle_end": 180, "weight": "crayon"}]},
     "05_circle_rotring": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "rotring"}]},
     "06_surface_hatch": {"instructions": [{"primitive": "square", "position": [0.25, 0.25], "size": [0.5, 0.5], "weight": "pen", "surface": {"texture": "hatch", "density": 0.5, "direction": "diagonal_rising"}}]},
+    # engine 13/14: the computer tool. 17 and 18 differ only in length, and the
+    # `raster-bleed` cells of both must sit on the same lattice — that is what
+    # "one drawing, one grid" means. 19 puts the lattice on a closed contour,
+    # 20 puts it on a canvas whose long side is 2.35x the short one (the pitch
+    # must not move), and 21 sends it through the hatch call site.
+    "17_line_computer": {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "weight": "computer"}]},
+    "18_line_computer_short": {"instructions": [{"primitive": "line", "from": [0.45, 0.3], "to": [0.55, 0.3], "weight": "computer"}]},
+    "19_circle_computer": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "computer"}]},
+    "20_line_computer_wide": {"canvas": {"aspect": "wide"}, "instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "weight": "computer"}]},
+    "21_hatch_computer": {"instructions": [{"primitive": "square", "position": [0.25, 0.25], "size": [0.5, 0.5], "weight": "computer", "surface": {"texture": "hatch", "density": 0.5, "direction": "diagonal_rising"}}]},
 }
 
-# engine 12: `wild` reaches only `synthesize_stroke`, which the renderer calls
-# for the `line` primitive alone. Each of these repeats the Score of a tracked
-# OFF render, so the pair is the test: 15 must differ from 02, and 16 must be
-# byte-identical to 01. A port that wires `wild` into the contour path passes
-# the first and fails the second.
+# Each of these repeats the Score of a tracked OFF render, so the pair is the
+# test. engine 14 moved the line: `wild` now reaches every contour, not only the
+# `line` primitive, so 16 must DIFFER from 01 (under engine 12 it was
+# byte-identical). The two identities left are the discriminating ones —
+# cloudform does not go through the stroke path at all, and a periodic grammar
+# ignores `wild` — so a port that wires the flag in globally fails 24 and 25.
+#
+#   must differ:    15 vs 02   16 vs 01   22 vs 04   23 vs 03
+#   must be equal:  24 vs 11   25 vs 17
 WILD_SCORES: dict[str, str] = {
     "15_line_brush_wild": "02_line_brush",
     "16_circle_pen_wild": "01_circle_pen",
+    "22_arc_crayon_wild": "04_arc_crayon",
+    "23_square_filled_wild": "03_square_filled",
+    "24_cloudform_pencil_wild": "11_cloudform_pencil",
+    "25_line_computer_wild": "17_line_computer",
 }
 
 TAGS = ("path", "polyline", "polygon", "circle", "ellipse", "line", "rect", "g")
@@ -837,6 +947,10 @@ def fill_and_arc_fixtures() -> None:
 WEIGHTS_ALL = (
     "hair", "pencil", "pen", "rotring", "crayon",
     "chalk", "brush_thin", "brush_thick", "burin", "drypoint",
+    # engine 13. Its lateral energy is 0.34, so the cloudform touch term is not
+    # zero: a port that treats the computer as "rotring with a lattice" lands on
+    # a different contour for every angle.
+    "computer",
 )
 
 CLOUDFORM_SCORES: dict[str, dict] = {

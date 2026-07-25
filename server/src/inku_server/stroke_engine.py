@@ -26,6 +26,11 @@ class ToolGrammar:
     # Exact repetition belongs to the computer tool. The zero defaults keep the
     # existing hand-tool grammars on their unchanged path.
     periodic: bool = False
+    # Lattice pitch as a fraction of the canvas short side, not of the stroke.
+    # The grid is the paper the tool works on, so one drawing has one grid: a
+    # short line and a long one land on the same cells. The caller turns this
+    # into px (`canvas.unit * quantize`) and passes it in as `grid_step`,
+    # because this module does not know the canvas.
     quantize: float = 0.0
     width_steps: int = 0
 
@@ -230,7 +235,13 @@ def synthesize_stroke(
     samples: int = 49,
     *,
     wild: bool = False,
+    grid_step: float = 0.0,
 ) -> StrokeResult:
+    """Synthesize one straight stroke.
+
+    `grid_step` is the side of one lattice cell in px, already resolved against
+    the canvas by the caller. Zero means the tool does not quantize.
+    """
     grammar = GRAMMARS[weight]
     dx, dy = end[0] - start[0], end[1] - start[1]
     length = max(1e-6, math.hypot(dx, dy))
@@ -311,9 +322,8 @@ def synthesize_stroke(
         x = position[0] + nx * lateral + gx
         y = position[1] + ny * lateral + gy
         residual = 0.0
-        if grammar.quantize:
-            step = length * grammar.quantize
-            qx, qy = _quantize(x, step), _quantize(y, step)
+        if grid_step > 0:
+            qx, qy = _quantize(x, grid_step), _quantize(y, grid_step)
             residual = math.hypot(x - qx, y - qy)
             x, y = qx, qy
         if grammar.width_steps:
@@ -339,7 +349,7 @@ def synthesize_stroke(
         len(events),
         side,
         min(0.35, burr_opacity),
-        length * grammar.quantize,
+        grid_step,
     )
 
 
@@ -431,6 +441,7 @@ def synthesize_along(
     *,
     closed: bool,
     anchors: frozenset[int] = frozenset(),
+    grid_step: float = 0.0,
 ) -> ContourStrokeResult:
     """Synthesize one stroke that follows an arbitrary intended centerline.
 
@@ -444,6 +455,9 @@ def synthesize_along(
     between two strokes. A closed centerline with no anchors is instead closed
     by ramping the accumulated deviation back to its seam value, so the loop
     meets itself without a kink.
+
+    `grid_step` is the side of one lattice cell in px, already resolved against
+    the canvas by the caller. Zero means the tool does not quantize.
     """
     points = list(centerline)
     count = len(points)
@@ -456,16 +470,6 @@ def synthesize_along(
 
     normals = centerline_normals(points, closed)
     parameters = _arc_length_parameters(points, closed)
-    total_length = max(
-        1e-6,
-        sum(
-            math.hypot(
-                points[index + 1][0] - points[index][0],
-                points[index + 1][1] - points[index][1],
-            )
-            for index in range(count - 1)
-        ),
-    )
     events = _event_map(seed, grammar.event_rate, count)
     position = [points[0][0], points[0][1]]
     velocity = [0.0, 0.0]
@@ -532,9 +536,8 @@ def synthesize_along(
         nx, ny = normals[index]
         x, y = position[0] + nx * lateral, position[1] + ny * lateral
         residual = 0.0
-        if grammar.quantize:
-            step = total_length * grammar.quantize
-            qx, qy = _quantize(x, step), _quantize(y, step)
+        if grid_step > 0:
+            qx, qy = _quantize(x, grid_step), _quantize(y, grid_step)
             residual = math.hypot(x - qx, y - qy)
             x, y = qx, qy
         if grammar.width_steps:
@@ -575,7 +578,7 @@ def synthesize_along(
         side,
         min(0.35, burr_opacity),
         closed,
-        total_length * grammar.quantize,
+        grid_step,
     )
 
 

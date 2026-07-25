@@ -391,6 +391,20 @@ def _stroke_width_px(weight: str, canvas: CanvasSize) -> float:
     return WEIGHT_TO_STROKE_WIDTH[weight] * _unit_scale(canvas)
 
 
+def _grid_step_px(weight: str, canvas: CanvasSize) -> float:
+    """量子化する道具の目盛 (px)。量子化しない道具は 0.0。
+
+    一枚の紙には一枚の方眼しかない。目盛はキャンバス短辺だけで決まり、置かれた
+    対象の大きさにも位置にも依らないので、同じ絵の中のすべてのストロークが同じ
+    セルへ落ちる。stroke_engine はキャンバスを知らないので、ここで px へ直して
+    渡す。
+    """
+    grammar = GRAMMARS.get(weight)
+    if grammar is None or grammar.quantize <= 0:
+        return 0.0
+    return canvas.unit * grammar.quantize
+
+
 def _speck_count(base: int, path_len_px: float, canvas: CanvasSize) -> int:
     """speck の個数を輪郭長 (線なら線長) に比例させる。
 
@@ -2220,6 +2234,7 @@ def _render_surface_vectors(
                     ins.weight,
                     _fill_stroke_seed(seed, i + layer_index * 4096),
                     closed=False,
+                    grid_step=_grid_step_px(ins.weight, canvas),
                 )
                 group.add(
                     dwg.path(
@@ -3662,6 +3677,7 @@ def _render_hand_stroke(
 ):
     length = math.hypot(end[0] - start[0], end[1] - start[1])
     base_width = _stroke_width_px(ins.weight, canvas)
+    grid_step = _grid_step_px(ins.weight, canvas)
     stroke = synthesize_stroke(
         start,
         end,
@@ -3670,6 +3686,7 @@ def _render_hand_stroke(
         _seed_for_instruction(ins, render_seed),
         samples=_stroke_sample_count(length, canvas),
         wild=wild,
+        grid_step=grid_step,
     )
     group = dwg.g(
         class_=f"stroke-engine-v1 controls-{len(stroke.samples)} events-{stroke.event_count}"
@@ -3697,6 +3714,7 @@ def _render_hand_stroke(
             _seed_for_instruction(ins, render_seed),
             samples=len(centerline),
             wild=wild,
+            grid_step=grid_step,
         )
         outline = outline_for_centerline(
             centerline, [sample.width for sample in varied.samples]
@@ -3882,6 +3900,7 @@ def _render_fill_strokes(
     if len(contour) < 3:
         return None
     base_width = _stroke_width_px(ins.weight, canvas)
+    grid_step = _grid_step_px(ins.weight, canvas)
     seed = _seed_for_instruction(ins, render_seed)
     segments = _scanline_segments(
         contour, _fill_scan_angle(seed), _fill_scan_spacing(ins, canvas), seed
@@ -3921,6 +3940,7 @@ def _render_fill_strokes(
             ins.weight,
             _fill_stroke_seed(seed, order),
             closed=False,
+            grid_step=grid_step,
         )
         path_attrs = {
             "d": contour_stroke_path(stroke),
@@ -3990,6 +4010,7 @@ def _render_contour_hand_stroke(
         _seed_for_instruction(ins, render_seed),
         closed=closed,
         anchors=anchors,
+        grid_step=_grid_step_px(ins.weight, canvas),
     )
     group = dwg.g(
         class_=(
@@ -4074,7 +4095,14 @@ def _render_arc_hand_stroke(
             cx, cy, r, ins.angle_start, ins.angle_end, _stroke_sample_count(arc_len, canvas)
         )
     base_width = _stroke_width_px(ins.weight, canvas)
-    stroke = synthesize_along(centerline, base_width, ins.weight, seed, closed=False)
+    stroke = synthesize_along(
+        centerline,
+        base_width,
+        ins.weight,
+        seed,
+        closed=False,
+        grid_step=_grid_step_px(ins.weight, canvas),
+    )
     group = dwg.g(
         class_=(
             f"arc-stroke-v1 controls-{len(stroke.samples)} events-{stroke.event_count}"

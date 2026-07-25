@@ -1936,3 +1936,23 @@ Per contract `antigravity-android-engine12.md` §4b, the material outline layer 
 - `render_engine_version` remains `"11"` (to be bumped to `"12"` at 4c final commit).
 - XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 65 out of 65 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
 - `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148085`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4c (Wild Wiring & Engine Version 12 Promotion)
+
+Per contract `antigravity-android-engine12.md` §4c, the `wild` flag wiring (`line` primitive only) and `render_engine_version` promotion to `"12"` were completed.
+
+### Implementation Details
+
+1. **`wild` Flag Pipeline Wiring (`DefaultSvgRenderer.kt`)**:
+   - Read `render_wild` / `wild` from `score` JSON and wired it through `renderInstruction` → `renderHandStroke` → `ServerStrokeEngine.synthesizeStroke(..., wild = wild)`.
+   - Scoped strictly to `line` primitives, ensuring closed contours, hatches, and arcs remain unaffected.
+2. **`render_engine_version` Promotion**:
+   - Promoted `render_engine_version` in `DefaultSvgRenderer.kt` metadata from `"11"` to **`"12"`**.
+3. **Discriminating Pair Tests (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - Added `testWildPairingDivergenceAndIdentity`.
+   - Verified that `15_line_brush_wild` diverges from `02_line_brush` (`assertNotEquals`), while `16_circle_pen_wild` maintains **exact byte identity** with `01_circle_pen` (`assertEquals`).
+
+### Verification
+
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 66 out of 66 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148086`.

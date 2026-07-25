@@ -1500,4 +1500,24 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 65 件の単体テストが **100% 成功 (PASS 65 / Failures 0 / Errors 0 / Skipped 0)**。
 - `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148085`** にインクリメント。
 
+## 2026-07-25 render engine 12 追随 段 4c (wild の結線と render_engine_version="12" 昇格)
+
+契約 `antigravity-android-engine12.md` §4c に基づき、`wild` フラグの配線（`line` プリミティブ専用）および `render_engine_version` の `"12"` への昇格を完了した。
+
+### 実装および追随の詳細
+
+1. **`wild` フラグのパイプライン接続 (`DefaultSvgRenderer.kt`)**:
+   - `score` JSON の `render_wild` / `wild` フラグを読み取り、`renderInstruction` → `renderHandStroke` → `ServerStrokeEngine.synthesizeStroke(..., wild = wild)` へ配線。
+   - `line` プリミティブのみに適用し、円・矩形・弧・ハッチ等の `synthesizeAlong` や輪郭には通さない仕様を維持。
+2. **`render_engine_version` の更新**:
+   - `DefaultSvgRenderer.kt` の出力メタデータにおいて `render_engine_version` を `"11"` から **`"12"`** へ更新。
+3. **判別テストの追加 (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - `testWildPairingDivergenceAndIdentity` を追加。
+   - 同一 Score 条件下で `15_line_brush_wild` が `02_line_brush` と異なること（`assertNotEquals`）、および `16_circle_pen_wild` が `01_circle_pen` と**バイト完全一致**すること（`assertEquals`）を検証。
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 66 件の単体テストが **100% 成功 (PASS 66 / Failures 0 / Errors 0 / Skipped 0)**。
+- `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148086`** にインクリメント。
+
 

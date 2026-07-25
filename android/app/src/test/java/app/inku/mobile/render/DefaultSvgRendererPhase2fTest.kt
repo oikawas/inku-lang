@@ -30,6 +30,9 @@ class DefaultSvgRendererPhase2fTest {
         if (entry.has("render_seed") && !entry.isNull("render_seed")) {
             scoreObj.put("render_seed", entry.getLong("render_seed"))
         }
+        if (entry.has("wild") && !entry.isNull("wild")) {
+            scoreObj.put("render_wild", entry.getBoolean("wild"))
+        }
 
         val renderer = DefaultSvgRenderer()
         val result = renderer.render(
@@ -235,5 +238,16 @@ class DefaultSvgRendererPhase2fTest {
             val actualElements = countElements(actualSvg)
             assertEquals("Element counts map for $key.svg must match", expectedElements, actualElements)
         }
+    }
+
+    @Test
+    fun testWildPairingDivergenceAndIdentity() {
+        val svg02 = renderSvgForReference("02_line_brush")
+        val svg15 = renderSvgForReference("15_line_brush_wild")
+        org.junit.Assert.assertNotEquals("15_line_brush_wild must diverge from 02_line_brush", svg02, svg15)
+
+        val svg01 = renderSvgForReference("01_circle_pen")
+        val svg16 = renderSvgForReference("16_circle_pen_wild")
+        assertEquals("16_circle_pen_wild must be byte-identical to 01_circle_pen", svg01, svg16)
     }
 }

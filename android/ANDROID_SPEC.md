@@ -1956,3 +1956,31 @@ Per contract `antigravity-android-engine12.md` §4c, the `wild` flag wiring (`li
 
 - XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 66 out of 66 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
 - `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148086`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4d (rh3 Migration, Room Database & UI Integration)
+
+Per contract `antigravity-android-engine12.md` §4d, the edition ID migration to `rh3`, Room schema extension, and UI toggle integration were completed.
+
+### Implementation Details
+
+1. **Edition ID Migration to `rh3` (`LocalFallbackPipeline.kt`)**:
+   - Updated `renderHash` method to `rh3` format.
+   - Standardized payload to 7 keys in ascending order (`render_color_catalog_id`, `render_engine_id`, `render_engine_version`, `render_seed`, `render_wild`, `score`, `version`).
+   - Verified zero occurrences of `rh2` in the codebase via `grep_search`.
+2. **`rh3` Fixed Reference Parity Tests (`ServerScoreParityTest.kt`)**:
+   - Updated `testRenderHashParity` to assert all 4 reference expectation strings specified in §3.5:
+     - `render_wild` unset: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = false`: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = true`: `rh3:842f46d67af6a696001f90ccd29367a8b65888cd8ea922e67ecb4d82f7c139e2`
+     - `render_wild = false` / engine `"11"`: `rh3:d1b1c9e25a031429e931ae6d8575dbda538bb78e8862a7ace337d2077799e8b6`
+3. **Room Schema Extension & Migration (`HistoryItemEntity.kt`, `InkuDatabase.kt`)**:
+   - Added `renderWild: Boolean? = null` column to `HistoryItemEntity`.
+   - Bumped `InkuDatabase` to `version = 4` and registered `MIGRATION_3_4` (`ALTER TABLE history_items ADD COLUMN render_wild INTEGER`).
+4. **UI Toggle Integration (`InkuViewModel.kt`, `InkuApp.kt`)**:
+   - Added `renderWild: Boolean = false` state and `setRenderWild` handler to `InkuViewModel`.
+   - Added "暴れる（演奏上限の解除） / Wild (unleashed performance)" toggle switch (default OFF) in settings panel.
+
+### Verification
+
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 66 out of 66 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148087`.

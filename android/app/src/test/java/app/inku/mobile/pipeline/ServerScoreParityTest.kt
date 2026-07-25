@@ -141,30 +141,9 @@ class ServerScoreParityTest {
     }
 
     @Test
-    fun testRenderHashExactParityWithSeedCanonicalization() {
+    fun testRenderHashParity() {
         val pipeline = LocalFallbackPipeline()
-        val scoreStr = """{"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1}]}"""
-        val metadataJson = """{
-            "render_seed": "12345",
-            "vary_seed": null,
-            "render_build_number": "689",
-            "render_engine_id": "default",
-            "render_engine_version": "2",
-            "render_color_catalog_id": "default"
-        }"""
-        val request = PaintRequest(
-            description = "中心に円を置く。",
-            originalText = "中心に円を置く。",
-            stage1Model = "local-litert-lm:gemma-4b-it",
-            stage2Model = "local-litert-lm:gemma-4b-it",
-            colorCatalogId = "default",
-            canvasAspect = "square",
-            autoRepair = true,
-        )
-
-        val result = pipeline.renderFromScore(scoreStr, request)
-        // Verify renderHash calculation directly using same metadata structure
-        val renderHashField = LocalFallbackPipeline::class.java.getDeclaredMethod(
+        val renderHashMethod = LocalFallbackPipeline::class.java.getDeclaredMethod(
             "renderHash",
             String::class.java,
             String::class.java,
@@ -174,36 +153,31 @@ class ServerScoreParityTest {
             String::class.java,
         ).apply { isAccessible = true }
 
-        val hash = renderHashField.invoke(
-            pipeline,
-            request.originalText,
-            request.description,
-            scoreStr,
-            "<svg></svg>",
-            metadataJson,
-            "default",
-        ) as String
+        val scoreStr = """{"instructions":[{"center":[0.5,0.5],"primitive":"circle","radius":0.2,"weight":"pen"}]}"""
 
-        val canonicalMethod = LocalFallbackPipeline::class.java.getDeclaredMethod("canonicalJson", Any::class.java).apply { isAccessible = true }
-        val scoreObj = JSONObject(scoreStr)
-        val payload = JSONObject()
-            .put("version", "rh2")
-            .put("score", scoreObj)
+        // Case 1: render_wild unset -> rh3:44cf...
+        val meta1 = JSONObject()
             .put("render_seed", 12345)
-            .put("vary_seed", JSONObject.NULL)
-            .put("render_build_number", "689")
-            .put("render_engine_id", "default")
-            .put("render_engine_version", "2")
+            .put("render_engine_id", "inku-svg")
+            .put("render_engine_version", "12")
             .put("render_color_catalog_id", "default")
-        val ktCanonical = canonicalMethod.invoke(pipeline, payload) as String
-        println("KT_CANONICAL: $ktCanonical")
-        println("COMPUTED_HASH: $hash")
+        val hash1 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta1.toString(), "default") as String
+        assertEquals("rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694", hash1)
 
-        assertEquals(
-            "rh2:d4b42a90425a23c49b23f3b0fe3b52383b158be92ce39286482496cb53021ea6",
-            hash,
-        )
-        assertEquals("1EA6", hash.takeLast(4).uppercase())
+        // Case 2: render_wild = false -> rh3:44cf...
+        val meta2 = JSONObject(meta1.toString()).put("render_wild", false)
+        val hash2 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta2.toString(), "default") as String
+        assertEquals("rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694", hash2)
+
+        // Case 3: render_wild = true -> rh3:842f...
+        val meta3 = JSONObject(meta1.toString()).put("render_wild", true)
+        val hash3 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta3.toString(), "default") as String
+        assertEquals("rh3:842f46d67af6a696001f90ccd29367a8b65888cd8ea922e67ecb4d82f7c139e2", hash3)
+
+        // Case 4: render_wild = false, engine_version = "11" -> rh3:d1b1...
+        val meta4 = JSONObject(meta1.toString()).put("render_wild", false).put("render_engine_version", "11")
+        val hash4 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta4.toString(), "default") as String
+        assertEquals("rh3:d1b1c9e25a031429e931ae6d8575dbda538bb78e8862a7ace337d2077799e8b6", hash4)
     }
 
     @Test

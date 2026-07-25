@@ -1520,4 +1520,32 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 66 件の単体テストが **100% 成功 (PASS 66 / Failures 0 / Errors 0 / Skipped 0)**。
 - `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148086`** にインクリメント。
 
+## 2026-07-25 render engine 12 追随 段 4d (rh3 移行・Room 保存・UI トグル統合)
+
+契約 `antigravity-android-engine12.md` §4d に基づき、エディション ID の `rh3` 移行、Room データベース連携、および UI 設定トグルの統合を完了した。
+
+### 実装および追随の詳細
+
+1. **エディション ID `rh3` への移行 (`LocalFallbackPipeline.kt`)**:
+   - ハッシュ計算処理 `renderHash` を `rh3` に更新。
+   - ペイロードを 7 キー（`render_color_catalog_id`, `render_engine_id`, `render_engine_version`, `render_seed`, `render_wild`, `score`, `version`）の昇順 canonical JSON に統一。
+   - `grep_search` による全検索で `rh2` がコードベース内に一切残存していないことを確認。
+2. **`rh3` 固定実測期待値テスト (`ServerScoreParityTest.kt`)**:
+   - `testRenderHashParity` において §3.5 で指定された 4 つの実測期待値との一致を検証：
+     - `render_wild` 未設定: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = false`: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = true`: `rh3:842f46d67af6a696001f90ccd29367a8b65888cd8ea922e67ecb4d82f7c139e2`
+     - `render_wild = false` / engine `"11"`: `rh3:d1b1c9e25a031429e931ae6d8575dbda538bb78e8862a7ace337d2077799e8b6`
+3. **Room スキーマ拡張とマイグレーション (`HistoryItemEntity.kt`, `InkuDatabase.kt`)**:
+   - `HistoryItemEntity` に `renderWild: Boolean? = null` を追加。
+   - `InkuDatabase` を `version = 4` へ更新し、`MIGRATION_3_4` (`ALTER TABLE history_items ADD COLUMN render_wild INTEGER`) を追加。
+4. **UI トグルスイッチ配置 (`InkuViewModel.kt`, `InkuApp.kt`)**:
+   - `InkuUiState` に `renderWild: Boolean = false` をバインド。
+   - 設定パネル内に「暴れる（演奏上限の解除） / Wild (unleashed performance)」のトグルスイッチ（デフォルト OFF）を配置。
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 66 件の単体テストが **100% 成功 (PASS 66 / Failures 0 / Errors 0 / Skipped 0)**。
+- `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148087`** にインクリメント。
+
 

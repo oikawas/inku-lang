@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PluginSettingEntity::class,
         ExportTemplateEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -39,7 +39,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -54,6 +54,12 @@ abstract class InkuDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_items_trashed_created_at` ON `history_items` (`trashed`, `created_at`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_items_starred_trashed_created_at` ON `history_items` (`starred`, `trashed`, `created_at`)")
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history_items ADD COLUMN render_wild INTEGER")
             }
         }
     }

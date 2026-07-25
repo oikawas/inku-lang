@@ -25,8 +25,15 @@ internal object ServerRendererGeometry {
         return when (seed) {
             is Number -> seed.toLong()
             is String -> seed.toULongOrNull()?.toLong() ?: seed.toLongOrNull() ?: seed.hashCode().toLong()
-            else -> 0L
+            else -> seed?.hashCode()?.toLong() ?: 0L
         }
+    }
+
+    fun seedForInstruction(ins: JSONObject, renderSeed: Long? = null): Long {
+        val localSeed = ins.optLong("render_seed", -1L)
+        val effectiveSeed = if (localSeed != -1L) localSeed else renderSeed
+        if (effectiveSeed != null) return effectiveSeed
+        return seedToLong(ins.toString())
     }
 
     private fun formatSeed(seed: Any): String {

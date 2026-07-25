@@ -1477,4 +1477,27 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 65 件の単体テストのうち 64 件成功、1 件失敗（SVG構造比較。段 4b で解決予定）、スキップ 0 件。`ServerStrokeEngineTest` の 5 件は 100% 成功。
 - 変更は `android/` 配下のみ。
 
+## 2026-07-25 render engine 12 追随 段 4b (材質アウトライン層の移植と完全整合)
+
+契約 `antigravity-android-engine12.md` §4b に基づき、材質アウトライン層（`<polyline class="material-outline">` への置換、ジェスチャ中心線追随、可変 dasharray 列生成、蛇行オフセット、非一様粒）を Android 描画パイプラインへ完全移植した。
+
+### 実装および追随の詳細
+
+1. **材質アウトライン層の拡張 (`ServerRendererMaterial.kt`)**:
+   - 1D Value Noise (`valueNoise1d`) および `hash01` (SHA-256 先頭4バイト) による独立乱数系列生成を移植。
+   - ジェスチャ後の中心線に追随する `offsetPolyline` および全周にわたって非周期的な破線をつくる `variedDashPattern` を実装。
+   - 直線要素描画において `<line>` 3本出力を `<polyline class="material-outline">` 3本出力へ移行。
+2. **描画パイプライン接続 (`DefaultSvgRenderer.kt`)**:
+   - `renderHandStroke` から `ServerRendererMaterial.lineGroup` を呼ぶ際、ジェスチャ後の中心線座標列 (`materialCenterline`) を正しく伝達。
+   - `rotring`（`05_circle_rotring`）および雲形（`11_cloudform_pencil`, `12_cloudform_rotring`）は幾何要素のままとし、バイト一致を維持。
+3. **SVG コーパステスト完全緑化**:
+   - 着手時点で失敗していた SVG 11 件を含むテスト全件が緑に復帰（`testAllReferenceSvgStructureParity`, `testReferenceSvgParity11To14` を含む）。
+   - `class="material-outline"` が `<polyline>` にのみ付与され `<line>` には付与されないことを検証。
+
+### 検証結果
+
+- `render_engine_version` は `"11"` を維持（4c の最後のコミットで `"12"` に更新）。
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 65 件の単体テストが **100% 成功 (PASS 65 / Failures 0 / Errors 0 / Skipped 0)**。
+- `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148085`** にインクリメント。
+
 

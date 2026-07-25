@@ -1913,3 +1913,26 @@ Per contract `antigravity-android-engine12.md` §4a, the de-regularization of `S
 - `render_engine_version` remains `"11"` (to be bumped to `"12"` at the final commit of 4c).
 - XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 64 out of 65 unit tests pass, 1 failure (SVG structure parity, resolved in 4b), 0 skipped. `ServerStrokeEngineTest` passes 5/5 (100%).
 - Changes restricted to `android/`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4b (Material Outline Layer Port & Full Parity)
+
+Per contract `antigravity-android-engine12.md` §4b, the material outline layer (replacing `<line>` elements with `<polyline class="material-outline">`, gesture centerline tracking, variable dasharray generation, wandering offset, non-uniform specks) was fully ported to the Android renderer.
+
+### Implementation Details
+
+1. **Material Outline Layer Extensions (`ServerRendererMaterial.kt`)**:
+   - Ported `valueNoise1d` (1D value noise) and `hash01` (SHA-256 4-byte uint) random stream generators.
+   - Implemented `offsetPolyline` (tracking gestured centerline) and `variedDashPattern` (spanning line without repeating cadence).
+   - Migrated straight line texture rendering from 3 `<line>` elements to 3 `<polyline class="material-outline">` elements.
+2. **Renderer Wiring (`DefaultSvgRenderer.kt`)**:
+   - Connected `materialCenterline` (gestured stroke samples) from `renderHandStroke` to `ServerRendererMaterial.lineGroup`.
+   - Maintained `rotring` (`05_circle_rotring`) and cloudforms (`11_cloudform_pencil`, `12_cloudform_rotring`) as clean geometric primitives, maintaining byte-level identity.
+3. **Full Parity for Reference SVG Test Suite**:
+   - All 11 reference SVG tests that failed at baseline (including `testAllReferenceSvgStructureParity` and `testReferenceSvgParity11To14`) returned to 100% green.
+   - Verified `class="material-outline"` appears strictly on `<polyline>` elements and never on `<line>` elements.
+
+### Verification
+
+- `render_engine_version` remains `"11"` (to be bumped to `"12"` at 4c final commit).
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 65 out of 65 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148085`.

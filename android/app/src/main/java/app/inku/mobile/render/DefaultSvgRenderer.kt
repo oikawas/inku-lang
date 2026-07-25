@@ -811,8 +811,9 @@ class DefaultSvgRenderer : SvgRenderer {
         val fillOpacityStr = fmt(opacity)
         sb.append("""<path d="$pathD" fill="$color" fill-opacity="$fillOpacityStr" stroke="none"/>""")
 
+        val materialCenterline = stroke.samples.map { Pair(it.x, it.y) }
         if (weight in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) {
-            val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false)
+            val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false, renderSeed = renderSeed, centerline = materialCenterline)
             if (mat != null) {
                 sb.append(mat)
             }
@@ -845,8 +846,8 @@ class DefaultSvgRenderer : SvgRenderer {
         return sb.toString()
     }
 
-    private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double): String? {
-        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit)
+    private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double, renderSeed: Long? = null, centerline: List<Pair<Double, Double>>? = null): String? {
+        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, renderSeed = renderSeed, centerline = centerline)
     }
 
     private fun materialCircleOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, unit: Double): String {

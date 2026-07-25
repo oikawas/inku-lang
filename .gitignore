@@ -75,3 +75,6 @@ AGENTS.md
 
 # plugin runtime state (enabled/disabled set, server-local)
 server/plugins/.plugin-state.json
+
+# Local agent scratch (author's, not part of the project)
+.gemini/

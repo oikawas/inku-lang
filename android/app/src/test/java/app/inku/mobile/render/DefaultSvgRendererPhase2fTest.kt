@@ -256,6 +256,22 @@ class DefaultSvgRendererPhase2fTest {
         val svg01 = renderSvgForReference("01_circle_pen")
         val svg16 = renderSvgForReference("16_circle_pen_wild")
         org.junit.Assert.assertNotEquals("16_circle_pen_wild must diverge from 01_circle_pen", svg01, svg16)
+
+        val svg04 = renderSvgForReference("04_arc_crayon")
+        val svg22 = renderSvgForReference("22_arc_crayon_wild")
+        org.junit.Assert.assertNotEquals("22_arc_crayon_wild must diverge from 04_arc_crayon", svg04, svg22)
+
+        val svg03 = renderSvgForReference("03_square_filled")
+        val svg23 = renderSvgForReference("23_square_filled_wild")
+        org.junit.Assert.assertNotEquals("23_square_filled_wild must diverge from 03_square_filled", svg03, svg23)
+
+        val svg11 = renderSvgForReference("11_cloudform_pencil")
+        val svg24 = renderSvgForReference("24_cloudform_pencil_wild")
+        org.junit.Assert.assertEquals("24_cloudform_pencil_wild must be identical to 11_cloudform_pencil", svg11, svg24)
+
+        val svg17 = renderSvgForReference("17_line_computer")
+        val svg25 = renderSvgForReference("25_line_computer_wild")
+        org.junit.Assert.assertEquals("25_line_computer_wild must be identical to 17_line_computer", svg17, svg25)
     }
 
     private fun extractMaterialOutlinePoints(svg: String): List<String> {

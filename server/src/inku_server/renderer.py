@@ -3454,6 +3454,85 @@ def _add_material_arc_outline(
         )
 
 
+def _resample_points(
+    path: list[tuple[float, float]], count: int
+) -> list[tuple[float, float]]:
+    """path から count 点を等間隔 (index 基準) に取り出す。"""
+    if count <= 0 or not path:
+        return []
+    last = len(path)
+    return [path[min(last - 1, int(index * last / count))] for index in range(count)]
+
+
+def _offset_performed_path(
+    path: list[tuple[float, float]],
+    amount: float,
+    closed: bool,
+    center: tuple[float, float],
+) -> list[tuple[float, float]]:
+    """演奏後の中心線を法線方向へ amount だけずらす。正が外側。
+
+    法線の符号は輪郭の生成順で変わる (円は内向き、弧は外向き) ので、図形の中心に
+    対して一度だけ多数決で決める。幾何版の `r + offset` と向きを揃えるため。
+    """
+    normals = centerline_normals(path, closed)
+    votes = 0
+    for (x, y), (nx, ny) in zip(path, normals):
+        votes += 1 if nx * (x - center[0]) + ny * (y - center[1]) >= 0 else -1
+    sign = 1.0 if votes >= 0 else -1.0
+    return [
+        (x + nx * amount * sign, y + ny * amount * sign)
+        for (x, y), (nx, ny) in zip(path, normals)
+    ]
+
+
+def _add_material_performed_outline(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    attrs: dict,
+    path: list[tuple[float, float]],
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    closed: bool,
+    path_len_px: float,
+    center: tuple[float, float],
+) -> None:
+    """材質輪郭と粉を、幾何ではなく演奏後の中心線から作る。
+
+    幾何から引くと、墨が暴れたときに材質層だけが元の位置に罫線として取り残される
+    (engine 12 が直線で直したのと同じ型の不具合)。呼ぶのは wild のときだけで、
+    OFF の出力は幾何版のまま 1 バイトも動かさない。
+    """
+    seed = _seed_for_instruction(ins, render_seed)
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+        points = _offset_performed_path(path, offset, closed, center)
+        element = dwg.polygon if closed else dwg.polyline
+        group.add(
+            element(
+                points=points,
+                **_outline_attrs(
+                    attrs, stroke_width=width, opacity=opacity, dash=dash
+                ),
+            )
+        )
+    specks = _speck_profile(ins.weight, path_len_px, canvas)
+    if specks is not None:
+        count, spread, radius, opacity = specks
+        _add_specks_at_points(
+            dwg,
+            group,
+            _resample_points(path, count),
+            attrs,
+            seed,
+            canvas,
+            spread=spread,
+            radius=radius,
+            opacity=opacity,
+        )
+
+
 # The computer's material layer. A hand tool leaves something beside the
 # stroke (graphite dust, hair, wax); a computer leaves the remainder of
 # sampling. The geometry is rounded onto a lattice, and the difference between
@@ -4012,8 +4091,12 @@ def _render_contour_hand_stroke(
     closed: bool = True,
     anchors: frozenset[int] = frozenset(),
     wild: bool = False,
-):
-    """閉輪郭を一筆のストロークとして合成し、帯 (ring) として描く。"""
+) -> tuple[object, list[tuple[float, float]]]:
+    """閉輪郭を一筆のストロークとして合成し、帯 (ring) として描く。
+
+    戻り値の 2 つめは演奏後の中心線。材質層がこれに追随できるように返す
+    (幾何から引くと墨だけが動いて材質が取り残される)。
+    """
     base_width = _stroke_width_px(ins.weight, canvas)
     stroke = synthesize_along(
         contour,
@@ -4064,7 +4147,7 @@ def _render_contour_hand_stroke(
         if use_filters:
             burr_attrs["filter"] = "url(#texture-drypoint)"
         group.add(dwg.polygon(**burr_attrs))
-    return group
+    return group, [(sample.x, sample.y) for sample in stroke.samples]
 
 
 def _render_arc_hand_stroke(
@@ -4172,19 +4255,36 @@ def _render_arc_hand_stroke(
         group.add(dwg.polyline(**burr_attrs))
 
     if _uses_material_outline(ins.weight):
-        _add_material_arc_outline(
-            dwg,
-            group,
-            ins,
-            attrs,
-            cx,
-            cy,
-            r,
-            ins.angle_start,
-            ins.angle_end,
-            canvas,
-            render_seed,
-        )
+        if wild:
+            arc_len = r * abs(
+                math.radians(ins.angle_end) - math.radians(ins.angle_start)
+            )
+            _add_material_performed_outline(
+                dwg,
+                group,
+                ins,
+                attrs,
+                [(sample.x, sample.y) for sample in stroke.samples],
+                canvas,
+                render_seed,
+                closed=False,
+                path_len_px=arc_len,
+                center=(cx, cy),
+            )
+        else:
+            _add_material_arc_outline(
+                dwg,
+                group,
+                ins,
+                attrs,
+                cx,
+                cy,
+                r,
+                ins.angle_start,
+                ins.angle_end,
+                canvas,
+                render_seed,
+            )
     return _apply_rotation(group, ins, canvas)
 
 
@@ -4219,19 +4319,18 @@ def _render_corner_shape(
     group.add(dwg.polygon(points=points, **body_attrs))
     if fill_group is not None:
         group.add(fill_group)
-    group.add(
-        _render_contour_hand_stroke(
-            dwg,
-            ins,
-            contour,
-            attrs,
-            canvas,
-            render_seed,
-            use_filters=use_filters,
-            anchors=anchors,
-            wild=wild,
-        )
+    contour_group, _performed = _render_contour_hand_stroke(
+        dwg,
+        ins,
+        contour,
+        attrs,
+        canvas,
+        render_seed,
+        use_filters=use_filters,
+        anchors=anchors,
+        wild=wild,
     )
+    group.add(contour_group)
     return _apply_rotation(group, ins, canvas)
 
 
@@ -4320,23 +4419,37 @@ def _render_instruction(
             group.add(element)
             if fill_group is not None:
                 group.add(fill_group)
+            performed: list[tuple[float, float]] | None = None
             if hand:
-                group.add(
-                    _render_contour_hand_stroke(
+                contour_group, performed = _render_contour_hand_stroke(
+                    dwg,
+                    ins,
+                    contour,
+                    attrs,
+                    canvas,
+                    render_seed,
+                    use_filters=use_filters,
+                    wild=wild,
+                )
+                group.add(contour_group)
+            if _uses_material_outline(ins.weight):
+                if wild and performed is not None:
+                    _add_material_performed_outline(
                         dwg,
+                        group,
                         ins,
-                        contour,
                         attrs,
+                        performed,
                         canvas,
                         render_seed,
-                        use_filters=use_filters,
-                        wild=wild,
+                        closed=True,
+                        path_len_px=2 * math.pi * r,
+                        center=(cx, cy),
                     )
-                )
-            if _uses_material_outline(ins.weight):
-                _add_material_circle_outline(
-                    dwg, group, ins, attrs, cx, cy, r, canvas, render_seed
-                )
+                else:
+                    _add_material_circle_outline(
+                        dwg, group, ins, attrs, cx, cy, r, canvas, render_seed
+                    )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -4395,23 +4508,37 @@ def _render_instruction(
             group.add(element)
             if fill_group is not None:
                 group.add(fill_group)
+            performed: list[tuple[float, float]] | None = None
             if hand:
-                group.add(
-                    _render_contour_hand_stroke(
+                contour_group, performed = _render_contour_hand_stroke(
+                    dwg,
+                    ins,
+                    contour,
+                    attrs,
+                    canvas,
+                    render_seed,
+                    use_filters=use_filters,
+                    wild=wild,
+                )
+                group.add(contour_group)
+            if _uses_material_outline(ins.weight):
+                if wild and performed is not None:
+                    _add_material_performed_outline(
                         dwg,
+                        group,
                         ins,
-                        contour,
                         attrs,
+                        performed,
                         canvas,
                         render_seed,
-                        use_filters=use_filters,
-                        wild=wild,
+                        closed=True,
+                        path_len_px=_ellipse_perimeter(rx, ry),
+                        center=(cx, cy),
                     )
-                )
-            if _uses_material_outline(ins.weight):
-                _add_material_ellipse_outline(
-                    dwg, group, ins, attrs, cx, cy, rx, ry, canvas, render_seed
-                )
+                else:
+                    _add_material_ellipse_outline(
+                        dwg, group, ins, attrs, cx, cy, rx, ry, canvas, render_seed
+                    )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 
@@ -4494,24 +4621,38 @@ def _render_instruction(
             group.add(element)
             if fill_group is not None:
                 group.add(fill_group)
+            performed = None
             if hand:
-                group.add(
-                    _render_contour_hand_stroke(
+                contour_group, performed = _render_contour_hand_stroke(
+                    dwg,
+                    ins,
+                    contour,
+                    attrs,
+                    canvas,
+                    render_seed,
+                    use_filters=use_filters,
+                    anchors=anchors,
+                    wild=wild,
+                )
+                group.add(contour_group)
+            if _uses_material_outline(ins.weight):
+                if wild and performed is not None:
+                    _add_material_performed_outline(
                         dwg,
+                        group,
                         ins,
-                        contour,
                         attrs,
+                        performed,
                         canvas,
                         render_seed,
-                        use_filters=use_filters,
-                        anchors=anchors,
-                        wild=wild,
+                        closed=True,
+                        path_len_px=2 * (w + h),
+                        center=(x + w / 2, y + h / 2),
                     )
-                )
-            if _uses_material_outline(ins.weight):
-                _add_material_rect_outline(
-                    dwg, group, ins, attrs, x, y, w, h, canvas, render_seed
-                )
+                else:
+                    _add_material_rect_outline(
+                        dwg, group, ins, attrs, x, y, w, h, canvas, render_seed
+                    )
             return _apply_rotation(group, ins, canvas)
         return _apply_rotation(element, ins, canvas)
 

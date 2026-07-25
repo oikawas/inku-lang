@@ -470,6 +470,17 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | continuity | つらなり | solid (default), dashed, dotted, dash-dot |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
+
+### Unleashed (engine 12)
+
+**Separate from the vocabulary, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — unleashed.
+
+- **One switch for the whole work**, not per stroke and not per tool
+- **It removes only the amplitude ceiling and the ban on self-intersection.** Endpoint pinning and determinism hold when it is on: the same Score, the same seed, and the same state render the same SVG every time
+- **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed unleashed and performed plainly are different works**
+- **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when unleashed. **A machine has nothing to unleash**
+
+This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; unleashed leaves the score alone and widens the performance.
 | relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
@@ -523,7 +534,9 @@ snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
 `render_hash` is the work-edition identifier. SVG text, input text, normalized DDL, and raw LLM responses are never part of the hash payload.
 
-**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`vary_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
+**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`vary_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
+
+**`render_wild` joined the material in engine 12; the format name stays `rh3`.** Extending the material does make a separate hash space, but **`render_engine_version` sits inside the same payload**, so a value computed under the old material always contains `"11"` or lower and one under the new always contains `"12"` or higher. The two can never coincide, so no `rh4` is needed. **This argument holds only because the engine version moved at the same time; the material must never be extended on its own.**
 
 **`rh2` (v1.60 through v2.4.4) is retained as legacy and never recalculated.** Stored `rh2:` rows keep their values and no destructive migration runs, matching how the earlier 64-character hex hashes were left in place. **`rh2` and `rh3` are separate hash spaces and must not be compared to decide whether two works are the same edition.** The startup backfill writes `rh3` only for rows whose `render_hash` is empty. `render_hash_short` — the four-character uppercase suffix used in the UI and CLI — is unchanged across both forms.
 `score.canvas` remains the score-level canvas instruction, while
@@ -1059,19 +1072,30 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `11` | **the same Score and seed perform differently** |
+| `render_engine_version` | the drawing engine | `12` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `1` | the same input and seed produce different output |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `1` | grammar is added, changed, or retired |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.4.8 | per release |
-| `web/BUILD_NUMBER` | build serial | 698 | **moves for UI-only changes too** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.5.0 | per release |
+| `web/BUILD_NUMBER` | build serial | 706 | **moves for UI-only changes too** |
+
+**A version also rises when the performable vocabulary grows** (author's ruling,
+2026-07-25). Adding a tool or a surface moves no existing corpus case, because
+**no case uses the new word — the output does not shift by a byte and CI stays
+green**. Bumping only when results change would let vocabulary be added without a
+version, leaving "an engine that can perform the word" beside "an engine that
+cannot" under the same number. **The meaning of a version — same version, same
+result — then breaks on the input set rather than the output.** A vocabulary
+version confirms the existing cases are byte-identical, then moves forward and
+freezes that identity as the artifact: **the proof sheet showing that adding a
+block moved none of the existing prints.**
 
 `ddl_version` and `ddl_engine_version` **start counting at 1** (author's ruling,
 2026-07-24). No other version shares those numbers, which keeps the separate
 namespaces from being read as linked. They step in whole integers.
 
 **The work-edition ID is `rh3`** (details in the render-metadata section). Identity
-comes from `score`, `render_seed`, the render engine's ID and version, and
+comes from `score`, `render_seed`, `render_wild`, the render engine's ID and version, and
 `render_color_catalog_id`.
 
 - **`render_build_number` is not part of identity.** It is stamped for UI-only
@@ -1106,7 +1130,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-11/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 220 |
+| Drawing | `server/reference/render-engine-12/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 220 |
 | Deterministic DDL layers | `server/reference/ddl-engine-1/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 29 (A 15 / B 14) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -1124,10 +1148,25 @@ something the machine enforces.**
 created and its manifest digests are compared against the previous one. Only the case
 IDs that moved are listed in `changed_from_previous`, and **only those cases' actual
 output is stored**. Cases that did not move are still current in the older version.
-"How does engine 11 draw case X?" resolves mechanically by finding **the last version
+"How does engine 12 draw case X?" resolves mechanically by finding **the last version
 in which X moved**.
 
 **The number of directories is itself the record of how many times that layer changed.**
+
+**Engine 12 is the first version where this discipline did any work.** Engine 11
+declared the master grid and moved all 220 cases, so "store what moved" and "store
+everything" were indistinguishable. Engine 12 moved 199 cases and **left 21
+untouched**, and what those 21 are is itself the account of what engine 12 did.
+
+- **The 12 `rotring` cases are byte-identical.** Every wobble term in its grammar
+  is zero, so de-regularization has nothing to reach. **The machine pole of the
+  tool vocabulary sits exactly where it did**
+- **The 9 `cloudform` cases are byte-identical for a different reason.** A
+  cloudform is written as a Catmull-Rom path by `generate_cloudform_contour` and
+  never enters `stroke_engine`, so it carries no material outline layer either.
+  Its contour does vary by tool (all ten tool digests differ), but none of that
+  variation comes from stroke synthesis. **This is a gap engine 12 exposed, not
+  one it created**
 
 The corpus ships with no release: `server/reference/ export-ignore` in `.gitattributes`
 keeps it out of `git archive`.

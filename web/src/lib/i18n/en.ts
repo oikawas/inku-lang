@@ -200,6 +200,8 @@ export const en: LangPack = {
 	tooltipInputLang: 'Text input language detection',
 	tooltipInputModel: 'Select LLM models for Stage 1 & 2',
 	tooltipInputTenkei: 'Choose how much staffage (small supporting elements) is added: none, sparse, or auto.',
+	wildButton: 'Unleashed',
+	tooltipInputWild: 'Lifts the ceiling on the stroke. OFF is predictable; ON lets strokes bend, curl and overlap freely (whole work; recorded and replayed).',
 	tooltipInputCanvas: 'Choose the canvas aspect ratio (square, wide, tall, and so on).',
 	tooltipDdlNew: 'Write DDL code directly and draw it as a standalone artwork, without a description.',
 	tooltipDdlEdit: 'Edit the displayed artwork\'s DDL and redraw it as a child of that artwork.',

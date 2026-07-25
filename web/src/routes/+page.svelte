@@ -61,6 +61,7 @@
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	const CATALOG_KEY         = 'inku-color-catalog';
 	const TENKEI_KEY          = 'inku-tenkei';
+	const WILD_KEY            = 'inku-wild';
 	const SHOW_BIRDS_KEY      = 'inku-show-birds';
 	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
 	const SHOW_CRAB_KEY       = 'inku-show-crab';
@@ -69,7 +70,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v2.4.9';
+	const APP_VERSION = 'v2.5.0';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -101,6 +102,7 @@
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect_ratio?: number | null;
 		render_seed?: number | null;
+		render_wild?: boolean | null;
 		vary_seed?: number | null;
 		interpretation_seed?: string | null;
 		seed_text?: string | null;
@@ -380,6 +382,7 @@
 		renderCanvasAspectId?: string | null;
 		renderCanvasAspectRatio?: number | null;
 		renderSeed?: number | null;
+		renderWild?: boolean | null;
 		varySeed?: number | null;
 		tokensIn: number | null;
 		tokensOut: number | null;
@@ -668,6 +671,12 @@
 	function setTenkeiLevel(level: TenkeiLevel) {
 		tenkeiLevel = level;
 		try { localStorage.setItem(TENKEI_KEY, level); } catch {}
+	}
+	// 暴れる (engine 12): OFF = 予想のつく標準、ON = 天井を外した奔放なストローク。作品全体の 1 スイッチ・永続化。
+	let wildEnabled = $state(false);
+	function setWildEnabled(value: boolean) {
+		wildEnabled = value;
+		try { localStorage.setItem(WILD_KEY, value ? '1' : '0'); } catch {}
 	}
 	// Refine dialogs: null = inherit from the parent artwork (field omitted).
 	let refineTenkeiOverride = $state<TenkeiLevel | null>(null);
@@ -2584,6 +2593,7 @@
 		randomColorCatalog?: boolean;
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
+		wild?: boolean;
 		varySeed?: number;
 		// 変奏 (v2.0): 両方そろって初めてサーバーが展開層をずらす。
 		variationAmplitude?: string;
@@ -2698,6 +2708,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				ui_lang: uiLang,
 				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				render_seed: options.renderSeed,
+				wild: options.wild ?? false,
 				vary_seed: options.varySeed,
 				variation_amplitude: options.variationAmplitude ?? null,
 				variation_seed: options.variationSeed ?? null,
@@ -2816,6 +2827,7 @@ if (unreadWords.length > 0) {
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect_ratio?: number | null;
 		render_seed?: number | null;
+		render_wild?: boolean | null;
 		vary_seed?: number | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
@@ -2865,6 +2877,7 @@ if (unreadWords.length > 0) {
 			render_canvas_aspect_id?: string | null;
 			render_canvas_aspect_ratio?: number | null;
 			render_seed?: number | null;
+			render_wild?: boolean | null;
 			vary_seed?: number | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
@@ -3097,6 +3110,7 @@ if (unreadWords.length > 0) {
 					sourceText: input,
 					catalogId: selectedCatalog,
 					canvasAspectId: effectiveCanvasAspectId(),
+					wild: wildEnabled,
 					lineageParentNodeId: submitParentNodeId,
 					derivationKind: submitDerivationKind,
 					derivationMetadata: submitDerivationMetadata,
@@ -3160,6 +3174,7 @@ if (unreadWords.length > 0) {
 							batchRunId,
 							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : batchCatalogId,
 							canvasAspectId: batchCanvasAspectId,
+							wild: wildEnabled,
 							tenkei: tenkeiLevel,
 							signal: abortController.signal,
 						});
@@ -3303,6 +3318,7 @@ if (unreadWords.length > 0) {
 				render_canvas_aspect_id?: string | null;
 				render_canvas_aspect_ratio?: number | null;
 				render_seed?: number | null;
+				render_wild?: boolean | null;
 				vary_seed?: number | null;
 				instruction_lang_requested?: string | null;
 				instruction_lang_resolved?: string | null;
@@ -3944,6 +3960,7 @@ if (unreadWords.length > 0) {
 						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
 						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
 						renderSeed: composed.render_seed ?? null,
+						renderWild: composed.render_wild ?? null,
 						varySeed: composed.vary_seed ?? null,
 						tokensIn: interpreted.tokens_in,
 						tokensOut: interpreted.tokens_out,
@@ -4073,6 +4090,7 @@ if (unreadWords.length > 0) {
 						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
 						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
 						renderSeed: composed.render_seed ?? null,
+						renderWild: composed.render_wild ?? null,
 						varySeed: composed.vary_seed ?? null,
 						tokensIn: interpreted.tokens_in,
 						tokensOut: interpreted.tokens_out,
@@ -4148,6 +4166,7 @@ if (unreadWords.length > 0) {
 				render_canvas_aspect_id: item.renderCanvasAspectId ?? item.renderCanvasAspect ?? effectiveCanvasAspectId(),
 				render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
 				render_seed: item.renderSeed ?? null,
+				render_wild: item.renderWild ?? null,
 				vary_seed: item.varySeed ?? null,
 				instruction_lang_requested: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
 				instruction_lang_resolved: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
@@ -4197,6 +4216,7 @@ if (unreadWords.length > 0) {
 					catalog_id: catalogId,
 					canvas_aspect: canvasId,
 					render_seed: replaySeed,
+					wild: Boolean(it.render_wild),
 					seed_text: it.seed_text,
 				})
 			});
@@ -5898,6 +5918,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
 			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
+			const wild = localStorage.getItem(WILD_KEY); if (wild !== null) wildEnabled = wild === '1';
 			const kiwi = localStorage.getItem(SHOW_KIWI_KEY);
 			const birds = localStorage.getItem(SHOW_BIRDS_KEY);
 			if (kiwi !== null) showKiwi = kiwi !== '0';
@@ -6034,6 +6055,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{stageLabel}
 						{tenkeiLevel}
 						onSelectTenkei={setTenkeiLevel}
+						{wildEnabled}
+						onSelectWild={setWildEnabled}
 						{showKiwi}
 						{showCrab}
 						{canvasAspectEnabled}

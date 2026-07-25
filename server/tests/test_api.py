@@ -134,7 +134,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["build_number"]
     assert data["developer_mode"] is False
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "11"
+    assert data["render_engine_version"] == "12"
     assert data["ddl_version"] == "1"
     assert data["ddl_engine_version"] == "1"
 
@@ -1277,7 +1277,7 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
         "standard": "IEC 61966-2-1:1999",
     }
     assert r.json()["render_engine_id"] == "default"
-    assert r.json()["render_engine_version"] == "11"
+    assert r.json()["render_engine_version"] == "12"
     assert r.json()["ddl_version"] == "1"
     assert r.json()["ddl_engine_version"] == "1"
     assert r.json()["render_canvas_aspect"] == "square"
@@ -1314,7 +1314,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
         "standard": "IEC 61966-2-1:1999",
     }
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "11"
+    assert data["render_engine_version"] == "12"
     assert data["ddl_version"] == "1"
     assert data["ddl_engine_version"] == "1"
     assert data["render_canvas_aspect"] == "square"
@@ -2007,7 +2007,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_build_number"] == data["render_build_number"]
     assert item["render_color_profile"]["id"] == "srgb"
     assert item["render_engine_id"] == "default"
-    assert item["render_engine_version"] == "11"
+    assert item["render_engine_version"] == "12"
     assert item["ddl_version"] == "1"
     assert item["ddl_engine_version"] == "1"
     assert item["render_canvas_aspect"] == "wide"
@@ -3264,3 +3264,31 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     db.delete_session(token)
     db.delete_user(admin["id"])
     db.delete_user_group(group["id"])
+
+
+def test_render_svg_forwards_wild_to_the_renderer(auth_context, monkeypatch):
+    """The wild flag reaches the renderer from the request, both ways (not vacuous)."""
+    headers, _user, _group = auth_context
+    import inku_server.render_engines.default as default_engine
+
+    captured: dict = {}
+
+    def fake_render_svg(score, *, color_map=None, svg_profile=None, render_seed=None, wild=False):
+        captured["wild"] = wild
+        return '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+
+    monkeypatch.setattr(default_engine, "render_svg", fake_render_svg)
+    score = {
+        "version": "0.1.0",
+        "background": "white",
+        "instructions": [
+            {"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "weight": "pen", "color": "black"}
+        ],
+    }
+    r_on = client.post("/api/render-svg", json={"score": score, "wild": True}, headers=headers)
+    assert r_on.status_code == 200
+    assert captured["wild"] is True
+
+    r_off = client.post("/api/render-svg", json={"score": score, "wild": False}, headers=headers)
+    assert r_off.status_code == 200
+    assert captured["wild"] is False

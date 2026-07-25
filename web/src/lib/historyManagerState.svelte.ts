@@ -59,6 +59,7 @@ export type HistoryItem = {
 	render_hash?: string | null;
 	render_hash_short?: string | null;
 	render_seed?: number | string | null;
+	render_wild?: boolean | null;
 	vary_seed?: number | string | null;
 	interpretation_seed?: string | null;
 	seed_text?: string | null;

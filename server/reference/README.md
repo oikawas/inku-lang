@@ -15,6 +15,9 @@ server/reference/
 ├── render-engine-11/
 │   ├── manifest.json
 │   └── <permanent-case-id>.svg
+├── render-engine-12/
+│   ├── manifest.json
+│   └── <permanent-case-id>.svg
 └── ddl-engine-1/
     ├── manifest.json
     ├── a_expand/
@@ -31,6 +34,34 @@ feeds B; corpora for different layers must not feed one another.
 Directories are immutable after they are frozen. Never regenerate an old
 version to accept changed output. Create the next version directory instead.
 Case IDs are permanent: do not rename or delete them; new cases may be added.
+
+A version directory holds an SVG body only for the cases that version changed.
+Its manifest still carries the digest, byte count, tag counts, and classes of all
+220 cases, so a case that did not move is answered by walking back to the last
+version where it did. The file listing therefore reads as "what this version
+changed", which is the point of keeping the directories at all. Engine 11 holds
+all 220 bodies because the master grid moved every case; engine 12 holds 199.
+
+## What engine 12 changed
+
+Engine 12 de-regularizes the performance. The width envelope was a fixed
+symmetric `sin(pi t)` hump, so every stroke was fattest exactly at its midpoint;
+the correction event repeated with period 5; a closed contour carried a thin seam
+opposite a fat middle; and the material outline used an even dash with evenly
+spaced specks. All four are now driven by seeded low-frequency noise, and the
+centreline itself gains a gesture scaled by the stroke length.
+
+**21 of the 220 cases did not move, and both groups are informative.**
+
+- **The 12 `rotring` cases are byte-identical.** Its grammar is all zeros, so it
+  has no wobble for the de-regularization to reach. The machine pole of the tool
+  vocabulary is exactly where it was
+- **The 9 remaining `cloudform` cases are byte-identical.** Not for the same
+  reason: `cloudform` is emitted as a Catmull-Rom path from
+  `generate_cloudform_contour` and never enters `stroke_engine`, so it carries no
+  material outline layer. Its contour does vary by tool (all 10 tool digests
+  differ), but none of that variation comes from stroke synthesis. This is a gap
+  that predates engine 12, not something engine 12 introduced
 
 ## `render-engine-10` cannot be regenerated outside macOS
 

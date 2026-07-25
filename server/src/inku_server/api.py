@@ -583,6 +583,7 @@ def _render_score_svg(
     canvas_aspect: str | None = None,
     svg_profile: str | None = None,
     render_seed: int | None = None,
+    wild: bool = False,
 ) -> str:
     score = coerce_score(Score.model_validate(score_payload))
     canvas = _validated_canvas_aspect_override(canvas_aspect)
@@ -595,6 +596,7 @@ def _render_score_svg(
             color_map=render_metadata["render_color_map"],
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=render_seed,
+            wild=wild,
         ).svg
 
 
@@ -766,13 +768,15 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
 
 def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: str | None = None) -> tuple[str, dict]:
     effective_seed = int(render_metadata.get("render_seed") or new_render_seed())
-    render_metadata = {**render_metadata, "render_seed": effective_seed}
+    wild = bool(render_metadata.get("render_wild"))
+    render_metadata = {**render_metadata, "render_seed": effective_seed, "render_wild": wild}
     with _render_capacity():
         result = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=effective_seed,
+            wild=wild,
         )
     return result.svg, {**render_metadata, **result.metadata}
 
@@ -878,6 +882,7 @@ class ComposeRequest(BaseModel):
     variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     lineage_parent_node_id: str | None = Field(default=None, description="添景水準の継承元 lineage ノード (v1.97)。保存には関与しない")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
@@ -911,6 +916,7 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
+    render_wild: bool | None = None
     vary_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
@@ -991,6 +997,7 @@ class PaintRequest(BaseModel):
     variation_amplitude: str | None = Field(default=None, description="変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効")
     variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
@@ -1027,6 +1034,7 @@ class PaintResponse(BaseModel):
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
+    render_wild: bool | None = None
     vary_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
@@ -1080,6 +1088,7 @@ class RenderSvgRequest(BaseModel):
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
@@ -1090,6 +1099,7 @@ class RenderScoreRequest(BaseModel):
     catalog_id: str | None = None
     canvas_aspect: str | None = None
     render_seed: int | None = None
+    wild: bool = False
     vary_seed: int | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
@@ -1215,6 +1225,7 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
+    render_wild: bool | None = None
     vary_seed: int | None = None
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$")
     interpretation_seed: str | None = None
@@ -3072,6 +3083,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
         "render_seed": render_seed,
+        "render_wild": req.wild,
         "vary_seed": req.vary_seed,
         "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
@@ -3367,6 +3379,7 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
         render_metadata = {
             **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
             "render_seed": render_seed,
+            "render_wild": req.wild,
             "vary_seed": req.vary_seed,
             "interpretation_seed": req.interpretation_seed,
             "seed_text": seed_text,
@@ -3400,6 +3413,7 @@ def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user))
             canvas_aspect=req.canvas_aspect,
             svg_profile=req.svg_profile,
             render_seed=render_seed,
+            wild=req.wild,
         )
     except HTTPException:
         raise
@@ -3617,6 +3631,7 @@ def _paint_events(
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
         "render_seed": render_seed,
+        "render_wild": req.wild,
         "vary_seed": req.vary_seed,
         "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
@@ -4175,6 +4190,7 @@ def api_history_svg(
                 item.get("score", {}),
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,
+                wild=bool(item.get("render_wild")),
             )
         except HTTPException:
             raise

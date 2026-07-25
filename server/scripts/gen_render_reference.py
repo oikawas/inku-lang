@@ -27,11 +27,13 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-24"
+FROZEN_AT = "2026-07-25"
 REASON = (
-    "Declare one master grid for every emitted number (master_grid.py). Engine 10 "
-    "mixed 1-3 decimal places with raw 17-digit floats, so the corpus could not be "
-    "reproduced outside macOS."
+    "De-regularize the performance. The width envelope was a fixed symmetric "
+    "sin(pi t) hump, the correction event repeated with period 5, closed contours "
+    "carried a thin seam opposite a fat middle, and the material outline used an "
+    "even dash and evenly spaced specks. All four are replaced by seeded "
+    "low-frequency noise, and the centreline gains a length-scaled gesture."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -210,6 +212,24 @@ def _color_map_digest(color_map: dict[str, str]) -> str:
     return hashlib.sha256(encoded).hexdigest()[:32]
 
 
+def _previous_manifest() -> dict[str, Any] | None:
+    """The frozen manifest of the highest engine version below the current one.
+
+    Version directories are the record of how many times the layer changed, so
+    "previous" is the largest integer under the current one that was actually
+    frozen, not `current - 1`.
+    """
+    current = int(ENGINE_VERSION)
+    candidates: list[tuple[int, pathlib.Path]] = []
+    for path in REFERENCE_ROOT.glob("render-engine-*/manifest.json"):
+        suffix = path.parent.name.rsplit("-", 1)[-1]
+        if suffix.isdigit() and int(suffix) < current:
+            candidates.append((int(suffix), path))
+    if not candidates:
+        return None
+    return json.loads(max(candidates)[1].read_text())
+
+
 def _source_commit() -> str:
     return subprocess.run(["git", "rev-parse", "HEAD"], cwd=REFERENCE_ROOT.parent.parent,
                           check=True, capture_output=True, text=True).stdout.strip()
@@ -218,13 +238,6 @@ def _source_commit() -> str:
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
-    if existing is None:
-        frozen = {
-            "frozen_at": FROZEN_AT, "commit": _source_commit(), "reason": REASON,
-            "changed_from_previous": sorted(inputs),
-        }
-    else:
-        frozen = {key: existing[key] for key in ("frozen_at", "commit", "reason", "changed_from_previous")}
 
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}
@@ -241,6 +254,23 @@ def generate() -> None:
             "classes": sorted(set(re.findall(r'class="([^"]+)"', svg))),
         }
 
+    if existing is None:
+        previous = _previous_manifest()
+        if previous is None:
+            changed = sorted(cases)
+        else:
+            before = previous["cases"]
+            changed = sorted(
+                case_id for case_id, case in cases.items()
+                if case_id not in before or before[case_id]["digest"] != case["digest"]
+            )
+        frozen = {
+            "frozen_at": FROZEN_AT, "commit": _source_commit(), "reason": REASON,
+            "changed_from_previous": changed,
+        }
+    else:
+        frozen = {key: existing[key] for key in ("frozen_at", "commit", "reason", "changed_from_previous")}
+
     manifest = {
         "corpus_format_version": CORPUS_FORMAT_VERSION, "layer": "render-engine",
         "engine_id": ENGINE.id, "engine_version": ENGINE_VERSION,
@@ -249,8 +279,11 @@ def generate() -> None:
         **frozen, "cases": cases,
     }
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    for case_id, svg in rendered.items():
-        (OUTPUT_DIR / f"{case_id}.svg").write_text(svg, encoding="utf-8")
+    # Only the cases that moved get an SVG body. An unchanged case is already
+    # frozen in the last version where it moved; copying it forward would make
+    # the directory listing stop meaning "what this version changed".
+    for case_id in frozen["changed_from_previous"]:
+        (OUTPUT_DIR / f"{case_id}.svg").write_text(rendered[case_id], encoding="utf-8")
     MANIFEST_PATH.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     if existing is not None and existing.get("cases") != manifest["cases"]:

@@ -18,20 +18,30 @@ class ToolGrammar:
     event_rate: float
     taper: float
     bulge: float
+    # Tool-habit gesture amplitude as a fraction of the stroke length: a slow
+    # low-frequency wander of the centreline itself (bends, curls, self-overlap),
+    # distinct from `energy_lateral` which is scaled by pen width. Multiplied by
+    # WILD_GAIN when the performance is unleashed. rotring keeps the machine pole.
+    gesture: float
 
 
 GRAMMARS: dict[str, ToolGrammar] = {
-    "hair": ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02),
-    "pencil": ToolGrammar(0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14),
-    "pen": ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06),
-    "rotring": ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    "crayon": ToolGrammar(0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18),
-    "chalk": ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20),
-    "brush_thin": ToolGrammar(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28),
-    "brush_thick": ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34),
-    "burin": ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0),
-    "drypoint": ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48),
+    "hair": ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012),
+    "pencil": ToolGrammar(0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05),
+    "pen": ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022),
+    "rotring": ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    "crayon": ToolGrammar(0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06),
+    "chalk": ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07),
+    "brush_thin": ToolGrammar(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10),
+    "brush_thick": ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13),
+    "burin": ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018),
+    "drypoint": ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05),
 }
+
+# The performance ceiling. OFF (predictable): tool-habit gesture only. ON
+# (unleashed): the amplitude ceiling and the no-self-intersection guard are
+# removed. Endpoint pinning and determinism are kept in both.
+WILD_GAIN = 3.5
 
 
 @dataclass(frozen=True)
@@ -72,12 +82,6 @@ class ContourStrokeResult:
     closed: bool
 
 
-# A closed contour is drawn as one loop, so it has no entry/exit taper. The
-# seam still thins, because that is where the tool lands and leaves, but it is
-# floored so the loop never reads as broken.
-CLOSED_ENVELOPE_FLOOR = 0.35
-
-
 def _unit(seed: int, label: str, index: int) -> float:
     raw = hashlib.sha256(f"{seed}:{label}:{index}".encode()).digest()[:8]
     return int.from_bytes(raw, "little") / (2**64 - 1)
@@ -102,6 +106,51 @@ def latent_energy(t: float, seed: int) -> float:
     return max(-1.0, min(1.0, sum(values) / 1.75))
 
 
+def _smooth_noise_salted(t: float, seed: int, salt: str, frequency: float) -> float:
+    # Same value-noise as `_smooth_noise` but at an arbitrary (low) frequency and
+    # an explicit salt, so envelopes and gestures draw from independent streams.
+    x = t * frequency
+    i = math.floor(x)
+    f = x - i
+    f = f * f * (3 - 2 * f)
+    a = _unit(seed, salt, i) * 2 - 1
+    b = _unit(seed, salt, i + 1) * 2 - 1
+    return a * (1 - f) + b * f
+
+
+# Fraction at each end over which the endpoint taper ramps. Inside it the window
+# is 1.0, so the middle no longer carries a fixed central bulge.
+_GESTURE_EDGE = 0.16
+
+
+def _edge_window(t: float) -> float:
+    # 1.0 across the middle, raised-cosine down to 0 at both endpoints. Replaces
+    # the old `max(0, sin(pi t))` so wobble and gestures still vanish where the
+    # endpoints are pinned, without imposing one symmetric hump on every stroke.
+    if t <= 0.0 or t >= 1.0:
+        return 0.0
+    if t < _GESTURE_EDGE:
+        return 0.5 * (1 - math.cos(math.pi * t / _GESTURE_EDGE))
+    if t > 1.0 - _GESTURE_EDGE:
+        return 0.5 * (1 - math.cos(math.pi * (1.0 - t) / _GESTURE_EDGE))
+    return 1.0
+
+
+def _swell(t: float, seed: int) -> float:
+    # A slow per-stroke modulation of where the stroke reads as full, in
+    # [0.45, 1.0]. Replaces the fixed sine peak so "where it is fat" wanders.
+    n = _smooth_noise_salted(t, seed, "swell", 1.5)
+    return 0.45 + 0.55 * (0.5 + 0.5 * n)
+
+
+def _gesture_wave(t: float, seed: int, salt: str) -> float:
+    # Low-frequency 2D drive for the centreline gesture, in [-1, 1]. One and two
+    # cycles per stroke so it bends and curls rather than buzzes.
+    a = _smooth_noise_salted(t, seed, salt, 1.0)
+    b = _smooth_noise_salted(t, seed, salt, 2.0)
+    return max(-1.0, min(1.0, a * 0.7 + b * 0.35))
+
+
 def _event_map(seed: int, rate: float, count: int) -> dict[int, str]:
     events: dict[int, str] = {}
     # Bernoulli approximation to sparse Poisson arrivals; endpoint anchors excluded.
@@ -124,6 +173,8 @@ def synthesize_stroke(
     weight: str,
     seed: int,
     samples: int = 49,
+    *,
+    wild: bool = False,
 ) -> StrokeResult:
     grammar = GRAMMARS[weight]
     dx, dy = end[0] - start[0], end[1] - start[1]
@@ -133,6 +184,7 @@ def synthesize_stroke(
     events = _event_map(seed, grammar.event_rate, samples)
     position = [start[0], start[1]]
     velocity = [dx / (samples - 1), dy / (samples - 1)]
+    gesture_amp = length * grammar.gesture * (WILD_GAIN if wild else 1.0)
     result: list[StrokeSample] = []
     for i in range(samples):
         t = i / (samples - 1)
@@ -150,7 +202,7 @@ def synthesize_stroke(
             position[0] += velocity[0] * 0.72
             position[1] += velocity[1] * 0.72
         energy = latent_energy(t, seed)
-        envelope = max(0.0, math.sin(math.pi * t))
+        envelope = _edge_window(t) * _swell(t, seed)
         lateral = (
             energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope)
         )
@@ -162,7 +214,9 @@ def synthesize_stroke(
         elif event == "fade":
             event_width = 0.04
         elif event == "correction":
-            lateral += math.sin((i % 5) * math.pi / 2) * base_width * 0.25
+            # Length-based, not sample-index-based: a seed kick that does not
+            # change texture when the sample count changes.
+            lateral += (_unit(seed, "correction-kick", i) * 2 - 1) * base_width * 0.25
         profile = 1.0
         if grammar.taper:
             profile *= (1 - grammar.taper) + grammar.taper * envelope
@@ -175,11 +229,22 @@ def synthesize_stroke(
             * (1 + grammar.energy_width * energy * 0.45)
             * event_width,
         )
+        # Centreline gesture: a low-frequency 2D wander scaled by stroke length.
+        # The edge window pins it to zero at both endpoints; determinism is from
+        # the seed. Under `wild` the amplitude ceiling is lifted so the path may
+        # fold and cross itself.
+        gx = gy = 0.0
+        if gesture_amp:
+            win = _edge_window(t)
+            g_lat = _gesture_wave(t, seed, "gesture-lat")
+            g_lon = _gesture_wave(t, seed, "gesture-lon")
+            gx = gesture_amp * win * (nx * g_lat + ux * g_lon)
+            gy = gesture_amp * win * (ny * g_lat + uy * g_lon)
         result.append(
             StrokeSample(
                 t,
-                position[0] + nx * lateral,
-                position[1] + ny * lateral,
+                position[0] + nx * lateral + gx,
+                position[1] + ny * lateral + gy,
                 width,
                 energy,
                 lateral,
@@ -343,9 +408,13 @@ def synthesize_along(
             position[0] += step[0] + velocity[0] * 0.72
             position[1] += step[1] + velocity[1] * 0.72
         energy = latent_energy(t, seed)
-        envelope = max(0.0, math.sin(math.pi * t))
         if closed:
-            envelope = max(CLOSED_ENVELOPE_FLOOR, envelope)
+            # A loop has no endpoints, so no edge taper: the old sine imposed a
+            # spurious thin seam opposite a fat middle. The swell alone (floored)
+            # keeps the loop unbroken while letting the fullness wander.
+            envelope = _swell(t, seed)
+        else:
+            envelope = _edge_window(t) * _swell(t, seed)
         lateral = (
             energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope)
         )
@@ -357,7 +426,8 @@ def synthesize_along(
         elif event == "fade":
             event_width = 0.04
         elif event == "correction":
-            lateral += math.sin((index % 5) * math.pi / 2) * base_width * 0.25
+            # Length-based seed kick (see synthesize_stroke).
+            lateral += (_unit(seed, "correction-kick", index) * 2 - 1) * base_width * 0.25
         profile = 1.0
         if grammar.taper:
             profile *= (1 - grammar.taper) + grammar.taper * envelope

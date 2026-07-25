@@ -74,14 +74,49 @@ def test_render_reference_discriminator_cases() -> None:
     assert not any("fill-stroke-v1" in name for name in tiny["classes"])
 
 
+def _resolve_svg(case_id: str) -> pathlib.Path:
+    """ケースの実物を、最後にそれが動いた版まで遡って探す。
+
+    動かなかったケースの SVG は現在の版のディレクトリには無い。前の版のものが
+    そのまま最新であり、それを辿れることがこの構造の要点である (SPEC §15.7)。
+    """
+    reference_root = MANIFEST_PATH.parent.parent
+    versions = sorted(
+        (int(path.name.rsplit("-", 1)[-1]), path)
+        for path in reference_root.glob("render-engine-*")
+        if path.name.rsplit("-", 1)[-1].isdigit()
+        and int(path.name.rsplit("-", 1)[-1]) <= int(ENGINE_VERSION)
+    )
+    for _, directory in reversed(versions):
+        candidate = directory / f"{case_id}.svg"
+        if candidate.exists():
+            return candidate
+    raise AssertionError(f"no frozen SVG for {case_id} in any version up to {ENGINE_VERSION}")
+
+
 def test_render_reference_svg_files_match_manifest() -> None:
     manifest = _manifest()
-    output_dir = MANIFEST_PATH.parent
     generator = _generator()
     for case_id, case in manifest["cases"].items():
-        svg = (output_dir / f"{case_id}.svg").read_text(encoding="utf-8")
+        svg = _resolve_svg(case_id).read_text(encoding="utf-8")
         assert len(svg.encode("utf-8")) == case["bytes"]
         assert generator._normalized_digest(svg) == case["digest"]
+
+
+def test_unchanged_cases_keep_the_previous_version_body() -> None:
+    """変わらなかったケースは本文を持たず、前の版の実物がそのまま最新である。
+
+    版のディレクトリに並ぶファイルが「その版が何を動かしたか」を意味するための
+    条件。全件を書き写すと、この一覧が意味を失う。
+    """
+    manifest = _manifest()
+    changed = set(manifest["changed_from_previous"])
+    bodies = {path.stem for path in MANIFEST_PATH.parent.glob("*.svg")}
+    assert bodies == changed
+    unchanged = set(manifest["cases"]) - changed
+    assert unchanged, "この版は全件を動かしている。遡りの検査が空振りしていないか確認する"
+    for case_id in unchanged:
+        assert _resolve_svg(case_id).parent != MANIFEST_PATH.parent
 
 
 def test_every_corpus_number_sits_on_the_master_grid() -> None:
@@ -104,6 +139,6 @@ def test_every_corpus_number_sits_on_the_master_grid() -> None:
                 checked += 1
                 if len(decimals) != MASTER_GRID_DECIMALS:
                     off_grid.append((path.name, name, decimals))
-    assert len(files) == 220
+    assert len(files) == len(_manifest()["changed_from_previous"])
     assert checked > 100_000, checked
     assert off_grid == []

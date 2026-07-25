@@ -104,12 +104,16 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # engine 11 (マスターグリッド宣言) で再採取。座標の書き出しが 3 桁から 6 桁へ
 # 上がった分だけ値が動く。旧実装との差は 220 件のコーパスと本 5 件のいずれでも
 # 数値の個数が一致し、最大変化量は 5e-4 (旧 .3f の半幅) 未満に収まっている。
+# engine 12 (脱・規則化) で 5 件すべて再採取。ここは engine 11 までと違って
+# 「値がわずかに動いた」のではなく、演奏そのものが変わっている。
+# 幅エンベロープの対称な山と閉輪郭の継ぎ目やせが外れ、中心線にジェスチャが乗り、
+# 材質アウトラインの dash と粒が等間隔でなくなった。
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "2846417cd41d168a77a56d42bbe7bcdd",
-    "chalk_square": "32f81c5c84c4a240150d58f77f1417c2",
-    "crayon_arc": "579e607d9d0b112e0860d53e921b9993",
-    "pencil_circle": "d5fe8396489e32f357d9f86447651d91",
-    "pencil_ellipse": "8c27b9d3d7d1309dab0040bbec1f9dd7",
+    "brush_thin_line": "6390f6a40e55cfa430fb4df170f7cb2a",
+    "chalk_square": "1083b8fe36b434ba166a60a1e756d610",
+    "crayon_arc": "cd8b468dff56c9483c12b12dbfa6e956",
+    "pencil_circle": "7c7e66e9c6ce62a632568034f03c459c",
+    "pencil_ellipse": "cc21c73dd805e3128e78ad01094374fe",
 }
 
 
@@ -246,7 +250,7 @@ def test_material_outline_is_deterministic_per_seed(name: str):
 
 @pytest.mark.parametrize("name", sorted(MATERIAL_SHAPES))
 def test_material_outline_none_seed_is_byte_compatible(name: str):
-    """render_seed=None の演奏は main (v2.0.4) とバイト一致する。"""
+    """render_seed=None の演奏が現行 engine の固定値とバイト一致する。"""
     svg = _render(MATERIAL_SHAPES[name], render_seed=None)
     assert _digest(svg) == MATERIAL_NONE_SEED_DIGESTS[name]
 

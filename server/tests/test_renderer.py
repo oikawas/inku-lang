@@ -242,7 +242,9 @@ def test_render_pencil_line_uses_material_texture():
     )
     svg = render(score)
     assert 'fill-opacity="0.660000"' in svg
-    assert 'stroke-dasharray="1.000000,7.000000"' in svg
+    # Material strata are aperiodic-dashed polylines along the centreline.
+    assert svg.count("<polyline") >= 2
+    assert "stroke-dasharray=" in svg
     assert 'id="texture-pencil"' in svg
     assert 'filter="url(#texture-pencil)"' in svg
     assert svg.count("<circle") >= _expected_specks(18, 1000.0)
@@ -264,7 +266,8 @@ def test_render_chalk_line_uses_blurred_powder_texture():
     svg = render(score)
     assert 'id="texture-chalk"' in svg
     assert 'filter="url(#texture-chalk)"' in svg
-    assert 'stroke-dasharray="8.000000,12.000000,1.000000,8.000000"' in svg
+    assert svg.count("<polyline") >= 2
+    assert "stroke-dasharray=" in svg
     assert "<feTurbulence" in svg
     assert "<feDisplacementMap" in svg
     assert svg.count("<circle") >= _expected_specks(34, 1000.0)
@@ -284,9 +287,10 @@ def test_render_crayon_line_adds_rubbed_layers():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 4
+    # Material texture layers ride the (gestured) centreline as polylines now.
+    assert svg.count("<polyline") >= 4
     assert "stroke-engine-v1" in svg
-    assert 'stroke-dasharray="2.000000,5.000000,9.000000,7.000000"' in svg
+    assert "stroke-dasharray=" in svg
     assert 'id="texture-crayon"' in svg
     assert svg.count("<circle") >= _expected_specks(26, 1000.0)
 
@@ -477,10 +481,10 @@ def test_render_brush_lines_use_layered_material_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<line") >= 5
+    # Material texture layers ride the (gestured) centreline as polylines now.
+    assert svg.count("<polyline") >= 5
     assert svg.count("stroke-engine-v1") == 2
-    assert 'stroke-dasharray="22.000000,9.000000"' in svg
-    assert 'stroke-dasharray="18.000000,7.000000,3.000000,11.000000"' in svg
+    assert "stroke-dasharray=" in svg
     assert 'id="texture-brush_thick"' in svg
 
 
@@ -1606,11 +1610,13 @@ def test_legacy_arrangement_layouts_keep_golden_output():
         rendered.append(render(score, svg_profile="compat", render_seed=123))
 
     digest = hashlib.sha256("".join(rendered).encode()).hexdigest()
-    # engine 11 (マスターグリッド宣言) で再採取。座標の書き出しが 3 桁から 6 桁へ
-    # 上がった分だけ値が動く。数値の個数は 1528 個で不変、最大変化量は 5e-4 未満。
+    # engine 12 (エンベロープの脱・規則化 + 中心線ジェスチャ) で再採取。
+    # 幅エンベロープが sin(pi t) の対称な山から _edge_window * _swell へ変わり、
+    # 中心線に低周波のジェスチャが乗った分だけ値が動く。書き出される数値の個数は
+    # engine 11 と同じ 1444 個で、動いたのは値だけである。
     # engine 10 まではこのダイジェストが素のバイト列だったため macOS でしか通らな
     # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
-    assert digest == "f9769fbadba259de260dcd2cdaf19f3e4038f9353296646c9f7aaeed74b9397e"
+    assert digest == "75afbfb92840cc922e87edd598c25b45937e7d651aaf6d9c806ade157636f33e"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

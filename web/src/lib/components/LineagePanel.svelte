@@ -524,7 +524,7 @@ $effect(() => {
 <section class="lineage-panel" class:overview={overviewOpen}>
 	<header>
 		<div>
-			<h2>{isJapanese ? '作品の系譜' : 'Artwork Lineage'}</h2>
+			<h2>{isJapanese ? '作品の系譜' : 'Lineage of the work'}</h2>
 			{#if overviewOpen}<p>{lineageOrientation === 'horizontal' ? (isJapanese ? '全体を左から右へ見渡せます。' : 'Review the complete tree from left to right.') : (isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.')}</p>{/if}
 		</div>
 <div class="lineage-actions">
@@ -537,9 +537,9 @@ $effect(() => {
 		<div class="overview-zoom"><button type="button" onclick={() => (overviewScale = Math.max(.4, overviewScale - .1))}>−</button><span>{Math.round(overviewScale * 100)}%</span><button type="button" onclick={() => (overviewScale = Math.min(1.4, overviewScale + .1))}>＋</button></div>
 		<button type="button" onclick={closeOverview}>{isJapanese ? '閉じる' : 'Close'}</button>
 	{:else}
-		<button type="button" onclick={openOverview}>{isJapanese ? '全体図' : 'Overview'}</button>
+		<button type="button" onclick={openOverview}>{isJapanese ? '全体図' : 'Map'}</button>
 	{/if}
-	<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked artworks to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked artworks to trash'} onclick={askTrashChecked}>
+	<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
 		<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
 		{#if checkedHistoryIds.length > 0}<span>{checkedHistoryIds.length}</span>{/if}
 	</button>
@@ -551,7 +551,7 @@ $effect(() => {
 	{:else if error}
 		<div class="lineage-message error">{error}</div>
 	{:else if !graph || graph.nodes.length === 0}
-		<div class="lineage-message">{isJapanese ? '保存すると、ここに系譜が表示されます。' : 'Save an artwork to begin its lineage.'}</div>
+		<div class="lineage-message">{isJapanese ? '保存すると、ここに系譜が表示されます。' : 'Save a work to begin its lineage.'}</div>
 	{:else}
 		<div class="lineage-scroll" class:overview-scroll={overviewOpen} class:horizontal={lineageOrientation === 'horizontal'} bind:this={lineageScrollEl}>
 			<div class="lineage-columns" class:horizontal={lineageOrientation === 'horizontal'} bind:this={lineageColumnsEl} style={overviewOpen ? (lineageOrientation === 'horizontal' ? `transform: scale(${overviewScale}); transform-origin: top left;` : `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;`) : undefined}>
@@ -592,7 +592,7 @@ $effect(() => {
 		{@const ddlOrigin = isDdlOrigin(node)}
 		<div class="card-dropdown-menu" role="menu">
 			<div class="card-dropdown-title">
-				{isJapanese ? '作品編集' : 'Edit artwork'}
+				{isJapanese ? '作品編集' : 'Edit the work'}
 				{#if ddlOrigin}<span class="card-dropdown-origin">{isJapanese ? '（DDL直接生成作品）' : '(DDL-authored)'}</span>{/if}
 			</div>
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
@@ -600,7 +600,7 @@ $effect(() => {
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-					{isJapanese ? '指示を編集' : 'Edit instruction'}
+					{isJapanese ? '指示を編集' : 'Edit the instructions'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
@@ -615,14 +615,14 @@ $effect(() => {
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
-				{isJapanese ? 'AI自動推敲プロセス' : 'AI refinement process'}
+				{isJapanese ? 'AI自動推敲プロセス' : 'Autonomous refinement process'}
 			</button>
 		</div>
 	{/if}
 {/if}
 </div>
 
-								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted artwork')} onclick={() => openNode(node)}>
+								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted work')} onclick={() => openNode(node)}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
 									</div>
@@ -631,7 +631,7 @@ $effect(() => {
 									</div>
 									{#if node.history?.display_label}<div class="display-label">{node.history.display_label}</div>{/if}
 									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}
-									<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || (isJapanese ? '削除された作品' : 'Deleted artwork')}</div>
+									<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || (isJapanese ? '削除された作品' : 'Deleted work')}</div>
 								</button>
 								{#if childCount > 0 && !overviewOpen}
 									<button class="branch-toggle" type="button" aria-expanded={expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${childCount}件` : `${childCount} children`}</button>
@@ -649,7 +649,7 @@ $effect(() => {
 											<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(edge?.derivation_kind)}</dd>
 										</dl>
 										<div class="note-editor">
-										<label for={`lineage-note-${node.id}`}>{isJapanese ? '作品へのコメント' : 'Artwork Comment'}</label>
+										<label for={`lineage-note-${node.id}`}>{isJapanese ? '作品へのコメント' : 'Comment on the work'}</label>
 											<textarea id={`lineage-note-${node.id}`} maxlength="240" rows="3" value={noteValue(node)} disabled={savingNoteIds.includes(node.id)} oninput={(event) => updateNoteDraft(node.id, event.currentTarget.value)}></textarea>
 											<button type="button" disabled={savingNoteIds.includes(node.id) || noteValue(node).trim() === (node.history?.note ?? '').trim()} onclick={() => saveNodeNote(node)}>{savingNoteIds.includes(node.id) ? (isJapanese ? '保存中…' : 'Saving…') : (isJapanese ? '保存' : 'Save')}</button>
 										</div>
@@ -662,10 +662,10 @@ $effect(() => {
 				{/each}
 			</div>
 		</div>
-		<ol class="sr-only" aria-label={isJapanese ? '作品系譜の階層一覧' : 'Artwork lineage hierarchy'}>
+		<ol class="sr-only" aria-label={isJapanese ? '作品系譜の階層一覧' : 'Lineage hierarchy of works'}>
 			{#each graph.nodes as node (node.id)}
 				{@const edge = edgeByChild.get(node.id)}
-				<li>{node.id === graph.focus_node_id ? (isJapanese ? '表示中 — ' : 'Displayed — ') : ''}{operationLabel(edge?.derivation_kind)} — {node.history?.source_text ?? node.history?.input ?? (isJapanese ? '削除された作品' : 'Deleted artwork')}</li>
+				<li>{node.id === graph.focus_node_id ? (isJapanese ? '表示中 — ' : 'Displayed — ') : ''}{operationLabel(edge?.derivation_kind)} — {node.history?.source_text ?? node.history?.input ?? (isJapanese ? '削除された作品' : 'Deleted work')}</li>
 			{/each}
 		</ol>
 	{/if}
@@ -677,7 +677,7 @@ $effect(() => {
 			<header>
 				<div>
 					<h2 id="lineage-edit-title">{editMode === 'description' ? (isJapanese ? '記述を編集' : 'Edit description') : (isJapanese ? 'DDLを編集' : 'Edit DDL')}</h2>
-					<p>{isJapanese ? '描画すると、選択した作品の子として系譜へ保存します。' : 'Drawing saves a new child of the selected artwork.'}</p>
+					<p>{isJapanese ? '描画すると、選択した作品の子として系譜へ保存します。' : 'Drawing saves a new child of the chosen work.'}</p>
 				</div>
 				<button type="button" disabled={editDrawing} aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeEditDialog}>×</button>
 			</header>
@@ -690,7 +690,7 @@ $effect(() => {
 				{#if editDrawing}
 					<RunStatus
 						variant="inline"
-						label={stageLabel || (isJapanese ? '生成中…' : 'Generating…')}
+						label={stageLabel || (isJapanese ? '生成中…' : 'Painting…')}
 						stage1Model={stage1ModelLabel}
 						stage2Model={stage2ModelLabel}
 						elapsedMs={editElapsedMs}

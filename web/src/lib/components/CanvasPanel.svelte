@@ -508,12 +508,12 @@
 		<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
 			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
 		</Tooltip>
-		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show artwork derivations'}>
+		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show how this work was derived'}>
 			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if result}
-			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Displayed artwork information'}>
+			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Information about the displayed work'}>
 				<span class="render-meta-scope">{isJapanese ? '\u8868\u793a\u4e2d' : 'Displayed'}</span>
 				<span class="render-meta-item render-meta-generation">
 					{#if statusGeneration}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
@@ -523,9 +523,9 @@
 					<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
 					<strong title={statusStage1Model + ' / ' + statusStage2Model}>
 						{#if statusStage1Model === statusStage2Model}
-							{isJapanese ? '\u89e3\u91c8\uff0f\u63cf\u753b' : 'Interpretation / rendering'} {statusStage1Model}
+							{isJapanese ? '\u89e3\u91c8\uff0f\u63cf\u753b' : 'Interpretation / performance'} {statusStage1Model}
 						{:else}
-							{isJapanese ? '\u89e3\u91c8' : 'Interpretation'} {statusStage1Model} / {isJapanese ? '\u63cf\u753b' : 'Rendering'} {statusStage2Model}
+							{isJapanese ? '\u89e3\u91c8' : 'Interpretation'} {statusStage1Model} / {isJapanese ? '\u63cf\u753b' : 'Performance'} {statusStage2Model}
 						{/if}
 					</strong>
 				</span>
@@ -752,7 +752,7 @@
 									{#if refineKind === 'touch'}
 										<label class="touch-seed-field">
 											<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={variationBusy || variationGridBusy} />
-											<small>{isJapanese ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be generated.'}</small>
+											<small>{isJapanese ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.'}</small>
 										</label>
 									{/if}
 								</section>
@@ -955,7 +955,7 @@
 								{/if}
 							</div>
 						</div>
-						<p class="lang-combo-hint">{isJapanese ? 'Stage 1（解釈）と Stage 2（描画）の言語の組み合わせを選びます。' : 'Pick the Stage 1 (interpretation) × Stage 2 (rendering) language combination.'}</p>
+						<p class="lang-combo-hint">{isJapanese ? 'Stage 1（解釈）と Stage 2（描画）の言語の組み合わせを選びます。' : 'Pick the Stage 1 (interpretation) × Stage 2 (performance) language combination.'}</p>
 						<div class="model-choice-grid lang-combo-grid" aria-label={isJapanese ? '比較する言語の組み合わせ' : 'Language combinations to compare'}>
 							{#each LANGUAGE_COMBOS as combo (combo.join(':'))}
 								{@const stage1 = combo[0]}
@@ -1012,9 +1012,9 @@
 	</div>
 
 	{#if generationInfoOpen}
-		<aside class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}>
+		<aside class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}>
 			<header class="generation-info-head">
-				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}</strong>
+				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</strong>
 				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
 			</header>
 			<div class="generation-info-tabs" role="tablist">
@@ -1028,15 +1028,15 @@
 						<dl>
 							<dt>{isJapanese ? '\u4f5c\u6210\u65e5' : 'Created'}</dt><dd>{currentRenderedAt ?? '-'}</dd>
 							<dt>Stage 1 ({isJapanese ? '\u89e3\u91c8' : 'Interpretation'})</dt><dd>{statusStage1Model}</dd>
-							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'Rendering'})</dt><dd>{statusStage2Model}</dd>
+							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'Performance'})</dt><dd>{statusStage2Model}</dd>
 							<dt>Stage 1 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage1Lang)}</dd>
 							<dt>Stage 2 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage2Lang)}</dd>
 							<dt>{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</dt><dd>{statusCatalogName}</dd>
 							<dt>{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</dt><dd>{statusCanvasName}</dd>
 							<dt>{isJapanese ? '添景' : 'Staffage'}</dt><dd>{statusTenkei ? tenkeiLabel(statusTenkei, isJapanese) : '-'}</dd>
 							<dt>render seed</dt><dd>{detailRenderSeed ?? '-'}</dd>
-							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'Layout Seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
-							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'Interpretation Seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
+							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'Composition seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
+							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'Interpretation seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
 							<dt>render hash</dt><dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
 							<dt>description hash</dt><dd><code>{detailDescriptionHash || '-'}</code></dd>
 							<dt>render engine</dt><dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
@@ -1097,7 +1097,7 @@
 				onclick={onReplayCurrent}
 			>{t().historyReplay}</button>
 		</Tooltip>
-		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show generation details, prompts, and JSON for the selected artwork'}>
+		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show the provenance, prompts, and JSON of the chosen work'}>
 			<button
 				type="button"
 				class="generation-info-button"
@@ -1105,7 +1105,7 @@
 				disabled={!result && !allowEmptyOutputTabs}
 				aria-expanded={generationInfoOpen}
 				onclick={() => (generationInfoOpen = !generationInfoOpen)}
-			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Generation Info'}</button>
+			>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</button>
 		</Tooltip>
 		<Tooltip placement="top" text={t().tooltipSaijikiToggle}>
 			<button

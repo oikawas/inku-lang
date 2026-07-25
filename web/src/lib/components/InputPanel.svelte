@@ -278,7 +278,7 @@
 			{:else}
 				<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
 				<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-				<span class="cs-sub">{isJapanese ? '描画' : 'Rendering'}</span>
+				<span class="cs-sub">{isJapanese ? '描画' : 'Performance'}</span>
 				<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
 			{/if}
 		</span>

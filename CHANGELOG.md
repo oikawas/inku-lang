@@ -806,6 +806,19 @@ and a frozen corpus of their own.
 
 ---
 
+### v2.7.2 — retiring two fields nothing reads (Build 711, 2026-07-26)
+
+**`contact` and `thickness` were declared in the schema and read nowhere.** `contact` carried no information at all: a touching relation was required to set it to `both_ends`, and every other relation was forbidden from setting it, so only one value could ever be written.
+
+- **`Relation.contact` and the `thickness` dimension are gone**, along with the `RelationContact` type. The SPEC §17.A row that listed `thickness` as unimplemented goes with them — it recorded a declaration that was never going to be built.
+- **Saved work still replays.** 41 of the 1780 scores on pentala carry `contact`, and `extra="forbid"` would reject them, so each model now **drops the retired key before validation**. **Unknown fields are still refused.**
+- **The producers stopped emitting it** — both Stage 2 prompts and their examples, the relation repair path, and the pair-splitting plugin. The reference dump loses the `contact` enum.
+- **`absorbency` was not retired.** Its value is indeed never read, but the ground texture seed is a hash of the whole Score (`_texture_seed`), so removing the field re-rolls the grain of any work that has a ground. **18 of the 23 such works changed**, so the change was withdrawn and the reason written into the field description. **It will be retired as a deliberate change the next time the engine version moves.**
+- **Output neutrality was measured against real data.** 312 saved scores (all 62 carrying `contact` or `absorbency`, plus 250 at random) were rendered under both the old and new code: **zero changed**. Across the 639 scores carrying a relation: **zero changed**. **The engine version did not move.**
+- **Verification.** pytest **1101 passed / 30 skipped** (one added compatibility test), cli 68 passed, ruff clean. **Neither `web/` nor `android/` has a diff, so `npm run check` and the Android suite were not run.**
+
+---
+
 ### v2.7.1 — the canonical English glossary, and a lint that enforces it (Build 710, 2026-07-26)
 
 **v2.6.1 aligned the English interface but left nothing to keep it aligned.** One new string is enough to bring a forbidden word back or give a concept a second English term. **The rules now sit beside the strings they govern, with a lint that checks them mechanically.**

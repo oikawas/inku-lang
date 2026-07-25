@@ -1243,7 +1243,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
     "amplitude": "fine",
     "frequency": "high",
     "quality": "perlin",
-    "dimensions": ["position_y", "thickness"]
+    "dimensions": ["position_y"]
   }
 }
 ```
@@ -1253,7 +1253,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 | `amplitude` | `fine` / `medium` / `broad` | 振幅（運動語彙由来） |
 | `frequency` | `slow` / `medium` / `high` | 周波数（運動語彙由来） |
 | `quality` | `none` / `white` / `perlin` / `pink` / `wave` | ノイズ種別（weight由来） |
-| `dimensions` | `[position_x, position_y, angle, length, thickness, ...]` | どの次元を揺らすか |
+| `dimensions` | `[position_x, position_y, angle, length, rotation, radius]` | どの次元を揺らすか。`thickness` は v2.7.2 で退役した（宣言だけで Renderer が読まなかった） |
 
 **記述者はこの構造を直接書かない**。運動語彙・weight・プラグインの組み合わせから、第二段階の構造化層が生成する。
 
@@ -1385,7 +1385,7 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 触れない | not touching | 直前要素に接近するが接触しない | `not_touching` |
 | 切る | cutting | 直前要素を横切り、視覚的な断絶を作る（短歌の「切れ」に相当） | `cutting` |
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
-| 触れる | touching | 直前要素に接触する。`contact: both_ends` は両端点を一致させて閉形を構成する | `touching` |
+| 触れる | touching | 直前要素に接触する。両端点を一致させて閉形を構成する | `touching` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
 
@@ -1412,7 +1412,6 @@ instruction に任意フィールド `relation` を追加する。
 |---|---|---|
 | `type` | `along` / `not_touching` / `cutting` / `between` / `touching` | 関係の種類 |
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
-| `contact` | `both_ends` | `touching` 専用。現段階では両端点の一致だけを許す |
 
 **参照先は常に「直前の instruction」とする（暗黙 prev 参照）。** `between` のみ直前の2要素を参照する。id による任意参照は導入しない。理由:
 
@@ -1430,7 +1429,7 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `along` → 直前要素の軌跡に沿う帯領域内で、位置・位相・長さを演奏ごとに決める
 - `cutting` → 直前要素と交差する角度・交点を、レンジ内で演奏ごとに決める
 - `between` → 直前2要素の間の領域内で決める
-- `touching, contact=both_ends` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
+- `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
 
 `touching` で当該要素が弧なら、直前要素の確定端点を P1, P2、弦長を `c=|P2-P1|`、当該弧の演奏後の符号付き矢高を `b` とし、`r=c²/(8|b|)+|b|/2` で劣弧を再構成する。中心は弦の中点から膨らみと反対側へ `r-|b|` だけ置き、掃引角は必ず180°未満とする。直前要素が弧なら膨らみ側はその反対側を既定とする。劣弧の符号・掃引規約はRendererのSVG弧描画と一つの実装を共有する。variationと筆致は端点を固定し、中間区間だけへ作用する。閉形、端点のない直前要素、退化した弦・矢高ではrelationをdropし、座標推定による修復やgovernorは行わない。
 
@@ -1867,7 +1866,6 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 | triangle 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定 |
 | square 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定（polygon も同様） |
 | arc 揺らぎ | 実装済 (v1.99) | 分割 + オフセット、両端点は完全固定（touching 接点契約の維持） |
-| `thickness` dimension | 未対応 | stroke-width を segment 毎に変化 (1 line = 複数 path 必要) |
 | `angle` / `rotation` / `length` dimension | 未対応 | 線の端点位置に作用する軸 |
 | てざわり視覚品質 | 実装済 (v1.25) | `weight` ごとに stroke 属性、texture filter、副線、粒、撚り線を生成。line / circle / ellipse / square / arc の輪郭に適用 |
 

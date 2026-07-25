@@ -32,11 +32,11 @@ def _manifest() -> dict:
 
 def test_render_reference_case_counts() -> None:
     cases = _manifest()["cases"]
-    assert len(cases) == 220
+    assert len(cases) == 228
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D")
-    } == {"A": 80, "B": 72, "C": 40, "D": 28}
+    } == {"A": 88, "B": 72, "C": 40, "D": 28}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -140,5 +140,5 @@ def test_every_corpus_number_sits_on_the_master_grid() -> None:
                 if len(decimals) != MASTER_GRID_DECIMALS:
                     off_grid.append((path.name, name, decimals))
     assert len(files) == len(_manifest()["changed_from_previous"])
-    assert checked > 100_000, checked
+    assert checked > 2_400, checked
     assert off_grid == []

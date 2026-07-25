@@ -38,6 +38,7 @@ from .stroke_engine import (
     GRAMMARS,
     centerline_normals,
     contour_stroke_path,
+    grid_point,
     outline_for_centerline,
     polygon_path,
     synthesize_along,
@@ -59,6 +60,7 @@ WEIGHT_TO_STROKE_WIDTH: dict[str, float] = {
     "brush_thick": 8.0,
     "burin": 3.2,
     "drypoint": 2.6,
+    "computer": 2.0,
 }
 
 COLOR_MAP: dict[str, str] = {
@@ -219,6 +221,7 @@ WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
     "brush_thick": {"stroke_opacity": 0.86, "stroke_linecap": "round"},
     "burin": {"stroke_opacity": 0.96, "stroke_linecap": "round"},
     "drypoint": {"stroke_opacity": 0.92, "stroke_linecap": "round"},
+    "computer": {"stroke_opacity": 1.0, "stroke_linecap": "round"},
 }
 
 BACKGROUND = "#ffffff"
@@ -3428,6 +3431,40 @@ def _add_material_arc_outline(
         )
 
 
+# The computer's material layer. A hand tool leaves something beside the
+# stroke (graphite dust, hair, wax); a computer leaves the remainder of
+# sampling. The geometry is rounded onto a lattice, and the difference between
+# where the ink was headed and the lattice point it landed on is thrown away.
+# These cells give that difference back as tone: the geometry repeats without
+# error, the material shows where the error went. No seed, so the same figure
+# always bleeds the same way.
+RASTER_BLEED_OPACITY = 0.45
+
+
+def _add_raster_bleed(dwg, group, samples, grid_step: float, color: str) -> None:
+    """Add one lattice cell per sample the rounding moved, under the stroke."""
+    if grid_step <= 0:
+        return
+    half = grid_step / 2
+    for sample in samples:
+        if sample.residual <= 0.0:
+            continue
+        # The cell sits on the lattice, not at the intended position: it is the
+        # cell the ink was rounded into.
+        x = grid_point(sample.x, grid_step)
+        y = grid_point(sample.y, grid_step)
+        group.add(
+            dwg.rect(
+                insert=(x - half, y - half),
+                size=(grid_step, grid_step),
+                fill=color,
+                fill_opacity=RASTER_BLEED_OPACITY * min(1.0, sample.residual / half),
+                stroke="none",
+                class_="raster-bleed",
+            )
+        )
+
+
 def _material_line_group(
     dwg: svgwrite.Drawing,
     ins: Instruction,
@@ -3441,7 +3478,13 @@ def _material_line_group(
     render_seed: int | None = None,
     centerline: list[tuple[float, float]] | None = None,
 ):
-    if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick"):
+    if ins.weight not in (
+        "pencil",
+        "crayon",
+        "chalk",
+        "brush_thin",
+        "brush_thick",
+    ):
         return None
 
     # The texture layers ride the actual (possibly gestured) centreline, not the
@@ -3633,6 +3676,7 @@ def _render_hand_stroke(
     )
     color = attrs.get("stroke", "#111111")
     opacity = float(attrs.get("stroke_opacity", 1.0))
+    _add_raster_bleed(dwg, group, stroke.samples, stroke.grid_step, color)
     outline = stroke.outline
     material_centerline = [(s.x, s.y) for s in stroke.samples]
     if _needs_path_variation(ins.variation):
@@ -3955,6 +3999,7 @@ def _render_contour_hand_stroke(
     )
     color = attrs.get("stroke", "#111111")
     opacity = float(attrs.get("stroke_opacity", 1.0))
+    _add_raster_bleed(dwg, group, stroke.samples, stroke.grid_step, color)
     path_attrs = {
         "d": contour_stroke_path(stroke),
         "fill": color,
@@ -4052,6 +4097,7 @@ def _render_arc_hand_stroke(
 
     color = attrs.get("stroke", "#111111")
     opacity = float(attrs.get("stroke_opacity", 1.0))
+    _add_raster_bleed(dwg, group, stroke.samples, stroke.grid_step, color)
     path_attrs = {
         "d": contour_stroke_path(stroke),
         "fill": color,

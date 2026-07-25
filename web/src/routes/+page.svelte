@@ -564,6 +564,7 @@
 				brush_thick: '<path d="M22 56 C47 25 105 68 158 37 C128 60 62 54 22 56 Z" fill="#2b2b2b" opacity="0.84"/><path d="M35 54 C72 42 112 58 151 41" fill="none" stroke="#fffdf8" stroke-width="1.2" opacity="0.45"/>',
 				burin: '<path d="M22 55 C56 42 106 57 158 39 C119 55 67 51 22 55 Z" fill="#2b2b2b"/>',
 				drypoint: `${defs}<path d="M22 55 C56 40 107 58 158 39 C118 54 67 52 22 55 Z" fill="#2b2b2b"/><path d="M23 59 C58 44 108 62 159 43" fill="none" stroke="#2b2b2b" stroke-width="5" opacity="0.28" filter="url(#touch-soft)"/>`,
+				computer: '<path d="M22 52 H34 V46 H46 V40 H58 V46 H70 V52 H82 V58 H94 V64 H106 V58 H118 V52 H130 V46 H142 V40 H158" fill="none" stroke="#2b2b2b" stroke-width="2.4" stroke-linejoin="round"/><path d="M22 36 H158 M22 68 H158" fill="none" stroke="#2b2b2b" stroke-width="0.9" stroke-dasharray="22 9" stroke-linecap="round" opacity="0.576"/>',
 			};
 			return shapeSvg(paths[kind] ?? paths.pen);
 		};
@@ -607,6 +608,7 @@
 			太筆: { effect: '大きな幅変化と穂先の筋を持つ太い筆線。', example: '太筆で黒い線を引く', effectEn: 'A thick brush stroke with wide width changes and streaks from the tip.', exampleEn: 'Draw a black line with a thick brush', svg: touchSvg('brush_thick') },
 			ビュラン: { effect: '入りと抜きが細く、中央に彫りの勢いが集まる硬い線。', example: 'ビュランで線を彫る', effectEn: 'A hard line, thin at both ends, with the cutting force gathered at the center.', exampleEn: 'Cut a line with a burin', svg: touchSvg('burin') },
 			ドライポイント: { effect: '緩い中膨らみと、片側だけの柔らかなburrを伴う線。', example: 'ドライポイントの線', effectEn: 'A line with a slight mid-swell and a soft burr on one side only.', exampleEn: 'A drypoint line', svg: touchSvg('drypoint') },
+			コンピュータ: { effect: '幅と軌道を格子と段に落とし、同じ周期と破線を誤差なく反復する。', example: 'コンピュータの線', effectEn: 'Snaps width and path to a grid and steps, repeating the same cycle and dashes without error.', exampleEn: 'A computer line', svg: touchSvg('computer') },
 			実線: { effect: '切れ目のない線。', example: '実線で引く', effectEn: 'An unbroken line.', exampleEn: 'Draw with a solid line', svg: lineSvg() },
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', effectEn: 'Places short segments with gaps between them.', exampleEn: 'A dashed arc', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', effectEn: 'Draws as a run of dots.', exampleEn: 'Enclose with a dotted line', svg: lineSvg('stroke-dasharray="1 12"') },

@@ -29,17 +29,16 @@ CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-07-25"
 REASON = (
-    "De-regularize the performance. The width envelope was a fixed symmetric "
-    "sin(pi t) hump, the correction event repeated with period 5, closed contours "
-    "carried a thin seam opposite a fat middle, and the material outline used an "
-    "even dash and evenly spaced specks. All four are replaced by seeded "
-    "low-frequency noise, and the centreline gains a length-scaled gesture."
+    "Add the computer touch: its width and path fall onto fixed steps and a grid, "
+    "its cycles repeat independently of render seed, and its material layer is the "
+    "remainder of that sampling — one lattice cell per rounded sample, toned by the "
+    "residual the grid discarded."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
 
 TOOLS = (
-    "brush_thick", "brush_thin", "burin", "chalk", "crayon",
+    "brush_thick", "brush_thin", "burin", "chalk", "computer", "crayon",
     "drypoint", "hair", "pen", "pencil", "rotring",
 )
 PRIMITIVES = (
@@ -195,9 +194,9 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         _case(cases, f"D-unsigned-seed-{seed}",
               _instruction("arc", weight="drypoint"), render_seed=seed)
 
-    expected = {"A": 80, "B": 72, "C": 40, "D": 28}
+    expected = {"A": 88, "B": 72, "C": 40, "D": 28}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 220:
+    if actual != expected or len(cases) != 228:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

@@ -26,8 +26,15 @@ _ALLOWED_JA = (("髪、", 1), ("髪・", 1), ("描く、", 2))
 _ALLOWED_EN = (("hair, ", 2),)
 
 # (置換対象, 置換後, 期待出現回数)。削剪では表せない許可差分 (語順修正)。
-_REORDERED_JA: tuple[tuple[str, str, int], ...] = ()
-_REORDERED_EN = (("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),)
+_REORDERED_JA = (
+    ("ビュラン・ドライポイントのいずれか", "ビュラン・ドライポイント・コンピュータのいずれか", 1),
+    ("ビュラン、ドライポイント\n", "ビュラン、ドライポイント、コンピュータ\n", 1),
+)
+_REORDERED_EN = (
+    ("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),
+    ("burin, or drypoint.", "burin, drypoint, or computer.", 1),
+    ("burin, drypoint\n", "burin, drypoint, computer\n", 1),
+)
 
 
 def test_saijiki_categories_store_one_bilingual_word_sequence() -> None:
@@ -83,7 +90,7 @@ _EXPECTED_CORE_MARKERS = {
         "線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形",
         "置く", "引く", "並べる", "散らす", "敷き詰める", "埋める",  # 描く 削剪
         "触れる", "沿う", "切る", "触れない", "間に",
-        "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント",  # 髪 削剪
+        "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ",  # 髪 削剪
         "白", "黒", "青", "赤", "緑", "灰",
         "細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む",
         "水平", "垂直", "斜め", "右上がり", "右下がり", "回転",
@@ -95,7 +102,7 @@ _EXPECTED_CORE_MARKERS = {
         "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform",
         "place", "draw", "arrange", "scatter", "tile", "fill",
         "touching", "along", "cutting", "not touching", "between",
-        "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint",  # hair 削剪
+        "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer",  # hair 削剪
         "white", "black", "blue", "red", "green", "gray",
         "fine", "large", "slowly", "quickly", "swaying", "undulating", "trembling", "blurring",
         "horizontal", "vertical", "diagonal", "rising", "falling", "rotated",

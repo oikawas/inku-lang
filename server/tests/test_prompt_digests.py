@@ -27,12 +27,12 @@ def empty_plugin_vocabulary(monkeypatch):
 @pytest.mark.parametrize(
     ("lang", "tenkei", "expected_bytes", "expected_digest"),
     [
-        ("ja", "auto", 17_929, "611c81f7023ae43c"),
-        ("ja", "sparse", 18_239, "546d56a8401ed755"),
-        ("ja", "none", 18_311, "c5f9cf5d3bdfb808"),
-        ("en", "auto", 16_830, "7b9b42df2e54d03e"),
-        ("en", "sparse", 17_059, "d5aa5ac24c998805"),
-        ("en", "none", 17_195, "a57b887025856c0e"),
+        ("ja", "auto", 17_971, "3000bee8a2e241d6"),
+        ("ja", "sparse", 18_281, "194d36c765218595"),
+        ("ja", "none", 18_353, "0f4495440b181fce"),
+        ("en", "auto", 16_850, "e680f73ee6fab57a"),
+        ("en", "sparse", 17_079, "ec03b0fbdd7e70ae"),
+        ("en", "none", 17_215, "65932837ce9e6c9e"),
     ],
 )
 def test_stage1_prompt_base_digest_expected_values(
@@ -54,9 +54,9 @@ def test_stage1_prompt_base_digest_expected_values(
 @pytest.mark.parametrize(
     ("text", "lang", "expected_bytes", "expected_digest"),
     [
-        ("中心に円を置く。", "ja", 18_616, "f062442b8900daa0"),
-        ("雨上がりの水面に光が散る。", "ja", 18_764, "0935e044d74c1fa0"),
-        ("Place one circle at the center.", "en", 17_504, "b6595e6480847f87"),
+        ("中心に円を置く。", "ja", 18_658, "373b7cbf3134c8d5"),
+        ("雨上がりの水面に光が散る。", "ja", 18_806, "43b077215a31f374"),
+        ("Place one circle at the center.", "en", 17_524, "204745e66dcef798"),
     ],
 )
 def test_stage1_actual_prompt_digest_expected_values(
@@ -77,7 +77,7 @@ def test_stage1_base_digest_excludes_input_dependent_examples():
         "雨上がりの水面に光が散る。"
     )
     assert _digest(first_prompt) != _digest(second_prompt)
-    assert _digest(first_base) == _digest(second_base) == "611c81f7023ae43c"
+    assert _digest(first_base) == _digest(second_base) == "3000bee8a2e241d6"
 
 
 @pytest.mark.usefixtures("empty_plugin_vocabulary")
@@ -113,14 +113,14 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_497
-    assert _digest(composer.SYSTEM_PROMPT) == "76871757a50efec1"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_552
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "de205dbae6837078"
-    assert len(tool_json.encode("utf-8")) == 17_859
-    assert _digest(tool_json) == "b3529ddcb109e21b"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "4c26278bb95621b2"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "1ed1eb710a790574"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_594
+    assert _digest(composer.SYSTEM_PROMPT) == "7a9a890c0d76e863"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_635
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "1633f1ac07c490b6"
+    assert len(tool_json.encode("utf-8")) == 17_958
+    assert _digest(tool_json) == "18ce46e090cf8d41"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "da6657aa52613024"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "476fcee99699b34b"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -166,15 +166,15 @@ def test_saijiki_word_changes_both_stage1_base_digests(monkeypatch):
         replace(
             category,
             words=category.words
-            + (saijiki.SaijikiWord("コンピュータ", "computer"),),
+                + (saijiki.SaijikiWord("プロッター", "plotter"),),
         )
         if category.key == "tezawari"
         else category
         for category in original_categories
     )
     expected = {
-        "ja": (17_971, "3000bee8a2e241d6"),
-        "en": (16_850, "e680f73ee6fab57a"),
+        "ja": (18_007, "7671738818af4a48"),
+        "en": (16_868, "75f2108fbcd9b4f2"),
     }
     for lang, prefix in (
         ("ja", interpreter.SYSTEM_PROMPT_PREFIX),
@@ -222,8 +222,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     changed_tool = replace_description(changed_tool)
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "4b8f29b7512cbcbe"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "76871757a50efec1"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "9ad6e6f8a3fc1167"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "7a9a890c0d76e863"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

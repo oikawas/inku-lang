@@ -162,6 +162,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("太筆", "thick-brush", score_value="brush_thick"),
             _w("ビュラン", "burin", score_value="burin"),
             _w("ドライポイント", "drypoint", score_value="drypoint"),
+            _w("コンピュータ", "computer", score_value="computer"),
         ),
     ),
     SaijikiCategory(

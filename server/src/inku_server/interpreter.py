@@ -1142,6 +1142,7 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
             "thick-brush",
             "burin",
             "drypoint",
+            "computer",
         )
         if lang == "en"
         else (
@@ -1153,6 +1154,7 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
             "太筆",
             "ビュラン",
             "ドライポイント",
+            "コンピュータ",
         )
     )
     if not any(

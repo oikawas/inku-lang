@@ -379,6 +379,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 | 太筆 | brush_thick |
 | ビュラン | burin |
 | ドライポイント | drypoint |
+| コンピュータ（格子に乗り、段に落ち、誤差なく反復する） | computer |
 
 入力: 灰色の横長の雲形を上半分に置く。ゆっくり波打つ。
 出力: {"instructions":[{"primitive":"cloudform","center":[0.5,0.3],"size":[0.72,0.22],"color":"gray","variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["radius"]}}]}
@@ -726,6 +727,7 @@ When the normalized DDL contains a material word, always set the weight field. O
 | thick-brush | brush_thick |
 | burin | burin |
 | drypoint | drypoint |
+| computer (snaps to a grid, falls into steps, repeats without error) | computer |
 
 Input: Place a wide gray cloudform in the upper half. Make it undulate slowly.
 Output: {"instructions":[{"primitive":"cloudform","center":[0.5,0.3],"size":[0.72,0.22],"color":"gray","variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["radius"]}}]}

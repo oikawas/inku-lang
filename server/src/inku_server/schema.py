@@ -27,6 +27,7 @@ Weight = Literal[
     "brush_thick",
     "burin",
     "drypoint",
+    "computer",
 ]
 Color = Literal["white", "black", "blue", "red", "green", "gray"]
 SurfaceTexture = Literal[
@@ -445,6 +446,7 @@ class Instruction(BaseModel):
             "hair=髪 / pencil=鉛筆 / pen=ペン / rotring=ロットリング"
             " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆"
             " / burin=ビュラン / drypoint=ドライポイント"
+            " / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ"
         ),
     )
     mode: InstructionMode = Field(

@@ -90,6 +90,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("鉛筆", "pencil"), ("ペン", "pen"), ("ロットリング", "rotring"), ("クレヨン", "crayon"),
         ("チョーク", "chalk"), ("細筆", "fine-brush"), ("太筆", "thick-brush"),
         ("ビュラン", "burin"), ("ドライポイント", "drypoint"),
+        ("コンピュータ", "computer"),
     ),
     "tsuranari": (
         ("実線", "solid"), ("破線", "dashed"), ("点線", "dotted"), ("一点鎖線", "dash-dot"),

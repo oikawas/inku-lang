@@ -2395,6 +2395,8 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         weight = "burin"
     elif ("ドライポイント" in ddl) or ("drypoint" in lower):
         weight = "drypoint"
+    elif ("コンピュータ" in ddl) or ("computer" in lower):
+        weight = "computer"
     elif ("ロットリング" in ddl) or ("rotring" in lower):
         weight = "rotring"
     elif ("鉛筆" in ddl) or ("pencil" in lower):

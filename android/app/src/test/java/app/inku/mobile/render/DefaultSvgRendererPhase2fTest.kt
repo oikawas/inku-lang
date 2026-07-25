@@ -250,4 +250,41 @@ class DefaultSvgRendererPhase2fTest {
         val svg16 = renderSvgForReference("16_circle_pen_wild")
         assertEquals("16_circle_pen_wild must be byte-identical to 01_circle_pen", svg01, svg16)
     }
+
+    private fun extractMaterialOutlinePoints(svg: String): List<String> {
+        val result = mutableListOf<String>()
+        val regex = Regex("""<polyline[^>]*points="([^"]+)"[^>]*class="material-outline"|<polyline[^>]*class="material-outline"[^>]*points="([^"]+)"""")
+        regex.findAll(svg).forEach { match ->
+            val pts = match.groupValues[1].ifEmpty { match.groupValues[2] }
+            result.add(pts)
+        }
+        return result
+    }
+
+    private fun extractMaterialOutlineDashArrays(svg: String): List<String> {
+        val result = mutableListOf<String>()
+        val regex = Regex("""<polyline[^>]*stroke-dasharray="([^"]+)"[^>]*class="material-outline"|<polyline[^>]*class="material-outline"[^>]*stroke-dasharray="([^"]+)"""")
+        regex.findAll(svg).forEach { match ->
+            val dash = match.groupValues[1].ifEmpty { match.groupValues[2] }
+            result.add(dash)
+        }
+        return result
+    }
+
+    @Test
+    fun testMaterialOutlinePointsAndDashArrayExactParity() {
+        val keys = listOf("02_line_brush", "09_line_white", "14_region_then_relation", "15_line_brush_wild")
+        for (key in keys) {
+            val expectedSvg = readReferenceResource("$key.svg")
+            val actualSvg = renderSvgForReference(key)
+
+            val expectedPoints = extractMaterialOutlinePoints(expectedSvg)
+            val actualPoints = extractMaterialOutlinePoints(actualSvg)
+            assertEquals("Material outline points list for $key.svg must match exact reference", expectedPoints, actualPoints)
+
+            val expectedDashes = extractMaterialOutlineDashArrays(expectedSvg)
+            val actualDashes = extractMaterialOutlineDashArrays(actualSvg)
+            assertEquals("Material outline dasharrays list for $key.svg must match exact reference", expectedDashes, actualDashes)
+        }
+    }
 }

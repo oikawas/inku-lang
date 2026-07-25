@@ -792,6 +792,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val opacity = attrs.strokeOpacity
 
         val variation = ins.optJSONObject("variation")
+        var materialCenterline = stroke.samples.map { Pair(it.x, it.y) }
         val outline = if (needsPathVariation(variation)) {
             val centerline = ServerRendererGeometry.variedLinePoints(x1, y1, x2, y2, variation, seedStr, ins, width, height, unit)
             val varied = ServerStrokeEngine.synthesizeStroke(
@@ -803,6 +804,7 @@ class DefaultSvgRenderer : SvgRenderer {
                 samplesCount = centerline.size,
                 wild = wild
             )
+            materialCenterline = centerline
             ServerStrokeEngine.outlineForCenterline(centerline, varied.samples.map { it.width })
         } else {
             stroke.outline
@@ -815,9 +817,8 @@ class DefaultSvgRenderer : SvgRenderer {
         val fillOpacityStr = fmt(opacity)
         sb.append("""<path d="$pathD" fill="$color" fill-opacity="$fillOpacityStr" stroke="none"/>""")
 
-        val materialCenterline = stroke.samples.map { Pair(it.x, it.y) }
         if (weight in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) {
-            val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false, renderSeed = renderSeed, centerline = materialCenterline)
+            val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false, renderSeed = renderSeed, centerline = materialCenterline, instructionSeed = seedLong)
             if (mat != null) {
                 sb.append(mat)
             }
@@ -851,7 +852,9 @@ class DefaultSvgRenderer : SvgRenderer {
     }
 
     private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double, renderSeed: Long? = null, centerline: List<Pair<Double, Double>>? = null): String? {
-        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, renderSeed = renderSeed, centerline = centerline)
+        val seedStr = seedForInstruction(ins, renderSeed)
+        val seedLong = seedStr.toULongOrNull()?.toLong() ?: 0L
+        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, renderSeed = renderSeed, centerline = centerline, instructionSeed = seedLong)
     }
 
     private fun materialCircleOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, unit: Double): String {

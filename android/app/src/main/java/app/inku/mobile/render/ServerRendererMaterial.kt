@@ -13,19 +13,17 @@ internal object ServerRendererMaterial {
     fun usesMaterialOutline(weight: String): Boolean = materialOutlineProfile(weight, 1000.0).isNotEmpty() || baseSpeckProfile(weight) != null
 
     fun outlineOffsetPx(offset: Double, unit: Double): Double {
-        val scale = unit / 1000.0
-        val raw = offset * scale
         val floor = 0.0035 * unit
-        if (floor <= 0 || kotlin.math.abs(raw) >= floor) return raw
-        return java.lang.Math.copySign(floor, raw)
+        if (floor <= 0.0 || kotlin.math.abs(offset) >= floor) return offset
+        return java.lang.Math.copySign(floor, offset)
     }
 
     fun outlineOpacity(opacity: Double): Double {
-        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.5))
+        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.50))
     }
 
     fun speckOpacity(opacity: Double): Double {
-        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.4))
+        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.40))
     }
 
     fun scaleDash(spec: String?, scale: Double): String? {
@@ -39,10 +37,10 @@ internal object ServerRendererMaterial {
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         val input = "${seed.toULong()}:$salt:$i".toByteArray(Charsets.UTF_8)
         val hash = digest.digest(input)
-        var raw: Long = 0
-        for (b in 0 until 4) {
-            raw = raw or ((hash[b].toLong() and 0xFFL) shl (b * 8))
-        }
+        val raw = (hash[0].toLong() and 0xFFL) or
+            ((hash[1].toLong() and 0xFFL) shl 8) or
+            ((hash[2].toLong() and 0xFFL) shl 16) or
+            ((hash[3].toLong() and 0xFFL) shl 24)
         return raw.toDouble() / 4294967295.0
     }
 
@@ -72,7 +70,8 @@ internal object ServerRendererMaterial {
                 n - 1 -> Pair(points[n - 1].first - points[n - 2].first, points[n - 1].second - points[n - 2].second)
                 else -> Pair(points[i + 1].first - points[i - 1].first, points[i + 1].second - points[i - 1].second)
             }
-            val length = Math.hypot(tx, ty).let { if (it == 0.0) 1.0 else it }
+            val len = Math.hypot(tx, ty)
+            val length = if (len == 0.0) 1.0 else len
             val nx = -ty / length
             val ny = tx / length
             var off = amount
@@ -95,8 +94,8 @@ internal object ServerRendererMaterial {
         for (i in 0 until count) {
             val m = mark * (0.5 + 1.3 * hash01(i, seed, "dash-mark"))
             val g = gap * (0.45 + 1.5 * hash01(i, seed, "dash-gap"))
-            vals.add(ServerRendererGeometry.fmt(m))
-            vals.add(ServerRendererGeometry.fmt(g))
+            vals.add(java.lang.String.format(java.util.Locale.US, "%.3f", m))
+            vals.add(java.lang.String.format(java.util.Locale.US, "%.3f", g))
         }
         return vals.joinToString(",")
     }
@@ -111,12 +110,13 @@ internal object ServerRendererMaterial {
         unit: Double,
         includeBase: Boolean = true,
         renderSeed: Long? = null,
-        centerline: List<Pair<Double, Double>>? = null
+        centerline: List<Pair<Double, Double>>? = null,
+        instructionSeed: Long? = null
     ): String? {
         val weight = ins.optString("weight", "pen")
         if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) return null
 
-        val seedInt = ServerRendererGeometry.seedForInstruction(ins, renderSeed)
+        val seedInt = instructionSeed ?: ServerRendererGeometry.seedForInstruction(ins, renderSeed)
         val scale = unit / 1000.0
         val offsetGain = 2.8
         val opacityGain = 1.8

@@ -1548,4 +1548,28 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 66 件の単体テストが **100% 成功 (PASS 66 / Failures 0 / Errors 0 / Skipped 0)**。
 - `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148087`** にインクリメント。
 
+## 2026-07-25 render engine 12 追随 段 4b′ (材質アウトライン層の再移植および points / stroke-dasharray 完全一致検証)
+
+契約 `antigravity-android-engine12.md` §9 に基づき、差し戻された材質アウトライン層 (`<polyline class="material-outline">`) の再移植と `points` 座標列・`stroke-dasharray` 破線値の文字列完全一致比較テストを完了した。
+
+### 実装および追随の詳細
+
+1. **`ServerRendererMaterial.kt` の完全直移植・バグ修正**:
+   - `outlineOffsetPx` 内で二重に掛け合わされていた `scale` を除去し、`_outline_offset_px` の計算式と完全に一致させた。
+   - `hash01` でのシード文字列化を `${seed.toULong()}:$salt:$i` （unsigned uint64 10進表現）に修正。
+   - `variedDashPattern`（3桁小数）と `scaleDash`（`fmt` 6桁小数）のフォーマットを Python 側実装に完全統一。
+2. **`DefaultSvgRenderer.kt` でのシードおよびパス伝達修正**:
+   - `renderHandStroke` および `materialLineGroup` において、`seedForInstruction` から導出した正規化 64-bit uint64 シード（`seedLong`）を `instructionSeed` パラメータとして伝達。
+   - `variation`（手ブレ・波）が存在する場合、`materialCenterline` に `centerline`（波形中心線）をバインドするように修正。
+3. **`points` および `stroke-dasharray` 完全一致比較テストの追加 (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - `testMaterialOutlinePointsAndDashArrayExactParity` を追加。
+   - `02_line_brush`, `09_line_white`, `14_region_then_relation`, `15_line_brush_wild` の 4 件について、`<polyline class="material-outline">` の `points` 座標文字列および `stroke-dasharray` 破線配列が参照 SVG と完全一致すること（`assertEquals`）を検証。
+4. **ミューテーションテスト（判別力検証）**:
+   - `outlineOffsetPx` の `floor` 係数 `0.0035` に `1e-6` の微小摂動（`0.003500001`）を加えた際、`testMaterialOutlinePointsAndDashArrayExactParity` が実際に **FAILED** になることを確認。
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 68 件の単体テストが **100% 成功 (PASS 68 / Failures 0 / Errors 0 / Skipped 0)**。
+- `android/BUILD_NUMBER` は **`148088`** にインクリメント。
+
 

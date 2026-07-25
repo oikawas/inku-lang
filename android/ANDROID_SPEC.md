@@ -1550,6 +1550,27 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §10, propo
 ### Wiring & Resolution of Unimplemented Requirements
 1. **Complete Removal of Legacy Functions & Defaults**: Removed `ServerRendererGeometry.getAmplitudePx` in favor of `amplitudePx`. Removed default parameter `= 1000.0` from `ServerRendererStyle.strokeAttrs` and `strokeWidth`.
 2. **Full Propagation of Canvas `unit` (`min(width, height)`)**: Threaded `unit` down from `DefaultSvgRenderer` to all geometry, material, and style calls.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4b′ (Material Outline Layer Re-implementation & Exact Parity Verification)
+
+In accordance with contract `antigravity-android-engine12.md` §9, re-implemented the material outline layer (`<polyline class="material-outline">`) and added exact string parity assertions for `points` and `stroke-dasharray`.
+
+### Implementation & Parity Fixes
+1. **`ServerRendererMaterial.kt` Direct Port Fixes**:
+   - Fixed redundant `scale` multiplication in `outlineOffsetPx` to match `_outline_offset_px`.
+   - Formatted seed in `hash01` as `${seed.toULong()}:$salt:$i` (unsigned uint64 decimal representation).
+   - Unified `variedDashPattern` (3 decimal places) and `scaleDash` (`fmt` 6 decimal places) formats with Python implementation.
+2. **`DefaultSvgRenderer.kt` Pipeline Fixes**:
+   - Passed normalized 64-bit uint64 seed (`seedLong`) derived via `seedForInstruction` to `ServerRendererMaterial.lineGroup` via `instructionSeed`.
+   - Bound `materialCenterline` to `centerline` (varied centerline) when `ins.variation` is present.
+3. **Exact String Parity Tests (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - Added `testMaterialOutlinePointsAndDashArrayExactParity` verifying exact string parity (`assertEquals`) of `points` and `stroke-dasharray` against reference SVGs for `02_line_brush`, `09_line_white`, `14_region_then_relation`, and `15_line_brush_wild`.
+4. **Mutation Sensitivity Verification**:
+   - Verified that adding a `1e-6` perturbation (`0.003500001`) to `outlineOffsetPx` floor causes `testMaterialOutlinePointsAndDashArrayExactParity` to FAIL.
+
+### Verification Results
+- All 68 unit tests PASS 100% (`PASS 68 / Failures 0 / Errors 0 / Skipped 0`).
+- `android/BUILD_NUMBER` is **`148088`**.
 3. **Dynamic Blur Filter Aggregation**: Replaced static `blur-fine / blur-medium / blur-broad` with dynamic `filter_id = "blur-${amp}-${int(std*10)}"` aggregation computed from `blurStdPx` and outputted to `<defs>`.
 4. **Proportional Texture Filters**: Updated `baseFrequency` to be inversely proportional to `unit` (`base * (1000.0 / unit)`) and displacement scale to be proportional to `unit`.
 5. **Material Constraints**: Applied material outline offset floor `0.0035 * unit` (preserving sign via `Math.copySign`), outline opacity floor 0.5 (capped at 1.0), speck opacity floor 0.4 (capped at 1.0), and perimeter-proportional speck counts.

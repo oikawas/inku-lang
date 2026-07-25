@@ -818,3 +818,27 @@ and a frozen corpus of their own.
 - One `en.ts` entry was corrected to sentence case along the way (`Instructions (Normalized DDL)` → `Instructions (normalized DDL)`) — **a miss the lint found.**
 - **Verification.** `npm run check` 0 errors / 2 warnings (217 files), `npm run lint:i18n` **788 strings / 36 exceptions / 0 errors**, pytest 1100 passed / 30 skipped, cli 68 passed, ruff clean. **Android's suite was not run, since `android/` has no diff.**
 - **Left undone (stated).** The English documentation (`README.md`, `manual/en/`, the rest of `SPEC.md`) has not been brought into line. **The lint watches only the display strings under `web/`; it does not read documentation.**
+
+---
+
+### The English documentation follows the interface vocabulary (no version, 2026-07-26)
+
+**When v2.6.1 moved the English interface onto the terminology dictionary, the English documentation stayed behind.** Only the interface carried the new vocabulary, while `README.md`, `SPEC.md` and `manual/en/` still said `artwork`, `Generation Info` and `Vary Touch with Words`. They now follow. **No Japanese canonical document and no code was touched.**
+
+- `artwork` → `work` (the art register), `Generation info` → `Provenance`, `Okugaki` → `Colophon`, `Kotobagaki` → `Headnote`, the five refinement operations by their ruled names (`Another performance`, `Another composition`, `Another reading`, `Another catalog`), and the variation amplitudes as `subtle / moderate / sweeping`.
+- **The English UI casing rule now points at `web/src/lib/i18n/GLOSSARY.md` instead of being restated.** SPEC.md said short English labels use Title Case, which the interface had left behind in v2.6.1. **One rule does not get two homes.**
+- **Deliberately left alone:** (1) **text quoted verbatim from the CLI** — `inku-cli` still prints `Artwork Lineage:`, so a manual that says otherwise is simply wrong; (2) CLI subcommand and flag names (`okugaki`, `refine generate`, `--kind layout`); (3) **JSON and API field names** (`palette`, `resolved_palette`, `palette:<name>`); (4) the romanized glosses beside `Headnote` and `Colophon`; (5) **the revision-history line recording that an older build unified Title Case**, which remains true of that build.
+- **`palette` was first counted as 12 stale occurrences; classified, it was zero.** The Japanese canonical uses パレット in the same places, and the rest are color-catalog API fields. **What the dictionary forbids is `palette` meaning the color catalog, not the ordinary noun.** Treating a raw grep count as the work item would have deleted correct usage.
+- **Five sentences broken by the mechanical substitution were repaired** (`not an work governor`, `by an work-page boundary`, and similar, where `artwork` → `work` damaged an article or a compound). **A bulk replacement always needs a pass afterwards.**
+- **The lint does not watch this.** `npm run lint:i18n` scans only the display strings under `web/`; documentation is out of its reach, so nothing mechanical stops it drifting again.
+- **No version was assigned** (documentation only — the first application of the numbering rule below).
+
+### The version numbering rule is tightened (author's ruling, 2026-07-26)
+
+**"Version numbers are climbing too fast. Use +0.0.1 increments more."** A ruling to the same effect had already been given on 2026-07-21, but **a render engine bump kept being treated as grounds for a minor**, and v2.5.0 (engine 12) → v2.6.0 (engine 13) → v2.7.0 (engine 14) moved the minor digit three times in five days. **The engine version is a performance-compatibility counter, not the granularity of a user-facing version.**
+
+- **A patch bump (+0.0.1) is the default**: feature work, UI and terminology changes, bug fixes, added tests or reference corpora, **and a render engine version bump**.
+- **A minor bump is reserved for three cases**: a milestone the author names, an external release that gets a tag, and a compatibility break (saved data, API, or edition-identity format).
+- **Documentation-only changes take no version at all**, and are recorded under a dated heading with no version number, as the Android entries are.
+- `web/BUILD_NUMBER` is a separate counter and still moves with every deployed change.
+- **When in doubt, take the patch. Numbers already published are never renumbered** (v2.5.0, v2.6.0 and v2.7.0 stand).

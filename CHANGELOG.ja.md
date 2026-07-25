@@ -2928,3 +2928,27 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - あわせて `en.ts` の 1 項目を Sentence case へ是正した（`Instructions (Normalized DDL)` → `Instructions (normalized DDL)`）。**これは lint を通すために見つかった取りこぼしである。**
 - **検証:** `npm run check` 0 errors / 2 warnings（217 files）、`npm run lint:i18n` **788 文字列 / 36 例外 / 0 errors**、pytest 1100 passed / 30 skipped、cli 68 passed、ruff clean。**`android/` に差分が無いので Android のテストは回していない。**
 - **積み残し（明示）:** 英語ドキュメント（`README.md` / `manual/en/`、`SPEC.md` の残り）の用語追随は行っていない。**lint は `web/` の表示文字列だけを見ており、ドキュメントは見ていない。**
+
+---
+
+### 英語ドキュメントの用語追随（版数なし・2026-07-26）
+
+**v2.6.1 が UI の英語を辞書へ揃えたとき、英語ドキュメントは旧語彙のまま残っていた。** UI だけが新しく、`README.md` / `SPEC.md` / `manual/en/` は `artwork` / `Generation Info` / `Vary Touch with Words` と書いたままだったので、そこを追随させた。**日本語正本とコードは 1 バイトも触っていない。**
+
+- `artwork` → `work`（美術の register）、`Generation info` → `Provenance`、`Okugaki` → `Colophon`、`Kotobagaki` → `Headnote`、五つの推敲操作を確定した名前（`Another performance` / `Another composition` / `Another reading` / `Another catalog`）へ、変奏の強度を `subtle / moderate / sweeping` へ。
+- **英語 UI の表記規則は、SPEC で述べ直すのをやめて `web/src/lib/i18n/GLOSSARY.md` を指すようにした。** SPEC.md には「短い英語ラベルは Title Case」と書いてあり、v2.6.1 で Sentence case へ移った実装と矛盾していた。**正本を 2 箇所に置かない。**
+- **意図して直さなかったもの:** ① **CLI の実出力の引用**（`inku-cli` は今も `Artwork Lineage:` と印字するので、マニュアルは原文どおりでなければ嘘になる）、② CLI のサブコマンド名とフラグ値（`okugaki`、`refine generate`、`--kind layout`）、③ **JSON / API のフィールド名**（`palette`、`resolved_palette`、`palette:<name>`）、④ `Headnote` / `Colophon` に添えたローマ字の注記、⑤ **改訂履歴の「英語 UI の Title Case 統一」**（過去のビルドが実際にそうしたという記録であり、いまも真である）。
+- **`palette` は当初「12 件が旧語」と数えていたが、分類すると 0 件だった。** 日本語正本も「色パレット」と書いており、残りは色カタログ API のフィールド名である。**辞書が禁じているのは「色カタログの意味での palette」であって、一般名詞のパレットではない。** 生の grep 件数をそのまま作業量として扱うと、正しい用法まで消すことになる。
+- **機械置換が壊した英文を 5 箇所直した**（`not an work governor` / `by an work-page boundary` など、`artwork` → `work` で冠詞と複合語が崩れた箇所）。**一括置換は必ず後始末が要る。**
+- **lint はここを見ていない。** `npm run lint:i18n` が走査するのは `web/` の表示文字列だけで、ドキュメントは対象外である。ドキュメント側の退行を機械で止める仕組みは無い。
+- **採番していない**（ドキュメントのみの変更のため。下記の採番規則の最初の適用例）。
+
+### 採番規則の強化（2026-07-26 作者裁定）
+
+**「バージョン番号が速く上がりすぎている。0.0.1 単位での上昇をより多用する」。** 2026-07-21 にも同じ趣旨の裁定を受けていたが、その後も **engine の版上げを minor の理由として扱って**しまい、v2.5.0（engine 12）→ v2.6.0（engine 13）→ v2.7.0（engine 14）と 5 日で minor が 3 回上がった。**engine 版は演奏互換性のカウンタであって、ユーザー向けバージョンの粒度ではない。**
+
+- **patch (+0.0.1) を既定とする。** 機能の追加・改修、UI・用語の改修、バグ修正、テストや参照コーパスの追加、**および render engine の版上げ**はすべて patch。
+- **minor (+0.1.0) は 3 つの場合だけ** — 作者が節目と明示したとき、タグを打つ外部向けリリース、互換性が切れるとき（保存済みデータ・API・エディション ID の形式変更）。
+- **ドキュメントのみの変更は採番しない。** CHANGELOG には版数なしの日付見出しで記録する（Android entry と同じ形）。
+- `web/BUILD_NUMBER` は別勘定で、反映のたびに上がってよい。
+- **迷ったら patch に倒す。既に公開した番号は振り直さない**（v2.5.0 / v2.6.0 / v2.7.0 はそのまま）。

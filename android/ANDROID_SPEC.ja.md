@@ -1448,4 +1448,33 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 64 件の単体テスト（既存 62 件 + Phase 3d 新設 2 件）が 100% 通過 (PASS / Failures 0 / Errors 0)。
 - `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148083` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
 
+## 2026-07-25 render engine 12 追随 段 4a (ServerStrokeEngine の脱・規則化)
+
+契約 `antigravity-android-engine12.md` §4a に基づき、`ServerStrokeEngine.kt` の脱・規則化（エンベロープの置換、`ToolGrammar` への `gesture` 追加、中心線ジェスチャの合成、長さ基準の補正イベント、`wild` 引数の追加）および `ServerStrokeEngineTest.kt` のテスト追随を完了した。
+
+### 実装および追随の詳細
+
+1. **ToolGrammar およびツールの拡張 (`ServerStrokeEngine.kt`)**:
+   - `ToolGrammar` に 10 番目のフィールド `gesture: Double` を追加し、全 10 種類のツール文法に engine 12 の値を反映。
+   - `WILD_GAIN = 3.5` および `GESTURE_EDGE = 0.16` を定義。
+2. **脱・規則化関数の追加**:
+   - `smoothNoiseSalted`: 明示 salt と周波数で独立乱数系列を生成する 4 番目のハッシュ関数。
+   - `edgeWindow`: 端点のみレイズドコサインで落とし中央を 1.0 に保つ端点窓関数（旧固定サイン山 `max(0, sin(pi t))` の置換）。
+   - `swell`: ストロークごとの太さ中心の低周波変調関数。
+   - `gestureWave`: 低周波 2D 中心線揺らぎ関数。
+3. **ストローク合成の修正 (`synthesizeStroke`, `synthesizeAlong`)**:
+   - `synthesizeStroke` に `wild: Boolean = false` を追加し、`gestureAmp` による中心線変形を適用。
+   - エンベロープを `edgeWindow(t) * swell(t, seed)` へ変更（`synthesizeAlong` の閉輪郭は `swell(t, seed)`）。
+   - `correction` イベントの振幅補正を標本インデックス剰余 `i % 5` から長さ基準の `correction-kick` ハッシュへ変更。
+4. **単体テストおよびミューテーション検証 (`ServerStrokeEngineTest.kt`)**:
+   - `testPrimitivesParity` / `testSynthesizeStrokeParity` / `testSynthesizeAlongParity` の parity テストに追随（`gesture`, `wild_gain`, `gesture_edge`, 4 関数の標本および `wild` パラメータ入力）。
+   - `testWildPairingDivergenceAndIdentity` を追加し、`rotring` で `flat` と `wild` が完全一致すること、`pencil` で `gesture_off` と `_wild` が異なることを検証。
+   - `swell` に `1e-6` のミューテーションを与えた際、対象 3 テストが意図通り全て失敗することを確認・検証済み。
+
+### 検証結果
+
+- `render_engine_version` は `"11"` を維持（4c の最後のコミットで `"12"` に更新）。
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 65 件の単体テストのうち 64 件成功、1 件失敗（SVG構造比較。段 4b で解決予定）、スキップ 0 件。`ServerStrokeEngineTest` の 5 件は 100% 成功。
+- 変更は `android/` 配下のみ。
+
 

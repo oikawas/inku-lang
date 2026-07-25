@@ -31,12 +31,14 @@ class ServerStrokeEngineTest {
             assertEquals("event_rate for $weight", expected.getDouble("event_rate"), actual.eventRate, 1e-12)
             assertEquals("taper for $weight", expected.getDouble("taper"), actual.taper, 1e-12)
             assertEquals("bulge for $weight", expected.getDouble("bulge"), actual.bulge, 1e-12)
+            assertEquals("gesture for $weight", expected.getDouble("gesture"), actual.gesture, 1e-12)
         }
 
-        // 2. Closed envelope floor
-        assertEquals(CLOSED_ENVELOPE_FLOOR, root.getDouble("closed_envelope_floor"), 1e-12)
+        // 1b. Engine 12 constants
+        assertEquals(WILD_GAIN, root.getDouble("wild_gain"), 1e-12)
+        assertEquals(GESTURE_EDGE, root.getDouble("gesture_edge"), 1e-12)
 
-        // 3. Unit hash (56 cases)
+        // 2. Unit hash (56 cases)
         val unitArr = root.getJSONArray("unit")
         assertEquals(56, unitArr.length())
         for (i in 0 until unitArr.length()) {
@@ -49,7 +51,7 @@ class ServerStrokeEngineTest {
             assertEquals("unitHash mismatch for seed=$seed label=$label index=$index", expected, actual, 1e-12)
         }
 
-        // 4. Smooth noise (24 cases)
+        // 3. Smooth noise (24 cases)
         val smoothArr = root.getJSONArray("smooth_noise")
         assertEquals(24, smoothArr.length())
         for (i in 0 until smoothArr.length()) {
@@ -62,7 +64,53 @@ class ServerStrokeEngineTest {
             assertEquals("smoothNoise mismatch for t=$t seed=$seed octave=$octave", expected, actual, 1e-12)
         }
 
-        // 5. Event map (16 cases)
+        // 4. Edge window
+        val edgeWindowArr = root.getJSONArray("edge_window")
+        for (i in 0 until edgeWindowArr.length()) {
+            val item = edgeWindowArr.getJSONObject(i)
+            val t = item.getDouble("t")
+            val expected = item.getDouble("value")
+            val actual = ServerStrokeEngine.edgeWindow(t)
+            assertEquals("edgeWindow mismatch for t=$t", expected, actual, 1e-12)
+        }
+
+        // 5. Swell
+        val swellArr = root.getJSONArray("swell")
+        for (i in 0 until swellArr.length()) {
+            val item = swellArr.getJSONObject(i)
+            val t = item.getDouble("t")
+            val seed = item.getLong("seed")
+            val expected = item.getDouble("value")
+            val actual = ServerStrokeEngine.swell(t, seed)
+            assertEquals("swell mismatch for t=$t seed=$seed", expected, actual, 1e-12)
+        }
+
+        // 6. Smooth noise salted
+        val smoothSaltedArr = root.getJSONArray("smooth_noise_salted")
+        for (i in 0 until smoothSaltedArr.length()) {
+            val item = smoothSaltedArr.getJSONObject(i)
+            val t = item.getDouble("t")
+            val seed = item.getLong("seed")
+            val salt = item.getString("salt")
+            val frequency = item.getDouble("frequency")
+            val expected = item.getDouble("value")
+            val actual = ServerStrokeEngine.smoothNoiseSalted(t, seed, salt, frequency)
+            assertEquals("smoothNoiseSalted mismatch for t=$t seed=$seed salt=$salt freq=$frequency", expected, actual, 1e-12)
+        }
+
+        // 7. Gesture wave
+        val gestureWaveArr = root.getJSONArray("gesture_wave")
+        for (i in 0 until gestureWaveArr.length()) {
+            val item = gestureWaveArr.getJSONObject(i)
+            val t = item.getDouble("t")
+            val seed = item.getLong("seed")
+            val salt = item.getString("salt")
+            val expected = item.getDouble("value")
+            val actual = ServerStrokeEngine.gestureWave(t, seed, salt)
+            assertEquals("gestureWave mismatch for t=$t seed=$seed salt=$salt", expected, actual, 1e-12)
+        }
+
+        // 8. Event map (16 cases)
         val eventArr = root.getJSONArray("event_map")
         assertEquals(16, eventArr.length())
         for (i in 0 until eventArr.length()) {
@@ -135,7 +183,7 @@ class ServerStrokeEngineTest {
     @Test
     fun testSynthesizeStrokeParity() {
         val root = JSONArray(readResource("stroke_engine_synthesize_stroke.json"))
-        assertEquals(9, root.length())
+        assertEquals(13, root.length())
         for (caseIdx in 0 until root.length()) {
             val caseObj = root.getJSONObject(caseIdx)
             val name = caseObj.getString("name")
@@ -149,8 +197,9 @@ class ServerStrokeEngineTest {
             val weight = input.getString("weight")
             val seed = input.getLong("seed")
             val samplesCount = input.getInt("samples")
+            val wild = input.optBoolean("wild", false)
 
-            val result = ServerStrokeEngine.synthesizeStroke(start, end, baseWidth, weight, seed, samplesCount)
+            val result = ServerStrokeEngine.synthesizeStroke(start, end, baseWidth, weight, seed, samplesCount, wild)
 
             // Samples check
             val expectedSamples = caseObj.getJSONArray("samples")
@@ -260,5 +309,27 @@ class ServerStrokeEngineTest {
             assertEquals("burr_opacity for $name", caseObj.getDouble("burr_opacity"), result.burrOpacity, 1e-9)
             assertEquals("path_d for $name", caseObj.getString("path_d"), ServerStrokeEngine.contourStrokePath(result))
         }
+    }
+
+    @Test
+    fun testWildPairingDivergenceAndIdentity() {
+        val root = JSONArray(readResource("stroke_engine_synthesize_stroke.json"))
+        val cases = mutableMapOf<String, JSONObject>()
+        for (i in 0 until root.length()) {
+            val obj = root.getJSONObject(i)
+            cases[obj.getString("name")] = obj
+        }
+
+        val rotringFlat = cases["line_rotring_flat"] ?: error("Missing line_rotring_flat")
+        val rotringWild = cases["line_rotring_wild"] ?: error("Missing line_rotring_wild")
+        assertEquals(rotringFlat.getJSONArray("samples").toString(), rotringWild.getJSONArray("samples").toString())
+        assertEquals(rotringFlat.getJSONArray("outline").toString(), rotringWild.getJSONArray("outline").toString())
+        assertEquals(rotringFlat.getString("path_d"), rotringWild.getString("path_d"))
+
+        val pencilOff = cases["line_pencil_gesture_off"] ?: error("Missing line_pencil_gesture_off")
+        val pencilWild = cases["line_pencil_gesture_wild"] ?: error("Missing line_pencil_gesture_wild")
+        org.junit.Assert.assertNotEquals(pencilOff.getJSONArray("samples").toString(), pencilWild.getJSONArray("samples").toString())
+        org.junit.Assert.assertNotEquals(pencilOff.getJSONArray("outline").toString(), pencilWild.getJSONArray("outline").toString())
+        org.junit.Assert.assertNotEquals(pencilOff.getString("path_d"), pencilWild.getString("path_d"))
     }
 }

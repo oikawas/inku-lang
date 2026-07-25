@@ -1884,3 +1884,32 @@ plugin expansion (`Nature.風` / `Nature.うねり` / `Nature.無風` and the En
   (62 existing + 2 new), 0 failures, 0 errors, 0 skipped.
 - `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148083`.
   `android/VERSION` remains `2.0.0-android.1`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4a (De-regularization of `ServerStrokeEngine`)
+
+Per contract `antigravity-android-engine12.md` §4a, the de-regularization of `ServerStrokeEngine.kt` (envelope replacement, addition of `gesture` to `ToolGrammar`, centerline gesture synthesis, length-based correction events, addition of `wild` parameter) and `ServerStrokeEngineTest.kt` parity updates were completed.
+
+### Implementation Details
+
+1. **ToolGrammar & Tool Extensions (`ServerStrokeEngine.kt`)**:
+   - Added 10th field `gesture: Double` to `ToolGrammar` and updated all 10 tool grammars with engine 12 values.
+   - Defined `WILD_GAIN = 3.5` and `GESTURE_EDGE = 0.16`.
+2. **De-regularization Primitive Functions**:
+   - `smoothNoiseSalted`: 4th hash noise stream using explicit salt and frequency parameters.
+   - `edgeWindow`: Raised-cosine endpoint window (replacing fixed central sine bulge `max(0, sin(pi t))`).
+   - `swell`: Low-frequency modulation of maximum width position.
+   - `gestureWave`: Low-frequency 2D centerline wander wave.
+3. **Stroke Synthesis Updates (`synthesizeStroke`, `synthesizeAlong`)**:
+   - Added `wild: Boolean = false` to `synthesizeStroke` to scale `gestureAmp`.
+   - Replaced envelope with `edgeWindow(t) * swell(t, seed)` (`synthesizeAlong` closed loops use `swell(t, seed)`).
+   - Changed `correction` event amplitude perturbation from sample index modulo `i % 5` to length-based `correction-kick` hash.
+4. **Unit Tests & Mutation Verification (`ServerStrokeEngineTest.kt`)**:
+   - Updated parity tests (`testPrimitivesParity`, `testSynthesizeStrokeParity`, `testSynthesizeAlongParity`) for engine 12 primitive samples, constants, and `wild` option.
+   - Added `testWildPairingDivergenceAndIdentity` to verify `rotring` identity and `pencil` divergence under `wild`.
+   - Verified mutation response: introducing `1e-6` offset to `swell` causes all 3 target parity tests to fail as expected.
+
+### Verification
+
+- `render_engine_version` remains `"11"` (to be bumped to `"12"` at the final commit of 4c).
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 64 out of 65 unit tests pass, 1 failure (SVG structure parity, resolved in 4b), 0 skipped. `ServerStrokeEngineTest` passes 5/5 (100%).
+- Changes restricted to `android/`.

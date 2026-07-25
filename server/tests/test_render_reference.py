@@ -32,11 +32,11 @@ def _manifest() -> dict:
 
 def test_render_reference_case_counts() -> None:
     cases = _manifest()["cases"]
-    assert len(cases) == 228
+    assert len(cases) == 347
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
-        for prefix in ("A", "B", "C", "D")
-    } == {"A": 88, "B": 72, "C": 40, "D": 28}
+        for prefix in ("A", "B", "C", "D", "E")
+    } == {"A": 88, "B": 72, "C": 40, "D": 28, "E": 119}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -56,6 +56,7 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
         assert set(case["color_map"]) == set(generator.DEFAULT_COLOR_MAP)
         assert case["svg_profile"] == "editable"
         assert isinstance(case["render_seed"], int)
+        assert isinstance(case["wild"], bool)
 
 
 def test_render_reference_discriminator_cases() -> None:

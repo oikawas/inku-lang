@@ -153,7 +153,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 - **「前の線に沿って」/ "along the previous line" → relation={"type":"along","gap":"narrow"}**
 - **「前の形に触れない」/ "not touching the previous shape" → relation={"type":"not_touching","gap":"narrow"}。広く触れないなら gap="wide"**
-- **「前の線に触れる」「前の弧に両端で触れる」/ "touching the previous line", "touching the previous arc at both ends" → relation={"type":"touching","contact":"both_ends"}。接触を明示した時だけ使い、自発付与しない**
+- **「前の線に触れる」「前の弧に両端で触れる」/ "touching the previous line", "touching the previous arc at both ends" → relation={"type":"touching"}。接触を明示した時だけ使い、自発付与しない**
 - **「前の線を切る」/ "cutting the previous line" → relation={"type":"cutting","gap":"medium"}**
 - **「前の二つの間に」/ "between the previous two" → relation={"type":"between","gap":"medium"}**
 - relation は正規化DDL に上記の定型句が**完全な関係指定として**文字どおりある時だけ転記する。relation を推測で追加しない。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「触れていない」「近く/遠く」は relation ではない。先頭 instruction には relation を付けない。
@@ -299,10 +299,10 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 
 入力: 緑の弧を一本置く。もう一本の弧を前の弧に両端で触れるように置く。
-出力: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833,"angle_start":-143.13,"angle_end":-36.87,"color":"green"},{"primitive":"arc","center":[0.50,0.53],"radius":0.0833,"angle_start":143.13,"angle_end":36.87,"color":"green","relation":{"type":"touching","contact":"both_ends"}}]}
+出力: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833,"angle_start":-143.13,"angle_end":-36.87,"color":"green"},{"primitive":"arc","center":[0.50,0.53],"radius":0.0833,"angle_start":143.13,"angle_end":36.87,"color":"green","relation":{"type":"touching"}}]}
 
 入力: 黒い線を一本引く。赤い線を前の線に触れるように置く。
-出力: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching","contact":"both_ends"}}]}
+出力: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching"}}]}
 
 入力: 緑の弧を二本、上下に離して置く。
 出力: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
@@ -525,7 +525,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 - **"along the previous line" -> relation={"type":"along","gap":"narrow"}**
 - **"not touching the previous shape" -> relation={"type":"not_touching","gap":"narrow"}. Use gap="wide" for wide separation**
-- **"touching the previous line" / "touching the previous arc at both ends" -> relation={"type":"touching","contact":"both_ends"}. Use only for explicit contact language; never add it spontaneously**
+- **"touching the previous line" / "touching the previous arc at both ends" -> relation={"type":"touching"}. Use only for explicit contact language; never add it spontaneously**
 - **"cutting the previous line" -> relation={"type":"cutting","gap":"medium"}**
 - **"between the previous two" -> relation={"type":"between","gap":"medium"}**
 - Copy relation only when the normalized DDL literally contains one of these fixed phrases as an explicit previous-object relation. Do not infer relations. Natural-language-derived phrases such as "around", "same beat", "ahead/behind", "not touched", "near", or "far" are not relations. Do not attach relation to the first instruction.
@@ -626,10 +626,10 @@ Output: {"instructions":[{"primitive":"line","from":[0.47,0.5],"to":[0.53,0.5],"
 
 
 Input: Place one green arc. Place another arc touching the previous arc at both ends.
-Output: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833,"angle_start":-143.13,"angle_end":-36.87,"color":"green"},{"primitive":"arc","center":[0.50,0.53],"radius":0.0833,"angle_start":143.13,"angle_end":36.87,"color":"green","relation":{"type":"touching","contact":"both_ends"}}]}
+Output: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833,"angle_start":-143.13,"angle_end":-36.87,"color":"green"},{"primitive":"arc","center":[0.50,0.53],"radius":0.0833,"angle_start":143.13,"angle_end":36.87,"color":"green","relation":{"type":"touching"}}]}
 
 Input: Draw one black line. Place a red line touching the previous line.
-Output: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching","contact":"both_ends"}}]}
+Output: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching"}}]}
 
 Input: Place two green arcs separated vertically.
 Output: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
@@ -1060,7 +1060,7 @@ def _enforce_relation_literal_gate(score: Score, ddl: str) -> Score:
                 instructions[index]["relation"] = {
                     "type": relation_type,
                     **(
-                        {"contact": "both_ends"}
+                        {}
                         if relation_type == "touching"
                         else {
                             "gap": "medium"

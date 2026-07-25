@@ -83,7 +83,7 @@ def _score() -> Score:
                     (0.44, 0.50),
                     (0.56, 0.50),
                     0.045,
-                    relation={"type": "touching", "contact": "both_ends"},
+                    relation={"type": "touching"},
                 ),
             ]
         }
@@ -474,7 +474,7 @@ def test_touching_schema_is_strict_versioned_and_migration_is_idempotent() -> No
         "version": "0.1.0",
         "instructions": [],
     }
-    relation = {"type": "touching", "contact": "both_ends"}
+    relation = {"type": "touching"}
     score = Score.model_validate(
         {
             "version": "0.1.0",
@@ -489,7 +489,9 @@ def test_touching_schema_is_strict_versioned_and_migration_is_idempotent() -> No
             ],
         }
     )
-    assert score.instructions[1].relation.contact == "both_ends"
+    assert score.instructions[1].relation.type == "touching"
+    # 厳格さの検査。contact が退役した (v2.7.2) ので「touching なら contact 必須」は
+    # もう無いが、未知フィールドの拒否は残っている。
     with pytest.raises(ValidationError):
         Score.model_validate(
             {
@@ -498,7 +500,7 @@ def test_touching_schema_is_strict_versioned_and_migration_is_idempotent() -> No
                         "primitive": "line",
                         "from": [0.2, 0.5],
                         "to": [0.8, 0.5],
-                        "relation": {"type": "touching"},
+                        "relation": {"type": "touching", "hold": "tight"},
                     }
                 ]
             }
@@ -516,13 +518,13 @@ def test_invalid_touching_is_drop_only_for_closed_or_endpointless_targets() -> N
                     "radius": 0.08,
                     "angle_start": 20,
                     "angle_end": 120,
-                    "relation": {"type": "touching", "contact": "both_ends"},
+                    "relation": {"type": "touching"},
                 },
                 {
                     "primitive": "circle",
                     "center": [0.4, 0.4],
                     "radius": 0.04,
-                    "relation": {"type": "touching", "contact": "both_ends"},
+                    "relation": {"type": "touching"},
                 },
             ]
         }
@@ -743,7 +745,6 @@ def test_formal_leaf_bench_scores_use_only_strict_schema(name: str) -> None:
     assert any(
         instruction.relation is not None
         and instruction.relation.type == "touching"
-        and instruction.relation.contact == "both_ends"
         for instruction in score.instructions
     )
 
@@ -782,13 +783,9 @@ def test_stage2_literal_gate_maps_explicit_touching_and_drops_spontaneous() -> N
     explicit = _enforce_relation_literal_gate(base, "前の線に触れる")
     assert explicit.instructions[1].relation is not None
     assert explicit.instructions[1].relation.type == "touching"
-    assert explicit.instructions[1].relation.contact == "both_ends"
 
     spontaneous_data = base.model_dump(by_alias=True)
-    spontaneous_data["instructions"][1]["relation"] = {
-        "type": "touching",
-        "contact": "both_ends",
-    }
+    spontaneous_data["instructions"][1]["relation"] = {"type": "touching"}
     spontaneous = _enforce_relation_literal_gate(
         Score.model_validate(spontaneous_data),
         "二本の線を離して置く",
@@ -831,3 +828,48 @@ def test_general_30_inputs_do_not_enable_touching_spontaneously() -> None:
     ]
     assert len(general_inputs) == 30
     assert all("touching" not in _literal_relation_types(text) for text in general_inputs)
+
+
+def test_retired_fields_are_dropped_from_saved_scores() -> None:
+    """v2.7.2 で退役した 2 フィールドは、保存済み Score の再生を妨げない。
+
+    pentala の保存済み 1780 件のうち contact が 41 件で使われている (thickness は
+    0 件)。`extra="forbid"` があるので、落とす経路が無いと再生時に ValidationError
+    で弾かれる。absorbency は退役していない — 値は読まれないが、地の texture seed が
+    Score 全体のハッシュなので、消すと地を持つ 23 件の粒配置が変わる。
+    """
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5]},
+                {
+                    "primitive": "line",
+                    "from": [0.3, 0.4],
+                    "to": [0.7, 0.4],
+                    "relation": {"type": "touching", "contact": "both_ends"},
+                    "variation": {
+                        "quality": "wave",
+                        "dimensions": ["position_y", "thickness"],
+                    },
+                },
+            ],
+        }
+    )
+    assert not hasattr(score.instructions[1].relation, "contact")
+    assert score.instructions[1].relation.type == "touching"
+    assert score.instructions[1].variation.dimensions == ["position_y"]
+
+    # 落とすのは退役した 2 つだけで、未知フィールドは今も拒否する。
+    with pytest.raises(ValidationError):
+        Score.model_validate(
+            {
+                "instructions": [
+                    {
+                        "primitive": "line",
+                        "from": [0.2, 0.5],
+                        "to": [0.8, 0.5],
+                        "relation": {"type": "along", "grip": "firm"},
+                    }
+                ]
+            }
+        )

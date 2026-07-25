@@ -221,7 +221,6 @@ def _normalized_ddl_phrases() -> dict[str, Any]:
         },
         "relation_enums": {
             "type": list(get_args(schema.RelationType)),
-            "contact": list(get_args(schema.RelationContact)),
             "gap": list(get_args(schema.RelationGap)),
         },
         "ground_enums": {
@@ -323,7 +322,6 @@ _ENUM_ALIASES = (
     "GazePressure",
     "ContourDensity",
     "RelationType",
-    "RelationContact",
     "RelationGap",
     "InstructionMode",
     "CarveDepth",
@@ -435,8 +433,8 @@ def _verification() -> dict[str, Any]:
             "A touching arc pair uses the minor arc only: abs(minor_arc_delta) "
             "must stay below 180 degrees.",
             "An arc sagitta must be positive and smaller than half the chord.",
-            "touching relation requires contact=both_ends with opposing apex "
-            "sides so the pair reads as closed rather than a smooth circle.",
+            "A touching relation pairs opposing apex sides so the pair reads as "
+            "closed rather than as a smooth circle.",
         ],
     }
 

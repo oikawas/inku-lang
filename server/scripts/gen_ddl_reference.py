@@ -43,7 +43,7 @@ BASE_ARRANGEMENT: dict[str, Any] = {
     "center": None, "radius": None, "density": "none", "cluster_count": None,
     "fade": "none", "preserve_space": False, "rhythm_spacing": "none",
 }
-BASE_RELATION = {"type": "touching", "gap": "medium", "contact": "both_ends"}
+BASE_RELATION = {"type": "touching", "gap": "medium"}
 BASE_PRESENCE = {
     "kind": "figure_like", "intensity": "medium", "center": [0.5, 0.5],
     "symmetry": "bilateral", "gaze_pressure": "low", "contour_density": "low",

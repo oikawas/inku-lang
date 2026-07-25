@@ -1505,22 +1505,20 @@ class LocalFallbackPipeline(
         val metadata = JSONObject(renderMetadataJson)
         val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
         val renderSeed = canonicalSeed(metadata.opt("render_seed") ?: metadata.opt("seed"))
-        val varySeed = canonicalSeed(metadata.opt("vary_seed"))
-        val buildNumber = metadata.opt("render_build_number")?.toString()
         val engineId = metadata.optString("render_engine_id", "default").ifBlank { "default" }
-        val engineVersion = metadata.optString("render_engine_version", "2").ifBlank { "2" }
+        val engineVersion = metadata.optString("render_engine_version", "12").ifBlank { "12" }
         val colorCatalogId = metadata.optString("render_color_catalog_id", catalogId).ifBlank { catalogId }
+        val wild = metadata.optBoolean("render_wild", metadata.optBoolean("wild", false))
 
         val payload = JSONObject()
-            .put("version", "rh2")
-            .put("score", scoreObj)
-            .put("render_seed", renderSeed ?: JSONObject.NULL)
-            .put("vary_seed", varySeed ?: JSONObject.NULL)
-            .put("render_build_number", buildNumber ?: JSONObject.NULL)
+            .put("render_color_catalog_id", colorCatalogId)
             .put("render_engine_id", engineId)
             .put("render_engine_version", engineVersion)
-            .put("render_color_catalog_id", colorCatalogId)
-        return "rh2:" + sha256(canonicalJson(payload))
+            .put("render_seed", renderSeed ?: JSONObject.NULL)
+            .put("render_wild", wild)
+            .put("score", scoreObj)
+            .put("version", "rh3")
+        return "rh3:" + sha256(canonicalJson(payload))
     }
 
     private fun canonicalJson(value: Any?): String {

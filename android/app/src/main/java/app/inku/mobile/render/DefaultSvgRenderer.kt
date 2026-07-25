@@ -21,6 +21,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val background = colors[score.optString("background", "white")] ?: "#ffffff"
         val instructions = score.optJSONArray("instructions") ?: JSONArray()
         val renderSeed = if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
+        val wild = score.optBoolean("render_wild", score.optBoolean("wild", false))
         val width = canvas.width.toDouble()
         val height = canvas.height.toDouble()
         val unit = min(width, height)
@@ -42,7 +43,7 @@ class DefaultSvgRenderer : SvgRenderer {
             val insSb = StringBuilder()
             for ((index, mark) in expanded.withIndex()) {
                 val markId = "mark_${"%03d".format(i)}_${"%03d".format(index)}_${primitive}"
-                var elem = renderInstruction(mark, colors, width, height, unit, neededBlurs, i, renderSeed)
+                var elem = renderInstruction(mark, colors, width, height, unit, neededBlurs, i, renderSeed, wild)
                 if (structured && elem.startsWith("<g ")) {
                     elem = elem.replaceFirst(">", """ id="$markId">""")
                 } else if (structured && elem.startsWith("<path ")) {
@@ -74,7 +75,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val svg = applyMasterGrid(rawSvg)
         val metadata = JSONObject()
             .put("render_engine_id", "default")
-            .put("render_engine_version", "11")
+            .put("render_engine_version", "12")
             .put("render_canvas_aspect", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_id", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_ratio", CanvasAspects.ratioFor(request.canvasAspect))
@@ -87,7 +88,7 @@ class DefaultSvgRenderer : SvgRenderer {
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }
 
-    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, unit: Double, neededBlurs: MutableMap<String, Double>, index: Int = 0, renderSeed: Long? = null): String {
+    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, unit: Double, neededBlurs: MutableMap<String, Double>, index: Int = 0, renderSeed: Long? = null, wild: Boolean = false): String {
         val primitive = ins.optString("primitive", "line")
         val colorKey = ins.optString("color", "black")
         val weight = ins.optString("weight", "pen")
@@ -103,7 +104,7 @@ class DefaultSvgRenderer : SvgRenderer {
                 val x2 = px(to?.optDouble(0, 0.5) ?: 0.5, width)
                 val y2 = px(to?.optDouble(1, 1.0) ?: 1.0, height)
                 if (weight != "rotring") {
-                    renderHandStroke(ins, attrs, x1, y1, x2, y2, weight, unit, width, height, renderSeed)
+                    renderHandStroke(ins, attrs, x1, y1, x2, y2, weight, unit, width, height, renderSeed, wild)
                 } else {
                     val variation = ins.optJSONObject("variation")
                     if (needsPathVariation(variation)) {
@@ -767,7 +768,8 @@ class DefaultSvgRenderer : SvgRenderer {
         unit: Double,
         width: Double,
         height: Double,
-        renderSeed: Long? = null
+        renderSeed: Long? = null,
+        wild: Boolean = false
     ): String {
         val length = kotlin.math.hypot(x2 - x1, y2 - y1)
         val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
@@ -781,7 +783,8 @@ class DefaultSvgRenderer : SvgRenderer {
             baseWidth = baseWidth,
             weight = weight,
             seed = seedLong,
-            samplesCount = samples
+            samplesCount = samples,
+            wild = wild
         )
 
         val groupClass = "stroke-engine-v1 controls-${stroke.samples.size} events-${stroke.eventCount}"
@@ -789,6 +792,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val opacity = attrs.strokeOpacity
 
         val variation = ins.optJSONObject("variation")
+        var materialCenterline = stroke.samples.map { Pair(it.x, it.y) }
         val outline = if (needsPathVariation(variation)) {
             val centerline = ServerRendererGeometry.variedLinePoints(x1, y1, x2, y2, variation, seedStr, ins, width, height, unit)
             val varied = ServerStrokeEngine.synthesizeStroke(
@@ -797,8 +801,10 @@ class DefaultSvgRenderer : SvgRenderer {
                 baseWidth = baseWidth,
                 weight = weight,
                 seed = seedLong,
-                samplesCount = centerline.size
+                samplesCount = centerline.size,
+                wild = wild
             )
+            materialCenterline = centerline
             ServerStrokeEngine.outlineForCenterline(centerline, varied.samples.map { it.width })
         } else {
             stroke.outline
@@ -812,7 +818,7 @@ class DefaultSvgRenderer : SvgRenderer {
         sb.append("""<path d="$pathD" fill="$color" fill-opacity="$fillOpacityStr" stroke="none"/>""")
 
         if (weight in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) {
-            val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false)
+            val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false, renderSeed = renderSeed, centerline = materialCenterline, instructionSeed = seedLong)
             if (mat != null) {
                 sb.append(mat)
             }
@@ -845,8 +851,10 @@ class DefaultSvgRenderer : SvgRenderer {
         return sb.toString()
     }
 
-    private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double): String? {
-        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit)
+    private fun materialLineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double, renderSeed: Long? = null, centerline: List<Pair<Double, Double>>? = null): String? {
+        val seedStr = seedForInstruction(ins, renderSeed)
+        val seedLong = seedStr.toULongOrNull()?.toLong() ?: 0L
+        return ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, renderSeed = renderSeed, centerline = centerline, instructionSeed = seedLong)
     }
 
     private fun materialCircleOutline(ins: JSONObject, attrs: SvgAttrs, cx: Double, cy: Double, r: Double, unit: Double): String {

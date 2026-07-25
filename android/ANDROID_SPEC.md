@@ -1550,6 +1550,27 @@ In accordance with contract `antigravity-android-phase2-renderer.md` §10, propo
 ### Wiring & Resolution of Unimplemented Requirements
 1. **Complete Removal of Legacy Functions & Defaults**: Removed `ServerRendererGeometry.getAmplitudePx` in favor of `amplitudePx`. Removed default parameter `= 1000.0` from `ServerRendererStyle.strokeAttrs` and `strokeWidth`.
 2. **Full Propagation of Canvas `unit` (`min(width, height)`)**: Threaded `unit` down from `DefaultSvgRenderer` to all geometry, material, and style calls.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4b′ (Material Outline Layer Re-implementation & Exact Parity Verification)
+
+In accordance with contract `antigravity-android-engine12.md` §9, re-implemented the material outline layer (`<polyline class="material-outline">`) and added exact string parity assertions for `points` and `stroke-dasharray`.
+
+### Implementation & Parity Fixes
+1. **`ServerRendererMaterial.kt` Direct Port Fixes**:
+   - Fixed redundant `scale` multiplication in `outlineOffsetPx` to match `_outline_offset_px`.
+   - Formatted seed in `hash01` as `${seed.toULong()}:$salt:$i` (unsigned uint64 decimal representation).
+   - Unified `variedDashPattern` (3 decimal places) and `scaleDash` (`fmt` 6 decimal places) formats with Python implementation.
+2. **`DefaultSvgRenderer.kt` Pipeline Fixes**:
+   - Passed normalized 64-bit uint64 seed (`seedLong`) derived via `seedForInstruction` to `ServerRendererMaterial.lineGroup` via `instructionSeed`.
+   - Bound `materialCenterline` to `centerline` (varied centerline) when `ins.variation` is present.
+3. **Exact String Parity Tests (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - Added `testMaterialOutlinePointsAndDashArrayExactParity` verifying exact string parity (`assertEquals`) of `points` and `stroke-dasharray` against reference SVGs for `02_line_brush`, `09_line_white`, `14_region_then_relation`, and `15_line_brush_wild`.
+4. **Mutation Sensitivity Verification**:
+   - Verified that adding a `1e-6` perturbation (`0.003500001`) to `outlineOffsetPx` floor causes `testMaterialOutlinePointsAndDashArrayExactParity` to FAIL.
+
+### Verification Results
+- All 68 unit tests PASS 100% (`PASS 68 / Failures 0 / Errors 0 / Skipped 0`).
+- `android/BUILD_NUMBER` is **`148088`**.
 3. **Dynamic Blur Filter Aggregation**: Replaced static `blur-fine / blur-medium / blur-broad` with dynamic `filter_id = "blur-${amp}-${int(std*10)}"` aggregation computed from `blurStdPx` and outputted to `<defs>`.
 4. **Proportional Texture Filters**: Updated `baseFrequency` to be inversely proportional to `unit` (`base * (1000.0 / unit)`) and displacement scale to be proportional to `unit`.
 5. **Material Constraints**: Applied material outline offset floor `0.0035 * unit` (preserving sign via `Math.copySign`), outline opacity floor 0.5 (capped at 1.0), speck opacity floor 0.4 (capped at 1.0), and perimeter-proportional speck counts.
@@ -1884,3 +1905,103 @@ plugin expansion (`Nature.風` / `Nature.うねり` / `Nature.無風` and the En
   (62 existing + 2 new), 0 failures, 0 errors, 0 skipped.
 - `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148083`.
   `android/VERSION` remains `2.0.0-android.1`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4a (De-regularization of `ServerStrokeEngine`)
+
+Per contract `antigravity-android-engine12.md` §4a, the de-regularization of `ServerStrokeEngine.kt` (envelope replacement, addition of `gesture` to `ToolGrammar`, centerline gesture synthesis, length-based correction events, addition of `wild` parameter) and `ServerStrokeEngineTest.kt` parity updates were completed.
+
+### Implementation Details
+
+1. **ToolGrammar & Tool Extensions (`ServerStrokeEngine.kt`)**:
+   - Added 10th field `gesture: Double` to `ToolGrammar` and updated all 10 tool grammars with engine 12 values.
+   - Defined `WILD_GAIN = 3.5` and `GESTURE_EDGE = 0.16`.
+2. **De-regularization Primitive Functions**:
+   - `smoothNoiseSalted`: 4th hash noise stream using explicit salt and frequency parameters.
+   - `edgeWindow`: Raised-cosine endpoint window (replacing fixed central sine bulge `max(0, sin(pi t))`).
+   - `swell`: Low-frequency modulation of maximum width position.
+   - `gestureWave`: Low-frequency 2D centerline wander wave.
+3. **Stroke Synthesis Updates (`synthesizeStroke`, `synthesizeAlong`)**:
+   - Added `wild: Boolean = false` to `synthesizeStroke` to scale `gestureAmp`.
+   - Replaced envelope with `edgeWindow(t) * swell(t, seed)` (`synthesizeAlong` closed loops use `swell(t, seed)`).
+   - Changed `correction` event amplitude perturbation from sample index modulo `i % 5` to length-based `correction-kick` hash.
+4. **Unit Tests & Mutation Verification (`ServerStrokeEngineTest.kt`)**:
+   - Updated parity tests (`testPrimitivesParity`, `testSynthesizeStrokeParity`, `testSynthesizeAlongParity`) for engine 12 primitive samples, constants, and `wild` option.
+   - Added `testWildPairingDivergenceAndIdentity` to verify `rotring` identity and `pencil` divergence under `wild`.
+   - Verified mutation response: introducing `1e-6` offset to `swell` causes all 3 target parity tests to fail as expected.
+
+### Verification
+
+- `render_engine_version` remains `"11"` (to be bumped to `"12"` at the final commit of 4c).
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 64 out of 65 unit tests pass, 1 failure (SVG structure parity, resolved in 4b), 0 skipped. `ServerStrokeEngineTest` passes 5/5 (100%).
+- Changes restricted to `android/`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4b (Material Outline Layer Port & Full Parity)
+
+Per contract `antigravity-android-engine12.md` §4b, the material outline layer (replacing `<line>` elements with `<polyline class="material-outline">`, gesture centerline tracking, variable dasharray generation, wandering offset, non-uniform specks) was fully ported to the Android renderer.
+
+### Implementation Details
+
+1. **Material Outline Layer Extensions (`ServerRendererMaterial.kt`)**:
+   - Ported `valueNoise1d` (1D value noise) and `hash01` (SHA-256 4-byte uint) random stream generators.
+   - Implemented `offsetPolyline` (tracking gestured centerline) and `variedDashPattern` (spanning line without repeating cadence).
+   - Migrated straight line texture rendering from 3 `<line>` elements to 3 `<polyline class="material-outline">` elements.
+2. **Renderer Wiring (`DefaultSvgRenderer.kt`)**:
+   - Connected `materialCenterline` (gestured stroke samples) from `renderHandStroke` to `ServerRendererMaterial.lineGroup`.
+   - Maintained `rotring` (`05_circle_rotring`) and cloudforms (`11_cloudform_pencil`, `12_cloudform_rotring`) as clean geometric primitives, maintaining byte-level identity.
+3. **Full Parity for Reference SVG Test Suite**:
+   - All 11 reference SVG tests that failed at baseline (including `testAllReferenceSvgStructureParity` and `testReferenceSvgParity11To14`) returned to 100% green.
+   - Verified `class="material-outline"` appears strictly on `<polyline>` elements and never on `<line>` elements.
+
+### Verification
+
+- `render_engine_version` remains `"11"` (to be bumped to `"12"` at 4c final commit).
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 65 out of 65 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148085`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4c (Wild Wiring & Engine Version 12 Promotion)
+
+Per contract `antigravity-android-engine12.md` §4c, the `wild` flag wiring (`line` primitive only) and `render_engine_version` promotion to `"12"` were completed.
+
+### Implementation Details
+
+1. **`wild` Flag Pipeline Wiring (`DefaultSvgRenderer.kt`)**:
+   - Read `render_wild` / `wild` from `score` JSON and wired it through `renderInstruction` → `renderHandStroke` → `ServerStrokeEngine.synthesizeStroke(..., wild = wild)`.
+   - Scoped strictly to `line` primitives, ensuring closed contours, hatches, and arcs remain unaffected.
+2. **`render_engine_version` Promotion**:
+   - Promoted `render_engine_version` in `DefaultSvgRenderer.kt` metadata from `"11"` to **`"12"`**.
+3. **Discriminating Pair Tests (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - Added `testWildPairingDivergenceAndIdentity`.
+   - Verified that `15_line_brush_wild` diverges from `02_line_brush` (`assertNotEquals`), while `16_circle_pen_wild` maintains **exact byte identity** with `01_circle_pen` (`assertEquals`).
+
+### Verification
+
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 66 out of 66 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148086`.
+
+## 2026-07-25 render engine 12 Catch-up Phase 4d (rh3 Migration, Room Database & UI Integration)
+
+Per contract `antigravity-android-engine12.md` §4d, the edition ID migration to `rh3`, Room schema extension, and UI toggle integration were completed.
+
+### Implementation Details
+
+1. **Edition ID Migration to `rh3` (`LocalFallbackPipeline.kt`)**:
+   - Updated `renderHash` method to `rh3` format.
+   - Standardized payload to 7 keys in ascending order (`render_color_catalog_id`, `render_engine_id`, `render_engine_version`, `render_seed`, `render_wild`, `score`, `version`).
+   - Verified zero occurrences of `rh2` in the codebase via `grep_search`.
+2. **`rh3` Fixed Reference Parity Tests (`ServerScoreParityTest.kt`)**:
+   - Updated `testRenderHashParity` to assert all 4 reference expectation strings specified in §3.5:
+     - `render_wild` unset: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = false`: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = true`: `rh3:842f46d67af6a696001f90ccd29367a8b65888cd8ea922e67ecb4d82f7c139e2`
+     - `render_wild = false` / engine `"11"`: `rh3:d1b1c9e25a031429e931ae6d8575dbda538bb78e8862a7ace337d2077799e8b6`
+3. **Room Schema Extension & Migration (`HistoryItemEntity.kt`, `InkuDatabase.kt`)**:
+   - Added `renderWild: Boolean? = null` column to `HistoryItemEntity`.
+   - Bumped `InkuDatabase` to `version = 4` and registered `MIGRATION_3_4` (`ALTER TABLE history_items ADD COLUMN render_wild INTEGER`).
+4. **UI Toggle Integration (`InkuViewModel.kt`, `InkuApp.kt`)**:
+   - Added `renderWild: Boolean = false` state and `setRenderWild` handler to `InkuViewModel`.
+   - Added "暴れる（演奏上限の解除） / Wild (unleashed performance)" toggle switch (default OFF) in settings panel.
+
+### Verification
+
+- XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 66 out of 66 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
+- `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148087`.

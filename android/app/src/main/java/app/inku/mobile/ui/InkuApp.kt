@@ -2101,6 +2101,13 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 )
             }
         }
+        SettingsCard("描画表現", "脱・規則化", if (state.renderWild) "ON (Wild)" else "OFF (Standard)") {
+            SettingCheckRow(
+                checked = state.renderWild,
+                text = "暴れる（演奏上限の解除） / Wild (unleashed performance)",
+                onCheckedChange = viewModel::setRenderWild,
+            )
+        }
     }
 }
 

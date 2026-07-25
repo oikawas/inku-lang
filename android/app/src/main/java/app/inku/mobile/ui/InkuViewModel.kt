@@ -102,6 +102,7 @@ data class InkuUiState(
     val canvasPanX: Float = 0f,
     val canvasPanY: Float = 0f,
     val canvasPresentationMode: Boolean = false,
+    val renderWild: Boolean = false,
 )
 
 data class BatchFailure(
@@ -459,6 +460,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun setShowKiwi(enabled: Boolean) {
         localState.value = localState.value.copy(showKiwi = enabled)
         persistSetting("show_kiwi", JSONObject().put("enabled", enabled).toString())
+    }
+
+    fun setRenderWild(wild: Boolean) {
+        localState.value = localState.value.copy(renderWild = wild)
     }
 
     fun setShowCrab(enabled: Boolean) {

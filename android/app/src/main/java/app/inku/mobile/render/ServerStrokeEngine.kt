@@ -15,21 +15,25 @@ data class ToolGrammar(
     val energyLateral: Double,
     val eventRate: Double,
     val taper: Double,
-    val bulge: Double
+    val bulge: Double,
+    val gesture: Double
 )
 
 val GRAMMARS: Map<String, ToolGrammar> = mapOf(
-    "hair" to ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02),
-    "pencil" to ToolGrammar(0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14),
-    "pen" to ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06),
-    "rotring" to ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    "crayon" to ToolGrammar(0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18),
-    "chalk" to ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20),
-    "brush_thin" to ToolGrammar(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28),
-    "brush_thick" to ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34),
-    "burin" to ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0),
-    "drypoint" to ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48)
+    "hair" to ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012),
+    "pencil" to ToolGrammar(0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05),
+    "pen" to ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022),
+    "rotring" to ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    "crayon" to ToolGrammar(0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06),
+    "chalk" to ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07),
+    "brush_thin" to ToolGrammar(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10),
+    "brush_thick" to ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13),
+    "burin" to ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018),
+    "drypoint" to ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05)
 )
+
+const val WILD_GAIN: Double = 3.5
+const val GESTURE_EDGE: Double = 0.16
 
 data class StrokeSample(
     val t: Double,
@@ -97,6 +101,38 @@ object ServerStrokeEngine {
         return Math.max(-1.0, Math.min(1.0, valNorm))
     }
 
+    fun smoothNoiseSalted(t: Double, seed: Long, salt: String, frequency: Double): Double {
+        val x = t * frequency
+        val i = Math.floor(x).toInt()
+        var f = x - i
+        f = f * f * (3.0 - 2.0 * f)
+        val a = unitHash(seed, salt, i) * 2.0 - 1.0
+        val b = unitHash(seed, salt, i + 1) * 2.0 - 1.0
+        return a * (1.0 - f) + b * f
+    }
+
+    fun edgeWindow(t: Double): Double {
+        if (t <= 0.0 || t >= 1.0) return 0.0
+        if (t < GESTURE_EDGE) {
+            return 0.5 * (1.0 - Math.cos(Math.PI * t / GESTURE_EDGE))
+        }
+        if (t > 1.0 - GESTURE_EDGE) {
+            return 0.5 * (1.0 - Math.cos(Math.PI * (1.0 - t) / GESTURE_EDGE))
+        }
+        return 1.0
+    }
+
+    fun swell(t: Double, seed: Long): Double {
+        val n = smoothNoiseSalted(t, seed, "swell", 1.5)
+        return 0.45 + 0.55 * (0.5 + 0.5 * n)
+    }
+
+    fun gestureWave(t: Double, seed: Long, salt: String): Double {
+        val a = smoothNoiseSalted(t, seed, salt, 1.0)
+        val b = smoothNoiseSalted(t, seed, salt, 2.0)
+        return Math.max(-1.0, Math.min(1.0, a * 0.7 + b * 0.35))
+    }
+
     fun eventMap(seed: Long, rate: Double, count: Int): Map<Int, String> {
         val events = mutableMapOf<Int, String>()
         val probability = Math.min(0.12, rate / Math.max(1, count - 2).toDouble())
@@ -120,7 +156,8 @@ object ServerStrokeEngine {
         baseWidth: Double,
         weight: String,
         seed: Long,
-        samplesCount: Int = 49
+        samplesCount: Int = 49,
+        wild: Boolean = false
     ): StrokeResult {
         val grammar = GRAMMARS[weight] ?: error("Unknown weight: $weight")
         val dx = end.first - start.first
@@ -134,6 +171,7 @@ object ServerStrokeEngine {
         
         val position = doubleArrayOf(start.first, start.second)
         val velocity = doubleArrayOf(dx / (samplesCount - 1), dy / (samplesCount - 1))
+        val gestureAmp = length * grammar.gesture * (if (wild) WILD_GAIN else 1.0)
         val result = mutableListOf<StrokeSample>()
 
         for (i in 0 until samplesCount) {
@@ -148,7 +186,7 @@ object ServerStrokeEngine {
             }
             
             val energy = latentEnergy(t, seed)
-            val envelope = Math.max(0.0, Math.sin(Math.PI * t))
+            val envelope = edgeWindow(t) * swell(t, seed)
             var lateral = energy * grammar.energyLateral * baseWidth * (0.18 + 0.82 * envelope)
             
             val event = events[i]
@@ -159,7 +197,7 @@ object ServerStrokeEngine {
             } else if (event == "fade") {
                 eventWidth = 0.04
             } else if (event == "correction") {
-                lateral += Math.sin((i % 5) * Math.PI / 2.0) * baseWidth * 0.25
+                lateral += (unitHash(seed, "correction-kick", i) * 2.0 - 1.0) * baseWidth * 0.25
             }
 
             var profile = 1.0
@@ -175,11 +213,21 @@ object ServerStrokeEngine {
                 baseWidth * profile * (1.0 + grammar.energyWidth * energy * 0.45) * eventWidth
             )
 
+            var gx = 0.0
+            var gy = 0.0
+            if (gestureAmp != 0.0) {
+                val win = edgeWindow(t)
+                val gLat = gestureWave(t, seed, "gesture-lat")
+                val gLon = gestureWave(t, seed, "gesture-lon")
+                gx = gestureAmp * win * (nx * gLat + ux * gLon)
+                gy = gestureAmp * win * (ny * gLat + uy * gLon)
+            }
+
             result.add(
                 StrokeSample(
                     t,
-                    position[0] + nx * lateral,
-                    position[1] + ny * lateral,
+                    position[0] + nx * lateral + gx,
+                    position[1] + ny * lateral + gy,
                     width,
                     energy,
                     lateral,
@@ -341,9 +389,10 @@ object ServerStrokeEngine {
             }
 
             val energy = latentEnergy(t, seed)
-            var envelope = Math.max(0.0, Math.sin(Math.PI * t))
-            if (closed) {
-                envelope = Math.max(CLOSED_ENVELOPE_FLOOR, envelope)
+            val envelope = if (closed) {
+                swell(t, seed)
+            } else {
+                edgeWindow(t) * swell(t, seed)
             }
 
             var lateral = energy * grammar.energyLateral * baseWidth * (0.18 + 0.82 * envelope)
@@ -356,7 +405,7 @@ object ServerStrokeEngine {
             } else if (event == "fade") {
                 eventWidth = 0.04
             } else if (event == "correction") {
-                lateral += Math.sin((index % 5) * Math.PI / 2.0) * baseWidth * 0.25
+                lateral += (unitHash(seed, "correction-kick", index) * 2.0 - 1.0) * baseWidth * 0.25
             }
 
             var profile = 1.0
@@ -453,3 +502,4 @@ object ServerStrokeEngine {
         return corrected
     }
 }
+

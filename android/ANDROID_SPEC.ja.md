@@ -1448,4 +1448,128 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 - `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 64 件の単体テスト（既存 62 件 + Phase 3d 新設 2 件）が 100% 通過 (PASS / Failures 0 / Errors 0)。
 - `gradle :app:assembleDebug` が成功し、`android/BUILD_NUMBER` は `148083` にインクリメント。`android/VERSION` は `2.0.0-android.1` を維持。
 
+## 2026-07-25 render engine 12 追随 段 4a (ServerStrokeEngine の脱・規則化)
+
+契約 `antigravity-android-engine12.md` §4a に基づき、`ServerStrokeEngine.kt` の脱・規則化（エンベロープの置換、`ToolGrammar` への `gesture` 追加、中心線ジェスチャの合成、長さ基準の補正イベント、`wild` 引数の追加）および `ServerStrokeEngineTest.kt` のテスト追随を完了した。
+
+### 実装および追随の詳細
+
+1. **ToolGrammar およびツールの拡張 (`ServerStrokeEngine.kt`)**:
+   - `ToolGrammar` に 10 番目のフィールド `gesture: Double` を追加し、全 10 種類のツール文法に engine 12 の値を反映。
+   - `WILD_GAIN = 3.5` および `GESTURE_EDGE = 0.16` を定義。
+2. **脱・規則化関数の追加**:
+   - `smoothNoiseSalted`: 明示 salt と周波数で独立乱数系列を生成する 4 番目のハッシュ関数。
+   - `edgeWindow`: 端点のみレイズドコサインで落とし中央を 1.0 に保つ端点窓関数（旧固定サイン山 `max(0, sin(pi t))` の置換）。
+   - `swell`: ストロークごとの太さ中心の低周波変調関数。
+   - `gestureWave`: 低周波 2D 中心線揺らぎ関数。
+3. **ストローク合成の修正 (`synthesizeStroke`, `synthesizeAlong`)**:
+   - `synthesizeStroke` に `wild: Boolean = false` を追加し、`gestureAmp` による中心線変形を適用。
+   - エンベロープを `edgeWindow(t) * swell(t, seed)` へ変更（`synthesizeAlong` の閉輪郭は `swell(t, seed)`）。
+   - `correction` イベントの振幅補正を標本インデックス剰余 `i % 5` から長さ基準の `correction-kick` ハッシュへ変更。
+4. **単体テストおよびミューテーション検証 (`ServerStrokeEngineTest.kt`)**:
+   - `testPrimitivesParity` / `testSynthesizeStrokeParity` / `testSynthesizeAlongParity` の parity テストに追随（`gesture`, `wild_gain`, `gesture_edge`, 4 関数の標本および `wild` パラメータ入力）。
+   - `testWildPairingDivergenceAndIdentity` を追加し、`rotring` で `flat` と `wild` が完全一致すること、`pencil` で `gesture_off` と `_wild` が異なることを検証。
+   - `swell` に `1e-6` のミューテーションを与えた際、対象 3 テストが意図通り全て失敗することを確認・検証済み。
+
+### 検証結果
+
+- `render_engine_version` は `"11"` を維持（4c の最後のコミットで `"12"` に更新）。
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 65 件の単体テストのうち 64 件成功、1 件失敗（SVG構造比較。段 4b で解決予定）、スキップ 0 件。`ServerStrokeEngineTest` の 5 件は 100% 成功。
+- 変更は `android/` 配下のみ。
+
+## 2026-07-25 render engine 12 追随 段 4b (材質アウトライン層の移植と完全整合)
+
+契約 `antigravity-android-engine12.md` §4b に基づき、材質アウトライン層（`<polyline class="material-outline">` への置換、ジェスチャ中心線追随、可変 dasharray 列生成、蛇行オフセット、非一様粒）を Android 描画パイプラインへ完全移植した。
+
+### 実装および追随の詳細
+
+1. **材質アウトライン層の拡張 (`ServerRendererMaterial.kt`)**:
+   - 1D Value Noise (`valueNoise1d`) および `hash01` (SHA-256 先頭4バイト) による独立乱数系列生成を移植。
+   - ジェスチャ後の中心線に追随する `offsetPolyline` および全周にわたって非周期的な破線をつくる `variedDashPattern` を実装。
+   - 直線要素描画において `<line>` 3本出力を `<polyline class="material-outline">` 3本出力へ移行。
+2. **描画パイプライン接続 (`DefaultSvgRenderer.kt`)**:
+   - `renderHandStroke` から `ServerRendererMaterial.lineGroup` を呼ぶ際、ジェスチャ後の中心線座標列 (`materialCenterline`) を正しく伝達。
+   - `rotring`（`05_circle_rotring`）および雲形（`11_cloudform_pencil`, `12_cloudform_rotring`）は幾何要素のままとし、バイト一致を維持。
+3. **SVG コーパステスト完全緑化**:
+   - 着手時点で失敗していた SVG 11 件を含むテスト全件が緑に復帰（`testAllReferenceSvgStructureParity`, `testReferenceSvgParity11To14` を含む）。
+   - `class="material-outline"` が `<polyline>` にのみ付与され `<line>` には付与されないことを検証。
+
+### 検証結果
+
+- `render_engine_version` は `"11"` を維持（4c の最後のコミットで `"12"` に更新）。
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 65 件の単体テストが **100% 成功 (PASS 65 / Failures 0 / Errors 0 / Skipped 0)**。
+- `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148085`** にインクリメント。
+
+## 2026-07-25 render engine 12 追随 段 4c (wild の結線と render_engine_version="12" 昇格)
+
+契約 `antigravity-android-engine12.md` §4c に基づき、`wild` フラグの配線（`line` プリミティブ専用）および `render_engine_version` の `"12"` への昇格を完了した。
+
+### 実装および追随の詳細
+
+1. **`wild` フラグのパイプライン接続 (`DefaultSvgRenderer.kt`)**:
+   - `score` JSON の `render_wild` / `wild` フラグを読み取り、`renderInstruction` → `renderHandStroke` → `ServerStrokeEngine.synthesizeStroke(..., wild = wild)` へ配線。
+   - `line` プリミティブのみに適用し、円・矩形・弧・ハッチ等の `synthesizeAlong` や輪郭には通さない仕様を維持。
+2. **`render_engine_version` の更新**:
+   - `DefaultSvgRenderer.kt` の出力メタデータにおいて `render_engine_version` を `"11"` から **`"12"`** へ更新。
+3. **判別テストの追加 (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - `testWildPairingDivergenceAndIdentity` を追加。
+   - 同一 Score 条件下で `15_line_brush_wild` が `02_line_brush` と異なること（`assertNotEquals`）、および `16_circle_pen_wild` が `01_circle_pen` と**バイト完全一致**すること（`assertEquals`）を検証。
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 66 件の単体テストが **100% 成功 (PASS 66 / Failures 0 / Errors 0 / Skipped 0)**。
+- `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148086`** にインクリメント。
+
+## 2026-07-25 render engine 12 追随 段 4d (rh3 移行・Room 保存・UI トグル統合)
+
+契約 `antigravity-android-engine12.md` §4d に基づき、エディション ID の `rh3` 移行、Room データベース連携、および UI 設定トグルの統合を完了した。
+
+### 実装および追随の詳細
+
+1. **エディション ID `rh3` への移行 (`LocalFallbackPipeline.kt`)**:
+   - ハッシュ計算処理 `renderHash` を `rh3` に更新。
+   - ペイロードを 7 キー（`render_color_catalog_id`, `render_engine_id`, `render_engine_version`, `render_seed`, `render_wild`, `score`, `version`）の昇順 canonical JSON に統一。
+   - `grep_search` による全検索で `rh2` がコードベース内に一切残存していないことを確認。
+2. **`rh3` 固定実測期待値テスト (`ServerScoreParityTest.kt`)**:
+   - `testRenderHashParity` において §3.5 で指定された 4 つの実測期待値との一致を検証：
+     - `render_wild` 未設定: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = false`: `rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694`
+     - `render_wild = true`: `rh3:842f46d67af6a696001f90ccd29367a8b65888cd8ea922e67ecb4d82f7c139e2`
+     - `render_wild = false` / engine `"11"`: `rh3:d1b1c9e25a031429e931ae6d8575dbda538bb78e8862a7ace337d2077799e8b6`
+3. **Room スキーマ拡張とマイグレーション (`HistoryItemEntity.kt`, `InkuDatabase.kt`)**:
+   - `HistoryItemEntity` に `renderWild: Boolean? = null` を追加。
+   - `InkuDatabase` を `version = 4` へ更新し、`MIGRATION_3_4` (`ALTER TABLE history_items ADD COLUMN render_wild INTEGER`) を追加。
+4. **UI トグルスイッチ配置 (`InkuViewModel.kt`, `InkuApp.kt`)**:
+   - `InkuUiState` に `renderWild: Boolean = false` をバインド。
+   - 設定パネル内に「暴れる（演奏上限の解除） / Wild (unleashed performance)」のトグルスイッチ（デフォルト OFF）を配置。
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 66 件の単体テストが **100% 成功 (PASS 66 / Failures 0 / Errors 0 / Skipped 0)**。
+- `gradle :app:assembleDebug` 成功により `android/BUILD_NUMBER` は **`148087`** にインクリメント。
+
+## 2026-07-25 render engine 12 追随 段 4b′ (材質アウトライン層の再移植および points / stroke-dasharray 完全一致検証)
+
+契約 `antigravity-android-engine12.md` §9 に基づき、差し戻された材質アウトライン層 (`<polyline class="material-outline">`) の再移植と `points` 座標列・`stroke-dasharray` 破線値の文字列完全一致比較テストを完了した。
+
+### 実装および追随の詳細
+
+1. **`ServerRendererMaterial.kt` の完全直移植・バグ修正**:
+   - `outlineOffsetPx` 内で二重に掛け合わされていた `scale` を除去し、`_outline_offset_px` の計算式と完全に一致させた。
+   - `hash01` でのシード文字列化を `${seed.toULong()}:$salt:$i` （unsigned uint64 10進表現）に修正。
+   - `variedDashPattern`（3桁小数）と `scaleDash`（`fmt` 6桁小数）のフォーマットを Python 側実装に完全統一。
+2. **`DefaultSvgRenderer.kt` でのシードおよびパス伝達修正**:
+   - `renderHandStroke` および `materialLineGroup` において、`seedForInstruction` から導出した正規化 64-bit uint64 シード（`seedLong`）を `instructionSeed` パラメータとして伝達。
+   - `variation`（手ブレ・波）が存在する場合、`materialCenterline` に `centerline`（波形中心線）をバインドするように修正。
+3. **`points` および `stroke-dasharray` 完全一致比較テストの追加 (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - `testMaterialOutlinePointsAndDashArrayExactParity` を追加。
+   - `02_line_brush`, `09_line_white`, `14_region_then_relation`, `15_line_brush_wild` の 4 件について、`<polyline class="material-outline">` の `points` 座標文字列および `stroke-dasharray` 破線配列が参照 SVG と完全一致すること（`assertEquals`）を検証。
+4. **ミューテーションテスト（判別力検証）**:
+   - `outlineOffsetPx` の `floor` 係数 `0.0035` に `1e-6` の微小摂動（`0.003500001`）を加えた際、`testMaterialOutlinePointsAndDashArrayExactParity` が実際に **FAILED** になることを確認。
+
+### 検証結果
+
+- `app/build/test-results/testDebugUnitTest/*.xml` の自力集計により、全 68 件の単体テストが **100% 成功 (PASS 68 / Failures 0 / Errors 0 / Skipped 0)**。
+- `android/BUILD_NUMBER` は **`148088`** にインクリメント。
+
 

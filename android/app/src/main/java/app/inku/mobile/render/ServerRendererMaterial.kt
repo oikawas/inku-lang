@@ -13,19 +13,17 @@ internal object ServerRendererMaterial {
     fun usesMaterialOutline(weight: String): Boolean = materialOutlineProfile(weight, 1000.0).isNotEmpty() || baseSpeckProfile(weight) != null
 
     fun outlineOffsetPx(offset: Double, unit: Double): Double {
-        val scale = unit / 1000.0
-        val raw = offset * scale
         val floor = 0.0035 * unit
-        if (floor <= 0 || kotlin.math.abs(raw) >= floor) return raw
-        return java.lang.Math.copySign(floor, raw)
+        if (floor <= 0.0 || kotlin.math.abs(offset) >= floor) return offset
+        return java.lang.Math.copySign(floor, offset)
     }
 
     fun outlineOpacity(opacity: Double): Double {
-        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.5))
+        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.50))
     }
 
     fun speckOpacity(opacity: Double): Double {
-        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.4))
+        return kotlin.math.min(1.0, kotlin.math.max(opacity, 0.40))
     }
 
     fun scaleDash(spec: String?, scale: Double): String? {
@@ -35,72 +33,176 @@ internal object ServerRendererMaterial {
         }
     }
 
-    fun lineGroup(ins: JSONObject, attrs: SvgAttrs, x1: Double, y1: Double, x2: Double, y2: Double, unit: Double, includeBase: Boolean = true): String? {
-        val weight = ins.optString("weight", "pen")
-        if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint")) return null
-        val seedStr = ins.toString()
-        val seedInt = ServerRendererGeometry.seedToLong(seedStr)
-        val scale = unit / 1000.0
-        val lineLen = kotlin.math.hypot(x2 - x1, y2 - y1)
-        val out = StringBuilder()
-        out.append("<g>")
-        if (includeBase) {
-            out.append("""<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" fill="none" ${attrs.toSvgAttributes(includeFill = false)}/>""")
+    fun hash01(i: Int, seed: Long, salt: String): Double {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val input = "${seed.toULong()}:$salt:$i".toByteArray(Charsets.UTF_8)
+        val hash = digest.digest(input)
+        val raw = (hash[0].toLong() and 0xFFL) or
+            ((hash[1].toLong() and 0xFFL) shl 8) or
+            ((hash[2].toLong() and 0xFFL) shl 16) or
+            ((hash[3].toLong() and 0xFFL) shl 24)
+        return raw.toDouble() / 4294967295.0
+    }
+
+    fun valueNoise1d(x: Double, seed: Long): Double {
+        val xi = Math.floor(x).toInt()
+        val xf = x - xi
+        val v1 = ServerRendererGeometry.hashToUnit(xi, seed)
+        val v2 = ServerRendererGeometry.hashToUnit(xi + 1, seed)
+        val t = xf * xf * (3.0 - 2.0 * xf)
+        return v1 * (1.0 - t) + v2 * t
+    }
+
+    fun offsetPolyline(
+        points: List<Pair<Double, Double>>,
+        amount: Double,
+        wander: Double = 0.0,
+        wanderPeriod: Double = 1.0,
+        seed: Long = 0L
+    ): List<Pair<Double, Double>> {
+        val n = points.size
+        if (n < 2) return points
+        val out = mutableListOf<Pair<Double, Double>>()
+        var arc = 0.0
+        for (i in 0 until n) {
+            val (tx, ty) = when (i) {
+                0 -> Pair(points[1].first - points[0].first, points[1].second - points[0].second)
+                n - 1 -> Pair(points[n - 1].first - points[n - 2].first, points[n - 1].second - points[n - 2].second)
+                else -> Pair(points[i + 1].first - points[i - 1].first, points[i + 1].second - points[i - 1].second)
+            }
+            val len = Math.hypot(tx, ty)
+            val length = if (len == 0.0) 1.0 else len
+            val nx = -ty / length
+            val ny = tx / length
+            var off = amount
+            if (wander != 0.0) {
+                val period = Math.max(1e-6, wanderPeriod)
+                off += wander * (valueNoise1d(arc / period, seed) * 2.0 - 1.0)
+            }
+            out.add(Pair(points[i].first + nx * off, points[i].second + ny * off))
+            if (i < n - 1) {
+                arc += Math.hypot(points[i + 1].first - points[i].first, points[i + 1].second - points[i].second)
+            }
         }
+        return out
+    }
+
+    fun variedDashPattern(dashUnits: Double, mark: Double, gap: Double, seed: Long): String {
+        val period = Math.max(1.0, mark + gap)
+        val count = Math.max(6, Math.min(28, (dashUnits / period).toInt() + 3))
+        val vals = mutableListOf<String>()
+        for (i in 0 until count) {
+            val m = mark * (0.5 + 1.3 * hash01(i, seed, "dash-mark"))
+            val g = gap * (0.45 + 1.5 * hash01(i, seed, "dash-gap"))
+            vals.add(java.lang.String.format(java.util.Locale.US, "%.3f", m))
+            vals.add(java.lang.String.format(java.util.Locale.US, "%.3f", g))
+        }
+        return vals.joinToString(",")
+    }
+
+    fun lineGroup(
+        ins: JSONObject,
+        attrs: SvgAttrs,
+        x1: Double,
+        y1: Double,
+        x2: Double,
+        y2: Double,
+        unit: Double,
+        includeBase: Boolean = true,
+        renderSeed: Long? = null,
+        centerline: List<Pair<Double, Double>>? = null,
+        instructionSeed: Long? = null
+    ): String? {
+        val weight = ins.optString("weight", "pen")
+        if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) return null
+
+        val seedInt = instructionSeed ?: ServerRendererGeometry.seedForInstruction(ins, renderSeed)
+        val scale = unit / 1000.0
+        val offsetGain = 2.8
+        val opacityGain = 1.8
+        val spreadGain = 3.2
+        val lineLen = Math.hypot(x2 - x1, y2 - y1)
+        val dashUnits = lineLen / Math.max(1e-6, scale)
+
+        val path = if (!centerline.isNullOrEmpty()) centerline else listOf(Pair(x1, y1), Pair(x2, y2))
+        val out = StringBuilder()
+
+        fun layerOpacity(v: Double): Double = outlineOpacity(v * opacityGain)
+        fun layerOffset(amount: Double): Double = outlineOffsetPx(amount * scale * offsetGain, unit)
+
+        fun emitLayer(amount: Double, layerAttrs: SvgAttrs, mark: Double, gap: Double, k: Int) {
+            val offPx = layerOffset(amount)
+            val layerSeed = seedInt + k * 7919L
+            val wander = 0.35 * Math.abs(offPx) + 0.6 * scale
+            val pts = offsetPolyline(path, offPx, wander = wander, wanderPeriod = 60.0 * scale, seed = layerSeed)
+            val ptsStr = pts.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
+            val dashPattern = scaleDash(variedDashPattern(dashUnits, mark, gap, layerSeed), scale)
+            val la = layerAttrs.copy(dash = dashPattern)
+            out.append("""<polyline points="$ptsStr" fill="none" ${la.toSvgAttributes(includeFill = false)} class="material-outline"/>""")
+        }
+
+        if (includeBase) {
+            val basePts = offsetPolyline(path, 0.0, wander = 0.5 * scale, wanderPeriod = 70.0 * scale, seed = seedInt)
+            val basePtsStr = basePts.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
+            out.append("""<polyline points="$basePtsStr" fill="none" ${attrs.toSvgAttributes(includeFill = false)} class="material-outline"/>""")
+        }
+
         when (weight) {
             "pencil" -> {
-                listOf(-0.9 * scale, 1.1 * scale).forEachIndexed { idx, amount ->
-                    val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * 0.6 * scale
-                    val layer = attrs.copy(strokeWidth = 0.45 * scale, strokeOpacity = 0.26, dash = scaleDash("1,7", scale), filter = "url(#texture-pencil)")
-                    out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
+                listOf(-0.9, 1.1).forEachIndexed { k, amount ->
+                    val layerAttrs = attrs.copy(
+                        strokeWidth = 0.45 * scale,
+                        strokeOpacity = layerOpacity(0.26),
+                        filter = "url(#texture-pencil)"
+                    )
+                    emitLayer(amount, layerAttrs, 1.0, 7.0, k)
                 }
                 val spec = speckProfile("pencil", lineLen, unit)
                 if (spec != null) {
-                    out.append(powderSpecks(x1, y1, x2, y2, attrs, seedStr, count = spec.count, spread = spec.spread, radius = spec.radius, opacity = spec.opacity))
+                    out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread * spreadGain, radius = spec.radius, opacity = spec.opacity))
                 }
             }
             "chalk" -> {
-                listOf(-3.0 * scale, 3.4 * scale).forEachIndexed { idx, amount ->
-                    val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * 1.4 * scale
-                    val layer = attrs.copy(strokeWidth = 1.1 * scale, strokeOpacity = 0.28, dash = scaleDash("8,12,1,8", scale))
-                    out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
+                listOf(-3.0, 3.4).forEachIndexed { k, amount ->
+                    val layerAttrs = attrs.copy(
+                        strokeWidth = 1.1 * scale,
+                        strokeOpacity = layerOpacity(0.28)
+                    )
+                    emitLayer(amount, layerAttrs, 8.0, 11.0, k)
                 }
                 val spec = speckProfile("chalk", lineLen, unit)
                 if (spec != null) {
-                    out.append(powderSpecks(x1, y1, x2, y2, attrs, seedStr, count = spec.count, spread = spec.spread, radius = spec.radius, opacity = spec.opacity))
+                    out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread * spreadGain, radius = spec.radius, opacity = spec.opacity))
                 }
             }
             "brush_thin" -> {
-                listOf(-1.4 * scale, 1.8 * scale).forEachIndexed { idx, amount ->
-                    val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * 1.1 * scale
-                    val layer = attrs.copy(strokeWidth = (0.9 + idx * 0.5) * scale, strokeOpacity = 0.32, dash = scaleDash(if (idx == 0) "22,9" else "14,8", scale))
-                    out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
+                listOf(-1.4, 1.8).forEachIndexed { k, amount ->
+                    val layerAttrs = attrs.copy(
+                        strokeWidth = (0.9 + k * 0.5) * scale,
+                        strokeOpacity = layerOpacity(0.32)
+                    )
+                    emitLayer(amount, layerAttrs, 22.0, 9.0, k)
                 }
             }
             else -> {
-                val amounts = if (weight == "crayon") listOf(-3.2 * scale, -1.4 * scale, 2.0 * scale, 3.6 * scale) else listOf(-3.5 * scale, 2.8 * scale, 5.0 * scale)
-                amounts.forEachIndexed { idx, amount ->
-                    val (ox, oy) = ServerRendererGeometry.linePerpOffset(x1, y1, x2, y2, amount)
-                    val jitter = ServerRendererGeometry.hashToUnit(idx, seedInt) * (if (weight == "crayon") 2.2 else 2.8) * scale
-                    val layer = attrs.copy(
-                        strokeWidth = max(0.8 * scale, ServerRendererStyle.strokeWidth(weight, unit) * if (weight == "crayon") 0.25 else 0.30),
-                        strokeOpacity = if (weight == "crayon") 0.24 else 0.38,
-                        dash = scaleDash(if (weight == "crayon") "2,5,9,7" else "18,7,3,11", scale),
+                val amounts = if (weight == "crayon") listOf(-3.2, -1.4, 2.0, 3.6) else listOf(-3.5, 2.8, 5.0)
+                val (mark, gap) = if (weight == "crayon") Pair(6.0, 6.0) else Pair(14.0, 9.0)
+                amounts.forEachIndexed { k, amount ->
+                    val baseW = ServerRendererStyle.strokeWidth(weight, unit)
+                    val layerAttrs = attrs.copy(
+                        strokeWidth = Math.max(0.8 * scale, baseW * (if (weight == "crayon") 0.25 else 0.30)),
+                        strokeOpacity = layerOpacity(if (weight == "crayon") 0.24 else 0.38)
                     )
-                    out.append(lineElement(x1 + ox + jitter, y1 + oy, x2 + ox - jitter, y2 + oy, layer))
+                    emitLayer(amount, layerAttrs, mark, gap, k)
                 }
                 if (weight == "crayon") {
                     val spec = speckProfile("crayon", lineLen, unit)
                     if (spec != null) {
-                        out.append(powderSpecks(x1, y1, x2, y2, attrs, seedStr, count = spec.count, spread = spec.spread, radius = spec.radius, opacity = spec.opacity))
+                        out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread * spreadGain, radius = spec.radius, opacity = spec.opacity))
                     }
                 }
             }
         }
-        out.append("</g>")
         return out.toString()
     }
 

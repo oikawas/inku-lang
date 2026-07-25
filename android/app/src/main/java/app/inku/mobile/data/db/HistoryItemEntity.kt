@@ -60,4 +60,6 @@ data class HistoryItemEntity(
     val thumbnailWidth: Int? = null,
     @ColumnInfo(name = "thumbnail_height")
     val thumbnailHeight: Int? = null,
+    @ColumnInfo(name = "render_wild")
+    val renderWild: Boolean? = null,
 )

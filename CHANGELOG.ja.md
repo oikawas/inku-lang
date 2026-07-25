@@ -2861,3 +2861,17 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **格子について未裁定で残したこと:** 格子は**絶対座標**に効き、**目盛はストローク長に比例する**（`step = 長さ × 0.018`）。したがって置かれた位置で格子の位相が変わり、同じ長さの線を等間隔に 30 本置くと**異なる図が 9 種**できる。キャンバス基準の 1 枚の方眼へ変えるかは別の裁定とし、現状のまま据え置いた。
 - **SPEC:** §15.9 を新設（道具の核・格子・材質＝標本化の残り・第 1 版を捨てた経緯）、§4 の語彙表・§15.6 の版数・§15.7 のコーパス表を更新。英語版は §12.6 として対応。
 - **検証:** pytest **1091 passed / 30 skipped**（+2 = 材質の新テスト）、cli 68 passed、ruff clean、`npm run check` **0 errors / 2 warnings**（217 files）。コーパスは再生成の差分ゼロ。**摂動 3 件で判別力を実測**した — 不透明度の係数を 0.45→0.44、格子への丸めを外す、残差 0 の除外を外す、のいずれでもテストが落ちる。**丸めの摂動は最初素通りした**（開いたストロークは標本が既に格子上にあるため）ので、**継ぎ目補正で標本が格子から外れる閉輪郭の検査を足して**効くようにした。
+
+---
+
+### Android `2.1.0-android.1` — 描画層が render engine 12 へ追随（`raster` 以前の脱・規則化・材質層・暴れる・`rh3`）（android Build 148084〜148089、2026-07-25）
+
+**Android の描画層が engine 11 から 12 へ追いついた。** Stage 1.5 展開層は Phase 3d で追いついていたので、**これで遅れているのは engine 13（コンピュータ）だけになった**。
+
+- **4a 演奏の脱・規則化:** `ToolGrammar` に 10 番目のフィールド `gesture` を足し、`WILD_GAIN = 3.5` / `GESTURE_EDGE = 0.16`、`smoothNoiseSalted` / `edgeWindow` / `swell` / `gestureWave` を移植。エンベロープ・補正イベント（`correction-kick`）・中心線ジェスチャを engine 12 と同形にした。
+- **4b′ 材質アウトライン層（差し戻し 1 回）:** 初回は**移植ではなく別実装**だった。`points` を突き合わせると **0/234 点一致・最大 16.4px ずれ**、`stroke-dasharray` も全別値。**既存テストが `path d`・class 文字列・要素数しか見ておらず、この層の幾何を 1 点も比較していなかった**ため「SVG 11 件 100% PASS」のまま通っていた（**契約が既存テスト名で条件を書いたことが穴だった**）。4b′ で `outlineOffsetPx` の `scale` 二重掛け、`hash01` の seed 文字列化（符号なし 64bit）、`variedDashPattern` / `scaleDash` の書式を server 正本へ揃え、**`points` と `stroke-dasharray` の完全一致比較**を条件に加えた。
+- **4c 暴れる（wild）の結線と版数:** `render_wild` を `line` プリミティブの `synthesizeStroke` にだけ通し、輪郭・ハッチ・弧には渡さない（**server がそうなっているため**）。`render_engine_version` を `"12"` へ。判別は 2 件の対で行う — `15_line_brush_wild` は `02_line_brush` と**異なり**、`16_circle_pen_wild` は `01_circle_pen` と**バイト一致**する（輪郭経路へ配線した実装は前者を通して後者で落ちる）。
+- **4d `rh3` と記録・UI:** エディション ID を `rh2` → `rh3` へ（`render_wild` を材料に含む 7 キーの canonical JSON）。Room を version 4 へ上げ `MIGRATION_3_4` と `renderWild: Boolean?` を追加、UI に「暴れる」トグル（日英・既定 OFF）を結線した。**`rh2` の生成経路は撤去済み。**
+- **受け入れで見つけた別の欠陥を直した（git 管理セッション）:** 検査を契約が名指しした 4 件から**参照 SVG 全 16 件**へ広げると、`11_cloudform_pencil` の `stroke-dasharray` が **`1,3`**（Android）対 **`1.000000,3.000000`**（server）で食い違った。server は style / texture の両方の dash を `_scale_dash` に通すが、Android は**素のリテラルを返していた**。**正方形キャンバスでは数値が一致するので見えないが、pillar / wide では server 側だけが目盛を伸ばす。** 出どころは Phase 2b′（`c6e2c9e`）で、**本契約より前からの欠陥**。dash 双方へ `scale` を適用し、server が Phase 1 で削除した `rope` の残骸も除いた。**全 16 件を `path d` / `points` / `stroke-dasharray` で比較するテストを恒久化**した（名指しの一覧は穴を残す）。
+- **検証:** `testDebugUnitTest --rerun-tasks` を XML 自力集計で **68 件 / failures 0 / errors 0 / skipped 0**（着手時 64・4b′ 到着時 67）。**判別は受け入れ側で 3 件実測** — `swell` に 1e-6 で 8 件、`outlineOffsetPx` の floor に 1e-6 で 2 件、texture dash の `scale` を外すと 1 件が落ちる。着手時点の赤 14 件はすべて緑になり、**参照コーパスは 1 バイトも改変されていない**。
+- **積み残さなかったもの（明示）:** engine 13（コンピュータ）は移植していない。`server` / `web` / `cli` / `shared` は変更していない。閉輪郭・ハッチ・弧への `wild` 配線は行っていない（server に無い）。既存履歴の `renderWild` は backfill していない。

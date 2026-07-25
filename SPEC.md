@@ -466,7 +466,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touches | てざわり | pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint |
+| touches | てざわり | pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
 | continuity | つらなり | solid (default), dashed, dotted, dash-dot |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
@@ -1072,7 +1072,7 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `12` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `13` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `1` | the same input and seed produce different output |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `1` | grammar is added, changed, or retired |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
@@ -1130,7 +1130,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-12/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 220 |
+| Drawing | `server/reference/render-engine-13/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 228 |
 | Deterministic DDL layers | `server/reference/ddl-engine-1/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 29 (A 15 / B 14) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -1237,6 +1237,55 @@ print can be kept.
 
 **Recording only the version number while discarding the output is like noting the date
 of the carving and throwing away the print.**
+
+### 12.6 The Computer Touch (v2.6.0, engine 13)
+
+**An eleventh tool, "computer", joins the touches.** Its core is not "the hand does not
+shake" but **"it repeats without error"**. A hand cannot produce the same value twice; a
+machine can produce nothing else. **A cycle repeats along the line, a lattice repeats
+across the plane** — two axes of one property.
+
+This is what separates it from `rotring`. **Rotring has no wobble to repeat** (every term
+of its grammar is zero). **The computer has wobble and repeats it exactly.** So this is not
+a retreat to the symmetric envelope of engine 11: that envelope was a **default nobody could
+decline**, and this one is **vocabulary you choose** (§12.5 stands).
+
+- **The repetition does not vary with the seed.** The machine cycles (five and ten per
+  stroke for energy, two for gesture), the width steps and the lattice are all constants and
+  take no `render_seed`. **The same Score performs byte-identically under different seeds**,
+  which no hand tool does. Placement and motion vocabulary keep their seed dependence: those
+  belong to the layers above.
+- **"Unleashed" has no effect** (§13.4 of the Japanese SPEC). Being unleashed is a property
+  of the hand, so the computer is treated like `rotring`.
+- **Lattice**: centreline coordinates are rounded to a step of `stroke length x 0.018`, and
+  width falls onto four steps.
+- **A closed contour may look almost like rotring's.** No radius modulation is written for
+  closed contours; that flatness is the CG taste.
+
+#### The material is the remainder of sampling
+
+A hand tool's material layer is **what the tool drops beside the stroke** (graphite dust,
+brush hair, shaved wax). A machine drops none of that. **What it has is the difference it
+threw away when it rounded to the lattice.**
+
+**The geometry repeats without error. The material shows where the error went.**
+
+For each sample, the distance between the position before rounding and the lattice point
+after it is the residual. **Only samples with a non-zero residual** get a square of one
+lattice cell (`class="raster-bleed"`), laid under the stroke, **placed on the lattice** and
+**toned in proportion to the residual** (capped at 0.45 where the rounding moved half a
+cell). No seed is involved, so **the same figure always bleeds the same way**.
+
+**Endpoints are pinned to the intention and polygon corners are anchored**, so those samples
+carry no residual and emit no cell: a line yields 39 cells from 41 samples, a square 76 from
+80, an arc 60 from 62.
+
+**This material replaced a first version of engine 13.** That version drew "a ruled line and
+one identical dash pattern on every stroke", restating the "rain of straight lines" of the
+older work `rh2:9e991c...` as a property of the tool. Rendered and looked at, the ruled layer
+was pinned to the intended start and end while **the performed centreline wanders up to 55px
+away**, so the dashes detached from the stroke and read as background ruling. **It carried no
+pictorial meaning and was discarded.**
 
 ---
 

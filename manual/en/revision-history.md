@@ -23,8 +23,8 @@ Full revision.
 
 - Aligned Creating Images with the current Web UI, including automatic instruction-language detection, color/model/canvas controls, and normalized-DDL editing.
 - Added Refine Adjust, Model comparison, Language comparison, and deterministic word-based touch variation.
-- Added Generation info Details, Prompts, and JSON, including per-stage languages, seeds, hashes, and derivation metadata.
-- Added artwork lineage, intermediate works, promotion to regular history, Nearby works, and Timeline/By lineage History Manager modes.
+- Added Provenance Details, Prompts, and JSON, including per-stage languages, seeds, hashes, and derivation metadata.
+- Added work lineage, intermediate works, promotion to regular history, Nearby works, and Timeline/By lineage History Manager modes.
 - Rewrote Application Installation around lockfiles, pre-migration backup, reference systemd deployment, acceptance checks, and rollback.
 - Rewrote Server Configuration around configuration boundaries, current environment variables, DB migration, four identities, authentication scope, language resolution, Renderer replay, backup, monitoring, and security.
 - Aligned the environment, systemd, and logrotate templates with the current reference deployment and permission policy.

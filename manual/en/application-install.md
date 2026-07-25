@@ -169,7 +169,7 @@ systemctl status inku-server.service --no-pager
 3. Check provider connections, API keys, and published models in Settings.
 4. Create users and groups.
 5. Choose Stage 1 and Stage 2 under `model selection`.
-6. Generate short Japanese and English descriptions and verify automatic language detection, history saving, and SVG/PNG export.
+6. Paint short Japanese and English descriptions and verify automatic language detection, history saving, and SVG/PNG export.
 
 Normal generation has no manual instruction-language selector. It detects the input language and falls back to the UI language only when the text has no language signal.
 
@@ -195,7 +195,7 @@ Check in the Web UI:
 - Japanese and English description generation
 - Color catalog, model, and canvas selection
 - Refine adjustments, Model comparison, and Language comparison
-- Generation info Details, Prompts, and JSON
+- Provenance Details, Prompts, and JSON
 - Timeline and By lineage history modes
 - SVG and PNG export
 

@@ -16,13 +16,13 @@ Run inku-cli COMMAND --help for the complete option list.
 |---|---|
 | login / logout / me | Start, discard, and inspect a session |
 | models | Configure default Stage 1 and Stage 2 models |
-| paint / batch | Generate one or many works from descriptions or DDL |
+| paint / batch | Paint one or many works from descriptions or DDL |
 | refine | Refine an existing work's touch, layout, reading, or color |
 | lineage | Inspect lineage node trees and promote intermediate works |
 | inspect | Inspect and compare multiple inference models in parallel |
 | review | Evaluate drawings using Vision NIM and submit unread words |
 | render-score | Render Score JSON without Stage 1 or Stage 2 |
-| demo-instruction | Generate a demo description |
+| demo-instruction | Write a demo description |
 | history / history-export | List or export history by hash |
 | unread-words | Show the user's ledger; administrators may use --all |
 | contact-sheet / analyze / ddl-compare | Compare and analyze local artifacts |
@@ -50,7 +50,7 @@ When retrying a save request, reuse an Idempotency-Key to prevent duplicate work
     uv run inku-cli api POST /api/history --file work.json --header Idempotency-Key=import-20260715-001
 
 
-## Autonomous AI & Quality Improvement Commands
+## Autonomous Refinement & Quality Improvement Commands
 
 These commands allow an AI agent to automatically generate variations, evaluate visual aesthetics, and traverse/update the lineage tree.
 
@@ -71,7 +71,7 @@ Traverse the derivation tree or promote an intermediate node to regular history.
 ### 2. Refinement & Variations (refine)
 Create or import variations derived from an existing parent work.
 
-* **Generate a Variation Option**:
+* **Make a Variation Option**:
   ```sh
   uv run inku-cli refine generate WORK_ID --kind touch -o ./refinements --png
   ```

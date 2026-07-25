@@ -1,12 +1,12 @@
 # inku-cli AI Autonomous Operation & Testing Reference
 
-This document serves as a guideline for AI agents (e.g., Codex, Antigravity) to operate the `inku-server` via command line and perform autonomous artwork generation, visual evaluation, and refinement (Vary/Refine) while tracking lineage nodes.
+This document serves as a guideline for AI agents (e.g., Codex, Antigravity) to operate the `inku-server` via command line and paint works autonomously, evaluate them visually, and refine them (Vary/Refine) while tracking lineage nodes.
 
 ---
 
 ## AI Autonomous & Quality Improvement Workflow (Testing Procedure)
 
-The standard operational procedure for an AI agent to gradually refine and improve artwork.
+The standard operational procedure for an AI agent to refine a work step by step.
 
 ### Step 1: Establish Connection and Verify Session
 Verify that the API server is reachable and inspect the current user's session role.
@@ -17,21 +17,21 @@ uv run inku-cli me
 * **Expected Output (JSON)**: A JSON object containing the user profile, e.g., role `admin` or `user`.
 * **AI Decision Logic**: Connection is successful if the response contains `id` and `username`.
 
-### Step 2: Generate Initial Artwork (Root Node)
-Generate the first artwork using a prompt (Shikishi text) and save it to the server history.
+### Step 2: Paint the Initial Work (Root Node)
+Paint the first work from a description (Shikishi text) and save it to the server history.
 
 ```sh
 uv run inku-cli paint "Draw one wave line with a thick black brush on white space." -o ./test_output --png --save-history
 ```
 * **Expected Output (JSON)**:
-  A JSON object representing the generated artwork's metadata.
+  A JSON object representing the generated work's metadata.
   * `history_id`: `"d5989732-9f3a-4dd2-82df-c49c50761119"` (example)
   * `render_hash`: Unique rendering hash
   * `paths.json`, `paths.svg`, `paths.png`: Local paths for exported files
 * **AI Decision Logic**: Extract the `"history_id"` and store it as the `PARENT_ID` variable.
 
-### Step 3: Generate a Variation (Refinement)
-Create a localized variation of the artwork and attach it as a child node in the lineage tree.
+### Step 3: Make a Variation (Refinement)
+Create a localized variation of the work and attach it as a child node in the lineage tree.
 
 ```sh
 # Generate a layout variation for the PARENT_ID (e.g., d5989732-9f3a-4dd2-82df-c49c50761119)
@@ -42,7 +42,7 @@ uv run inku-cli refine generate PARENT_ID --kind layout -o ./test_output --png
   * `layout`: Reconstruct coordinates and size balance (Stage 2 LLM reconstruction).
   * `reading`: Re-interpret the original prompt text (Stage 1.5 LLM re-interpretation).
   * `color`: Apply a different color catalog (very fast; no LLM call).
-* **Expected Output**: A JSON object containing the refined child artwork's metadata.
+* **Expected Output**: A JSON object containing the refined child work's metadata.
 
 ### Step 4: Traverse and Verify the Lineage Tree
 Verify that the newly generated child node is correctly connected to the parent node.

@@ -22,11 +22,11 @@ inku stands at the crossing of ideas learned from three cultural traditions — 
 
 | Tradition | What it gives inku |
 |---|---|
-| **Sol LeWitt's instruction art** | The idea that the description itself is the artwork; the concept from which this application began |
+| **Sol LeWitt's instruction art** | The idea that the description itself is the work; the concept from which this application began |
 | **Bonsai** | The practice that constraint is not limitation but concentration |
 | **Tanka** | The form in which the type silences the self, and presentation replaces assertion |
 
-As of 2026, generative image and artwork making hides its own process from the creator; it might fairly be called incantatory — write a prompt, then pray, and repeat. The DDL concept takes the opposite path: it splits the generation process into layers, and the human interprets, selects, and edits the AI's interventions at each layer while finishing the work.
+As of 2026, generative image and picture making hides its own process from the creator; it might fairly be called incantatory — write a prompt, then pray, and repeat. The DDL concept takes the opposite path: it splits the generation process into layers, and the human interprets, selects, and edits the AI's interventions at each layer while finishing the work.
 
 inku is built on LLMs, but each layer is placed under strict constraints. Constraints on vocabulary, primitives, and coordinates are not limits on what can be made. They are the instruments by which you make a work and render your intention visible.
 
@@ -34,7 +34,7 @@ inku is built on LLMs, but each layer is placed under strict constraints. Constr
 
 ## Works — a description becoming a picture
 
-The pieces below were drawn by inku. **Under each picture is the sentence that was written (the kotobagaki) and the instructions (normalized DDL) that grew out of it.** The correspondence between words and picture is what this language is about.
+The pieces below were drawn by inku. **Under each picture is the sentence that was written (the headnote) and the instructions (normalized DDL) that grew out of it.** The correspondence between words and picture is what this language is about.
 
 These works were written in Japanese; the original text is given with an English rendering.
 
@@ -210,7 +210,7 @@ SVG (the performance — one-time)
 | **Instructions (Normalized DDL)** | The executable specification the interpretation produces. Corresponds to LeWitt's instruction sheet |
 | **Score (JSON Score)** | The structured intermediate form of the instructions. Stored deterministically |
 | **Performance (SVG)** | The one-time result of playing the score |
-| **Kotobagaki (caption)** | The description re-presented beside the finished work (as in tanka) |
+| **Headnote** | The description raised beside the finished work — kotobagaki, the note set beside a poem |
 | **Reading** | Rebuilding candidates by re-reading the words (another interpretation) |
 
 ### One work, followed through the layers
@@ -312,9 +312,9 @@ None of them breaks default reproducibility; each acts only on your explicit req
 
 | Operation | What is redrawn | What is kept | Cost |
 |---|---|---|---|
-| **Another performance** (vary touch with words) | Line tremor, placement phase | Interpretation and composition | Very fast, no LLM call |
-| **Another color** (vary color catalog) | The color assignment | Interpretation, composition, performance | Very fast, no LLM call |
-| **Another composition** (vary layout) | Composition family, focus, technique | Interpretation (how the words were read) | Moderate, Stage 2 |
+| **Another performance** | Line tremor, placement phase | Interpretation and composition | Very fast, no LLM call |
+| **Another catalog** | The color assignment | Interpretation, composition, performance | Very fast, no LLM call |
+| **Another composition** | Composition family, focus, technique | Interpretation (how the words were read) | Medium, Stage 2 |
 | **Variation** (let the app change Stage 1.5) | Axes of the expansion layer; the range depends on the strength | Your sentence, its reading, and the axes the strength leaves alone | Moderate, Stage 2 |
 | **Another interpretation** | The reading of the words themselves | Your sentence | Slower, from Stage 1 |
 
@@ -341,7 +341,7 @@ Either mode accepts a direction of your own (a sentence such as "festive, and ye
 
 Candidates can be made one at a time or as a grid of four. Keep the ones you like (multiple selection is allowed) and **attach a short note about why you chose them**. **Choosing is part of the work, alongside writing.**
 
-What you keep becomes the next parent. Another performance from there, another color, a variation — the whole back and forth is recorded in the **lineage**, so you can trace later which generation you redrew what from to arrive at the drawing in front of you. History stores seeds and an edition ID, so any generation along the way can be reproduced exactly as it was.
+What you keep becomes the next parent. Another performance from there, another catalog, a variation — the whole back and forth is recorded in the **lineage**, so you can trace later which generation you redrew what from to arrive at the drawing in front of you. History stores seeds and an edition ID, so any generation along the way can be reproduced exactly as it was.
 
 **A piece is finished not when a generation happens to land, but when you decide to stop here.**
 

@@ -128,7 +128,7 @@ Lineage connects only explicit creation operations. It is never inferred from si
 | `group_lead` | User administration within assigned scope |
 | `user` | Generation and management of own history and settings |
 
-Generation, history, lineage, and settings APIs enforce authentication and user scope. Acceptance testing must verify that roots, artworks, and counts never cross user boundaries.
+Generation, history, lineage, and settings APIs enforce authentication and user scope. Acceptance testing must verify that roots, works, and counts never cross user boundaries.
 
 ## 5. Models and Languages
 
@@ -244,10 +244,10 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 |---|---|
 | Cannot sign in | Bootstrap conditions, user state, secure-cookie setting, and DB connection |
 | Cannot generate | Provider key, Base URL, published models, and Stage logs |
-| Japanese or English is misdetected | Language signal in input, `ui_lang` fallback, and effective languages in Generation info |
+| Japanese or English is misdetected | Language signal in input, `ui_lang` fallback, and effective languages in Provenance |
 | History is missing | User scope, regular/trash mode, and timeline/lineage filter |
 | Lineage appears broken | Parent-candidate save failure, lineage migration, and tombstones |
-| Artwork appears but artifacts do not | Queue skip, output permissions, and worker count |
+| A work appears but artifacts do not | Queue skip, output permissions, and worker count |
 | Provider key cannot decrypt | Confirm the same recovery-point `INKU_SECRET_KEY_FILE` |
 | DB fails after startup | Migration logs, DB backup, and concurrent mixed backend versions |
 

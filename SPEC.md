@@ -471,16 +471,16 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
 
-### Unleashed (engine 12)
+### Wild (engine 12; its reach in engine 14)
 
-**Separate from the vocabulary, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — unleashed.
+**Separate from the vocabulary, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — wild.
 
-- **One switch for the whole work**, not per stroke and not per tool
+- **One switch for the whole work**, not per stroke and not per tool. **In engine 12 it reached only the line primitive** (circles, ellipses, triangles, squares, polygons, arcs, fills and hatches came out byte-identical with it on). **Engine 14 extends it to contours, arcs, fills and hatches**, so the implementation now matches the description
 - **It removes only the amplitude ceiling and the ban on self-intersection.** Endpoint pinning and determinism hold when it is on: the same Score, the same seed, and the same state render the same SVG every time
-- **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed unleashed and performed plainly are different works**
-- **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when unleashed. **A machine has nothing to unleash**
+- **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed wild and performed plainly are different works**
+- **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when it is on. **A machine has nothing to unleash**
 
-This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; unleashed leaves the score alone and widens the performance.
+This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance.
 | relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
@@ -1072,7 +1072,7 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `13` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `14` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `1` | the same input and seed produce different output |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `1` | grammar is added, changed, or retired |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
@@ -1130,7 +1130,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-13/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 228 |
+| Drawing | `server/reference/render-engine-14/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 347 |
 | Deterministic DDL layers | `server/reference/ddl-engine-1/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 29 (A 15 / B 14) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -1255,10 +1255,12 @@ decline**, and this one is **vocabulary you choose** (§12.5 stands).
   take no `render_seed`. **The same Score performs byte-identically under different seeds**,
   which no hand tool does. Placement and motion vocabulary keep their seed dependence: those
   belong to the layers above.
-- **"Unleashed" has no effect** (§13.4 of the Japanese SPEC). Being unleashed is a property
+- **"Wild" has no effect** (§13.4 of the Japanese SPEC). Being wild is a property
   of the hand, so the computer is treated like `rotring`.
-- **Lattice**: centreline coordinates are rounded to a step of `stroke length x 0.018`, and
-  width falls onto four steps.
+- **Lattice**: centreline coordinates are rounded to a lattice, and
+  width falls onto four steps. **Engine 13 used a step of `stroke length x 0.018`, so every
+  object carried its own graph paper; engine 14 replaced it with one sheet of
+  `canvas short side x 0.018`** (§12.7).
 - **A closed contour may look almost like rotring's.** No radius modulation is written for
   closed contours; that flatness is the CG taste.
 
@@ -1286,6 +1288,85 @@ older work `rh2:9e991c...` as a property of the tool. Rendered and looked at, th
 was pinned to the intended start and end while **the performed centreline wanders up to 55px
 away**, so the dashes detached from the stroke and read as background ruling. **It carried no
 pictorial meaning and was discarded.**
+
+---
+
+### 12.7 One Sheet of Graph Paper, and the Reach of Wild (v2.7.0, engine 14)
+
+**The two holes engine 13 left open are closed in one version**, since both change what is
+performed and a single version means the corpus is re-frozen once.
+
+#### A lattice is a property of the paper, not of the object placed on it
+
+Engine 13's lattice had a step **proportional to stroke length** (`step = length x 0.018`), so:
+
+- **objects of different length got different steps** (100px -> 1.8px, 400px -> 7.2px, 800px -> 14.4px);
+- **the same length changed figure with position**: thirty equal lines placed apart produced **thirty distinct figures**;
+- one picture held **as many separate sheets of graph paper as it held sizes**.
+
+Engine 14 derives the step from **`canvas short side x quantize`**. The value of `quantize` is still
+`0.018`, but **its meaning moved from "a fraction of the stroke's length" to "a fraction of the
+canvas's short side"**. `stroke_engine` does not know about the canvas, so **the renderer converts to
+pixels and passes the step in**. No length-relative path remains -- no flag and no fallback.
+
+- 18.000000px on a 1000px square. Being short-side based, **it varies with aspect** (a4 12.726px,
+  oban 12.006px, vertical 10.116px, **pillar 3.600px**). That is a consequence, not a defect
+- **Every stroke in one picture falls onto the same cells.** Material cells share one side length
+  within a Score and their centres sit on integer multiples of one step (with three objects of
+  different size in one Score, coordinates off the lattice went from 188/194 to **0/194**)
+- **Because the paper no longer shrinks with the object, consecutive samples can round into the same
+  cell.** Overlapping cells are drawn as they fall; they are not deduplicated. The author chose 18px
+  with this appearance in view
+
+#### Wild reaches the contours
+
+Engine 12's wild switch **reached only the `line` primitive**. In measurement, **63 of the 88
+combinations (11 tools x 8 primitives) came out byte-identical with it on and off**, which
+contradicted the "one switch for the whole work" description in the Unleashed section above.
+
+Engine 14 adds the centreline gesture to `synthesize_along` (circles, ellipses, triangles, squares,
+polygons, arcs, fills and hatches) and threads `wild` through it. **With the switch off nothing
+changes, byte for byte** -- of the 228 existing corpus cases, the only seven that moved did so
+because of the lattice.
+
+**Exactly 25 combinations may still be identical, each for its own reason.**
+
+| Identical by design | Count | Why |
+|---|---|---|
+| all 11 tools x `cloudform` | 11 | `cloudform.py` does not go through `stroke_engine` (**a known hole engine 14 does not fix**) |
+| `rotring` x the other 7 primitives | 7 | its grammar's `gesture` is zero -- the machine pole |
+| `computer` x the other 7 primitives | 7 | `periodic` skips `WILD_GAIN` (12.6) |
+
+#### Three ways a naive port breaks
+
+Copying the straight-line gesture onto a contour does not work. **All three were measured on a
+prototype before they became specification.**
+
+1. **Amplitude must not be scaled by arc length.** A closed contour's perimeter is not its size (a
+   heptagon turned into a star). **A closed contour is measured by `perimeter / tau` -- its radius equivalent.**
+2. **The gesture's mean must be removed.** A non-zero mean rescales the whole figure (a circle shrank).
+   **Size is decided by the score; a performance may not change it.**
+3. **The window must fall to zero before an anchor.** A gesture riding on the vertices next to a
+   corner that is pinned back to the intention produces spikes.
+
+#### The material follows the ink
+
+The material outline of a contour or an arc (`class="material-outline"`) was **built from the
+geometry and never looked at the performed centreline**. With wild reaching contours, **all nine
+measured combinations moved the ink alone and left the material behind on the geometry** -- the same
+defect engine 12 fixed for lines, where a material layer that does not follow the centreline reads
+as ruling behind the drawing.
+
+**With wild on, the material outline and specks of a contour or an arc are built from the performed
+centreline.** With it off they are exactly as engine 13 left them.
+
+#### Version and corpus
+
+`render_engine_version` moves from `13` to **`14`**. The reference corpus grows to **347 cases**
+(`corpus_format_version` `"1"` -> `"2"`, since each case's input now carries `wild`).
+`changed_from_previous` holds **126**: **7 existing cases** (the `A-computer-*` set minus
+`cloudform`) and **119 new E-block cases** (the full 88 under wild, plus 15 fills and 16 surfaces),
+leaving **221 unchanged**. **Not one of the ten hand tools moved.**
 
 ---
 

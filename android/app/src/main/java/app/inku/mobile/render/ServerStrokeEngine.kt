@@ -16,7 +16,10 @@ data class ToolGrammar(
     val eventRate: Double,
     val taper: Double,
     val bulge: Double,
-    val gesture: Double
+    val gesture: Double,
+    val periodic: Boolean = false,
+    val quantize: Double = 0.0,
+    val widthSteps: Int = 0
 )
 
 val GRAMMARS: Map<String, ToolGrammar> = mapOf(
@@ -29,7 +32,20 @@ val GRAMMARS: Map<String, ToolGrammar> = mapOf(
     "brush_thin" to ToolGrammar(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10),
     "brush_thick" to ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13),
     "burin" to ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018),
-    "drypoint" to ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05)
+    "drypoint" to ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05),
+    "computer" to ToolGrammar(
+        1.0,
+        1.0,
+        0.30,
+        0.34,
+        0.0,
+        0.0,
+        0.0,
+        0.06,
+        periodic = true,
+        quantize = 0.018,
+        widthSteps = 4
+    )
 )
 
 const val WILD_GAIN: Double = 3.5
@@ -42,7 +58,8 @@ data class StrokeSample(
     val width: Double,
     val energy: Double,
     val lateral: Double,
-    val event: String? = null
+    val event: String? = null,
+    val residual: Double = 0.0
 )
 
 data class StrokeResult(
@@ -50,7 +67,8 @@ data class StrokeResult(
     val outline: List<Pair<Double, Double>>,
     val eventCount: Int,
     val burrSide: Int,
-    val burrOpacity: Double
+    val burrOpacity: Double,
+    val gridStep: Double = 0.0
 )
 
 data class ContourStrokeResult(
@@ -60,7 +78,8 @@ data class ContourStrokeResult(
     val eventCount: Int,
     val burrSide: Int,
     val burrOpacity: Double,
-    val closed: Boolean
+    val closed: Boolean,
+    val gridStep: Double = 0.0
 )
 
 const val CLOSED_ENVELOPE_FLOOR: Double = 0.35
@@ -133,6 +152,28 @@ object ServerStrokeEngine {
         return Math.max(-1.0, Math.min(1.0, a * 0.7 + b * 0.35))
     }
 
+    fun quantize(value: Double, step: Double): Double {
+        return if (step <= 0.0) value else Math.rint(value / step) * step
+    }
+
+    fun gridPoint(value: Double, step: Double): Double {
+        return quantize(value, step)
+    }
+
+    fun machineEnergy(t: Double): Double {
+        val tau = 2.0 * Math.PI
+        return 0.72 * Math.sin(t * tau * 5.0) + 0.28 * Math.sin(t * tau * 10.0)
+    }
+
+    fun machineSwell(t: Double): Double {
+        return 0.45 + 0.55 * Math.sin(Math.PI * t)
+    }
+
+    fun machineGesture(t: Double): Double {
+        val tau = 2.0 * Math.PI
+        return Math.sin(t * tau * 2.0)
+    }
+
     fun eventMap(seed: Long, rate: Double, count: Int): Map<Int, String> {
         val events = mutableMapOf<Int, String>()
         val probability = Math.min(0.12, rate / Math.max(1, count - 2).toDouble())
@@ -157,7 +198,8 @@ object ServerStrokeEngine {
         weight: String,
         seed: Long,
         samplesCount: Int = 49,
-        wild: Boolean = false
+        wild: Boolean = false,
+        gridStep: Double = 0.0
     ): StrokeResult {
         val grammar = GRAMMARS[weight] ?: error("Unknown weight: $weight")
         val dx = end.first - start.first
@@ -171,7 +213,10 @@ object ServerStrokeEngine {
         
         val position = doubleArrayOf(start.first, start.second)
         val velocity = doubleArrayOf(dx / (samplesCount - 1), dy / (samplesCount - 1))
-        val gestureAmp = length * grammar.gesture * (if (wild) WILD_GAIN else 1.0)
+        var gestureAmp = length * grammar.gesture
+        if (wild && !grammar.periodic) {
+            gestureAmp *= WILD_GAIN
+        }
         val result = mutableListOf<StrokeSample>()
 
         for (i in 0 until samplesCount) {
@@ -185,8 +230,15 @@ object ServerStrokeEngine {
                 position[1] += velocity[1] * 0.72
             }
             
-            val energy = latentEnergy(t, seed)
-            val envelope = edgeWindow(t) * swell(t, seed)
+            val energy: Double
+            val envelope: Double
+            if (grammar.periodic) {
+                energy = machineEnergy(t)
+                envelope = machineSwell(t)
+            } else {
+                energy = latentEnergy(t, seed)
+                envelope = edgeWindow(t) * swell(t, seed)
+            }
             var lateral = energy * grammar.energyLateral * baseWidth * (0.18 + 0.82 * envelope)
             
             val event = events[i]
@@ -208,7 +260,7 @@ object ServerStrokeEngine {
                 profile *= 1.0 + grammar.bulge * envelope
             }
 
-            val width = Math.max(
+            var width = Math.max(
                 0.015,
                 baseWidth * profile * (1.0 + grammar.energyWidth * energy * 0.45) * eventWidth
             )
@@ -216,29 +268,55 @@ object ServerStrokeEngine {
             var gx = 0.0
             var gy = 0.0
             if (gestureAmp != 0.0) {
-                val win = edgeWindow(t)
-                val gLat = gestureWave(t, seed, "gesture-lat")
-                val gLon = gestureWave(t, seed, "gesture-lon")
+                val win: Double
+                val gLat: Double
+                val gLon: Double
+                if (grammar.periodic) {
+                    win = 1.0
+                    gLat = machineGesture(t)
+                    gLon = 0.0
+                } else {
+                    win = edgeWindow(t)
+                    gLat = gestureWave(t, seed, "gesture-lat")
+                    gLon = gestureWave(t, seed, "gesture-lon")
+                }
                 gx = gestureAmp * win * (nx * gLat + ux * gLon)
                 gy = gestureAmp * win * (ny * gLat + uy * gLon)
+            }
+
+            var x = position[0] + nx * lateral + gx
+            var y = position[1] + ny * lateral + gy
+            var residual = 0.0
+
+            if (gridStep > 0.0) {
+                val qx = quantize(x, gridStep)
+                val qy = quantize(y, gridStep)
+                residual = Math.hypot(x - qx, y - qy)
+                x = qx
+                y = qy
+            }
+
+            if (grammar.widthSteps > 0) {
+                width = Math.max(0.015, quantize(width, baseWidth / grammar.widthSteps))
             }
 
             result.add(
                 StrokeSample(
                     t,
-                    position[0] + nx * lateral + gx,
-                    position[1] + ny * lateral + gy,
+                    x,
+                    y,
                     width,
                     energy,
                     lateral,
-                    event
+                    event,
+                    residual
                 )
             )
         }
 
         // Pin intention endpoints. Width still carries the entry/exit profile.
-        result[0] = StrokeSample(0.0, start.first, start.second, result[0].width, result[0].energy, 0.0, null)
-        result[result.size - 1] = StrokeSample(1.0, end.first, end.second, result[result.size - 1].width, result[result.size - 1].energy, 0.0, null)
+        result[0] = StrokeSample(0.0, start.first, start.second, result[0].width, result[0].energy, 0.0, null, 0.0)
+        result[result.size - 1] = StrokeSample(1.0, end.first, end.second, result[result.size - 1].width, result[result.size - 1].energy, 0.0, null, 0.0)
 
         val left = result.map { p -> Pair(p.x + nx * p.width / 2.0, p.y + ny * p.width / 2.0) }
         val right = result.reversed().map { p -> Pair(p.x - nx * p.width / 2.0, p.y - ny * p.width / 2.0) }
@@ -252,7 +330,8 @@ object ServerStrokeEngine {
             left + right,
             events.size,
             side,
-            Math.min(0.35, burrOpacity)
+            Math.min(0.35, burrOpacity),
+            gridStep
         )
     }
 
@@ -354,7 +433,9 @@ object ServerStrokeEngine {
         weight: String,
         seed: Long,
         closed: Boolean,
-        anchors: Set<Int> = emptySet()
+        anchors: Set<Int> = emptySet(),
+        gridStep: Double = 0.0,
+        wild: Boolean = false
     ): ContourStrokeResult {
         val points = centerline
         val count = points.size
@@ -363,13 +444,36 @@ object ServerStrokeEngine {
         if (count < 2) {
             val sample = StrokeSample(0.0, points[0].first, points[0].second, baseWidth, 0.0, 0.0)
             return ContourStrokeResult(
-                listOf(sample), points, points, 0, 1, 0.0, closed
+                listOf(sample), points, points, 0, 1, 0.0, closed, gridStep
             )
         }
 
         val normals = centerlineNormals(points, closed)
         val parameters = arcLengthParameters(points, closed)
         val events = eventMap(seed, grammar.eventRate, count)
+
+        var gestureAmp = 0.0
+        if (wild && !grammar.periodic) {
+            val totalLength = Math.max(
+                1e-6,
+                (0 until count - 1).sumOf { i ->
+                    Math.hypot(points[i + 1].first - points[i].first, points[i + 1].second - points[i].second)
+                }
+            )
+            val size = if (closed) totalLength / (2.0 * Math.PI) else totalLength
+            gestureAmp = size * grammar.gesture * WILD_GAIN
+        }
+
+        var gestures = DoubleArray(count)
+        if (gestureAmp != 0.0) {
+            gestures = DoubleArray(count) { i -> gestureWave(parameters[i], seed, "gesture-lat") }
+            if (closed) {
+                val mean = gestures.sum() / count
+                for (i in 0 until count) {
+                    gestures[i] -= mean
+                }
+            }
+        }
 
         val position = doubleArrayOf(points[0].first, points[0].second)
         val velocity = doubleArrayOf(0.0, 0.0)
@@ -388,11 +492,17 @@ object ServerStrokeEngine {
                 position[1] += step.second + velocity[1] * 0.72
             }
 
-            val energy = latentEnergy(t, seed)
-            val envelope = if (closed) {
-                swell(t, seed)
+            val energy: Double
+            val envelope: Double
+            if (grammar.periodic) {
+                energy = machineEnergy(t)
+                envelope = if (closed) 1.0 else machineSwell(t)
+            } else if (closed) {
+                energy = latentEnergy(t, seed)
+                envelope = swell(t, seed)
             } else {
-                edgeWindow(t) * swell(t, seed)
+                energy = latentEnergy(t, seed)
+                envelope = edgeWindow(t) * swell(t, seed)
             }
 
             var lateral = energy * grammar.energyLateral * baseWidth * (0.18 + 0.82 * envelope)
@@ -416,14 +526,38 @@ object ServerStrokeEngine {
                 profile *= 1.0 + grammar.bulge * envelope
             }
 
-            val width = Math.max(
+            var width = Math.max(
                 0.015,
                 baseWidth * profile * (1.0 + grammar.energyWidth * energy * 0.45) * eventWidth
             )
 
+            var gesture = 0.0
+            if (gestureAmp != 0.0) {
+                var win = if (closed) 1.0 else edgeWindow(t)
+                if (anchors.isNotEmpty()) {
+                    val minDist = anchors.minOf { anchor -> Math.abs(index - anchor) }
+                    win *= Math.min(1.0, minDist / 12.0)
+                }
+                gesture = gestureAmp * win * gestures[index]
+            }
+
             val (nx, ny) = normals[index]
-            var x = position[0] + nx * lateral
-            var y = position[1] + ny * lateral
+            var x = position[0] + nx * (lateral + gesture)
+            var y = position[1] + ny * (lateral + gesture)
+            var residual = 0.0
+
+            if (gridStep > 0.0) {
+                val qx = quantize(x, gridStep)
+                val qy = quantize(y, gridStep)
+                residual = Math.hypot(x - qx, y - qy)
+                x = qx
+                y = qy
+            }
+
+            if (grammar.widthSteps > 0) {
+                width = Math.max(0.015, quantize(width, baseWidth / grammar.widthSteps))
+            }
+
             var finalLateral = lateral
             var finalEvent = event
 
@@ -434,16 +568,17 @@ object ServerStrokeEngine {
                 finalEvent = null
                 position[0] = target.first
                 position[1] = target.second
+                residual = 0.0
             }
 
-            samples.add(StrokeSample(t, x, y, width, energy, finalLateral, finalEvent))
+            samples.add(StrokeSample(t, x, y, width, energy, finalLateral, finalEvent, residual))
         }
 
         if (!closed) {
-            samples[0] = StrokeSample(0.0, points[0].first, points[0].second, samples[0].width, samples[0].energy, 0.0)
+            samples[0] = StrokeSample(0.0, points[0].first, points[0].second, samples[0].width, samples[0].energy, 0.0, null, 0.0)
             val lastPIdx = points.lastIndex
             val lastSIdx = samples.lastIndex
-            samples[lastSIdx] = StrokeSample(1.0, points[lastPIdx].first, points[lastPIdx].second, samples[lastSIdx].width, samples[lastSIdx].energy, 0.0)
+            samples[lastSIdx] = StrokeSample(1.0, points[lastPIdx].first, points[lastPIdx].second, samples[lastSIdx].width, samples[lastSIdx].energy, 0.0, null, 0.0)
         } else if (anchors.isEmpty() && count > 2) {
             samples = closedSeamCorrection(samples, points, parameters)
         }
@@ -463,7 +598,8 @@ object ServerStrokeEngine {
             events.size,
             side,
             Math.min(0.35, burrOpacity),
-            closed
+            closed,
+            gridStep
         )
     }
 
@@ -495,7 +631,8 @@ object ServerStrokeEngine {
                     Math.max(0.015, sample.width - gapWidth * factor),
                     sample.energy,
                     sample.lateral,
-                    sample.event
+                    sample.event,
+                    sample.residual
                 )
             )
         }

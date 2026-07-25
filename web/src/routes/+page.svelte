@@ -4044,7 +4044,7 @@ if (unreadWords.length > 0) {
 		const rendered = new Set(languageInspectionResults.map((item) => item.id));
 		const pending = jobs.filter((job) => !rendered.has(job.id));
 		if (pending.length === 0) {
-			languageInspectionStatus = getLang() === 'ja' ? '選択済みの言語構成はすべて描画済みです。' : 'All selected language combinations are rendered.';
+			languageInspectionStatus = getLang() === 'ja' ? '選択済みの言語構成はすべて描画済みです。' : 'All chosen language combinations have been painted.';
 			return;
 		}
 		const runId = ++languageInspectionRunId;
@@ -4345,14 +4345,14 @@ function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
 }
 
 async function showNewLineageChild(historyId: string | null | undefined, nodeId: string | null | undefined): Promise<void> {
-	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The rendered result could not be saved to the lineage.');
+	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The finished work could not be saved to the lineage.');
 	let found = await fetchHistoryOffset(0, { anchorId: historyId });
 	if (!found && historyStarredOnly) {
 		historyStarredOnly = false;
 		found = await fetchHistoryOffset(0, { anchorId: historyId });
 	}
 	const saved = historyItems.find((item) => item.id === historyId);
-	if (!saved) throw new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved artwork could not be loaded.');
+	if (!saved) throw new Error(getLang() === 'ja' ? '保存した作品を読み込めませんでした。' : 'The saved work could not be loaded.');
 	// Description / DDL edits produce a single artwork, not a candidate set, so
 	// land on the canvas tab and show it. The lineage is still refreshed below.
 	outputTab = 'canvas';
@@ -6177,8 +6177,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			<button
 				class="left-rail-toggle"
 				onclick={() => (leftPanelCollapsed = !leftPanelCollapsed)}
-				title={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open input area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse input area')}
-				aria-label={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open input area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse input area')}
+				title={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open the description area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse the description area')}
+				aria-label={leftPanelCollapsed ? (getLang() === 'ja' ? '記述エリアを開く' : 'Open the description area') : (getLang() === 'ja' ? '記述エリアを畳む' : 'Collapse the description area')}
 				aria-expanded={!leftPanelCollapsed}
 			>{leftPanelCollapsed ? '›' : '‹'}</button>
 

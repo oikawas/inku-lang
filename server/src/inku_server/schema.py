@@ -58,7 +58,6 @@ Dimension = Literal[
     "position_y",
     "angle",
     "length",
-    "thickness",
     "rotation",
     "radius",
 ]
@@ -75,7 +74,6 @@ PresenceSymmetry = Literal["none", "bilateral", "radial"]
 GazePressure = Literal["none", "low", "medium", "high"]
 ContourDensity = Literal["low", "medium", "high"]
 RelationType = Literal["along", "not_touching", "cutting", "between", "touching"]
-RelationContact = Literal["both_ends"]
 RelationGap = Literal["narrow", "medium", "wide"]
 InstructionMode = Literal["additive", "carve"]
 CarveDepth = Literal["light", "half", "bright"]
@@ -152,7 +150,13 @@ class CanvasGroundSpec(BaseModel):
         default=0.12, ge=0.0, le=1.0, description="地の質感不透明度 0.0-1.0"
     )
     absorbency: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="吸い込みやすさ 0.0-1.0"
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "吸い込みやすさ 0.0-1.0。値そのものは描画に読まれないが、地の texture seed は"
+            " Score 全体のハッシュなので、消すと地を持つ作品の粒配置が変わる (v2.7.2 調査)"
+        ),
     )
     seed: Optional[int] = Field(
         default=None,
@@ -215,18 +219,16 @@ class Relation(BaseModel):
         default="medium",
         description="関係解決時の距離目安: narrow / medium / wide。具体距離は Renderer が解決する",
     )
-    contact: Optional[RelationContact] = Field(
-        default=None,
-        description="touching の接触方法。現段階では both_ends のみ",
-    )
 
-    @model_validator(mode="after")
-    def _validate_contact(self) -> "Relation":
-        if self.type == "touching" and self.contact != "both_ends":
-            raise ValueError("touching relation requires contact=both_ends")
-        if self.type != "touching" and self.contact is not None:
-            raise ValueError("contact is only valid for touching relation")
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_retired_contact(cls, v: object) -> object:
+        # 退役フィールド (v2.7.2)。touching の接触は both_ends しか許していなかったので
+        # 値は情報を運んでおらず、Renderer も読んでいなかった。保存済み Score には
+        # 残っているため、ここで落として再生できるようにする。
+        if isinstance(v, dict) and "contact" in v:
+            v = {k: val for k, val in v.items() if k != "contact"}
+        return v
 
 
 class Variation(BaseModel):
@@ -250,6 +252,17 @@ class Variation(BaseModel):
         default_factory=list,
         description="揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_retired_dimensions(cls, v: object) -> object:
+        # thickness は Renderer が一度も読まないまま宣言だけされていた (v2.7.2 で退役)。
+        # 保存済み Score が持っていても揺らぎの残りは再生できるよう、値だけ落とす。
+        if isinstance(v, dict) and isinstance(v.get("dimensions"), list):
+            kept = [d for d in v["dimensions"] if d != "thickness"]
+            if len(kept) != len(v["dimensions"]):
+                v = {**v, "dimensions": kept}
+        return v
 
 
 class Arrangement(BaseModel):

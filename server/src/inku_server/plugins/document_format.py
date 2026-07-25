@@ -671,7 +671,7 @@ def _pair_instructions(
                 "radius": radius,
                 "angle_start": float(round(start2)),
                 "angle_end": float(round(start2 + span2)),
-                "relation": {"type": "touching", "contact": "both_ends"},
+                "relation": {"type": "touching"},
             }
         )
     return out

@@ -282,7 +282,7 @@ INACTIVE_VARIATIONS = [
     {"quality": "none", "dimensions": ["position_x"]},
     {"quality": "wave", "dimensions": []},
     {"quality": "perlin", "dimensions": ["rotation"]},
-    {"quality": "white", "dimensions": ["thickness", "length"]},
+    {"quality": "white", "dimensions": ["length"]},
 ]
 
 

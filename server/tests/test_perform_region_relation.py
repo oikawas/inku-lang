@@ -49,7 +49,7 @@ def _double_arc_score(with_at: bool) -> Score:
         "angle_start": 0.0,
         "angle_end": 120.0,
     }
-    second = {**base, "relation": {"type": "touching", "contact": "both_ends"}}
+    second = {**base, "relation": {"type": "touching"}}
     if with_at:
         base = {**base, "at": {"region": [0.2, 0.2, 0.5, 0.5]}}
         second = {**second, "at": {"region": [0.5, 0.5, 0.8, 0.8]}}
@@ -60,7 +60,7 @@ def _assert_vesica(svg: str) -> None:
     arcs = _arc_paths(svg)
     assert len(arcs) == 2, f"expected 2 arc paths, got {len(arcs)}"
     (s1x, s1y, e1x, e1y, laf1, sf1), (s2x, s2y, e2x, e2y, laf2, sf2) = arcs
-    # 両端一致 (touching contact=both_ends)
+    # 両端一致 (touching)
     assert {(s1x, s1y), (e1x, e1y)} == {(s2x, s2y), (e2x, e2y)}
     # 双方とも劣弧 (§14.4: 掃引角 180° 未満)
     assert laf1 == 0 and laf2 == 0
@@ -126,7 +126,7 @@ def test_invalid_touching_primitive_drops_with_warning(caplog: pytest.LogCapture
                     "color": "black",
                     "center": [0.5, 0.5],
                     "radius": 0.1,
-                    "relation": {"type": "touching", "contact": "both_ends"},
+                    "relation": {"type": "touching"},
                 },
             ],
         }

@@ -59,7 +59,7 @@ def test_pair_member_transcribes_place_and_touching_ja() -> None:
     for k in range(0, 6, 2):
         place, touch = res.instructions[k], res.instructions[k + 1]
         assert place["primitive"] == "arc" and "at" in place and "relation" not in place
-        assert touch["relation"] == {"type": "touching", "contact": "both_ends"}
+        assert touch["relation"] == {"type": "touching"}
         assert place["center"] == touch["center"]  # 対は同一 member region 由来
         # 掃引は劣弧（180°未満）で、対ごとに揺れる
         assert (place["angle_end"] - place["angle_start"]) < 180

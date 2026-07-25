@@ -59,6 +59,7 @@ WEIGHT_TO_STROKE_WIDTH: dict[str, float] = {
     "brush_thick": 8.0,
     "burin": 3.2,
     "drypoint": 2.6,
+    "computer": 2.0,
 }
 
 COLOR_MAP: dict[str, str] = {
@@ -219,6 +220,7 @@ WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
     "brush_thick": {"stroke_opacity": 0.86, "stroke_linecap": "round"},
     "burin": {"stroke_opacity": 0.96, "stroke_linecap": "round"},
     "drypoint": {"stroke_opacity": 0.92, "stroke_linecap": "round"},
+    "computer": {"stroke_opacity": 1.0, "stroke_linecap": "round"},
 }
 
 BACKGROUND = "#ffffff"
@@ -3227,6 +3229,10 @@ _MATERIAL_OUTLINE_SPECS: dict[str, list[tuple[float, float, float, float, str]]]
         (-1.5, 0.0, 0.20, 0.20, "4,8"),
         (2.4, 0.0, 0.22, 0.22, "2,5,9,7"),
     ],
+    "computer": [
+        (-1.4, 0.9, 0.0, 0.32, "22,9"),
+        (1.8, 0.9, 0.0, 0.32, "22,9"),
+    ],
 }
 
 # (基準個数, spread_px, radius_px, opacity)。個数は周長比例の基準値。
@@ -3441,7 +3447,14 @@ def _material_line_group(
     render_seed: int | None = None,
     centerline: list[tuple[float, float]] | None = None,
 ):
-    if ins.weight not in ("pencil", "crayon", "chalk", "brush_thin", "brush_thick"):
+    if ins.weight not in (
+        "pencil",
+        "crayon",
+        "chalk",
+        "brush_thin",
+        "brush_thick",
+        "computer",
+    ):
         return None
 
     # The texture layers ride the actual (possibly gestured) centreline, not the
@@ -3460,6 +3473,23 @@ def _material_line_group(
 
     def _layer_offset(amount: float) -> float:
         return _outline_offset_px(amount * scale * offset_gain, canvas)
+
+    if ins.weight == "computer":
+        # A computer repeats the same ruled stratum on every stroke. Unlike the
+        # hand tools below, these layers do not follow the performed centreline,
+        # wander, or derive their dash cadence from a render seed.
+        for amount in (-1.4, 1.8):
+            layer_attrs = _copy_attrs(attrs)
+            layer_attrs["fill"] = "none"
+            layer_attrs["class_"] = "material-outline"
+            layer_attrs["stroke_width"] = 0.9 * scale
+            layer_attrs["stroke_opacity"] = _layer_opacity(0.32)
+            layer_attrs["stroke_dasharray"] = _scale_dash("22,9", scale)
+            points = _offset_polyline(
+                [start, end], _layer_offset(amount), wander=0.0, seed=0
+            )
+            group.add(dwg.line(start=points[0], end=points[-1], **layer_attrs))
+        return _apply_rotation(group, ins, canvas)
 
     dash_units = length / max(1e-6, scale)
 

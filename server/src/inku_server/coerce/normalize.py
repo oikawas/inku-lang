@@ -485,6 +485,18 @@ def _repair_visibility(ins: Instruction, background: str) -> Instruction:
     return _with_density_budget(repaired)
 
 
+def _repair_coerced_instruction(
+    ins: Instruction,
+    *,
+    original_background: str,
+    background: str,
+) -> Instruction:
+    repaired = ins
+    if original_background == "gray" and repaired.color == "gray":
+        repaired = _with_visible_color(repaired, "gray")
+    return _repair_visibility(repaired, background)
+
+
 def ensure_renderable_score(score: Score) -> None:
     """Raise when Stage 2 returned no drawable instructions."""
     if not score.instructions:

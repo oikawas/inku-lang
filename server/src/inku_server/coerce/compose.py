@@ -18,7 +18,7 @@ from .normalize import (
     _dedupe_instructions,
     _drop_invalid_relations,
     _expanded_count,
-    _repair_visibility,
+    _repair_coerced_instruction,
     _shape_extent,
     _with_per_instruction_density_budget,
     _with_presence_auxiliary_shape_repair,
@@ -3516,19 +3516,9 @@ def _with_explicit_constraint_enforcement(
     return repaired
 
 
-def _coerce_and_repair_instruction(
-    ins: Instruction,
-    *,
-    original_background: str,
-    background: str,
-    ddl: str | None,
-) -> Instruction:
-    coerced = _coerce_instruction(ins)
-    coerced = _with_material_hint(coerced, ddl)
-    coerced = _with_variation_hint(coerced, ddl)
-    if original_background == "gray" and coerced.color == "gray":
-        coerced = _with_visible_color(coerced, "gray")
-    return _repair_visibility(coerced, background)
+def _with_ddl_instruction_hints(ins: Instruction, *, ddl: str | None) -> Instruction:
+    hinted = _with_material_hint(ins, ddl)
+    return _with_variation_hint(hinted, ddl)
 
 
 def _record_branch_fire(
@@ -3631,7 +3621,11 @@ def coerce_score(
     )
     _branch_before = score.instructions
     instructions = [
-        _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)
+        _repair_coerced_instruction(
+            _with_ddl_instruction_hints(_coerce_instruction(ins), ddl=ddl),
+            original_background=score.background,
+            background=background,
+        )
         for ins in score.instructions
     ]
     _record_branch_fire(branch_report, "coerce_and_repair_instruction", _branch_before, instructions)

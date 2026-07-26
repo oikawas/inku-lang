@@ -47,7 +47,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **正規化DDLの「雲形」だけを primitive="cloudform", center+size へ転記する。輪郭座標・制御点は生成しない。雲形を補完・推測で追加しない**
 - **正規化DDLに雲形が1句以上ある場合、出力にも同じ雲形 instruction を必ず残す。横長、arrangement、surface、carve と合成されても ellipse/line へ置換・省略しない。複数同一雲形は1 instruction + arrangementにする**
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
-- **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
+- **同一図形の同一配置の反復 → 1 instruction + arrangement.count。反復を N 件の instruction へ展開しない。個数・配置・位置が異なる群は別 instruction にする**
 - **正規化DDL に図形・線・弧の指示がある場合、instructions を空配列にしてはいけない。変換不能なら最も近い線・楕円・四角へ落とし込む**
 - **疎で最小限の作品も有効。単一の方向線・地平線・端寄りの焦点だけの DDL も、少なくとも1つの描画可能な instruction にする**
 - **出力は 1〜5 instructions に圧縮する。DDL 全文を説明し直さず、主題を成立させる主要な視覚関係だけを JSON 化する**
@@ -304,7 +304,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 黒い線を一本引く。赤い線を前の線に触れるように置く。
 出力: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching"}}]}
 
-入力: 緑の弧を二本、上下に離して置く。
+入力: 緑の弧を上下の異なる位置に一本ずつ離して置く。
 出力: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
 
 入力: 黒い横線を一本引く。赤い小さな楕円を前の線に沿って三つ置く。
@@ -313,7 +313,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 青い小さな円を一つ置く。白い小さな四角を前の二つの間に置く。
 出力: {"instructions":[{"primitive":"circle","center":[0.42,0.5],"radius":0.04,"color":"blue"},{"primitive":"square","position":[0.55,0.47],"size":[0.06,0.06],"color":"white"}]}
 
-入力: 黒い線を二本置く。赤い小さな円を前の二つの間に置く。
+入力: 黒い線を上下の異なる位置に一本ずつ置く。赤い小さな円を前の二つの間に置く。
 出力: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
 
 入力: 黒い横線を一本引く。赤い小さな円を前の線に沿って置く。青い小さな四角を前の線に沿って置く。
@@ -631,7 +631,7 @@ Output: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833
 Input: Draw one black line. Place a red line touching the previous line.
 Output: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching"}}]}
 
-Input: Place two green arcs separated vertically.
+Input: Place one green arc at each of two separate vertical positions.
 Output: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
 
 Input: Draw one black horizontal line. Place three small red ellipses along the previous line.
@@ -640,7 +640,7 @@ Output: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"
 Input: Place one small blue circle. Place one small white square between the previous two.
 Output: {"instructions":[{"primitive":"circle","center":[0.42,0.5],"radius":0.04,"color":"blue"},{"primitive":"square","position":[0.55,0.47],"size":[0.06,0.06],"color":"white"}]}
 
-Input: Draw two black lines. Place a small red circle between the previous two.
+Input: Draw one black line at each of two different vertical positions. Place a small red circle between the previous two.
 Output: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
 
 Input: Draw one black horizontal line. Place one small red circle along the previous line. Place one small blue square along the previous line.

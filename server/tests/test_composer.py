@@ -467,7 +467,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "自然文由来" in SYSTEM_PROMPT
     assert "原則 relation を使わない" in SYSTEM_PROMPT
     assert "青い小さな円を一つ置く。白い小さな四角を前の二つの間に置く" in SYSTEM_PROMPT
-    assert "黒い線を二本置く。赤い小さな円を前の二つの間に置く" in SYSTEM_PROMPT
+    assert "黒い線を上下の異なる位置に一本ずつ置く。赤い小さな円を前の二つの間に置く" in SYSTEM_PROMPT
     assert '"layout":"vertical"' in SYSTEM_PROMPT
     assert "ランダム" not in SYSTEM_PROMPT
     assert "20 程度" not in SYSTEM_PROMPT
@@ -541,7 +541,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "Natural-language-derived phrases" in SYSTEM_PROMPT_EN
     assert "use no relation by default" in SYSTEM_PROMPT_EN
     assert "Place one small blue circle. Place one small white square between the previous two" in SYSTEM_PROMPT_EN
-    assert "Draw two black lines. Place a small red circle between the previous two" in SYSTEM_PROMPT_EN
+    assert "Draw one black line at each of two different vertical positions. Place a small red circle between the previous two" in SYSTEM_PROMPT_EN
     assert '"layout":"vertical"' in SYSTEM_PROMPT_EN
     assert "random" not in SYSTEM_PROMPT_EN.lower()
     assert "≈ 20" not in SYSTEM_PROMPT_EN

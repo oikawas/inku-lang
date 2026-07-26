@@ -113,14 +113,14 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_528
-    assert _digest(composer.SYSTEM_PROMPT) == "c45d834108b7b9b2"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_569
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "bb5595c86022000c"
-    assert len(tool_json.encode("utf-8")) == 17_927
-    assert _digest(tool_json) == "0a13af26701c2ccf"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a8f569873558340e"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "4bccc149e697088b"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_685
+    assert _digest(composer.SYSTEM_PROMPT) == "c807c3bcfbc6908b"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_633
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "b13a0d02aeb41400"
+    assert len(tool_json.encode("utf-8")) == 18_021
+    assert _digest(tool_json) == "76e0c2b9d23a47f9"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "d8e5bebf83e41cd3"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "3d7651fd5548baf0"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -222,8 +222,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     changed_tool = replace_description(changed_tool)
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "e280a785c123f0e9"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "c45d834108b7b9b2"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a30f84f17deac74f"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "c807c3bcfbc6908b"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

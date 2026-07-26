@@ -1949,6 +1949,11 @@ def _compose_response_as_paint_result(
         "compose_retry_count": result.get("retry_count", 0),
         "compose_retry_reasons": result.get("retry_reasons", []),
         "compose_fallback_used": result.get("fallback_used", False),
+        "coerce_branch_counts": result.get("coerce_branch_counts"),
+        "coerce_relation_input_count": result.get("coerce_relation_input_count"),
+        "coerce_relation_output_count": result.get("coerce_relation_output_count"),
+        "coerce_relation_dropped_count": result.get("coerce_relation_dropped_count"),
+        "coerce_warnings": result.get("coerce_warnings"),
         "catalog_id": result.get("render_color_catalog_id"),
     }
 

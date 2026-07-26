@@ -393,7 +393,15 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "700〜1000" in SYSTEM_PROMPT
     assert "六百十" in SYSTEM_PROMPT
     assert "instructions を空配列にしてはいけない" in SYSTEM_PROMPT
-    assert "余白を残す" in SYSTEM_PROMPT
+    assert "240 未満なら literal" in SYSTEM_PROMPT
+    assert "240 以上なら代表化" in SYSTEM_PROMPT
+    assert "literal 合計が 400 以下" in SYSTEM_PROMPT
+    assert "110 / 64 / 48" in SYSTEM_PROMPT
+    assert '"count":137' in SYSTEM_PROMPT
+    assert "below 240 is literal" in SYSTEM_PROMPT_EN
+    assert "quantity of 240 or more" in SYSTEM_PROMPT_EN
+    assert "remaining literal sum is 400 or less" in SYSTEM_PROMPT_EN
+    assert '"count":137' in SYSTEM_PROMPT_EN
     assert "cluster_count" in SYSTEM_PROMPT
     assert "preserve_space" in SYSTEM_PROMPT
     assert "透明な膜" in SYSTEM_PROMPT
@@ -478,7 +486,7 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "six hundred ten" in SYSTEM_PROMPT_EN
     assert "instructions must not be empty" in SYSTEM_PROMPT_EN
     assert "Sparse or minimal works are valid" in SYSTEM_PROMPT_EN
-    assert "Preserve negative space" in SYSTEM_PROMPT_EN
+    assert "do not reduce it for density or negative space" in SYSTEM_PROMPT_EN
     assert "cluster_count" in SYSTEM_PROMPT_EN
     assert "preserve_space" in SYSTEM_PROMPT_EN
     assert "transparent membrane" in SYSTEM_PROMPT_EN

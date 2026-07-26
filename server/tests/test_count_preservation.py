@@ -6,15 +6,17 @@ compliant Stage 2 output for every single-group line of `cli/bench/count`, paire
 with the DDL that line actually produced, so the deterministic half can be
 measured on its own in milliseconds.
 
-The numbers below are a **baseline, not a target**. Nineteen of the fifty cases
-lose their count today, every one of them to `_with_context_density_governor`, and
-the loss is twice as heavy in English as in Japanese. Work that sets out to fix
-that is expected to break this test; update the pins in the same commit so the
-change shows up in the diff.
+At v2.7.5 nineteen of the fifty lost their count, all to
+`_with_context_density_governor`, and the loss was three times heavier in English.
+A count the description states outright is now left alone, and all fifty survive.
+The governor still thins counts nobody asked for — `test_the_governor_still_thins_
+counts_nobody_asked_for` is what keeps this from being a suite that passes by
+switching the branch off.
 """
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -26,13 +28,6 @@ from inku_server.schema import Score
 FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "count_preservation_cases.json"
 PAYLOAD = json.loads(FIXTURE.read_text(encoding="utf-8"))
 CASES = {case["id"]: case for case in PAYLOAD["cases"]}
-
-# measured at v2.7.5 / Build 714
-CUT_TODAY = {
-    "ja-11", "ja-12", "ja-14", "ja-20", "ja-21",
-    "en-09", "en-11", "en-12", "en-13", "en-14", "en-15", "en-16", "en-18",
-    "en-20", "en-21", "en-22", "en-23", "en-24", "en-25",
-}
 
 
 def _replay(case: dict) -> tuple[int, dict[str, int]]:
@@ -58,29 +53,38 @@ def test_the_fixture_covers_both_languages_and_every_band() -> None:
 def test_compliant_counts_survive_coerce(case_id: str) -> None:
     case = CASES[case_id]
     got, _ = _replay(case)
-    if case_id in CUT_TODAY:
-        pytest.xfail(f"requested {case['requested']}, coerce returns {got}")
     assert _kept(case, got), f"requested {case['requested']}, coerce returns {got}"
 
 
-def test_every_loss_today_comes_from_the_quiet_density_governor() -> None:
-    """One branch owns the whole gap. A second one appearing changes the diagnosis."""
-    culprits: set[str] = set()
-    for case_id in sorted(CUT_TODAY):
-        case = CASES[case_id]
-        got, report = _replay(case)
-        assert not _kept(case, got), f"{case_id} now survives; drop it from CUT_TODAY"
-        culprits |= {
-            branch
-            for branch, fired in report.items()
-            if fired and ("density" in branch or "budget" in branch)
-        }
-    assert culprits == {"with_context_density_governor"}
+def test_neither_language_is_favoured() -> None:
+    """The v2.7.5 gap was ja 20/25 against en 11/25. Halves that differ are the symptom."""
+    kept = {"ja": 0, "en": 0}
+    for case in CASES.values():
+        got, _ = _replay(case)
+        kept[case["lang"]] += int(_kept(case, got))
+    assert kept == {"ja": 25, "en": 25}
 
 
-def test_the_loss_is_heavier_in_english() -> None:
-    """The language gap in the final Score is not only a prompt gap."""
-    per_lang = {"ja": 0, "en": 0}
-    for case_id in CUT_TODAY:
-        per_lang[CASES[case_id]["lang"]] += 1
-    assert per_lang == {"ja": 5, "en": 14}
+@pytest.mark.parametrize(
+    ("case_id", "unrequested_count"),
+    [("ja-11", 137), ("en-11", 137), ("ja-14", 200), ("en-15", 300)],
+)
+def test_the_governor_still_thins_counts_nobody_asked_for(case_id: str, unrequested_count: int) -> None:
+    """Exempting a requested count must not amount to switching the branch off.
+
+    Same DDL, same instruction, a count the description never mentions: the quiet
+    reading of the scene still applies and the count still comes down.
+    """
+    case = copy.deepcopy(CASES[case_id])
+    case["score"]["instructions"][0]["arrangement"]["count"] = unrequested_count
+    got, report = _replay(case)
+    assert got < unrequested_count, f"{case_id}: {unrequested_count} passed through untouched"
+    assert report.get("with_context_density_governor")
+
+
+def test_a_represented_count_only_stands_in_for_a_large_request() -> None:
+    """80-120 is exempt because it stands in for 240 or more, not because it is 80-120."""
+    case = copy.deepcopy(CASES["ja-11"])  # this description asks for 74; nothing large
+    case["score"]["instructions"][0]["arrangement"]["count"] = 110
+    got, _ = _replay(case)
+    assert got < 110

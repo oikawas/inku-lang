@@ -10,6 +10,7 @@ from typing import Any
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from ..schema import Instruction
 from .normalize import (
+    MAX_EXPANDED_PER_INSTRUCTION,
     VISIBLE_ON_BACKGROUND,
     _closed_shape_area,
     _coerce_marker_values,
@@ -2087,6 +2088,7 @@ def _with_context_density_governor(
 
     has_vertical_context = _context_has_vertical_density(ddl)
     has_neon_blur_context = _context_has_neon_blur_density(ddl)
+    requested_counts = _explicit_counts_from_ddl(ddl)
     adjusted: list[Instruction] = []
     governed_count = 0
     for ins in instructions:
@@ -2098,6 +2100,13 @@ def _with_context_density_governor(
         ins = _with_unintentional_filled_shape_tempering(ins, ddl=ddl)
         arr = ins.arrangement
         if arr is None:
+            adjusted.append(ins)
+            continue
+
+        # A count the description stated outright is not the governor's to thin.
+        # Quiet is a reading of the scene; "two hundred thirty-three" is not a reading.
+        # The shape temperings above still apply: they touch size, not how many.
+        if _count_follows_ddl_request(arr.count, requested_counts):
             adjusted.append(ins)
             continue
 
@@ -3285,6 +3294,79 @@ def _parse_count_token(token: str) -> int | None:
     if token in ENGLISH_SMALL_NUMBERS:
         return ENGLISH_SMALL_NUMBERS[token]
     return _parse_small_japanese_number(token)
+
+
+COUNTED_OBJECT_WORDS: frozenset[str] = frozenset(
+    {
+        "line", "lines", "stroke", "strokes", "square", "squares", "circle", "circles",
+        "ellipse", "ellipses", "oval", "ovals", "triangle", "triangles", "arc", "arcs",
+        "polygon", "polygons", "cloudform", "cloudforms", "dot", "dots", "mark", "marks",
+        "point", "points", "tile", "tiles", "brick", "bricks", "shape", "shapes",
+    }
+)
+
+JAPANESE_COUNT_PATTERN = re.compile(r"(\d{1,4}|[一二三四五六七八九十百千]{1,8})(?:本|個|つ(?!の方向)|点|枚)")
+
+# The description asked for a number, so the number is not a guess to be second-guessed.
+# 240 is where coerce itself stops expanding (MAX_EXPANDED_PER_INSTRUCTION); above it the
+# prompt asks Stage 2 for a representative 80-120 instead of the literal value.
+LITERAL_COUNT_THRESHOLD = MAX_EXPANDED_PER_INSTRUCTION
+REPRESENTED_COUNT_RANGE = (80, 120)
+
+
+def _explicit_counts_from_ddl(ddl: str | None) -> frozenset[int]:
+    """Every count the description states outright, in either language.
+
+    `count_hint_from_ddl` answers "what is the count here" and stops at the first
+    match. This answers "which counts were asked for at all", which is what tells a
+    group written to order apart from one a governor is free to thin.
+    """
+    if not ddl:
+        return frozenset()
+    counts: set[int] = set()
+    for token in JAPANESE_COUNT_PATTERN.findall(ddl):
+        value = _parse_small_japanese_number(token)
+        if value:
+            counts.add(value)
+    words = re.findall(r"[a-z]+", ddl.lower().replace("-", " "))
+    number_words = set(ENGLISH_COUNT_UNITS) | {"hundred", "thousand", "and"}
+    index = 0
+    while index < len(words):
+        if words[index] not in number_words or words[index] == "and":
+            index += 1
+            continue
+        end = index
+        phrase: list[str] = []
+        while end < len(words) and words[end] in number_words:
+            phrase.append(words[end])
+            end += 1
+        if any(word in COUNTED_OBJECT_WORDS for word in words[end : end + 9]):
+            total = 0
+            current = 0
+            for token in phrase:
+                if token == "and":
+                    continue
+                if token == "hundred":
+                    current = max(current, 1) * 100
+                elif token == "thousand":
+                    total += max(current, 1) * 1000
+                    current = 0
+                else:
+                    current += ENGLISH_COUNT_UNITS[token]
+            if total + current:
+                counts.add(total + current)
+        index = end
+    return frozenset(counts)
+
+
+def _count_follows_ddl_request(count: int, requested: frozenset[int]) -> bool:
+    """Is this count the one the description asked for, literally or as its stand-in?"""
+    if count in requested:
+        return True
+    low, high = REPRESENTED_COUNT_RANGE
+    if low <= count <= high:
+        return any(value >= LITERAL_COUNT_THRESHOLD for value in requested)
+    return False
 
 
 def _strict_count_hint_from_ddl(ddl: str | None) -> int | None:

@@ -23,7 +23,8 @@ from pathlib import Path
 import pytest
 
 from inku_server.coerce import coerce_score
-from inku_server.schema import Score
+from inku_server.coerce.normalize import MAX_EXPANDED_PRIMITIVES, _with_total_density_budget
+from inku_server.schema import Instruction, Score
 
 FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "count_preservation_cases.json"
 PAYLOAD = json.loads(FIXTURE.read_text(encoding="utf-8"))
@@ -80,6 +81,42 @@ def test_the_governor_still_thins_counts_nobody_asked_for(case_id: str, unreques
     got, report = _replay(case)
     assert got < unrequested_count, f"{case_id}: {unrequested_count} passed through untouched"
     assert report.get("with_context_density_governor")
+
+
+def _line(count: int) -> Instruction:
+    return Instruction.model_validate(
+        {
+            "primitive": "line",
+            "from": [0.1, 0.5],
+            "to": [0.9, 0.5],
+            "color": "black",
+            "arrangement": {"count": count, "layout": "scatter"},
+        }
+    )
+
+
+def test_the_total_budget_gives_way_from_the_largest_group() -> None:
+    """180+150+130 is over budget; the 180 yields and the two smaller ones stay whole."""
+    out = _with_total_density_budget([_line(180), _line(150), _line(130)])
+    counts = [ins.arrangement.count for ins in out]
+    assert counts[1:] == [150, 130]
+    assert counts[0] < 180
+    assert sum(counts) <= MAX_EXPANDED_PRIMITIVES
+
+
+def test_the_total_budget_shares_one_ceiling_rather_than_emptying_groups() -> None:
+    """Ten equal groups meet one ceiling; none is reduced to a token single mark."""
+    out = _with_total_density_budget([_line(110) for _ in range(10)])
+    counts = [ins.arrangement.count for ins in out]
+    assert len(set(counts)) == 1
+    assert min(counts) > 1
+    assert sum(counts) <= MAX_EXPANDED_PRIMITIVES
+
+
+def test_the_total_budget_never_inflates_a_group_to_spend_the_budget() -> None:
+    """The old proportional pass raised a requested 120 to 232 to use up the room."""
+    out = _with_total_density_budget([_line(200), _line(200), _line(120)])
+    assert [ins.arrangement.count for ins in out][2] <= 120
 
 
 def test_a_represented_count_only_stands_in_for_a_large_request() -> None:

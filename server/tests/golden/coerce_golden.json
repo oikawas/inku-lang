@@ -2,7 +2,7 @@
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches.",
  "frozen_at": "2026-07-26",
- "commit": "c88acbd731aa5cea0f4631b50da813892995ce71",
+ "commit": "f954238c5e2c5ec3e92cc986b84171f415349350",
  "branches_reached": [
   "coerce_and_repair_instruction",
   "dedupe_instructions",
@@ -9837,7 +9837,7 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "expanded density clustered to preserve negative space; original count 200",
+       "color_hint": "largest group represented to fit the total density budget; original count 200",
        "variation": null,
        "arrangement": {
         "count": 84,
@@ -9887,7 +9887,7 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "expanded density clustered to preserve negative space; original count 200",
+       "color_hint": "largest group represented to fit the total density budget; original count 200",
        "variation": null,
        "arrangement": {
         "count": 84,
@@ -9943,10 +9943,10 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "expanded density capped to preserve negative space",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
-        "count": 232,
+        "count": 120,
         "layout": "scatter",
         "rows": null,
         "cols": null,
@@ -9998,7 +9998,7 @@
      "with_shape_delivery_repair": 0,
      "with_structural_duplicate_repair": 0,
      "with_surface_tension": 0,
-     "with_total_density_budget": 3,
+     "with_total_density_budget": 2,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event": 0,
      "with_visual_event_type_hints": 0,

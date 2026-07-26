@@ -1571,7 +1571,7 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 | **プラグイン展開** | `plugins/document_format.py` の `expand_plugin_ddl` | **はい** | 0 | `ddl_engine_version` |
 | **Stage 1.5 展開・変奏** | `ddl_expander.py` の `expand_intermediate_ddl` | **はい** | 0 | `ddl_engine_version` |
 | **Stage 2 構成** | `composer.py` | **いいえ** | 19 箇所 | 版を持たない（`stage2_prompt_digest` で来歴のみ） |
-| **coerce / validation** | `coerce.py` の `coerce_score` | **はい** | 0 | `ddl_engine_version` |
+| **coerce / validation** | `coerce/` の `coerce_score`（`normalize` = Score だけを見る補修 / `compose` = `ddl` を読んで構図を書く） | **はい** | 0 | `ddl_engine_version` |
 | JSON Score | `schema.py` | — | — | `version`（`"0.1.0"`。Schema Version） |
 | **Renderer 演奏** | `renderer.py` / `stroke_engine.py` | **はい**（seed 固定時） | 0 | `render_engine_version` |
 | 出力（SVG） | 保存済み作品 | — | — | `rh3`（作品エディション） |

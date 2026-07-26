@@ -3018,3 +3018,18 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **設計プランの数値 3 点を訂正した。** 分岐は 32 でなく **34**（instruction リストでなく値を返す `_with_background_dominance_governor` と `_presence_from_ddl` が漏れていた）。振り分けは normalize 6 / compose **28**。「発火率を測る手段が無い」も誤りで、`_record_branch_fire` は要素ごとの dict 不一致も数えるため書き換えだけの分岐も検出する。実際の欠落は `cli.py` の `_compose_response_as_paint_result` が `/api/compose` 応答から `coerce_*` を引き継いでいない 1 箇所だけだった。
 - **採番しなかった。** 動くコードは 1 行も変えておらず、反映するものが無い。この検査面は、それが守るための coerce 分割と同じ版で採番する。
 - **検証:** server **1143 passed / 30 skipped**（着手時 1101 / 30）、ruff clean。
+
+---
+
+### v2.7.4 — coerce を `normalize` と `compose` に割る（Build 713、2026-07-26）
+
+**構図を決めている場所に名前をつけた。絵は 1 画素も変わらない。** `coerce.py`（4212 行）は、描画可能化のための機械的補修と、入力を解釈して構図を書く処理が、**34 分岐の一列に混ざっていた**。構図を決めているのは Stage 2 でも Renderer でもなくここである（本番 60 作品で instruction の 27% は DDL でなく coerce 製）にもかかわらず、その責務の境目に名前が無かった。
+
+- **分割の判定基準は「`ddl` を引数に取るか」**とした。主観的な線引きを避け、機械検査できる基準にするため。`normalize` は Score だけを見る。`ddl` を読む処理は入力の解釈であり、すべて `compose` に置く。
+- 実測の振り分けは **normalize 6 分岐 / compose 28 分岐**。共有は関数 4 つ（`_closed_shape_area` / `_cluster_count` / `_expanded_count` / `_shape_extent`）と定数 1 つ（`VISIBLE_ON_BACKGROUND`）だけで、いずれも `ddl` を読まないため `normalize.py` に置いて `compose.py` から一方向 import した。**第 3 のモジュールは要らなかった。** 最終構成は normalize 34 関数 / 7 定数、compose 123 関数 / 55 定数、`__init__` が `coerce_score` 1 つ。
+- **`coerce_score` の呼び出し順を 1 行も動かしていない。** normalize 系と compose 系は交互に並んでおり（`dedupe` は 4 番目、密度予算は 29〜30 番目、`drop_invalid_relations` は 33 番目）、**まとめて呼ぼうとすると順序が変わって結果が変わる**。分割はモジュールの分割であって、パイプラインの並べ替えではない。受け入れ側で main の分岐列 39 件と分割後を機械照合し、順序も条件行 16 件も完全一致を確認した。
+- 両方の責務を持つ唯一の関数 `_coerce_and_repair_instruction` は 3 つに開いた（normalize の `_coerce_instruction` と `_repair_coerced_instruction`、compose の `_with_ddl_instruction_hints`）。**元の適用順序を厳密に保っている。**
+- **同一性の確認**: ゴールデン 39 ケースが**バイト差 0**。34 分岐を 1 つずつ恒等関数に差し替えたときに動くケース数も、**分割前の実測と 1 件違わず一致**した（最大 17・最小 1・ゼロ無し）。
+- **CLI の診断値の引き継ぎ漏れも直した**。`_compose_response_as_paint_result` が `/api/compose` 応答から `coerce_*` を 1 つも引き継いでおらず、`--input-mode ddl` の batch で `coerce_branch_counts` が空になっていた。pentala に対する実地確認で **0 キー → 34 キー**。
+- **積み残し（意図的）**: Topology は入れていない。座標リテラル 94 対は値も所在も動かしていない（分割後の所在は `compose.py`）。分岐は 1 つも削除していない。**39 ケースで 34 分岐すべてが発火したため、死んだ分岐は見つかっていない。**
+- **検証:** server **1147 passed / 30 skipped**（着手時 1143 / 30。C-1〜C-4 の 4 件を追加）、ruff clean、cli **69 passed**（+1）、`npm run check` 0 errors / 2 warnings / 217 files。

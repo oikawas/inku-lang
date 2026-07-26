@@ -489,6 +489,29 @@ _VARIATION_SEED_FIELDS_ALL = frozenset(
     {"amplitude", "frequency", "quality", "dimensions"}
 )
 
+_SEED_INSTRUCTION_FIELDS = (
+    "primitive",
+    "from_",
+    "to",
+    "center",
+    "radius",
+    "sides",
+    "position",
+    "size",
+    "angle_start",
+    "angle_end",
+    "rotation",
+    "filled",
+    "style",
+    "weight",
+    "mode",
+    "carve_depth",
+    "variation",
+    "arrangement",
+    "surface",
+)
+_SEED_ARRANGEMENT_FIELDS = ("jitter",)
+
 
 def _variation_seed_fields(ins: Instruction) -> frozenset[str] | None:
     """seed key に残す variation フィールド。None = variation ごと落とす。
@@ -514,7 +537,13 @@ def _variation_seed_fields(ins: Instruction) -> frozenset[str] | None:
 
 def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None) -> int:
     """Instruction と演奏 seed から安定した乱数 seed を作る。"""
-    payload = ins.model_dump(mode="json")
+    dumped = ins.model_dump(mode="json")
+    payload = {name: dumped[name] for name in _SEED_INSTRUCTION_FIELDS}
+    arrangement = payload.get("arrangement")
+    if isinstance(arrangement, dict):
+        payload["arrangement"] = {
+            name: arrangement[name] for name in _SEED_ARRANGEMENT_FIELDS
+        }
     if payload.get("mode") == "additive":
         payload.pop("mode", None)
     if payload.get("carve_depth") is None:

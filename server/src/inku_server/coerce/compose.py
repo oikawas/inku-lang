@@ -1,3 +1,24 @@
+"""DDL-aware score composition and repair."""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+from typing import Any
+
+from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
+from ..schema import Instruction
+from .normalize import (
+    VISIBLE_ON_BACKGROUND,
+    _closed_shape_area,
+    _coerce_marker_values,
+    _cluster_count,
+    _expanded_count,
+    _shape_extent,
+)
+
+
 """Stage 2 出力の構造補修 (coerce layer).
 
 設計原則 — primitive 個別コードを書かない:
@@ -11,158 +32,6 @@
   2. cross-field fallback (center 欠損時に position を代用など)
   3. FieldSpec.default (上記すべて失敗時)
 """
-
-from __future__ import annotations
-
-import hashlib
-import json
-import os
-import re
-from dataclasses import dataclass, field as dc_field
-from typing import Any, Callable
-
-from .language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
-from .schema import Instruction, Score
-
-
-# ── 型正規化ヘルパー ──────────────────────────────────────────────────────────────
-# 各関数は「変換できなければ None を返す」契約。None → FieldSpec.default が使われる。
-
-def _as_coord(v: Any) -> list[float] | None:
-    """任意の値を [x, y] に正規化。"""
-    if isinstance(v, (list, tuple)) and len(v) >= 2:
-        try:
-            return [float(v[0]), float(v[1])]
-        except (TypeError, ValueError):
-            return None
-    if isinstance(v, (int, float)):
-        f = float(v)
-        return [f, f]
-    return None
-
-
-def _as_positive_float(v: Any) -> float | None:
-    """正の float に変換。0以下は None。"""
-    try:
-        f = float(v)
-        return f if f > 0 else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _as_positive_size(v: Any) -> list[float] | None:
-    """[w, h] に変換。いずれかが 0以下なら None。"""
-    c = _as_coord(v)
-    if c is None:
-        return None
-    return c if (c[0] > 0 and c[1] > 0) else None
-
-
-def _as_float(v: Any) -> float | None:
-    """float に変換 (0を含む有効値)。"""
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def _as_polygon_sides(v: Any) -> int | None:
-    """polygon の頂点数を 5-8 に正規化。"""
-    try:
-        return min(max(int(v), 5), 8)
-    except (TypeError, ValueError):
-        return None
-
-
-# ── フィールド補修仕様 ──────────────────────────────────────────────────────────
-
-@dataclass
-class FieldSpec:
-    """1フィールドの補修ルール。
-
-    name:      対象フィールド名 (JSON by_alias)
-    default:   欠損・不正値のときに使うデフォルト
-    fallbacks: name が欠損時、代替として試みるフィールド名リスト (cross-field)
-    coerce:    値の型検証・正規化関数。None を返すと default にフォールバック
-    """
-
-    name: str
-    default: Any
-    fallbacks: list[str] = dc_field(default_factory=list)
-    coerce: Callable[[Any], Any] | None = None
-
-
-# primitive → 必須フィールドの補修仕様テーブル
-# 新 primitive を追加するときはここにエントリを追記するだけ
-PRIMITIVE_SPECS: dict[str, list[FieldSpec]] = {
-    "line": [
-        FieldSpec("from",   [0.1, 0.5], coerce=_as_coord),
-        FieldSpec("to",     [0.9, 0.5], coerce=_as_coord),
-    ],
-    "circle": [
-        FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
-        FieldSpec("radius", 0.15,                               coerce=_as_positive_float),
-    ],
-    "ellipse": [
-        FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
-        FieldSpec("size",   [0.3, 0.3],                          coerce=_as_positive_size),
-    ],
-    "cloudform": [
-        FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
-        FieldSpec("size",   [0.3, 0.3],                          coerce=_as_positive_size),
-    ],
-    "arc": [
-        FieldSpec("center",      [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
-        FieldSpec("radius",      0.15,                               coerce=_as_positive_float),
-        FieldSpec("angle_start", 0.0,                                coerce=_as_float),
-        FieldSpec("angle_end",   270.0,                              coerce=_as_float),
-    ],
-    "polygon": [
-        FieldSpec("center", [0.5, 0.5], fallbacks=["position"], coerce=_as_coord),
-        FieldSpec("radius", 0.12,                              coerce=_as_positive_float),
-        FieldSpec("sides",  5,                                 coerce=_as_polygon_sides),
-    ],
-    "square": [
-        FieldSpec("position", [0.35, 0.35], fallbacks=["center"], coerce=_as_coord),
-        FieldSpec("size",     [0.3, 0.3],                          coerce=_as_positive_size),
-    ],
-    "triangle": [
-        FieldSpec("position", [0.35, 0.35], fallbacks=["center"], coerce=_as_coord),
-        FieldSpec("size",     [0.3, 0.3],                          coerce=_as_positive_size),
-    ],
-}
-
-
-# ── cross-field 制約補正 ──────────────────────────────────────────────────────────
-# フィールド間依存がある制約のみここに書く。
-
-def _fix_arc_angles(data: dict) -> None:
-    """arc: angle_start == angle_end → 270° 広げる。"""
-    if abs(data.get("angle_start", 0) - data.get("angle_end", 0)) < 1e-6:
-        data["angle_end"] = (data.get("angle_start", 0) + 270.0) % 360.0
-
-
-POST_COERCE: dict[str, Callable[[dict], None]] = {
-    "arc": _fix_arc_angles,
-}
-
-
-VISIBLE_ON_BACKGROUND: dict[str, str] = {
-    "white": "black",
-    "black": "white",
-    "gray": "black",
-    "blue": "white",
-    "red": "white",
-    "green": "white",
-}
-
-def _coerce_marker_values(name: str) -> tuple[Any, ...]:
-    values: list[Any] = []
-    for support in INSTRUCTION_LANGUAGE_REGISTRY.values():
-        language_values = support.coerce_markers.get(name, ())
-        if isinstance(language_values, tuple):
-            values.extend(language_values)
-    return tuple(values)
 
 
 def _coerce_marker_dict(name: str) -> dict[str, tuple[str, ...]]:
@@ -178,25 +47,54 @@ def _coerce_marker_dict(name: str) -> dict[str, tuple[str, ...]]:
 
 MATERIAL_WEIGHT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("material_weight_hints")
 
-MAX_EXPANDED_PRIMITIVES = 400
-MAX_EXPANDED_PER_INSTRUCTION = 240
-MAX_VISUAL_CLUSTERED_COUNT = 120
+
 MAX_QUIET_VISUAL_COUNT = 64
+
+
 MAX_QUIET_VERTICAL_COUNT = 48
+
+
 MAX_NEON_BLUR_VISUAL_COUNT = 24
+
+
 MAX_NEON_BLUR_VERTICAL_COUNT = 18
+
+
 MAX_QUIET_LARGE_SHAPE_COUNT = 16
+
+
 MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
+
+
 MAX_QUIET_SYMBOLIC_SHAPE_WIDTH = 0.12
+
+
 MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT = 0.09
+
+
 MAX_QUIET_SINGLE_SHAPE_WIDTH = 0.34
+
+
 MAX_QUIET_SINGLE_SHAPE_HEIGHT = 0.24
+
+
 MAX_QUIET_SINGLE_SHAPE_RADIUS = 0.17
+
+
 MAX_QUIET_SINGLE_SHAPE_AREA = 0.14
+
+
 MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH = 0.42
+
+
 MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT = 0.30
+
+
 MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS = 0.20
+
+
 MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
+
 
 COLOR_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("color_markers")
 
@@ -214,7 +112,9 @@ def _any_marker_in_text(markers: tuple[str, ...], text: str, lower: str) -> bool
 
 NEGATED_COLOR_MARKERS: dict[str, tuple[str, ...]] = _coerce_marker_dict("negated_color_markers")
 
+
 SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("shape_intent_markers")
+
 
 MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("motif_intent_markers")
 
@@ -223,83 +123,6 @@ def _visible_background(background: str) -> str:
     if background == "gray":
         return "white"
     return background
-
-
-def _shape_extent(ins: Instruction) -> float:
-    if ins.primitive in ("circle", "arc", "polygon"):
-        return float(ins.radius or 0.0) * 2
-    if ins.size:
-        return max(float(ins.size[0]), float(ins.size[1]))
-    if ins.from_ and ins.to:
-        return max(abs(ins.from_[0] - ins.to[0]), abs(ins.from_[1] - ins.to[1]))
-    return 0.0
-
-
-def _is_tiny_unfilled_particle(ins: Instruction) -> bool:
-    if ins.primitive not in ("circle", "ellipse", "square", "triangle"):
-        return False
-    if ins.filled:
-        return False
-    if not ins.arrangement or ins.arrangement.count < 40:
-        return False
-    return _shape_extent(ins) <= 0.012
-
-
-def _with_visible_color(ins: Instruction, background: str) -> Instruction:
-    if ins.color != background:
-        return ins
-    data = ins.model_dump(by_alias=True)
-    hint = data.get("color_hint")
-    norm_hint = (hint or "").lower()
-    sensory_markers = (
-        "soft light",
-        "five-sense",
-        "scent",
-        "fragrance",
-        "membrane",
-        "haze",
-        "atmosphere",
-        "透明な膜",
-        "柔らかな光",
-        "五感",
-        "香り",
-        "匂",
-        "気配",
-    )
-    is_sensory = any(marker in norm_hint or marker in (hint or "") for marker in sensory_markers)
-    if is_sensory and background == "white":
-        if any(marker in norm_hint or marker in (hint or "") for marker in ("scent", "fragrance", "香り", "匂")):
-            data["color"] = "green"
-            note = "white sensory layer made visible as pale green"
-        else:
-            data["color"] = "blue"
-            note = "white sensory layer made visible as pale blue"
-    else:
-        data["color"] = VISIBLE_ON_BACKGROUND.get(background, "black")
-        note = f"{background} foreground made visible"
-    data["color_hint"] = f"{hint}; {note}" if hint else note
-    return Instruction.model_validate(data)
-
-
-def _with_visible_particle(ins: Instruction) -> Instruction:
-    if not _is_tiny_unfilled_particle(ins):
-        return ins
-    data = ins.model_dump(by_alias=True)
-    data["filled"] = True
-    if ins.primitive == "circle":
-        data["radius"] = max(float(ins.radius or 0.0), 0.006)
-    elif ins.size:
-        data["size"] = [max(float(ins.size[0]), 0.008), max(float(ins.size[1]), 0.008)]
-    return Instruction.model_validate(data)
-
-
-def _with_density_budget(ins: Instruction) -> Instruction:
-    arr = ins.arrangement
-    if arr is None or arr.layout != "scatter" or arr.count <= 240:
-        return ins
-    if _shape_extent(ins) > 0.018:
-        return ins
-    return _with_clustered_density(ins, "scatter density clustered to preserve negative space")
 
 
 def _with_material_hint(ins: Instruction, ddl: str | None) -> Instruction:
@@ -350,68 +173,69 @@ def _with_variation_hint(ins: Instruction, ddl: str | None) -> Instruction:
     return Instruction.model_validate(data)
 
 
-def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
-    deduped: list[Instruction] = []
-    seen: set[str] = set()
-    for ins in instructions:
-        # Relations are sequential operations whose result depends on the
-        # preceding performed instruction. Identical payloads at different
-        # positions are therefore not duplicates.
-        if ins.relation is not None:
-            deduped.append(ins)
-            continue
-        key = json.dumps(ins.model_dump(by_alias=True, exclude_none=True), sort_keys=True, ensure_ascii=False)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(ins)
-    return deduped
-
-
-def _dedupe_instruction_key(ins: Instruction) -> str:
-    data = ins.model_dump(by_alias=True, exclude_none=True)
-    data.pop("color_hint", None)
-    return json.dumps(data, sort_keys=True, ensure_ascii=False)
-
-
-def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[Instruction]:
-    """color_hint だけが違う同一補助層を統合する。"""
-    repaired: list[Instruction] = []
-    seen: set[str] = set()
-    for ins in instructions:
-        if ins.relation is not None:
-            repaired.append(ins)
-            continue
-        key = _dedupe_instruction_key(ins)
-        if key in seen:
-            continue
-        seen.add(key)
-        repaired.append(ins)
-    return repaired
-
-
-ATMOSPHERIC_EFFECT_MARKERS: tuple[str, ...] = _coerce_marker_values("atmospheric_effect")
 QUIET_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("quiet_density")
+
+
 VERTICAL_DENSITY_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("vertical_density")
+
+
 MOTION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("motion")
+
+
 COLORFUL_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("colorful")
+
+
 LEAF_GRAIN_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("leaf_grain")
+
+
 SILENCE_LAYER_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("silence_layer")
+
+
 HARD_EDGE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("hard_edge")
+
+
 PLAYFUL_MOTION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("playful_motion")
+
+
 EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("edge_light")
+
+
 STRONG_EDGE_LIGHT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("strong_edge_light")
+
+
 VANISHING_TRACE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("vanishing_trace")
+
+
 RHYTHM_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("rhythm")
+
+
 VISUAL_EVENT_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("visual_event")
+
+
 MA_PRESSURE_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("ma_pressure")
+
+
 SEMANTIC_VISUAL_EVENT_HINTS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("semantic_visual_event_hints")
+
+
 SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("surface_tension")
+
+
 INTENTIONAL_LARGE_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("intentional_large_surface")
+
+
 GENERATED_BACKGROUND_PLAN_MARKERS: tuple[str, ...] = _coerce_marker_values("generated_background_plan")
+
+
 EXPLICIT_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("explicit_surface")
+
+
 SUNSET_SKY_MARKERS: tuple[str, ...] = _coerce_marker_values("sunset_sky")
+
+
 DAWN_MARKERS: tuple[str, ...] = _coerce_marker_values("dawn")
+
+
 NIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("night")
 
 
@@ -457,113 +281,6 @@ def _context_has_marker(ddl: str | None, markers: tuple[str, ...]) -> bool:
         return False
     lower = ddl.lower()
     return _any_marker_in_text(markers, ddl, lower)
-
-
-def _closed_shape_geometry_key(ins: Instruction) -> tuple | None:
-    if ins.primitive not in ("circle", "ellipse", "square", "triangle", "polygon"):
-        return None
-    if ins.primitive == "circle" and ins.center is not None:
-        return ("circle", round(ins.center[0], 2), round(ins.center[1], 2), round(ins.radius or 0.1, 2))
-    if ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
-        return (
-            "ellipse",
-            round(ins.center[0], 2),
-            round(ins.center[1], 2),
-            round(ins.size[0], 2),
-            round(ins.size[1], 2),
-        )
-    if ins.primitive in ("square", "triangle") and ins.position is not None and ins.size is not None:
-        return (
-            ins.primitive,
-            round(ins.position[0], 2),
-            round(ins.position[1], 2),
-            round(ins.size[0], 2),
-            round(ins.size[1], 2),
-        )
-    if ins.primitive == "polygon" and ins.center is not None:
-        return (
-            "polygon",
-            round(ins.center[0], 2),
-            round(ins.center[1], 2),
-            round(ins.radius or 0.1, 2),
-            int(ins.sides or 5),
-        )
-    return None
-
-
-def _closed_shape_area(ins: Instruction) -> float:
-    if ins.primitive == "circle":
-        radius = ins.radius if ins.radius is not None else 0.1
-        return radius * radius
-    if ins.primitive == "ellipse" and ins.size is not None:
-        return ins.size[0] * ins.size[1]
-    if ins.primitive in ("square", "triangle") and ins.size is not None:
-        return ins.size[0] * ins.size[1]
-    if ins.primitive == "polygon":
-        radius = ins.radius if ins.radius is not None else 0.1
-        return radius * radius
-    return 0.0
-
-
-def _is_atmospheric_effect_hint(hint: str | None) -> bool:
-    if not hint:
-        return False
-    lower = hint.lower()
-    return any(marker in hint or marker.lower() in lower for marker in ATMOSPHERIC_EFFECT_MARKERS)
-
-
-def _is_plain_material_hint(hint: str | None) -> bool:
-    if not hint:
-        return True
-    lower = hint.lower()
-    return "material inferred from ddl" in lower and not _is_atmospheric_effect_hint(hint)
-
-
-def _with_presence_auxiliary_shape_repair(instructions: list[Instruction], presence: Any) -> list[Instruction]:
-    """presence 有効時に、補助的な大きい閉図形のプレーン重複を抑える。"""
-    kind = presence.get("kind") if isinstance(presence, dict) else getattr(presence, "kind", None)
-    if presence is None or kind == "none":
-        return instructions
-
-    atmospheric_keys = {
-        key
-        for ins in instructions
-        if (key := _closed_shape_geometry_key(ins)) is not None
-        and _closed_shape_area(ins) >= 0.025
-        and _is_atmospheric_effect_hint(ins.color_hint)
-    }
-    if not atmospheric_keys:
-        return instructions
-
-    repaired: list[Instruction] = []
-    for ins in instructions:
-        key = _closed_shape_geometry_key(ins)
-        if (
-            key in atmospheric_keys
-            and _closed_shape_area(ins) >= 0.025
-            and _is_plain_material_hint(ins.color_hint)
-        ):
-            continue
-        repaired.append(ins)
-    return repaired
-
-
-def _expanded_count(ins: Instruction) -> int:
-    if ins.arrangement is None:
-        return 1
-    return max(1, int(ins.arrangement.count))
-
-
-def _with_arrangement_count(ins: Instruction, count: int, note: str) -> Instruction:
-    if ins.arrangement is None or ins.arrangement.count == count:
-        return ins
-    data = ins.model_dump(by_alias=True)
-    arrangement = dict(data["arrangement"])
-    arrangement["count"] = max(1, int(count))
-    data["arrangement"] = arrangement
-    hint = data.get("color_hint")
-    data["color_hint"] = f"{hint}; {note}" if hint else note
-    return Instruction.model_validate(data)
 
 
 def _with_arrangement_density_governor(ins: Instruction, *, count: int, density: str, fade: str, note: str) -> Instruction:
@@ -1793,6 +1510,8 @@ def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: s
 
 
 FOCAL_EVENT_MIN_EXTENT = 0.075
+
+
 FOCAL_EVENT_MIN_LINE_EXTENT = 0.14
 
 
@@ -2444,108 +2163,6 @@ def _with_context_density_governor(
     )
 
 
-def _density_label(original_count: int) -> str:
-    if original_count >= 180:
-        return "high"
-    if original_count >= 80:
-        return "medium"
-    return "low"
-
-
-def _cluster_count(original_count: int) -> int:
-    if original_count >= 500:
-        return 9
-    if original_count >= 240:
-        return 7
-    if original_count >= 120:
-        return 5
-    return 3
-
-
-def _clustered_visual_count(original_count: int) -> int:
-    if original_count <= MAX_VISUAL_CLUSTERED_COUNT:
-        return original_count
-    return min(MAX_VISUAL_CLUSTERED_COUNT, max(48, int(original_count * 0.42)))
-
-
-def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
-    arr = ins.arrangement
-    if arr is None or arr.layout == "grid":
-        return ins
-    original_count = arr.count
-    data = ins.model_dump(by_alias=True)
-    arr_data = dict(data["arrangement"])
-    arr_data["count"] = _clustered_visual_count(original_count)
-    existing_density = arr_data.get("density", "none")
-    arr_data["density"] = existing_density if existing_density != "none" else _density_label(original_count)
-    arr_data["cluster_count"] = arr_data.get("cluster_count") or _cluster_count(original_count)
-    arr_data["preserve_space"] = True
-    arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.18)
-    if arr_data.get("fade", "none") == "none":
-        arr_data["fade"] = "directional" if arr.path != "none" or arr.layout in ("horizontal", "vertical") else "outward"
-    data["arrangement"] = arr_data
-    hint = data.get("color_hint")
-    full_note = f"{note}; original count {original_count}"
-    data["color_hint"] = f"{hint}; {full_note}" if hint else full_note
-    return Instruction.model_validate(data)
-
-
-def _with_per_instruction_density_budget(instructions: list[Instruction]) -> list[Instruction]:
-    adjusted: list[Instruction] = []
-    for ins in instructions:
-        if (
-            ins.arrangement is None
-            or ins.arrangement.layout == "grid"
-            or ins.arrangement.count <= MAX_EXPANDED_PER_INSTRUCTION
-        ):
-            adjusted.append(ins)
-            continue
-        adjusted.append(_with_clustered_density(ins, "single arrangement density clustered to preserve negative space"))
-    return adjusted
-
-
-def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruction]:
-    def is_grid(ins: Instruction) -> bool:
-        return ins.arrangement is not None and ins.arrangement.layout == "grid"
-
-    total = sum(_expanded_count(ins) for ins in instructions if not is_grid(ins))
-    if total <= MAX_EXPANDED_PRIMITIVES:
-        return instructions
-
-    remaining_budget = MAX_EXPANDED_PRIMITIVES
-    remaining = list(instructions)
-    adjusted: list[Instruction] = []
-    for index, ins in enumerate(remaining):
-        if is_grid(ins):
-            adjusted.append(ins)
-            continue
-        count = _expanded_count(ins)
-        rest_minimum = sum(1 for item in remaining[index + 1:] if not is_grid(item))
-        if ins.arrangement is None:
-            adjusted.append(ins)
-            remaining_budget -= 1
-            continue
-        if remaining_budget <= rest_minimum + 1:
-            allowed = 1
-        else:
-            remaining_total = sum(
-                _expanded_count(item)
-                for item in remaining[index:]
-                if not is_grid(item)
-            )
-            share = count / remaining_total if remaining_total > 0 else 0
-            allowed = max(1, int((remaining_budget - rest_minimum) * share))
-        if allowed < count and count > 80:
-            adjusted_ins = _with_clustered_density(ins, "expanded density clustered to preserve negative space")
-            if _expanded_count(adjusted_ins) > allowed:
-                adjusted_ins = _with_arrangement_count(adjusted_ins, allowed, "expanded density capped after clustering")
-        else:
-            adjusted_ins = _with_arrangement_count(ins, allowed, "expanded density capped to preserve negative space")
-        adjusted.append(adjusted_ins)
-        remaining_budget -= _expanded_count(adjusted_ins)
-    return adjusted
-
-
 def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
     if not ddl:
         return set()
@@ -3030,16 +2647,24 @@ HUMAN_PRESENCE_MARKERS: tuple[str, ...] = (
     "人", "人物", "人影", "人型", "顔", "表情", "視線", "まなざし", "眼差し", "目線", "誰か", "群衆",
     "human", "person", "people", "figure", "face", "gaze", "look", "crowd",
 )
+
+
 CREATURE_PRESENCE_MARKERS: tuple[str, ...] = (
     "動物", "獣", "鳥", "魚", "犬", "猫", "馬", "鹿", "群れ", "羽", "翼", "尾", "尻尾",
     "animal", "creature", "bird", "fish", "dog", "cat", "horse", "deer", "flock", "herd", "tail", "wing",
 )
+
+
 GROUP_PRESENCE_MARKERS: tuple[str, ...] = (
     "群れ", "群衆", "複数", "集ま", "並ぶ", "crowd", "group", "flock", "herd", "many figures",
 )
+
+
 GAZE_PRESENCE_MARKERS: tuple[str, ...] = (
     "顔", "視線", "まなざし", "眼差し", "目線", "見つめ", "face", "gaze", "look", "stare",
 )
+
+
 SYMMETRY_PRESENCE_MARKERS: tuple[str, ...] = (
     "人型", "顔", "正面", "対称", "figure", "face", "frontal", "symmetry",
 )
@@ -3591,6 +3216,7 @@ ENGLISH_SMALL_NUMBERS: dict[str, int] = {
     "ten": 10,
 }
 
+
 ENGLISH_COUNT_UNITS: dict[str, int] = {
     **ENGLISH_SMALL_NUMBERS,
     "eleven": 11,
@@ -3881,104 +3507,9 @@ def _with_explicit_constraint_enforcement(
     return repaired
 
 
-def _repair_visibility(ins: Instruction, background: str) -> Instruction:
-    repaired = _with_visible_color(ins, background)
-    repaired = _with_visible_particle(repaired)
-    return _with_density_budget(repaired)
-
-
-def _coerce_and_repair_instruction(
-    ins: Instruction,
-    *,
-    original_background: str,
-    background: str,
-    ddl: str | None,
-) -> Instruction:
-    coerced = _coerce_instruction(ins)
-    coerced = _with_material_hint(coerced, ddl)
-    coerced = _with_variation_hint(coerced, ddl)
-    if original_background == "gray" and coerced.color == "gray":
-        coerced = _with_visible_color(coerced, "gray")
-    return _repair_visibility(coerced, background)
-
-
-def ensure_renderable_score(score: Score) -> None:
-    """Raise when Stage 2 returned no drawable instructions."""
-    if not score.instructions:
-        raise ValueError("Stage 2 returned no drawable instructions")
-
-
-def _has_relation_contour(ins: Instruction) -> bool:
-    if ins.primitive == "line":
-        return ins.from_ is not None and ins.to is not None
-    if ins.primitive in {"circle", "arc", "polygon"}:
-        return ins.center is not None and ins.radius is not None
-    if ins.primitive in {"ellipse", "cloudform"}:
-        return ins.center is not None and ins.size is not None
-    if ins.primitive in {"square", "triangle"}:
-        return ins.position is not None and ins.size is not None
-    return False
-
-
-def _drop_invalid_relations(instructions: list[Instruction]) -> list[Instruction]:
-    result: list[Instruction] = []
-    for index, ins in enumerate(instructions):
-        relation = ins.relation
-        if relation is None:
-            result.append(ins)
-            continue
-        invalid = index == 0 or not result or not _has_relation_contour(result[-1])
-        if relation.type == "between":
-            invalid = invalid or len(result) < 2 or not _has_relation_contour(result[-2])
-        elif relation.type == "touching":
-            invalid = invalid or ins.primitive not in {"line", "arc"}
-            invalid = invalid or result[-1].primitive not in {"line", "arc"}
-        if invalid:
-            data = ins.model_dump(by_alias=True)
-            data.pop("relation", None)
-            result.append(Instruction.model_validate(data))
-        else:
-            result.append(ins)
-    return result
-
-
-# ── 汎用補修ループ ────────────────────────────────────────────────────────────────
-
-def _coerce_instruction(ins: Instruction) -> Instruction:
-    """PRIMITIVE_SPECS テーブルを参照して 1 命令を補修する。
-
-    補修の流れ:
-      1. フィールドが None → fallbacks を順に試みる
-      2. 値を coerce 関数で型正規化 (None なら default へ)
-      3. POST_COERCE で cross-field 制約を適用
-    """
-    data = ins.model_dump(by_alias=True)
-
-    for spec in PRIMITIVE_SPECS.get(ins.primitive, []):
-        val = data.get(spec.name)
-
-        # (1) None → fallback を順に試みる
-        if val is None:
-            for fb in spec.fallbacks:
-                fb_val = data.get(fb)
-                if fb_val is not None:
-                    val = fb_val
-                    break
-
-        # (2) 型正規化。失敗 (None 返却) なら default を使う
-        if val is not None and spec.coerce is not None:
-            val = spec.coerce(val)
-
-        if val is None:
-            val = list(spec.default) if isinstance(spec.default, list) else spec.default
-
-        data[spec.name] = val
-
-    # (3) cross-field 補正
-    if post := POST_COERCE.get(ins.primitive):
-        post(data)
-
-    return Instruction.model_validate(data)
+def _with_ddl_instruction_hints(ins: Instruction, *, ddl: str | None) -> Instruction:
+    hinted = _with_material_hint(ins, ddl)
+    return _with_variation_hint(hinted, ddl)
 
 
 def _record_branch_fire(
@@ -4014,199 +3545,3 @@ def _record_value_branch_fire(
 
 def _style_coerce_disabled() -> bool:
     return os.getenv("INKU_COERCE_DISABLE", "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def coerce_score(
-    score: Score,
-    *,
-    ddl: str | None = None,
-    branch_report: dict[str, int] | None = None,
-    tenkei: str = "auto",
-    plugin_instructions_present: bool = False,
-) -> Score:
-    """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。
-
-    tenkei (v1.96 添景水準): 自律的な添景挿入分岐（B10/B12/B13/B17内包/B19/B22/B28）を
-    none で非発火、sparse で挿入合計 1 instruction までに決定的に制限する。
-    修復系・変異系・明示内容の救済（B5/B8）は水準に依らず動く。
-    plugin_instructions_present: プラグイン決定的転写が主題を搬送済みの場合、
-    none/sparse では B9 (complex_motif) も主題の二重配達としてゲートする。
-    """
-    if _style_coerce_disabled():
-        _branch_before = score.instructions
-        instructions = [_coerce_instruction(ins) for ins in score.instructions]
-        _record_branch_fire(branch_report, "coerce_instruction", _branch_before, instructions)
-        _branch_before = instructions
-        instructions = _without_spontaneous_grid(instructions, ddl=ddl)
-        _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)
-        _branch_before = instructions
-        instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
-        _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
-        _branch_before = instructions
-        instructions = _drop_invalid_relations(instructions)
-        _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
-        _branch_before = instructions
-        instructions = _without_explicit_region_support(instructions, ddl=ddl)
-        _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
-        data = score.model_dump(by_alias=True)
-        data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
-        return Score.model_validate(data)
-    # v1.96 添景水準の挿入予算 (None = 無制限 = 現行挙動)
-    scenery_budget: int | None
-    if tenkei == "none":
-        scenery_budget = 0
-    elif tenkei == "sparse":
-        scenery_budget = 1
-    else:
-        scenery_budget = None
-
-    def _scenery_allows() -> bool:
-        return scenery_budget is None or scenery_budget > 0
-
-    def _scenery_spend(before: list[Instruction], after: list[Instruction]) -> None:
-        nonlocal scenery_budget
-        if scenery_budget is None:
-            return
-        added = len(after) - len(before)
-        if added > 0:
-            scenery_budget -= added
-
-    visible_background = _visible_background(score.background)
-    background = _with_background_dominance_governor(visible_background, ddl=ddl)
-    _record_value_branch_fire(
-        branch_report,
-        "with_background_dominance_governor",
-        visible_background,
-        background,
-    )
-    _branch_before = score.instructions
-    instructions = [
-        _coerce_and_repair_instruction(ins, original_background=score.background, background=background, ddl=ddl)
-        for ins in score.instructions
-    ]
-    _record_branch_fire(branch_report, "coerce_and_repair_instruction", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _without_spontaneous_grid(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _dedupe_instructions(instructions)
-    _record_branch_fire(branch_report, "dedupe_instructions", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
-    _record_branch_fire(branch_report, "with_ddl_coverage", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)
-    _record_branch_fire(branch_report, "with_primary_color_delivery", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_color_delivery_repair(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_color_delivery_repair", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
-    _record_branch_fire(branch_report, "with_shape_delivery_repair", _branch_before, instructions)
-    # B9: プラグイン転写が主題を搬送済みなら none/sparse では二重配達としてゲート
-    if not (plugin_instructions_present and scenery_budget is not None) or _scenery_allows():
-        _branch_before = instructions
-        instructions = _with_complex_motif_repair(instructions, ddl=ddl, background=background)
-        _record_branch_fire(branch_report, "with_complex_motif_repair", _branch_before, instructions)
-        if plugin_instructions_present:
-            _scenery_spend(_branch_before, instructions)
-    if _scenery_allows():
-        _branch_before = instructions
-        instructions = _with_composition_diversity_repair(instructions, ddl=ddl, background=background)
-        _record_branch_fire(branch_report, "with_composition_diversity_repair", _branch_before, instructions)
-        _scenery_spend(_branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_structural_duplicate_repair(instructions)
-    _record_branch_fire(branch_report, "with_structural_duplicate_repair", _branch_before, instructions)
-    if _scenery_allows():
-        _branch_before = instructions
-        instructions = _with_context_energy_repair(instructions, ddl=ddl, background=background)
-        _record_branch_fire(branch_report, "with_context_energy_repair", _branch_before, instructions)
-        _scenery_spend(_branch_before, instructions)
-    if _scenery_allows():
-        _branch_before = instructions
-        instructions = _with_surface_tension(instructions, ddl=ddl, background=background)
-        _record_branch_fire(branch_report, "with_surface_tension", _branch_before, instructions)
-        _scenery_spend(_branch_before, instructions)
-    effective_presence = score.presence or _presence_from_ddl(ddl)
-    _record_value_branch_fire(
-        branch_report,
-        "presence_from_ddl",
-        score.presence,
-        effective_presence,
-    )
-    _branch_before = instructions
-    instructions = _with_presence_auxiliary_shape_repair(instructions, effective_presence)
-    _record_branch_fire(branch_report, "with_presence_auxiliary_shape_repair", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = [_with_unintentional_filled_shape_tempering(ins, ddl=ddl) for ins in instructions]
-    _record_branch_fire(branch_report, "with_unintentional_filled_shape_tempering", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_context_density_governor(
-        instructions, ddl=ddl, background=background, allow_accent=_scenery_allows()
-    )
-    _record_branch_fire(branch_report, "with_context_density_governor", _branch_before, instructions)
-    _scenery_spend(_branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_motion_energy(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_motion_energy", _branch_before, instructions)
-    if _scenery_allows():
-        _branch_before = instructions
-        instructions = _with_motion_floor(instructions, ddl=ddl, background=background)
-        _record_branch_fire(branch_report, "with_motion_floor", _branch_before, instructions)
-        _scenery_spend(_branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_rhythm_variation(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_rhythm_variation", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_repetition_event_variation(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_repetition_event_variation", _branch_before, instructions)
-    if _scenery_allows():
-        _branch_before = instructions
-        instructions = _with_visual_event(instructions, ddl=ddl, background=background)
-        _record_branch_fire(branch_report, "with_visual_event", _branch_before, instructions)
-        _scenery_spend(_branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_crescent_sensory_suppression(instructions, ddl=ddl, background=background)
-    _record_branch_fire(branch_report, "with_crescent_sensory_suppression", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_ma_pressure(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_ma_pressure", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_semantic_visual_event_hints(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_semantic_visual_event_hints", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_visual_event_type_hints(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_visual_event_type_hints", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_existing_event_counterweight(instructions, ddl=ddl, background=background)
-    _record_branch_fire(branch_report, "with_existing_event_counterweight", _branch_before, instructions)
-    if _scenery_allows():
-        _branch_before = instructions
-        instructions = _with_focal_event_floor(instructions, ddl=ddl, background=background)
-        _record_branch_fire(branch_report, "with_focal_event_floor", _branch_before, instructions)
-        _scenery_spend(_branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_per_instruction_density_budget(instructions)
-    _record_branch_fire(branch_report, "with_per_instruction_density_budget", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_total_density_budget(instructions)
-    _record_branch_fire(branch_report, "with_total_density_budget", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
-    _record_branch_fire(branch_report, "with_explicit_constraint_enforcement", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _drop_invalid_relations(instructions)
-    _record_branch_fire(branch_report, "drop_invalid_relations", _branch_before, instructions)
-    _branch_before = instructions
-    instructions = _without_explicit_region_support(instructions, ddl=ddl)
-    _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
-    data = score.model_dump(by_alias=True)
-    data["background"] = background
-    if score.presence is None and effective_presence is not None:
-        data["presence"] = effective_presence
-    data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
-    return Score.model_validate(data)

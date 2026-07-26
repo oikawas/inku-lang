@@ -237,6 +237,22 @@ def test_compose_response_as_paint_result_uses_effective_ddl():
     assert result["elapsed_total_ms"] == 500
 
 
+def test_compose_response_as_paint_result_carries_coerce_diagnostics():
+    diagnostics = {
+        "coerce_branch_counts": {"with_ddl_coverage": 2},
+        "coerce_relation_input_count": 3,
+        "coerce_relation_output_count": 2,
+        "coerce_relation_dropped_count": 1,
+        "coerce_warnings": ["relation dropped"],
+    }
+    result = cli._compose_response_as_paint_result(
+        diagnostics, ddl="DDL。", input_text="入力", stage2_model="model"
+    )
+
+    for key, value in diagnostics.items():
+        assert result[key] == value
+
+
 def test_model_summary_marks_server_default():
     summary = cli._model_summary(None, "gemma", stage2_provider="nvidia")
 

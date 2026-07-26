@@ -2965,3 +2965,17 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **`absorbency` は退役させなかった。** 調査の結果、値そのものは読まれないが、**地の texture seed が Score 全体のハッシュ**（`_texture_seed`）なので、消すと地を持つ作品の粒配置が変わる。実測で **23 件中 18 件の出力が動いた**ため取りやめ、フィールドの説明にその理由を書いた。**次に engine の版を上げるときに、意図した変更として扱う。**
 - **出力が変わらないことを実データで確かめた。** pentala の保存済み Score から 312 件（`contact` / `absorbency` を持つ 62 件全部 + 無作為 250 件）を旧実装と新実装で描き比べ、**変化 0 件**。関係を持つ 639 件でも **0 件**。**engine の版は上げていない。**
 - **検証:** pytest **1101 passed / 30 skipped**（退役フィールドの互換テスト 1 件を追加）、cli 68 passed、ruff clean。**`web/` にも `android/` にも差分が無いので、`npm run check` と Android のテストは回していない。**
+
+---
+
+### Android `2.1.1-android.1` — 描画層が render engine 14 へ追随（コンピュータ・一枚の方眼・暴れるの到達・てざわり語彙の是正）（android Build 148090、2026-07-26）
+
+**engine 13 と 14 の 2 版を 1 契約でまとめて追いついた。** これで Android は server と同じ render engine 14 を名乗る。
+
+- **5a 機械項と格子:** `ToolGrammar` に `periodic` / `quantize` / `width_steps` を足し 11 道具へ同調。`grid_point` / `machine_energy` / `machine_swell` / `machine_gesture` を移植し、`StrokeSample` に `residual` を追加。**周期文法は `wild` を無視する**（`wild && !periodic`）。
+- **5b renderer の格子と raster bleed:** 目盛は**キャンバス短辺 × `quantize`**（正方形で 18.0px）。`RASTER_BLEED_OPACITY = 0.45` の `<rect class="raster-bleed">` を敷き、直線・輪郭・弧・ハッチの全経路へ `gridStep` を渡す。
+- **5c 暴れるを輪郭へ + 版数:** `wild` を輪郭・塗り・弧・ハッチへ結線（**雲形には渡さない**）。`render_engine_version` を `"12"` → **`"14"`**（`DefaultSvgRenderer` と `LocalFallbackPipeline` の両方）。
+- **5d てざわり語彙の是正:** 表示語彙を server の `saijiki.py` と同じ **10 語ちょうど**へ（コンピュータ・ビュラン・ドライポイントを追加、髪と縄を除去）。**`hair` は Score の値としては保持**（保存済み作品の再生のため）。`rh3` の 4 値を engine 14 の実測値で固定。
+- **受け入れで見つけて直した（git 管理セッション）:** 語彙から縄は消えていたが、**描画表には残っていた** — `ropeTwists`（呼び出し元ゼロ）、スタイル表の `"rope" -> 0.88`、線幅表の `"rope" -> 10f`。実装セッションが足した検査は**プロンプト文字列しか見ていなかった**ため通っていた。3 か所を削除し、**スタイル表・線幅表・文法表を見る検査**を足した（分岐を戻すと落ちることを確認）。
+- **検証:** `testDebugUnitTest --rerun-tasks` を XML 自力集計で **71 件 / failures 0 / errors 0 / skipped 0**（着手時 68）。**判別は受け入れ側で 3 件実測** — 格子の目盛に ×1.000001 で 2 件が落ち、周期文法の `wild` 無視を外すと 4 件が落ち、`rope` の分岐を戻すと語彙テストが落ちる。
+- **積み残さなかったもの（明示）:** `server` / `web` / `cli` / `shared` と参照コーパスは変更していない。Stage 1.5 の 3e 以降（葉文書プラグイン）、てざわり以外の歳時記カテゴリの語彙照合は範囲外。

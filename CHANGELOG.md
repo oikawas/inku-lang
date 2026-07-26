@@ -855,3 +855,17 @@ and a frozen corpus of their own.
 - **`absorbency` was not retired.** Its value is indeed never read, but the ground texture seed is a hash of the whole Score (`_texture_seed`), so removing the field re-rolls the grain of any work that has a ground. **18 of the 23 such works changed**, so the change was withdrawn and the reason written into the field description. **It will be retired as a deliberate change the next time the engine version moves.**
 - **Output neutrality was measured against real data.** 312 saved scores (all 62 carrying `contact` or `absorbency`, plus 250 at random) were rendered under both the old and new code: **zero changed**. Across the 639 scores carrying a relation: **zero changed**. **The engine version did not move.**
 - **Verification.** pytest **1101 passed / 30 skipped** (one added compatibility test), cli 68 passed, ruff clean. **Neither `web/` nor `android/` has a diff, so `npm run check` and the Android suite were not run.**
+
+---
+
+### Android `2.1.1-android.1` — the drawing layer follows render engine 14 (the computer, one lattice, wild reaching every contour, and the touch vocabulary) (android Build 148090, 2026-07-26)
+
+**Two engine versions, 13 and 14, were caught up under one contract.** Android now reports the same render engine 14 as the server.
+
+- **5a machine terms and the lattice.** `ToolGrammar` gains `periodic`, `quantize` and `width_steps` across all 11 tools; `grid_point`, `machine_energy`, `machine_swell` and `machine_gesture` are ported, and `StrokeSample` carries `residual`. **A periodic grammar ignores `wild`.**
+- **5b the renderer's grid and raster bleed.** The pitch is **the canvas short side × `quantize`** (18.0px on a square canvas). `<rect class="raster-bleed">` cells at `RASTER_BLEED_OPACITY = 0.45` sit under the stroke, and every call site — line, contour, arc, hatch — receives the grid step.
+- **5c wild reaches the contours, and the version moves.** `wild` is wired into contours, fills, arcs and hatches, **but not cloudform**. `render_engine_version` goes from `"12"` to **`"14"`** in both the renderer and the fallback pipeline.
+- **5d the touch vocabulary is corrected.** The displayed words become **exactly the ten** the server's `saijiki.py` publishes: the computer, the burin and the drypoint join; hair and rope leave. **`hair` is still accepted as a Score value** so saved work replays. The four `rh3` values are pinned to their engine 14 measurements.
+- **Found and fixed during acceptance (git session).** Rope was gone from the words but still in the drawing tables — `ropeTwists` (never called), the style table and the width table. The check that shipped with 5d read only the prompt text, so the tables passed it. All three are deleted, and the check now reads the tables too.
+- **Verification.** `testDebugUnitTest --rerun-tasks`, counted from the XML: **71 tests, 0 failures, 0 errors, 0 skipped** (68 at the start). **Three discriminating perturbations were measured on the accepting side**: scaling the lattice pitch by 1.000001 fails two tests, removing the periodic grammar's `wild` exemption fails four, and restoring the rope branch fails the vocabulary test.
+- **Left undone (stated).** `server`, `web`, `cli`, `shared` and the reference corpus are unchanged. Stage 1.5 from 3e onward and the vocabulary of the other saijiki categories remain out of scope.

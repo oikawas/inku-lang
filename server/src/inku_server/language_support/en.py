@@ -59,7 +59,9 @@ COERCE_MARKERS = {
         "five-sense", "reflection",
     ),
     "quiet_density": (
-        "quiet", "silence", "negative space", "thin", "pale", "slight", "single", "one ",
+        # "one " was here and matched the number itself: "one hundred twenty lines"
+        # tripped the quiet-density governor and lost the very count it asked for.
+        "quiet", "silence", "negative space", "thin", "pale", "slight", "single",
         "presence", "trace", "memory", "forgotten", "shadow", "cold", "transparent", "membrane",
         "haze", "fog", "mist", "blur", "low cloud", "pressing down",
     ),

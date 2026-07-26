@@ -570,9 +570,20 @@ Important score concepts:
 - `at.region`: optional normalized placement region `[x0,y0,x1,y1]` resolved by the renderer seed
 - `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, `between`, or `touching`; a touching relation pins both endpoints
 
-Large repetitions should prefer group behavior over literal overload.  Dense
-clusters use `arrangement.density`, `cluster_count`, `fade`, and
-`preserve_space` so that negative space remains part of the composition.
+A count the description states outright outranks any later reading of it. Below
+240 the count is literal: the requested value is used unchanged. At 240 and above
+it is represented by a count of 80-120 plus `arrangement.density`,
+`cluster_count`, `fade`, and `preserve_space`, so that negative space remains
+part of the composition. The threshold matches `MAX_EXPANDED_PER_INSTRUCTION`;
+putting it at 300 would leave 241-299 defined as literal and yet cut at 240.
+**Two hundred thirty-three strokes are two hundred thirty-three.**
+
+The quiet-density governor, which thins repetition for still, membranous, or
+remembered scenes, does not apply to a group whose count was stated: quiet is a
+reading of the scene, and a stated number is not a reading. When the literal
+groups together exceed `MAX_EXPANDED_PRIMITIVES` (400), the largest is
+represented first and the budget is rechecked before the next one gives way, so
+the small groups a reader could have counted stay literal.
 
 Current scene-tone palette behavior uses abstract colors only:
 

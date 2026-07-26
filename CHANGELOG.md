@@ -923,3 +923,50 @@ and a frozen corpus of their own.
 - **A dropped diagnostic in the CLI was fixed too.** `_compose_response_as_paint_result` carried none of the `coerce_*` fields out of the `/api/compose` response, so `coerce_branch_counts` came back empty for every `--input-mode ddl` batch. Verified against pentala: **0 keys to 34**.
 - **Left undone, deliberately.** No Topology. The 94 coordinate literals moved neither in value nor in place (they now sit in `compose.py`). Not one branch was deleted: **all thirty-four fire across the 39 cases, so no dead branch has been found.**
 - **Verification.** server **1147 passed / 30 skipped** (1143 / 30 before; C-1 through C-4 added four), ruff clean, cli **69 passed** (+1), `npm run check` 0 errors / 2 warnings / 217 files.
+
+---
+
+### v2.7.5 — an explicit count below 240 stays literal (Build 714, 2026-07-27)
+
+**Ask for two hundred thirty-three strokes and two were drawn.** Stage 2 dropped 24% of the counts the description stated, and the density budget accounted for only 4% of that. The rest came from the prompt contradicting itself. **The contradictions were removed. The acceptance thresholds were not met, and the measurement now says why: the cause is not Stage 2 but coerce.**
+
+- **There were three contradictions.** (1) "when a tiny scatter exceeds 120 items, use the representation tools (density, cluster_count, fade, preserve_space)" and "represent quantities of 300 or more" **compete across the 120–299 band as the model sees it** — the band whose 20% adherence was the worst of all. (2) "two or more identical shapes: multiple instructions are absolutely forbidden" **also folded groups of differing counts into one**. (3) **Four worked examples answered a requested 137 with `"count":96`.** An example outweighs a rule.
+- **The threshold is 240**, matching `MAX_EXPANDED_PER_INSTRUCTION = 240`. Placing it at 300 would make 241–299 a band that **is defined as literal and yet cut at 240 by coerce** — unkeepable by construction. **Two hundred thirty-three strokes are now two hundred thirty-three.**
+- **The prohibition was narrowed** to "expanding a repetition of the same shape in the same placement into N instructions," in all four places that carry it (the Japanese and English system prompts in `composer.py`, the `count` and `arrangement` descriptions in `schema.py`, and the empty-drawing retry in `api.py`). **Fixing one place alone leaves the paths disagreeing.** The two examples that broke the rule were brought into line at the same time.
+- **At the layer the prompts govern, it moved.** Measured on the Stage 2 output before coerce, the worst band, **120–239, goes from 33% to 55% in Japanese and 37% to 92% in English**; 300+ goes from 55% to 88% and from 88% to 100%.
+- **The final Score did not follow.** Of the six acceptance bands, only 2–11 holding at 100% was met. **Feeding a fully compliant Score through coerce leaves 20 of 25 single-group bench lines intact in Japanese and 11 of 25 in English** — `_with_context_density_governor` rewrites the rest to 64, 48, or 16. **The 90–95% thresholds were unreachable without touching the coerce and compose code the contract put out of scope.**
+- **The language gap lives in the same layer.** The quiet-density marker fires on 36 of 87 Japanese descriptions and **72 of 87 English ones**; the vertical-density marker, 15 against 48. The "within 10 points" condition is likewise out of reach from the prompt alone.
+- **One line was removed on acceptance.** Both prompts told the model to record the representation and the original requested value in diagnostic metadata, but **Score has no `metadata` field and every model forbids extra keys** — a compliant response would have failed validation. Its absence is now pinned by a test.
+- **A note on the measurement**: 13 of the 174 stage-5 samples are **not Stage 2 responses but the deterministic fallback** (10 after an empty-instructions retry, 3 after a hard timeout). Excluding them moves the band rates by a few points at most. The benchmark isolates Stage 2 through `--input-mode ddl` and is **not the production adherence rate** (production goes through Stage 1, supplies `original_text`, and may apply `tenkei`).
+- **Left undone, deliberately.** No count-correction branch was added under `coerce/`; no deterministic enforcement was added on the compose side; the language asymmetry in the density governor's markers was not touched. **The next contract takes these.**
+- **Verification.** server **1147 passed / 30 skipped**, cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files. The engine version, the reference corpora, and the golden set were not touched.
+
+---
+
+### v2.7.6 — a stated count outranks a later reading of it (Build 715, 2026-07-27)
+
+**This version explains why v2.7.5 fixed the prompt and the final Score did not follow.** `_with_context_density_governor` read the scene — still, membranous, remembered — and thinned every repetition it found, including the groups written to order.
+
+- **Quiet is a reading of the scene; "two hundred thirty-three" is not a reading.** A group whose count the description states outright now passes the three count caps (vertical 48, large-shape 16, visual 64) untouched. **The shape temperings still apply** — they touch size, not how many. The test is whether the count appears in the DDL, literally or as the 80–120 stand-in for a request of 240 or more.
+- **The fifty frozen cases go from 31 to 50, and from 20/25 Japanese against 11/25 English to 25/25 in both.** This gate **calls no LLM and runs in two seconds** (`server/scripts/measure_count_preservation.py`).
+- **The language gap was the English marker `"one "`**: it matched `one hundred twenty short black pencil lines`, so **asking for a count in English tripped the branch that cuts it**. Removing it is right but **saves nothing on its own** — four of the five sentences also match `thin`, `trace`, `pale`, or `blur`. Attribution: **0 cases to the marker fix, 19 to the exemption.**
+- **The total density budget stopped shrinking in proportion.** Over budget, it gave each group its share, so **twelve squares a reader could have counted were thinned to pay for two hundred dots nobody can count**. Now the largest group is represented, the budget is rechecked, and only then does the next give way; if representing them all is still not enough, the large groups share one ceiling instead of collapsing to a single mark each.
+- **It also stopped inflating.** The old pass assigned each group its share whether or not that exceeded the count asked for: **a requested 120 was raised to 232, a 150 to 173.** The golden case `S-total-density` is exactly that, and is **the only one of the 39 refrozen** — synthetic, not a saved work.
+- **A defect in the gate itself was fixed.** The nineteen pins added in the previous version called `pytest.xfail()` imperatively, which marks a test xfailed whatever the outcome — **the gate could not have gone red once the counts started surviving**. They are assertions now, alongside cases proving that counts the description never mentions (137, 200, 300) are still thinned, so the exemption cannot pass as a disabled branch.
+- **Perturbation.** Forcing the exemption to False returns **31/50 (ja 20, en 11), matching the measurement taken before the work**. Emptying the extracted DDL counts gives the same. Restoring the old budget pass fails all three new tests.
+- **No production-scale benchmark was run** (author's call). Every deterministic gate is green, and the remaining unknown — how often Stage 2 emits a compliant count — was measured in v2.7.5 (78–100% Japanese, 67–100% English, before coerce).
+- **Left undone.** A represented count does not always land in 80–120 (180 becomes 75, existing `_clustered_visual_count` behavior). **The prompt and the specification both say 80–120, and the deterministic layer does not follow them.**
+- **Verification.** server **1207 passed / 30 skipped** (1181 / 30 / 19 xfailed before), cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files. The reference corpora `render-engine-14` and `ddl-engine-1` are green and **were not regenerated**. The engine version is unchanged.
+
+---
+
+### v2.7.7 — a represented count stays inside the band the documentation names (Build 716, 2026-07-27)
+
+**The prompt and the specification both say a request of 240 or more is shown as 80–120 marks. The floor was 48.**
+
+- Only one path showed it. Representation at 240 and above already landed between 100 and 120 (`_clustered_visual_count(240)=100`); the band was missed for groups of 121–239, and under the v2.7.6 rule those are literal — they are represented only when the total budget knocks one down. That is where **180 became 75**.
+- The floor is now 80, and **`MIN_VISUAL_CLUSTERED_COUNT` and `MAX_VISUAL_CLUSTERED_COUNT` are written as a pair**. The band is one rule; only one end having a name is part of why the discrepancy went unseen.
+- `[180, 150, 130]` now gives **`[80, 150, 130]`** rather than `[75, 150, 130]`, totalling 360, within budget.
+- **A discriminating test** pins the band at ten points from 121 to 2000. Restoring the floor of 48 fails it for 121–239.
+- **None of the 39 golden cases moves** (`S-total-density` represents 200 as 84, already above the floor).
+- **Verification.** server **1217 passed / 30 skipped**, cli **69 passed**, ruff clean. Count preservation stays at **50/50**.

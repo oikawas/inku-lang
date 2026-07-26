@@ -147,6 +147,10 @@ MAX_EXPANDED_PRIMITIVES = 400
 MAX_EXPANDED_PER_INSTRUCTION = 240
 
 
+# The two ends of the representative band the prompt and SPEC name: a request too
+# large to count is shown as 80-120 marks. Both ends belong to the same rule, so
+# they are written as a pair.
+MIN_VISUAL_CLUSTERED_COUNT = 80
 MAX_VISUAL_CLUSTERED_COUNT = 120
 
 
@@ -398,7 +402,7 @@ def _cluster_count(original_count: int) -> int:
 def _clustered_visual_count(original_count: int) -> int:
     if original_count <= MAX_VISUAL_CLUSTERED_COUNT:
         return original_count
-    return min(MAX_VISUAL_CLUSTERED_COUNT, max(48, int(original_count * 0.42)))
+    return min(MAX_VISUAL_CLUSTERED_COUNT, max(MIN_VISUAL_CLUSTERED_COUNT, int(original_count * 0.42)))
 
 
 def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
@@ -438,44 +442,55 @@ def _with_per_instruction_density_budget(instructions: list[Instruction]) -> lis
 
 
 def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruction]:
+    """Bring the total back under budget by representing the largest groups first.
+
+    Counted and uncountable are different things. Twelve squares can be counted by
+    eye; two hundred dots cannot. Shrinking every group in proportion spends the
+    budget on the groups a reader could have verified, so the large groups give way
+    first and the small ones stay literal for as long as the budget allows.
+    """
+
     def is_grid(ins: Instruction) -> bool:
         return ins.arrangement is not None and ins.arrangement.layout == "grid"
 
-    total = sum(_expanded_count(ins) for ins in instructions if not is_grid(ins))
+    adjusted = list(instructions)
+    movable = [index for index, ins in enumerate(adjusted) if not is_grid(ins) and ins.arrangement is not None]
+    total = sum(_expanded_count(ins) for ins in adjusted if not is_grid(ins))
     if total <= MAX_EXPANDED_PRIMITIVES:
         return instructions
 
-    remaining_budget = MAX_EXPANDED_PRIMITIVES
-    remaining = list(instructions)
-    adjusted: list[Instruction] = []
-    for index, ins in enumerate(remaining):
-        if is_grid(ins):
-            adjusted.append(ins)
-            continue
-        count = _expanded_count(ins)
-        rest_minimum = sum(1 for item in remaining[index + 1:] if not is_grid(item))
-        if ins.arrangement is None:
-            adjusted.append(ins)
-            remaining_budget -= 1
-            continue
-        if remaining_budget <= rest_minimum + 1:
-            allowed = 1
+    # Represent the largest group, check the budget, and only then reach for the next.
+    for index in sorted(movable, key=lambda i: _expanded_count(adjusted[i]), reverse=True):
+        if total <= MAX_EXPANDED_PRIMITIVES:
+            break
+        before = _expanded_count(adjusted[index])
+        candidate = _with_clustered_density(
+            adjusted[index], "largest group represented to fit the total density budget"
+        )
+        after = _expanded_count(candidate)
+        if after < before:
+            adjusted[index] = candidate
+            total -= before - after
+
+    if total <= MAX_EXPANDED_PRIMITIVES or not movable:
+        return adjusted
+
+    # Representing every group is not always enough. What is left is a ceiling the
+    # large groups share: the highest one under which the total fits. Groups already
+    # below it are untouched, so the small ones still come through whole.
+    counts = [_expanded_count(adjusted[index]) for index in movable]
+    fixed = sum(_expanded_count(ins) for ins in adjusted if not is_grid(ins)) - sum(counts)
+    ceiling = 1
+    for candidate in range(1, max(counts) + 1):
+        if fixed + sum(min(count, candidate) for count in counts) <= MAX_EXPANDED_PRIMITIVES:
+            ceiling = candidate
         else:
-            remaining_total = sum(
-                _expanded_count(item)
-                for item in remaining[index:]
-                if not is_grid(item)
+            break
+    for index in movable:
+        if _expanded_count(adjusted[index]) > ceiling:
+            adjusted[index] = _with_arrangement_count(
+                adjusted[index], ceiling, "expanded density capped to preserve negative space"
             )
-            share = count / remaining_total if remaining_total > 0 else 0
-            allowed = max(1, int((remaining_budget - rest_minimum) * share))
-        if allowed < count and count > 80:
-            adjusted_ins = _with_clustered_density(ins, "expanded density clustered to preserve negative space")
-            if _expanded_count(adjusted_ins) > allowed:
-                adjusted_ins = _with_arrangement_count(adjusted_ins, allowed, "expanded density capped after clustering")
-        else:
-            adjusted_ins = _with_arrangement_count(ins, allowed, "expanded density capped to preserve negative space")
-        adjusted.append(adjusted_ins)
-        remaining_budget -= _expanded_count(adjusted_ins)
     return adjusted
 
 

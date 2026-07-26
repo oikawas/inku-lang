@@ -1,0 +1,3152 @@
+{
+  "cases": [
+    {
+      "ddl": "背景を白で塗りつぶす。黒いペンの縦線を三本並べる。黒いペンの細い斜め線を右上がりに三本並べる。細かく震える。",
+      "id": "ja-01",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 1,
+      "requested": 3,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 3,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "horizontal",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.5,
+              0.0
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.5,
+              1.0
+            ],
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。灰色の鉛筆の小さな円を七つ散らす。灰色の右上がりの小さな楕円を左から右への横の帯に三個並べる。横長にする。",
+      "id": "ja-02",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 2,
+      "requested": 7,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 7,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "none",
+              "preserve_space": false,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.1,
+                0.1,
+                0.9,
+                0.9
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.03,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.6,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r3"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白いロットリングの横線を十一本並べる。",
+      "id": "ja-03",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 3,
+      "requested": 11,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 11,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "vertical",
+              "margin": 0.1,
+              "path": "none",
+              "preserve_space": false,
+              "rhythm_spacing": "none"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.25,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.75,
+              0.5
+            ],
+            "weight": "rotring"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒いロットリングの縦長の四角を左から右へ十二本並べる。黒い細筆の縦線を水墨の濃淡として左から右へ三本並べる。境界が滲む。",
+      "id": "ja-04",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 4,
+      "requested": 12,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "blue",
+                "white"
+              ],
+              "count": 12,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "horizontal",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.1,
+                0.3,
+                0.9,
+                0.7
+              ]
+            },
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.35,
+              0.35
+            ],
+            "primitive": "square",
+            "rotation": -24.0,
+            "size": [
+              0.3,
+              0.3
+            ],
+            "style": "solid",
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "pink"
+            },
+            "weight": "rotring"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白い細筆の弧を上から下へ十九本並べる。白いペンの細い弧を上端寄りの焦点から三つ広げる。半径は0.11。",
+      "id": "ja-05",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 5,
+      "requested": 19,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "angle_end": 180.0,
+            "angle_start": 0.0,
+            "arrangement": {
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 19,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "vertical",
+              "margin": 0.1,
+              "path": "top_to_bottom",
+              "preserve_space": false,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.39,
+                0.07,
+                0.61,
+                0.29
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "arc",
+            "radius": 0.11,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.6,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "wash",
+              "tone_steps": 3
+            },
+            "weight": "brush_thin"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。灰色のペンの小さな楕円を二十四個散らす。黒いペンの細い弧を右下の焦点から三つ広げる。半径は0.11。",
+      "id": "ja-06",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 6,
+      "requested": 24,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 24,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "none",
+              "preserve_space": false,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "ellipse",
+            "size": [
+              0.04,
+              0.02
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.6,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白いクレヨンの短い線を三十三本散らす。白いペンの細い斜め線を右上がりに三本並べる。細かく震える。",
+      "id": "ja-07",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 7,
+      "requested": 33,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.222,
+                0.242
+              ],
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 33,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.43,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.5700000000000001,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒いチョークの小さな三角を四十七個散らす。黒い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-08",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 8,
+      "requested": 47,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 47,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.1,
+                0.1,
+                0.9,
+                0.9
+              ]
+            },
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.48,
+              0.48
+            ],
+            "primitive": "triangle",
+            "rotation": -24.0,
+            "size": [
+              0.03,
+              0.03
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.85,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "chalk"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒い鉛筆の短い線を五十三本散らす。黒い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-09",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 9,
+      "requested": 53,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.18,
+                0.193
+              ],
+              "color_cycle": [
+                "black",
+                "gray"
+              ],
+              "count": 53,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.48,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.52,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白いペンの小さな円を六十一個散らす。白い右上がりの小さな楕円を上から下への縦の帯に三個並べる。横長にする。",
+      "id": "ja-10",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 10,
+      "requested": 61,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 61,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "none",
+              "preserve_space": false,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.02,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r2"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。灰色の細筆の弧を七十四本並べる。黒いペンの細い弧を右半分の焦点から三つ広げる。半径は0.11。",
+      "id": "ja-11",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 11,
+      "requested": 74,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "angle_end": 270.0,
+            "angle_start": 0.0,
+            "arrangement": {
+              "cluster_count": 3,
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 74,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "arc",
+            "radius": 0.15,
+            "style": "solid",
+            "weight": "brush_thin"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白い鉛筆の小さな四角を八十六個散らす。白いロットリングの細い線を前の線に沿って右半分の焦点へ三本引く。",
+      "id": "ja-12",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 12,
+      "requested": 86,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 3,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 86,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.49,
+              0.49
+            ],
+            "primitive": "square",
+            "size": [
+              0.02,
+              0.02
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "weight": "rotring"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒いペンの短い線を上から下へ九十九本散らす。黒い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-13",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 13,
+      "requested": 99,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.18,
+                0.18
+              ],
+              "cluster_count": 6,
+              "color_cycle": [
+                "black",
+                "gray"
+              ],
+              "count": 99,
+              "density": "medium",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "vertical",
+              "margin": 0.22,
+              "path": "top_to_bottom",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.48,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.52,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白い細筆の小さな楕円を百十七個散らす。白いペンの細い弧を右半分の焦点から三つ広げる。半径は0.11。",
+      "id": "ja-14",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 14,
+      "requested": 117,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 3,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 117,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.45,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "ellipse",
+            "size": [
+              0.03,
+              0.02
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.8,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "weight": "brush_thin"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒い鉛筆の短い線を百二十本散らす。黒い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-15",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 15,
+      "requested": 120,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.18,
+                0.209
+              ],
+              "cluster_count": 6,
+              "color_cycle": [
+                "black",
+                "gray"
+              ],
+              "count": 120,
+              "density": "medium",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.48,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.52,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白いペンの小さな円を百五十五個散らす。白いペンの短い線を右下の焦点から外へ三本散らす。細かく震える。",
+      "id": "ja-16",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 16,
+      "requested": 155,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 155,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.15,
+            "style": "solid",
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。灰色のクレヨンの小さな四角を百八十八個散らす。灰色のクレヨンの短い線を擦れとして左から右への横の帯に七本散らす。",
+      "id": "ja-17",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 17,
+      "requested": 188,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 188,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "none",
+              "preserve_space": false,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.35,
+              0.35
+            ],
+            "primitive": "square",
+            "size": [
+              0.3,
+              0.3
+            ],
+            "style": "solid",
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白いドライポイントの短い線を二百二十本散らす。白い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-18",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 18,
+      "requested": 220,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.18,
+                0.18
+              ],
+              "cluster_count": 7,
+              "color_cycle": [
+                "white",
+                "gray"
+              ],
+              "count": 220,
+              "density": "high",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.48,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.8,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "to": [
+              0.52,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒いペンの小さな円を二百三十九個散らす。黒い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-19",
+      "kind": "literal",
+      "lang": "ja",
+      "line": 19,
+      "requested": 239,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 239,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.15,
+            "style": "solid",
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒いペンの小さな円を二百四十個散らす。黒いペンの細い弧を左下の焦点から三つ広げる。半径は0.11。",
+      "id": "ja-20",
+      "kind": "represented",
+      "lang": "ja",
+      "line": 20,
+      "requested": 240,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 7,
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 110,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.02,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白い鉛筆の短い線を二百六十本散らす。白いペンの細い斜め線を右上がりに三本並べる。細かく震える。",
+      "id": "ja-21",
+      "kind": "represented",
+      "lang": "ja",
+      "line": 21,
+      "requested": 260,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.247,
+                0.22
+              ],
+              "cluster_count": 7,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 110,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.43,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.5700000000000001,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。灰色の細筆の小さな楕円を二百九十個散らす。灰色のペンの短い線を右下の焦点から外へ三本散らす。細かく震える。",
+      "id": "ja-22",
+      "kind": "represented",
+      "lang": "ja",
+      "line": 22,
+      "requested": 290,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 7,
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 110,
+              "density": "high",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "loose"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "ellipse",
+            "rotation": -24.0,
+            "size": [
+              0.03,
+              0.02
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "wash",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "brush_thin"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白いペンの小さな円を三百二十個散らす。白い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-23",
+      "kind": "represented",
+      "lang": "ja",
+      "line": 23,
+      "requested": 320,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 8,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 110,
+              "density": "high",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "loose"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.02,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を白で塗りつぶす。黒い鉛筆の小さな四角を五百個散らす。黒い回転した小さな四角を前の形に触れないように左から右への横の帯に十三個散らす。",
+      "id": "ja-24",
+      "kind": "represented",
+      "lang": "ja",
+      "line": 24,
+      "requested": 500,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 8,
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 110,
+              "density": "high",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "loose"
+            },
+            "color": "black",
+            "filled": true,
+            "mode": "additive",
+            "position": [
+              0.497,
+              0.497
+            ],
+            "primitive": "square",
+            "rotation": -24.0,
+            "size": [
+              0.01,
+              0.01
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "背景を黒で塗りつぶす。白いクレヨンの短い線を八百本散らす。白い右下がりの小さな楕円を波打つ軌跡に沿って七個散らす。ゆっくり揺れる。",
+      "id": "ja-25",
+      "kind": "represented",
+      "lang": "ja",
+      "line": 25,
+      "requested": 800,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.18,
+                0.219
+              ],
+              "cluster_count": 8,
+              "color_cycle": [
+                "white",
+                "gray"
+              ],
+              "count": 110,
+              "density": "high",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.48,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.52,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5-ja-r1"
+    },
+    {
+      "ddl": "Fill background with white. Line up three black pen vertical lines. Line up three thin black crayon diagonal lines rising to the right. Fine trembling.",
+      "id": "en-01",
+      "kind": "literal",
+      "lang": "en",
+      "line": 1,
+      "requested": 3,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 3,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "horizontal",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.3,
+                0.0,
+                0.7,
+                1.0
+              ]
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.5,
+              0.0
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.5,
+              1.0
+            ],
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter seven small gray pencil circles. Line up three small gray ellipses rising to the right dotted across the whole canvas. Make them wide.",
+      "id": "en-02",
+      "kind": "literal",
+      "lang": "en",
+      "line": 2,
+      "requested": 7,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 7,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "none",
+              "preserve_space": false,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.04,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Line up eleven white rotring horizontal lines. Line up three thin white crayon diagonal lines rising to the right. Fine trembling.",
+      "id": "en-03",
+      "kind": "literal",
+      "lang": "en",
+      "line": 3,
+      "requested": 11,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.729,
+                0.225
+              ],
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 11,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "vertical",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.24000000000000002,
+              0.535
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.7000000000000001,
+              0.46499999999999997
+            ],
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "rotring"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Line up twelve black rotring tall squares from left to right. Scatter three short black rotring lines from top to bottom. Fine trembling. Line up three thin black fine-brush lines left to right as drawing underlines. Fine trembling.",
+      "id": "en-04",
+      "kind": "literal",
+      "lang": "en",
+      "line": 4,
+      "requested": 12,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 12,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "horizontal",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.425,
+              0.325
+            ],
+            "primitive": "square",
+            "rotation": -24.0,
+            "size": [
+              0.15,
+              0.35
+            ],
+            "style": "solid",
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "rotring"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Line up nineteen white fine-brush arcs from top to bottom. Line up three thin white crayon diagonal lines rising to the right. Fine trembling.",
+      "id": "en-05",
+      "kind": "literal",
+      "lang": "en",
+      "line": 5,
+      "requested": 19,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "angle_end": 180.0,
+            "angle_start": 0.0,
+            "arrangement": {
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 19,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "vertical",
+              "margin": 0.1,
+              "path": "top_to_bottom",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "arc",
+            "radius": 0.1,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.1,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.8,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "wash",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter twenty-four small gray pen ellipses. Scatter three short gray crayon lines left to right. Fine trembling.",
+      "id": "en-06",
+      "kind": "literal",
+      "lang": "en",
+      "line": 6,
+      "requested": 24,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "white",
+                "gray"
+              ],
+              "count": 24,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "ellipse",
+            "rotation": -24.0,
+            "size": [
+              0.3,
+              0.3
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.05,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter thirty-three short white crayon lines. Line up three thin white crayon diagonal lines rising to the right. Fine trembling.",
+      "id": "en-07",
+      "kind": "literal",
+      "lang": "en",
+      "line": 7,
+      "requested": 33,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.248,
+                0.214
+              ],
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 33,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.43,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "to": [
+              0.5700000000000001,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter forty-seven small black chalk triangles. Scatter seven small black ellipses falling to the right along an undulating trace. Swaying slowly.",
+      "id": "en-08",
+      "kind": "literal",
+      "lang": "en",
+      "line": 8,
+      "requested": 47,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.735,
+                0.792
+              ],
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 47,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "left_to_right",
+              "preserve_space": true,
+              "rhythm_spacing": "loose"
+            },
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.45,
+              0.45
+            ],
+            "primitive": "triangle",
+            "size": [
+              0.075,
+              0.05
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "chalk"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter fifty-three short black pencil lines. Scatter seven small black ellipses falling to the right along an undulating trace. Swaying slowly.",
+      "id": "en-09",
+      "kind": "literal",
+      "lang": "en",
+      "line": 9,
+      "requested": 53,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 3,
+              "color_cycle": [],
+              "count": 53,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.1,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "to": [
+              0.9,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter sixty-one small white pen circles. Scatter seven small white ellipses falling to the right along an undulating trace. Swaying slowly. Draw three thin white crayon lines toward an upper-right focus along the previous line.",
+      "id": "en-10",
+      "kind": "literal",
+      "lang": "en",
+      "line": 10,
+      "requested": 61,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 61,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.02,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 1.0,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Line up seventy-four gray fine-brush arcs. Line up three thin black crayon diagonal lines rising to the right. Fine trembling.",
+      "id": "en-11",
+      "kind": "literal",
+      "lang": "en",
+      "line": 11,
+      "requested": 74,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "angle_end": 270.0,
+            "angle_start": 0.0,
+            "arrangement": {
+              "cluster_count": 3,
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 74,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "wave",
+              "preserve_space": true,
+              "rhythm_spacing": "loose"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "arc",
+            "radius": 0.1,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "wash",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter eighty-six small white pencil squares. Scatter seven small white ellipses falling to the right along an undulating trace. Swaying slowly. Scatter seven short white crayon lines dotted across the whole canvas as crayon rubbing.",
+      "id": "en-12",
+      "kind": "literal",
+      "lang": "en",
+      "line": 12,
+      "requested": 86,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 3,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 86,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.45,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.49,
+              0.49
+            ],
+            "primitive": "square",
+            "size": [
+              0.02,
+              0.02
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.8,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter ninety-nine short black pen lines from top to bottom. Line up three thin black crayon diagonal lines rising to the right. Fine trembling.",
+      "id": "en-13",
+      "kind": "literal",
+      "lang": "en",
+      "line": 13,
+      "requested": 99,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "center": [
+                0.795,
+                0.76
+              ],
+              "cluster_count": 6,
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 99,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "vertical",
+              "margin": 0.22,
+              "path": "top_to_bottom",
+              "preserve_space": true,
+              "rhythm_spacing": "syncopated"
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.52,
+              0.535
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.42000000000000004,
+              0.065
+            ],
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter one hundred seventeen small white fine-brush ellipses. Line up three small red ellipses rising to the right radiating from a lower-right focus. Make them wide. Line up five thin white rotring uniform lines left to right.",
+      "id": "en-14",
+      "kind": "literal",
+      "lang": "en",
+      "line": 14,
+      "requested": 117,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 3,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 117,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "ellipse",
+            "size": [
+              0.03,
+              0.02
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.1,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.6,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "wash",
+              "tone_steps": 3
+            },
+            "weight": "rotring"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter one hundred twenty short black pencil lines. Scatter seven small red ellipses falling to the right along an undulating trace. Swaying slowly. Line up three black fine-brush vertical lines left to right as ink-wash value. Edges blurring.",
+      "id": "en-15",
+      "kind": "literal",
+      "lang": "en",
+      "line": 15,
+      "requested": 120,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 5,
+              "color_cycle": [],
+              "count": 120,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.45,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "color": "black",
+            "filled": false,
+            "from": [
+              0.48,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.52,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter one hundred fifty-five small white pen circles. Line up three small red ellipses rising to the right radiating from a lower-right focus. Make them wide. Layer two pale white watercolor ellipses in the upper right as five-sense presence. Edges blurring.",
+      "id": "en-16",
+      "kind": "literal",
+      "lang": "en",
+      "line": 16,
+      "requested": 155,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 5,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 155,
+              "density": "medium",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.45,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.02,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "stipple",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "pink"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter one hundred eighty-eight small gray crayon squares. Scatter three short red rotring lines outward from a lower-right focus. Fine trembling. Line up six small rotated squares in red, blue, green, gray as patchwork grid. Line up nine small rotated squares in red, blue, green, gray as quilt-like patchwork.",
+      "id": "en-17",
+      "kind": "literal",
+      "lang": "en",
+      "line": 17,
+      "requested": 188,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "gray",
+                "white"
+              ],
+              "count": 188,
+              "density": "low",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.14,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "color": "gray",
+            "filled": false,
+            "mode": "additive",
+            "position": [
+              0.49,
+              0.49
+            ],
+            "primitive": "square",
+            "rotation": -24.0,
+            "size": [
+              0.02,
+              0.02
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "rotring"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter two hundred twenty short white drypoint lines. Scatter seven small red ellipses falling to the right along an undulating trace. Swaying slowly.",
+      "id": "en-18",
+      "kind": "literal",
+      "lang": "en",
+      "line": 18,
+      "requested": 220,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 5,
+              "color_cycle": [],
+              "count": 220,
+              "density": "low",
+              "fade": "directional",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.1,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "to": [
+              0.9,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter two hundred thirty-nine small black pen circles. Scatter three short red crayon lines left to right. Fine trembling.",
+      "id": "en-19",
+      "kind": "literal",
+      "lang": "en",
+      "line": 19,
+      "requested": 239,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 239,
+              "density": "none",
+              "fade": "none",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.1,
+              "path": "wave",
+              "preserve_space": false,
+              "rhythm_spacing": "loose"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.15,
+            "style": "solid",
+            "variation": {
+              "amplitude": "fine",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "medium",
+              "quality": "perlin"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r2"
+    },
+    {
+      "ddl": "Fill background with white. Scatter two hundred forty small black pen circles. Scatter seven small red ellipses falling to the right along an undulating trace. Swaying slowly.",
+      "id": "en-20",
+      "kind": "represented",
+      "lang": "en",
+      "line": 20,
+      "requested": 240,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 5,
+              "color_cycle": [
+                "black",
+                "red",
+                "white"
+              ],
+              "count": 110,
+              "density": "medium",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.15,
+            "style": "solid",
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pen"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter two hundred sixty short white pencil lines. Scatter seven small red ellipses falling to the right along an undulating trace. Swaying slowly.",
+      "id": "en-21",
+      "kind": "represented",
+      "lang": "en",
+      "line": 21,
+      "requested": 260,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 7,
+              "color_cycle": [],
+              "count": 110,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.48,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "to": [
+              0.52,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter two hundred ninety small gray fine-brush ellipses. Scatter seven small red ellipses falling to the right along an undulating trace. Swaying slowly.",
+      "id": "en-22",
+      "kind": "represented",
+      "lang": "en",
+      "line": 22,
+      "requested": 290,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "color_cycle": [
+                "black",
+                "red",
+                "white",
+                "gray"
+              ],
+              "count": 110,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "at": {
+              "region": [
+                0.0,
+                0.0,
+                1.0,
+                1.0
+              ]
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "black",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "ellipse",
+            "size": [
+              0.3,
+              0.3
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.02,
+              "spacing_gradient": "none",
+              "texture": "none",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "brush_thin"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter three hundred twenty small white pen circles. Line up three thin white crayon arcs spreading from a lower-right focus. Radius 0.11.",
+      "id": "en-23",
+      "kind": "represented",
+      "lang": "en",
+      "line": 23,
+      "requested": 320,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 7,
+              "color_cycle": [
+                "white",
+                "black"
+              ],
+              "count": 110,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "center": [
+              0.5,
+              0.5
+            ],
+            "color": "white",
+            "filled": false,
+            "mode": "additive",
+            "primitive": "circle",
+            "radius": 0.02,
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "stipple",
+              "tone_steps": 3
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with white. Scatter five hundred small black pencil squares. Scatter seven small red ellipses falling to the right along an undulating trace. Swaying slowly. Line up three black fine-brush vertical lines left to right as ink-wash value. Edges blurring.",
+      "id": "en-24",
+      "kind": "represented",
+      "lang": "en",
+      "line": 24,
+      "requested": 500,
+      "score": {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 7,
+              "color_cycle": [
+                "black",
+                "white"
+              ],
+              "count": 110,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "color": "black",
+            "filled": true,
+            "mode": "additive",
+            "position": [
+              0.49,
+              0.49
+            ],
+            "primitive": "square",
+            "size": [
+              0.01,
+              0.01
+            ],
+            "style": "solid",
+            "surface": {
+              "bleed": 0.0,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.28,
+              "scale": 0.35,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "pencil"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r1"
+    },
+    {
+      "ddl": "Fill background with black. Scatter eight hundred short white crayon lines. Scatter seven small red ellipses falling to the right along an undulating trace. Swaying slowly.",
+      "id": "en-25",
+      "kind": "represented",
+      "lang": "en",
+      "line": 25,
+      "requested": 800,
+      "score": {
+        "background": "black",
+        "canvas": "square",
+        "instructions": [
+          {
+            "arrangement": {
+              "cluster_count": 8,
+              "color_cycle": [],
+              "count": 110,
+              "density": "low",
+              "fade": "outward",
+              "jitter": 0.12,
+              "layout": "scatter",
+              "margin": 0.22,
+              "path": "none",
+              "preserve_space": true,
+              "rhythm_spacing": "none"
+            },
+            "color": "white",
+            "filled": false,
+            "from": [
+              0.49,
+              0.5
+            ],
+            "mode": "additive",
+            "primitive": "line",
+            "style": "solid",
+            "surface": {
+              "bleed": 0.1,
+              "density": 0.35,
+              "direction": "none",
+              "opacity": 0.8,
+              "scale": 0.35,
+              "seed": 1234567890,
+              "spacing_gradient": "none",
+              "texture": "grain",
+              "tone_steps": 3
+            },
+            "to": [
+              0.51,
+              0.5
+            ],
+            "variation": {
+              "amplitude": "medium",
+              "dimensions": [
+                "position_x",
+                "position_y"
+              ],
+              "frequency": "slow",
+              "quality": "wave"
+            },
+            "weight": "crayon"
+          }
+        ],
+        "version": "0.1.0"
+      },
+      "source_run": "713-v2.7.4-count-stage5b-en-r2"
+    }
+  ],
+  "note": "Compliant Stage 2 output for each single-group line of cli/bench/count. Replay through coerce_score to measure whether the pipeline keeps the count.",
+  "representative_count": 110,
+  "requested_counts": {
+    "1": 3,
+    "2": 7,
+    "3": 11,
+    "4": 12,
+    "5": 19,
+    "6": 24,
+    "7": 33,
+    "8": 47,
+    "9": 53,
+    "10": 61,
+    "11": 74,
+    "12": 86,
+    "13": 99,
+    "14": 117,
+    "15": 120,
+    "16": 155,
+    "17": 188,
+    "18": 220,
+    "19": 239,
+    "20": 240,
+    "21": 260,
+    "22": 290,
+    "23": 320,
+    "24": 500,
+    "25": 800
+  }
+}

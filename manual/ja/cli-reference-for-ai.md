@@ -52,7 +52,7 @@ uv run inku-cli lineage show PARENT_ID
 ```
 * **期待される出力 (ツリー表示の例)**:
   ```text
-  Artwork Lineage:
+  Work lineage:
   - (Root) dfced380 [Displayed] : 白い余白に、黒い太筆の波線を一本引く。
     - (layout_variation) b91ae625  : 白い余白に、黒い太筆の波線を一本引く。
   ```

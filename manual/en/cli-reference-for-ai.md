@@ -52,7 +52,7 @@ uv run inku-cli lineage show PARENT_ID
 ```
 * **Expected Output (Hierarchical Tree View)**:
   ```text
-  Artwork Lineage:
+  Work lineage:
   - (Root) dfced380 [Displayed] : Draw one wave line with a thick black brush on white space.
     - (layout_variation) b91ae625  : Draw one wave line with a thick black brush on white space.
   ```

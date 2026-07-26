@@ -869,3 +869,15 @@ and a frozen corpus of their own.
 - **Found and fixed during acceptance (git session).** Rope was gone from the words but still in the drawing tables — `ropeTwists` (never called), the style table and the width table. The check that shipped with 5d read only the prompt text, so the tables passed it. All three are deleted, and the check now reads the tables too.
 - **Verification.** `testDebugUnitTest --rerun-tasks`, counted from the XML: **71 tests, 0 failures, 0 errors, 0 skipped** (68 at the start). **Three discriminating perturbations were measured on the accepting side**: scaling the lattice pitch by 1.000001 fails two tests, removing the periodic grammar's `wild` exemption fails four, and restoring the rope branch fails the vocabulary test.
 - **Left undone (stated).** `server`, `web`, `cli`, `shared` and the reference corpus are unchanged. Stage 1.5 from 3e onward and the vocabulary of the other saijiki categories remain out of scope.
+
+---
+
+### The frozen DDL corpus drops the retired field from its recorded input (no version, 2026-07-26)
+
+**The v2.7.2 retirement left its difference not in the drawn output but in the input the corpus records.** The `ddl-engine` job of `reference-corpus` had been red for three runs since `9c70e8f`, with the generator's guard (`DDL corpus changed without an identity-field change`) firing exactly as designed.
+
+- **The only thing that moved was the `contact` key in the recorded input of one case, `B-invalid-touching`.** All 29 outputs were byte-identical.
+- **Because no output moved, the record was corrected rather than a new version frozen** (author's ruling, 2026-07-26). That is an exception to "never rewrite a frozen corpus", so the fact of the rewrite is recorded here.
+- Freezing a `ddl-engine-2` was rejected: it would create a version whose output is identical to its predecessor, which drains the meaning of a version.
+- **A missed check, recorded.** v2.7.2 ran pytest and ruff after the schema change but never ran the corpus generators themselves. pytest reads the corpus output; the freeze guard only fires when the generator runs. **Touch the schema, run the generators.**
+- **Verification.** `gen_ddl_reference.py` and `gen_render_reference.py` both exit 0 and leave no diff on a second run. pytest 1101 passed / 30 skipped.

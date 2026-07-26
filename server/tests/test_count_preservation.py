@@ -23,7 +23,13 @@ from pathlib import Path
 import pytest
 
 from inku_server.coerce import coerce_score
-from inku_server.coerce.normalize import MAX_EXPANDED_PRIMITIVES, _with_total_density_budget
+from inku_server.coerce.normalize import (
+    MAX_EXPANDED_PRIMITIVES,
+    MAX_VISUAL_CLUSTERED_COUNT,
+    MIN_VISUAL_CLUSTERED_COUNT,
+    _clustered_visual_count,
+    _with_total_density_budget,
+)
 from inku_server.schema import Instruction, Score
 
 FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "count_preservation_cases.json"
@@ -95,12 +101,22 @@ def _line(count: int) -> Instruction:
     )
 
 
+@pytest.mark.parametrize("requested", [121, 150, 180, 220, 239, 240, 260, 300, 800, 2000])
+def test_a_represented_count_lands_in_the_band_the_specification_names(requested: int) -> None:
+    """The prompt and SPEC both say 80-120. The deterministic layer has to mean it.
+
+    Before v2.7.7 the floor was 48, so a group of 180 knocked down by the total
+    budget came out at 75 — outside the band its own documentation promised.
+    """
+    assert MIN_VISUAL_CLUSTERED_COUNT <= _clustered_visual_count(requested) <= MAX_VISUAL_CLUSTERED_COUNT
+
+
 def test_the_total_budget_gives_way_from_the_largest_group() -> None:
     """180+150+130 is over budget; the 180 yields and the two smaller ones stay whole."""
     out = _with_total_density_budget([_line(180), _line(150), _line(130)])
     counts = [ins.arrangement.count for ins in out]
     assert counts[1:] == [150, 130]
-    assert counts[0] < 180
+    assert MIN_VISUAL_CLUSTERED_COUNT <= counts[0] < 180
     assert sum(counts) <= MAX_EXPANDED_PRIMITIVES
 
 

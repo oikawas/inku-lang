@@ -1872,7 +1872,6 @@
               "primitive": "line",
               "radius": null,
               "relation": {
-                "contact": "both_ends",
                 "gap": "medium",
                 "type": "touching"
               },

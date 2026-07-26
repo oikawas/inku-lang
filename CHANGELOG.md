@@ -881,3 +881,15 @@ and a frozen corpus of their own.
 - Freezing a `ddl-engine-2` was rejected: it would create a version whose output is identical to its predecessor, which drains the meaning of a version.
 - **A missed check, recorded.** v2.7.2 ran pytest and ruff after the schema change but never ran the corpus generators themselves. pytest reads the corpus output; the freeze guard only fires when the generator runs. **Touch the schema, run the generators.**
 - **Verification.** `gen_ddl_reference.py` and `gen_render_reference.py` both exit 0 and leave no diff on a second run. pytest 1101 passed / 30 skipped.
+
+---
+
+### v2.7.3 — the CLI's English joins the terminology dictionary (Build 712, 2026-07-26)
+
+**The fourth channel of English display text is the CLI.** v2.6.1 and v2.7.1 brought `web/` onto the dictionary and pinned it with a lint, but **`npm run lint:i18n` reads only the display strings under `web/`**, so the CLI was never covered.
+
+- **The forbidden word `artwork` survived in three places and is now `work`** (§2 of the glossary: 作品 = **work**). `Artwork Lineage:` becomes **`Work lineage:`** in sentence case, `show or control artwork lineage` becomes `show or control the lineage of a work`, and the PNG fallback warning follows.
+- **The manual quotes the CLI's actual output, so both languages were updated in the same commit** (`manual/{ja,en}/cli-reference-for-ai.md`).
+- **The six `palette` hits are out of scope**: they are server API **field names** (`catalog.get("palette")`), not display text. **A raw grep count is not a measure of work.**
+- **Left undone, and stated.** The subcommand `okugaki` is `colophon` in the dictionary, but **a command name is an identifier, and renaming it breaks the reader's own scripts**; it stands. `README.md`, `SPEC.md` and `manual/en/` still carry the older vocabulary.
+- **Verification.** cli 68 passed, ruff clean, and the new wording confirmed in the real `inku-cli --help` output. server 1101 passed / 30 skipped.

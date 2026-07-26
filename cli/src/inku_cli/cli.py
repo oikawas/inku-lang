@@ -553,7 +553,7 @@ def _rasterize_png(svg: str, **kwargs: int) -> bytes:
         print(
             "warning: resvg-py is not installed, so PNG output falls back to cairosvg, "
             "which does not render the material filters (pencil / crayon / chalk / brush_thick). "
-            "The PNGs will look cleaner than the artwork actually is.",
+            "The PNGs will look cleaner than the work actually is.",
             file=sys.stderr,
         )
     return svg_to_png(svg, **kwargs)
@@ -2864,7 +2864,7 @@ def command_lineage(args: argparse.Namespace) -> int:
                 for child_edge in sorted(edges_by_parent.get(node_id, []), key=lambda e: e.get("at", 0)):
                     print_tree(child_edge["child_node_id"], indent + 1)
 
-            print("Artwork Lineage:")
+            print("Work lineage:")
             for root in roots:
                 print_tree(root["id"])
     elif args.lineage_cmd == "promote":
@@ -3589,7 +3589,7 @@ def build_parser() -> argparse.ArgumentParser:
     version_cmd.set_defaults(func=command_version)
 
     # lineage
-    lineage = subparsers.add_parser("lineage", help="show or control artwork lineage")
+    lineage = subparsers.add_parser("lineage", help="show or control the lineage of a work")
     _add_common_server_args(lineage)
     lineage_sub = lineage.add_subparsers(dest="lineage_cmd", required=True)
     

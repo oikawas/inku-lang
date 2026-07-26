@@ -2991,3 +2991,15 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - 版を起こす選択（`ddl-engine-2` の新設）は、**出力が同一の版**を作ることになり版の意味が薄れるため採らなかった
 - **検査漏れの記録**: v2.7.2 ではスキーマ変更後に pytest と ruff を回したが、**参照コーパスの生成器そのものを走らせていなかった**。pytest はコーパスの出力を見る一方、凍結ガードは生成器を実行しないと通らない。**スキーマを触ったら生成器も回す**
 - **検証:** `gen_ddl_reference.py` と `gen_render_reference.py` がともに終了コード 0、再実行後の差分は無し。pytest 1101 passed / 30 skipped
+
+---
+
+### v2.7.3 — CLI の英語表示を用語辞書へ揃える（Build 712、2026-07-26）
+
+**英語表示の第 4 の系統は CLI である。** v2.6.1 と v2.7.1 が `web/` を辞書へ揃え、lint で固定したが、**`npm run lint:i18n` は `web/` の表示文字列しか見ておらず、CLI には届いていなかった**。
+
+- **禁止語 `artwork` が残っていた 3 か所を `work` へ**（辞書 §2「作品 = **work**」）。`Artwork Lineage:` → **`Work lineage:`**（Sentence case）、`show or control artwork lineage` → `show or control the lineage of a work`、PNG フォールバックの警告文 1 行。
+- **マニュアルは実出力を引用しているので、日英とも同じ commit で追随させた**（`manual/{ja,en}/cli-reference-for-ai.md`）。
+- **`palette` 6 件は対象外**。`catalog.get("palette")` などサーバー API の**フィールド名**であり、表示文字列ではない。**生の grep 件数をそのまま作業量にしない。**
+- **積み残し（明示・裁定待ち）**: サブコマンド名 `okugaki` は辞書では `colophon` だが、**コマンド名は識別子であり、変えると利用者の手順が壊れる**。今回は触っていない。`README.md` / `SPEC.md` / `manual/en/` の旧語彙（`artwork` ほか）も未追随のまま。
+- **検証:** cli 68 passed、ruff clean、`inku-cli --help` の実出力で新しい文言を確認。server 1101 passed / 30 skipped。

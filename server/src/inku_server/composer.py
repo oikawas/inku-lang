@@ -47,7 +47,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **正規化DDLの「雲形」だけを primitive="cloudform", center+size へ転記する。輪郭座標・制御点は生成しない。雲形を補完・推測で追加しない**
 - **正規化DDLに雲形が1句以上ある場合、出力にも同じ雲形 instruction を必ず残す。横長、arrangement、surface、carve と合成されても ellipse/line へ置換・省略しない。複数同一雲形は1 instruction + arrangementにする**
 - 中央配置の square/triangle: position = [0.5-w/2, 0.5-h/2]
-- **複数同一図形 → 1 instruction + arrangement。複数 instruction 生成は絶対禁止**
+- **同一図形の同一配置の反復 → 1 instruction + arrangement.count。反復を N 件の instruction へ展開しない。個数・配置・位置が異なる群は別 instruction にする**
 - **正規化DDL に図形・線・弧の指示がある場合、instructions を空配列にしてはいけない。変換不能なら最も近い線・楕円・四角へ落とし込む**
 - **疎で最小限の作品も有効。単一の方向線・地平線・端寄りの焦点だけの DDL も、少なくとも1つの描画可能な instruction にする**
 - **出力は 1〜5 instructions に圧縮する。DDL 全文を説明し直さず、主題を成立させる主要な視覚関係だけを JSON 化する**
@@ -72,10 +72,11 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 ## 数量と密度
 
-- **count は 1〜1000 の整数。DDL に明示的な数があればその値を使う**
+- **count は 1〜1000 の整数**
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
-- **余白を残す。小さな scatter が 120 個を超える場合は、全面密度ではなく arrangement.density, cluster_count, fade, preserve_space を使い、斜めの帯・上から下・右半分などの配置語を尊重する。要素サイズを小さくしすぎない**
-- **大数量は「数の忠実さ」より「群の見え方」を優先する。300 個以上は count を 80〜120 個へ代表化し、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で原意を保持する**
+- **明示数量は、後述する grid を除き、240 未満なら literal。要求値をそのまま arrangement.count に使う。110 / 64 / 48 などの代表値へ置換せず、密度や余白を理由に縮小しない**
+- **明示数量が 240 以上なら代表化する。count を 80〜120 とし、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で群の見え方と配置語を保持する**
+- **複数群の literal 対象の合計が 400 を超える場合は、要求値の大きい群から順に代表化し、literal 合計が 400 以下になった時点で止める。小さい群を先に削らず、比例縮小や群の統合をしない**
 
 ## 対象物化の禁止と抽象化
 
@@ -208,7 +209,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.014,0.014],"color":"white","rotation":30,"arrangement":{"count":110,"layout":"scatter","density":"high","cluster_count":9,"fade":"outward","preserve_space":true,"margin":0.2}}]}
 
 入力: 白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。
-出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+出力: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 入力: 震えるペンの緑の直線を三百本、上から下に引く。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"green","arrangement":{"count":110,"layout":"vertical","path":"top_to_bottom","density":"high","cluster_count":7,"fade":"directional","preserve_space":true},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]}}]}
@@ -280,7 +281,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 出力: {"background":"white","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"black","color_hint":"白い線を可視化"}]}
 
 入力: 背景を白で塗りつぶす。白い短い線を上から下へ百三十七本散らす。
-出力: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"白い線を小面積側で可視化","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}
+出力: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"白い線を小面積側で可視化","arrangement":{"count":137,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}
 
 入力: 背景を白で塗りつぶす。白い大きな円を上端近くに置く。半径は0.15。
 出力: {"background":"blue","instructions":[{"primitive":"circle","center":[0.5,0.18],"radius":0.15,"color":"white"}]}
@@ -304,7 +305,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 黒い線を一本引く。赤い線を前の線に触れるように置く。
 出力: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching"}}]}
 
-入力: 緑の弧を二本、上下に離して置く。
+入力: 緑の弧を上下の異なる位置に一本ずつ離して置く。
 出力: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
 
 入力: 黒い横線を一本引く。赤い小さな楕円を前の線に沿って三つ置く。
@@ -313,7 +314,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 青い小さな円を一つ置く。白い小さな四角を前の二つの間に置く。
 出力: {"instructions":[{"primitive":"circle","center":[0.42,0.5],"radius":0.04,"color":"blue"},{"primitive":"square","position":[0.55,0.47],"size":[0.06,0.06],"color":"white"}]}
 
-入力: 黒い線を二本置く。赤い小さな円を前の二つの間に置く。
+入力: 黒い線を上下の異なる位置に一本ずつ置く。赤い小さな円を前の二つの間に置く。
 出力: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
 
 入力: 黒い横線を一本引く。赤い小さな円を前の線に沿って置く。青い小さな四角を前の線に沿って置く。
@@ -418,7 +419,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Transcribe only normalized DDL cloudform as primitive="cloudform" with center+size. Never generate contour coordinates or control points, and never infer or repair cloudform into the score**
 - **When normalized DDL contains one or more cloudform clauses, the output must retain the same cloudform instruction. Never replace or omit it as ellipse/line when combined with a wide proportion, arrangement, surface, or carve. Repeated identical cloudforms use one instruction plus arrangement**
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
-- **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
+- **Repeated identical shapes in the same placement → 1 instruction + arrangement.count. Do not expand a repetition into N instructions. Groups with different counts, placements, or positions use separate instructions**
 - **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
 - **Sparse or minimal works are valid. A single directional line, horizon line, or edge-biased focus must still become at least one drawable instruction**
 - **Compress the output to 1–5 instructions. Do not restate the whole DDL; convert only the main visual relationship that makes the work readable**
@@ -443,10 +444,11 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 ## Count and density
 
-- **count is integer 1–1000. Use explicit numbers from DDL**
+- **count is an integer from 1–1000**
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
-- **Preserve negative space. When tiny scatter exceeds 120 items, do not turn it into uniform full-canvas density; use arrangement.density, cluster_count, fade, and preserve_space while respecting placement phrases such as diagonal band, top to bottom, or right half**
-- **For very large quantities, prioritize the visible group behavior over literal item count. For 300+ items, represent them with count around 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true**
+- **Except for grid described below, an explicit quantity below 240 is literal. Use the requested value unchanged as arrangement.count. Do not replace it with a representative value such as 110, 64, or 48, and do not reduce it for density or negative space**
+- **Represent an explicit quantity of 240 or more with count 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true. Preserve the visible group behavior and placement phrase**
+- **When the sum of literal groups exceeds 400, convert the largest requested groups to representation one by one and stop as soon as the remaining literal sum is 400 or less. Do not reduce smaller groups first, scale groups proportionally, or merge groups**
 
 ## De-objectification and abstraction
 
@@ -568,7 +570,7 @@ Input: Scatter six hundred ten small rotated white squares dotted across the who
 Output: {"instructions":[{"primitive":"square","position":[0.49,0.49],"size":[0.014,0.014],"color":"white","rotation":30,"arrangement":{"count":110,"layout":"scatter","density":"high","cluster_count":9,"fade":"outward","preserve_space":true,"margin":0.2}}]}
 
 Input: Scatter one hundred thirty-seven short white lines from top to bottom. Swaying slowly.
-Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
+Output: {"instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"white","arrangement":{"count":137,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true},"variation":{"amplitude":"medium","frequency":"slow","quality":"wave","dimensions":["position_x","position_y"]}}]}
 
 Input: Draw three hundred trembling green pen lines from top to bottom.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"green","arrangement":{"count":110,"layout":"vertical","path":"top_to_bottom","density":"high","cluster_count":7,"fade":"directional","preserve_space":true},"variation":{"amplitude":"fine","frequency":"medium","quality":"perlin","dimensions":["position_x","position_y"]}}]}
@@ -631,7 +633,7 @@ Output: {"instructions":[{"primitive":"arc","center":[0.50,0.47],"radius":0.0833
 Input: Draw one black line. Place a red line touching the previous line.
 Output: {"instructions":[{"primitive":"line","from":[0.20,0.50],"to":[0.80,0.50],"color":"black"},{"primitive":"line","from":[0.30,0.40],"to":[0.70,0.40],"color":"red","relation":{"type":"touching"}}]}
 
-Input: Place two green arcs separated vertically.
+Input: Place one green arc at each of two separate vertical positions.
 Output: {"instructions":[{"primitive":"arc","center":[0.50,0.38],"radius":0.10,"angle_start":200,"angle_end":340,"color":"green"},{"primitive":"arc","center":[0.50,0.62],"radius":0.10,"angle_start":20,"angle_end":160,"color":"green"}]}
 
 Input: Draw one black horizontal line. Place three small red ellipses along the previous line.
@@ -640,7 +642,7 @@ Output: {"instructions":[{"primitive":"line","from":[0.12,0.5],"to":[0.88,0.5],"
 Input: Place one small blue circle. Place one small white square between the previous two.
 Output: {"instructions":[{"primitive":"circle","center":[0.42,0.5],"radius":0.04,"color":"blue"},{"primitive":"square","position":[0.55,0.47],"size":[0.06,0.06],"color":"white"}]}
 
-Input: Draw two black lines. Place a small red circle between the previous two.
+Input: Draw one black line at each of two different vertical positions. Place a small red circle between the previous two.
 Output: {"instructions":[{"primitive":"line","from":[0.18,0.36],"to":[0.55,0.36],"color":"black"},{"primitive":"line","from":[0.45,0.64],"to":[0.82,0.64],"color":"black"},{"primitive":"circle","center":[0.5,0.5],"radius":0.035,"color":"red","relation":{"type":"between","gap":"medium"}}]}
 
 Input: Draw one black horizontal line. Place one small red circle along the previous line. Place one small blue square along the previous line.
@@ -674,7 +676,7 @@ Input: Draw one gray line rising from the bottom-left to the upper-right.
 Output: {"instructions":[{"primitive":"line","from":[0.15,0.78],"to":[0.78,0.28],"color":"gray","arrangement":{"count":1,"layout":"scatter","density":"low","fade":"outward","preserve_space":true}}]}
 
 Input: Fill background with white. Scatter one hundred thirty-seven short white lines from top to bottom.
-Output: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"white lines made visible on the smaller area","arrangement":{"count":96,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}
+Output: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"white lines made visible on the smaller area","arrangement":{"count":137,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}
 
 Input: Fill background with white. Place a large white circle near the top edge. Radius 0.15.
 Output: {"background":"blue","instructions":[{"primitive":"circle","center":[0.5,0.18],"radius":0.15,"color":"white"}]}

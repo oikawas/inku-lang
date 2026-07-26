@@ -273,7 +273,7 @@ class Arrangement(BaseModel):
     count: int = Field(
         ge=1,
         le=2000,
-        description="配置数。通常配置は1-1000、gridは1-2000。2以上の同一図形には必ず使う。複数 instruction 生成は禁止",
+        description="配置数。通常配置は1-1000、gridは1-2000。同一図形・同一配置の反復に使い、反復を N 件の instruction へ展開しない",
     )
 
     @field_validator("count", mode="before")
@@ -485,7 +485,7 @@ class Instruction(BaseModel):
     )
     arrangement: Optional[Arrangement] = Field(
         default=None,
-        description="N個配置。2以上の同一図形は必ずこれを使う。複数 instruction 生成は絶対禁止",
+        description="N個配置。同一図形・同一配置の反復は必ずこれを使い、N 件の instruction へ展開しない。個数や配置が異なる群は別 instruction にする",
     )
     at: Optional[AtRegion] = Field(
         default=None,

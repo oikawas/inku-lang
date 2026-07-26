@@ -147,6 +147,10 @@ MAX_EXPANDED_PRIMITIVES = 400
 MAX_EXPANDED_PER_INSTRUCTION = 240
 
 
+# The two ends of the representative band the prompt and SPEC name: a request too
+# large to count is shown as 80-120 marks. Both ends belong to the same rule, so
+# they are written as a pair.
+MIN_VISUAL_CLUSTERED_COUNT = 80
 MAX_VISUAL_CLUSTERED_COUNT = 120
 
 
@@ -398,7 +402,7 @@ def _cluster_count(original_count: int) -> int:
 def _clustered_visual_count(original_count: int) -> int:
     if original_count <= MAX_VISUAL_CLUSTERED_COUNT:
         return original_count
-    return min(MAX_VISUAL_CLUSTERED_COUNT, max(48, int(original_count * 0.42)))
+    return min(MAX_VISUAL_CLUSTERED_COUNT, max(MIN_VISUAL_CLUSTERED_COUNT, int(original_count * 0.42)))
 
 
 def _with_clustered_density(ins: Instruction, note: str) -> Instruction:

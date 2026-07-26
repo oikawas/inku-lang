@@ -396,6 +396,9 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "240 未満なら literal" in SYSTEM_PROMPT
     assert "240 以上なら代表化" in SYSTEM_PROMPT
     assert "literal 合計が 400 以下" in SYSTEM_PROMPT
+    # Score has no metadata field and every model forbids extras, so the prompt must not ask for one.
+    assert "metadata" not in SYSTEM_PROMPT
+    assert "metadata" not in SYSTEM_PROMPT_EN
     assert "110 / 64 / 48" in SYSTEM_PROMPT
     assert '"count":137' in SYSTEM_PROMPT
     assert "below 240 is literal" in SYSTEM_PROMPT_EN

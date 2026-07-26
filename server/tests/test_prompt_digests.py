@@ -113,14 +113,14 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_865
-    assert _digest(composer.SYSTEM_PROMPT) == "c1cd79817749e349"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 41_026
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "a6240aec838be0ad"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_795
+    assert _digest(composer.SYSTEM_PROMPT) == "1dd998b61016daf0"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_947
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "f7f202b29f16392a"
     assert len(tool_json.encode("utf-8")) == 18_021
     assert _digest(tool_json) == "76e0c2b9d23a47f9"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "fd4d22e88cb47ed5"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "b926effe5e9854c9"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "88fd68b059e412c8"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "c037afbbf2d6dec2"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -222,8 +222,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     changed_tool = replace_description(changed_tool)
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "b3c3d01bfbd10381"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "c1cd79817749e349"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "606ee64ce26be1cf"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "1dd998b61016daf0"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

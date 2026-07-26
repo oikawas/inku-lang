@@ -76,7 +76,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
 - **明示数量は、後述する grid を除き、240 未満なら literal。要求値をそのまま arrangement.count に使う。110 / 64 / 48 などの代表値へ置換せず、密度や余白を理由に縮小しない**
 - **明示数量が 240 以上なら代表化する。count を 80〜120 とし、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で群の見え方と配置語を保持する**
-- **複数群の literal 対象の合計が 400 を超える場合は、要求値の大きい群から順に代表化し、literal 合計が 400 以下になった時点で止める。小さい群を先に削らず、比例縮小や群の統合をしない。代表化した事実と元の要求値を診断 metadata に残す**
+- **複数群の literal 対象の合計が 400 を超える場合は、要求値の大きい群から順に代表化し、literal 合計が 400 以下になった時点で止める。小さい群を先に削らず、比例縮小や群の統合をしない**
 
 ## 対象物化の禁止と抽象化
 
@@ -448,7 +448,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
 - **Except for grid described below, an explicit quantity below 240 is literal. Use the requested value unchanged as arrangement.count. Do not replace it with a representative value such as 110, 64, or 48, and do not reduce it for density or negative space**
 - **Represent an explicit quantity of 240 or more with count 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true. Preserve the visible group behavior and placement phrase**
-- **When the sum of literal groups exceeds 400, convert the largest requested groups to representation one by one and stop as soon as the remaining literal sum is 400 or less. Do not reduce smaller groups first, scale groups proportionally, or merge groups. Record the representation and original requested value in diagnostic metadata**
+- **When the sum of literal groups exceeds 400, convert the largest requested groups to representation one by one and stop as soon as the remaining literal sum is 400 or less. Do not reduce smaller groups first, scale groups proportionally, or merge groups**
 
 ## De-objectification and abstraction
 

@@ -263,6 +263,57 @@ internal object ServerRendererMaterial {
         return out.toString()
     }
 
+    fun offsetPerformedPath(
+        path: List<Pair<Double, Double>>,
+        offset: Double,
+        closed: Boolean,
+        center: Pair<Double, Double>
+    ): List<Pair<Double, Double>> {
+        val normals = ServerStrokeEngine.centerlineNormals(path, closed)
+        var votes = 0
+        for (i in path.indices) {
+            val (x, y) = path[i]
+            val (nx, ny) = normals[i]
+            if (nx * (x - center.first) + ny * (y - center.second) >= 0.0) votes++ else votes--
+        }
+        val sign = if (votes >= 0) 1.0 else -1.0
+        return path.indices.map { i ->
+            val (x, y) = path[i]
+            val (nx, ny) = normals[i]
+            Pair(x + nx * offset * sign, y + ny * offset * sign)
+        }
+    }
+
+    fun performedOutline(
+        ins: JSONObject,
+        attrs: SvgAttrs,
+        path: List<Pair<Double, Double>>,
+        unit: Double,
+        closed: Boolean,
+        pathLenPx: Double,
+        center: Pair<Double, Double>,
+        renderSeed: Long? = null
+    ): String {
+        val weight = ins.optString("weight", "pen")
+        val seedStr = ServerRendererGeometry.seedForInstruction(ins, renderSeed)
+        val out = StringBuilder()
+        materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
+            val pts = offsetPerformedPath(path, offset, closed, center)
+            val ptsStr = pts.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
+            val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
+            val tag = if (closed) "polygon" else "polyline"
+            out.append("""<$tag points="$ptsStr" ${outline.toSvgAttributes()} class="material-outline"/>""")
+        }
+        val spec = speckProfile(weight, pathLenPx, unit)
+        if (spec != null && spec.count > 0 && path.isNotEmpty()) {
+            val resampled = (0 until spec.count).map { idx ->
+                path[minOf(path.size - 1, (idx * path.size) / spec.count)]
+            }
+            out.append(specksAtPoints(resampled, attrs, seedStr.toString(), spec))
+        }
+        return out.toString()
+    }
+
 
     private fun materialOutlineProfile(weight: String, unit: Double): List<OutlineProfile> {
         val scale = unit / 1000.0
@@ -360,25 +411,6 @@ internal object ServerRendererMaterial {
             val oy = ServerRendererGeometry.signedHash(idx + 157, seed) * profile.spread
             val r = max(0.35, profile.radius * (0.75 + kotlin.math.abs(ServerRendererGeometry.signedHash(idx + 263, seed)) * 0.7))
             out.append("""<circle cx="${ServerRendererGeometry.fmt(point.first + ox)}" cy="${ServerRendererGeometry.fmt(point.second + oy)}" r="${ServerRendererGeometry.fmt(r)}" fill="${attrs.stroke}" stroke="none" opacity="${ServerRendererGeometry.fmt(profile.opacity)}"/>""")
-        }
-        return out.toString()
-    }
-
-    private fun ropeTwists(x1: Double, y1: Double, x2: Double, y2: Double, attrs: SvgAttrs, seed: String, unit: Double): String {
-        val scale = unit / 1000.0
-        val out = StringBuilder()
-        val (ux, uy) = ServerRendererGeometry.lineDirection(x1, y1, x2, y2)
-        val px = -uy
-        val py = ux
-        val twistAttrs = attrs.copy(strokeWidth = 1.2 * scale, strokeOpacity = 0.42, dash = null, filter = null)
-        for (idx in 0 until 13) {
-            val t = (idx + 0.5) / 13.0
-            val cx = x1 + (x2 - x1) * t
-            val cy = y1 + (y2 - y1) * t
-            val phase = if (idx % 2 == 0) 1.0 else -1.0
-            val span = (8.0 + kotlin.math.abs(ServerRendererGeometry.signedHash(idx, seed)) * 2.5) * scale
-            val halfU = 3.0 * scale
-            out.append(lineElement(cx - ux * halfU + px * span * phase, cy - uy * halfU + py * span * phase, cx + ux * halfU - px * span * phase, cy + uy * halfU - py * span * phase, twistAttrs))
         }
         return out.toString()
     }

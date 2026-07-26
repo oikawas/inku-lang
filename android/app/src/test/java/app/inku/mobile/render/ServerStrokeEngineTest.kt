@@ -18,7 +18,7 @@ class ServerStrokeEngineTest {
     fun testPrimitivesParity() {
         val root = JSONObject(readResource("stroke_engine_primitives.json"))
 
-        // 1. Grammars
+        // 1. Grammars (11 tools)
         val grammarsObj = root.getJSONObject("grammars")
         assertEquals(GRAMMARS.size, grammarsObj.length())
         for (weight in GRAMMARS.keys) {
@@ -32,11 +32,57 @@ class ServerStrokeEngineTest {
             assertEquals("taper for $weight", expected.getDouble("taper"), actual.taper, 1e-12)
             assertEquals("bulge for $weight", expected.getDouble("bulge"), actual.bulge, 1e-12)
             assertEquals("gesture for $weight", expected.getDouble("gesture"), actual.gesture, 1e-12)
+            assertEquals("periodic for $weight", expected.getBoolean("periodic"), actual.periodic)
+            assertEquals("quantize for $weight", expected.getDouble("quantize"), actual.quantize, 1e-12)
+            assertEquals("width_steps for $weight", expected.getInt("width_steps"), actual.widthSteps)
         }
 
-        // 1b. Engine 12 constants
+        // 1b. Engine 12/14 constants
         assertEquals(WILD_GAIN, root.getDouble("wild_gain"), 1e-12)
         assertEquals(GESTURE_EDGE, root.getDouble("gesture_edge"), 1e-12)
+
+        // 1c. Machine terms (9 samples)
+        if (root.has("machine")) {
+            val machineArr = root.getJSONArray("machine")
+            assertEquals(9, machineArr.length())
+            for (i in 0 until machineArr.length()) {
+                val item = machineArr.getJSONObject(i)
+                val t = item.getDouble("t")
+                assertEquals("machineEnergy at t=$t", item.getDouble("energy"), ServerStrokeEngine.machineEnergy(t), 1e-12)
+                assertEquals("machineSwell at t=$t", item.getDouble("swell"), ServerStrokeEngine.machineSwell(t), 1e-12)
+                assertEquals("machineGesture at t=$t", item.getDouble("gesture"), ServerStrokeEngine.machineGesture(t), 1e-12)
+            }
+        }
+
+        // 1d. Grid point (33 samples)
+        if (root.has("grid_point")) {
+            val gridPointArr = root.getJSONArray("grid_point")
+            assertEquals(33, gridPointArr.length())
+            for (i in 0 until gridPointArr.length()) {
+                val item = gridPointArr.getJSONObject(i)
+                val value = item.getDouble("value")
+                val step = item.getDouble("step")
+                val expected = item.getDouble("point")
+                val actual = ServerStrokeEngine.gridPoint(value, step)
+                assertEquals("gridPoint mismatch for value=$value step=$step", expected, actual, 1e-12)
+            }
+        }
+
+        // 1e. Grid step px (12 samples)
+        if (root.has("grid_step_px")) {
+            val gridStepPxArr = root.getJSONArray("grid_step_px")
+            assertEquals(12, gridStepPxArr.length())
+            for (i in 0 until gridStepPxArr.length()) {
+                val item = gridStepPxArr.getJSONObject(i)
+                val weight = item.getString("weight")
+                val canvasArr = item.getJSONArray("canvas")
+                val shortSide = Math.min(canvasArr.getDouble(0), canvasArr.getDouble(1))
+                val grammar = GRAMMARS[weight] ?: error("Missing grammar for $weight")
+                val expected = item.getDouble("value")
+                val actual = shortSide * grammar.quantize
+                assertEquals("grid_step_px mismatch for weight=$weight case $i", expected, actual, 1e-12)
+            }
+        }
 
         // 2. Unit hash (56 cases)
         val unitArr = root.getJSONArray("unit")
@@ -183,7 +229,7 @@ class ServerStrokeEngineTest {
     @Test
     fun testSynthesizeStrokeParity() {
         val root = JSONArray(readResource("stroke_engine_synthesize_stroke.json"))
-        assertEquals(13, root.length())
+        assertEquals(19, root.length())
         for (caseIdx in 0 until root.length()) {
             val caseObj = root.getJSONObject(caseIdx)
             val name = caseObj.getString("name")
@@ -198,8 +244,9 @@ class ServerStrokeEngineTest {
             val seed = input.getLong("seed")
             val samplesCount = input.getInt("samples")
             val wild = input.optBoolean("wild", false)
+            val gridStep = input.optDouble("grid_step", 0.0)
 
-            val result = ServerStrokeEngine.synthesizeStroke(start, end, baseWidth, weight, seed, samplesCount, wild)
+            val result = ServerStrokeEngine.synthesizeStroke(start, end, baseWidth, weight, seed, samplesCount, wild, gridStep)
 
             // Samples check
             val expectedSamples = caseObj.getJSONArray("samples")
@@ -213,6 +260,9 @@ class ServerStrokeEngineTest {
                 assertEquals("sample $sIdx width for $name", expS.getDouble("width"), actS.width, 1e-6)
                 assertEquals("sample $sIdx energy for $name", expS.getDouble("energy"), actS.energy, 1e-6)
                 assertEquals("sample $sIdx lateral for $name", expS.getDouble("lateral"), actS.lateral, 1e-6)
+                if (expS.has("residual")) {
+                    assertEquals("sample $sIdx residual for $name", expS.getDouble("residual"), actS.residual, 1e-6)
+                }
                 if (expS.isNull("event")) {
                     assertNull("sample $sIdx event for $name should be null", actS.event)
                 } else {
@@ -233,6 +283,9 @@ class ServerStrokeEngineTest {
             assertEquals("event_count for $name", caseObj.getInt("event_count"), result.eventCount)
             assertEquals("burr_side for $name", caseObj.getInt("burr_side"), result.burrSide)
             assertEquals("burr_opacity for $name", caseObj.getDouble("burr_opacity"), result.burrOpacity, 1e-9)
+            if (caseObj.has("grid_step")) {
+                assertEquals("grid_step for $name", caseObj.getDouble("grid_step"), result.gridStep, 1e-9)
+            }
             assertEquals("path_d for $name", caseObj.getString("path_d"), ServerStrokeEngine.polygonPath(result.outline))
         }
     }
@@ -240,7 +293,7 @@ class ServerStrokeEngineTest {
     @Test
     fun testSynthesizeAlongParity() {
         val root = JSONArray(readResource("stroke_engine_synthesize_along.json"))
-        assertEquals(5, root.length())
+        assertEquals(8, root.length())
         for (caseIdx in 0 until root.length()) {
             val caseObj = root.getJSONObject(caseIdx)
             val name = caseObj.getString("name")
@@ -262,8 +315,10 @@ class ServerStrokeEngineTest {
             for (i in 0 until anchorsArr.length()) {
                 anchors.add(anchorsArr.getInt(i))
             }
+            val gridStep = input.optDouble("grid_step", 0.0)
+            val wild = input.optBoolean("wild", false)
 
-            val result = ServerStrokeEngine.synthesizeAlong(centerline, baseWidth, weight, seed, closed, anchors)
+            val result = ServerStrokeEngine.synthesizeAlong(centerline, baseWidth, weight, seed, closed, anchors, gridStep, wild)
 
             // Samples check
             val expectedSamples = caseObj.getJSONArray("samples")
@@ -277,6 +332,9 @@ class ServerStrokeEngineTest {
                 assertEquals("sample $sIdx width for $name", expS.getDouble("width"), actS.width, 1e-4)
                 assertEquals("sample $sIdx energy for $name", expS.getDouble("energy"), actS.energy, 1e-4)
                 assertEquals("sample $sIdx lateral for $name", expS.getDouble("lateral"), actS.lateral, 1e-4)
+                if (expS.has("residual")) {
+                    assertEquals("sample $sIdx residual for $name", expS.getDouble("residual"), actS.residual, 1e-4)
+                }
                 if (expS.isNull("event")) {
                     assertNull("sample $sIdx event for $name should be null", actS.event)
                 } else {
@@ -307,6 +365,9 @@ class ServerStrokeEngineTest {
             assertEquals("event_count for $name", caseObj.getInt("event_count"), result.eventCount)
             assertEquals("burr_side for $name", caseObj.getInt("burr_side"), result.burrSide)
             assertEquals("burr_opacity for $name", caseObj.getDouble("burr_opacity"), result.burrOpacity, 1e-9)
+            if (caseObj.has("grid_step")) {
+                assertEquals("grid_step for $name", caseObj.getDouble("grid_step"), result.gridStep, 1e-9)
+            }
             assertEquals("path_d for $name", caseObj.getString("path_d"), ServerStrokeEngine.contourStrokePath(result))
         }
     }
@@ -331,5 +392,16 @@ class ServerStrokeEngineTest {
         org.junit.Assert.assertNotEquals(pencilOff.getJSONArray("samples").toString(), pencilWild.getJSONArray("samples").toString())
         org.junit.Assert.assertNotEquals(pencilOff.getJSONArray("outline").toString(), pencilWild.getJSONArray("outline").toString())
         org.junit.Assert.assertNotEquals(pencilOff.getString("path_d"), pencilWild.getString("path_d"))
+
+        // Computer判別テスト:
+        // 1. line_computer_plain と line_computer_other_seed が標本ごと一致すること
+        val compPlain = cases["line_computer_plain"] ?: error("Missing line_computer_plain")
+        val compOtherSeed = cases["line_computer_other_seed"] ?: error("Missing line_computer_other_seed")
+        assertEquals("Computer plain vs other seed samples", compPlain.getJSONArray("samples").toString(), compOtherSeed.getJSONArray("samples").toString())
+
+        // 2. line_computer_grid と line_computer_grid_wild が residual を含めて一致すること
+        val compGrid = cases["line_computer_grid"] ?: error("Missing line_computer_grid")
+        val compGridWild = cases["line_computer_grid_wild"] ?: error("Missing line_computer_grid_wild")
+        assertEquals("Computer grid vs grid_wild samples", compGrid.getJSONArray("samples").toString(), compGridWild.getJSONArray("samples").toString())
     }
 }

@@ -155,29 +155,29 @@ class ServerScoreParityTest {
 
         val scoreStr = """{"instructions":[{"center":[0.5,0.5],"primitive":"circle","radius":0.2,"weight":"pen"}]}"""
 
-        // Case 1: render_wild unset -> rh3:44cf...
+        // Case 1: engine_version = "14", render_wild unset -> rh3:49909b323b19dd6931ebe4c417050793671b26fbf0ecfa458b360c9b760b379b
         val meta1 = JSONObject()
             .put("render_seed", 12345)
             .put("render_engine_id", "inku-svg")
-            .put("render_engine_version", "12")
+            .put("render_engine_version", "14")
             .put("render_color_catalog_id", "default")
         val hash1 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta1.toString(), "default") as String
-        assertEquals("rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694", hash1)
+        assertEquals("rh3:49909b323b19dd6931ebe4c417050793671b26fbf0ecfa458b360c9b760b379b", hash1)
 
-        // Case 2: render_wild = false -> rh3:44cf...
+        // Case 2: engine_version = "14", render_wild = false -> rh3:49909b323b19dd6931ebe4c417050793671b26fbf0ecfa458b360c9b760b379b
         val meta2 = JSONObject(meta1.toString()).put("render_wild", false)
         val hash2 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta2.toString(), "default") as String
-        assertEquals("rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694", hash2)
+        assertEquals("rh3:49909b323b19dd6931ebe4c417050793671b26fbf0ecfa458b360c9b760b379b", hash2)
 
-        // Case 3: render_wild = true -> rh3:842f...
+        // Case 3: engine_version = "14", render_wild = true -> rh3:2e344afb5426b5418763add9a6c23adae3361fb33a74382821fc11c804cc98b0
         val meta3 = JSONObject(meta1.toString()).put("render_wild", true)
         val hash3 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta3.toString(), "default") as String
-        assertEquals("rh3:842f46d67af6a696001f90ccd29367a8b65888cd8ea922e67ecb4d82f7c139e2", hash3)
+        assertEquals("rh3:2e344afb5426b5418763add9a6c23adae3361fb33a74382821fc11c804cc98b0", hash3)
 
-        // Case 4: render_wild = false, engine_version = "11" -> rh3:d1b1...
-        val meta4 = JSONObject(meta1.toString()).put("render_wild", false).put("render_engine_version", "11")
+        // Case 4: engine_version = "12", render_wild = false -> rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694
+        val meta4 = JSONObject(meta1.toString()).put("render_wild", false).put("render_engine_version", "12")
         val hash4 = renderHashMethod.invoke(pipeline, "input", "ddl", scoreStr, "<svg/>", meta4.toString(), "default") as String
-        assertEquals("rh3:d1b1c9e25a031429e931ae6d8575dbda538bb78e8862a7ace337d2077799e8b6", hash4)
+        assertEquals("rh3:44cf760dc769c1e04ea8187d602120401c29cdea58d6a3bcc08ea428179e9694", hash4)
     }
 
     @Test

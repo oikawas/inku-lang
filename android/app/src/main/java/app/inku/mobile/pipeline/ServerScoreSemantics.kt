@@ -274,6 +274,7 @@ internal object ServerScoreSemantics {
         text.contains("髪") || text.contains("ヘア") || text.contains("hair", ignoreCase = true) -> "hair"
         text.contains("ビュラン") || text.contains("burin", ignoreCase = true) -> "burin"
         text.contains("ドライポイント") || text.contains("drypoint", ignoreCase = true) -> "drypoint"
+        text.contains("コンピュータ") || text.contains("コンピューター") || text.contains("computer", ignoreCase = true) -> "computer"
         text.contains("ロットリング") || text.contains("rotring", ignoreCase = true) -> "rotring"
         text.contains("鉛筆") || text.contains("pencil", ignoreCase = true) -> "pencil"
         text.contains("ペン") || text.contains("pen", ignoreCase = true) -> "pen"

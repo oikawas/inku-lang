@@ -128,7 +128,6 @@ internal object ServerRendererStyle {
         "chalk" -> 0.70
         "brush_thin" -> 0.90
         "brush_thick" -> 0.86
-        "rope" -> 0.88
         else -> 1.0
     }
 

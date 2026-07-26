@@ -62,7 +62,7 @@ internal object ServerScoreCoercer {
         val primitive = source.optString("primitive", "line").takeIf { it in supportedPrimitives } ?: "line"
         val data = JSONObject(source.toString()).put("primitive", primitive)
         data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray") } ?: "black")
-        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("hair", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint") } ?: "pen")
+        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("hair", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint", "computer") } ?: "pen")
         data.put("style", data.optString("style", "solid").ifBlank { "solid" })
         if (!data.has("filled")) data.put("filled", false)
         if (data.has("mode")) {
@@ -276,6 +276,7 @@ internal object ServerScoreCoercer {
         listOf("水墨", "墨", "ink-wash", "ink wash") to "brush_thin",
         listOf("ビュラン", "burin") to "burin",
         listOf("ドライポイント", "drypoint") to "drypoint",
+        listOf("コンピュータ", "computer") to "computer",
     )
 }
 

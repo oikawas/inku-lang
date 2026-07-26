@@ -187,7 +187,7 @@ private val DeviceRotation.clockwiseDegrees: Int
         DeviceRotation.LandscapeRight -> 270
     }
 
-private data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
+internal data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
 private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
@@ -269,9 +269,9 @@ private object ArtworkBitmapCache {
     }
 }
 
-private val saijikiGroups = listOf(
+internal val saijikiGroups = listOf(
     SaijikiGroup("かたち", "forms", listOf("円", "楕円", "三角", "四角", "線", "弧")),
-    SaijikiGroup("てざわり", "touches", listOf("髪", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "縄")),
+    SaijikiGroup("てざわり", "touches", listOf("鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ")),
     SaijikiGroup("つらなり", "continuity", listOf("実線", "破線", "点線", "一点鎖線")),
     SaijikiGroup("いろ", "colors", listOf("白", "黒", "青", "赤", "緑", "灰")),
     SaijikiGroup("ゆらぎ", "movements", listOf("細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む")),
@@ -4771,7 +4771,6 @@ private fun firstSvgFillColor(svgText: String): Color? {
 
 private fun strokeWidthPx(weight: String): Float = when (weight) {
     "brush_thick" -> 8f
-    "rope" -> 10f
     "crayon" -> 4f
     "chalk", "brush_thin" -> 3f
     "pencil" -> 1.5f

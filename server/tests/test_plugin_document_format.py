@@ -128,8 +128,9 @@ def test_delete_and_reinstall_does_not_change_saved_replay_artifact(tmp_path: Pa
 
 def test_stage15_and_coerce_have_no_plugin_injection_path() -> None:
     package = Path(__file__).parents[1] / "src" / "inku_server"
-    for module in ("ddl_expander.py", "coerce.py"):
-        source = (package / module).read_text(encoding="utf-8")
+    modules = [package / "ddl_expander.py", *sorted((package / "coerce").glob("*.py"))]
+    for module in modules:
+        source = module.read_text(encoding="utf-8")
         assert "DOCUMENT_PLUGIN_MANAGER" not in source
         assert "expand_plugin_ddl" not in source
 

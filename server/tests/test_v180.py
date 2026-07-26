@@ -60,8 +60,14 @@ def test_unread_word_ledger_is_user_scoped():
 
 def test_generation_modules_do_not_import_feature_analysis():
     package = Path(__file__).resolve().parents[1] / "src" / "inku_server"
-    for name in ("renderer.py", "composer.py", "ddl_expander.py", "coerce.py"):
-        tree = ast.parse((package / name).read_text(encoding="utf-8"))
+    modules = [
+        package / "renderer.py",
+        package / "composer.py",
+        package / "ddl_expander.py",
+        *sorted((package / "coerce").glob("*.py")),
+    ]
+    for module in modules:
+        tree = ast.parse(module.read_text(encoding="utf-8"))
         imported = {
             alias.name
             for node in ast.walk(tree)
@@ -73,7 +79,7 @@ def test_generation_modules_do_not_import_feature_analysis():
             for node in ast.walk(tree)
             if isinstance(node, ast.ImportFrom)
         )
-        assert not any("feature_analysis" in item or "inku_analysis" in item for item in imported), name
+        assert not any("feature_analysis" in item or "inku_analysis" in item for item in imported), module.name
 
 def test_coerce_branch_report_is_observational():
     score = Score.model_validate({

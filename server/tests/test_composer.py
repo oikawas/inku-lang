@@ -402,6 +402,8 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "quantity of 240 or more" in SYSTEM_PROMPT_EN
     assert "remaining literal sum is 400 or less" in SYSTEM_PROMPT_EN
     assert '"count":137' in SYSTEM_PROMPT_EN
+    assert "Groups with different counts, placements, or positions use separate instructions" in SYSTEM_PROMPT_EN
+    assert "Multiple instructions are absolutely forbidden" not in SYSTEM_PROMPT_EN
     assert "cluster_count" in SYSTEM_PROMPT
     assert "preserve_space" in SYSTEM_PROMPT
     assert "透明な膜" in SYSTEM_PROMPT

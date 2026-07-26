@@ -419,7 +419,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Transcribe only normalized DDL cloudform as primitive="cloudform" with center+size. Never generate contour coordinates or control points, and never infer or repair cloudform into the score**
 - **When normalized DDL contains one or more cloudform clauses, the output must retain the same cloudform instruction. Never replace or omit it as ellipse/line when combined with a wide proportion, arrangement, surface, or carve. Repeated identical cloudforms use one instruction plus arrangement**
 - center-positioned square/triangle: position = [0.5-w/2, 0.5-h/2]
-- **Multiple identical shapes → 1 instruction + arrangement. Multiple instructions are absolutely forbidden**
+- **Repeated identical shapes in the same placement → 1 instruction + arrangement.count. Do not expand a repetition into N instructions. Groups with different counts, placements, or positions use separate instructions**
 - **If normalized DDL contains shapes, lines, or arcs, instructions must not be empty. If exact conversion is difficult, map it to the nearest line, ellipse, or square**
 - **Sparse or minimal works are valid. A single directional line, horizon line, or edge-biased focus must still become at least one drawable instruction**
 - **Compress the output to 1–5 instructions. Do not restate the whole DDL; convert only the main visual relationship that makes the work readable**

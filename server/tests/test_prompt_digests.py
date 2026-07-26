@@ -115,12 +115,12 @@ def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
     assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_865
     assert _digest(composer.SYSTEM_PROMPT) == "c1cd79817749e349"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_916
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "e92f724f363156a4"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 41_026
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "a6240aec838be0ad"
     assert len(tool_json.encode("utf-8")) == 18_021
     assert _digest(tool_json) == "76e0c2b9d23a47f9"
     assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "fd4d22e88cb47ed5"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "ed1891f7bbe1d6d1"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "b926effe5e9854c9"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):

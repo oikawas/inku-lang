@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.7.6 / Build 715**
+**Target version: v2.7.7 / Build 716**
 
 This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
 

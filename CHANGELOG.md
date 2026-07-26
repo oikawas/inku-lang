@@ -957,3 +957,16 @@ and a frozen corpus of their own.
 - **No production-scale benchmark was run** (author's call). Every deterministic gate is green, and the remaining unknown — how often Stage 2 emits a compliant count — was measured in v2.7.5 (78–100% Japanese, 67–100% English, before coerce).
 - **Left undone.** A represented count does not always land in 80–120 (180 becomes 75, existing `_clustered_visual_count` behavior). **The prompt and the specification both say 80–120, and the deterministic layer does not follow them.**
 - **Verification.** server **1207 passed / 30 skipped** (1181 / 30 / 19 xfailed before), cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files. The reference corpora `render-engine-14` and `ddl-engine-1` are green and **were not regenerated**. The engine version is unchanged.
+
+---
+
+### v2.7.7 — a represented count stays inside the band the documentation names (Build 716, 2026-07-27)
+
+**The prompt and the specification both say a request of 240 or more is shown as 80–120 marks. The floor was 48.**
+
+- Only one path showed it. Representation at 240 and above already landed between 100 and 120 (`_clustered_visual_count(240)=100`); the band was missed for groups of 121–239, and under the v2.7.6 rule those are literal — they are represented only when the total budget knocks one down. That is where **180 became 75**.
+- The floor is now 80, and **`MIN_VISUAL_CLUSTERED_COUNT` and `MAX_VISUAL_CLUSTERED_COUNT` are written as a pair**. The band is one rule; only one end having a name is part of why the discrepancy went unseen.
+- `[180, 150, 130]` now gives **`[80, 150, 130]`** rather than `[75, 150, 130]`, totalling 360, within budget.
+- **A discriminating test** pins the band at ten points from 121 to 2000. Restoring the floor of 48 fails it for 121–239.
+- **None of the 39 golden cases moves** (`S-total-density` represents 200 as 84, already above the floor).
+- **Verification.** server **1217 passed / 30 skipped**, cli **69 passed**, ruff clean. Count preservation stays at **50/50**.

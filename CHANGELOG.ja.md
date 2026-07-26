@@ -3003,3 +3003,18 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **`palette` 6 件は対象外**。`catalog.get("palette")` などサーバー API の**フィールド名**であり、表示文字列ではない。**生の grep 件数をそのまま作業量にしない。**
 - **積み残し（明示・裁定待ち）**: サブコマンド名 `okugaki` は辞書では `colophon` だが、**コマンド名は識別子であり、変えると利用者の手順が壊れる**。今回は触っていない。`README.md` / `SPEC.md` / `manual/en/` の旧語彙（`artwork` ほか）も未追随のまま。
 - **検証:** cli 68 passed、ruff clean、`inku-cli --help` の実出力で新しい文言を確認。server 1101 passed / 30 skipped。
+
+---
+
+### coerce にゴールデンの赤を敷く（版数なし・2026-07-26）
+
+**coerce の 34 分岐は、凍結コーパスに 1 つも守られていなかった。** 分割の契約（`normalize` / `compose`）は「参照コーパス `render-engine-14` の 347 件が赤にならないこと」を受入の核に据えていたが、**そのコーパスは coerce を通らない**（`gen_render_reference.py` は `coerce_score` を import せず、docstring に "no ... coerce path supplies fixture values" と書いてある）。coerce を通る唯一のコーパス `ddl-engine-1` の B 群 14 件も、34 分岐のうち 10 しか発火させない。
+
+- **34 分岐 × 4 スイートを全数実測した**（分岐を 1 つずつ恒等関数に置き換えて、どのスイートが赤くなるかを数えた）。凍結コーパス 376 件は **34 分岐すべてで緑**。`test_api.py` + `test_composer.py` は 1 分岐のみ。`test_coerce.py`（125 件）は 31 分岐を捕まえる一方、**`_dedupe_instructions` / `_with_presence_auxiliary_shape_repair` / `_with_total_density_budget` の 3 つは無防備**だった。
+- **ゴールデン 39 ケースを追加した。** 保存作品 21 件（pentala の `history` から分岐被覆で選抜）と、実作品が届かない分岐のために組んだ合成入力 18 件。coerce 後の Score 全体・instruction 数・**分岐ごとの発火数**を固定する。発火数まで固定してあるので、**失敗したときにどの分岐が動いたかが名前で出る**。
+- **34 分岐すべてが、無効化すると 1 件以上のケースを動かす**（最大 17 件・最小 1 件）。判別力ゼロの分岐は無い。
+- **`_dedupe_instructions` は素朴に作ると空振りした。** 無効化しても当初の 38 件は 1 件も動かなかった。**11 番目の `_with_structural_duplicate_repair` のキーが「dump から `color_hint` を除いたもの」＝より粗く、4 番目が落とす行を必ず落とす**ためである。片方だけの摂動が下流に吸収される型。完全同一 10 行 + モチーフ要求（モチーフ修復は合計 10 行を超えると足さない）という 1 ケースを足して破った。
+- **「順序を 2 つ入れ替えれば赤になる」は成り立たない。** `dedupe_instructions` と `with_ddl_coverage` を入れ替えても 3 つのゲートすべてが緑だった。**同じケースで両方が発火する組でなければ、入れ替えても出力は動かない。**
+- **設計プランの数値 3 点を訂正した。** 分岐は 32 でなく **34**（instruction リストでなく値を返す `_with_background_dominance_governor` と `_presence_from_ddl` が漏れていた）。振り分けは normalize 6 / compose **28**。「発火率を測る手段が無い」も誤りで、`_record_branch_fire` は要素ごとの dict 不一致も数えるため書き換えだけの分岐も検出する。実際の欠落は `cli.py` の `_compose_response_as_paint_result` が `/api/compose` 応答から `coerce_*` を引き継いでいない 1 箇所だけだった。
+- **採番しなかった。** 動くコードは 1 行も変えておらず、反映するものが無い。この検査面は、それが守るための coerce 分割と同じ版で採番する。
+- **検証:** server **1143 passed / 30 skipped**（着手時 1101 / 30）、ruff clean。

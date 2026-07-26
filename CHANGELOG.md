@@ -893,3 +893,18 @@ and a frozen corpus of their own.
 - **The six `palette` hits are out of scope**: they are server API **field names** (`catalog.get("palette")`), not display text. **A raw grep count is not a measure of work.**
 - **Left undone, and stated.** The subcommand `okugaki` is `colophon` in the dictionary, but **a command name is an identifier, and renaming it breaks the reader's own scripts**; it stands. `README.md`, `SPEC.md` and `manual/en/` still carry the older vocabulary.
 - **Verification.** cli 68 passed, ruff clean, and the new wording confirmed in the real `inku-cli --help` output. server 1101 passed / 30 skipped.
+
+---
+
+### A golden gate for coerce (no version, 2026-07-26)
+
+**Not one of coerce's thirty-four branches was protected by a frozen corpus.** The contract for splitting it into `normalize` and `compose` rested on "the 347 cases of `render-engine-14` must not go red", but **that corpus never calls coerce**: `gen_render_reference.py` does not import `coerce_score`, and says so in its docstring ("no ... coerce path supplies fixture values"). The one corpus that does call it, the fourteen B cases of `ddl-engine-1`, fires ten of the thirty-four branches.
+
+- **All thirty-four branches were measured against all four suites**, by replacing each branch with the identity function and counting which suites turned red. The 376 frozen corpus cases stayed **green for every branch**. `test_api.py` and `test_composer.py` caught one. `test_coerce.py` (125 tests) caught thirty-one, leaving **`_dedupe_instructions`, `_with_presence_auxiliary_shape_repair` and `_with_total_density_budget` with no guard at all**.
+- **A golden set of thirty-nine cases was added**: twenty-one saved works, chosen from the pentala `history` for branch coverage, and eighteen synthetic inputs built for what real works never reach. It pins the whole coerced Score, the instruction count, and **the per-branch fire report** — so a failure names the branch that moved.
+- **Every one of the thirty-four branches changes at least one case when disabled** (seventeen at most, one at least). No branch is beyond the gate's reach.
+- **The plain dedupe needed a case where it decides something.** Disabling it moved none of the first thirty-eight outputs, because **the later `_with_structural_duplicate_repair` keys on the same payload minus `color_hint`** — strictly coarser, so it collapses every row the earlier one would have. A perturbation on one of two places that enforce the same property is absorbed downstream. Ten identical rows in front of a motif request breaks the tie, since the motif repair adds nothing once the score would exceed ten rows.
+- **"Swap any two calls and it goes red" does not hold.** Swapping `dedupe_instructions` with `with_ddl_coverage` left all three gates green. **Unless both branches fire on the same case, the swap changes nothing.**
+- **Three numbers in the design plan were corrected.** There are **thirty-four** recorded branches, not thirty-two: `_with_background_dominance_governor` and `_presence_from_ddl` return a value rather than an instruction list and had been missed. The split is six for normalize and **twenty-eight** for compose. "There is no way to measure the fire rates" was also wrong — `_record_branch_fire` counts element-wise dict inequality, so a branch that only rewrites is still seen. The real gap was a single line in `cli.py`, where `_compose_response_as_paint_result` carries none of the `coerce_*` fields out of the `/api/compose` response.
+- **No version was taken.** Not one line of running code changed, so there is nothing to deploy. This gate takes its number alongside the coerce split it exists to guard.
+- **Verification.** server **1143 passed / 30 skipped** (1101 / 30 before), ruff clean.

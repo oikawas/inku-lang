@@ -2,7 +2,7 @@
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches.",
  "frozen_at": "2026-07-26",
- "commit": "890ae0494a4bd30efde64a1276df2f3b10bd4cbe",
+ "commit": "c88acbd731aa5cea0f4631b50da813892995ce71",
  "branches_reached": [
   "coerce_and_repair_instruction",
   "dedupe_instructions",
@@ -11079,6 +11079,358 @@
      "with_composition_diversity_repair": 1,
      "with_context_density_governor": 0,
      "with_context_energy_repair": 0,
+     "with_crescent_sensory_suppression": 0,
+     "with_ddl_coverage": 0,
+     "with_existing_event_counterweight": 0,
+     "with_explicit_constraint_enforcement": 0,
+     "with_focal_event_floor": 0,
+     "with_literal_grid_fidelity": 0,
+     "with_ma_pressure": 0,
+     "with_motion_energy": 0,
+     "with_motion_floor": 0,
+     "with_per_instruction_density_budget": 0,
+     "with_presence_auxiliary_shape_repair": 0,
+     "with_primary_color_delivery": 0,
+     "with_repetition_event_variation": 0,
+     "with_rhythm_variation": 0,
+     "with_semantic_visual_event_hints": 0,
+     "with_shape_delivery_repair": 0,
+     "with_structural_duplicate_repair": 0,
+     "with_surface_tension": 0,
+     "with_total_density_budget": 0,
+     "with_unintentional_filled_shape_tempering": 0,
+     "with_visual_event": 0,
+     "with_visual_event_type_hints": 0,
+     "without_explicit_region_support": 0,
+     "without_spontaneous_grid": 0
+    }
+   }
+  },
+  "S-dedupe-gates-motif": {
+   "source": "synthetic",
+   "targets": "dedupe_instructions",
+   "note": "removing the plain dedupe alone changes nothing downstream, because the later structural dedupe keys on the same payload minus color_hint and collapses the same rows; it only shows when the rows it saves cross a threshold in between -- the motif repair adds nothing once the score would exceed ten",
+   "input": {
+    "score": {
+     "background": "white",
+     "instructions": [
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "color": "black",
+       "weight": "pen"
+      }
+     ]
+    },
+    "ddl": "落ち葉が散る。",
+    "tenkei": "auto",
+    "plugin_instructions_present": false
+   },
+   "expected": {
+    "score": {
+     "version": "0.1.0",
+     "canvas": "square",
+     "background": "white",
+     "presence": null,
+     "instructions": [
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.5
+       ],
+       "to": [
+        0.8,
+        0.5
+       ],
+       "center": null,
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": false,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": "green restored in color_cycle from DDL color intent",
+       "variation": null,
+       "arrangement": {
+        "count": 2,
+        "layout": "scatter",
+        "rows": null,
+        "cols": null,
+        "jitter": 0.12,
+        "path": "none",
+        "color_cycle": [
+         "black",
+         "green"
+        ],
+        "margin": 0.16,
+        "center": null,
+        "radius": null,
+        "density": "none",
+        "cluster_count": null,
+        "fade": "none",
+        "preserve_space": false,
+        "rhythm_spacing": "none"
+       },
+       "at": null,
+       "relation": null,
+       "surface": null
+      },
+      {
+       "primitive": "ellipse",
+       "from": null,
+       "to": null,
+       "center": [
+        0.38,
+        0.44
+       ],
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": [
+        0.13,
+        0.035
+       ],
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": -28.0,
+       "filled": false,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "green",
+       "color_hint": "leaf_cluster motif restored from DDL intent",
+       "variation": null,
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "surface": null
+      },
+      {
+       "primitive": "arc",
+       "from": null,
+       "to": null,
+       "center": [
+        0.4,
+        0.44
+       ],
+       "radius": 0.08,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": 200.0,
+       "angle_end": 335.0,
+       "rotation": -24.0,
+       "filled": false,
+       "style": "solid",
+       "weight": "brush_thin",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": "leaf_cluster motif restored from DDL intent",
+       "variation": null,
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "surface": null
+      },
+      {
+       "primitive": "ellipse",
+       "from": null,
+       "to": null,
+       "center": [
+        0.42,
+        0.62
+       ],
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": [
+        0.045,
+        0.018
+       ],
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": -28.0,
+       "filled": true,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "red",
+       "color_hint": "leaf/grain energy restored without density growth",
+       "variation": null,
+       "arrangement": {
+        "count": 6,
+        "layout": "scatter",
+        "rows": null,
+        "cols": null,
+        "jitter": 0.12,
+        "path": "diagonal",
+        "color_cycle": [
+         "red",
+         "gray",
+         "green"
+        ],
+        "margin": 0.22,
+        "center": null,
+        "radius": null,
+        "density": "low",
+        "cluster_count": null,
+        "fade": "directional",
+        "preserve_space": true,
+        "rhythm_spacing": "none"
+       },
+       "at": null,
+       "relation": null,
+       "surface": null
+      }
+     ]
+    },
+    "instruction_count": 4,
+    "branch_report": {
+     "coerce_and_repair_instruction": 0,
+     "dedupe_instructions": 9,
+     "drop_invalid_relations": 0,
+     "presence_from_ddl": 0,
+     "with_background_dominance_governor": 0,
+     "with_color_delivery_repair": 1,
+     "with_complex_motif_repair": 2,
+     "with_composition_diversity_repair": 0,
+     "with_context_density_governor": 0,
+     "with_context_energy_repair": 1,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,

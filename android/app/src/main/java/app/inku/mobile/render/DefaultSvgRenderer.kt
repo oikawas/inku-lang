@@ -1191,6 +1191,11 @@ class DefaultSvgRenderer : SvgRenderer {
         return value
     }
 
+    // render engine 15: the seed key is an allowlist, not the whole instruction dump.
+    // Fields the performance never consumes - color, color_hint, at, relation, and every
+    // arrangement field but jitter - used to re-roll the marks, so an annotation coerce
+    // wrote onto an instruction changed the drawing. Mirrors _SEED_INSTRUCTION_FIELDS and
+    // _SEED_ARRANGEMENT_FIELDS in renderer.py, in that order.
     private fun serverInstructionJson(ins: JSONObject): String {
         return buildString {
             append("{")
@@ -1208,15 +1213,23 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"filled\":"); append(ins.optBoolean("filled", false))
             append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
             append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
-            append(",\"color\":"); append(jsonString(ins.optString("color", "black")))
-            append(",\"color_hint\":"); append(stringOrNull(ins, "color_hint"))
+            // server pops the two defaults so a plain instruction keeps the shorter key.
+            val mode = ins.optString("mode", "additive")
+            if (mode != "additive") { append(",\"mode\":"); append(jsonString(mode)) }
+            if (ins.has("carve_depth") && !ins.isNull("carve_depth")) {
+                append(",\"carve_depth\":"); append(jsonString(ins.optString("carve_depth")))
+            }
             append(",\"variation\":"); append(variationJson(ins, ins.optJSONObject("variation")))
-            append(",\"arrangement\":"); append(arrangementJson(ins.optJSONObject("arrangement")))
-            append(",\"at\":null")
-            append(",\"relation\":null")
+            append(",\"arrangement\":"); append(seedArrangementJson(ins.optJSONObject("arrangement")))
             append(",\"surface\":"); append(surfaceJson(ins.optJSONObject("surface")))
             append("}")
         }
+    }
+
+    // Only jitter survives into the seed key (_SEED_ARRANGEMENT_FIELDS).
+    private fun seedArrangementJson(arr: JSONObject?): String {
+        if (arr == null) return "null"
+        return "{\"jitter\":${doubleJson(arr.optDouble("jitter", 0.12))}}"
     }
 
     private fun surfaceJson(surface: JSONObject?): String {

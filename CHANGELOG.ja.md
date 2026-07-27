@@ -3317,3 +3317,28 @@ engine 13 の前例。**条件は「公開前に済ませること」**）。
 - **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 725 へ
 - **検証（Build 725 時点）:** server **1423 passed / 31 skipped**、cli **71 passed**、ruff clean、
   `npm run check` 0 errors / 2 warnings / 217 files
+
+**残っていたローマ字も同じ版で通した（Build 726）。** 打鍵する名前を全数
+（CLI サブコマンド 46・オプション 84・API パス 61）調べたところ、
+**奥書と同じ形はあと 1 つだけだった** — **添景の旗 `--tenkei`**。
+
+- **辞書は 添景 = `staffage` と既に定めており（GLOSSARY :58）、web はその語で表示していた。**
+  **ローマ字が残っていたのは打鍵する側 1 箇所だけ**だった。`--staffage` へ移し、
+  **エイリアスは残していない**（奥書と同じ方針・2026-07-27 作者裁定）
+- **help の文言は第三の語だった** — `scenery level` と書かれており、
+  `tenkei` でも `staffage` でもなかった。`staffage` へ揃えた
+- **動かしていないもの**: API の要求・応答フィールド `tenkei`（server 27 箇所）、
+  DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `tenkei.ts` と i18n 鍵。
+  **鍵名のローマ字は通例**という規則がそのまま効く。**外部スクリプトが直すのは旗の綴りだけ**で、
+  payload を組み立てている側は触らなくてよい
+- **番人を 2 つ置いた** — `--tenkei` が `SystemExit` になること、**旗の一覧そのものに
+  `tenkei` を含むものが無いこと**。**2 本目は最初 上位パーサしか見ておらず、
+  エイリアスを残す摂動を素通りさせた**（実際の旗はサブパーサ側に付いている）。
+  **サブパーサまで降りるよう直してから、摂動で 2 本とも赤くなることを確かめた**
+- **`/api/saijiki` と歳時記のカテゴリ鍵 9 個はローマ字のままでよい** — 辞書が
+  歳時記 = `Saijiki`（固有名詞・大文字）と定めているとおりで、**ローマ字が正しい英語表記**である。
+  `renga` / `hacho` も同じ扱い。**`sumi` / `washi` は識別子ではなく DDL の語彙値**
+  （`sumi` は `black` の同義語として `ink` / `obsidian` / `黒` と並ぶ、記述者が書く語）
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 726 へ
+- **検証（Build 726 時点）:** server **1423 passed / 31 skipped**、cli **73 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**

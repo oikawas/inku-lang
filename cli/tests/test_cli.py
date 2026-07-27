@@ -318,6 +318,46 @@ def test_the_colophon_subcommand_replaced_okugaki_outright():
         parser.parse_args(["okugaki", "node-1"])
 
 
+def test_the_staffage_flag_replaced_tenkei_outright():
+    """添景の旗は `--staffage`。**ローマ字は残していない。**
+
+    辞書 (`web/src/lib/i18n/GLOSSARY.md`) が 添景 = staffage と定めており、web は
+    既にその語で表示している。ローマ字が残っていたのは打鍵する側だけだった。
+    エイリアスを残さないのは奥書と同じ方針 (2026-07-27 作者裁定)。
+
+    **要求の鍵と DB 列は `tenkei` のまま**なので、送る payload の側も併せて見る。
+    """
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨", "--staffage", "sparse"])
+    assert args.staffage == "sparse"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["paint", "一滴の墨", "--tenkei", "sparse"])
+
+    # 打鍵する名前は動いたが、API の鍵は動いていない。
+    assert cli._paint_payload(args, "一滴の墨")["tenkei"] == "sparse"
+
+
+def _all_option_strings(parser) -> set[str]:
+    """サブパーサまで降りて旗を集める。
+
+    **上位パーサの `_actions` だけを見ると穴が開く** — 実際の旗はサブコマンド側に
+    付いているので、`--tenkei` をエイリアスとして残しても素通りした (摂動で実測)。
+    """
+    flags = {option for action in parser._actions for option in action.option_strings}
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                flags |= _all_option_strings(sub)
+    return flags
+
+
+def test_no_cli_flag_is_spelled_tenkei():
+    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。"""
+    flags = _all_option_strings(cli.build_parser())
+    assert "--staffage" in flags, "走査がサブパーサまで届いていない"
+    assert not [flag for flag in flags if "tenkei" in flag]
+
+
 def test_vision_commands_keep_model_alias_and_prefer_vision_model():
     parser = cli.build_parser()
     legacy = parser.parse_args(["colophon", "node-1", "--model", "legacy-vision"])

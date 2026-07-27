@@ -32,6 +32,8 @@
 		modelsForProvider,
 		providerOfModel,
 		qualifiedModelId,
+		registerModelCatalog,
+		splitModelRef,
 		type Provider,
 		type ProviderGroup,
 		type ModelOption
@@ -242,6 +244,7 @@
 		stage2_model: string;
 		vision_provider: Provider;
 		vision_model: string;
+		okugaki_provider?: Provider;
 		okugaki_model?: string;
 		model_inspection_selected_models?: string[];
 		instruction_caption_visible?: boolean;
@@ -702,6 +705,13 @@
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
+	// Teach models.ts which providers this server serves, so that a reference
+	// qualified with an operator-added provider is recognised as qualified.
+	$effect(() => {
+		registerModelCatalog(modelCatalog);
+		registerModelCatalog(availableModelCatalog);
+		registerModelCatalog(availableVisionModelCatalog);
+	});
 	let dbBackupStatus = $state<string | null>(null);
 	let outputSaveStatus = $state<string | null>(null);
 	let logRetentionStatus = $state<string | null>(null);
@@ -842,11 +852,14 @@
 
 	function reconcileDemoPromptModel() {
 		if (!availableModelsLoaded || !demoSettingsLoaded) return;
-		const configuredModels = availableModelCatalog.flatMap((group) => group.models);
-		if (configuredModels.some((model) => model.id === demoSettings.prompt_model)) return;
-		const fallbackModel = configuredModels[0]?.id;
-		if (!fallbackModel) return;
-		void saveDemoSettings({ ...demoSettings, prompt_model: fallbackModel });
+		const configured = availableModelCatalog.some(
+			(group) => group.id === demoSettings.prompt_provider && group.models.some((model) => model.id === demoSettings.prompt_model)
+		);
+		if (configured) return;
+		const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
+		const fallbackModel = fallbackGroup?.models[0]?.id;
+		if (!fallbackGroup || !fallbackModel) return;
+		void saveDemoSettings({ ...demoSettings, prompt_provider: fallbackGroup.id, prompt_model: fallbackModel });
 	}
 
 	function applyUserModelSettings(user: UserItem | null) {
@@ -858,7 +871,9 @@
 		stage2Model = settings.stage2_model;
 		visionProvider = settings.vision_provider;
 		visionModel = settings.vision_model;
-		okugakiModel = settings.okugaki_model || qualifiedModelId(settings.vision_provider, settings.vision_model);
+		okugakiModel = settings.okugaki_model
+			? qualifiedModelId(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
+			: qualifiedModelId(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
 		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
 			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
@@ -875,8 +890,8 @@
 		} catch (e) { console.warn('failed to save instruction caption setting', e); }
 	}
 
-	async function persistOkugakiModel(model: string): Promise<void> {
-		const nextModel = model.trim();
+	async function persistOkugakiModel(provider: Provider, model: string): Promise<void> {
+		const nextModel = qualifiedModelId(provider, model.trim());
 		if (!nextModel || nextModel === okugakiModel) return;
 		const previous = okugakiModel;
 		okugakiModel = nextModel;
@@ -885,7 +900,7 @@
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ model_settings: { okugaki_model: nextModel } })
+				body: JSON.stringify({ model_settings: { okugaki_provider: provider, okugaki_model: model.trim() } })
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			currentUser = await r.json() as UserItem;
@@ -965,10 +980,14 @@
 	}
 
 	function normalizeDemoSettings(settings: DemoSettings): DemoSettings {
+		// Values stored before prompt_provider existed carry the provider inside
+		// prompt_model; the server splits them, and so does this.
+		const prompt = splitModelRef(settings.prompt_model || DEFAULT_MODEL);
 		return {
 			save_db: !!settings.save_db,
 			save_files: !!settings.save_files,
-			prompt_model: settings.prompt_model || DEFAULT_MODEL,
+			prompt_provider: prompt.provider ?? settings.prompt_provider ?? DEFAULT_PROVIDER,
+			prompt_model: prompt.model,
 			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
 			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
 			timeout_seconds: Math.max(60, Math.min(86400, Math.round(settings.timeout_seconds || 3600))),
@@ -1257,7 +1276,8 @@
 			stage2_model: stage2Model,
 			vision_provider: visionProvider,
 			vision_model: visionModel,
-			okugaki_model: okugakiModel,
+			okugaki_provider: splitModelRef(okugakiModel).provider ?? visionProvider,
+			okugaki_model: splitModelRef(okugakiModel).model,
 			model_inspection_selected_models: modelInspectionSelectedModels,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
@@ -2916,7 +2936,7 @@ if (unreadWords.length > 0) {
 	}
 
 	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
-		const model = qualifiedModelId(providerOfModel(settings.prompt_model), settings.prompt_model);
+		const model = qualifiedModelId(settings.prompt_provider, settings.prompt_model);
 		const r = await apiFetch('/api/demo/instruction', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },

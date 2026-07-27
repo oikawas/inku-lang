@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import type { Provider, ProviderGroup } from '$lib/models';
+	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import type { DemoSettings } from '$lib/demo';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
@@ -143,7 +143,7 @@
 			/>
 			<span>{t().demoRandomColorCatalog}</span>
 		</label>
-		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={settings.prompt_model} {providerGroups} disabled={running} onSelect={(_provider: Provider, model: string) => updateSettings({ prompt_model: model })} /></div>
+		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={qualifiedModelId(settings.prompt_provider, settings.prompt_model)} {providerGroups} disabled={running} onSelect={(provider: Provider, model: string) => updateSettings({ prompt_provider: provider, prompt_model: model })} /></div>
 		<label class="wide">
 			<span>{t().demoSeedPhrase}</span>
 			<textarea

@@ -72,6 +72,7 @@ from .model_settings import (
     normalize_model_settings,
     provider_for_model,
     public_model_settings,
+    split_model_ref,
     update_model_settings,
 )
 from . import db as _db
@@ -334,10 +335,8 @@ _log_startup_banner()
 
 
 def _is_qualified_model_id(model: str) -> bool:
-    if ":" not in model:
-        return False
-    prefix = model.split(":", 1)[0]
-    return prefix in normalize_model_settings(_db.get_model_settings())["providers"]
+    provider, _ = split_model_ref(model, _db.get_model_settings())
+    return provider is not None
 
 
 def _resolved_stage_model(model: str | None, actor: dict | None, *, stage: str) -> str:
@@ -1417,6 +1416,7 @@ class PluginValueBody(BaseModel):
 class DemoSettingsBody(BaseModel):
     save_db: bool = False
     save_files: bool = False
+    prompt_provider: str = Field(default="nvidia", min_length=1)
     prompt_model: str = Field(default="google/gemma-4-31b-it", min_length=1)
     seed_phrase: str = Field(default="日本の四季を感じさせる文章を40語以内で生成", min_length=1, max_length=1000)
     interval_seconds: int = Field(default=30, ge=1, le=3600)

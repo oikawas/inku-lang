@@ -24,6 +24,7 @@ from typing import Any
 
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
+from .provider_limits import provider_slot
 from .saijiki import relation_literal_markers
 from .schema import Score, Variation
 
@@ -1484,20 +1485,23 @@ def _compose_openai(
         },
     }
 
-    resp = call_with_llm_retry(
-        lambda: client.chat.completions.create(
-            model=model,
-            max_tokens=MAX_TOKENS,
-            temperature=0.0,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_msg},
-            ],
-            tools=[tool],
-            tool_choice={"type": "function", "function": {"name": "submit_score"}},
-            stream=False,
+    # Ollama Cloud ignores every form of structured output but honours tool calling
+    # (measured 2026-07-27), so this path stays on tools for that provider.
+    with provider_slot(provider):
+        resp = call_with_llm_retry(
+            lambda: client.chat.completions.create(
+                model=model,
+                max_tokens=MAX_TOKENS,
+                temperature=0.0,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                tools=[tool],
+                tool_choice={"type": "function", "function": {"name": "submit_score"}},
+                stream=False,
+            )
         )
-    )
     usage = resp.usage
     tin: int | None = getattr(usage, "prompt_tokens", None)
     tout: int | None = getattr(usage, "completion_tokens", None)

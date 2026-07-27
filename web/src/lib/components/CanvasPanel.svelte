@@ -168,7 +168,7 @@
 		refineTenkeiValue: TenkeiLevel;
 		refineTenkeiInherited: boolean;
 		onSetRefineTenkei: (level: TenkeiLevel | null) => void;
-		onSaveOkugakiModel: (model: string) => void | Promise<void>;
+		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
 		onSaveLineageNote: (node: LineageNode, note: string) => void | Promise<void>;

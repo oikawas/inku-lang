@@ -18,8 +18,8 @@ they scored badly or could not be measured, for the same reason.
 Method and rubric: no-git-sync/fable5/mode-api-claude/SCORING-DESIGN.md
 """
 
-MODEL_CONFIG_VERSION = "2.1.0"
-MODEL_CONFIG_LAST_UPDATED = "2026-07-20T22:41:00Z"
+MODEL_CONFIG_VERSION = "2.2.0"
+MODEL_CONFIG_LAST_UPDATED = "2026-07-27T12:27:00Z"
 
 VERIFIED_NVIDIA_MODELS: list[dict[str, object]] = [
     {"id": "mistralai/mistral-nemotron", "label": "mistralai/mistral-nemotron", "purposes": ["llm"], "recommendation_llm": 4, "speed_class": "ultra-fast", "speed_label": "昼 121s / 夕 10s / 深夜 8s", "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.0。応答中央値 昼 121s / 夕 10s / 深夜 8s。", "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.0 corrections on average; median response midday 121s / evening 10s / late night 8s."},
@@ -66,4 +66,74 @@ VERIFIED_NVIDIA_MODELS: list[dict[str, object]] = [
     {"id": "thinkingmachines/inkling", "label": "thinkingmachines/inkling", "purposes": ["llm"], "speed_class": "unknown", "speed_label": "未計測", "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。", "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."},
     {"id": "qwen/qwen3.5-122b-a10b", "label": "qwen/qwen3.5-122b-a10b", "purposes": ["llm"], "eol": True, "eol_date": "2026-07-20", "speed_class": "unknown", "speed_label": "提供終了", "comment_ja": "提供終了。過去の作品は保存済みの Score と SVG で閲覧できるが、再描画はできない。", "comment_en": "Retired by the provider. Existing artworks still render from their stored score and SVG, but cannot be redrawn."},
     {"id": "qwen/qwen3-coder-480b-a35b-instruct", "label": "qwen/qwen3-coder-480b-a35b-instruct", "purposes": ["llm"], "eol": True, "eol_date": "2026-07-20", "speed_class": "unknown", "speed_label": "提供終了", "comment_ja": "提供終了。過去の作品は保存済みの Score と SVG で閲覧できるが、再描画はできない。", "comment_en": "Retired by the provider. Existing artworks still render from their stored score and SVG, but cannot be redrawn."},
+]
+
+
+# Ollama Cloud (ollama.com), listed 2026-07-27. A separate provider from the local
+# Ollama one on purpose: the weights share a name but the two are not interchangeable.
+# Cloud runs models far larger than a laptop holds, and it sends the description off
+# the machine, which is the one thing the local setup exists to avoid. Every comment
+# says so, because the tooltip is where a reader decides which of the two they picked.
+#
+# Two behaviours were measured on 2026-07-27 and shape how the provider is wired:
+# structured output is ignored in all three of its forms (native `format`, OpenAI
+# `response_format` strict and non-strict), while tool calling works — so Stage 2 must
+# keep using tools here. And the free tier is limited by concurrency rather than
+# volume: eight simultaneous requests returned 429 while 7.6% of the weekly allowance
+# was spent. `max_concurrency` on the provider definition holds the line at 2.
+#
+# Recommendation levels are deliberately absent. Only gemma4:31b has been run, and one
+# model's Stage 1 pass is not enough to place anything on the 1-5 scale that
+# SCORING-DESIGN.md defines. They arrive with the local-model scoring work.
+_OLLAMA_CLOUD_NOTICE_JA = "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。"
+_OLLAMA_CLOUD_NOTICE_EN = (
+    "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model."
+)
+
+_OLLAMA_CLOUD_UNMEASURED = [
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
+    "glm-5.1",
+    "glm-5.2",
+    "gpt-oss:20b",
+    "gpt-oss:120b",
+    "kimi-k2.5",
+    "kimi-k2.6",
+    "kimi-k2.7-code",
+    "minimax-m2.5",
+    "minimax-m2.7",
+    "minimax-m3",
+    "mistral-large-3:675b",
+    "nemotron-3-nano:30b",
+    "nemotron-3-super",
+    "nemotron-3-ultra",
+    "qwen3.5:397b",
+]
+
+VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
+    {
+        "id": "gemma4:31b",
+        "label": "gemma4:31b",
+        "purposes": ["llm"],
+        "speed_class": "unknown",
+        "speed_label": "1〜110s",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "第一段階は実測 6/6 応答。第二段階は tool calling で通る (構造化出力の指定は無視される)。"
+        + "同じ要求の所要が 1 秒から 110 秒まで振れるため、待ち時間は約束できない。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " Stage 1 answered 6 of 6 attempts; Stage 2 works through tool calling, since structured output"
+        + " requests are ignored. The same request took anywhere from 1 to 110 seconds, so no wait can be promised.",
+    },
+    *[
+        {
+            "id": model_id,
+            "label": model_id,
+            "purposes": ["llm"],
+            "speed_class": "unknown",
+            "speed_label": "未計測",
+            "comment_ja": _OLLAMA_CLOUD_NOTICE_JA + "品質は未計測。",
+            "comment_en": _OLLAMA_CLOUD_NOTICE_EN + " Its quality has not been measured.",
+        }
+        for model_id in _OLLAMA_CLOUD_UNMEASURED
+    ],
 ]

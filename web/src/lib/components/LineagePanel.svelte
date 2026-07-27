@@ -45,7 +45,7 @@
 		stage2ModelLabel: string;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
-		onSaveOkugakiModel: (model: string) => void | Promise<void>;
+		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
 		onAskTrash: (historyIds: string[]) => void;
@@ -333,7 +333,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		selectedOkugakiModel = nextModel;
 		okugakiError = null;
 		try {
-			await onSaveOkugakiModel(nextModel);
+			await onSaveOkugakiModel(provider, model);
 		} catch (cause) {
 			selectedOkugakiModel = previous;
 			okugakiError = cause instanceof Error ? cause.message : String(cause);

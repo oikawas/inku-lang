@@ -29,15 +29,18 @@ export type ProviderGroup = {
 	models: ModelOption[];
 };
 
+// Model ids here are bare, exactly as the server catalog states them. They used
+// to be written qualified for some providers and bare for others, which left no
+// way to ask "which providers list this model".
 export const PROVIDER_GROUPS: ProviderGroup[] = [
 	{
 		id: 'openai',
 		label: 'OpenAI API Platform',
 		models: [
-			{ id: 'openai:gpt-5.1', label: 'GPT-5.1' },
-			{ id: 'openai:gpt-5.1-mini', label: 'GPT-5.1 mini' },
-			{ id: 'openai:gpt-4.1', label: 'GPT-4.1' },
-			{ id: 'openai:gpt-4.1-mini', label: 'GPT-4.1 mini' }
+			{ id: 'gpt-5.1', label: 'GPT-5.1' },
+			{ id: 'gpt-5.1-mini', label: 'GPT-5.1 mini' },
+			{ id: 'gpt-4.1', label: 'GPT-4.1' },
+			{ id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' }
 		]
 	},
 	{
@@ -53,27 +56,36 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 		id: 'anthropic',
 		label: 'Claude API',
 		models: [
-			{ id: 'anthropic:claude-opus-4-7', label: 'Anthropic Claude Opus 4.7' },
-			{ id: 'anthropic:claude-sonnet-4-6', label: 'Anthropic Claude Sonnet 4.6' },
-			{ id: 'anthropic:claude-haiku-4-5-20251001', label: 'Anthropic Claude Haiku 4.5' }
+			{ id: 'claude-opus-4-7', label: 'Anthropic Claude Opus 4.7' },
+			{ id: 'claude-sonnet-4-6', label: 'Anthropic Claude Sonnet 4.6' },
+			{ id: 'claude-haiku-4-5-20251001', label: 'Anthropic Claude Haiku 4.5' }
 		]
 	},
 	{
 		id: 'gemini',
 		label: 'Gemini API',
 		models: [
-			{ id: 'gemini:gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-			{ id: 'gemini:gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-			{ id: 'gemini:gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' }
+			{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+			{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+			{ id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' }
 		]
 	},
 	{
 		id: 'ollama',
 		label: 'Ollama',
 		models: [
-			{ id: 'ollama:llama3.2', label: 'Llama 3.2' },
-			{ id: 'ollama:gpt-oss:20b', label: 'gpt-oss 20B' },
-			{ id: 'ollama:qwen3:8b', label: 'Qwen3 8B' }
+			{ id: 'llama3.2', label: 'Llama 3.2' },
+			{ id: 'gpt-oss:20b', label: 'gpt-oss 20B' },
+			{ id: 'qwen3:8b', label: 'Qwen3 8B' }
+		]
+	},
+	{
+		id: 'ollama-cloud',
+		label: 'Ollama Cloud (ollama.com)',
+		models: [
+			{ id: 'gemma4:31b', label: 'gemma4:31b' },
+			{ id: 'qwen3.5:397b', label: 'qwen3.5:397b' },
+			{ id: 'glm-5.2', label: 'glm-5.2' }
 		]
 	},
 	{
@@ -95,23 +107,96 @@ export function modelsForProvider(provider: Provider): ModelOption[] {
 	return PROVIDER_GROUPS.find((g) => g.id === provider)?.models ?? [];
 }
 
-export function qualifiedModelId(provider: Provider, modelId: string): string {
+// The catalog the resolution rules read when a caller does not name one. It
+// starts as the built-in list and grows as the server catalogs arrive, so the
+// ~40 call sites of qualifiedModelId() stay correct for providers the operator
+// added without threading a catalog through every one of them.
+let registeredProviderIds = new Set<Provider>(PROVIDER_GROUPS.map((group) => group.id));
+let registeredModelOwners = ownersOf(PROVIDER_GROUPS);
+
+function ownersOf(groups: ProviderGroup[]): Map<string, Set<Provider>> {
+	const owners = new Map<string, Set<Provider>>();
+	for (const group of groups) {
+		for (const model of group.models) {
+			const seen = owners.get(model.id) ?? new Set<Provider>();
+			seen.add(group.id);
+			owners.set(model.id, seen);
+		}
+	}
+	return owners;
+}
+
+/** Teach the rules about the providers and models this server actually serves. */
+export function registerModelCatalog(groups: ProviderGroup[]): void {
+	if (!Array.isArray(groups) || groups.length === 0) return;
+	const ids = new Set<Provider>(registeredProviderIds);
+	const owners = new Map<string, Set<Provider>>(registeredModelOwners);
+	for (const group of groups) {
+		ids.add(group.id);
+		for (const model of group.models) {
+			const seen = new Set<Provider>(owners.get(model.id) ?? []);
+			seen.add(group.id);
+			owners.set(model.id, seen);
+		}
+	}
+	registeredProviderIds = ids;
+	registeredModelOwners = owners;
+}
+
+/**
+ * Split "provider:model"; provider is null when the reference is not qualified.
+ *
+ * Written with indexOf/slice on purpose. `'a:b:c'.split(':', 1)` returns
+ * `['a']` in JavaScript -- the limit drops the tail instead of capping the
+ * number of splits the way Python's `split(':', 1)` does, so the model id
+ * would silently lose everything after its own colon.
+ */
+export function splitModelRef(
+	ref: string,
+	groups?: ProviderGroup[]
+): { provider: Provider | null; model: string } {
+	const text = String(ref ?? '');
+	const index = text.indexOf(':');
+	if (index <= 0) return { provider: null, model: text };
+	const head = text.slice(0, index);
+	const rest = text.slice(index + 1);
+	const known = groups ? new Set(groups.map((group) => group.id)) : registeredProviderIds;
+	if (rest && known.has(head)) return { provider: head, model: rest };
+	return { provider: null, model: text };
+}
+
+/**
+ * Prefix the provider unless the reference is already qualified by a *known*
+ * provider. Testing only for one's own id produced 'ollama:ollama-cloud:...'.
+ */
+export function qualifiedModelId(provider: Provider, modelId: string, groups?: ProviderGroup[]): string {
 	const cleanProvider = String(provider || '').trim();
 	const cleanModel = String(modelId || '').trim();
 	if (!cleanProvider || !cleanModel) return cleanModel;
-	return cleanModel.startsWith(`${cleanProvider}:`) ? cleanModel : `${cleanProvider}:${cleanModel}`;
+	return splitModelRef(cleanModel, groups).provider ? cleanModel : `${cleanProvider}:${cleanModel}`;
 }
 
-export function providerOfModel(modelId: string): Provider {
-	if (modelId.startsWith('openai:')) return 'openai';
-	if (modelId.startsWith('anthropic:')) return 'anthropic';
-	if (modelId.startsWith('gemini:')) return 'gemini';
-	if (modelId.startsWith('nvidia:')) return 'nvidia';
-	if (modelId.startsWith('ollama:')) return 'ollama';
-	if (modelId.startsWith('ovms:')) return 'ovms';
-	if (modelId.includes(':') && !modelId.startsWith('gpt-oss:')) return modelId.split(':', 1)[0];
-	for (const g of PROVIDER_GROUPS) {
-		if (g.models.some((m) => m.id === modelId)) return g.id;
-	}
-	return 'nvidia';
+/**
+ * Resolve a reference to (provider, model). Same three rules as the server's
+ * provider_for_model(): explicit qualification, then sole ownership, then the
+ * stage default. Nothing is guessed from the shape of the string.
+ */
+export function resolveModelRef(
+	modelId: string,
+	groups?: ProviderGroup[],
+	stageProvider: Provider = DEFAULT_PROVIDER
+): { provider: Provider; model: string } {
+	const split = splitModelRef(modelId, groups);
+	if (split.provider) return { provider: split.provider, model: split.model };
+	const owners = groups ? ownersOf(groups).get(split.model) : registeredModelOwners.get(split.model);
+	if (owners && owners.size === 1) return { provider: [...owners][0], model: split.model };
+	return { provider: stageProvider, model: split.model };
+}
+
+export function providerOfModel(
+	modelId: string,
+	groups?: ProviderGroup[],
+	stageProvider: Provider = DEFAULT_PROVIDER
+): Provider {
+	return resolveModelRef(modelId, groups, stageProvider).provider;
 }

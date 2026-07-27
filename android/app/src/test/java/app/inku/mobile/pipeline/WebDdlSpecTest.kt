@@ -63,7 +63,7 @@ class WebDdlSpecTest {
             detectWeightKey = ServerScoreSemantics::detectWeightKey,
             visibleForeground = ServerScoreSemantics::visibleForeground
         )
-        org.junit.Assert.assertEquals("hair weight must be preserved for legacy score playback", "hair", coerced.getString("weight"))
+        org.junit.Assert.assertEquals("legacy hair must be replaced by silverpoint, not dropped to the default", "silverpoint", coerced.getString("weight"))
 
         // 3. Rope / 縄 removal verification
         val fullPrompt = WebDdlSpec.buildStage1SystemPrompt("テスト")

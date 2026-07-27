@@ -707,7 +707,7 @@ class LocalFallbackPipeline(
             .put("angle_end", 330)
             .put("rotation", -16)
             .put("color", color)
-            .put("weight", "hair")
+            .put("weight", "silverpoint")
             .put("color_hint", "motion floor restored as a small directional trace")
             .put(
                 "arrangement",
@@ -858,7 +858,7 @@ class LocalFallbackPipeline(
                 .put("angle_end", 245)
                 .put("rotation", -18)
                 .put("color", color)
-                .put("weight", "hair")
+                .put("weight", "silverpoint")
                 .put("color_hint", "visual event restored as a small focal pulse")
         }
         return this + accent
@@ -878,7 +878,7 @@ class LocalFallbackPipeline(
             .put("angle_end", 342)
             .put("rotation", -4)
             .put("color", color)
-            .put("weight", "hair")
+            .put("weight", "silverpoint")
             .put("color_hint", "surface tension restored as a quiet shadow trace")
     }
 
@@ -888,7 +888,13 @@ class LocalFallbackPipeline(
         var governedCount = 0
         val hasVerticalContext = contextHasVerticalDensity(ddl)
         val hasNeonBlurContext = contextHasNeonBlurDensity(ddl)
+        val requestedCounts = ServerScoreCounts.explicitCountsFromDdl(ddl)
         for (item in this) {
+            // A grid is a tiling, not a group the governor may thin.
+            if (item.optJSONObject("arrangement")?.optString("layout") == "grid") {
+                adjusted += item
+                continue
+            }
             val copy = temperQuietSymbolicShape(copyJsonObject(item), ddl)
             val arrangement = copy.optJSONObject("arrangement")
             if (arrangement == null) {
@@ -896,8 +902,17 @@ class LocalFallbackPipeline(
                 continue
             }
             val count = arrangement.optInt("count", 1)
-            val isVerticalLoad = hasVerticalContext &&
-                (copy.optString("primitive") == "line" || arrangement.optString("layout") == "vertical" || arrangement.optString("path") == "top_to_bottom")
+            // A count the description stated outright is not the governor's to thin. Quiet
+            // is a reading of the scene; "two hundred thirty-nine" is not a reading. The
+            // shape tempering above still applies: it touches size, not how many.
+            if (ServerScoreCounts.countFollowsDdlRequest(count, requestedCounts)) {
+                adjusted += copy
+                continue
+            }
+            val isVerticalArrangement =
+                arrangement.optString("layout") == "vertical" || arrangement.optString("path") == "top_to_bottom"
+            val isVerticalLoad = isVerticalArrangement ||
+                (hasVerticalContext && copy.optString("primitive") == "line")
             val verticalCountCap = if (hasNeonBlurContext) MAX_NEON_BLUR_VERTICAL_COUNT else MAX_QUIET_VERTICAL_COUNT
             when {
                 isVerticalLoad && count > verticalCountCap -> {
@@ -1002,10 +1017,29 @@ class LocalFallbackPipeline(
         return withPerInstructionDensityBudget().withTotalDensityBudget()
     }
 
+    /**
+     * The three count-touching passes, in the order [composeFromDdl] runs them.
+     *
+     * This is the seam `count_preservation.json` was measured through: the server ran its
+     * own three, in this order, over the same Scores. Nothing else is in between, so a
+     * difference here is a difference in these three and nowhere else.
+     */
+    internal fun applyDensityPassesForParity(
+        instructions: List<JSONObject>,
+        ddl: String,
+        background: String,
+    ): List<JSONObject> = instructions
+        .withContextDensityGovernor(ddl, background)
+        .withPerInstructionDensityBudget()
+        .withTotalDensityBudget()
+
+    private fun isGrid(item: JSONObject): Boolean =
+        item.optJSONObject("arrangement")?.optString("layout") == "grid"
+
     private fun List<JSONObject>.withPerInstructionDensityBudget(): List<JSONObject> {
         return map { item ->
             val count = expandedCount(item)
-            if (item.optJSONObject("arrangement") == null || count <= MAX_EXPANDED_PER_INSTRUCTION) {
+            if (item.optJSONObject("arrangement") == null || isGrid(item) || count <= MAX_EXPANDED_PER_INSTRUCTION) {
                 item
             } else {
                 item.withClusteredDensity("single arrangement density clustered to preserve negative space")
@@ -1013,41 +1047,56 @@ class LocalFallbackPipeline(
         }
     }
 
+    /**
+     * Bring the total back under budget by representing the largest groups first.
+     *
+     * Counted and uncountable are different things. Twelve squares can be counted by eye;
+     * two hundred dots cannot. Shrinking every group in proportion spends the budget on
+     * the groups a reader could have verified - and the old proportional pass here could
+     * even raise a group of 120 to 232. The large groups give way first, and the small
+     * ones stay literal for as long as the budget allows.
+     */
     private fun List<JSONObject>.withTotalDensityBudget(): List<JSONObject> {
-        val total = sumOf { expandedCount(it) }
+        val adjusted = toMutableList()
+        val movable = adjusted.indices.filter { !isGrid(adjusted[it]) && adjusted[it].optJSONObject("arrangement") != null }
+        var total = adjusted.filterNot { isGrid(it) }.sumOf { expandedCount(it) }
         if (total <= MAX_EXPANDED_PRIMITIVES) return this
 
-        var remainingBudget = MAX_EXPANDED_PRIMITIVES
-        val adjusted = mutableListOf<JSONObject>()
-        forEachIndexed { index, item ->
-            val count = expandedCount(item)
-            val restMinimum = size - index - 1
-            if (item.optJSONObject("arrangement") == null) {
-                adjusted += item
-                remainingBudget -= 1
-                return@forEachIndexed
+        // Represent the largest group, check the budget, and only then reach for the next.
+        for (index in movable.sortedByDescending { expandedCount(adjusted[it]) }) {
+            if (total <= MAX_EXPANDED_PRIMITIVES) break
+            val before = expandedCount(adjusted[index])
+            val candidate = adjusted[index].withClusteredDensity(
+                "largest group represented to fit the total density budget"
+            )
+            val after = expandedCount(candidate)
+            if (after < before) {
+                adjusted[index] = candidate
+                total -= before - after
             }
+        }
 
-            val allowed = if (remainingBudget <= restMinimum + 1) {
-                1
-            } else {
-                val remainingTotal = subList(index, size).sumOf { expandedCount(it) }
-                val share = if (remainingTotal > 0) count.toDouble() / remainingTotal.toDouble() else 0.0
-                maxOf(1, ((remainingBudget - restMinimum) * share).toInt())
-            }
+        if (total <= MAX_EXPANDED_PRIMITIVES || movable.isEmpty()) return adjusted
 
-            val adjustedItem = if (allowed < count && count > 80) {
-                val clustered = item.withClusteredDensity("expanded density clustered to preserve negative space")
-                if (expandedCount(clustered) > allowed) {
-                    clustered.withArrangementCount(allowed, "expanded density capped after clustering")
-                } else {
-                    clustered
-                }
+        // Representing every group is not always enough. What is left is a ceiling the
+        // large groups share: the highest one under which the total fits. Groups already
+        // below it are untouched, so the small ones still come through whole.
+        val counts = movable.map { expandedCount(adjusted[it]) }
+        val fixed = adjusted.filterNot { isGrid(it) }.sumOf { expandedCount(it) } - counts.sum()
+        var ceiling = 1
+        for (candidate in 1..counts.max()) {
+            if (fixed + counts.sumOf { minOf(it, candidate) } <= MAX_EXPANDED_PRIMITIVES) {
+                ceiling = candidate
             } else {
-                item.withArrangementCount(allowed, "expanded density capped to preserve negative space")
+                break
             }
-            adjusted += adjustedItem
-            remainingBudget -= expandedCount(adjustedItem)
+        }
+        for (index in movable) {
+            if (expandedCount(adjusted[index]) > ceiling) {
+                adjusted[index] = adjusted[index].withArrangementCount(
+                    ceiling, "expanded density capped to preserve negative space"
+                )
+            }
         }
         return adjusted
     }
@@ -1142,7 +1191,7 @@ class LocalFallbackPipeline(
                 .put("to", JSONArray(listOf(0.82, 0.38)))
                 .put("rotation", -7)
                 .put("color", visible)
-                .put("weight", "hair")
+                .put("weight", "silverpoint")
                 .put("color_hint", "silence_layer energy restored as a long optical trace")
                 .put(
                     "arrangement",
@@ -1325,26 +1374,75 @@ class LocalFallbackPipeline(
         return if (originalCount <= MAX_VISUAL_CLUSTERED_COUNT) {
             originalCount
         } else {
-            minOf(MAX_VISUAL_CLUSTERED_COUNT, maxOf(48, (originalCount * 0.42).toInt()))
+            // Both ends of the representative band the prompt and SPEC name. The floor was
+            // 48 here, which is below the band the rest of the system speaks of.
+            minOf(MAX_VISUAL_CLUSTERED_COUNT, maxOf(MIN_VISUAL_CLUSTERED_COUNT, (originalCount * 0.42).toInt()))
         }
     }
 
+    /**
+     * Temper the stand-in shapes coerce itself put on the page when the scene reads quiet.
+     *
+     * This only ever meant the shapes the fallback fabricated - that is what the color_hint
+     * markers below identify - and only the ones with corners. The port had widened it to
+     * every closed shape with no hint gate at all, so a group Stage 2 wrote to the
+     * description's own order was cut to eight: eight of the fifty frozen count cases fell
+     * to 8 here before the count ever reached the governor.
+     */
     private fun temperQuietSymbolicShape(item: JSONObject, ddl: String): JSONObject {
-        val arrangement = item.optJSONObject("arrangement") ?: return item
         if (!contextHasDensityGovernor(ddl)) return item
         val primitive = item.optString("primitive")
-        if (primitive !in setOf("circle", "ellipse", "square", "triangle", "polygon", "arc")) return item
-        val count = arrangement.optInt("count", 1)
-        if (count <= 8 || shapeExtent(item) <= 0.12) return item
+        if (primitive !in setOf("square", "triangle", "polygon")) return item
+        val size = item.optJSONArray("size")
+        val hasRadius = item.has("radius") && !item.isNull("radius")
+        if (primitive != "polygon" && size == null) return item
+        if (primitive == "polygon" && !hasRadius) return item
+
+        val hint = item.optString("color_hint", "")
+        val fabricatedMarkers = listOf(
+            "coverage from DDL clause", "motif restored", "shape intent", "fallback from DDL"
+        )
+        if (fabricatedMarkers.none { it in hint }) return item
+
+        val arrangement = item.optJSONObject("arrangement")
+        val count = arrangement?.optInt("count", 1) ?: 1
+        val needsSizeCap = if (primitive == "polygon") {
+            item.optDouble("radius", 0.0) > MAX_QUIET_SYMBOLIC_SHAPE_WIDTH / 2.0
+        } else {
+            size!!.optDouble(0, 0.0) > MAX_QUIET_SYMBOLIC_SHAPE_WIDTH ||
+                size.optDouble(1, 0.0) > MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT
+        }
+        val needsCountCap = arrangement != null && count > MAX_QUIET_SYMBOLIC_SHAPE_COUNT
+        if (!needsSizeCap && !needsCountCap) return item
+
         val copy = copyJsonObject(item)
-        val adjusted = copy.optJSONObject("arrangement") ?: return copy
-        adjusted.put("count", minOf(count, 8))
-        adjusted.put("density", "low")
-        adjusted.put("fade", "outward")
-        adjusted.put("preserve_space", true)
-        copy.put("arrangement", adjusted)
-        copy.put("color_hint", appendHint(copy.optString("color_hint"), "quiet symbolic shape tempered to preserve negative space; original count $count"))
+        if (needsSizeCap) {
+            if (primitive == "polygon") {
+                copy.put("radius", minOf(item.optDouble("radius", 0.1), MAX_QUIET_SYMBOLIC_SHAPE_WIDTH / 2.0))
+            } else {
+                copy.put("size", capSize(size!!, MAX_QUIET_SYMBOLIC_SHAPE_WIDTH, MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT))
+            }
+        }
+        val adjusted = copy.optJSONObject("arrangement")
+        if (adjusted != null) {
+            if (needsCountCap) adjusted.put("count", MAX_QUIET_SYMBOLIC_SHAPE_COUNT)
+            adjusted.put("preserve_space", true)
+            adjusted.put("margin", maxOf(adjusted.optDouble("margin", 0.1), 0.24))
+            if (adjusted.optString("fade", "none") == "none") adjusted.put("fade", "outward")
+            if (adjusted.optString("density", "none") == "none") adjusted.put("density", "low")
+            copy.put("arrangement", adjusted)
+        }
+        copy.put("color_hint", appendHint(hint, "quiet symbolic shape tempered to avoid fallback dominance"))
         return copy
+    }
+
+    private fun capSize(size: JSONArray, maxWidth: Double, maxHeight: Double): JSONArray {
+        return JSONArray(
+            listOf(
+                minOf(size.optDouble(0, maxWidth), maxWidth),
+                minOf(size.optDouble(1, maxHeight), maxHeight),
+            )
+        )
     }
 
     private fun closedShapeArea(item: JSONObject): Double {
@@ -1506,7 +1604,7 @@ class LocalFallbackPipeline(
         val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
         val renderSeed = canonicalSeed(metadata.opt("render_seed") ?: metadata.opt("seed"))
         val engineId = metadata.optString("render_engine_id", "default").ifBlank { "default" }
-        val engineVersion = metadata.optString("render_engine_version", "14").ifBlank { "14" }
+        val engineVersion = metadata.optString("render_engine_version", "15").ifBlank { "15" }
         val colorCatalogId = metadata.optString("render_color_catalog_id", catalogId).ifBlank { catalogId }
         val wild = metadata.optBoolean("render_wild", metadata.optBoolean("wild", false))
 
@@ -1557,12 +1655,18 @@ class LocalFallbackPipeline(
         private const val PERF_TAG = "InkuPerf"
         private const val MAX_EXPANDED_PRIMITIVES = 400
         private const val MAX_EXPANDED_PER_INSTRUCTION = 240
+        // The two ends of the representative band the prompt and SPEC name: a request too
+        // large to count is shown as 80-120 marks. Both belong to the same rule.
+        private const val MIN_VISUAL_CLUSTERED_COUNT = 80
         private const val MAX_VISUAL_CLUSTERED_COUNT = 120
         private const val MAX_QUIET_VISUAL_COUNT = 64
         private const val MAX_QUIET_VERTICAL_COUNT = 48
         private const val MAX_NEON_BLUR_VISUAL_COUNT = 24
         private const val MAX_NEON_BLUR_VERTICAL_COUNT = 18
         private const val MAX_QUIET_LARGE_SHAPE_COUNT = 16
+        private const val MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
+        private const val MAX_QUIET_SYMBOLIC_SHAPE_WIDTH = 0.12
+        private const val MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT = 0.09
         private val motionOrTextureTerms = listOf(
             "震える", "震え", "揺れる", "揺らぐ", "揺れ", "小刻み", "滲む", "にじむ", "太い", "細い",
             "trembling", "tremble", "swaying", "sway", "wobble", "wobbly", "blurring", "blurred", "thick", "thin",

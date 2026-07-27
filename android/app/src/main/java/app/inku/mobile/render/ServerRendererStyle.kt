@@ -106,7 +106,7 @@ internal object ServerRendererStyle {
 
     fun strokeWidth(weight: String, unit: Double): Double {
         val base = when (weight) {
-            "hair" -> 0.5
+            "silverpoint" -> 0.5
             "pencil" -> 1.5
             "rotring" -> 1.0
             "crayon" -> 4.0
@@ -121,7 +121,7 @@ internal object ServerRendererStyle {
     }
 
     fun strokeOpacity(weight: String): Double = when (weight) {
-        "hair" -> 0.72
+        "silverpoint" -> 0.72
         "pencil" -> 0.66
         "rotring" -> 0.95
         "crayon" -> 0.78
@@ -132,7 +132,7 @@ internal object ServerRendererStyle {
     }
 
     fun lineCap(weight: String): String = when (weight) {
-        "hair" -> "butt"
+        "silverpoint" -> "butt"
         "rotring" -> "square"
         else -> "round"
     }

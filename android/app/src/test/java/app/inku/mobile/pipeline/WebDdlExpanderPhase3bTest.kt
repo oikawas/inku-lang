@@ -44,7 +44,8 @@ class WebDdlExpanderPhase3bTest {
         val ddl = input.getString("ddl")
         val lang = if (input.has("lang")) input.getString("lang") else "ja"
         val contextText = if (!input.has("context_text") || input.isNull("context_text")) null else input.getString("context_text")
-        val varySeed = parseSeed(input, "vary_seed")
+        // manifest key renamed in v2.8.0; the expander parameter and the "#vary" salt stay frozen.
+        val varySeed = parseSeed(input, "composition_seed")
         val enablePlugins = input.optBoolean("enable_plugins", true)
         val pluginInstructionsPresent = input.optBoolean("plugin_instructions_present", false)
         val tenkei = input.optString("tenkei", "auto")

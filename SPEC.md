@@ -191,7 +191,7 @@ possibilities by selectively applying:
 
 - mathematical and geometric laws
 - spatial paths and non-central focus
-- scene-tone palette choices
+- scene-tone color choices
 - music-derived structures such as counterpoint, canon, and harmonic ratios
 - painting and material techniques such as perspective, chiaroscuro, drawing,
   pointillism, watercolor, oil-paint layering, patchwork, fresco, and sumi ink
@@ -269,7 +269,7 @@ guard is intentionally not applied to multi-motif DDL.
 When Stage 2 cannot return usable instructions because of timeout, empty output,
 or transient model failure, the server may produce a deterministic fallback
 Score.  This fallback is still expected to preserve the DDL's visible essentials:
-quantity, placement path, material words, palette tone, and enough shape variety
+quantity, placement path, material words, scene tone, and enough shape variety
 to remain reviewable.
 
 ### Renderer: Performance
@@ -585,7 +585,7 @@ groups together exceed `MAX_EXPANDED_PRIMITIVES` (400), the largest is
 represented first and the budget is rechecked before the next one gives way, so
 the small groups a reader could have counted stay literal.
 
-Current scene-tone palette behavior uses abstract colors only:
+The scene-tone rule currently chooses from the abstract colors alone:
 
 - spring, flowers, buds, and warm light lean toward red / green / white
 - water, night, moon, rain, mist, and cold air lean toward blue / white / gray
@@ -1622,7 +1622,7 @@ The reference implementation currently includes:
 - shared kiwi progress mascot for single drawing and DDL replay
 - integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
   token/time display, and cancellable `/api/compose` replay
-- scene-tone palette strategy, richer fallback Scores, sensory visibility
+- scene-tone color strategy, richer fallback Scores, sensory visibility
   safeguards, and broader primitive use within the current schema
 - renderer material effects, wobble, rotation, arrangement paths, density/fade,
   and canvas aspect support

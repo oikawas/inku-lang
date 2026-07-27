@@ -1847,8 +1847,10 @@ def _paint_payload(
         or DEFAULT_COLOR_CATALOG_ID
     )
     payload: dict[str, Any] = {
-        "description": text,
-        "original_description": args.original_text,
+        # description は作者が書いた記述。CLI は文脈を注入しないので、Stage 1 が読む
+        # 文字列は打った本文そのままになる。
+        "description": args.original_text or text,
+        "stage1_input": text,
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
         "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
         "include_thinking": args.include_thinking,
@@ -1883,7 +1885,7 @@ def _compose_payload(
     payload: dict[str, Any] = {
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
-        "original_description": args.original_text,
+        "description": args.original_text,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,

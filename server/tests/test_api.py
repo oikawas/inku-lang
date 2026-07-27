@@ -1247,6 +1247,71 @@ def test_interpret_empty_rejected(auth_context):
     assert r.status_code == 422
 
 
+def _capturing_interpret(seen: list[str]):
+    def fake_interpret(text, *args, **kwargs):
+        seen.append(text)
+        return ("中心に黒い円を置く。", None)
+
+    return fake_interpret
+
+
+def test_interpret_reads_the_description_when_no_stage1_input(monkeypatch, auth_context):
+    """A client that injects no context sends only the description, and Stage 1 reads it."""
+    headers, _, _ = auth_context
+    seen: list[str] = []
+    monkeypatch.setattr(api_module, "interpret_detail", _capturing_interpret(seen))
+    r = client.post("/api/interpret", json={"description": "一滴の墨"}, headers=headers)
+    assert r.status_code == 200
+    assert seen == ["一滴の墨"]
+
+
+def test_interpret_reads_the_stage1_input_when_it_is_sent(monkeypatch, auth_context):
+    """The augmented text is what Stage 1 reads; the description stays the author's own."""
+    headers, _, _ = auth_context
+    seen: list[str] = []
+    monkeypatch.setattr(api_module, "interpret_detail", _capturing_interpret(seen))
+    r = client.post(
+        "/api/interpret",
+        json={"description": "一滴の墨", "stage1_input": "一滴の墨\n\n感情: 静か"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert seen == ["一滴の墨\n\n感情: 静か"]
+
+
+def test_paint_keeps_the_augmented_text_out_of_the_history(monkeypatch, auth_context):
+    """What is saved is the description, not the string Stage 1 was handed."""
+    headers, user, _ = auth_context
+    seen: list[str] = []
+    monkeypatch.setattr(api_module, "interpret_detail", _capturing_interpret(seen))
+    monkeypatch.setattr(
+        api_module,
+        "compose",
+        lambda ddl, model=None: Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        ),
+    )
+
+    r = client.post(
+        "/api/paint",
+        json={
+            "description": "一滴の墨",
+            "stage1_input": "一滴の墨\n\n感情: 静か",
+            "save_history": True,
+        },
+        headers=headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert seen == ["一滴の墨\n\n感情: 静か"]
+
+    history = client.get("/api/history", headers=headers).json()
+    item = next(entry for entry in history["items"] if entry["id"] == data["history_id"])
+    assert item["input"] == "一滴の墨"
+
+    db.delete_items(user["id"], [data["history_id"]])
+
+
 def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_context):
     headers, _, _ = auth_context
 
@@ -1261,7 +1326,7 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
         "/api/compose",
         json={
             "ddl": "黒い線を置く。",
-            "original_description": "白い余白に、黒い線だけを残す。",
+            "description": "白い余白に、黒い線だけを残す。",
         },
         headers=headers,
     )
@@ -1966,8 +2031,8 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     r = client.post(
         "/api/paint",
         json={
-            "description": "一滴の墨\n\n感情: 静か",
-            "original_description": "一滴の墨",
+            "description": "一滴の墨",
+            "stage1_input": "一滴の墨\n\n感情: 静か",
             "save_history": True,
             "history_input": "一滴の墨",
             "history_at": 1_700_000_000_000,

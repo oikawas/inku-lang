@@ -2701,8 +2701,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			signal: options.signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				description: augmented,
-				original_description: text,
+				description: text,
+				stage1_input: augmented,
 				stage1_model: resolvedStage1Model,
 				stage2_model: resolvedStage2Model,
 				include_thinking: includeThinking,
@@ -2780,8 +2780,8 @@ if (unreadWords.length > 0) {
 			signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				description: augmented,
-				original_description: text,
+				description: text,
+				stage1_input: augmented,
 				model: resolvedStage1Model,
 				include_thinking: includeThinking,
 				instruction_lang: langOverride ?? instructionLang,
@@ -2847,7 +2847,7 @@ if (unreadWords.length > 0) {
 			body: JSON.stringify({
 				ddl: currentDdl,
 				model: resolvedStage2Model,
-				original_description: originalText,
+				description: originalText,
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				catalog_id: renderOptions.catalogId ?? selectedCatalog,
@@ -3292,7 +3292,7 @@ if (unreadWords.length > 0) {
 				body: JSON.stringify({
 					ddl,
 					model: resolvedStage2Model,
-					original_description: replayInput,
+					description: replayInput,
 					instruction_lang: instructionLang,
 					ui_lang: uiLang,
 					catalog_id: selectedCatalog,
@@ -5136,7 +5136,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				ddl: baseDdl,
-				original_description: source,
+				description: source,
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
@@ -5232,7 +5232,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				ddl: baseDdl,
-				original_description: source,
+				description: source,
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),

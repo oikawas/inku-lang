@@ -863,7 +863,7 @@ class ComposeRequest(BaseModel):
     model: str | None = Field(
         default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
     )
-    original_description: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述 (省略可)")
+    description: str | None = Field(default=None, max_length=100_000, description="作者が書いた記述 (省略可)")
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
     ui_lang: str | None = Field(default=None, description="UI表示言語")
     color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -937,8 +937,8 @@ class ComposeResponse(BaseModel):
 
 
 class InterpretRequest(BaseModel):
-    description: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
-    original_description: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
+    description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
+    stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
     model: str | None = Field(
         default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
     )
@@ -961,8 +961,8 @@ class InterpretResponse(BaseModel):
 
 
 class PaintRequest(BaseModel):
-    description: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
-    original_description: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
+    description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
+    stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
@@ -3013,7 +3013,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
-        req.original_description or req.ddl,
+        req.description or req.ddl,
         instruction_lang_requested,
         ui_lang=ui_lang,
     )
@@ -3027,7 +3027,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         compose_detail = _call_compose_detail(
             req.ddl,
             model=resolved_stage2_model,
-            original_description=req.original_description,
+            original_description=req.description,
             system_prompt=None,
             lang=instruction_lang_resolved,
             composition_seed=req.composition_seed,
@@ -3054,7 +3054,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             score = coerce_score(
                 score,
                 branch_report=branch_counts,
-                ddl=_coerce_context(compose_detail.ddl, req.original_description),
+                ddl=_coerce_context(compose_detail.ddl, req.description),
                 tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )
@@ -3096,7 +3096,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     render_metadata = {
         **render_metadata,
         **_render_hash_metadata(
-            input_text=req.original_description or req.ddl,
+            input_text=req.description or req.ddl,
             ddl=compose_detail.ddl,
             score=score,
             svg=svg,
@@ -3137,19 +3137,22 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 @app.post("/api/interpret")
 def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
-    source_text = req.original_description or req.description
+    source_text = req.description
+    # Stage 1 が読むのは、記述に文脈を注入したあとの文字列。注入しない client は
+    # stage1_input を送ってこないので、そのときは記述そのものを読む。
+    stage1_text = req.stage1_input or req.description
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
         source_text, instruction_lang_requested, ui_lang=ui_lang
     )
     resolved_tenkei = req.tenkei or "auto"
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.description):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
-            detail = InterpretDetail(ddl=req.description.strip(), thinking=None, raw=None)
+            detail = InterpretDetail(ddl=stage1_text.strip(), thinking=None, raw=None)
         else:
             detail = _call_interpret_detail(
-                req.description,
+                stage1_text,
                 model=_resolved_stage1_model(req.model, actor),
                 include_thinking=req.include_thinking,
                 system_prompt_prefix=None,
@@ -3516,7 +3519,9 @@ def _paint_events(
     complete PaintResponse).
     """
     t0 = time.perf_counter()
-    source_text = req.original_description or req.description
+    source_text = req.description
+    # Stage 1 が読むのは、記述に文脈を注入したあとの文字列 (api_interpret と同じ規約)。
+    stage1_text = req.stage1_input or req.description
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
@@ -3532,14 +3537,14 @@ def _paint_events(
         req.variation_seed if resolved_variation_amplitude is not None else None
     )
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.description):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
             interpret_detail_result = InterpretDetail(
-                ddl=req.description.strip(), raw=req.description.strip() if req.include_trace else None
+                ddl=stage1_text.strip(), raw=stage1_text.strip() if req.include_trace else None
             )
         else:
             interpret_detail_result = _call_interpret_detail(
-                req.description,
+                stage1_text,
                 model=resolved_stage1_model,
                 include_thinking=req.include_thinking,
                 lang=instruction_lang_resolved,

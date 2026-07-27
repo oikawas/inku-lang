@@ -4595,28 +4595,55 @@ def _render_instruction(
         )
         # 塗りは描かれた曲線に沿わせたいので、制御点ではなく Catmull-Rom を
         # 標本化した密なポリゴンを走査する。凹みも交点対のまま扱える。
-        fill_group, _region_fill = _interior_fill(
+        sampled = list(sample_closed_catmull_rom(contour.points))
+        fill_group, region_fill = _interior_fill(
             dwg,
             ins,
-            list(sample_closed_catmull_rom(contour.points)),
+            sampled,
             attrs,
             canvas,
             render_seed,
             use_filters=use_filters,
             wild=wild,
         )
-        body_attrs = attrs
-        if fill_group is not None:
+        # engine 15: 同じ密なポリラインを閉輪郭の共通経路へ渡す。square / circle /
+        # polygon と同じ道を通るので、材質層の 3 機構 (材質輪郭・raster-bleed・
+        # burr) と wild がまとめて届く。輪郭生成そのものは engine 14 のまま。
+        hand = _uses_hand_stroke(ins.weight)
+        if hand:
+            body_attrs = _body_attrs_for_contour_stroke(
+                attrs, ins, region_fill=region_fill
+            )
+        elif fill_group is not None:
             body_attrs = _copy_attrs(attrs)
             body_attrs["fill"] = "none"
             body_attrs.pop("fill_opacity", None)
+        else:
+            body_attrs = attrs
         path = dwg.path(d=contour.path_d, **body_attrs)
-        path["class"] = "cloudform contour-v1 stroke-engine-touch"
-        if fill_group is None:
+        # class は事実だけを名乗る。rotring は幾何のままなので触れていない。
+        path["class"] = "cloudform contour-v1" + (
+            " stroke-engine-touch" if hand else ""
+        )
+        if fill_group is None and not hand:
             return _apply_rotation(path, ins, canvas)
         group = dwg.g()
         group.add(path)
-        group.add(fill_group)
+        if fill_group is not None:
+            group.add(fill_group)
+        if hand:
+            contour_group, _performed = _render_contour_hand_stroke(
+                dwg,
+                ins,
+                sampled,
+                attrs,
+                canvas,
+                render_seed,
+                use_filters=use_filters,
+                closed=True,
+                wild=wild,
+            )
+            group.add(contour_group)
         return _apply_rotation(group, ins, canvas)
 
     if ins.primitive == "square":

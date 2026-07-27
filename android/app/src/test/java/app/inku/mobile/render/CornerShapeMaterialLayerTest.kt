@@ -56,8 +56,21 @@ class CornerShapeMaterialLayerTest {
         MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
 
-    private fun speckCount(svg: String): Int =
-        Regex("""<circle[^>]*stroke="none"""").findAll(svg).count()
+    /**
+     * Where each grain of powder landed, not merely how many there are. A count alone
+     * survives a wrong spread: halving the intensity ladder's speck gain moves all 48 and
+     * changes none of them away.
+     */
+    private fun speckPositions(svg: String): List<String> =
+        Regex("""<circle\b([^>]*)/?>""").findAll(svg).mapNotNull { match ->
+            val attrs = Regex("""([\w-]+)="([^"]*)"""").findAll(match.groupValues[1])
+                .associate { it.groupValues[1] to it.groupValues[2] }
+            if (attrs["stroke"] == "none" && attrs.containsKey("cx")) {
+                "${attrs["cx"]},${attrs["cy"]},${attrs["r"]}"
+            } else {
+                null
+            }
+        }.toList()
 
     private fun triangle(weight: String): JSONObject = JSONObject()
         .put("primitive", "triangle")
@@ -88,7 +101,13 @@ class CornerShapeMaterialLayerTest {
             "c9e24c029a9bb1128b4677dff5a8efd740a0fd53c915d4a4a0ba0eb486e9e47a",
             sha256(points.joinToString("|")),
         )
-        assertEquals("pencil powder, spread by the intensity ladder's 1.8", 48, speckCount(svg))
+        val specks = speckPositions(svg)
+        assertEquals("pencil powder, counted by perimeter", 48, specks.size)
+        assertEquals(
+            "every grain must land where the server puts it, spread by the ladder's 1.8",
+            "a2efb96e3828d342423105103ae5d79cb86b7834fba7c059b33ba60d3e646dc3",
+            sha256(specks.joinToString("|")),
+        )
     }
 
     @Test
@@ -104,7 +123,7 @@ class CornerShapeMaterialLayerTest {
             "02fca4c7c951d6b72dbcceeb9332ed6722475b648aa32d9a133f4630ef811144",
             sha256(points.joinToString("|")),
         )
-        assertEquals("brush_thin is given no powder", 0, speckCount(svg))
+        assertEquals("brush_thin is given no powder", emptyList<String>(), speckPositions(svg))
     }
 
     @Test
@@ -114,7 +133,7 @@ class CornerShapeMaterialLayerTest {
         val svg = render(triangle("rotring"))
         assertEquals(emptyList<String>(), classes(svg))
         assertEquals(0, outlinePoints(svg).size)
-        assertEquals(0, speckCount(svg))
+        assertEquals(emptyList<String>(), speckPositions(svg))
     }
 
     @Test

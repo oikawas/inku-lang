@@ -6,6 +6,7 @@
 	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
+	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
 	import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -179,9 +180,7 @@
 	}
 
 	function operationLabel(kind?: string): string {
-		const ja: Record<string, string> = { touch_change: 'タッチ', layout_change: '構図', catalog_change: '色', reinterpretation: '解釈', model_comparison: 'モデル', language_comparison: '言語', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画', canvas_aspect_change: 'キャンバス変更' };
-		const en: Record<string, string> = { touch_change: 'Touch', layout_change: 'Layout', catalog_change: 'Color', reinterpretation: 'Reading', model_comparison: 'Model', language_comparison: 'Language', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay', canvas_aspect_change: 'Canvas change' };
-		return (isJapanese ? ja : en)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
+		return derivationKindLabel(kind, isJapanese);
 	}
 
 function toggleCheckedHistory(historyId: string): void {

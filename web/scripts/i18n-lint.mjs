@@ -60,12 +60,18 @@ const RESTRICTED = [
 			'aiRefineVisionModeHint', 'aiRefineDirectionRandomHint', 'aiRefineGensLabel',
 			'settingsDbBackupMaxGenerations', 'okugakiDescription', 'okugakiBranchConfirm',
 			'okugakiProgress', 'svgExportDisplayUse', 'svgExportEditableFeature', 'svgExportCompatFeature',
+			'provenanceLabelGeneration', 'provenanceHintGeneration',
 		],
 		texts: [],
 	},
 	{
 		word: 'prompt', re: /prompt/i, instead: 'the author\'s text is a "description"',
-		keys: ['tabPrompts', 'tooltipCanvasTabPrompts', 'promptStage1System', 'promptStage2System'],
+		keys: [
+			'tabPrompts', 'tooltipCanvasTabPrompts', 'promptStage1System', 'promptStage2System',
+			'provenanceLabelStage1PromptDigest', 'provenanceLabelStage1PromptBaseDigest',
+			'provenanceLabelStage2PromptDigest', 'provenanceHintStage1PromptDigest',
+			'provenanceHintStage1PromptBaseDigest', 'provenanceHintStage2PromptDigest',
+		],
 		texts: ['Show the provenance, prompts, and JSON of the chosen work'],
 	},
 	{

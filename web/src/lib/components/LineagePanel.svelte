@@ -179,8 +179,8 @@
 	}
 
 	function operationLabel(kind?: string): string {
-		const ja: Record<string, string> = { touch_variation: 'タッチ', layout_variation: '構図', catalog_change: '色', reinterpretation: '解釈', model_variation: 'モデル', language_variation: '言語', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画', canvas_aspect_change: 'キャンバス変更' };
-		const en: Record<string, string> = { touch_variation: 'Touch', layout_variation: 'Layout', catalog_change: 'Color', reinterpretation: 'Reading', model_variation: 'Model', language_variation: 'Language', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay', canvas_aspect_change: 'Canvas change' };
+		const ja: Record<string, string> = { touch_change: 'タッチ', layout_change: '構図', catalog_change: '色', reinterpretation: '解釈', model_comparison: 'モデル', language_comparison: '言語', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画', canvas_aspect_change: 'キャンバス変更' };
+		const en: Record<string, string> = { touch_change: 'Touch', layout_change: 'Layout', catalog_change: 'Color', reinterpretation: 'Reading', model_comparison: 'Model', language_comparison: 'Language', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay', canvas_aspect_change: 'Canvas change' };
 		return (isJapanese ? ja : en)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
 	}
 
@@ -645,7 +645,7 @@ $effect(() => {
 											<dt>rh2</dt><dd>{shortHash(node.render_hash)}</dd>
 											<dt>Stage 1</dt><dd>{node.history.stage1_model ?? '—'}</dd>
 											<dt>Stage 2</dt><dd>{node.history.stage2_model ?? '—'}</dd>
-											<dt>seed</dt><dd>{node.history.render_seed ?? '—'} / {node.history.vary_seed ?? '—'} / {node.history.interpretation_seed ?? '—'}</dd>
+											<dt>seed</dt><dd>{node.history.render_seed ?? '—'} / {node.history.composition_seed ?? '—'} / {node.history.interpretation_seed ?? '—'}</dd>
 											<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(edge?.derivation_kind)}</dd>
 										</dl>
 										<div class="note-editor">

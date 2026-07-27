@@ -143,7 +143,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `image` | **Vision が実際に画像を見る**文脈 | `modelSelectionVisionHint` / `aiRefineVisionModeHint` / `aiRefineVisionReading` / `aiRefineVisionSourceError` |
 | `render*` | **サーバー側の技術設定・DB フィールド名・置換トークン** | `canvasSeedSummary`(`{render}`) / `settingsRenderConcurrency*`(5 件) / `historyReplayMissingSeed`(`render_seed`) / `replayComparisonTitle`(Renderer) |
 | `kotobagaki` | 語彙ダイアログの**注記としての一度だけ** | `appInfoVocabRows` |
-| `Moderate` | **変奏の強度・中** | `hensouMedium` / `hensouTooltipLarge` |
+| `Moderate` | **変奏の強度・中** | `variationMedium` / `variationTooltipLarge` |
 
 **新しく例外を足すときは、`i18n-lint.mjs` の該当リストとこの表を同じ commit で更新する。**
 例外に足す前に、まず訳語を変えられないかを考えること。
@@ -169,8 +169,20 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 **それでも動かさないもの**: DB のテーブル名・列名（`okugaki` テーブル）、
 `model_settings` の `okugaki_model`（**保存済みユーザー設定**）、
 モジュール名 `okugaki.py`、i18n の鍵 `okugaki*`。
-**鍵名のローマ字は例外ではなく通例である** — 変奏の鍵は `variation` という
-完璧な辞書語がありながら **`hensou*` のまま**である。禁じているのは表示に出る語であって、鍵ではない。
+**鍵名のローマ字は本来なら通例であり、禁じているのは表示に出る語である。**
+ただし変奏については**辞書を完全に通すという作者裁定（2026-07-27）**により、
+**鍵まで `hensou*` → `variation*` へ揃えた**（v2.8.0）。
+
+**変奏では衝突が逆向きだった** — 辞書は `variation` を変奏だけに予約している
+（候補は `option`）のに、実装では**本物の変奏がローマ字 `hensou`** で、
+**変奏でない 4 種が `*_variation`** を名乗っていた。`touch_variation` → `touch_change`、
+`model_variation` → `model_comparison`、`layout_variation` → `layout_change`、
+`language_variation` → `language_comparison` とし、`hensou` → `variation` を戻した。
+**`vary_seed` は変奏ですらなく Stage 1.5 の構図 seed** なので `composition_seed` にした。
+
+> **hash と同一性 ID の材料は名前ではない。凍結する。**
+> rh2 payload の鍵 `vary_seed` と `ddl_expander` の salt `#hensou` / `#vary` は動かしていない。
+> **新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md` に記録がある。**
 
 **判断規則**: 変えようとしている文字列が Stage 1/2 プロンプト・Score・テスト fixture に届いているなら、
 **直さずに作者へ報告する**（歳時記カテゴリ名が先例）。

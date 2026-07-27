@@ -142,7 +142,7 @@ Canvas下部の`生成情報`を開くと、選択中作品の記録を確認で
 | プロンプト | Stage 1／2のsystem promptとuser prompt |
 | JSON | 詳細情報の機械可読なトップレベル項目とJSON Score |
 
-JSONには`stage1_instruction_lang`、`stage2_instruction_lang`、`render_seed`、`vary_seed`、`interpretation_seed`、`description_hash`、`derivation_kind`、`derivation_metadata`などが含まれます。JSON Score本体と生成情報を混同しないでください。
+JSONには`stage1_instruction_lang`、`stage2_instruction_lang`、`render_seed`、`composition_seed`、`interpretation_seed`、`description_hash`、`derivation_kind`、`derivation_metadata`などが含まれます。JSON Score本体と生成情報を混同しないでください。
 
 ## 9. 系譜をたどる
 

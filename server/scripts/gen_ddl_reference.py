@@ -61,13 +61,13 @@ def _score(instructions: list[dict[str, Any]], **changes: Any) -> dict[str, Any]
     return result
 
 def _expand_input(ddl: str, *, lang: str = "ja", context_text: str | None = None,
-                  vary_seed: int | None = None, enable_plugins: bool = True,
+                  composition_seed: int | None = None, enable_plugins: bool = True,
                   plugin_instructions_present: bool = False, tenkei: str = "auto",
                   focus: str | None = None, variation_amplitude: str | None = None,
                   variation_seed: int | None = None) -> dict[str, Any]:
     return {
         "ddl": ddl, "lang": lang, "context_text": context_text,
-        "vary_seed": vary_seed, "enable_plugins": enable_plugins,
+        "composition_seed": composition_seed, "enable_plugins": enable_plugins,
         "plugin_instructions_present": plugin_instructions_present,
         "tenkei": tenkei, "focus": focus,
         "variation_amplitude": variation_amplitude, "variation_seed": variation_seed,

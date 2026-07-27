@@ -142,7 +142,7 @@ Open `Provenance` at the bottom of Canvas to inspect the selected work.
 | Prompts | Stage 1/2 system and user prompts |
 | JSON | Machine-readable top-level generation metadata plus JSON Score |
 
-JSON includes fields such as `stage1_instruction_lang`, `stage2_instruction_lang`, `render_seed`, `vary_seed`, `interpretation_seed`, `description_hash`, `derivation_kind`, and `derivation_metadata`. Keep top-level generation metadata distinct from the JSON Score itself.
+JSON includes fields such as `stage1_instruction_lang`, `stage2_instruction_lang`, `render_seed`, `composition_seed`, `interpretation_seed`, `description_hash`, `derivation_kind`, and `derivation_metadata`. Keep top-level generation metadata distinct from the JSON Score itself.
 
 ## 9. Follow Lineage
 

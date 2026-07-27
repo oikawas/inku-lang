@@ -145,7 +145,7 @@ DBは次を分離して保存します。
 
 ## 6. Rendererと再現性
 
-`render_seed`はタッチ、`vary_seed`は配置、`interpretation_seed`は読み取りの再現補助です。`seed_text`は明示語を決定的にhashし、Rendererのperformance seedだけへ作用します。解釈、DDL、JSON Score、配置へ作用させません。
+`render_seed`はタッチ、`composition_seed`は配置、`interpretation_seed`は読み取りの再現補助です。`seed_text`は明示語を決定的にhashし、Rendererのperformance seedだけへ作用します。解釈、DDL、JSON Score、配置へ作用させません。
 
 履歴再現では保存済みScore、色カタログ、キャンバス、seed、render engine versionを使用します。engine変更後のbit一致を保証するのではなく、version情報を監査可能にします。
 

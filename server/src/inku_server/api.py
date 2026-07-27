@@ -876,7 +876,7 @@ class ComposeRequest(BaseModel):
     lineage_parent_node_id: str | None = Field(default=None, description="添景水準の継承元 lineage ノード (v1.97)。保存には関与しない")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
-    vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
+    composition_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
@@ -910,7 +910,7 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     render_wild: bool | None = None
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
@@ -991,7 +991,7 @@ class PaintRequest(BaseModel):
     variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
-    vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
+    composition_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
@@ -1028,7 +1028,7 @@ class PaintResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     render_wild: bool | None = None
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
@@ -1093,7 +1093,7 @@ class RenderScoreRequest(BaseModel):
     canvas_aspect: str | None = None
     render_seed: int | None = None
     wild: bool = False
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
 
@@ -1116,7 +1116,7 @@ class RenderScoreResponse(BaseModel):
     render_canvas_aspect_id: str
     render_canvas_aspect_ratio: float
     render_seed: int
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     render_hash: str
@@ -1219,7 +1219,7 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     render_wild: bool | None = None
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$")
     interpretation_seed: str | None = None
     seed_text: str | None = None
@@ -2682,7 +2682,7 @@ def _call_compose_detail(
     original_text: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     include_trace: bool = False,
     tenkei: str = "auto",
     focus: str | None = None,
@@ -2702,7 +2702,7 @@ def _call_compose_detail(
         plugin_expansion.ddl,
         lang=lang,
         context_text=original_text,
-        vary_seed=vary_seed,
+        composition_seed=composition_seed,
         plugin_instructions_present=bool(plugin_expansion.instructions),
         tenkei=tenkei,
         focus=focus,
@@ -3030,7 +3030,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             original_text=req.original_text,
             system_prompt=None,
             lang=instruction_lang_resolved,
-            vary_seed=req.vary_seed,
+            composition_seed=req.composition_seed,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
             variation_amplitude=resolved_variation_amplitude,
@@ -3079,7 +3079,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "render_wild": req.wild,
-        "vary_seed": req.vary_seed,
+        "composition_seed": req.composition_seed,
         "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
         "variation_amplitude": resolved_variation_amplitude,
@@ -3375,7 +3375,7 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
             **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
             "render_seed": render_seed,
             "render_wild": req.wild,
-            "vary_seed": req.vary_seed,
+            "composition_seed": req.composition_seed,
             "interpretation_seed": req.interpretation_seed,
             "seed_text": seed_text,
         }
@@ -3627,7 +3627,7 @@ def _paint_events(
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "render_wild": req.wild,
-        "vary_seed": req.vary_seed,
+        "composition_seed": req.composition_seed,
         "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
         "variation_amplitude": resolved_variation_amplitude,
@@ -4220,7 +4220,7 @@ def api_history_post(
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
             "render_seed": render_seed,
-            "vary_seed": body.vary_seed,
+            "composition_seed": body.composition_seed,
             # v1.97: 保存時に水準を確定する（renderer 専用派生でも系統の水準が途切れない）
             "tenkei": _resolved_tenkei(body.tenkei, actor, body.lineage_parent_node_id),
             "focus": body.focus if body.focus in FOCUS_IDS else None,

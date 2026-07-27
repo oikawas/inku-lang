@@ -340,7 +340,7 @@ def _render_hash_for_score(
     score: dict[str, Any],
     *,
     render_seed: int | None = None,
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     render_build_number: str | None = None,
     render_engine_id: str | None = None,
     render_engine_version: str | None = None,
@@ -350,7 +350,7 @@ def _render_hash_for_score(
         "version": "rh2",
         "score": score or {},
         "render_seed": render_seed,
-        "vary_seed": vary_seed,
+        "composition_seed": composition_seed,
         "render_build_number": render_build_number,
         "render_engine_id": render_engine_id,
         "render_engine_version": render_engine_version,
@@ -1860,7 +1860,7 @@ def _paint_payload(
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
-        "vary_seed": getattr(args, "vary_seed", None),
+        "composition_seed": getattr(args, "composition_seed", None),
         "tenkei": getattr(args, "tenkei", None),
         "seed_text": getattr(args, "seed_text", None),
         "include_trace": getattr(args, "trace", False) or None,
@@ -1890,7 +1890,7 @@ def _compose_payload(
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "auto_repair": True,
         "render_seed": getattr(args, "render_seed", None),
-        "vary_seed": getattr(args, "vary_seed", None),
+        "composition_seed": getattr(args, "composition_seed", None),
         "tenkei": getattr(args, "tenkei", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
@@ -2285,7 +2285,7 @@ def command_batch(args: argparse.Namespace) -> int:
     )
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
-    vary_count = max(1, int(getattr(args, "vary", 1) or 1))
+    composition_count = max(1, int(getattr(args, "composition_count", 1) or 1))
     pending_timeout_retries: list[tuple[int, str, int | None]] = []
     result_index_by_line: dict[tuple[int, int | None], int] = {}
 
@@ -2336,9 +2336,9 @@ def command_batch(args: argparse.Namespace) -> int:
                 )),
                 enabled=not args.no_progress,
             )
-        current_vary_seed = getattr(args, "vary_seed", None)
-        if vary_count > 1:
-            prefix = f"{args.prefix}-{index:03d}-v{current_vary_seed}" if args.prefix else f"inku-batch-{index:03d}-v{current_vary_seed}"
+        current_composition_seed = getattr(args, "composition_seed", None)
+        if composition_count > 1:
+            prefix = f"{args.prefix}-{index:03d}-v{current_composition_seed}" if args.prefix else f"inku-batch-{index:03d}-v{current_composition_seed}"
         else:
             prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
         output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
@@ -2362,7 +2362,7 @@ def command_batch(args: argparse.Namespace) -> int:
             "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
             "history_id": result.get("history_id"),
             "svg_profile": args.svg_profile,
-            "vary_seed": result.get("vary_seed"),
+            "composition_seed": result.get("composition_seed"),
             "elapsed_total_ms": elapsed,
             "tokens_in": tokens_in or None,
             "tokens_out": tokens_out or None,
@@ -2380,39 +2380,39 @@ def command_batch(args: argparse.Namespace) -> int:
             entry["server_timeout_retry_attempted"] = retry_timeout
         return entry
 
-    work_items = [(index, line, vary_index if vary_count > 1 else getattr(args, "vary_seed", None)) for index, line in enumerate(lines, start=1) for vary_index in range(vary_count)]
-    for ordinal, (index, line, vary_seed) in enumerate(work_items, start=1):
-        previous_vary_seed = getattr(args, "vary_seed", None)
-        args.vary_seed = vary_seed
+    work_items = [(index, line, composition_index if composition_count > 1 else getattr(args, "composition_seed", None)) for index, line in enumerate(lines, start=1) for composition_index in range(composition_count)]
+    for ordinal, (index, line, composition_seed) in enumerate(work_items, start=1):
+        previous_composition_seed = getattr(args, "composition_seed", None)
+        args.composition_seed = composition_seed
         try:
             entry = process_line(index, line)
-            key = (index, vary_seed)
+            key = (index, composition_seed)
             result_index_by_line[key] = len(results)
             results.append(entry)
             timeout_reasons = entry.get("server_timeout_reasons") or []
             if timeout_reasons:
-                pending_timeout_retries.append((index, line, vary_seed))
+                pending_timeout_retries.append((index, line, composition_seed))
                 print(
                     f"{ordinal}/{len(work_items)} server timeout ({', '.join(timeout_reasons)}); queued final retry",
                     file=sys.stderr,
                 )
             print(f"{ordinal}/{len(work_items)} ok line {index} {entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
-            failures.append({"line": index, "text": line, "vary_seed": vary_seed, "message": str(exc)})
+            failures.append({"line": index, "text": line, "composition_seed": composition_seed, "message": str(exc)})
             print(f"{ordinal}/{len(work_items)} failed line {index}: {exc}", file=sys.stderr)
             if not args.continue_on_error:
-                args.vary_seed = previous_vary_seed
+                args.composition_seed = previous_composition_seed
                 break
         finally:
-            args.vary_seed = previous_vary_seed
+            args.composition_seed = previous_composition_seed
     if pending_timeout_retries:
         print(f"server timeout final retry: {len(pending_timeout_retries)} item(s)", file=sys.stderr)
-    for index, line, vary_seed in pending_timeout_retries:
-        previous_vary_seed = getattr(args, "vary_seed", None)
-        args.vary_seed = vary_seed
+    for index, line, composition_seed in pending_timeout_retries:
+        previous_composition_seed = getattr(args, "composition_seed", None)
+        args.composition_seed = composition_seed
         try:
             retry_entry = process_line(index, line, retry_timeout=True)
-            original_result_index = result_index_by_line.get((index, vary_seed))
+            original_result_index = result_index_by_line.get((index, composition_seed))
             if original_result_index is not None:
                 results[original_result_index] = retry_entry
             else:
@@ -2426,10 +2426,10 @@ def command_batch(args: argparse.Namespace) -> int:
             else:
                 print(f"{index}/{len(lines)} final retry ok {retry_entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
-            failures.append({"line": index, "text": line, "vary_seed": vary_seed, "message": f"final retry failed: {exc}"})
+            failures.append({"line": index, "text": line, "composition_seed": composition_seed, "message": f"final retry failed: {exc}"})
             print(f"{index}/{len(lines)} final retry failed: {exc}", file=sys.stderr)
         finally:
-            args.vary_seed = previous_vary_seed
+            args.composition_seed = previous_composition_seed
 
     total_in = sum(int(result.get("tokens_in") or 0) for result in results)
     total_out = sum(int(result.get("tokens_out") or 0) for result in results)
@@ -2504,7 +2504,7 @@ def command_batch(args: argparse.Namespace) -> int:
         "failed": len(failures),
         "total": len(work_items),
         "prompt_total": len(lines),
-        "vary_count": vary_count,
+        "composition_count": composition_count,
         "input_mode": input_mode,
         **_model_summary(
             None if input_mode == "ddl" else stage1_model,
@@ -2702,7 +2702,7 @@ def command_render_score(args: argparse.Namespace) -> int:
     render_hash = _render_hash_for_score(
         score,
         render_seed=args.render_seed,
-        vary_seed=args.vary_seed,
+        composition_seed=args.composition_seed,
         render_build_number=render_build_number,
         render_engine_id="default",
         render_engine_version="2",
@@ -2722,7 +2722,7 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_canvas_aspect_id": args.canvas_aspect,
         "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
         "render_seed": args.render_seed,
-        "vary_seed": args.vary_seed,
+        "composition_seed": args.composition_seed,
         "svg_profile": args.svg_profile,
     }
     paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)
@@ -2924,11 +2924,11 @@ def command_refine(args: argparse.Namespace) -> int:
         if not parent_node_id:
             raise CliError(f"lineage node ID is missing on item {args.item_id}")
         
-        derivation_kind = "touch_variation"
+        derivation_kind = "touch_change"
         if args.kind == "touch":
-            derivation_kind = "touch_variation"
+            derivation_kind = "touch_change"
         elif args.kind == "layout":
-            derivation_kind = "layout_variation"
+            derivation_kind = "layout_change"
         elif args.kind == "reading":
             derivation_kind = "reinterpretation"
         elif args.kind == "color":
@@ -2943,22 +2943,22 @@ def command_refine(args: argparse.Namespace) -> int:
         
         if args.kind == "touch":
             params["render_seed"] = int(time.time() * 1000) & 0x7fffffff
-            params["vary_seed"] = target.get("vary_seed")
+            params["composition_seed"] = target.get("composition_seed")
             params["interpretation_seed"] = target.get("interpretation_seed")
             params["catalog_id"] = target.get("render_color_catalog_id")
         elif args.kind == "layout":
             params["render_seed"] = target.get("render_seed")
-            params["vary_seed"] = int(time.time() * 1000) & 0x7fffffff
+            params["composition_seed"] = int(time.time() * 1000) & 0x7fffffff
             params["interpretation_seed"] = target.get("interpretation_seed")
             params["catalog_id"] = target.get("render_color_catalog_id")
         elif args.kind == "reading":
             params["render_seed"] = target.get("render_seed")
-            params["vary_seed"] = target.get("vary_seed")
+            params["composition_seed"] = target.get("composition_seed")
             params["interpretation_seed"] = str(uuid.uuid4())
             params["catalog_id"] = target.get("render_color_catalog_id")
         elif args.kind == "color":
             params["render_seed"] = target.get("render_seed")
-            params["vary_seed"] = target.get("vary_seed")
+            params["composition_seed"] = target.get("composition_seed")
             params["interpretation_seed"] = target.get("interpretation_seed")
             params["random_color_catalog"] = True
             
@@ -3401,7 +3401,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
-    parser.add_argument("--vary-seed", type=int, help="Stage 1.5 composition variation seed")
+    parser.add_argument("--composition-seed", type=int, help="Stage 1.5 composition variation seed")
     parser.add_argument("--tenkei", choices=["none", "sparse", "auto"], help="scenery level (v1.96): none / sparse / auto")
     parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
@@ -3418,7 +3418,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")
-        parser.add_argument("--vary", type=int, default=1, help="generate N Stage 1.5 variations per prompt")
+        parser.add_argument("--composition-count", type=int, default=1, help="generate N Stage 1.5 variations per prompt")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
@@ -3503,7 +3503,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
     render_score.add_argument("--canvas-aspect", default="square")
     render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
-    render_score.add_argument("--vary-seed", type=int, help="record Stage 1.5 composition variation seed in output metadata")
+    render_score.add_argument("--composition-seed", type=int, help="record Stage 1.5 composition variation seed in output metadata")
     render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     render_score.add_argument("--color-catalog", help="server color catalog id")
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")

@@ -47,23 +47,38 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 _logger = logging.getLogger(__name__)
 _HISTORY_FTS_ENABLED = False
 LINEAGE_DERIVATION_KINDS = {
-    "touch_variation",
-    "layout_variation",
+    "touch_change",
+    "layout_change",
     "catalog_change",
     "reinterpretation",
-    "model_variation",
-    "language_variation",
+    "model_comparison",
+    "language_comparison",
     "ddl_edit",
     "description_edit",
     "replay",
-    "render_engine_variation",
-    "age_variation",
-    "hacho_variation",
+    "render_engine_change",
+    "age_change",
+    "hacho_change",
     "renga_reply",
-    "external_seed_variation",
+    "external_seed_change",
     "canvas_aspect_change",
-    "hensou",  # v2.0 変奏 (Stage 1.5 の展開をまとめて振る)
+    "variation",  # v2.0 変奏 (Stage 1.5 の展開をまとめて振る)。v2.8.0 で hensou から改名
 }
+
+# v2.8.0 の改名表。**保存済みの行はこの表で書き換える**（`_migrate_columns`）。
+# 新旧の対応は `no-git-sync/opus5/name_convantion/` にも記録がある。
+_LINEAGE_KIND_RENAMES = (
+    ("hensou", "variation"),
+    ("touch_variation", "touch_change"),
+    ("layout_variation", "layout_change"),
+    ("model_variation", "model_comparison"),
+    ("language_variation", "language_comparison"),
+    ("render_engine_variation", "render_engine_change"),
+    ("age_variation", "age_change"),
+    ("hacho_variation", "hacho_change"),
+    ("external_seed_variation", "external_seed_change"),
+)
+
 
 class Base(DeclarativeBase):
     pass
@@ -110,7 +125,7 @@ class HistoryRow(Base):
     ui_lang = Column(String, nullable=True)
     render_seed = Column(String, nullable=True)
     render_wild = Column(String, nullable=True)  # engine 12: "1"/"0"。NULL = 記録前の作品（OFF と区別する）
-    vary_seed = Column(String, nullable=True)
+    composition_seed = Column(String, nullable=True)
     tenkei = Column(String, nullable=True)  # v1.97 添景水準 (none/sparse/auto)。NULL = 保存開始前の作品
     focus = Column(String, nullable=True)  # v1.98 焦点。NULL = DDL テキストから決定的に選択
     # v2.0 変奏。両方 NULL = 変奏なしの展開。moved_axes は決定的に再計算できるので列を作らない。
@@ -288,7 +303,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "ui_lang": "ALTER TABLE history ADD COLUMN ui_lang VARCHAR",
     "render_seed": "ALTER TABLE history ADD COLUMN render_seed VARCHAR",
     "render_wild": "ALTER TABLE history ADD COLUMN render_wild VARCHAR",
-    "vary_seed": "ALTER TABLE history ADD COLUMN vary_seed VARCHAR",
+    "composition_seed": "ALTER TABLE history ADD COLUMN composition_seed VARCHAR",
     "tenkei": "ALTER TABLE history ADD COLUMN tenkei VARCHAR",
     "focus": "ALTER TABLE history ADD COLUMN focus VARCHAR",
     "variation_amplitude": "ALTER TABLE history ADD COLUMN variation_amplitude VARCHAR",
@@ -435,6 +450,20 @@ def _migrate_columns() -> None:
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError("failed to inspect history table columns for migration") from exc
 
+        # v2.8.0: 変奏の語を辞書へ揃えた。`vary_seed` は変奏ではなく Stage 1.5 の
+        # **構図** seed なので `composition_seed` へ移す。列を足すだけだと既存の値が
+        # 孤児になるので、**足す前に中身を移す**。
+        if (
+            "vary_seed" in existing_history_columns
+            and "composition_seed" not in existing_history_columns
+        ):
+            try:
+                conn.execute(text("ALTER TABLE history RENAME COLUMN vary_seed TO composition_seed"))
+                existing_history_columns.discard("vary_seed")
+                existing_history_columns.add("composition_seed")
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError("failed to rename history.vary_seed to composition_seed") from exc
+
         adding_expanded_ddl = "expanded_ddl" not in existing_history_columns
         for column, ddl in _HISTORY_COLUMN_MIGRATIONS.items():
             if column in existing_history_columns:
@@ -481,6 +510,19 @@ def _migrate_columns() -> None:
                 conn.execute(text(ddl))
             except Exception as exc:  # noqa: BLE001
                 raise RuntimeError(f"failed to migrate user_accounts.{column}") from exc
+
+        # v2.8.0: 保存済みの derivation kind を辞書の語へ移す。
+        # **`variation` は変奏だけの語である** — 変奏でない 4 種が名乗っていたのを外し、
+        # 本物の変奏 (`hensou`) をローマ字から戻した。**行は消さずに書き換える。**
+        if inspector.has_table("lineage_edges"):
+            for before, after in _LINEAGE_KIND_RENAMES:
+                try:
+                    conn.execute(
+                        text("UPDATE lineage_edges SET derivation_kind = :after WHERE derivation_kind = :before"),
+                        {"before": before, "after": after},
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"failed to rename derivation kind {before}") from exc
 
         for index_name, ddl in _HISTORY_INDEX_MIGRATIONS:
             try:
@@ -581,7 +623,10 @@ def _legacy_render_hash_for_item(item: dict) -> str:
         "version": "rh2",
         "score": item.get("score") or {},
         "render_seed": _canonical_seed(item.get("render_seed")),
-        "vary_seed": _canonical_seed(item.get("vary_seed")),
+        # **鍵名は `vary_seed` のまま凍結する。** これは名前ではなく hash の材料であり、
+        # 文字を変えると保存済み作品の rh2 が全部作り直しになる。値は新しい列から取る。
+        # (v2.8.0 の改名で実際に全件動いたのを検査が捕まえた)
+        "vary_seed": _canonical_seed(item.get("composition_seed")),
         "render_build_number": item.get("render_build_number"),
         "render_engine_id": item.get("render_engine_id"),
         "render_engine_version": item.get("render_engine_version"),
@@ -630,7 +675,7 @@ def _row_hash_payload(row: HistoryRow) -> dict:
         "render_color_catalog_sub": row.render_color_catalog_sub,
         "render_seed": row.render_seed,
         "render_wild": row.render_wild == "1",
-        "vary_seed": row.vary_seed,
+        "composition_seed": row.composition_seed,
     }
     if row.render_color_map is not None:
         try:
@@ -650,7 +695,7 @@ def _backfill_render_hashes(conn) -> None:
                render_color_catalog_id, render_color_catalog_name,
                render_color_catalog_sub, render_color_map, render_canvas_aspect,
                render_canvas_aspect_id, render_canvas_aspect_ratio, render_seed,
-               vary_seed
+               composition_seed
         FROM history
         WHERE render_hash IS NULL OR render_hash = ''
         """
@@ -680,7 +725,7 @@ def _backfill_render_hashes(conn) -> None:
             "render_color_catalog_name": row["render_color_catalog_name"],
             "render_color_catalog_sub": row["render_color_catalog_sub"],
             "render_seed": row["render_seed"],
-            "vary_seed": row["vary_seed"],
+            "composition_seed": row["composition_seed"],
         }
         if row["render_color_map"] is not None:
             try:
@@ -1718,11 +1763,11 @@ def _row_to_dict(row: HistoryRow) -> dict:
             item["render_seed"] = row.render_seed
     if row.render_wild is not None:
         item["render_wild"] = row.render_wild == "1"
-    if row.vary_seed is not None:
+    if row.composition_seed is not None:
         try:
-            item["vary_seed"] = int(row.vary_seed)
+            item["composition_seed"] = int(row.composition_seed)
         except ValueError:
-            item["vary_seed"] = row.vary_seed
+            item["composition_seed"] = row.composition_seed
     if row.tenkei is not None:
         item["tenkei"] = row.tenkei
     if row.focus is not None:
@@ -1868,7 +1913,7 @@ def add_item(item: dict) -> dict:
         instruction_lang_resolved=item.get("instruction_lang_resolved"), ui_lang=item.get("ui_lang"),
         render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
         render_wild=("1" if item.get("render_wild") else "0") if item.get("render_wild") is not None else None,
-        vary_seed=str(item.get("vary_seed")) if item.get("vary_seed") is not None else None,
+        composition_seed=str(item.get("composition_seed")) if item.get("composition_seed") is not None else None,
         tenkei=item.get("tenkei"), focus=item.get("focus"),
         variation_amplitude=item.get("variation_amplitude"),
         variation_seed=str(item.get("variation_seed")) if item.get("variation_seed") is not None else None,

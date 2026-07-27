@@ -3247,3 +3247,33 @@ engine 13 の前例。**条件は「公開前に済ませること」**）。
 - **検証:** server **1420 passed / 31 skipped**（+1）、cli **70 passed**（+1）、ruff clean、
   `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**。
   **描画には触れていない**（render engine は `"15"`、SVG は不変）
+
+**変奏の語も同じ版で通した（Build 723）。** 奥書は「1 語がローマ字」だったが、
+**変奏は衝突が逆向き**だった — 辞書は `variation` を**変奏だけ**に予約している
+（候補は `option`。「~~variation~~（変奏と衝突）」）のに、実装では
+**本物の変奏がローマ字 `hensou` で、変奏でない 4 種が `*_variation`** を名乗っていた。
+
+- **系譜の derivation kind を入れ替えた（保存済みの値）**: `hensou` → **`variation`**（本番 7 行）、
+  `touch_variation` → `touch_change`（25）、`model_variation` → `model_comparison`（11）、
+  `layout_variation` → `layout_change`（6）、`language_variation` → `language_comparison`（1）。
+  本番 0 件の 4 種（`render_engine_` / `age_` / `hacho_` / `external_seed_`）も `_change` へ揃えた
+- **`vary_seed` → `composition_seed`（186 箇所）。これは変奏ですらない** —
+  SPEC §12 が「記述者が持つ口は 入力テキスト・`vary_seed`・`tenkei`・そして**変奏**」と
+  **並べて**書いており、Stage 1.5 の**構図**の seed である。
+  **変奏の seed は `variation_seed`、強度は `variation_amplitude` で、どちらも改名していない**
+- **CLI の旗も移した**: `--vary-seed` → `--composition-seed`、`--vary N` → `--composition-count N`
+- **web の i18n 鍵まで揃えた**（`hensou*` → `variation*` 14 個ほか）。
+  **鍵名のローマ字は本来なら通例**だが、「辞書を完全に通す」という作者裁定による
+- **保存済みデータは migration で移す。壊さない** — 起動時に
+  `history.vary_seed` 列を `composition_seed` へ RENAME し、`lineage_edges.derivation_kind` を
+  表で UPDATE する。**本番 DB の複製で実測**（件数 25/11/7/6/1 が保存され、`composition_seed` は 9 件）、
+  **2 回目は 0 行＝冪等**
+- **凍結したもの（改名すると壊れる）**: **rh2 payload の鍵 `vary_seed`** は
+  **同一性 ID の材料**なので名前のまま置いた。**改名したら保存済み全作品の rh2 が動き、
+  検査が実際に捕まえた**（`test_legacy_render_hash_v2_calculation_remains_available`）。
+  `ddl_expander` の salt `#hensou` / `#vary` も hash の材料なので不変
+- **新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md` に記録した**（作者指示）。
+  外部スクリプトが動かなくなったときはここを引く
+- **採番は v2.8.0 のまま**（**未公開なので畳む**。タグ最新は `v2.7.2`）。Build だけ 723 へ
+- **検証（Build 723 時点）:** server **1420 passed / 31 skipped**、cli **70 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**

@@ -39,7 +39,7 @@ def _create_v175_database(path: Path) -> None:
             render_canvas_aspect VARCHAR, render_canvas_aspect_id VARCHAR,
             render_canvas_aspect_ratio FLOAT, instruction_lang_requested VARCHAR,
             instruction_lang_resolved VARCHAR, ui_lang VARCHAR, render_seed VARCHAR,
-            vary_seed VARCHAR, interpretation_seed VARCHAR, render_hash VARCHAR,
+            composition_seed VARCHAR, interpretation_seed VARCHAR, render_hash VARCHAR,
             trashed INTEGER NOT NULL DEFAULT 0, starred INTEGER NOT NULL DEFAULT 0, note TEXT
         );
         INSERT INTO user_groups VALUES ('group-1', 'default', 1);

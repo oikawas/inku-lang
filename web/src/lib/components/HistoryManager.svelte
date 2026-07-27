@@ -37,7 +37,7 @@
 		variation_amplitude?: string | null;
 		variation_seed?: number | string | null;
 		render_seed?: number | string | null;
-		vary_seed?: number | string | null;
+		composition_seed?: number | string | null;
 	interpretation_seed?: string | null;
 	lineage_node_id?: string | null;
 	lineage_root_node_id?: string | null;

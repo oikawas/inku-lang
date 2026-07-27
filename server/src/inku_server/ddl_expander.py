@@ -359,6 +359,8 @@ def _select_category(
     # 採用本数と同数で他に選びようがないときの最後の手段にする。
     reordered: list[str] | None = None
     for step in range(len(pool) + 1):
+        # salt の `#hensou` は **改名しない**。これは名前ではなく hash の材料であり、
+        # 文字を変えると同じ Score が別の展開になる (silverpoint の改名で実測済み)。
         alternate = _pick(pool, count, text=text, salt=f"{salt}#hensou{swap_offset + step}")
         if alternate == default:
             continue
@@ -673,10 +675,11 @@ def _contrast_en_color(ddl: str) -> str:
     return "black"
 
 
-def _vary_context(text: str, vary_seed: int | None) -> str:
-    if vary_seed is None:
+def _vary_context(text: str, composition_seed: int | None) -> str:
+    if composition_seed is None:
         return text
-    return f"{text}#vary{int(vary_seed)}"
+    # `#vary` は名前ではなく hash の材料。改名すると同じ入力が別の展開になる。
+    return f"{text}#vary{int(composition_seed)}"
 
 
 def _cap_category_plan(plan: tuple[int, int, int], tenkei: str) -> tuple[int, int, int]:
@@ -1043,7 +1046,7 @@ def expand_intermediate_ddl(
     *,
     lang: str = "ja",
     context_text: str | None = None,
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     enable_plugins: bool = True,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
@@ -1077,7 +1080,7 @@ def expand_intermediate_ddl(
         return expander(
             sanitized,
             context_text=context_text,
-            vary_seed=vary_seed,
+            composition_seed=composition_seed,
             plugin_instructions_present=plugin_instructions_present,
             tenkei=tenkei,
             focus=focus,
@@ -1117,7 +1120,7 @@ def _expand_ja(
     ddl: str,
     *,
     context_text: str | None = None,
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
     focus: str | None = None,
@@ -1153,7 +1156,7 @@ def _expand_ja(
     if decisions is not None:
         decisions[AXIS_COLOR] = f"{main_color}・{contrast_color}"
     context = f"{context_text or ''}\n{ddl}"
-    seed_context = _vary_context(context, vary_seed)
+    seed_context = _vary_context(context, composition_seed)
     profile = _profile_ja(context)
     if "geometry" in profile.tags:
         touch = "ロットリングの"
@@ -1276,7 +1279,7 @@ def _expand_en(
     ddl: str,
     *,
     context_text: str | None = None,
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
     focus: str | None = None,
@@ -1313,7 +1316,7 @@ def _expand_en(
     if decisions is not None:
         decisions[AXIS_COLOR] = f"{main_color}/{contrast_color}"
     context = f"{context_text or ''}\n{ddl}"
-    seed_context = _vary_context(context, vary_seed)
+    seed_context = _vary_context(context, composition_seed)
     profile = _profile_en(context)
     if "geometry" in profile.tags:
         touch = "rotring"

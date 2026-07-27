@@ -17,13 +17,13 @@
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; vary_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; vary_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'hensou';
-	type HensouAmplitude = 'small' | 'medium' | 'large';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
+	type VariationAmplitude = 'small' | 'medium' | 'large';
 	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type ModelInspectionResult = { id: string; model: string; compareMode: ModelCompareMode; comparisonKind?: 'model' | 'language'; stage1Lang?: 'ja' | 'en'; stage2Lang?: 'ja' | 'en'; stage1Model?: string | null; label: string; input: string; ddl: string; svg: string; score: Score; tokensIn: number | null; tokensOut: number | null; tokensInStage2: number | null; tokensOutStage2: number | null; elapsedMs: number; savedHistoryId?: string | null; starred?: boolean; saving?: boolean };
 
@@ -116,7 +116,7 @@
 		variationGridTotal: number;
 		variationGridStatus: string | null;
 		touchSeedText: string;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: HensouAmplitude) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
 		onAbortVariationCandidates: () => void;
 		onSaveSelectedVariationCandidates: () => void | Promise<void>;
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
@@ -343,9 +343,9 @@
 	let refineModalOpen = $state(false);
 	// 推敲要素の選択は前回の指定を引き継ぐ。
 	const REFINE_KIND_KEY = 'inku-refine-kind';
-	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'color', 'hensou'];
+	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'color', 'variation'];
 	let refineKind = $state<RefineKind>('touch');
-	let hensouAmplitude = $state<HensouAmplitude>('medium');
+	let variationAmplitude = $state<VariationAmplitude>('medium');
 	onMount(() => {
 		try {
 			const stored = localStorage.getItem(REFINE_KIND_KEY) as RefineKind | null;
@@ -392,7 +392,7 @@
 				? t().refineCostLayout
 				: refineKind === 'color'
 					? t().refineCostColor
-					: refineKind === 'hensou'
+					: refineKind === 'variation'
 						? t().refineCostLayout
 						: t().refineCostTouch
 	);
@@ -460,7 +460,7 @@
 		result
 			? t().canvasSeedSummary
 				.replace('{render}', result.render_seed == null ? '-' : String(result.render_seed))
-				.replace('{vary}', result.vary_seed == null ? t().seedBaseLabel : String(result.vary_seed))
+				.replace('{composition}', result.composition_seed == null ? t().seedBaseLabel : String(result.composition_seed))
 			: ''
 	);
 	// v1.98: Stage 1 が失敗してフォールバック DDL で描かれた作品を明示する。
@@ -470,7 +470,7 @@
 			: (result?.interpret_fallback_used ? (result?.interpret_fallback_reasons?.[0] ?? 'stage1_fallback') : null)
 	);
 	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
-	const detailVarySeed = $derived(statusHistoryItem?.vary_seed ?? result?.vary_seed ?? null);
+	const detailVarySeed = $derived(statusHistoryItem?.composition_seed ?? result?.composition_seed ?? null);
 	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
 	const detailDescriptionHash = $derived(statusHistoryItem?.description_hash ?? result?.description_hash ?? '');
 	const detailRenderHash = $derived(statusHistoryItem?.render_hash ?? result?.render_hash ?? '');
@@ -713,21 +713,21 @@
 												</span>
 											</Tooltip>
 										</label>
-										<label class="model-choice" class:checked={refineKind === 'hensou'}>
-											<input type="radio" name="refine-kind" value="hensou" checked={refineKind === 'hensou'} onchange={() => setRefineKind('hensou')} disabled={variationBusy || variationGridBusy} />
-											<Tooltip placement="bottom" text={t().tooltipHensou}>
+										<label class="model-choice" class:checked={refineKind === 'variation'}>
+											<input type="radio" name="refine-kind" value="variation" checked={refineKind === 'variation'} onchange={() => setRefineKind('variation')} disabled={variationBusy || variationGridBusy} />
+											<Tooltip placement="bottom" text={t().tooltipVariation}>
 												<span class="refine-choice-label">
-													<strong>{t().hensouRadioLabel}</strong>
+													<strong>{t().variationRadioLabel}</strong>
 													<span class="refine-info-mark" aria-hidden="true">i</span>
 												</span>
 											</Tooltip>
 										</label>
-										{#if refineKind === 'hensou'}
-											<div class="hensou-amplitude-field">
-												<div class="model-choice-grid hensou-amplitude-grid" role="radiogroup" aria-label={t().hensouTitle}>
-													{#each [['small', t().hensouSmall, t().hensouTooltipSmall, 'bottom-right'], ['medium', t().hensouMedium, t().hensouTooltipMedium, 'bottom'], ['large', t().hensouLarge, t().hensouTooltipLarge, 'bottom-left']] as [level, label, hint, place] (level)}
-														<label class="model-choice" class:checked={hensouAmplitude === level}>
-															<input type="radio" name="hensou-amplitude" value={level} checked={hensouAmplitude === level} onchange={() => (hensouAmplitude = level as HensouAmplitude)} disabled={variationBusy || variationGridBusy} />
+										{#if refineKind === 'variation'}
+											<div class="variation-amplitude-field">
+												<div class="model-choice-grid variation-amplitude-grid" role="radiogroup" aria-label={t().variationTitle}>
+													{#each [['small', t().variationSmall, t().variationTooltipSmall, 'bottom-right'], ['medium', t().variationMedium, t().variationTooltipMedium, 'bottom'], ['large', t().variationLarge, t().variationTooltipLarge, 'bottom-left']] as [level, label, hint, place] (level)}
+														<label class="model-choice" class:checked={variationAmplitude === level}>
+															<input type="radio" name="variation-amplitude" value={level} checked={variationAmplitude === level} onchange={() => (variationAmplitude = level as VariationAmplitude)} disabled={variationBusy || variationGridBusy} />
 															<Tooltip placement={place as 'bottom' | 'bottom-left' | 'bottom-right'} text={hint}>
 																<span class="refine-choice-label">
 																	<strong>{label}</strong>
@@ -761,7 +761,7 @@
 										<Tooltip text={t().tooltipRefineSingle}>
 											<div class="refine-action-wrap">
 												<PaintButton
-												onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined, refineKind === 'hensou' ? hensouAmplitude : undefined)}
+												onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined, refineKind === 'variation' ? variationAmplitude : undefined)}
 												disabled={!result || variationBusy || variationGridBusy || (refineKind === 'touch' && !touchSeedText.trim())}
 												>
 													{t().refineSingleButton}
@@ -771,7 +771,7 @@
 										<Tooltip text={t().tooltipVariationGridDefault}>
 											<div class="refine-action-wrap">
 												<PaintButton
-												onclick={() => onGenerateVariationCandidates(refineKind, 4, undefined, refineKind === 'hensou' ? hensouAmplitude : undefined)}
+												onclick={() => onGenerateVariationCandidates(refineKind, 4, undefined, refineKind === 'variation' ? variationAmplitude : undefined)}
 												disabled={!result || variationBusy || variationGridBusy || refineKind === 'touch'}
 												>
 													{t().variationGridDefault}
@@ -823,11 +823,11 @@
 													<span class="variation-card-art">{@html candidate.result.svg}</span>
 													<span class="variation-card-meta">
 														<span>{candidate.label}</span>
-														<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.vary_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
+														<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.composition_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
 														{#if candidate.result.variation_moved_axes?.length}
 															<span class="variation-card-moved">
 																{#each candidate.result.variation_moved_axes as moved (moved.axis)}
-																	<span class="variation-moved-axis">{t().hensouAxis(moved.axis)} {moved.to}</span>
+																	<span class="variation-moved-axis">{t().variationAxis(moved.axis)} {moved.to}</span>
 																{/each}
 															</span>
 														{/if}
@@ -1486,11 +1486,11 @@
 	/* 速度目安は描画ボタンの直下に単独行で置く */
 	.refine-paint-actions .refine-cost-indicator { flex: 0 0 100%; min-height: 0; }
 	/* 変奏の子であることが見えるよう、変奏ラジオの直下に段落ちさせる */
-	.hensou-amplitude-field { display: grid; gap: 5px; grid-column: 1 / -1; margin: -2px 0 2px 18px; padding-left: 10px; border-left: 2px solid var(--border2); }
+	.variation-amplitude-field { display: grid; gap: 5px; grid-column: 1 / -1; margin: -2px 0 2px 18px; padding-left: 10px; border-left: 2px solid var(--border2); }
 	/* 小・中・大は常に横 3 列（後段の .model-choice-grid に負けないよう詳細度を上げる） */
-	.hensou-amplitude-field .model-choice-grid.hensou-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-	.hensou-amplitude-field .model-choice { padding: 6px; gap: 5px; }
-	.hensou-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: 9px; }
+	.variation-amplitude-field .model-choice-grid.variation-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+	.variation-amplitude-field .model-choice { padding: 6px; gap: 5px; }
+	.variation-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: 9px; }
 	.variation-card-moved { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 	.variation-moved-axis { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; color: var(--fg2); white-space: nowrap; }
 	.refine-action-wrap { width: min(210px, 100%); }

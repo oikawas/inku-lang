@@ -223,7 +223,7 @@ in the response and in `history.focus`.
 Stage 1.5 is the application's own layer: it is deterministic, uses no LLM,
 and the author does not intervene in its individual parameters — by design
 principle, not by implementation convenience. The author's handles are the
-input text, `vary_seed`, `tenkei`, and **variation** (強度/amplitude + seed).
+input text, `composition_seed`, `tenkei`, and **variation** (強度/amplitude + seed).
 The author writes, the application shakes, the author chooses.
 
 Variation (v2.0, "hensou") shakes the expansion layer as a whole in one
@@ -534,7 +534,7 @@ snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
 `render_hash` is the work-edition identifier. SVG text, input text, normalized DDL, and raw LLM responses are never part of the hash payload.
 
-**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`vary_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
+**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`composition_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
 
 **`render_wild` joined the material in engine 12; the format name stays `rh3`.** Extending the material does make a separate hash space, but **`render_engine_version` sits inside the same payload**, so a value computed under the old material always contains `"11"` or lower and one under the new always contains `"12"` or higher. The two can never coincide, so no `rh4` is needed. **This argument holds only because the engine version moved at the same time; the material must never be extended on its own.**
 
@@ -815,9 +815,9 @@ The natural-language prompt is not reinterpreted by `Draw from DDL`.
 The drawing tab also exposes two explicit regeneration actions. **Another
 performance** keeps the same Score and asks only the renderer for a new
 performance seed. **Another composition** keeps the user-facing text as the
-identity of the work but increments a `vary_seed` for Stage 1.5 selection, so
+identity of the work but increments a `composition_seed` for Stage 1.5 selection, so
 composition family, focus, and technique candidates can change without making
-the default path nondeterministic. The same text plus the same `vary_seed` and
+the default path nondeterministic. The same text plus the same `composition_seed` and
 `render_seed` is reproducible from metadata.
 
 Since v1.98 single drawing calls `POST /api/paint/stream` (NDJSON): a `stage1`
@@ -1113,7 +1113,7 @@ comes from `score`, `render_seed`, `render_wild`, the render engine's ID and ver
   changes, so it gave a new edition ID to a drawing that had not changed by a single
   byte. It stays as provenance: worth keeping as history, not worth putting in the
   definition of sameness.
-- **The Score-side seed (`vary_seed`) is excluded too** — a different Score already
+- **The Score-side seed (`composition_seed`) is excluded too** — a different Score already
   yields a different ID.
 - **`rh2` is retained as legacy and never recalculated.** `rh2` and `rh3` are
   separate hash spaces and must not be compared to decide sameness.
@@ -1795,7 +1795,7 @@ Detailed implementation history remains in the canonical Japanese spec.
 
 Version 1.52 materializes post-selection through two explicit regeneration
 paths. `render_seed` supports another performance without an LLM call.
-`vary_seed` supports another composition by mixing an explicit counter into the
+`composition_seed` supports another composition by mixing an explicit counter into the
 Stage 1.5 selection seed while preserving the default rule that the same input
 produces the same expansion. The vary path changes composition-family, focus,
 and technique selection; it does not intentionally change Stage 1
@@ -1807,7 +1807,7 @@ rates. Coerce repair parts use input-derived placement and shape variation
 instead of fixed coordinates, and adjacent focal reactions fire only for
 isolated visual events.
 
-Build 442 verification confirmed that the `vary_seed` path is implemented
+Build 442 verification confirmed that the `composition_seed` path is implemented
 through the API, CLI, and web UI. A 5-prompt x 5-vary run succeeded 25/25 with
 no fallback, and JP/EN 30-sample repair-part measurement reduced
 `adjacent_reaction` from 56/60 to 14/60.
@@ -1943,8 +1943,8 @@ guard, and the relation-drop blocking item.
 
 Version 1.60 moves the project from quality-loop closure to a one-person playable 1.0 candidate: another person should be able to set up inku from the README, write a visual tanka, consult Saijiki, read interpretation feedback, choose with vary, save, and replay a result.
 
-- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
-- History now stores `vary_seed`, and the history manager can replay a saved Score with its saved seed.
+- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `composition_seed` (the rh2 payload keeps the frozen key name `vary_seed`), `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
+- History now stores `composition_seed`, and the history manager can replay a saved Score with its saved seed.
 - The input panel shows approximate post-processing interpretation feedback using ink-density shading. This does not change the Stage 1 schema or prompt.
 - The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
 - The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.

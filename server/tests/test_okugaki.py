@@ -101,14 +101,14 @@ def test_branch_fact_sheet_handles_lineage_only_and_tombstone():
             "child",
             1002,
             lineage_parent_node_id=hidden["lineage_node_id"],
-            derivation_kind="touch_variation",
+            derivation_kind="touch_change",
         ))
         assert db.delete_items(user["id"], [root["id"]]) == 1
 
         branch = db.get_lineage_branch(user["id"], child["lineage_node_id"])
         assert branch is not None
         assert [node["state"] for node in branch["nodes"]] == ["tombstone", "lineage_only", "active"]
-        assert [edge["derivation_kind"] for edge in branch["edges"]] == ["ddl_edit", "touch_variation"]
+        assert [edge["derivation_kind"] for edge in branch["edges"]] == ["ddl_edit", "touch_change"]
         sheet = build_fact_sheet(branch)
         assert sheet["branch_snapshot"] == [node["id"] for node in branch["nodes"]]
         assert sheet["generations"][0]["features"] is None
@@ -143,7 +143,7 @@ def test_generate_signs_mechanically_and_storage_is_append_only_scoped_and_idemp
             "child",
             2001,
             lineage_parent_node_id=root["lineage_node_id"],
-            derivation_kind="layout_variation",
+            derivation_kind="layout_change",
         ))
         before = db.get_items(user["id"], [child["id"]])[0]
         branch = db.get_lineage_branch(user["id"], child["lineage_node_id"])

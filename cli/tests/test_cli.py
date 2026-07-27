@@ -956,7 +956,7 @@ def test_render_hash_for_score_uses_rh2_semantics():
     render_hash = cli._render_hash_for_score(
         score,
         render_seed=1,
-        vary_seed=2,
+        composition_seed=2,
         render_build_number="449",
         render_engine_id="default",
         render_engine_version="2",
@@ -968,7 +968,7 @@ def test_render_hash_for_score_uses_rh2_semantics():
     assert cli._render_hash_for_score(
         score,
         render_seed=1,
-        vary_seed=2,
+        composition_seed=2,
         render_build_number="449",
         render_engine_id="default",
         render_engine_version="2",
@@ -977,7 +977,7 @@ def test_render_hash_for_score_uses_rh2_semantics():
     assert cli._render_hash_for_score(
         score,
         render_seed=2,
-        vary_seed=2,
+        composition_seed=2,
         render_build_number="449",
         render_engine_id="default",
         render_engine_version="2",

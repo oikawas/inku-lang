@@ -56,7 +56,7 @@ def test_history_groups_page_by_lineage_and_exclude_hidden_items():
             3000,
             "child",
             lineage_parent_node_id=root["lineage_node_id"],
-            derivation_kind="touch_variation",
+            derivation_kind="touch_change",
         ))
         db.add_item(_item(
             user["id"],
@@ -64,7 +64,7 @@ def test_history_groups_page_by_lineage_and_exclude_hidden_items():
             "hidden",
             history_visibility="lineage_only",
             lineage_parent_node_id=child["lineage_node_id"],
-            derivation_kind="layout_variation",
+            derivation_kind="layout_change",
         ))
         independent = db.add_item(_item(user["id"], 2000, "independent"))
 

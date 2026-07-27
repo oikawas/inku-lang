@@ -12,7 +12,7 @@ from inku_analysis.rasterizer import svg_to_png
 
 from .model_settings import connection_for, provider_for_model
 
-ALLOWED_KINDS = ("reinterpretation", "catalog_change", "layout_variation", "touch_variation", "hensou")
+ALLOWED_KINDS = ("reinterpretation", "catalog_change", "layout_change", "touch_change", "variation")
 
 
 def _png_data_url(svg: str) -> str:

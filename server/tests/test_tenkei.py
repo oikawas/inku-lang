@@ -311,7 +311,7 @@ def test_history_post_inherits_tenkei_from_parent(db_user, plugin_dir):
             "score": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]},
             "at": 3201,
             "lineage_parent_node_id": root["lineage_node_id"],
-            "derivation_kind": "touch_variation",
+            "derivation_kind": "touch_change",
         },
     )
     assert r.status_code == 200

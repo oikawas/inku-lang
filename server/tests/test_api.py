@@ -831,7 +831,7 @@ def test_render_hash_v3_uses_saved_score_and_render_conditions_not_svg_or_text()
         },
         "svg": "<svg><line x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\" /></svg>",
         "render_seed": 7,
-        "vary_seed": 2,
+        "composition_seed": 2,
         "render_build_number": "449",
         "render_engine_id": "default",
         "render_engine_version": "2",
@@ -851,11 +851,11 @@ def test_render_hash_v3_uses_saved_score_and_render_conditions_not_svg_or_text()
     assert db.render_hash_for_item(same_edition) == render_hash
 
 
-def test_render_hash_v3_changes_with_render_seed_but_not_vary_seed():
+def test_render_hash_v3_changes_with_render_seed_but_not_composition_seed():
     base = {
         "score": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]},
         "render_seed": 7,
-        "vary_seed": 2,
+        "composition_seed": 2,
         "render_build_number": "449",
         "render_engine_id": "default",
         "render_engine_version": "2",
@@ -863,7 +863,7 @@ def test_render_hash_v3_changes_with_render_seed_but_not_vary_seed():
     }
 
     assert db.render_hash_for_item({**base, "render_seed": 8}) != db.render_hash_for_item(base)
-    assert db.render_hash_for_item({**base, "vary_seed": 3}) == db.render_hash_for_item(base)
+    assert db.render_hash_for_item({**base, "composition_seed": 3}) == db.render_hash_for_item(base)
 
 
 def test_legacy_render_hash_short_remains_display_compatible():
@@ -1974,7 +1974,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
             "catalog_id": "vivid_material",
             "canvas_aspect": "wide",
             "render_seed": 123,
-            "vary_seed": 4,
+            "composition_seed": 4,
             "interpretation_seed": "interp-test-seed",
         },
         headers=headers,
@@ -1993,7 +1993,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert data["render_canvas_aspect_id"] == "wide"
     assert data["render_canvas_aspect_ratio"] == 2.35
     assert data["render_seed"] == 123
-    assert data["vary_seed"] == 4
+    assert data["composition_seed"] == 4
     assert data["interpretation_seed"] == "interp-test-seed"
 
     history = client.get("/api/history", headers=headers).json()
@@ -2018,7 +2018,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert "render_color_catalog" not in item
     assert item["render_color_map"]["green"] == "#008f39"
     assert item["render_seed"] == 123
-    assert item["vary_seed"] == 4
+    assert item["composition_seed"] == 4
     assert item["interpretation_seed"] == "interp-test-seed"
     assert item["svg"] == data["svg"]
 
@@ -2043,7 +2043,7 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
         "catalog_id": "vivid_material",
         "canvas_aspect": "square",
         "render_seed": 123,
-        "vary_seed": 456,
+        "composition_seed": 456,
         "interpretation_seed": "reading-seed",
     }
 
@@ -2057,7 +2057,7 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     assert data["render_color_map"]["green"] == "#008f39"
     assert data["render_canvas_aspect_id"] == "square"
     assert data["render_seed"] == 123
-    assert data["vary_seed"] == 456
+    assert data["composition_seed"] == 456
     assert data["interpretation_seed"] == "reading-seed"
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert data["score"]["instructions"][0]["center"] == [0.5, 0.5]
@@ -2075,7 +2075,7 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     alternate_data = alternate.json()
     assert alternate_data["score"] == data["score"]
     assert alternate_data["render_seed"] == data["render_seed"]
-    assert alternate_data["vary_seed"] == data["vary_seed"]
+    assert alternate_data["composition_seed"] == data["composition_seed"]
     assert alternate_data["interpretation_seed"] == data["interpretation_seed"]
     assert alternate_data["render_color_catalog_id"] == "ink_season"
     assert alternate_data["render_hash"] != data["render_hash"]

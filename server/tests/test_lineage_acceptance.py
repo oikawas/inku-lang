@@ -122,7 +122,7 @@ def test_lineage_only_trash_restore_tombstone_and_limits():
             301,
             history_visibility="lineage_only",
             lineage_parent_node_id=root["lineage_node_id"],
-            derivation_kind="layout_variation",
+            derivation_kind="layout_change",
         ))
         child = db.add_item(_item(
             user["id"],
@@ -174,7 +174,7 @@ def test_failed_history_insert_leaves_no_orphan_node_or_edge():
             "失敗する子",
             351,
             lineage_parent_node_id=root["lineage_node_id"],
-            derivation_kind="touch_variation",
+            derivation_kind="touch_change",
         )
         duplicate["id"] = root["id"]
         try:

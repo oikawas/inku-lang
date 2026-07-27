@@ -60,9 +60,9 @@ internal object ServerScoreCoercer {
         visibleForeground: (String, String) -> String,
     ): JSONObject {
         val primitive = source.optString("primitive", "line").takeIf { it in supportedPrimitives } ?: "line"
-        val data = JSONObject(source.toString()).put("primitive", primitive)
+        val data = ServerScoreCompat.migrateInstruction(JSONObject(source.toString())).put("primitive", primitive)
         data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray") } ?: "black")
-        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("hair", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint", "computer") } ?: "pen")
+        data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint", "computer") } ?: "pen")
         data.put("style", data.optString("style", "solid").ifBlank { "solid" })
         if (!data.has("filled")) data.put("filled", false)
         if (data.has("mode")) {

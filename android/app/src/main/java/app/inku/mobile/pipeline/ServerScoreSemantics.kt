@@ -165,7 +165,7 @@ internal object ServerScoreSemantics {
                 .put("angle_start", 205)
                 .put("angle_end", 325)
                 .put("color", color)
-                .put("weight", "hair")
+                .put("weight", "silverpoint")
                 .put("color_hint", "quiet expression accent restored after density governance")
                 .put(
                     "arrangement",
@@ -271,7 +271,7 @@ internal object ServerScoreSemantics {
     }
 
     fun detectWeightKey(text: String): String = when {
-        text.contains("髪") || text.contains("ヘア") || text.contains("hair", ignoreCase = true) -> "hair"
+        text.contains("髪") || text.contains("ヘア") || text.contains("hair", ignoreCase = true) -> "silverpoint"
         text.contains("ビュラン") || text.contains("burin", ignoreCase = true) -> "burin"
         text.contains("ドライポイント") || text.contains("drypoint", ignoreCase = true) -> "drypoint"
         text.contains("コンピュータ") || text.contains("コンピューター") || text.contains("computer", ignoreCase = true) -> "computer"

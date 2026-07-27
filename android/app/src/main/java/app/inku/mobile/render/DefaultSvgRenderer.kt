@@ -3,6 +3,7 @@ package app.inku.mobile.render
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.pipeline.RenderRequest
+import app.inku.mobile.pipeline.ServerScoreCompat
 import java.security.MessageDigest
 import kotlin.math.cos
 import kotlin.math.max
@@ -14,7 +15,9 @@ import org.json.JSONObject
 
 class DefaultSvgRenderer : SvgRenderer {
     override fun render(request: RenderRequest): RenderResult {
-        val score = JSONObject(request.scoreJson)
+        // Saved works carry retired tool names. Migrate before anything reads `weight`,
+        // the way the server's Instruction validator does on the way in.
+        val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = ColorCatalogs.get(request.colorCatalogId)
         val colors = catalog.renderMap

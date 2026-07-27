@@ -707,7 +707,7 @@ class LocalFallbackPipeline(
             .put("angle_end", 330)
             .put("rotation", -16)
             .put("color", color)
-            .put("weight", "hair")
+            .put("weight", "silverpoint")
             .put("color_hint", "motion floor restored as a small directional trace")
             .put(
                 "arrangement",
@@ -858,7 +858,7 @@ class LocalFallbackPipeline(
                 .put("angle_end", 245)
                 .put("rotation", -18)
                 .put("color", color)
-                .put("weight", "hair")
+                .put("weight", "silverpoint")
                 .put("color_hint", "visual event restored as a small focal pulse")
         }
         return this + accent
@@ -878,7 +878,7 @@ class LocalFallbackPipeline(
             .put("angle_end", 342)
             .put("rotation", -4)
             .put("color", color)
-            .put("weight", "hair")
+            .put("weight", "silverpoint")
             .put("color_hint", "surface tension restored as a quiet shadow trace")
     }
 
@@ -1142,7 +1142,7 @@ class LocalFallbackPipeline(
                 .put("to", JSONArray(listOf(0.82, 0.38)))
                 .put("rotation", -7)
                 .put("color", visible)
-                .put("weight", "hair")
+                .put("weight", "silverpoint")
                 .put("color_hint", "silence_layer energy restored as a long optical trace")
                 .put(
                     "arrangement",

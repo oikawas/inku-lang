@@ -18,7 +18,7 @@ class ServerRendererProportionalWiringTest {
     @Test
     fun testStrokeWidthProportionalWiring() {
         val weights = mapOf(
-            "hair" to Pair(0.5, 0.1),
+            "silverpoint" to Pair(0.5, 0.1),
             "rotring" to Pair(1.0, 0.2),
             "pencil" to Pair(1.5, 0.3),
             "pen" to Pair(2.0, 0.4),

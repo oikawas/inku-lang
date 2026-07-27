@@ -99,7 +99,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 ## 塗り・背景・色
 
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
-- **背景色 → Score の background フィールド。「背景を黒で塗りつぶす」→ {"background":"black","instructions":[...]}**
+- **背景色 → Score の background フィールド。「背景を黒で埋める」→ {"background":"black","instructions":[...]}。保存済み作品にある旧表現「背景を黒で塗りつぶす」も同じ background として受ける。この文は面を要素で埋める指示ではないので、密度・数量の規則を当てない**
 - **背景色と描画色が同じで、実質的に見えない instruction を作ってはいけない。background と同色なら面積の少ない側を変更する。通常は線・小図形・点の color を黒・白・青・赤・緑などの文脈に合う可視色へ寄せる。大きな主題図形が同色の場合だけ background 側を変更してよい**
 - **background="gray" を使ってはいけない。正規化DDL が灰背景を要求しても background は white/black/blue/red/green から文脈に合う色を選ぶ**
 - **灰色の主題は background ではなく foreground の color="gray" として扱う。灰の濃淡だけで構成せず、黒・白・青・赤・緑の可視色を併用する**
@@ -275,16 +275,16 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 桜色の小さな円を中央に。半径0.1。
 出力: {"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.1,"color":"red","color_hint":"桜色"}]}
 
-入力: 背景を黒で塗りつぶす。中央に白い横線を引く。
+入力: 背景を黒で埋める。中央に白い横線を引く。
 出力: {"background":"black","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"white"}]}
 
-入力: 背景を白で塗りつぶす。白い横線を中央に引く。
+入力: 背景を白で埋める。白い横線を中央に引く。
 出力: {"background":"white","instructions":[{"primitive":"line","from":[0.0,0.5],"to":[1.0,0.5],"color":"black","color_hint":"白い線を可視化"}]}
 
-入力: 背景を白で塗りつぶす。白い短い線を上から下へ百三十七本散らす。
+入力: 背景を白で埋める。白い短い線を上から下へ百三十七本散らす。
 出力: {"background":"white","instructions":[{"primitive":"line","from":[0.48,0.5],"to":[0.52,0.5],"color":"blue","color_hint":"白い線を小面積側で可視化","arrangement":{"count":137,"layout":"vertical","path":"top_to_bottom","density":"medium","cluster_count":5,"fade":"directional","preserve_space":true}}]}
 
-入力: 背景を白で塗りつぶす。白い大きな円を上端近くに置く。半径は0.15。
+入力: 背景を白で埋める。白い大きな円を上端近くに置く。半径は0.15。
 出力: {"background":"blue","instructions":[{"primitive":"circle","center":[0.5,0.18],"radius":0.15,"color":"white"}]}
 
 入力: 赤・青・緑・黒の色とりどりの円を放射状に八つ並べる。
@@ -353,7 +353,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 上弦の弧を中央に置く。半径は0.15。
 出力: {"instructions":[{"primitive":"arc","center":[0.5,0.5],"radius":0.15,"angle_start":270,"angle_end":90}]}
 
-入力: 背景を黒で塗りつぶす。三日月の弧を右上に置く。半径は0.12。
+入力: 背景を黒で埋める。三日月の弧を右上に置く。半径は0.12。
 出力: {"background":"black","instructions":[{"primitive":"arc","center":[0.7,0.25],"radius":0.12,"angle_start":210,"angle_end":330,"color":"white"}]}
 
 入力: 右上がりの横長の四角を中央に置く。
@@ -471,7 +471,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 ## Fill, background, and color
 
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
-- **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}**
+- **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}. This sentence is not a request to fill an area with elements, so do not apply the density or count rules to it**
 - **Do not create effectively invisible instructions whose drawing color matches the background. If they match, change the smaller visual area. Usually change line/small-shape/dot color to a context-fitting visible color such as black, white, blue, red, or green. Change the background only when the matching subject is large and dominant**
 - **Do not use background="gray". Even if normalized DDL asks for a gray background, choose a contextual background from white/black/blue/red/green instead**
 - **Treat gray subjects as foreground color="gray", not as the background. Do not build gray value-only drawings; combine gray with visible black, white, blue, red, or green foreground**

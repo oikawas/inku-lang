@@ -1,0 +1,21 @@
+{
+  "note": "Kotlin の同名定数は server のこれと一字一句同じであること。LiteRT 用の短縮プロンプトは対象外。",
+  "prompts": {
+    "STAGE1_PROMPT_PREFIX_JA": {
+      "bytes": 18403,
+      "sha256": "f56778ec689949f8700d4fdf4efabef50b7996e8b1bc599e5d53e341f3d72097"
+    },
+    "STAGE1_PROMPT_PREFIX_EN": {
+      "bytes": 17401,
+      "sha256": "5860ddec95f4a4a0b613109ba98c3353e4d5cfb4a1f7646e9e4c84fbd841264e"
+    },
+    "STAGE2_SYSTEM_PROMPT_JA": {
+      "bytes": 43007,
+      "sha256": "6d1bbabd3ebffb792efff44febec7de8caa318cedcbd400913145e9047800dd8"
+    },
+    "STAGE2_SYSTEM_PROMPT_EN": {
+      "bytes": 41113,
+      "sha256": "bb5597fdd67f8752b2fe3ca2f715978c06855cb4ab63208c0549988e61e80a82"
+    }
+  }
+}

@@ -39,11 +39,11 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 1. **感情語彙を排除せよ** (美しく→削除、激しく→速く、静かに→ゆっくり)
 2. **出力は静止画**。時間経過を表す動詞は禁止:
    - 禁止: 動く、動かす、広がる、広げる、流れる、伸びる、昇る、落ちる、散る、沈む、塗る、塗りつぶす
-   - 使える動作動詞: 置く、並べる、引く、散らす、埋める
+   - 使える動作動詞: 置く、並べる、引く、散らす、埋める、敷き詰める
    - 「ゆらぎ」は静止画に含める質感であり、動きの描写ではない
 3. 座標は 0.0〜1.0 の比率で考える (左上=(0,0), 右下=(1,1))
 4. 出力は普通の日本語。箇条書き禁止、説明禁止、前置き禁止
-5. 使えるのは Saijiki の語彙のみ
+5. 使えるのは Saijiki の語彙と、本書が定める次の定型だけ: 「面: ...」「地: ...」の質感句、版画技法の固定句、関係の previous-object 句、色とりどりの色列挙
 6. **正規化DDLに「ランダム」という語を出力してはいけない**。入力にあっても必ず「画面全体に点々と」「中央付近に」「上から下へ」「波打つ軌跡に沿って」などの明示配置へ置き換える
 
 # 関係（あいだ）
@@ -90,7 +90,7 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 # てざわり選択 — 線と弧には物理感を必ず選ぶ
 
 線・弧・輪郭線を描く文には、""" + texture_material_enumeration("ja") + """のいずれか一つを必ず明記する。
-入力に明示的な素材がなくても、質感・文脈から最も近いてざわりを選ぶ。毎回ペンに寄せない。
+入力に明示的な素材がなくても、質感・文脈から最も近いてざわりを選ぶ。ペンは未指定時の既定値であって推奨値ではない。機械的にペンへ寄せない。
 塗りつぶされた円・楕円・三角・四角など、線として見えない面だけの文へは機械的に付けない。
 ビュランとドライポイントは入力がその技法を明示した場合だけ選ぶ。
 
@@ -103,6 +103,7 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 
 てざわりは DDL に明示する: 「鉛筆の細い線」「チョークの横線」「クレヨンの短い線」「細筆の縦線」。
 「黒い細線」「白い横線」「放射状に線を引く」のような、てざわりのない線・弧の文を出力してはいけない。
+ただし、関係（あいだ）の定型句・わりあい（半円・上弦・下弦・三日月）・かたむきだけを示す最小の文は、てざわりを省いてよい。
 
 # 数量表現
 
@@ -177,8 +178,8 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 
 # 背景色
 
-「背景を塗りつぶす」「背景を○色にする」「暗い背景」→ 「背景を○色で塗りつぶす。」(独立した文として最初に置く)。
-例: 「黒い背景に白い線」→ 「背景を黒で塗りつぶす。白い横線を中央に引く。」
+「背景を塗りつぶす」「背景を○色にする」「暗い背景」→ 「背景を○色で埋める。」(独立した文として最初に置く)。
+例: 「黒い背景に白い線」→ 「背景を黒で埋める。白い横線を中央に引く。」
 
 # コントラスト保持
 
@@ -188,7 +189,7 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 - 背景が小さな領域で、主題図形が大きい場合だけ背景側を変える
 - 白い背景 + 白い線/小図形 → 黒・青・赤・緑など、文脈に合う可視色へ変える
 - 黒い背景 + 黒い線/小図形 → 白・灰・青などへ変える
-- 「背景を灰で塗りつぶす」を出力してはいけない。入力が灰色背景を求めても、背景は白・黒・青・赤・緑の文脈に合う色へ置き換える
+- 「背景を灰で埋める」を出力してはいけない。入力が灰色背景を求めても、背景は白・黒・青・赤・緑の文脈に合う色へ置き換える
 - 灰色は背景ではなく、必要なときだけ前景の線・点・四角の色として使う。灰だけで構成せず、黒・白・青・赤・緑など見える描画色を併用する
 - 白い雪・白い星・白い月など白が主題の場合でも、必ず背景を灰にする必要はない。面積の少ない側や補助要素を青・黒・赤・緑などへ変えてよい
 - 明示的な色指定が背景と同じ場合 → 主題性と面積を見て、近い可視色または構図上自然な別色を選ぶ
@@ -225,7 +226,7 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 
 # 非 Saijiki 語の展開
 
-雲形は、(a)「雲形」の明示、または (b) 雲・煙・霞・染み・島影・水たまり等、対象自体が無定形な場合に限って選ぶ。未知・不明瞭な対象の fallback に雲形を使ってはいけない。未知対象は文脈に最も近い既存の円・楕円・三角・四角・線・弧・多角形で近似する。
+雲形は、(a)「雲形」の明示、または (b) 雲・煙・霞・染み・島影・水たまり等、対象自体が無定形な場合に限って選ぶ。未知・不明瞭な対象の fallback に雲形を使ってはいけない。未知対象は文脈に最も近い既存の円・楕円・三角・四角・線・弧で近似する。
 
 Saijiki にない語が入力にあるとき、その語のイメージ・形・質感・構造から
 最も近い歳時記語彙に意味展開せよ。展開は文脈と構図全体を考慮すること。
@@ -273,7 +274,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["水", "滴", "雨", "波紋", "落ちる", "雫"],
         "input": "静かな水面に落ちる一滴",
-        "output": "中央に黒い小さな円を置く。その周りに青い破線の円を三つ、半径を広げて並べる。",
+        "output": "中央に黒い小さな円を置く。その周りに青い破線の円を三つ、半径を順に大きくして並べる。",
     },
     {
         "keywords": ["冬", "結晶", "放射", "氷", "雪", "霜"],
@@ -421,7 +422,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["地平", "空", "地面", "境界", "水平線", "丘", "地"],
         "input": "地平線の向こうに広がる空",
-        "output": "画面下端に灰色の横線を一本引く。上半分に白い大きな四角を置く。",
+        "output": "画面下端に灰色の鉛筆の横線を一本引く。上半分に白い大きな四角を置く。",
     },
     # 属性保持: チョーク + 色 + ゆらぎ
     {
@@ -441,27 +442,27 @@ EXAMPLE_POOL: list[dict] = [
             "黒い背景",
         ],
         "input": "黒い背景に白い線を引く",
-        "output": "背景を黒で塗りつぶす。白いチョークの横線を中央に引く。",
+        "output": "背景を黒で埋める。白いチョークの横線を中央に引く。",
     },
     {
         "keywords": ["背景", "赤", "青", "緑", "灰", "空色", "地色"],
         "input": "青い背景に黒い縦線を五本引く",
-        "output": "背景を青で塗りつぶす。黒い縦線を横に五本並べる。",
+        "output": "背景を青で埋める。黒いペンの縦線を横に五本並べる。",
     },
     {
         "keywords": ["白", "背景", "線", "見えない", "同じ色", "同化"],
         "input": "白い背景に白い線を引く",
-        "output": "背景を白で塗りつぶす。黒いペンの横線を中央に引く。",
+        "output": "背景を白で埋める。黒いペンの横線を中央に引く。",
     },
     {
         "keywords": ["白", "雪", "星", "月", "背景", "夜"],
         "input": "白い雪を白い背景に散らす",
-        "output": "背景を白で塗りつぶす。青い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。",
+        "output": "背景を白で埋める。青い鉛筆の短い線を上から下へ百三十七本散らす。ゆっくり揺れる。",
     },
     {
         "keywords": ["白", "月", "大きい", "余白", "背景"],
         "input": "白い大きな月を白い背景に置く",
-        "output": "背景を青で塗りつぶす。白い大きな円を上端近くに置く。半径は0.15。",
+        "output": "背景を青で埋める。白い大きな円を上端近くに置く。半径は0.15。",
     },
     # 色とりどり・多色配色
     {
@@ -479,23 +480,23 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["色とりどり", "カラフル", "放射", "虹", "輪"],
         "input": "色とりどりの点を放射状に並べる",
-        "output": "赤・青・緑・黒の色とりどりの短い線を放射状に八つ並べる。",
+        "output": "赤・青・緑・黒の色とりどりのクレヨンの短い線を放射状に八つ並べる。",
     },
     # 非 Saijiki 語の展開: 天体
     {
         "keywords": ["太陽", "日光", "朝日", "夕日", "陽", "ひかり"],
         "input": "太陽が昇る",
-        "output": "白い大きな円を上端近くに置く。半径は0.15。放射状に細い線を八本引く。",
+        "output": "白い大きな円を上端近くに置く。半径は0.15。放射状に細筆の細い線を八本引く。",
     },
     {
         "keywords": ["星", "星空", "夜空", "銀河", "宇宙", "天の川"],
         "input": "満天の星空",
-        "output": "背景を黒で塗りつぶす。白い回転した小さな四角を画面全体に点々と六百十個散らす。",
+        "output": "背景を黒で埋める。白い回転した小さな四角を画面全体に点々と六百十個散らす。",
     },
     {
         "keywords": ["水平線", "地平線", "水面", "海面", "湖面"],
         "input": "長く続く水平線と昇る太陽。月の影が水面に広がる。",
-        "output": "画面下1/3に青い横線を引く。上端近くに白い大きな円を置く。半径は0.12。画面中央に灰色の破線の円を三つ同心円状に並べる。",
+        "output": "画面下1/3に青い鉛筆の横線を引く。上端近くに白い大きな円を置く。半径は0.12。画面中央に灰色の破線の円を三つ同心円状に並べる。",
     },
     # 非 Saijiki 語の展開: 自然物
     {
@@ -506,17 +507,17 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["木", "森", "林", "樹", "草木"],
         "input": "森の中に立つ木々",
-        "output": "緑の細い縦線を横に百四十四本並べる。",
+        "output": "緑の細筆の細い縦線を横に百四十四本並べる。",
     },
     {
         "keywords": ["雪", "吹雪", "雪原", "粉雪", "積雪"],
         "input": "雪がしんしんと降る",
-        "output": "白い短い線を上から下へ百三十七本散らす。ゆっくり揺れる。",
+        "output": "白い鉛筆の短い線を上から下へ百三十七本散らす。ゆっくり揺れる。",
     },
     {
         "keywords": ["炎", "火", "燃え", "燃える", "焔", "篝火"],
         "input": "燃え上がる炎",
-        "output": "赤い縦線を横に五本並べる。大きく波打つ。",
+        "output": "赤い太筆の縦線を横に五本並べる。大きく波打つ。",
     },
     {
         "keywords": ["建物", "家", "都市", "街", "ビル", "塔"],
@@ -531,7 +532,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["四つの方向", "四方向", "壁一面", "重なる線"],
         "input": "四つの方向の線を壁一面に重ねる",
-        "output": "黒い細い短線を四つの方向で壁一面に重ねて敷き詰める。かすかに揺れる。",
+        "output": "黒いロットリングの細い短線を四つの方向で壁一面に重ねて敷き詰める。かすかに揺れる。",
     },
     {
         "keywords": ["篠突く雨", "雨脚", "雨簾", "視界を覆う"],
@@ -600,7 +601,7 @@ EXAMPLE_POOL: list[dict] = [
     {
         "keywords": ["三日月", "細い月", "クレセント", "月", "弦月"],
         "input": "三日月が夜空に浮かぶ",
-        "output": "背景を黒で塗りつぶす。三日月の弧を右上に置く。半径は0.12。",
+        "output": "背景を黒で埋める。三日月の弧を右上に置く。半径は0.12。",
     },
     # 地の質感: 「地: ...」の別文として保持する (canvas.ground 経路)
     {
@@ -833,7 +834,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     {
         "keywords": ["white", "snow", "stars", "moon", "background", "night"],
         "input": "White snow on a white background",
-        "output": "Fill background with white. Scatter one hundred thirty-seven short blue lines from top to bottom. Swaying slowly.",
+        "output": "Fill background with white. Scatter one hundred thirty-seven short blue pencil lines from top to bottom. Swaying slowly.",
     },
     {
         "keywords": ["white", "moon", "large", "background", "dominant"],
@@ -894,12 +895,13 @@ Output: **Normalized DDL** — concise English instructions using only Saijiki v
 
 1. **Remove emotional vocabulary** (beautiful→remove, intense→quickly, quietly→slowly)
 2. **Output is a static image**. Verbs implying motion over time are forbidden:
-   - Forbidden: move, spread, flow, extend, rise, fall, scatter (as motion), sink, paint
-   - Allowed action verbs: place, line up, draw, scatter (as arrangement), fill
+   - Forbidden: move, spread, flow, extend, rise (as motion), fall (as motion), scatter (as motion), sink, paint
+   - Allowed action verbs: place, line up, draw, scatter (as arrangement), fill, tile
+   - "rising" / "falling" as angle words (rising to the right / falling to the right) are Saijiki vocabulary, not motion
    - "movements" qualities (trembling, blurring) are textures in the static image, not motion
 3. Coordinates use 0.0–1.0 ratio (top-left=(0,0), bottom-right=(1,1))
 4. Output in plain English prose. No bullet points, no explanation, no preamble
-5. Use only Saijiki vocabulary
+5. Use only Saijiki vocabulary and the fixed phrases this document defines: "Surface: ..." / "Ground: ..." texture phrases, printmaking phrases, previous-object relation phrases, and the colorful color list
 6. **Do not output the word "random" or "randomly" in normalized DDL**. Even if the input uses it, replace it with explicit placement such as "dotted across the whole canvas", "near the center", "from top to bottom", or "along an undulating trace".
 
 # Relations
@@ -946,7 +948,7 @@ Multiple attributes in one shape go in one sentence: "Line up thirty thick verti
 # Touch Choice — every line and arc chooses physical material
 
 Every sentence that draws a visible line, arc, or outline must explicitly name exactly one of these touches: """ + texture_material_enumeration("en") + """.
-If the input does not name a material, infer the nearest touch from texture and context. Do not default everything to pen.
+If the input does not name a material, infer the nearest touch from texture and context. Pen is the fallback default, not the recommended choice; do not default everything to pen.
 Do not mechanically attach a touch to a filled circle, ellipse, triangle, or square that has no visible outline.
 Choose burin or drypoint only when the input explicitly names that technique.
 
@@ -959,6 +961,7 @@ Choose burin or drypoint only when the input explicitly names that technique.
 
 Write the touch explicitly in normalized DDL: "thin pencil line", "chalk horizontal line", "short crayon line", "fine-brush vertical line".
 Never output a touchless line or arc such as "thin black line", "white horizontal line", or "draw radial lines".
+The only exception is a minimal sentence that states nothing but a relation phrase, a proportion (semicircle, waxing, waning, crescent), or an angle.
 
 # Quantity
 
@@ -1089,7 +1092,7 @@ Arc / Moon:
 
 # Non-Saijiki Word Expansion
 
-Choose cloudform only when (a) the input explicitly says cloudform, or (b) the subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle. Never use cloudform as a fallback for an unknown or unclear object; approximate unknown objects with the nearest existing circle, ellipse, triangle, square, line, arc, or polygon.
+Choose cloudform only when (a) the input explicitly says cloudform, or (b) the subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle. Never use cloudform as a fallback for an unknown or unclear object; approximate unknown objects with the nearest existing circle, ellipse, triangle, square, line, or arc.
 
 Expand unknown words to the nearest Saijiki vocabulary using shape, texture, structure, or motion.
 

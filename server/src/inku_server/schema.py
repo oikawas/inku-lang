@@ -583,7 +583,7 @@ class Score(BaseModel):
     )
     background: Color = Field(
         default="white",
-        description="背景色 (省略=white)。「背景を黒で塗りつぶす」→ black",
+        description="背景色 (省略=white)。「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ",
     )
     presence: Optional[Presence] = Field(
         default=None,

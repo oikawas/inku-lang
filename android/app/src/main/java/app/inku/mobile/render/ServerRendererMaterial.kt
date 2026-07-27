@@ -19,6 +19,11 @@ internal object ServerRendererMaterial {
     private const val OUTLINE_OFFSET_FLOOR_RATIO = 0.0
     private const val OUTLINE_OPACITY_GAIN = 1.8
 
+    // The intensity ladder's speck lever. _speck_profile applies it once, at the source,
+    // so every caller gets the same powder; the port had left it out of the profile and
+    // put 3.2 in the straight-line path alone.
+    private const val SPECK_SPREAD_GAIN = 1.8
+
     // The tools that own a material outline. `_material_line_group` reads the same set as
     // the closed contours do, so a tool cannot come out clothed on a circle and bare on a
     // line. burin and drypoint are deliberately absent: they carry plate_tone and burr
@@ -139,7 +144,6 @@ internal object ServerRendererMaterial {
         val scale = unit / 1000.0
         val offsetGain = OUTLINE_OFFSET_GAIN
         val opacityGain = OUTLINE_OPACITY_GAIN
-        val spreadGain = 3.2
         val lineLen = Math.hypot(x2 - x1, y2 - y1)
         val dashUnits = lineLen / Math.max(1e-6, scale)
 
@@ -178,7 +182,7 @@ internal object ServerRendererMaterial {
                 }
                 val spec = speckProfile("pencil", lineLen, unit)
                 if (spec != null) {
-                    out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread * spreadGain, radius = spec.radius, opacity = spec.opacity))
+                    out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread, radius = spec.radius, opacity = spec.opacity))
                 }
             }
             "chalk" -> {
@@ -189,9 +193,9 @@ internal object ServerRendererMaterial {
                     )
                     emitLayer(amount, layerAttrs, 8.0, 11.0, k)
                 }
-                val spec = speckProfile("chalk", lineLen, unit)
+                val spec = speckProfile("chalk", lineLen, unit, baseCountOverride = 34)
                 if (spec != null) {
-                    out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread * spreadGain, radius = spec.radius, opacity = spec.opacity))
+                    out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread, radius = spec.radius, opacity = spec.opacity))
                 }
             }
             "brush_thin" -> {
@@ -226,9 +230,9 @@ internal object ServerRendererMaterial {
                     emitLayer(amount, layerAttrs, mark, gap, k)
                 }
                 if (weight == "crayon") {
-                    val spec = speckProfile("crayon", lineLen, unit)
+                    val spec = speckProfile("crayon", lineLen, unit, baseCountOverride = 26)
                     if (spec != null) {
-                        out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread * spreadGain, radius = spec.radius, opacity = spec.opacity))
+                        out.append(powderSpecks(x1, y1, x2, y2, attrs, ins.toString(), count = spec.count, spread = spec.spread, radius = spec.radius, opacity = spec.opacity))
                     }
                 }
             }
@@ -414,12 +418,17 @@ internal object ServerRendererMaterial {
         else -> null
     }
 
-    private fun speckProfile(weight: String, pathLenPx: Double, unit: Double): SpeckProfile? {
+    /**
+     * `baseCountOverride` is the straight line's own count table. The server's
+     * `_material_line_group` calls `_speck_count` with 18 / 34 / 26 rather than the closed
+     * contours' 18 / 36 / 28; the port had been reading the closed-contour numbers there.
+     */
+    private fun speckProfile(weight: String, pathLenPx: Double, unit: Double, baseCountOverride: Int? = null): SpeckProfile? {
         val base = baseSpeckProfile(weight) ?: return null
         val scale = unit / 1000.0
-        val count = speckCount(base.count, pathLenPx, unit)
+        val count = speckCount(baseCountOverride ?: base.count, pathLenPx, unit)
         val opacity = speckOpacity(base.opacity)
-        return SpeckProfile(count, base.spread * scale, base.radius * scale, opacity)
+        return SpeckProfile(count, base.spread * scale * SPECK_SPREAD_GAIN, base.radius * scale, opacity)
     }
 
     private fun lineElement(x1: Double, y1: Double, x2: Double, y2: Double, attrs: SvgAttrs): String {

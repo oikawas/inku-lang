@@ -168,21 +168,14 @@ _apply_stored_render_concurrency()
 def _log_rasterizer_backend() -> None:
     """Announce the PNG backend at boot.
 
-    A cairosvg fallback still writes clean-looking PNGs, it just silently omits the
-    material filters, so both the saved artwork and the Vision input degrade with no
-    other trace. Logged once per process rather than per rasterization.
+    resvg is the only one; there is no fallback to notice having taken. Logged once
+    per process rather than per rasterization.
     """
-    from inku_analysis.rasterizer import BACKEND_CAIROSVG, rasterizer_info
+    from inku_analysis.rasterizer import rasterizer_info
 
     info = rasterizer_info()
     if not info:
-        _logger.warning("no SVG rasterizer is installed; PNG output is disabled")
-    elif info["backend"] == BACKEND_CAIROSVG:
-        _logger.warning(
-            "PNG rasterizer fell back to cairosvg %s; material filters "
-            "(pencil / crayon / chalk / brush_thick) will not be rendered into PNG or Vision input",
-            info.get("version", "?"),
-        )
+        _logger.warning("resvg is not installed; PNG output is disabled")
     else:
         _logger.info("PNG rasterizer: %s %s", info["backend"], info.get("version", "?"))
 

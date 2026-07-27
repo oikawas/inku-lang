@@ -1194,22 +1194,23 @@ def test_png_output_records_the_rasterizer_that_produced_it(tmp_path, monkeypatc
     assert "png_rasterizer" not in without
 
 
-def test_cairosvg_fallback_warns_once_that_material_filters_are_missing(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(cli, "rasterizer_backend", lambda: cli.BACKEND_CAIROSVG)
-    monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
-    monkeypatch.setattr(cli, "_rasterizer_warned", False)
+def test_png_output_fails_when_resvg_is_absent(tmp_path, monkeypatch):
+    """There is no fallback to warn about any more -- it raises instead.
 
-    for prefix in ("one", "two"):
-        cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix=prefix, png=True)
+    A backend that drops the material filters writes a PNG that looks cleaner
+    than the work is, so the CLI would rather write nothing.
+    """
+    def unavailable(svg, **kwargs):
+        raise cli.RasterizerUnavailable("resvg-py is not installed")
 
-    stderr = capsys.readouterr().err
-    assert stderr.count("falls back to cairosvg") == 1
-    assert "material filters" in stderr
+    monkeypatch.setattr(cli, "svg_to_png", unavailable)
+
+    with pytest.raises(cli.CliError, match="resvg-py"):
+        cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="one", png=True)
 
 
 def test_no_warning_when_resvg_is_present(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
-    monkeypatch.setattr(cli, "_rasterizer_warned", False)
 
     cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="quiet", png=True)
 

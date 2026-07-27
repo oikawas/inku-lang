@@ -5,7 +5,6 @@ description = "Read-only composition mirrors and SVG rasterization shared by ink
 requires-python = ">=3.12"
 dependencies = [
     "resvg-py>=0.3.3",
-    "cairosvg>=2.7.0",
 ]
 
 [build-system]

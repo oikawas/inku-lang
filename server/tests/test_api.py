@@ -2179,7 +2179,7 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
-        if name in ("resvg_py", "cairosvg"):
+        if name == "resvg_py":
             raise ImportError(f"missing {name}")
         return real_import(name, *args, **kwargs)
 

@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "inku-analysis",
-    "cairosvg>=2.7.0",
     "pillow>=12.0.0",
 ]
 

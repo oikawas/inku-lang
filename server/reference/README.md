@@ -113,7 +113,7 @@ seed the first change rewrote. Both move on `cloudform` alone, because that is t
 one shape whose path they newly share: `rotring` drops the false
 `stroke-engine-touch` from its class, and `computer` gains its `raster-bleed`.
 
-Three cases entered and one left. `C-groundseed-auto-paper`, `-washi`, `-coarse`
+Four cases entered and one left. `C-groundseed-auto-paper`, `-washi`, `-coarse`
 and `-paper-opacity` are the first cases in the corpus's history to leave
 `ground.seed` unset — until engine 15 every ground case pinned it, so
 `_texture_seed` was called **zero times across all 347 cases** and the layer could

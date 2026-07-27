@@ -1381,6 +1381,72 @@ leaving **221 unchanged**. **Not one of the ten hand tools moved.**
 
 ---
 
+### 12.8 Remaking the Seed and the Trace (v2.7.8, engine 15)
+
+**Five changes to `renderer.py` land as one version.** They sit in the same layer, and
+bumping four times would have cost four Android follow-ups.
+
+#### A mark's seed is built from what makes it another mark
+
+`_seed_for_instruction` hashed **the instruction's whole dump**. Rewriting a colour note
+`coerce` had written was enough to change the drawing; changing `count` re-rolled the hand;
+an A/B on a composition flag was confounded by it. Engine 15 uses an allowlist: **what it is,
+the tool, the geometry, its variation, its surface, and `arrangement.jitter`**. Measured
+across all 49 fields, **30 move the output and 19 do not**.
+
+> **"Changing the count preserves the stroke" holds only for `layout="scatter"`.** With
+> `horizontal`, `vertical`, `radial` or `grid`, going from 12 to 13 moves the first twelve
+> as well. That is not a leak in the seed: `_clustered_pos` and `_path_pos` take the count
+> as an argument, and **a layout that divides a span by the count must move**.
+
+#### The ground's seed names the paper
+
+`_texture_seed` hashed the whole Score, so **touching anything at all dealt a new sheet of
+paper**. It is now made of **`material`, `grain` and the performance seed**, so raising the
+opacity **darkens the same sheet**.
+
+That freed **`ground.absorbency`** to be retired. Nothing had ever read it, but removing it
+moved the grain, so it could not be retired before. Saved Scores still carry it, so it is
+**dropped before validation**, as `contact` and `thickness` were in v2.7.2.
+
+#### `cloudform` joins the road every other closed contour takes
+
+It claimed `stroke-engine-touch` in its class while **never entering `stroke_engine`**, and
+all three material mechanisms were absent from it. Engine 15 passes the dense polyline the
+inner fill already builds straight into the hand-stroke path. **No cloudform-specific
+synthesis was written.**
+
+#### The corner shapes and `pen` gain the material layer
+
+`_render_corner_shape` had **no material-outline call at all**, leaving `triangle` and
+`polygon` bare for every tool that owns one, and **`pen`, the most used tool in production**,
+had nothing but its body stroke.
+
+#### Strength stops being distance
+
+Each rung of the material intensity ladder had answered "the layer reads weak" by multiplying
+the outline offset — to **2.8x, with a 3.5px floor**. Measured against the band's own
+half-width as drawn, the strata sat **4.5x out for `pencil` and 6.5x for `chalk`**: far enough
+to read as **a second contour rather than a trace**. The multiplier and the floor are gone.
+The specification table was never at fault — its values are 0.7 to 2.3 times the half-width.
+The opacity gain, which is the other lever, is **untouched**.
+
+> **Darkness carries strength. Distance is not a lever for it.**
+
+#### Version and corpus
+
+`render_engine_version` goes `14` to **`15`**. The corpus holds **350 cases** (four added,
+one dropped). **318 moved, and the 32 that did not are the point**: `computer` and `rotring`
+across the seven shapes that are not `cloudform`, plus four `D-canvas` rotring cases. Neither
+machine pole consumes the performance seed, so the first change never reaches them, and both
+**move on `cloudform` alone** — the one path they newly share, where `rotring` drops its false
+`stroke-engine-touch` and `computer` gains its `raster-bleed`.
+
+The four new cases (`C-groundseed-auto-*`) are **the first in the corpus's history to leave
+`ground.seed` unset**. Every ground case had pinned it, so **`_texture_seed` was called zero
+times across all 347 cases** and the layer this version rewrote could not be tested by the
+corpus at all.
+
 ## 13. CLI
 
 `inku-cli` is a command-line client for controlling the inku server through the

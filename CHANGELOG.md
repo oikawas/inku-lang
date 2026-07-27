@@ -970,3 +970,20 @@ and a frozen corpus of their own.
 - **A discriminating test** pins the band at ten points from 121 to 2000. Restoring the floor of 48 fails it for 121–239.
 - **None of the 39 golden cases moves** (`S-total-density` represents 200 as 84, already above the floor).
 - **Verification.** server **1217 passed / 30 skipped**, cli **69 passed**, ruff clean. Count preservation stays at **50/50**.
+
+---
+
+### v2.7.8 — remaking the seed and the trace (render engine 15) (Build 717, 2026-07-27)
+
+**Five changes to `renderer.py` land as one version.** They sit in the same layer, and bumping four times would have cost four Android follow-ups.
+
+- **A mark's seed is built from an allowlist.** `_seed_for_instruction` hashed **the instruction's whole dump**, so rewriting a colour note `coerce` had written was enough to change the drawing, and an A/B on a composition flag was confounded by it. Only what makes a mark physically another mark goes in now: what it is, the tool, the geometry, its variation, its surface, and `arrangement.jitter`. Across all 49 fields, **30 move the output and 19 do not**.
+- **The ground's seed names the paper.** `_texture_seed` hashed the whole Score, so **touching anything at all dealt a new sheet**. Made of `material`, `grain` and the performance seed, raising the opacity now **darkens the same sheet**. That freed **`ground.absorbency`** — a field nothing had ever read, which could not be retired because removing it moved the grain.
+- **`cloudform` joins the road every other closed contour takes.** It claimed `stroke-engine-touch` in its class while **never entering `stroke_engine`**, and all three material mechanisms were absent from it. **No cloudform-specific synthesis was written**: the dense polyline the inner fill already builds goes straight into the hand-stroke path.
+- **The corner shapes and `pen` gain the material layer they never had.** `_render_corner_shape` had **no material-outline call at all**, so `triangle` and `polygon` were bare for every tool that owns one, and **`pen`, the most used tool in production**, had nothing but its body stroke.
+- **Strength stops being distance.** Each rung of the intensity ladder had answered "the layer reads weak" by multiplying the outline offset, up to **2.8x with a 3.5px floor**. Measured against the band's own half-width as drawn, the strata sat **4.5x out for `pencil` and 6.5x for `chalk`** — far enough to read as a second contour rather than a trace. The multiplier and floor are gone; **the specification table was never at fault** (its values are 0.7 to 2.3 times the half-width), and the opacity gain is untouched.
+- **The corpus holds 350 cases** (four added, one dropped). **318 moved, and the 32 that did not are the point**: `computer` and `rotring` across the seven shapes that are not `cloudform`, plus four `D-canvas` rotring cases. Neither machine pole consumes the performance seed, so both **move on `cloudform` alone** — the one path they newly share.
+- **The four new cases are the first in the corpus's history to leave `ground.seed` unset.** Every ground case had pinned it, so **`_texture_seed` was called zero times across all 347 cases** and the layer this version rewrote could not be tested by the corpus at all.
+- **`hair` was given the material layer and then had it removed** (the author ruled that retiring `hair` altogether is the right call). Adding a layer to a tool being retired only means deleting it again, so stage 4b covers `pen` alone. **The retirement itself is a separate contract.**
+- **A limit of scope.** "Changing the count preserves the stroke" holds only for `layout="scatter"`. With `horizontal`, `vertical`, `radial` or `grid`, going from 12 to 13 moves the first twelve too — not a leak in the seed, but the arithmetic of **a layout that divides a span by the count**.
+- **Verification.** server **1402 passed / 30 skipped** (1268 passed / 6 failed / 30 skipped at the start), cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files. **The generator was run twice and the frozen output is byte-identical**, so the CI guard passes.

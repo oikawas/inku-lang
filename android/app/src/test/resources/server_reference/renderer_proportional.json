@@ -27,17 +27,17 @@
     "MATERIAL_INTENSITY_SELECTED": {
       "texture_displacement": 2.8,
       "texture_blur": 1.6,
-      "outline_offset": 2.8,
+      "outline_offset": 1.0,
       "outline_opacity": 1.8,
       "speck_count": 2.6,
       "speck_spread": 1.8,
       "speck_opacity": 1.6,
-      "outline_offset_floor_ratio": 0.0035,
+      "outline_offset_floor_ratio": 0.0,
       "outline_opacity_floor": 0.5,
       "speck_opacity_floor": 0.4
     },
     "WEIGHT_TO_STROKE_WIDTH": {
-      "hair": 0.5,
+      "silverpoint": 0.5,
       "pencil": 1.5,
       "pen": 2.0,
       "rotring": 1.0,
@@ -1500,11 +1500,6 @@
     },
     {
       "aspect": "square",
-      "weight": "hair",
-      "value": 0.5
-    },
-    {
-      "aspect": "square",
       "weight": "pen",
       "value": 2.0
     },
@@ -1517,6 +1512,11 @@
       "aspect": "square",
       "weight": "rotring",
       "value": 1.0
+    },
+    {
+      "aspect": "square",
+      "weight": "silverpoint",
+      "value": 0.5
     },
     {
       "aspect": "wide",
@@ -1555,11 +1555,6 @@
     },
     {
       "aspect": "wide",
-      "weight": "hair",
-      "value": 0.5
-    },
-    {
-      "aspect": "wide",
       "weight": "pen",
       "value": 2.0
     },
@@ -1572,6 +1567,11 @@
       "aspect": "wide",
       "weight": "rotring",
       "value": 1.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "silverpoint",
+      "value": 0.5
     },
     {
       "aspect": "pillar",
@@ -1610,11 +1610,6 @@
     },
     {
       "aspect": "pillar",
-      "weight": "hair",
-      "value": 0.1
-    },
-    {
-      "aspect": "pillar",
       "weight": "pen",
       "value": 0.4
     },
@@ -1627,6 +1622,11 @@
       "aspect": "pillar",
       "weight": "rotring",
       "value": 0.2
+    },
+    {
+      "aspect": "pillar",
+      "weight": "silverpoint",
+      "value": 0.1
     },
     {
       "aspect": "vertical",
@@ -1665,11 +1665,6 @@
     },
     {
       "aspect": "vertical",
-      "weight": "hair",
-      "value": 0.281
-    },
-    {
-      "aspect": "vertical",
       "weight": "pen",
       "value": 1.124
     },
@@ -1682,6 +1677,11 @@
       "aspect": "vertical",
       "weight": "rotring",
       "value": 0.562
+    },
+    {
+      "aspect": "vertical",
+      "weight": "silverpoint",
+      "value": 0.281
     }
   ],
   "speck_count": [

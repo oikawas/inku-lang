@@ -77,6 +77,15 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 		]
 	},
 	{
+		id: 'ollama-cloud',
+		label: 'Ollama Cloud (ollama.com)',
+		models: [
+			{ id: 'ollama-cloud:gemma4:31b', label: 'gemma4:31b' },
+			{ id: 'ollama-cloud:qwen3.5:397b', label: 'qwen3.5:397b' },
+			{ id: 'ollama-cloud:glm-5.2', label: 'glm-5.2' }
+		]
+	},
+	{
 		id: 'ovms',
 		label: 'Intel OVMS',
 		models: [

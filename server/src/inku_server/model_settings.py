@@ -11,7 +11,11 @@ from copy import deepcopy
 from typing import Any
 
 from .secrets import decrypt_secret, encrypt_secret
-from .verified_model_catalog import MODEL_CONFIG_VERSION, VERIFIED_NVIDIA_MODELS
+from .verified_model_catalog import (
+    MODEL_CONFIG_VERSION,
+    VERIFIED_NVIDIA_MODELS,
+    VERIFIED_OLLAMA_CLOUD_MODELS,
+)
 
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
     {
@@ -81,6 +85,21 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
             {"id": "gpt-oss:20b", "label": "gpt-oss 20B"},
             {"id": "qwen3:8b", "label": "Qwen3 8B"},
         ],
+    },
+    {
+        "id": "ollama-cloud",
+        "label": "Ollama Cloud (ollama.com)",
+        "kind": "openai_compatible",
+        "api_key_env": "OLLAMA_CLOUD_API_KEY",
+        "base_url_env": "OLLAMA_CLOUD_BASE_URL",
+        "default_base_url": "https://ollama.com/v1",
+        "requires_api_key": True,
+        # The free tier refuses work by concurrency rather than by volume: eight
+        # simultaneous requests returned 429 while only 7.6% of the weekly allowance
+        # had been spent (measured 2026-07-27). Two is a property of the service, not
+        # a taste, so it is fixed here instead of being offered as a setting.
+        "max_concurrency": 2,
+        "models": VERIFIED_OLLAMA_CLOUD_MODELS,
     },
     {
         "id": "ovms",
@@ -502,6 +521,22 @@ def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any
     if "/" in model:
         return "nvidia", model
     return "ovms", model
+
+
+def provider_concurrency_limit(provider_id: str) -> int:
+    """How many requests this provider will take at once. 0 means no limit.
+
+    Read from the builtin definition rather than from stored settings: a provider
+    that answers 429 above two simultaneous requests is describing itself, not
+    expressing a preference the operator should be able to raise.
+    """
+    builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
+    if not builtin:
+        return 0
+    limit = builtin.get("max_concurrency")
+    if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0:
+        return limit
+    return 0
 
 
 def connection_for(provider_id: str, settings: dict[str, Any]) -> dict[str, Any]:

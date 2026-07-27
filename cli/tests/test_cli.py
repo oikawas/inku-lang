@@ -99,6 +99,16 @@ def test_paint_payload_drops_none_values():
     assert "history_input" not in payload
 
 
+def test_paint_payload_separates_the_description_from_what_stage1_reads():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--original-text", "一滴の墨"])
+
+    payload = cli._paint_payload(args, "一滴の墨\n\n感情: 静か")
+
+    assert payload["description"] == "一滴の墨"
+    assert payload["stage1_input"] == "一滴の墨\n\n感情: 静か"
+
+
 def test_paint_payload_includes_trace_only_when_flag_set():
     parser = cli.build_parser()
     with_trace = cli._paint_payload(parser.parse_args(["paint", "x", "--trace"]), "x")
@@ -148,7 +158,7 @@ def test_compose_payload_for_ddl_input_mode():
     assert payload == {
         "ddl": "白い背景に黒い線を一本引く。",
         "model": "s2",
-        "original_description": "線",
+        "description": "線",
         "instruction_lang": "auto",
         "catalog_id": "default",
         "auto_repair": True,

@@ -3292,3 +3292,28 @@ engine 13 の前例。**条件は「公開前に済ませること」**）。
   **記述を指す語が `description` と `input` の 2 つになった**ので、次の一手として測ってある
 - **検証（Build 724 時点）:** server **1420 passed / 31 skipped**、cli **70 passed**、ruff clean、
   `npm run check` 0 errors / 2 warnings / 217 files
+
+**その語の付け先を、同じ版で直した（Build 725）。** Build 724 は語を移したが、
+**`description` を「作者が書いた記述」ではなく「文脈を注入したあとの、Stage 1 へ渡す文字列」に
+与えてしまい**、作者の本文のほうが `original_description` へ降格していた。
+**辞書の語が指すのは作者が書いたものである。**
+
+- **`description` = 作者が書いた記述**（`/api/interpret` と `/api/paint` では必須）。
+  **Stage 1 が実際に読む文字列には `stage1_input` という別の名前を与えた**（省略可）。
+  **省略した要求では記述そのものが Stage 1 へ渡る**ので、文脈を注入しない client は
+  `description` だけ送ればよい
+- **`/api/compose` の `original_description` も `description` へ**（省略可。DDL だけで叩けるため）。
+  web の送信 4 箇所がこの経路（契約は 3 箇所と見積もっていたが、実測は 4 箇所だった）
+- **`input` は据え置き**（作者裁定）。保存・表示される本文であって記述とは限らない —
+  本番 1780 件のうち **DDL 風が 4 件・空が 38 件**で、中立な語のほうが筋が通る
+- **内部の関数引数は 1 つも動かしていない** — `composer.py` の `original_description` と
+  `_call_compose_detail` の引数は**初めから意味が正しい**（Stage 2 へ渡す作者の原文）。
+  **片側だけ動かすと `TypeError` になり、1 回目の着手はそれで 42 件赤にした。**
+  動かしてよいのは **① Pydantic のフィールド定義 ② `req.` の読み出し ③ client の送信本体**の 3 つだけ
+- **判別テストを 4 本足した** — `stage1_input` を省いた要求で Stage 1 が `description` を読むこと、
+  送った要求では `stage1_input` を読むこと、**そのとき履歴に残るのは `description` のほう**であること
+  （augmented が保存されない）、CLI の payload が両者を分けること。
+  **実装を 2 点摂動して、それぞれが実際に赤くなることを確かめてから戻した**
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 725 へ
+- **検証（Build 725 時点）:** server **1423 passed / 31 skipped**、cli **71 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files

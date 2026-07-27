@@ -1091,3 +1091,13 @@ The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the r
 - **Four `"text"` keys were left alone**: the payloads sent to the LLM providers (Anthropic content blocks, Gemini `parts`). **Those are someone else's API contract.**
 - **The DB column `input` on `history` is still a third word** (nine server sites, thirty in the web client), so **the description now goes by two names**; it is measured and filed as the next step.
 - **Verification (at Build 724).** server **1420 passed / 31 skipped**, cli **70 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.
+
+**The same version corrects what that word was attached to (Build 725).** Build 724 moved the word but hung it on the wrong string: **`description` held the augmented text — the description with context injected — and the author's own line was demoted to `original_description`.** The dictionary word names what the author wrote.
+
+- **`description` is the author's description** (required on `/api/interpret` and `/api/paint`), and **the string Stage 1 actually reads gets its own name, `stage1_input`** (optional). **Omit it and the description itself goes to Stage 1**, so a client that injects no context sends only `description`.
+- **`/api/compose` loses `original_description` the same way**: its prose field is the author's description, so it is called that (optional there, since the endpoint can be driven by DDL alone). Four web call sites use that path — the contract had estimated three.
+- **`input` stays** (the author's ruling). It is the body that gets saved and displayed, which is not always prose: of 1780 saved works four are DDL-shaped and 38 are empty, so the neutral word still fits.
+- **Not one internal argument moved.** `composer.py`'s `original_description` and the argument to `_call_compose_detail` already mean the right thing — the author's original text on its way to Stage 2. **Moving one side of that pair without the other raises `TypeError`, which is how the first attempt went 42 tests red.** What may move is only **the Pydantic field definitions, the `req.` reads, and what the clients send**.
+- **Four discriminating tests were added**: Stage 1 reads `description` when `stage1_input` is omitted, reads `stage1_input` when it is sent, **the history then stores the `description` rather than the augmented text**, and the CLI payload keeps the two apart. **The implementation was perturbed at two points to confirm each one actually goes red, then restored.**
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 725.
+- **Verification (at Build 725).** server **1423 passed / 31 skipped**, cli **71 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.

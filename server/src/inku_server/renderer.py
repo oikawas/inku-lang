@@ -3291,6 +3291,18 @@ _MATERIAL_OUTLINE_SPECS: dict[str, list[tuple[float, float, float, float, str]]]
         (-1.5, 0.0, 0.20, 0.20, "4,8"),
         (2.4, 0.0, 0.22, 0.22, "2,5,9,7"),
     ],
+    # engine 15. 本番で 1 位 (pen 3261) と 4 位 (hair 583) の道具が、本体の
+    # ストロークしか持たないまま残っていた。数値は道具の性格を文法テーブル
+    # (`stroke_engine.GRAMMARS`) から引いている。
+    #
+    # hair (面相筆) は stiffness 0.93 / energy_width 0.08 で全道具中もっとも
+    # 抑制されている。痕跡は毛の分かれなので 1 本だけ、offset は全道具で最小
+    # (基準幅 0.5px の 1.2 倍)、dash は長い off でたまにしか現れない。
+    "hair": [(-0.6, 0.30, 0.0, 0.14, "2,23")],
+    # pen (つけペン) の痕跡は割れた 2 本の穂先で、線の両岸そのものを走る。
+    # offset ±1.0 は基準幅 2.0px のちょうど半分＝帯の縁。dash は brush_thin の
+    # 22,9 より細かく pencil の 1,7 より連続寄りで、穂先らしくほぼ途切れない。
+    "pen": [(-1.0, 0.38, 0.0, 0.24, "14,3"), (1.0, 0.34, 0.0, 0.20, "12,4")],
 }
 
 # (基準個数, spread_px, radius_px, opacity)。個数は周長比例の基準値。
@@ -3637,13 +3649,10 @@ def _material_line_group(
     render_seed: int | None = None,
     centerline: list[tuple[float, float]] | None = None,
 ):
-    if ins.weight not in (
-        "pencil",
-        "crayon",
-        "chalk",
-        "brush_thin",
-        "brush_thick",
-    ):
+    # 直線の材質層は閉輪郭とは別実装で、道具ごとの数値もここが独自に持っている。
+    # ゲートを `_MATERIAL_OUTLINE_SPECS` から引くことで、表に道具を足したのに
+    # 直線だけ裸のまま、という食い違いが起きないようにする (engine 15)。
+    if ins.weight not in _MATERIAL_OUTLINE_SPECS:
         return None
 
     # The texture layers ride the actual (possibly gestured) centreline, not the
@@ -3742,6 +3751,20 @@ def _material_line_group(
             layer_attrs["stroke_width"] = (0.9 + k * 0.5) * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.32)
             _emit_layer(amount, layer_attrs, 22.0, 9.0, k)
+    elif ins.weight == "hair":
+        # 毛の分かれは 1 本きり。長い gap でたまにしか現れない。粒は与えない
+        # (粉は柔らかく崩れる画材の印で、面相筆は崩れない)。
+        layer_attrs = _copy_attrs(attrs)
+        layer_attrs["stroke_width"] = 0.30 * scale
+        layer_attrs["stroke_opacity"] = _layer_opacity(0.14)
+        _emit_layer(-0.6, layer_attrs, 2.0, 23.0, 0)
+    elif ins.weight == "pen":
+        # 割れた 2 本の穂先。線の両岸を対称に走り、ほとんど途切れない。
+        for k, amount in enumerate((-1.0, 1.0)):
+            layer_attrs = _copy_attrs(attrs)
+            layer_attrs["stroke_width"] = (0.38 - k * 0.04) * scale
+            layer_attrs["stroke_opacity"] = _layer_opacity(0.24 - k * 0.04)
+            _emit_layer(amount, layer_attrs, 14.0 - k * 2.0, 3.0 + k, k)
     else:
         amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
         mark, gap = (6.0, 6.0) if ins.weight == "crayon" else (14.0, 9.0)

@@ -16,6 +16,7 @@ import os
 import pytest
 
 from inku_server.interpreter import (
+    EXAMPLE_POOL_EN,
     _build_system_prompt,
     _sanitize_placement_words,
     _select_examples,
@@ -134,9 +135,15 @@ def test_quantity_prompt_en_uses_dynamic_range():
     assert "where, in which direction, or along what trace" in prompt
     assert "about twenty" not in prompt
     assert "six hundred ten" in prompt
-    assert "eight hundred ninety" in prompt
     assert "dotted across the whole canvas" in prompt
-    assert "finely across the whole canvas" in prompt
+    # 砂の例は k=5 の枠を関係例に譲る (2026-07-27: 雪の例へ pencil を補った結果、
+    # てざわり補充の fallback が発火しなくなり、置換先が 1 つずれた)。
+    # プールから消えていないことは別に押さえる。
+    assert any(
+        "eight hundred ninety" in example["output"]
+        and "finely across the whole canvas" in example["output"]
+        for example in EXAMPLE_POOL_EN
+    )
     assert "same foreground and background color" in prompt
     assert "do not objectify emotion or place words" in prompt
     assert "respect context for city/building words" in prompt
@@ -174,11 +181,11 @@ def test_contrast_prompt_selects_invisible_examples():
     prompt = _build_system_prompt("白い背景に白い線を引く")
     assert "背景色と主描画色を同じにしてはいけない" in prompt
     assert "面積の少ない方" in prompt
-    assert "背景を灰で塗りつぶす" in prompt
+    assert "背景を灰で埋める" in prompt
     assert "出力してはいけない" in prompt
     assert "白い背景に白い線" in prompt
     assert "黒いペンの横線" in prompt
-    assert "青い短い線" in _build_system_prompt("白い雪を白い背景に散らす")
+    assert "青い鉛筆の短い線" in _build_system_prompt("白い雪を白い背景に散らす")
 
 
 def test_contrast_prompt_en_selects_invisible_examples():
@@ -189,14 +196,14 @@ def test_contrast_prompt_en_selects_invisible_examples():
     assert "Do not output" in prompt
     assert "White lines on a white background" in prompt
     assert "black pen horizontal line" in prompt
-    assert "short blue lines" in _build_system_prompt("white snow on a white background", lang="en")
+    assert "short blue pencil lines" in _build_system_prompt("white snow on a white background", lang="en")
 
 
 def test_touch_choice_prompt_selects_material_variations():
     prompt = _build_system_prompt("乾いた壁に残った粉の跡")
 
     assert "てざわり選択" in prompt
-    assert "毎回ペンに寄せない" in prompt
+    assert "機械的にペンへ寄せない" in prompt
     assert "粉、粉っぽい、かすれ" in prompt
     assert "チョーク" in prompt
     assert "クレヨン" in prompt
@@ -210,7 +217,7 @@ def test_touch_choice_prompt_en_selects_material_variations():
     prompt = _build_system_prompt("a dry powder trace left on a wall", lang="en")
 
     assert "Touch Choice" in prompt
-    assert "Do not default everything to pen" in prompt
+    assert "do not default everything to pen" in prompt
     assert "powder, dusty" in prompt
     assert "chalk" in prompt
     assert "crayon" in prompt

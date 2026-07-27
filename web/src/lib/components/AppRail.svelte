@@ -181,13 +181,16 @@
 		background: var(--bg2);
 		color: var(--fg);
 	}
+	/* 作品情報への入口。押せることが見えるよう、rail-toggle と同じ器に載せる。 */
 	.rail-logo {
 		width: auto;
+		height: 30px;
 		display: flex;
 		align-items: center;
-		border: 0;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
 		padding: 0;
-		background: transparent;
+		background: var(--panel);
 		font-size: 15px;
 		font-weight: 300;
 		letter-spacing: 0;
@@ -196,7 +199,14 @@
 		white-space: nowrap;
 		transform-origin: left center;
 		font-family: inherit;
-		cursor: default;
+		cursor: pointer;
+	}
+	.rail-logo:hover {
+		background: var(--bg2);
+		border-color: var(--fg3);
+	}
+	.app-rail.expanded .rail-logo {
+		padding-right: 9px;
 	}
 	.rail-logo-core {
 		width: 30px;

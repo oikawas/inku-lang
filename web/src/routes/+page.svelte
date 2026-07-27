@@ -1,5 +1,6 @@
 <script module lang="ts">
 	declare const __BUILD_NUMBER__: string;
+	declare const __BUILD_DATE__: string;
 </script>
 
 <script lang="ts">
@@ -77,6 +78,12 @@
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const APP_VERSION = 'v2.9.2';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
+	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
+	const buildDateLabel = $derived.by(() => {
+		const stamp = new Date(__BUILD_DATE__);
+		if (Number.isNaN(stamp.getTime())) return null;
+		return stamp.toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
+	});
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
@@ -6546,6 +6553,26 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			<button class="app-info-close" onclick={() => (appInfoOpen = false)} aria-label={t().appInfoClose}>×</button>
 		</div>
 		<div class="app-info-body">
+			<dl class="app-info-meta">
+				<div>
+					<dt>{t().appInfoVersionLabel}</dt>
+					<dd>{APP_VERSION}</dd>
+				</div>
+				<div>
+					<dt>{t().appInfoBuildDateLabel}</dt>
+					<dd>{buildDateLabel ?? t().historyVersionNotRecorded}</dd>
+				</div>
+				{#if developerMode}
+					<div>
+						<dt>{t().appInfoBuildLabel}</dt>
+						<dd>{__BUILD_NUMBER__}</dd>
+					</div>
+				{/if}
+				<div>
+					<dt>{t().appInfoRepositoryLabel}</dt>
+					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
+				</div>
+			</dl>
 			<section>
 				<h2>{t().appInfoConceptTitle}</h2>
 				<p>{t().appInfoConceptBody}</p>
@@ -6575,22 +6602,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				<div class="app-info-creator">{t().appInfoCreatorName}</div>
 				<p>{t().appInfoCreatorBody}</p>
 			</section>
-			<dl class="app-info-meta">
-				<div>
-					<dt>{t().appInfoVersionLabel}</dt>
-					<dd>{APP_VERSION}</dd>
-				</div>
-				{#if developerMode}
-					<div>
-						<dt>{t().appInfoBuildLabel}</dt>
-						<dd>{__BUILD_NUMBER__}</dd>
-					</div>
-				{/if}
-				<div>
-					<dt>{t().appInfoRepositoryLabel}</dt>
-					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
-				</div>
-			</dl>
 		</div>
 	</div>
 {/if}

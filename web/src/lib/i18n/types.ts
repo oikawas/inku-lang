@@ -13,6 +13,7 @@ export interface LangPack {
 	appInfoCreatorBody: string;
 	appInfoVersionLabel: string;
 	appInfoBuildLabel: string;
+	appInfoBuildDateLabel: string;
 	appInfoRepositoryLabel: string;
 	appInfoClose: string;
 	inputSectionHint: string;

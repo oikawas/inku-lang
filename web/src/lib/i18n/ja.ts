@@ -14,6 +14,7 @@ export const ja: LangPack = {
 	appInfoCreatorBody: '日本語と英語の仕様、参照実装、Web UI、CLI を設計・実装しています。',
 	appInfoVersionLabel: 'バージョン',
 	appInfoBuildLabel: 'ビルド',
+	appInfoBuildDateLabel: 'ビルド日時',
 	appInfoRepositoryLabel: 'GitHub',
 	appInfoClose: '閉じる',
 	appInfoVocabTitle: '用語と層',

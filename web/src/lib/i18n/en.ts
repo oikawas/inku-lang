@@ -14,6 +14,7 @@ export const en: LangPack = {
 	appInfoCreatorBody: 'Designs and implements the Japanese and English specifications, the reference implementation, the web UI, and the CLI.',
 	appInfoVersionLabel: 'Version',
 	appInfoBuildLabel: 'Build',
+	appInfoBuildDateLabel: 'Build date',
 	appInfoRepositoryLabel: 'GitHub',
 	appInfoClose: 'Close',
 	appInfoVocabTitle: 'Vocabulary and layers',

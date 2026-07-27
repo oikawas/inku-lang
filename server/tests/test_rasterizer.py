@@ -80,16 +80,60 @@ def test_cairosvg_is_not_a_declared_dependency(pyproject):
     assert "cairosvg" not in declared, f"{pyproject} still declares cairosvg"
 
 
+# Directories that hold no source the repository ships: virtualenvs, dependency
+# trees, build output, caches, CLI run artifacts, and `no-git-sync`, the untracked
+# working area where past measurement scripts are kept as a record of what was run.
+_UNSCANNED_DIRS = frozenset(
+    {
+        ".git",
+        ".gradle",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "bench",
+        "build",
+        "dist",
+        "no-git-sync",
+        "node_modules",
+        "out",
+        "out2",
+        "site-packages",
+    }
+)
+
+
+def _repo_python_files():
+    """Every .py we own, found by exclusion rather than by a list of roots.
+
+    The first version of this named its four roots, which is why `android/scripts`
+    kept an `import cairosvg` through v2.7.10: a named list cannot fail to be
+    incomplete, it can only fail to say so.
+    """
+    for path in REPO.rglob("*.py"):
+        if _UNSCANNED_DIRS.isdisjoint(path.relative_to(REPO).parts):
+            yield path
+
+
 def test_no_source_file_imports_cairosvg():
     """Prose may name it -- the module docstring explains why it is gone. Code may not."""
     pattern = re.compile(r"^\s*(import\s+cairosvg|from\s+cairosvg\b)", re.M)
     hits = [
         path.relative_to(REPO)
-        for root in ("shared/src", "server/src", "cli/src", "server/scripts")
-        for path in (REPO / root).rglob("*.py")
+        for path in _repo_python_files()
         if pattern.search(path.read_text(encoding="utf-8"))
     ]
     assert not hits, f"cairosvg is imported by {hits}"
+
+
+def test_the_scan_reaches_outside_the_python_packages():
+    """The guard above is only worth what it covers.
+
+    `android/scripts/` is the directory the named-roots version missed, so it is
+    named here -- not as the scope, but as proof the scope is wider than it was.
+    """
+    scanned = {path.relative_to(REPO).parts[0] for path in _repo_python_files()}
+    assert {"android", "cli", "server", "shared"} <= scanned, scanned
 
 
 @pytest.mark.parametrize(

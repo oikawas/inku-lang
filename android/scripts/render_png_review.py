@@ -8,19 +8,25 @@ import json
 from pathlib import Path
 from typing import Any
 
-import cairosvg
 from PIL import Image, ImageChops, ImageDraw, ImageStat
+
+from inku_analysis.rasterizer import svg_to_png as _rasterize
 
 
 def svg_to_png(svg_path: Path, png_path: Path, *, size: int) -> None:
+    """Rasterize through the shared helper, which is resvg and nothing else.
+
+    This used to call cairosvg, which drops feTurbulence / feDisplacementMap /
+    feGaussianBlur without failing. The whole point of this script is to put two
+    renderings side by side and read the difference, so a rasterizer that returns
+    a cleaner picture than the work is defeats it: server and Android would agree
+    precisely where both had been flattened.
+    """
     if not svg_path.exists():
         raise FileNotFoundError(svg_path)
     png_path.parent.mkdir(parents=True, exist_ok=True)
-    cairosvg.svg2png(
-        bytestring=svg_path.read_bytes(),
-        write_to=str(png_path),
-        output_width=size,
-        output_height=size,
+    png_path.write_bytes(
+        _rasterize(svg_path.read_text(encoding="utf-8"), width=size, height=size)
     )
 
 

@@ -3130,3 +3130,40 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **文書 4 本を現在形に直した**: `SETUP.ja.md` / `SETUP.md`（「resvg を優先し CairoSVG はフォールバック」→ resvg のみ・不在なら停止）、`manual/ja/application-install.md` / `manual/en/application-install.md`（「CairoSVG が必要とする OS ライブラリ」→ resvg-py は wheel なので追加の OS ライブラリは要らない）。**過去の版を述べる CHANGELOG と PROJECT_CONTEXT の記述は履歴なので触っていない**
 - **検証:** server **1413 passed / 31 skipped**、cli **69 passed**、ruff clean（`server` / `cli` とも）、`npm run check` 0 errors / 2 warnings / 217 files。**SVG は 1 バイトも変わらない**ので参照コーパスは再凍結していない。render engine は `"15"` のまま
 - **記録**: 黙って劣化するフォールバックは、文書化ではなく撤去する。**「差が無い」と「差が写っていない」を区別できない道具を、絵を判断する経路に置かない**
+
+---
+
+### v2.7.11 — 番人は、見る場所ではなく見ない場所で書く（Build 720、2026-07-27）
+
+v2.7.10 の取りこぼし 2 件と、**規則そのものを SPEC へ書く**という作者裁定（2026-07-27）の反映。
+
+- **`android/scripts/render_png_review.py` を resvg へ替えた。** 休眠スクリプトではなく、
+  `headless_render_compare.sh` と `headless_batch_compare.sh` から `PNG_REVIEW=true` のときに
+  呼ばれる**現役の目視ハーネス**である。**server と Android の SVG を PNG 化して差分を増幅し、
+  3 枚並べたシートと `metrics.json` を作る道具**なので、**フィルタを落とすラスタライザを挟むと
+  「両方とも平らに潰れた場所で一致する」**。v2.7.10 で cli から依存宣言を落とした結果、
+  **`uv sync` 済みの環境では既に ImportError で落ちる状態だった**
+  - 実測: `feDisplacementMap` の scale だけが違う 2 枚を通すと **mean 9.5% / rms 27.4% の差**を出す。
+    **cairosvg ならフィルタごと飛ぶので差 0 になる組**である
+- **番人②の走査範囲を「名指し」から「リポジトリ全体 − 除外」へ変えた。**
+  v2.7.10 は `shared/src` / `server/src` / `cli/src` / `server/scripts` の 4 根を名指ししたので、
+  `android/` を見ていなかった。**名指しの一覧は不完全になりうるが、不完全だと言うことはできない**
+  - 除外は 14 個（`.git` / `.gradle` / `.pytest_cache` / `.ruff_cache` / `.venv` / `__pycache__` /
+    `bench` / `build` / `dist` / `no-git-sync` / `node_modules` / `out` / `out2` / `site-packages`）
+  - **走査が実際に外へ届いていることを見る検査を足した**（`android` / `cli` / `server` / `shared` の
+    4 つが走査結果に含まれること）。**番人の値打ちは覆う範囲までしかない**
+  - **摂動で確かめた**: `android/scripts/render_png_review.py` に `import cairosvg` を戻すと落ちる
+- **走査を広げて分かったこと（直していない）**: 追跡外の `no-git-sync/` に **cairosvg を呼ぶ
+  過去の測定スクリプトが 3 本**ある（`fable5/render_with_relations.py`、
+  `rfc/phase0-scripts/ab.py`、`rfc/phase0-scripts/ps_ab.py`）。**何を回したかの記録**なので
+  書き換えず、走査からも外した。**venv から cairosvg が消えているので、再実行すると ImportError で止まる**
+  （`render_with_relations.py` だけは ImportError を捕まえて PNG 生成を飛ばす。**絵は出ない**ので安全側）
+- **SPEC に規則を書いた（作者裁定）** — `SPEC.ja.md` **§15.12「PNG は演奏を写す」** /
+  `SPEC.md` **§12.9**。①黙って落とすラスタライザを使わない（対象は少なくとも `feTurbulence` /
+  `feDisplacementMap` / `feGaussianBlur`。**性能や画質ではなく観測の話**である）
+  ②**`cairosvg` は使用を禁じる** ③無い実装より誤る実装のほうが悪い（フォールバックを置かない）
+  ④守り方（唯一の入口と番人 3 つ、**②の走査範囲は見ない場所で書く**）
+- **`server/Dockerfile` の `libcairo2` は今回落としていない** — **次回の配布で落とす**という
+  作者裁定（2026-07-27）。リリース runbook に **A-1b** として手順を起票した（一度きり・済んだら削除）
+- **検証:** server **1414 passed / 31 skipped**（+1 は走査範囲の検査）、cli **69 passed**、
+  ruff clean、`npm run check` 0 errors / 2 warnings / 217 files。**SVG は 1 バイトも変わらない**

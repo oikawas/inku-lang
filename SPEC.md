@@ -1447,6 +1447,51 @@ The four new cases (`C-groundseed-auto-*`) are **the first in the corpus's histo
 times across all 347 cases** and the layer this version rewrote could not be tested by the
 corpus at all.
 
+### 12.9 A PNG Is a Copy of the Performance (v2.7.10, v2.7.11)
+
+**The SVG is the original; a PNG is an image taken of it.** The image may be smaller, and it
+may be coarser. **It may not leave anything out.**
+
+#### No rasterizer that drops things in silence
+
+**The PNG path may not use an implementation that skips SVG filters it has not implemented.**
+The filters at stake are at least `feTurbulence`, `feDisplacementMap` and `feGaussianBlur`.
+They make **the whole of the ground grain and the material layer**, and a PNG that has skipped
+them still reads as a finished picture.
+
+**This is a rule about observation, not about performance or fidelity.** A PNG that came
+through such an implementation **cannot distinguish "there is no difference" from "the
+difference did not come through"**. In inku, whether a work is kept, whether an engine version
+is raised, and whether a port is identical are all decided by **reading two pictures side by
+side**. Put a lossy copier in that path and **every one of those judgements breaks quietly**.
+
+#### `cairosvg` is not to be used
+
+**`cairosvg` is prohibited** (author's ruling 2026-07-27, removed in v2.7.10). It implements
+none of the three filters above and **skips them without raising and without warning**. During
+a session in 2026-07 the clean-looking PNGs it produced **came within reach of being used as
+evidence four times**. Warnings existed in four places: the CLI's stderr, the server's startup
+log, the module docstring, and the `png_rasterizer` record in every artifact. **None of them
+helped, because what misleads a reader is the picture, not the log line.** Hence the
+disposition this section fixes: **remove, do not document**.
+
+#### An implementation that is wrong is worse than one that is missing
+
+**There is no fallback.** The only implementation is `resvg` (`resvg-py`), and **where it is
+absent PNG output stops rather than degrading quietly**. A missing PNG is visible; a PNG with
+the texture gone is not.
+
+#### How it is held
+
+`shared/src/inku_analysis/rasterizer.py` is **the only entrance**, and the server, the CLI and
+the Android comparison harness all go through it. Three sentinels: **① it is in no dependency
+declaration ② no `.py` in the repository imports it ③ it stays unreachable even where the
+environment has it.**
+
+> **Sentinel ②'s scope is written as what it does not look at, not as what it does.**
+> v2.7.10 named four roots and so missed `android/scripts/`. **A named list can fail to be
+> complete; what it cannot do is say so.**
+
 ## 13. CLI
 
 `inku-cli` is a command-line client for controlling the inku server through the

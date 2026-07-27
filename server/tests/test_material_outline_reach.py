@@ -4,14 +4,16 @@
 材質輪郭の呼び出しが無かった。`square` は自前の分岐を持ち、そちらにはあった。
 `cloudform` は段 3 で共通経路に載ったので、同じ穴として一緒に塞ぐ。
 
-段 4b — `hair` と `pen` は本体のストロークしか持たない。`_uses_material_outline()`
-は材質層 3 機構のうち 1 つしか見ないので、この関数で数えると `raster-bleed`
-(computer) と `burr` (drypoint) を取り落とし、裸の道具を 4 つと誤る。実際に何も
-持たないのは `hair` と `pen` の 2 つで、本番で最も使われている 1 位と 4 位である。
+段 4b — `pen` は本体のストロークしか持たない。`_uses_material_outline()` は材質層
+3 機構のうち 1 つしか見ないので、この関数で数えると `raster-bleed` (computer) と
+`burr` (drypoint) を取り落とし、裸の道具を 4 つと誤る。実際に何も持たないのは
+`hair` と `pen` の 2 つだったが、**`hair` は全面廃止が決まったので層を与えない**
+(作者裁定 2026-07-27)。残る `pen` は本番 3261 instruction で 1 位である。
 """
 
 from __future__ import annotations
 
+import math
 import re
 from xml.etree import ElementTree
 
@@ -38,8 +40,8 @@ GEOMETRY: dict[str, dict] = {
 }
 # engine 12 から数値が動いていない 5 道具。
 FROZEN_MATERIAL_TOOLS = ("pencil", "crayon", "chalk", "brush_thin", "brush_thick")
-BARE_TOOLS = ("hair", "pen")
-NO_MATERIAL_OUTLINE = ("rotring", "computer", "drypoint", "burin")
+BARE_TOOLS = ("pen",)
+NO_MATERIAL_OUTLINE = ("rotring", "computer", "drypoint", "burin", "hair")
 
 
 def _svg(primitive: str, weight: str, *, wild: bool = False) -> str:
@@ -138,7 +140,7 @@ def test_d7b_square_material_outline_keeps_its_element_type(weight: str) -> None
 )
 @pytest.mark.parametrize("weight", BARE_TOOLS)
 def test_d8_bare_tools_now_leave_a_material_trace(weight: str, primitive: str) -> None:
-    """D-8 (陽性): `pen` / `hair` は全 8 図形で材質輪郭を持つ。"""
+    """D-8 (陽性): `pen` は全 8 図形で材質輪郭を持つ。"""
     assert _outline_count(primitive, weight) > 0
 
 
@@ -159,18 +161,43 @@ def test_d9_the_other_tools_did_not_gain_a_material_outline(
     "primitive",
     ("line", "arc", "circle", "ellipse", "square", "triangle", "polygon", "cloudform"),
 )
-def test_d12_hair_leaves_one_stratum_and_pen_two(primitive: str) -> None:
-    """D-12 (判別): `hair` = 毛の分かれ 1 本、`pen` = 2 本の穂先。本数を仕様として固定する。"""
-    assert _outline_count(primitive, "hair") == 1
+def test_d12_pen_leaves_two_strata_and_hair_none(primitive: str) -> None:
+    """D-12 (判別): `pen` = 2 本の穂先。`hair` は廃止予定なので 0 本のまま。"""
     assert _outline_count(primitive, "pen") == 2
+    assert _outline_count(primitive, "hair") == 0
+
+
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _band_half_width(weight: str) -> float:
+    """描かれた墨の帯の実測平均半幅 (px)。両岸の対応点間距離の半分。
+
+    公称の `WEIGHT_TO_STROKE_WIDTH` ではなく実測を使う。engine 12 以降、幅は
+    エンベロープで揺れるので公称値は帯のどこにも現れない。
+    """
+    root = ElementTree.fromstring(_svg("line", weight))
+    bands = [
+        node.attrib["d"]
+        for node in root.iter()
+        if node.attrib.get("d")
+        and node.attrib.get("class") is None
+        and node.attrib.get("fill") not in (None, "none")
+    ]
+    numbers = [float(value) for value in _NUMBER.findall(max(bands, key=len))]
+    points = list(zip(numbers[0::2], numbers[1::2]))
+    half = len(points) // 2
+    left, right = points[:half], points[::-1][:half]
+    widths = [math.dist(a, b) / 2 for a, b in zip(left, right)]
+    return sum(widths) / len(widths)
 
 
 def _rendered_offsets(weight: str) -> list[float]:
     """描画に出る法線オフセット (px)。
 
     **仕様表の値ではなくここを見ること。** `_MATERIAL_OUTLINE_SPECS` の値には
-    強度レベルの gain (s1 で 2.8 倍) と下限 (3.5px) が掛かるので、表を読むだけの
-    検査は絵と無関係な数を固定してしまう。
+    強度レベルの gain と下限が掛かる。engine 14 まではそれが 2.8 倍と 3.5px で、
+    表を読むだけの検査は絵と無関係な数を固定していた。
     """
     from inku_server.renderer import _material_outline_profile
 
@@ -188,9 +215,9 @@ def test_pen_strata_are_symmetric_about_the_ink() -> None:
 def test_pen_strata_run_just_outside_the_band_edge() -> None:
     """`pen` の穂先は帯の縁のすぐ外を走る。
 
-    基準幅 2.0px の帯の縁は中心線から 1.0px。強度レベル s1 の下限 3.5px を
-    通すと痕跡が墨から 3.5px 離れ、閉輪郭で二重の輪に見えた (作者目視
-    2026-07-27 で差し戻し)。`pen` は下限を免除してある。
+    基準幅 2.0px の帯の縁は中心線から 1.0px。engine 14 の下限 3.5px を通すと
+    痕跡が墨から 3.5px 離れ、閉輪郭で二重の輪に見えた (作者目視 2026-07-27 で
+    差し戻し)。
     """
     from inku_server.renderer import _stroke_width_px
 
@@ -199,32 +226,31 @@ def test_pen_strata_run_just_outside_the_band_edge() -> None:
         assert half_width < abs(offset) < half_width * 2
 
 
-def test_the_offset_floor_still_governs_every_frozen_tool() -> None:
-    """下限を免除したのは `pen` だけで、engine 12 の 5 道具には今も掛かっている。
+def test_every_stratum_rides_the_ink_it_belongs_to() -> None:
+    """材質輪郭は墨の帯に沿う — 帯の実測半幅の 3 倍より遠くへは出ない。
 
-    `pencil` は表の値 (-1.0 / 1.2) に gain 2.8 を掛けても下限 3.5px に届かないので
-    両方とも下限に張り付く。ここが動いたら凍結された 5 道具の出力が動いている。
+    engine 14 まで強度レベル s1 が `outline_offset` に 2.8 倍と 3.5px の下限を
+    掛けており、痕跡は帯の半幅の 4.5 倍 (pencil)・6.5 倍 (chalk)・14 倍 (hair) まで
+    離れて、痕跡でなく別の輪郭に見えていた。engine 15 で距離側の倍率と下限を
+    外し、強さは濃さ (`outline_opacity` の 1.8 と下限 0.50) だけで持つ。
+
+    **仕様表ではなく描画に出る値を見ること** — 表を読むだけの検査はこの欠陥を
+    3 版にわたって見逃した。
     """
-    from inku_server.renderer import _OUTLINE_OFFSET_FLOOR_EXEMPT, _material_gain
-
-    assert _OUTLINE_OFFSET_FLOOR_EXEMPT == frozenset({"pen"})
-    floor = _material_gain("outline_offset_floor_ratio") * CANVAS.unit
-    assert _rendered_offsets("pencil") == [-floor, floor]
-    for weight in ("chalk", "brush_thin", "brush_thick", "crayon"):
-        assert all(abs(offset) >= floor for offset in _rendered_offsets(weight))
+    for weight in (*FROZEN_MATERIAL_TOOLS, "pen"):
+        half_width = _band_half_width(weight)
+        for offset in _rendered_offsets(weight):
+            assert abs(offset) <= half_width * 3, (weight, offset, half_width)
 
 
-def test_hair_stratum_sits_at_the_floor_like_pencil() -> None:
-    """`hair` の痕跡は下限に張り付いており、`pencil` と同じ位置に出る。
+def test_the_offset_distance_is_not_a_strength_lever() -> None:
+    """距離の倍率と下限は 1.0 / 0.0。強さは濃さ側だけが持つ。"""
+    from inku_server.renderer import _material_gain
 
-    契約は「`hair` の offset を全道具で最小に」としていたが、**強度レベル s1 では
-    到達できない** — 下限 3.5px より内側の値は表に何を書いても下限へ丸められる。
-    作者は 2026-07-27 にこの状態の描画を目視して承認しているので、ここは
-    「承認された絵」を固定する。動かすなら下限そのものの裁定が要る。
-    """
-    floor = 3.5
-    assert _rendered_offsets("hair") == [-floor]
-    assert _rendered_offsets("pencil") == [-floor, floor]
+    assert _material_gain("outline_offset") == 1.0
+    assert _material_gain("outline_offset_floor_ratio") == 0.0
+    assert _material_gain("outline_opacity") == 1.8
+    assert _material_gain("outline_opacity_floor") == 0.50
 
 
 def test_bare_tools_get_no_specks() -> None:

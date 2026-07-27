@@ -162,6 +162,10 @@
 		display: flex;
 		align-items: center;
 	}
+	/* 折りたたみボタンと inku ボタンは別の役目なので、隣り合わせず一息あける。 */
+	.rail-logo-row {
+		margin-top: 6px;
+	}
 	.rail-toggle {
 		width: 30px;
 		height: 30px;

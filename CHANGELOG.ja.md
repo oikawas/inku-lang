@@ -3507,3 +3507,40 @@ coerce ゴールデンを**版を上げずにその場で再凍結**したが、
 - **未対応（報告のみ・裁定が要る）:** 埋め込み Stage 2 tool スキーマが server と **237 行**乖離（`canvas` の地・`background` の旧表現・`weight` の説明。**地を Stage 2 に見せると Android が描けない支持体を要求されうる**）、server の temper 3 つのうち Kotlin は 1 つだけ（**個数には影響しない**ことを確認済み）、`surfaceSeed` が全 dump でなく allowlist 版を使っている、`renderHash` の engine 版フォールバックが server に無い既定値である、UI の「render engine」表示が **`1` のまま**。
 - **`server` / `web` / `cli` / `shared` は 1 バイトも変更していない。** `ANDROID_SPEC.ja.md` / `ANDROID_SPEC.md` は未追随のまま。
 - **検証:** 実装セッションの実測で `testDebugUnitTest --rerun-tasks` が **89 件 / failures 0 / errors 0 / skipped 0**（20 XML）。**受け入れの再テストは作者裁定により行っていない**ため、git 管理セッションでは Android のテストを回していない。`android/BUILD_NUMBER` はパッケージを作る task でしか自動採番されないので **148090 のまま**。
+
+---
+
+### v2.9.1 — 推測しない規則でモデルを解く（Ollama Cloud を別 provider に）（Build 731、2026-07-27）
+
+**モデル参照の解決から推測を全部外した。** これまでは修飾のない文字列を「`/` があれば NVIDIA」「`gemini-` で始まれば Gemini」「それ以外は OVMS」で当てていた。**当たっているうちは見えなかったが、OVMS の接続先が止まった今、同じ経路は静かな失敗になる**（`/health` は 200 を返すので描画するまで気付かない）。
+
+**規則は 3 段で、推測の枝は無い。**
+
+1. **明示修飾**（`ollama-cloud:gemma4:31b`）→ それを使う
+2. **一意所有** — 設定済み provider のうち、その model ID を持つものが**ちょうど 1 つ**ならそれ
+3. **段の既定**（`stage1_provider` / `stage2_provider`）
+
+- **規則 2 が「ちょうど 1 つ」であることが肝。** `gpt-oss:20b` は **`ollama` と `ollama-cloud` の両方に在る**ので**決めない**。決めないものは規則 3 へ落ちる。**この曖昧性は Ollama Cloud を provider として足した時点で原理的に生じたもの**で、それ以前は「修飾なしでも大体当たる」で済んでいた。
+- **分割点が一意である根拠**: provider ID は `[a-z0-9_-]` しか通さないので `:` を含み得ない。**最初の `:` が唯一の分割点**であり、モデル ID 側は `:` を何個持ってもよい（`qwen3.5:4b-q4_K_M`）。
+- **削除した 4 枝**: `anthropic:`（前段で拾われるので**一度も実行されない死んだ枝**だった）・`gemini-` 接頭辞・`/` → NVIDIA・**既定の落とし先 `ovms`**。
+- **web の `providerOfModel` からも `gpt-oss:` の名指し特例と provider ID の直書き 6 行を削除した。****規則がモデル名を名指しで例外にしている時点で破綻の印**である。
+
+**Ollama Cloud を別 provider として設定に載せた**（`https://ollama.com/v1`・鍵必須・検証済み 18 本）。**律速は容量でなく同時実行**（同時 8 で 429。その時点で無料枠は 7.6% しか使っていない）なので、**provider 単位の同時実行上限**を新設し、provider 定義から読む（**利用者が上げられる設定にはしない。429 を返すのは provider の性質であって好みではない**）。外部送信であることと cloud / local の別は 18 本すべての日英コメントに書いてツールチップへ出す。
+
+**設定の形を対へ一本化した。** `okugaki_model` と デモの `prompt_model` は単一の修飾文字列だったが、`stage1_provider` + `stage1_model` と同じ**対**にした。**旧い単一文字列は読み取りで受けて割る**ので、古いクライアントが送っても壊れない。
+
+**挙動が変わるのは 1 箇所だけ** — **どのカタログにも無い素の文字列**。`my-model` は今まで `ovms` へ、`meta/llama-x` は NVIDIA へ落ちていたが、これからは**段の provider** へ行く。カタログに在るものは規則 2 が拾うので答えは変わらない（理由が「`/` を含むから」から「設定に在るから」に変わるだけ）。
+
+**検査面**
+
+- **期待値表は `web/scripts/model-ref-expectations.json` が唯一の正本**で、**server の pytest と node の `npm run lint:models` が同じファイルを読む**。「日英 2 実装が同じ答えを返す」ことが、たまたま一致している 2 つの表ではなく**仕組みの性質**になる。表がカタログと食い違ったら赤くなる検査も置いた。
+- **web にテストランナーは足していない**（vitest も `*.test.ts` も 0 のまま）。**Node が `.ts` を型剥がしで直接読めるので、`i18n-lint.mjs` と同じ素の node スクリプト**にした。
+- **摂動して赤くなることを確かめた**: 規則 2 を「ちょうど 1 つ」から「1 つ以上」へ緩めると Python 4 件・node 3 件が落ちる。**JS で `indexOf`/`slice` を `split(':', 1)` に戻すと 56 件中 10 件が落ちる**（**Python の `split(':', 1)` は 2 要素、JS は 1 要素で後半が消える**。同じ規則を両言語へ写すときの最大の罠）。
+
+**測って分かったこと（直していない）**
+
+- **規則 3 は保存済みの段設定に届いていない。** `provider_for_model` に渡る settings は**カタログ側の dict** で `stage1_provider` を持たないため、実運用では常に既定（`nvidia`）へ落ちる。**本契約より前からある別のずれ**なので範囲外とし、呼び出し側が段の鍵を渡せば効くことをテストで固定した。
+- **`normalize_model_settings` は 1 回 約 5.0ms。`/api/paint` 1 回あたり 2 回**で、**変更前は 4 回だった**（同じ判定の別実装が二重に正規化していた）。**差し引き呼び出し回数は減っている。**
+- `api.py` の `_resolved_stage_model` / `_resolved_vision_model` は「要求が現在の設定と同じ文字列なら修飾する」という推測を続けている。下流が新規則で受けるので害は無いが、**同じ文字列かどうかで分岐する理由はもう無い**。
+
+**検証:** server **1487 passed / 31 skipped**（新規 56 件）、cli 76、ruff clean、`npm run check` 0 errors、`lint:i18n` 788 / 36 / 0、**`npm run lint:models` 56 checks passed**。**作者裁定により受け入れの再テストは行っていない**（数値は実装セッションの実測）。**Score にも Renderer にも触れていないので凍結コーパスの再生成は不要**。Android は追随していない。

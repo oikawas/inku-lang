@@ -1765,18 +1765,26 @@ remain readable for compatibility and are migrated to encrypted storage on the
 next save. The Model Settings tab shows this rule next to the AI service
 connections heading: API keys are encrypted in the DB, are never displayed
 again, and keys configured through environment
-variables are treated as initial values. LLM calls
-resolve provider-prefixed model IDs such as
-`openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`, and
-`ovms:...`, while keeping compatibility for older NVIDIA slash IDs and local
-OVMS model IDs.
+variables are treated as initial values. A model reference is resolved in three
+steps and never by guesswork: an explicit provider prefix wins
+(`openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`,
+`ollama-cloud:...`, `ovms:...`); otherwise, if *exactly one* configured provider
+lists that model ID, that provider is used; otherwise the stage's configured
+provider is used. Because a provider ID cannot contain a colon, the first colon
+is the only possible split point, so a model ID may carry any number of them
+(`qwen3.5:4b-q4_K_M`). A model ID offered by two providers — `gpt-oss:20b` is
+offered by both Ollama and Ollama Cloud — is deliberately *not* decided by the
+second step. The earlier fallbacks (a slash meaning NVIDIA, a `gemini-` prefix,
+and OVMS as the catch-all) are gone: a bare string that no catalog lists now
+goes to the stage's provider instead of silently to OVMS.
 The web UI normalizes model IDs sent to `/api/paint`, `/api/interpret`, and
 `/api/compose` by combining the selected provider with the selected model, for
-example `openai:gpt-5.2`. If an API request still sends a bare model ID and it
-matches the current user's configured Stage 1 or Stage 2 model, the server
-qualifies it with that user's configured provider before dispatching. Demo
-prompt generation uses the same provider resolution path for OpenAI API
-Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Intel OVMS.
+example `openai:gpt-5.2`. Stored per-user model choices are provider/model
+pairs; the older single qualified string is still accepted on read and split
+into a pair. Demo prompt generation uses the same provider resolution path for
+OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, Ollama Cloud,
+and Intel OVMS. Ollama Cloud declares its own concurrency ceiling, which the
+server enforces per provider rather than exposing as a setting.
 LLM server connection settings are global admin-managed settings.  Each user's
 Stage 1 / Stage 2 provider and model selection is stored separately in
 `user_accounts.model_settings`, saved from the model selection dialog through

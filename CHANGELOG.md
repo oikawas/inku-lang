@@ -1199,3 +1199,40 @@ Every deterministic check is green: server **1424 passed / 31 skipped**, ruff, c
 - **Reported, not fixed (these need a ruling):** the embedded Stage 2 tool schema is **237 lines** away from the server's (the `canvas` ground, `background`'s old wording, `weight`'s description — and **showing the ground to Stage 2 could ask Android for a support it cannot draw**); Kotlin has one of the server's three tempering passes (**confirmed not to affect counts**); `surfaceSeed` uses the allowlisted payload rather than the full dump; `renderHash`'s engine-version fallback is a default the server does not have; and the UI still displays **render engine `1`**.
 - **`server`, `web`, `cli` and `shared` were not touched at all.** `ANDROID_SPEC.ja.md` / `ANDROID_SPEC.md` remain behind.
 - **Verification:** the implementing session measured `testDebugUnitTest --rerun-tasks` at **89 tests, 0 failures, 0 errors, 0 skipped** across 20 XML files. **By the author's ruling no acceptance re-run was performed**, so the git session did not run the Android tests. `android/BUILD_NUMBER` only auto-increments on package-producing tasks, so it stays at **148090**.
+
+---
+
+### v2.9.1 — resolving a model by rule instead of by guess (and Ollama Cloud as its own provider) (Build 731, 2026-07-27)
+
+**Every guess has been taken out of model reference resolution.** An unqualified string used to be guessed at — a slash meant NVIDIA, a `gemini-` prefix meant Gemini, and anything else fell to OVMS. **That worked while it happened to be right; now that the OVMS endpoint is stopped, the same path is a silent failure** (`/health` still answers 200, so nothing shows until a drawing is attempted).
+
+**The rule is three steps, with no guessing branch.**
+
+1. **An explicit prefix** (`ollama-cloud:gemma4:31b`) wins.
+2. **Sole ownership** — if *exactly one* configured provider lists that model ID, that is the provider.
+3. **The stage's default** (`stage1_provider` / `stage2_provider`).
+
+- **"Exactly one" is the point of step 2.** `gpt-oss:20b` is listed by **both `ollama` and `ollama-cloud`**, so it is **deliberately not decided** and falls to step 3. **That ambiguity became a fact the moment Ollama Cloud was added as a provider**; before then "an unqualified name is usually right" was good enough.
+- **Why the split point is unambiguous:** a provider ID admits only `[a-z0-9_-]` and so cannot contain a colon. **The first colon is the only possible split**, and the model ID may carry as many more as it likes (`qwen3.5:4b-q4_K_M`).
+- **Four branches were deleted:** `anthropic:` (**dead code — the general prefix check caught it first, so it never ran once**), the `gemini-` prefix, slash-means-NVIDIA, and **OVMS as the catch-all**.
+- **The web's `providerOfModel` lost its `gpt-oss:` special case and six hard-coded provider IDs. A rule that names a model as an exception is already broken**, and with `gpt-oss:20b` in two providers the exception no longer sufficed.
+
+**Ollama Cloud is now a provider of its own** (`https://ollama.com/v1`, key required, 18 verified models). **The limit is concurrency, not capacity** — eight simultaneous requests answer 429 while only 7.6% of the free allowance has been spent — so a **per-provider concurrency ceiling** was added and is read from the provider definition. **It is not a setting the operator can raise: answering 429 above two requests is the provider describing itself, not expressing a preference.** That the calls leave the machine, and which models are cloud rather than local, is written into all 18 bilingual comments and shown in the tooltips.
+
+**Stored model choices are pairs now.** `okugaki_model` and the demo's `prompt_model` were single qualified strings; they are now provider/model pairs like `stage1_provider` + `stage1_model`. **The old single string is still accepted on read and split**, so an older client sending it is not broken.
+
+**Exactly one behaviour changes**: a bare string that no catalog lists. `my-model` used to reach OVMS and `meta/llama-x` used to reach NVIDIA; both now go to **the stage's provider**. Anything present in a catalog resolves as before — only the reason changes, from "it contains a slash" to "it is in the settings".
+
+**The checks**
+
+- **The expectation table lives in one file**, `web/scripts/model-ref-expectations.json`, and **both the server's pytest and node's `npm run lint:models` read that same file**. "Python and JavaScript agree" becomes a property of the arrangement rather than two tables that happen to match. A further test fails if the table drifts from the shipped catalog.
+- **No test framework was added to the web** (still no vitest, no `*.test.ts`). **Node reads `.ts` directly by stripping types**, so the checker is a plain node script in the style of `i18n-lint.mjs`.
+- **Each check was perturbed until it failed**: relaxing step 2 from "exactly one" to "one or more" costs 4 Python tests and 3 node checks. **Restoring `split(':', 1)` in place of `indexOf`/`slice` costs 10 of 56** — **Python's `split(':', 1)` returns two pieces, JavaScript's returns one and drops the rest**, which is the sharpest trap in carrying one rule into two languages.
+
+**Measured, not fixed**
+
+- **Step 3 never reaches the stored stage settings.** The `settings` handed to `provider_for_model` is the *catalog* dict, which carries no `stage1_provider`, so in practice it always falls to the default (`nvidia`). **This predates the change**, so it was left alone; a test pins that step 3 does read the stage once a caller passes those keys.
+- **`normalize_model_settings` costs about 5.0 ms per call, and `/api/paint` makes 2 — down from 4**, because the same decision had a second implementation that normalized all over again. **Net, the call count went down.**
+- `api.py`'s `_resolved_stage_model` / `_resolved_vision_model` still guess: they qualify a request only when it matches the user's current setting. The new rule catches whatever they pass through, so nothing breaks, but **there is no longer a reason to branch on whether the strings match**.
+
+**Verification:** server **1487 passed / 31 skipped** (56 new), cli 76, ruff clean, `npm run check` 0 errors, `lint:i18n` 788 / 36 / 0, **`npm run lint:models` 56 checks passed**. **By the author's ruling no acceptance re-run was performed** — these are the implementing session's measurements. **Neither the Score nor the renderer was touched, so no frozen corpus needed regenerating.** Android has not followed.

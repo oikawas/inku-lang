@@ -1777,6 +1777,11 @@ offered by both Ollama and Ollama Cloud — is deliberately *not* decided by the
 second step. The earlier fallbacks (a slash meaning NVIDIA, a `gemini-` prefix,
 and OVMS as the catch-all) are gone: a bare string that no catalog lists now
 goes to the stage's provider instead of silently to OVMS.
+Wherever a model is named on screen — the running indicator, the work's Stage 1
+and Stage 2 lines, the history table, the lineage node details — it is named as
+`<provider> / <model>`, because a model id alone does not say where it runs and,
+with `gpt-oss:20b` served by two providers, is not even unique. The model picker
+is the exception: its cards already sit under a provider heading.
 The web UI normalizes model IDs sent to `/api/paint`, `/api/interpret`, and
 `/api/compose` by combining the selected provider with the selected model, for
 example `openai:gpt-5.2`. Stored per-user model choices are provider/model

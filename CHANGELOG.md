@@ -1236,3 +1236,26 @@ Every deterministic check is green: server **1424 passed / 31 skipped**, ruff, c
 - `api.py`'s `_resolved_stage_model` / `_resolved_vision_model` still guess: they qualify a request only when it matches the user's current setting. The new rule catches whatever they pass through, so nothing breaks, but **there is no longer a reason to branch on whether the strings match**.
 
 **Verification:** server **1487 passed / 31 skipped** (56 new), cli 76, ruff clean, `npm run check` 0 errors, `lint:i18n` 788 / 36 / 0, **`npm run lint:models` 56 checks passed**. **By the author's ruling no acceptance re-run was performed** — these are the implementing session's measurements. **Neither the Score nor the renderer was touched, so no frozen corpus needed regenerating.** Android has not followed.
+
+---
+
+### v2.9.2 — a model is named together with the place that runs it (Build 732, 2026-07-27)
+
+**Wherever a model is named on screen, the provider is now named with it.** A model id on its own never said *where* it runs, and since v2.9.1 established that `gpt-oss:20b` is served by **both `ollama` and `ollama-cloud`**, **the name is not even unique**.
+
+**The form is `<provider> / <model>`** (author's ruling, 2026-07-27).
+
+| Where | Before | After |
+|---|---|---|
+| The running line, the work's Stage 1 / Stage 2, the next model, batches | `Google Gemma 4 31B Instruct` | **`NVIDIA NIM / Google Gemma 4 31B Instruct`** |
+| The history table's Stage1 / Stage2 columns | `gemma` (cut to eight characters) | **`NVIDIA NIM/gemma`** (the shortening rule is unchanged; the provider goes in front) |
+| The lineage node details | **the raw stored string** (`nvidia:google/…` showed through) | `NVIDIA NIM / Google Gemma 4 31B Instruct` |
+
+- **`models.ts` gained `providerLabel()` and `modelDisplayName()`, and every display goes through them.** The register of provider and model labels **grows through `registerModelCatalog()`**, so a provider the operator added shows its own name too — the same mechanism v2.9.1 introduced.
+- **The model picker cards are deliberately excluded**: they already sit **under a provider heading**. The model comparison list has always shown `label · providerLabel`.
+- **The CLI already printed both** (`Stage1 provider:` / `Stage1 model:`) and is unchanged.
+- **`statusModelName` now delegates to `modelDisplayName`, and `shortModel` applies its shortening to the bare model id** rather than to the string with its provider prefix still attached.
+
+**Verification:** `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` 788 / 36 / 0, `npm run lint:models` 56 checks passed. **The server, the CLI and the renderer were not touched**, so pytest and the frozen corpora are out of scope.
+
+**Noticed, not fixed:** the web's **static fallback catalog lists only three `ollama-cloud` models** where the server has 18, so in the moment before the server catalog arrives `gpt-oss:20b` looks singly-owned and reads as `Ollama`. **Once the catalog is registered it becomes ambiguous and falls to the stage's provider**, as the rule intends. This dates from v2.9.1 and is not a property of the display rule.

@@ -3544,3 +3544,26 @@ coerce ゴールデンを**版を上げずにその場で再凍結**したが、
 - `api.py` の `_resolved_stage_model` / `_resolved_vision_model` は「要求が現在の設定と同じ文字列なら修飾する」という推測を続けている。下流が新規則で受けるので害は無いが、**同じ文字列かどうかで分岐する理由はもう無い**。
 
 **検証:** server **1487 passed / 31 skipped**（新規 56 件）、cli 76、ruff clean、`npm run check` 0 errors、`lint:i18n` 788 / 36 / 0、**`npm run lint:models` 56 checks passed**。**作者裁定により受け入れの再テストは行っていない**（数値は実装セッションの実測）。**Score にも Renderer にも触れていないので凍結コーパスの再生成は不要**。Android は追随していない。
+
+---
+
+### v2.9.2 — モデル名は、それを走らせる場所とともに名指す（Build 732、2026-07-27）
+
+**モデル名を出すところでは、必ずプロバイダ名を併記するようにした。** `モデル ID だけでは「どこで走るのか」を言っていない`のに加えて、**v2.9.1 で `gpt-oss:20b` が `ollama` と `ollama-cloud` の両方に在ることが確定した**ので、**モデル名は一意ですらない**。
+
+**表示は `プロバイダ名 / モデル名`**（作者裁定・2026-07-27）。
+
+| 場所 | 前 | 後 |
+|---|---|---|
+| 描画中の 1 行・作品情報の Stage 1/2・次に使うモデル・バッチ | `Google Gemma 4 31B Instruct` | **`NVIDIA NIM / Google Gemma 4 31B Instruct`** |
+| 履歴テーブルの Stage1 / Stage2 列 | `gemma`（8 文字に潰す） | **`NVIDIA NIM/gemma`**（潰す規則はそのまま、プロバイダ名を前へ） |
+| 系譜ノードの詳細 | **保存された生の文字列**（`nvidia:google/…` がそのまま出ていた） | `NVIDIA NIM / Google Gemma 4 31B Instruct` |
+
+- **`models.ts` に `providerLabel()` と `modelDisplayName()` を足し、表示はすべてここを通す**。**プロバイダとモデルの表示名の登録簿は `registerModelCatalog()` が育てる**ので、利用者が足したプロバイダの表示名も出る（v2.9.1 で入れた仕組みをそのまま使う）。
+- **モデル選択カードは対象外** — カードは**プロバイダ見出しの下に並んでいて文脈がある**。**モデル比較の選択欄は元から `label · providerLabel` を出していた**。
+- **CLI は元から併記していた**（`Stage1 provider:` / `Stage1 model:`）ので変更なし。
+- **`statusModelName` は `modelDisplayName` へ置き換え、`shortModel` は短縮規則を素のモデル ID 側へ移した**（前はプロバイダ接頭辞ごと 8 文字に切っていた）。
+
+**検証:** `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` 788 / 36 / 0、`npm run lint:models` 56 checks passed。**server・cli・描画には触れていない**ので pytest と凍結コーパスは対象外。
+
+**記録（この改修で判ったが直していない）**: **web の静的フォールバックカタログは `ollama-cloud` を 3 本しか持たない**（server は 18 本）。そのためサーバーのカタログが届く前の一瞬だけ、`gpt-oss:20b` が一意所有と見えて `Ollama` と表示される。**カタログ登録後は曖昧になり段のプロバイダへ落ちる**。v2.9.1 からある性質で、表示規則の側の問題ではない。

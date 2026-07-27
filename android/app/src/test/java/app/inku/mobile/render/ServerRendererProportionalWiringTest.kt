@@ -4,6 +4,7 @@ import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
@@ -141,9 +142,12 @@ class ServerRendererProportionalWiringTest {
         val speckMatches = Regex("""<circle cx="[^"]+" cy="[^"]+" r="[^"]+" fill="[^"]+" stroke="none" opacity="[^"]+"/>""").findAll(resPillar.svg).toList()
         assertEquals("Speck count in pillar for crayon circle", 73, speckMatches.size)
 
-        // Check outline offset floor in pillar (unit = 200, floor = 0.0035 * 200 = 0.7)
-        // Crayon outline offset -1.5 * scale * offsetGain(2.8) = -0.84 -> r = 40.0 - 0.84 = 39.160000
-        assertTrue("Contains outline circle with floor offset r=39.160000", resPillar.svg.contains("""r="39.160000""""))
+        // engine 15 took the offset gain back to 1.0 and dropped the floor to 0.0, so the
+        // strata land where the table always said. In pillar (unit = 200, scale = 0.2) the
+        // crayon offset -1.5 * 0.2 = -0.3 -> r = 40.0 - 0.3 = 39.700000. Under engine 14
+        // the 2.8x gain and the 0.7px floor put it at 39.160000.
+        assertTrue("Contains outline circle at the table's own offset r=39.700000", resPillar.svg.contains("""r="39.700000""""))
+        assertFalse("The engine 14 floored offset r=39.160000 must be gone", resPillar.svg.contains("""r="39.160000""""))
     }
 
     private fun extractStrokeWidth(svg: String): Double {

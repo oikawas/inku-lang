@@ -10,10 +10,27 @@ internal object ServerRendererMaterial {
     private data class OutlineProfile(val offset: Double, val width: Double, val opacity: Double, val dash: String?)
     private data class SpeckProfile(val count: Int, val spread: Double, val radius: Double, val opacity: Double)
 
+    // render engine 15: strength is darkness, not distance. The intensity ladder answered
+    // "the material layer reads weak" by multiplying the outline offset (2.8x) and putting
+    // a 3.5px floor under it, which pushed the trace 3.5-14x the band's half-width away and
+    // made it read as a second contour. The table's own values were always 0.7-2.3x the
+    // half-width. The opacity lever (1.8 with a 0.50 floor) is untouched.
+    private const val OUTLINE_OFFSET_GAIN = 1.0
+    private const val OUTLINE_OFFSET_FLOOR_RATIO = 0.0
+    private const val OUTLINE_OPACITY_GAIN = 1.8
+
+    // The tools that own a material outline. `_material_line_group` reads the same set as
+    // the closed contours do, so a tool cannot come out clothed on a circle and bare on a
+    // line. burin and drypoint are deliberately absent: they carry plate_tone and burr
+    // instead, which are separate mechanisms.
+    private val MATERIAL_OUTLINE_WEIGHTS = setOf(
+        "pencil", "chalk", "brush_thin", "brush_thick", "crayon", "pen"
+    )
+
     fun usesMaterialOutline(weight: String): Boolean = materialOutlineProfile(weight, 1000.0).isNotEmpty() || baseSpeckProfile(weight) != null
 
     fun outlineOffsetPx(offset: Double, unit: Double): Double {
-        val floor = 0.0035 * unit
+        val floor = OUTLINE_OFFSET_FLOOR_RATIO * unit
         if (floor <= 0.0 || kotlin.math.abs(offset) >= floor) return offset
         return java.lang.Math.copySign(floor, offset)
     }
@@ -114,12 +131,14 @@ internal object ServerRendererMaterial {
         instructionSeed: Long? = null
     ): String? {
         val weight = ins.optString("weight", "pen")
-        if (weight !in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) return null
+        // engine 15: the gate reads the same spec table as the closed contours, so a tool
+        // added to the table cannot come out clothed on a circle and bare on a line.
+        if (weight !in MATERIAL_OUTLINE_WEIGHTS) return null
 
         val seedInt = instructionSeed ?: ServerRendererGeometry.seedForInstruction(ins, renderSeed)
         val scale = unit / 1000.0
-        val offsetGain = 2.8
-        val opacityGain = 1.8
+        val offsetGain = OUTLINE_OFFSET_GAIN
+        val opacityGain = OUTLINE_OPACITY_GAIN
         val spreadGain = 3.2
         val lineLen = Math.hypot(x2 - x1, y2 - y1)
         val dashUnits = lineLen / Math.max(1e-6, scale)
@@ -182,6 +201,17 @@ internal object ServerRendererMaterial {
                         strokeOpacity = layerOpacity(0.32)
                     )
                     emitLayer(amount, layerAttrs, 22.0, 9.0, k)
+                }
+            }
+            "pen" -> {
+                // The two tines of a split nib, running symmetrically just outside the
+                // band edge. No specks: powder is the mark of a soft, crumbling medium.
+                listOf(-1.40, 1.40).forEachIndexed { k, amount ->
+                    val layerAttrs = attrs.copy(
+                        strokeWidth = (0.38 - k * 0.04) * scale,
+                        strokeOpacity = layerOpacity(0.24 - k * 0.04)
+                    )
+                    emitLayer(amount, layerAttrs, 14.0 - k * 2.0, 3.0 + k, k)
                 }
             }
             else -> {
@@ -292,10 +322,14 @@ internal object ServerRendererMaterial {
         closed: Boolean,
         pathLenPx: Double,
         center: Pair<Double, Double>,
-        renderSeed: Long? = null
+        renderSeed: Long? = null,
+        // The speck seed is the instruction seed, which only the caller can build. The
+        // geometry-side fallback here returns the render seed itself, so leaving it to
+        // compute its own put the powder in the wrong places.
+        instructionSeed: String? = null
     ): String {
         val weight = ins.optString("weight", "pen")
-        val seedStr = ServerRendererGeometry.seedForInstruction(ins, renderSeed)
+        val seedStr = instructionSeed ?: ServerRendererGeometry.seedForInstruction(ins, renderSeed).toString()
         val out = StringBuilder()
         materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
             val pts = offsetPerformedPath(path, offset, closed, center)
@@ -318,13 +352,14 @@ internal object ServerRendererMaterial {
     private fun materialOutlineProfile(weight: String, unit: Double): List<OutlineProfile> {
         val scale = unit / 1000.0
         val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
-        val offsetGain = 2.8
-        val opacityGain = 1.8
-        val offsetFloor = 0.0035 * unit
+        val offsetGain = OUTLINE_OFFSET_GAIN
+        val opacityGain = OUTLINE_OPACITY_GAIN
+        val offsetFloor = OUTLINE_OFFSET_FLOOR_RATIO * unit
         val opacityFloor = 0.50
 
         fun calcOffset(raw: Double): Double {
             val v = raw * scale * offsetGain
+            if (offsetFloor <= 0.0) return v
             return if (kotlin.math.abs(v) >= offsetFloor) v else (if (v < 0) -offsetFloor else offsetFloor)
         }
 
@@ -354,8 +389,11 @@ internal object ServerRendererMaterial {
                 OutlineProfile(calcOffset(-1.5), baseWidth * 0.20, calcOpacity(0.20), scaleDash("4,8", scale)),
                 OutlineProfile(calcOffset(2.4), baseWidth * 0.22, calcOpacity(0.22), scaleDash("2,5,9,7", scale))
             )
-            "burin", "drypoint" -> listOf(
-                OutlineProfile(calcOffset(-0.8), 0.40 * scale, calcOpacity(0.30), scaleDash("1,4", scale))
+            // engine 15: the most used tool in production stops being a bare one. The trace
+            // is the two tines of a split nib, running just outside the band edge at +/-1.0px.
+            "pen" -> listOf(
+                OutlineProfile(calcOffset(-1.40), 0.38 * scale, calcOpacity(0.24), scaleDash("14,3", scale)),
+                OutlineProfile(calcOffset(1.40), 0.34 * scale, calcOpacity(0.20), scaleDash("12,4", scale))
             )
             else -> emptyList()
         }

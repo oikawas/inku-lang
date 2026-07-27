@@ -1153,3 +1153,29 @@ The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the r
 - **The six remaining `palette`s in SPEC are sound**: four are identifiers in the catalog JSON, two are ordinary art vocabulary.
 - **Behavioural equivalence cannot be proven deterministically** — once a word in the prompt moves, only the model can say. **Every deterministic check is green**: server 1423 passed / 31 skipped.
 - **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 729.
+
+### v2.9.0 — the six the prompt both forbade and required (Build 730, 2026-07-27)
+
+**A rule forbade a word that a later rule, the vocabulary table, or an example required.** Every explicit prohibition was collected and intersected mechanically with the rest of the same prompt; six of these came out. Two (the Japanese 塗りつぶす and the English `rise` / `fall`) were found in another session, the other four here.
+
+- **The Japanese background sentence moves to an allowed verb**: 「背景を○色で塗りつぶす。」 → **「背景を○色で埋める。」**. Principle 2 listed 塗りつぶす among the forbidden verbs while the Background section ordered the model to write it, and seven examples obeyed. **The English side never collided** — it has always said `Fill background with X.`, and `fill` is an allowed verb. **Each of the two contradictions exists on one side of the translation only.**
+- **Every parser keeps accepting the old wording**, so saved works still perform. The Stage 2 rule names both forms and the gray-background rewrite in `ddl_expander` matches either verb. **The remaining background detectors — the color test in `api.py`, the clause split in `compose.py`, the `explicit_surface` markers — key on `背景を` and never look at the verb**, so they are untouched. **coerce is untouched, so the frozen corpora do not move.**
+- **English `rise` / `fall` are now split as motion senses** (`rise (as motion), fall (as motion)`), with a line stating that the angle words `rising` / `falling` are Saijiki vocabulary. **`scatter` on the very same line already carried that split** (`as motion` / `as arrangement`); it had simply never been applied to rise and fall.
+- **The touchless-line rule was broken by its own examples** — 20 Japanese sentences and 9 English ones. **The bad example the rule names, "draw radial lines", was present near-verbatim as an example output.** Sentences that state nothing but a relation, a proportion, or an angle are now a declared exception, and **the eleven drawing examples were given a touch**.
+- **Principle 5 ("Saijiki vocabulary only") was broken by thirteen words not in the table** (surface, ground, printmaking phrases, the colorful list). **Principle 5 is what changed**, to name the fixed phrases this document defines. The vocabulary table is untouched, so nothing propagates to reference §1, the web display, or SPEC / README.
+- **`多角形` / `polygon` leaves the unknown-object fallback** — `saijiki.py` marks it as a hidden marker that is deliberately *not* Saijiki vocabulary, and the prompt was ordering it emitted anyway. The Stage 2 polygon rule (`sides=5-8`) and generation through coerce's `shape_intent_markers` are unchanged.
+- **The allowed action verbs gain `敷き詰める` / `tile`** — the movements table had six, this list had five, and the Placement section required the sixth.
+- **Pen is now stated to be the fallback default rather than the recommended choice**, which is what `pen (default)` in the vocabulary table has always meant; two passages told the model not to reach for it.
+- **One example used the forbidden verb 広げる** ("widening the radius"). Unlike the others, no later rule stood behind it.
+
+**Side effects of the checks**
+
+- **The Stage 1 golden keeps its Build 591 fixture**; the fourteen diffs are declared in `_REORDERED_JA` / `_REORDERED_EN`, so **undeclared drift still fails**.
+- **Twenty pinned prompt values were re-frozen** (6 Stage 1 base, 3 actual, 1 shared base, 6 Stage 2, 2 saijiki perturbation, 2 schema perturbation). Stage 1 base ja `9c8064958c8e3960` → **`f56778ec689949f8`**; Stage 2 combined ja `261373d0123a740f` → **`b5b40bbc27885eb1`**, en `f5bd29704e5906f2` → **`778f6a6e2dfa124f`**.
+- **One example dropped out of the selected set.** Giving the English snow example a touch stopped the touch-backfill from firing, which shifted the replacement slot by one and pushed the sand example out of the five. The test now pins that it is still in the pool.
+- **`SPEC.ja.md`'s Stage 1.5 example still showed a gray background**, which `_avoid_gray_background` rewrites to white — the specification's example was older than the implementation. Corrected here.
+- **README's DDL blocks are not rewritten.** They quote real saved output with its seed; the old wording is still accepted by every parser, so the record remains reproducible.
+
+**`埋める` already means "fill an area with elements"** — Stage 2's density rule reads 密集/埋める=120〜350. The deterministic layers decide on `背景を` and cannot get this wrong, but **the model may still read the sentence as a density cue**. Both Stage 2 prompts now say the sentence is not a request to fill an area with elements and that the density and count rules do not apply to it. **No model was run, so this mitigation is unverified.**
+
+Every deterministic check is green: server **1424 passed / 31 skipped**, ruff, cli 76, `npm run check` 0 errors, `lint:i18n` 0 errors, **both frozen corpora byte-identical**.

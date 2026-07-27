@@ -3277,3 +3277,18 @@ engine 13 の前例。**条件は「公開前に済ませること」**）。
 - **採番は v2.8.0 のまま**（**未公開なので畳む**。タグ最新は `v2.7.2`）。Build だけ 723 へ
 - **検証（Build 723 時点）:** server **1420 passed / 31 skipped**、cli **70 passed**、ruff clean、
   `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**
+
+**記述の語も同じ版で通した（Build 724）。** 辞書は **記述 = `description`（動詞は write）** と定め
+`prompt` を禁じているのに、**要求の主フィールドだけが `text` という第三の語**だった。
+
+- **`text` → `description`、`original_text` → `original_description`**。
+  `/api/paint` / `/api/paint/stream` / `/api/interpret` / `/api/compose` の要求、
+  `/api/paint` の応答、CLI の成果物 JSON、web の送信すべて
+- **`dh1`（記述の同一性 ID）は影響を受けない** — `description_hash()` は**値だけ**を hash しており
+  鍵名を含まない（実測して確かめてから着手した。`rh2` で痛い目を見た直後だったため）
+- **改名していない `"text"` が 4 つある** — **LLM プロバイダへ送る payload**
+  （Anthropic の content block、Gemini の `parts`）。**外部 API の契約である**
+- **`history` の DB 列 `input` は第三の語のまま残っている**（server 9 箇所・web 30 箇所）。
+  **記述を指す語が `description` と `input` の 2 つになった**ので、次の一手として測ってある
+- **検証（Build 724 時点）:** server **1420 passed / 31 skipped**、cli **70 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files

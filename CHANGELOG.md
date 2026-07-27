@@ -1083,3 +1083,11 @@ The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the r
 - **The old-to-new mapping is recorded in `no-git-sync/opus5/name_convantion/RENAMES.md`** (at the author's instruction) — the place to look when an external script stops working.
 - **The version stays v2.8.0**: it is unpublished, so this folds in rather than minting another (the newest tag is `v2.7.2`). Only the build number moves, to 723.
 - **Verification (at Build 723).** server **1420 passed / 31 skipped**, cli **70 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` **788 strings / 36 exceptions / 0 errors**.
+
+**The same version carries the description too (Build 724).** The dictionary sets 記述 = **`description`** (the verb is write) and bans `prompt`, yet **the main request field was a third word, `text`**.
+
+- **`text` → `description`, `original_text` → `original_description`** across the requests to `/api/paint`, `/api/paint/stream`, `/api/interpret` and `/api/compose`, the `/api/paint` response, the CLI's artifact JSON, and everything the web client sends.
+- **`dh1`, the description's identity, is untouched** — `description_hash()` hashes **the value alone** and carries no key name (measured before starting, having just been burned by `rh2`).
+- **Four `"text"` keys were left alone**: the payloads sent to the LLM providers (Anthropic content blocks, Gemini `parts`). **Those are someone else's API contract.**
+- **The DB column `input` on `history` is still a third word** (nine server sites, thirty in the web client), so **the description now goes by two names**; it is measured and filed as the next step.
+- **Verification (at Build 724).** server **1420 passed / 31 skipped**, cli **70 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.

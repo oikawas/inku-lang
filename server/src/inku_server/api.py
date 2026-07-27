@@ -541,8 +541,8 @@ def _validated_variation_amplitude(value: str | None) -> str | None:
     return None
 
 
-def _coerce_context(ddl: str, original_text: str | None = None) -> str:
-    original = (original_text or "").strip()
+def _coerce_context(ddl: str, original_description: str | None = None) -> str:
+    original = (original_description or "").strip()
     normalized = ddl.strip()
     if original and original != normalized:
         return f"{original}\n{normalized}"
@@ -863,7 +863,7 @@ class ComposeRequest(BaseModel):
     model: str | None = Field(
         default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
     )
-    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述 (省略可)")
+    original_description: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述 (省略可)")
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
     ui_lang: str | None = Field(default=None, description="UI表示言語")
     color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -937,8 +937,8 @@ class ComposeResponse(BaseModel):
 
 
 class InterpretRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
-    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
+    description: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
+    original_description: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
     model: str | None = Field(
         default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
     )
@@ -961,8 +961,8 @@ class InterpretResponse(BaseModel):
 
 
 class PaintRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
-    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
+    description: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
+    original_description: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
@@ -998,7 +998,7 @@ class PaintRequest(BaseModel):
 
 
 class PaintResponse(BaseModel):
-    text: str
+    description: str
     ddl: str
     # 入力側 DDL (展開前)。ddl は Stage 2 に渡った展開後。
     source_ddl: str | None = None
@@ -2679,7 +2679,7 @@ def _call_compose_detail(
     ddl: str,
     *,
     model: str | None = None,
-    original_text: str | None = None,
+    original_description: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
     composition_seed: int | None = None,
@@ -2692,16 +2692,16 @@ def _call_compose_detail(
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
         ddl,
-        source_text=original_text,
+        source_text=original_description,
         lang=lang,
-        seed_text=original_text or ddl,
+        seed_text=original_description or ddl,
     )
     plugin_expanded_ddl = plugin_expansion.ddl  # trace: after plugin expansion
     variation_report: dict = {}
     ddl = expand_intermediate_for_lang(
         plugin_expansion.ddl,
         lang=lang,
-        context_text=original_text,
+        context_text=original_description,
         composition_seed=composition_seed,
         plugin_instructions_present=bool(plugin_expansion.instructions),
         tenkei=tenkei,
@@ -2751,7 +2751,7 @@ def _call_compose_detail(
         def run_compose():
             kwargs: dict = {
                 "model": model,
-                "original_text": original_text,
+                "original_description": original_description,
                 "system_prompt": prompt,
                 "lang": lang,
                 "prompt_metadata": prompt_metadata,
@@ -3013,7 +3013,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
-        req.original_text or req.ddl,
+        req.original_description or req.ddl,
         instruction_lang_requested,
         ui_lang=ui_lang,
     )
@@ -3027,7 +3027,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         compose_detail = _call_compose_detail(
             req.ddl,
             model=resolved_stage2_model,
-            original_text=req.original_text,
+            original_description=req.original_description,
             system_prompt=None,
             lang=instruction_lang_resolved,
             composition_seed=req.composition_seed,
@@ -3054,7 +3054,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             score = coerce_score(
                 score,
                 branch_report=branch_counts,
-                ddl=_coerce_context(compose_detail.ddl, req.original_text),
+                ddl=_coerce_context(compose_detail.ddl, req.original_description),
                 tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )
@@ -3096,7 +3096,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     render_metadata = {
         **render_metadata,
         **_render_hash_metadata(
-            input_text=req.original_text or req.ddl,
+            input_text=req.original_description or req.ddl,
             ddl=compose_detail.ddl,
             score=score,
             svg=svg,
@@ -3137,19 +3137,19 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 @app.post("/api/interpret")
 def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
-    source_text = req.original_text or req.text
+    source_text = req.original_description or req.description
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
         source_text, instruction_lang_requested, ui_lang=ui_lang
     )
     resolved_tenkei = req.tenkei or "auto"
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.description):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
-            detail = InterpretDetail(ddl=req.text.strip(), thinking=None, raw=None)
+            detail = InterpretDetail(ddl=req.description.strip(), thinking=None, raw=None)
         else:
             detail = _call_interpret_detail(
-                req.text,
+                req.description,
                 model=_resolved_stage1_model(req.model, actor),
                 include_thinking=req.include_thinking,
                 system_prompt_prefix=None,
@@ -3516,7 +3516,7 @@ def _paint_events(
     complete PaintResponse).
     """
     t0 = time.perf_counter()
-    source_text = req.original_text or req.text
+    source_text = req.original_description or req.description
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
@@ -3532,14 +3532,14 @@ def _paint_events(
         req.variation_seed if resolved_variation_amplitude is not None else None
     )
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.description):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
             interpret_detail_result = InterpretDetail(
-                ddl=req.text.strip(), raw=req.text.strip() if req.include_trace else None
+                ddl=req.description.strip(), raw=req.description.strip() if req.include_trace else None
             )
         else:
             interpret_detail_result = _call_interpret_detail(
-                req.text,
+                req.description,
                 model=resolved_stage1_model,
                 include_thinking=req.include_thinking,
                 lang=instruction_lang_resolved,
@@ -3573,7 +3573,7 @@ def _paint_events(
         compose_detail = _call_compose_detail(
             ddl,
             model=resolved_stage2_model,
-            original_text=source_text,
+            original_description=source_text,
             lang=instruction_lang_resolved,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
@@ -3743,7 +3743,7 @@ def _paint_events(
     )
     _carriage = _carriage_warnings(compose_detail.ddl, score) or None
     response = PaintResponse(
-        text=source_text,
+        description=source_text,
         ddl=ddl,
         source_ddl=compose_detail.source_ddl or None,
         thinking=interpret_detail_result.thinking,

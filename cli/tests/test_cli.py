@@ -89,7 +89,7 @@ def test_paint_payload_drops_none_values():
 
     payload = cli._paint_payload(args, "一滴の墨")
 
-    assert payload["text"] == "一滴の墨"
+    assert payload["description"] == "一滴の墨"
     assert payload["stage1_model"] == "gemma"
     assert payload["save_history"] is True
     assert payload["include_thinking"] is False
@@ -148,7 +148,7 @@ def test_compose_payload_for_ddl_input_mode():
     assert payload == {
         "ddl": "白い背景に黒い線を一本引く。",
         "model": "s2",
-        "original_text": "線",
+        "original_description": "線",
         "instruction_lang": "auto",
         "catalog_id": "default",
         "auto_repair": True,
@@ -229,7 +229,7 @@ def test_compose_response_as_paint_result_uses_effective_ddl():
         stage2_model="requested",
     )
 
-    assert result["text"] == "元入力"
+    assert result["description"] == "元入力"
     assert result["ddl"] == "展開後DDL。"
     assert result["stage1_model"] is None
     assert result["stage2_model"] == "resolved"
@@ -341,7 +341,7 @@ def test_color_catalog_summary_uses_server_catalog_data():
 
 def test_color_trace_reports_missing_green():
     result = {
-        "text": "緑の葉が揺れる",
+        "description": "緑の葉が揺れる",
         "ddl": "緑の小さな楕円を散らす。",
         "score": {"instructions": [{"primitive": "ellipse", "color": "gray"}]},
     }
@@ -355,7 +355,7 @@ def test_color_trace_reports_missing_green():
 
 def test_color_trace_does_not_treat_words_as_green_leaf_marker():
     result = {
-        "text": "言えなかった言葉を白い余白に置く",
+        "description": "言えなかった言葉を白い余白に置く",
         "ddl": "言えなかった言葉のために白い余白を残す。",
         "score": {"instructions": [{"primitive": "ellipse", "color": "white"}]},
     }
@@ -369,7 +369,7 @@ def test_color_trace_does_not_treat_words_as_green_leaf_marker():
 
 def test_color_trace_does_not_read_crescent_as_scent():
     result = {
-        "text": "A single white crescent waits in an off-center dark field.",
+        "description": "A single white crescent waits in an off-center dark field.",
         "ddl": "Fill background with black. Place a white crescent arc in the upper right.",
         "score": {"instructions": [{"primitive": "arc", "color": "white"}]},
     }
@@ -387,7 +387,7 @@ def test_color_trace_detects_specific_leaf_terms_as_green():
 
 def test_color_trace_suppresses_negated_green_warning():
     result = {
-        "text": "言えなかった言葉を白い余白に置き、緑には寄せず黒い線だけを残す。",
+        "description": "言えなかった言葉を白い余白に置き、緑には寄せず黒い線だけを残す。",
         "ddl": "白い余白に黒い線だけを置く。",
         "score": {"instructions": [{"primitive": "line", "color": "black"}]},
     }
@@ -415,7 +415,7 @@ def test_timeout_prefers_args_then_config_then_default():
 
 def test_write_paint_outputs(tmp_path):
     result = {
-        "text": "一滴の墨",
+        "description": "一滴の墨",
         "ddl": "白い背景に黒い点を置く。",
         "score": {"canvas": {"width": 100, "height": 100}, "shapes": []},
         "svg": "<svg viewBox=\"0 0 10 10\"></svg>",
@@ -940,7 +940,7 @@ def test_quality_metrics_does_not_treat_surface_as_face():
 
 def test_paper_words_do_not_request_white_by_themselves():
     trace = cli._color_trace(
-        {"text": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},
+        {"description": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},
         catalog_id="default",
         catalog_data=CATALOG_DATA,
     )

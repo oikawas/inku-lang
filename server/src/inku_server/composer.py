@@ -833,11 +833,11 @@ def _current_model_settings() -> dict:
     return _db.get_model_settings()
 
 
-def _build_user_message(ddl: str, original_text: str | None, lang: str = "ja") -> str:
-    if original_text and original_text.strip() != ddl.strip():
+def _build_user_message(ddl: str, original_description: str | None, lang: str = "ja") -> str:
+    if original_description and original_description.strip() != ddl.strip():
         if lang == "en":
-            return f"[original text]\n{original_text}\n\n[normalized DDL]\n{ddl}"
-        return f"[原文]\n{original_text}\n\n[正規化DDL]\n{ddl}"
+            return f"[original text]\n{original_description}\n\n[normalized DDL]\n{ddl}"
+        return f"[原文]\n{original_description}\n\n[正規化DDL]\n{ddl}"
     return ddl
 
 
@@ -1296,7 +1296,7 @@ def compose(
     ddl: str,
     *,
     model: str | None = None,
-    original_text: str | None = None,
+    original_description: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
     trace_sink: list[dict] | None = None,
@@ -1307,7 +1307,7 @@ def compose(
     trace_sink 指定時は、この呼び出しの Stage 2 生応答 {raw_text, parse_ok} を
     append する (観測のみ; retry/fallback の判定・挙動は変えない)。
     """
-    user_msg = _build_user_message(ddl, original_text, lang=lang)
+    user_msg = _build_user_message(ddl, original_description, lang=lang)
     if system_prompt is not None:
         effective_prompt = system_prompt
     elif lang == "en":

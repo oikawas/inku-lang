@@ -220,7 +220,7 @@ def test_api_interpret_pure_invocation_bypasses_stage1(plugin_dir, user_headers)
     r = client.post(
         "/api/interpret",
         headers=user_headers,
-        json={"text": "Sketch.双弧", "tenkei": "none"},
+        json={"description": "Sketch.双弧", "tenkei": "none"},
     )
     assert r.status_code == 200
     assert r.json()["ddl"] == "Sketch.双弧"
@@ -230,7 +230,7 @@ def test_api_interpret_rejects_invalid_tenkei(plugin_dir, user_headers):
     r = client.post(
         "/api/interpret",
         headers=user_headers,
-        json={"text": "Sketch.双弧", "tenkei": "loud"},
+        json={"description": "Sketch.双弧", "tenkei": "loud"},
     )
     assert r.status_code == 422
 

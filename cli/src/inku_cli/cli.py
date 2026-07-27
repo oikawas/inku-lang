@@ -917,7 +917,7 @@ def command_ddl_compare(args: argparse.Namespace) -> int:
         for directory, items in zip(directories, collections):
             payload = items.get(key) or {}
             ddl = str(payload.get("ddl") or "")
-            original = original or payload.get("text") or payload.get("input") or payload.get("original_text")
+            original = original or payload.get("description") or payload.get("input") or payload.get("original_description")
             variants.append({
                 "artifact_set": str(directory), "ddl": ddl,
                 "saijiki_outside_ascii_terms": _ddl_unknown_terms(ddl),
@@ -945,7 +945,7 @@ def command_vision_review(args: argparse.Namespace) -> int:
         artifact = artifacts.get(image_path.stem, {})
         rows.append({
             "image": str(image_path),
-            "original": artifact.get("text") or artifact.get("input") or artifact.get("original_text"),
+            "original": artifact.get("description") or artifact.get("input") or artifact.get("original_description"),
             "blind_back_translation_ja": _nim_vision_chat(image_path, "入力文を推測せず、この抽象画に実際に見えるものだけを日本語一文で記述してください。", api_key=api_key, model=vision_model),
             "blind_back_translation_en": _nim_vision_chat(image_path, "Describe only what is visibly present in this abstract image in one English sentence. Do not infer its prompt.", api_key=api_key, model=vision_model),
         })
@@ -1717,7 +1717,7 @@ def _color_trace(
     catalog_data: dict[str, Any] | None = None,
     requested_text: str | None = None,
 ) -> dict[str, Any]:
-    text = requested_text or result.get("text")
+    text = requested_text or result.get("description")
     ddl = result.get("ddl")
     score = result.get("score")
     details = _score_color_details(score)
@@ -1847,8 +1847,8 @@ def _paint_payload(
         or DEFAULT_COLOR_CATALOG_ID
     )
     payload: dict[str, Any] = {
-        "text": text,
-        "original_text": args.original_text,
+        "description": text,
+        "original_description": args.original_text,
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
         "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
         "include_thinking": args.include_thinking,
@@ -1883,7 +1883,7 @@ def _compose_payload(
     payload: dict[str, Any] = {
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
-        "original_text": args.original_text,
+        "original_description": args.original_text,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
@@ -1906,7 +1906,7 @@ def _compose_response_as_paint_result(
     elapsed = int(elapsed_total_ms if elapsed_total_ms is not None else result.get("elapsed_ms") or 0)
     effective_ddl = str(result.get("ddl") or ddl)
     return {
-        "text": input_text,
+        "description": input_text,
         "ddl": effective_ddl,
         "score": result.get("score"),
         "svg": result.get("svg"),
@@ -2209,7 +2209,7 @@ def command_paint(args: argparse.Namespace) -> int:
         )
     paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
     summary = {
-        "text": result.get("text"),
+        "text": result.get("description"),
         "input_mode": input_mode,
         **_model_summary(
             None if input_mode == "ddl" else stage1_model,
@@ -2348,7 +2348,7 @@ def command_batch(args: argparse.Namespace) -> int:
         elapsed = int(result.get("elapsed_total_ms") or 0)
         entry = {
             "line": index,
-            "text": result.get("text"),
+            "text": result.get("description"),
             "input_mode": input_mode,
             **_model_summary(
                 None if input_mode == "ddl" else stage1_model,

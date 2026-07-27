@@ -54,7 +54,7 @@ def _mock_pipeline(monkeypatch):
 # invariant 1: no include_trace -> response unchanged, no trace key
 def test_paint_without_trace_omits_trace(monkeypatch, auth):
     _mock_pipeline(monkeypatch)
-    r = client.post("/api/paint", json={"text": "一滴の墨"}, headers=auth)
+    r = client.post("/api/paint", json={"description": "一滴の墨"}, headers=auth)
     assert r.status_code == 200
     body = r.json()
     assert "trace" not in body
@@ -64,7 +64,7 @@ def test_paint_without_trace_omits_trace(monkeypatch, auth):
 
 def test_paint_with_trace_has_all_keys(monkeypatch, auth):
     _mock_pipeline(monkeypatch)
-    r = client.post("/api/paint", json={"text": "一滴の墨", "include_trace": True}, headers=auth)
+    r = client.post("/api/paint", json={"description": "一滴の墨", "include_trace": True}, headers=auth)
     assert r.status_code == 200
     body = r.json()
     trace = body["trace"]
@@ -105,7 +105,7 @@ def test_trace_not_persisted_to_history(monkeypatch, auth):
     _mock_pipeline(monkeypatch)
     r = client.post(
         "/api/paint",
-        json={"text": "一滴の墨", "include_trace": True, "save_history": True},
+        json={"description": "一滴の墨", "include_trace": True, "save_history": True},
         headers=auth,
     )
     assert r.status_code == 200
@@ -123,7 +123,7 @@ def test_trace_not_persisted_to_history(monkeypatch, auth):
 # invariant 3 (and 4): score & render_hash invariant to include_trace
 def test_score_and_render_hash_invariant_to_trace(monkeypatch, auth):
     _mock_pipeline(monkeypatch)
-    base = {"text": "一滴の墨", "render_seed": 42}
+    base = {"description": "一滴の墨", "render_seed": 42}
     off = client.post("/api/paint", json=base, headers=auth).json()
     on = client.post("/api/paint", json={**base, "include_trace": True}, headers=auth).json()
     assert off["score"] == on["score"]
@@ -134,5 +134,5 @@ def test_score_and_render_hash_invariant_to_trace(monkeypatch, auth):
 
 # invariant 5: auth boundary identical to paint/compose
 def test_trace_requires_auth():
-    assert client.post("/api/paint", json={"text": "x", "include_trace": True}).status_code in (401, 403)
+    assert client.post("/api/paint", json={"description": "x", "include_trace": True}).status_code in (401, 403)
     assert client.post("/api/compose", json={"ddl": "x", "include_trace": True}).status_code in (401, 403)

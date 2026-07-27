@@ -46,13 +46,15 @@ BASE_SURFACE = {
 # The only combinations allowed to come out byte-identical with the toggle on.
 # Every one of them has a reason that predates this engine, and none of them is
 # a special case written into the synthesizer.
+#
+# Engine 15 put `cloudform` on the shared closed-contour path, so the nine hand
+# tools now move with the toggle and the exemption shrank from 25 to 16: the two
+# machine poles, across all eight shapes, and nothing else.
 IDENTICAL_UNDER_WILD = (
-    # `cloudform.py` never enters the stroke engine (SPEC §15.7, still open).
-    {(tool, "cloudform") for tool in TOOLS}
     # rotring is the machine pole: ToolGrammar.gesture is 0.0 (engine 8).
-    | {("rotring", primitive) for primitive in PRIMITIVES if primitive != "cloudform"}
+    {("rotring", primitive) for primitive in PRIMITIVES}
     # the computer repeats without error, so `wild` does not touch it (engine 13).
-    | {("computer", primitive) for primitive in PRIMITIVES if primitive != "cloudform"}
+    | {("computer", primitive) for primitive in PRIMITIVES}
 )
 
 
@@ -65,7 +67,7 @@ def _moves(instruction: dict) -> bool:
     return _svg(instruction, wild=False) != _svg(instruction, wild=True)
 
 
-def test_wild_reaches_every_tool_and_primitive_except_the_documented_25() -> None:
+def test_wild_reaches_every_tool_and_primitive_except_the_documented_16() -> None:
     identical = {
         (tool, primitive)
         for tool in TOOLS
@@ -73,7 +75,7 @@ def test_wild_reaches_every_tool_and_primitive_except_the_documented_25() -> Non
         if not _moves({"primitive": primitive, "weight": tool, **GEOMETRY[primitive]})
     }
     assert identical == IDENTICAL_UNDER_WILD
-    assert len(identical) == 25
+    assert len(identical) == 16
 
 
 def test_wild_reaches_fills() -> None:

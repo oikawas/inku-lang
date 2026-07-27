@@ -27,13 +27,17 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-25"
+FROZEN_AT = "2026-07-27"
 REASON = (
-    "One drawing, one lattice: the quantized grid is now the canvas's paper, so its "
-    "pitch no longer follows the length of what is drawn on it. The wild toggle "
-    "reaches past straight lines to contours, arcs, fills and hatches, and where it "
-    "does, the material outline is drawn from the performed centreline instead of "
-    "the geometry it left behind."
+    "The seed of a mark is made only of what makes it physically another mark, so "
+    "where it sits, what it relates to and what it is annotated with no longer "
+    "change the hand. The ground's seed names the paper - material and grain - so "
+    "raising the opacity darkens the same sheet instead of dealing a new one, and "
+    "absorbency, which nothing ever read, is retired. cloudform joins the road every "
+    "other closed contour takes, so the material layer and the wild toggle reach it. "
+    "The corner shapes and the pen gain the material layer they never had. And "
+    "strength stops being distance: the outline offset multiplier and its floor are "
+    "gone, so every stratum rides the ink at the distance its own table always named."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -79,7 +83,7 @@ BASE_SURFACE: dict[str, Any] = {
 }
 BASE_GROUND: dict[str, Any] = {
     "material": "plain", "tone": "off_white", "grain": "medium",
-    "density": 0.45, "opacity": 0.16, "absorbency": 0.25, "seed": 13579,
+    "density": 0.45, "opacity": 0.16, "seed": 13579,
 }
 GEOMETRY: dict[str, dict[str, Any]] = {
     "line": {"from": [0.18, 0.50], "to": [0.82, 0.50]},
@@ -164,11 +168,24 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         ground["material"] = material
         _case(cases, f"C-ground-{material}", _instruction("line", weight="pen"), ground=ground)
 
-    for field, value in (("density", 0.85), ("opacity", 0.42), ("absorbency", 0.85)):
+    for field, value in (("density", 0.85), ("opacity", 0.42)):
         ground = copy.deepcopy(BASE_GROUND)
         ground["material"] = "paper"
         ground[field] = value
         _case(cases, f"C-ground-field-{field}", _instruction("line", weight="pen"), ground=ground)
+
+    # The only path that reaches the derived ground seed: every other ground case
+    # above pins `seed`, so engine 14's corpus never called `_texture_seed` once.
+    for suffix, changes in (
+        ("paper", {}),
+        ("washi", {"material": "washi"}),
+        ("coarse", {"grain": "coarse"}),
+        ("paper-opacity", {"opacity": 0.42}),
+    ):
+        ground = copy.deepcopy(BASE_GROUND)
+        ground.update({"material": "paper", "grain": "medium", "seed": None})
+        ground.update(changes)
+        _case(cases, f"C-groundseed-auto-{suffix}", _instruction("line", weight="pen"), ground=ground)
 
     representatives = {
         "line-pencil": _instruction("line", weight="pencil"),
@@ -218,9 +235,9 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                   _instruction("square", weight=tool, filled=False, surface=surface),
                   wild=True)
 
-    expected = {"A": 88, "B": 72, "C": 40, "D": 28, "E": 119}
+    expected = {"A": 88, "B": 72, "C": 43, "D": 28, "E": 119}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 347:
+    if actual != expected or len(cases) != 350:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

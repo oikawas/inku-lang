@@ -18,6 +18,15 @@ server/reference/
 ├── render-engine-12/
 │   ├── manifest.json
 │   └── <permanent-case-id>.svg
+├── render-engine-13/
+│   ├── manifest.json
+│   └── <permanent-case-id>.svg
+├── render-engine-14/
+│   ├── manifest.json
+│   └── <permanent-case-id>.svg
+├── render-engine-15/
+│   ├── manifest.json
+│   └── <permanent-case-id>.svg
 └── ddl-engine-1/
     ├── manifest.json
     ├── a_expand/
@@ -36,11 +45,15 @@ version to accept changed output. Create the next version directory instead.
 Case IDs are permanent: do not rename or delete them; new cases may be added.
 
 A version directory holds an SVG body only for the cases that version changed.
-Its manifest still carries the digest, byte count, tag counts, and classes of all
-220 cases, so a case that did not move is answered by walking back to the last
+Its manifest still carries the digest, byte count, tag counts, and classes of
+every case, so a case that did not move is answered by walking back to the last
 version where it did. The file listing therefore reads as "what this version
 changed", which is the point of keeping the directories at all. Engine 11 holds
-all 220 bodies because the master grid moved every case; engine 12 holds 199.
+all 220 bodies because the master grid moved every case; engine 12 holds 199;
+engine 15 holds 318 of its 350.
+
+The corpus grows with the vocabulary, so the case count belongs to the version:
+220 for engines 10-12, 228 for engine 13, 347 for engine 14, 350 for engine 15.
 
 ## What engine 12 changed
 
@@ -62,6 +75,51 @@ centreline itself gains a gesture scaled by the stroke length.
   material outline layer. Its contour does vary by tool (all 10 tool digests
   differ), but none of that variation comes from stroke synthesis. This is a gap
   that predates engine 12, not something engine 12 introduced
+
+## What engine 15 changed
+
+Engine 15 is five changes to `renderer.py` landed as one version, because they sit
+in the same layer and bumping four times would have cost four Android follow-ups.
+
+- **The seed of a mark is built from an allowlist.** It used to be a hash of the
+  instruction's whole dump, so a colour annotation `coerce` wrote, a change of
+  `count`, or a composition flag being flipped all re-rolled the hand. Now only
+  what makes a mark physically another mark goes in: what it is, the tool, the
+  geometry, its variation, its surface, and `arrangement.jitter`
+- **The ground's seed names the paper.** `_texture_seed` hashed the whole Score,
+  so anything at all moved the grain of the canvas. It is now made of `material`,
+  `grain` and the performance seed, so raising the opacity darkens the same sheet
+  instead of dealing a new one. That freed `ground.absorbency`, a field nothing
+  had ever read, to be retired
+- **`cloudform` joins the road every other closed contour takes.** It had never
+  entered `stroke_engine` while claiming `stroke-engine-touch` in its class, and
+  all three material mechanisms were absent from it
+- **The corner shapes and the pen gain the material layer they never had.**
+  `_render_corner_shape` had no material-outline call at all, so `triangle` and
+  `polygon` were bare for every tool that owns one; and `pen`, the most used tool
+  in production, had nothing but its body stroke
+- **Strength stops being distance.** Each rung of the material intensity ladder
+  had answered "the layer reads weak" by multiplying the outline offset, up to
+  2.8x with a 3.5px floor. Measured against the band's own half-width as drawn,
+  the strata sat 4.5x out for `pencil` and 6.5x for `chalk` — far enough to read
+  as a second contour rather than a trace. The multiplier and floor are gone;
+  darkness is still carried by the opacity gain, which is untouched
+
+**318 of the 350 cases moved, and the 32 that did not are the point.** They are
+the two machine poles — `computer` and `rotring` — across the seven shapes that
+are not `cloudform`, plus the four `D-canvas` rotring cases. `rotring` is drawn as
+geometry and `computer` repeats without error, so neither consumes the performance
+seed the first change rewrote. Both move on `cloudform` alone, because that is the
+one shape whose path they newly share: `rotring` drops the false
+`stroke-engine-touch` from its class, and `computer` gains its `raster-bleed`.
+
+Three cases entered and one left. `C-groundseed-auto-paper`, `-washi`, `-coarse`
+and `-paper-opacity` are the first cases in the corpus's history to leave
+`ground.seed` unset — until engine 15 every ground case pinned it, so
+`_texture_seed` was called **zero times across all 347 cases** and the layer could
+not be tested by this corpus at all. `C-ground-field-absorbency` was dropped:
+with the field retired it renders byte-identically to `C-ground-paper`, and two
+IDs for one drawing misleads the reader.
 
 ## `render-engine-10` cannot be regenerated outside macOS
 

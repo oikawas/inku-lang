@@ -2,7 +2,7 @@
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches.",
  "frozen_at": "2026-07-26",
- "commit": "f954238c5e2c5ec3e92cc986b84171f415349350",
+ "commit": "0d05fa1df9f73f1d9a8b8d8cbb1c7eb93a586aaa",
  "branches_reached": [
   "coerce_and_repair_instruction",
   "dedupe_instructions",
@@ -8240,7 +8240,6 @@
        "grain": "fine",
        "density": 0.2,
        "opacity": 0.12,
-       "absorbency": 0.0,
        "seed": null
       }
      },

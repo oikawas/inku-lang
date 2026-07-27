@@ -149,24 +149,27 @@ class CanvasGroundSpec(BaseModel):
     opacity: float = Field(
         default=0.12, ge=0.0, le=1.0, description="地の質感不透明度 0.0-1.0"
     )
-    absorbency: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description=(
-            "吸い込みやすさ 0.0-1.0。値そのものは描画に読まれないが、地の texture seed は"
-            " Score 全体のハッシュなので、消すと地を持つ作品の粒配置が変わる (v2.7.2 調査)"
-        ),
-    )
     seed: Optional[int] = Field(
         default=None,
-        description="任意の地 texture seed。省略時は Renderer が演奏 seed から導出",
+        description="任意の地 texture seed。省略時は Renderer が支持体の同一性から導出",
     )
 
-    @field_validator("density", "opacity", "absorbency", mode="before")
+    @field_validator("density", "opacity", mode="before")
     @classmethod
     def _clamp_units(cls, v: object) -> object:
         return _clamp_unit_value(v)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_retired_absorbency(cls, v: object) -> object:
+        # 退役フィールド (render engine 15)。値は一度も描画に読まれていなかったが、
+        # 地の texture seed が Score 全体のハッシュだったため、消すと粒配置が動いて
+        # しまい退役できずにいた。seed を支持体の同一性 (material / grain / 演奏
+        # seed) だけから作るようにしたので、退役が無条件で解けた。保存済み Score に
+        # は残っているため、ここで落として再生できるようにする。
+        if isinstance(v, dict) and "absorbency" in v:
+            v = {k: val for k, val in v.items() if k != "absorbency"}
+        return v
 
 
 class CanvasSpec(BaseModel):

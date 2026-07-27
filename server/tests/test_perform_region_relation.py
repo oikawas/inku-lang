@@ -20,7 +20,14 @@ _ARC_RE = re.compile(
 )
 
 
+_MATERIAL_OUTLINE_ELEMENT = re.compile(r'<[a-z]+[^>]*class="material-outline"[^>]*/>')
+
+
 def _arc_paths(svg: str) -> list[tuple]:
+    # 材質輪郭も弧コマンドの path なので、意図弧だけを数えるには外す。engine 15 で
+    # `pen` が材質層を持つまで、この抽出器は道具が裸だったから成り立っていた
+    # (`test_arc_strokes` / `test_touching` は前から除外している)。
+    svg = _MATERIAL_OUTLINE_ELEMENT.sub("", svg)
     out = []
     for d in re.findall(r'd="(M [^"]*A [^"]*)"', svg):
         m = _ARC_RE.match(d)

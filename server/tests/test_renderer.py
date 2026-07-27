@@ -17,6 +17,19 @@ from inku_server.renderer import (
 )
 from inku_server.schema import Instruction, Score
 
+_MATERIAL_OUTLINE_ELEMENT = re.compile(r'<[a-z]+[^>]*class="material-outline"[^>]*/>')
+
+
+def _ink_only(svg: str) -> str:
+    """材質輪郭を落とした SVG。本体だけを数えたい検査はここを通す。
+
+    engine 15 で `pen` — 既定の weight — が材質層を持ったので、素の要素を数える
+    古い検査は装飾まで数えるようになった。抽出時に `material-outline` を除くのは
+    `test_arc_strokes` / `test_touching` / `test_computer_touch` と同じ規律で、
+    engine 15 で新たに必要になったのは既定の道具が裸でなくなったからである。
+    """
+    return _MATERIAL_OUTLINE_ELEMENT.sub("", svg)
+
 
 def test_new_render_seed_is_javascript_safe_integer():
     for _ in range(100):
@@ -109,7 +122,7 @@ def test_render_single_line_solid_pen_black():
     assert "stroke-engine-v1" in svg
     assert "<path" in svg
     assert "#111111" in svg
-    assert "stroke-dasharray" not in svg
+    assert "stroke-dasharray" not in _ink_only(svg)
 
 
 def test_render_wraps_primitives_in_canvas_clip():
@@ -319,7 +332,7 @@ def test_render_scatter_path_wave_places_items_on_trace():
     assert 'cx="500.000000"' in svg
     assert 'cx="700.000000"' in svg
     assert 'cx="900.000000"' in svg
-    assert svg.count("<circle") == 5
+    assert _ink_only(svg).count("<circle") == 5
 
 
 def test_render_rhythm_spacing_breaks_equal_repetition():
@@ -342,7 +355,7 @@ def test_render_rhythm_spacing_breaks_equal_repetition():
     )
 
     svg = render(score)
-    root = ElementTree.fromstring(svg)
+    root = ElementTree.fromstring(_ink_only(svg))
     xs = [
         float(node.attrib["cx"])
         for node in root.iter()
@@ -374,7 +387,7 @@ def test_render_arrangement_path_right_half_constrains_x():
     svg = render(score)
     assert 'cx="300.' not in svg
     assert 'cx="100.' not in svg
-    assert svg.count("<circle") == 4
+    assert _ink_only(svg).count("<circle") == 4
 
 
 def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
@@ -805,7 +818,7 @@ def test_render_line_with_perlin_variation_emits_variable_width_path():
     )
     svg = render(score)
     assert "<path" in svg
-    assert "<polyline" not in svg
+    assert "<polyline" not in _ink_only(svg)
 
 
 def test_render_line_with_wave_variation_emits_variable_width_path():
@@ -828,7 +841,7 @@ def test_render_line_with_wave_variation_emits_variable_width_path():
     )
     svg = render(score)
     assert "<path" in svg
-    assert "<polyline" not in svg
+    assert "<polyline" not in _ink_only(svg)
 
 
 def test_render_line_variation_is_deterministic():
@@ -872,7 +885,7 @@ def test_render_line_quality_none_still_straight():
     )
     svg = render(score)
     assert "<path" in svg
-    assert "<polyline" not in svg
+    assert "<polyline" not in _ink_only(svg)
 
 
 def test_line_missing_endpoints_uses_default():
@@ -920,7 +933,9 @@ def test_render_textured_pink_variation_keeps_valid_svg_filter_attribute():
     svg = render(score)
     ElementTree.fromstring(svg)
     # v2.2 (engine 8): 塗り本体と輪郭の帯がそれぞれ質感 filter を持つ。
-    assert svg.count('filter="url(#texture-chalk)"') == 2
+    # engine 15 で triangle にも材質輪郭が届いた分だけ 2 つ増え、square / circle と
+    # 同じ 4 になった (どちらも以前から 4 だった)。
+    assert svg.count('filter="url(#texture-chalk)"') == 4
     assert svg.count('filter="url(#blur-medium)"') == 0
 
 
@@ -944,7 +959,7 @@ def test_render_line_with_pink_variation_emits_blur_not_polyline():
     svg = render(score)
     assert "feGaussianBlur" in svg
     assert "<path" in svg
-    assert "<polyline" not in svg
+    assert "<polyline" not in _ink_only(svg)
 
 
 def test_render_pink_variation_deterministic():
@@ -1107,7 +1122,7 @@ def test_render_not_touching_relation_moves_second_mark_away_from_previous():
     svg = render(score, render_seed=5)
 
     assert svg.count("<circle") >= 2
-    assert svg.count('cx="500.000000"') == 1
+    assert _ink_only(svg).count('cx="500.000000"') == 1
 
 
 def test_render_cutting_relation_crosses_previous_line_center():
@@ -1616,7 +1631,9 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # engine 11 と同じ 1444 個で、動いたのは値だけである。
     # engine 10 まではこのダイジェストが素のバイト列だったため macOS でしか通らな
     # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
-    assert digest == "75afbfb92840cc922e87edd598c25b45937e7d651aaf6d9c806ade157636f33e"
+    # engine 15 (演奏 seed の allowlist 化 + 材質輪郭の距離是正) で再採取。
+    # ここは既定 weight の pen を使うので、pen が材質輪郭を持った分も入っている。
+    assert digest == "a822b5cf5eb09d9b8176d3b79f7d9f94890a9421c2956dad069b2983ac49cc67"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

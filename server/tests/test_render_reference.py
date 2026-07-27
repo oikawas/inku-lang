@@ -32,11 +32,14 @@ def _manifest() -> dict:
 
 def test_render_reference_case_counts() -> None:
     cases = _manifest()["cases"]
-    assert len(cases) == 347
+    # engine 15 で C 群が 40 → 43。`ground.seed` を明示しない 4 件を足し
+    # (それまでコーパスは `_texture_seed` を一度も呼んでいなかった)、
+    # `absorbency` の退役でその判別ケースが `C-ground-paper` の重複になったので外した。
+    assert len(cases) == 350
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E")
-    } == {"A": 88, "B": 72, "C": 40, "D": 28, "E": 119}
+    } == {"A": 88, "B": 72, "C": 43, "D": 28, "E": 119}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -59,24 +62,35 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
         assert isinstance(case["wild"], bool)
 
 
-def test_engine_14_moved_only_the_quantized_tool_among_the_frozen_cases() -> None:
-    """一枚の方眼は computer の 7 件しか動かさない。
+def test_engine_15_left_only_the_machine_poles_untouched() -> None:
+    """engine 15 が動かさなかったのは機械の極だけである。
 
-    格子は `grammar.quantize > 0` の道具にしか効かないので、手の 10 道具の演奏が
-    1 件でも動いていたら、目盛の変更が別の経路へ漏れている。`cloudform` が入って
-    いないのは `stroke_engine` を通らないため (SPEC §15.7 の既知の穴)。
+    本版は演奏 seed の作り方を変えたので、手の演奏を持つ道具は全部動く。動かない
+    のは、幾何のまま描かれる `rotring` と、誤差なく反復する `computer` だけ。
+    **ただし cloudform は両極とも動く** — 段 3 でその図形が共通の閉輪郭経路に
+    載り、`rotring` は class から偽りの `stroke-engine-touch` を落とし、`computer`
+    は raster-bleed を得たからである。
+
+    契約は「段 1 で 347 件すべてが動くので、不変の側が版の説明になるという読み方は
+    失われる」と書いていたが、**実際には失われていない**。32 件が engine 14 と
+    バイト一致で残り、その内訳がそのまま「本版が触れなかったもの」を語る。
     """
     manifest = _manifest()
-    moved = {
-        case_id
-        for case_id in manifest["changed_from_previous"]
-        if not case_id.startswith("E-")
+    unchanged = set(manifest["cases"]) - set(manifest["changed_from_previous"])
+    shapes_without_cloudform = (
+        "arc", "circle", "ellipse", "line", "polygon", "square", "triangle",
+    )
+    assert unchanged == {
+        f"{prefix}-{tool}-{primitive}"
+        for prefix in ("A", "E-wild")
+        for tool in ("computer", "rotring")
+        for primitive in shapes_without_cloudform
+    } | {
+        f"D-canvas-{aspect}-filled-square-rotring"
+        for aspect in ("square", "wide", "pillar", "vertical")
     }
-    assert moved == {
-        f"A-computer-{primitive}"
-        for primitive in ("arc", "circle", "ellipse", "line", "polygon", "square", "triangle")
-    }
-    assert "A-computer-cloudform" not in manifest["changed_from_previous"]
+    for tool in ("computer", "rotring"):
+        assert f"A-{tool}-cloudform" in manifest["changed_from_previous"]
 
 
 def test_render_reference_discriminator_cases() -> None:

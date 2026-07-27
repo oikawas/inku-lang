@@ -290,15 +290,21 @@ MATERIAL_INTENSITY: dict[str, dict[str, float]] = {
     # 強める段。倍率ではなく下限 (floor) で上げるのは、弱い weight (pencil・
     # crayon) だけを引き上げ、既に読める weight (brush_thin/thick) の輪郭が
     # 二重線に崩れるのを避けるため。
+    # engine 15: s1 の距離側 (outline_offset の倍率と下限) を 1.0 / 0.0 へ戻した。
+    # 「材質層が弱い」への対処として距離を掛けていたが、強さを決めるのは濃さ
+    # (outline_opacity の 1.8 と下限 0.50) のほうで、距離を掛けると痕跡が墨から
+    # 離れて別の輪郭に見える。実測では帯の実測半幅に対し痕跡が pencil 4.5 倍・
+    # chalk 6.5 倍・hair 14 倍まで離れていた。表の値はもともと半幅の 0.7〜2.3 倍で
+    # 設計されており、倍率と下限がそれを外へ押し出していた (作者裁定 2026-07-27)。
     "s1": {
         "texture_displacement": 2.8,
         "texture_blur": 1.6,
-        "outline_offset": 2.8,
+        "outline_offset": 1.0,
         "outline_opacity": 1.8,
         "speck_count": 2.6,
         "speck_spread": 1.8,
         "speck_opacity": 1.6,
-        "outline_offset_floor_ratio": 0.0035,
+        "outline_offset_floor_ratio": 0.0,
         "outline_opacity_floor": 0.50,
         "speck_opacity_floor": 0.40,
     },
@@ -369,7 +375,12 @@ def _material_gain(key: str) -> float:
 
 
 def _outline_offset_px(offset: float, canvas: CanvasSize) -> float:
-    """材質輪郭の法線オフセット。符号を保ったまま下限を課す。"""
+    """材質輪郭の法線オフセット。符号を保ったまま下限を課す。
+
+    現行レベル s1 の下限は 0.0 なので素通りする。下限を持つのは s2 だけで、
+    それは絶対値 (5px) なので細い道具の痕跡を墨から引き剥がす。採用するなら
+    道具の幅に対する比で持ち直すこと (engine 15 の実測)。
+    """
     floor = _material_gain("outline_offset_floor_ratio") * canvas.unit
     if floor <= 0 or abs(offset) >= floor:
         return offset
@@ -489,6 +500,29 @@ _VARIATION_SEED_FIELDS_ALL = frozenset(
     {"amplitude", "frequency", "quality", "dimensions"}
 )
 
+_SEED_INSTRUCTION_FIELDS = (
+    "primitive",
+    "from_",
+    "to",
+    "center",
+    "radius",
+    "sides",
+    "position",
+    "size",
+    "angle_start",
+    "angle_end",
+    "rotation",
+    "filled",
+    "style",
+    "weight",
+    "mode",
+    "carve_depth",
+    "variation",
+    "arrangement",
+    "surface",
+)
+_SEED_ARRANGEMENT_FIELDS = ("jitter",)
+
 
 def _variation_seed_fields(ins: Instruction) -> frozenset[str] | None:
     """seed key に残す variation フィールド。None = variation ごと落とす。
@@ -514,7 +548,13 @@ def _variation_seed_fields(ins: Instruction) -> frozenset[str] | None:
 
 def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None) -> int:
     """Instruction と演奏 seed から安定した乱数 seed を作る。"""
-    payload = ins.model_dump(mode="json")
+    dumped = ins.model_dump(mode="json")
+    payload = {name: dumped[name] for name in _SEED_INSTRUCTION_FIELDS}
+    arrangement = payload.get("arrangement")
+    if isinstance(arrangement, dict):
+        payload["arrangement"] = {
+            name: arrangement[name] for name in _SEED_ARRANGEMENT_FIELDS
+        }
     if payload.get("mode") == "additive":
         payload.pop("mode", None)
     if payload.get("carve_depth") is None:
@@ -1887,9 +1927,18 @@ def _score_canvas_ground(score: Score) -> CanvasGroundSpec | None:
 
 
 def _texture_seed(
-    score: Score, kind: str, render_seed: int | None, index: int = 0
+    ground: CanvasGroundSpec, kind: str, render_seed: int | None, index: int = 0
 ) -> int:
-    payload = score.model_dump(mode="json", by_alias=True)
+    """支持体の同一性だけから質感 seed を作る (render engine 15)。
+
+    engine 14 までは Score 全体の dump をハッシュしていたため、地と無関係な変更 —
+    instruction に coerce が書き込む色注記や、描画に一度も読まれない `absorbency` —
+    が地の粒配置を動かしていた。地の seed が決めているのは「どの紙か」であって
+    「どれだけ濃いか」ではないので、材質と紙目、そして演奏 seed だけを材料にする。
+    `opacity` を上げれば同じ紙が濃くなり、`density` を上げれば同じ紙に粒が足される
+    (先頭の粒は動かない)。`tone` は色調であって支持体ではない。
+    """
+    payload = {"material": ground.material, "grain": ground.grain}
     key = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     if render_seed is not None:
         key += f":render:{render_seed}"
@@ -1946,7 +1995,7 @@ def _render_canvas_ground(
     seed = int(
         ground.seed
         if ground.seed is not None
-        else _texture_seed(score, "canvas-ground", render_seed)
+        else _texture_seed(ground, "canvas-ground", render_seed)
     )
     tone = _ground_tone_color(ground, bg)
     group = dwg.g(id="layer_01_canvas_ground")
@@ -3253,6 +3302,14 @@ _MATERIAL_OUTLINE_SPECS: dict[str, list[tuple[float, float, float, float, str]]]
         (-1.5, 0.0, 0.20, 0.20, "4,8"),
         (2.4, 0.0, 0.22, 0.22, "2,5,9,7"),
     ],
+    # engine 15. 本番で最も使われている pen (3261 instruction・1 位) が、本体の
+    # ストロークしか持たないまま残っていた。数値は道具の性格を文法テーブル
+    # (`stroke_engine.GRAMMARS`) から引いている。
+    # pen (つけペン) の痕跡は割れた 2 本の穂先。±1.40px は基準幅 2.0px の帯の縁
+    # (±1.0) のすぐ外で、他の道具と同じく帯の実測半幅の 1〜2 倍に収まる。dash は
+    # brush_thin の 22,9 より細かく pencil の 1,7 より連続寄りで、穂先らしく
+    # ほぼ途切れない。
+    "pen": [(-1.40, 0.38, 0.0, 0.24, "14,3"), (1.40, 0.34, 0.0, 0.20, "12,4")],
 }
 
 # (基準個数, spread_px, radius_px, opacity)。個数は周長比例の基準値。
@@ -3486,6 +3543,25 @@ def _offset_performed_path(
     ]
 
 
+def _closed_path_length(path: list[tuple[float, float]]) -> float:
+    """閉じた折れ線の周長 (px)。粒の個数を周長比例で決めるのに使う。"""
+    if len(path) < 2:
+        return 0.0
+    return sum(
+        math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(path, path[1:] + path[:1])
+    )
+
+
+def _points_center(path: list[tuple[float, float]]) -> tuple[float, float]:
+    """法線の向きを多数決で決めるための図形中心。厳密な重心である必要はない。"""
+    if not path:
+        return (0.0, 0.0)
+    return (
+        sum(x for x, _ in path) / len(path),
+        sum(y for _, y in path) / len(path),
+    )
+
+
 def _add_material_performed_outline(
     dwg: svgwrite.Drawing,
     group,
@@ -3580,13 +3656,10 @@ def _material_line_group(
     render_seed: int | None = None,
     centerline: list[tuple[float, float]] | None = None,
 ):
-    if ins.weight not in (
-        "pencil",
-        "crayon",
-        "chalk",
-        "brush_thin",
-        "brush_thick",
-    ):
+    # 直線の材質層は閉輪郭とは別実装で、道具ごとの数値もここが独自に持っている。
+    # ゲートを `_MATERIAL_OUTLINE_SPECS` から引くことで、表に道具を足したのに
+    # 直線だけ裸のまま、という食い違いが起きないようにする (engine 15)。
+    if ins.weight not in _MATERIAL_OUTLINE_SPECS:
         return None
 
     # The texture layers ride the actual (possibly gestured) centreline, not the
@@ -3685,6 +3758,13 @@ def _material_line_group(
             layer_attrs["stroke_width"] = (0.9 + k * 0.5) * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.32)
             _emit_layer(amount, layer_attrs, 22.0, 9.0, k)
+    elif ins.weight == "pen":
+        # 割れた 2 本の穂先。帯の縁 (基準幅 2.0px の半分) のすぐ外を走る。
+        for k, amount in enumerate((-1.40, 1.40)):
+            layer_attrs = _copy_attrs(attrs)
+            layer_attrs["stroke_width"] = (0.38 - k * 0.04) * scale
+            layer_attrs["stroke_opacity"] = _layer_opacity(0.24 - k * 0.04)
+            _emit_layer(amount, layer_attrs, 14.0 - k * 2.0, 3.0 + k, k)
     else:
         amounts = (-3.2, -1.4, 2.0, 3.6) if ins.weight == "crayon" else (-3.5, 2.8, 5.0)
         mark, gap = (6.0, 6.0) if ins.weight == "crayon" else (14.0, 9.0)
@@ -4319,7 +4399,7 @@ def _render_corner_shape(
     group.add(dwg.polygon(points=points, **body_attrs))
     if fill_group is not None:
         group.add(fill_group)
-    contour_group, _performed = _render_contour_hand_stroke(
+    contour_group, performed = _render_contour_hand_stroke(
         dwg,
         ins,
         contour,
@@ -4331,6 +4411,24 @@ def _render_corner_shape(
         wild=wild,
     )
     group.add(contour_group)
+    # engine 15: この関数には材質輪郭の呼び出しが無かったので、triangle と polygon
+    # だけが 5 道具すべてで裸のまま残っていた (square は自前の分岐に持っている)。
+    # 角のある閉図形に幾何版の輪郭ヘルパーは無いため、演奏後の中心線から引く。
+    # wild の有無で作り方を変えないのは、ここに凍結された幾何版が無く、engine 14 の
+    # 教訓 (材質が墨から離れる) をそのまま適用できるからである。
+    if _uses_material_outline(ins.weight):
+        _add_material_performed_outline(
+            dwg,
+            group,
+            ins,
+            attrs,
+            performed,
+            canvas,
+            render_seed,
+            closed=True,
+            path_len_px=_closed_path_length(performed),
+            center=_points_center(points),
+        )
     return _apply_rotation(group, ins, canvas)
 
 
@@ -4557,28 +4655,68 @@ def _render_instruction(
         )
         # 塗りは描かれた曲線に沿わせたいので、制御点ではなく Catmull-Rom を
         # 標本化した密なポリゴンを走査する。凹みも交点対のまま扱える。
-        fill_group, _region_fill = _interior_fill(
+        sampled = list(sample_closed_catmull_rom(contour.points))
+        fill_group, region_fill = _interior_fill(
             dwg,
             ins,
-            list(sample_closed_catmull_rom(contour.points)),
+            sampled,
             attrs,
             canvas,
             render_seed,
             use_filters=use_filters,
             wild=wild,
         )
-        body_attrs = attrs
-        if fill_group is not None:
+        # engine 15: 同じ密なポリラインを閉輪郭の共通経路へ渡す。square / circle /
+        # polygon と同じ道を通るので、材質層の 3 機構 (材質輪郭・raster-bleed・
+        # burr) と wild がまとめて届く。輪郭生成そのものは engine 14 のまま。
+        hand = _uses_hand_stroke(ins.weight)
+        if hand:
+            body_attrs = _body_attrs_for_contour_stroke(
+                attrs, ins, region_fill=region_fill
+            )
+        elif fill_group is not None:
             body_attrs = _copy_attrs(attrs)
             body_attrs["fill"] = "none"
             body_attrs.pop("fill_opacity", None)
+        else:
+            body_attrs = attrs
         path = dwg.path(d=contour.path_d, **body_attrs)
-        path["class"] = "cloudform contour-v1 stroke-engine-touch"
-        if fill_group is None:
+        # class は事実だけを名乗る。rotring は幾何のままなので触れていない。
+        path["class"] = "cloudform contour-v1" + (
+            " stroke-engine-touch" if hand else ""
+        )
+        if fill_group is None and not hand:
             return _apply_rotation(path, ins, canvas)
         group = dwg.g()
         group.add(path)
-        group.add(fill_group)
+        if fill_group is not None:
+            group.add(fill_group)
+        if hand:
+            contour_group, performed = _render_contour_hand_stroke(
+                dwg,
+                ins,
+                sampled,
+                attrs,
+                canvas,
+                render_seed,
+                use_filters=use_filters,
+                closed=True,
+                wild=wild,
+            )
+            group.add(contour_group)
+            if _uses_material_outline(ins.weight):
+                _add_material_performed_outline(
+                    dwg,
+                    group,
+                    ins,
+                    attrs,
+                    performed,
+                    canvas,
+                    render_seed,
+                    closed=True,
+                    path_len_px=_closed_path_length(performed),
+                    center=_points_center(sampled),
+                )
         return _apply_rotation(group, ins, canvas)
 
     if ins.primitive == "square":

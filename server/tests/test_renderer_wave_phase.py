@@ -108,12 +108,16 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # 「値がわずかに動いた」のではなく、演奏そのものが変わっている。
 # 幅エンベロープの対称な山と閉輪郭の継ぎ目やせが外れ、中心線にジェスチャが乗り、
 # 材質アウトラインの dash と粒が等間隔でなくなった。
+# engine 15 で 5 件すべて再採取。動いた理由は 2 つある。演奏 seed が instruction の
+# 全 dump でなく allowlist から作られるようになったこと (色・配置・注記が手つきを
+# 変えなくなった) と、材質輪郭の距離が強度レベルの倍率と下限から解放され、表が
+# もともと書いていた距離 — 帯の半幅の 0.7〜2.3 倍 — へ戻ったことである。
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "6390f6a40e55cfa430fb4df170f7cb2a",
-    "chalk_square": "1083b8fe36b434ba166a60a1e756d610",
-    "crayon_arc": "cd8b468dff56c9483c12b12dbfa6e956",
-    "pencil_circle": "7c7e66e9c6ce62a632568034f03c459c",
-    "pencil_ellipse": "cc21c73dd805e3128e78ad01094374fe",
+    "brush_thin_line": "0085dba1234a0e336befdfbe81e7dcb9",
+    "chalk_square": "a69fee8dc7b6afe965159c3bb52c0ea2",
+    "crayon_arc": "f6f7b97a55a8688e72fd68baeecfb0bb",
+    "pencil_circle": "28ee36f58e5b264a7eea180428055c6a",
+    "pencil_ellipse": "95a23cc820b503178f0db51a104ab240",
 }
 
 

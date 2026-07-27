@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 CANVAS_PX = 1000
 
 WEIGHT_TO_STROKE_WIDTH: dict[str, float] = {
-    "hair": 0.5,
+    "silverpoint": 0.5,
     "pencil": 1.5,
     "pen": 2.0,
     "rotring": 1.0,
@@ -211,7 +211,7 @@ STYLE_TO_DASH: dict[str, str | None] = {
 }
 
 WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
-    "hair": {"stroke_opacity": 0.72, "stroke_linecap": "butt"},
+    "silverpoint": {"stroke_opacity": 0.72, "stroke_linecap": "butt"},
     "pencil": {"stroke_opacity": 0.66, "stroke_dasharray": "1,3"},
     "pen": {"stroke_opacity": 1.0},
     "rotring": {"stroke_opacity": 0.95, "stroke_linecap": "square"},
@@ -294,7 +294,7 @@ MATERIAL_INTENSITY: dict[str, dict[str, float]] = {
     # 「材質層が弱い」への対処として距離を掛けていたが、強さを決めるのは濃さ
     # (outline_opacity の 1.8 と下限 0.50) のほうで、距離を掛けると痕跡が墨から
     # 離れて別の輪郭に見える。実測では帯の実測半幅に対し痕跡が pencil 4.5 倍・
-    # chalk 6.5 倍・hair 14 倍まで離れていた。表の値はもともと半幅の 0.7〜2.3 倍で
+    # chalk 6.5 倍・silverpoint 14 倍まで離れていた。表の値はもともと半幅の 0.7〜2.3 倍で
     # 設計されており、倍率と下限がそれを外へ押し出していた (作者裁定 2026-07-27)。
     "s1": {
         "texture_displacement": 2.8,
@@ -3610,7 +3610,7 @@ def _add_material_performed_outline(
 
 
 # The computer's material layer. A hand tool leaves something beside the
-# stroke (graphite dust, hair, wax); a computer leaves the remainder of
+# stroke (graphite dust, bristle, wax); a computer leaves the remainder of
 # sampling. The geometry is rounded onto a lattice, and the difference between
 # where the ink was headed and the lattice point it landed on is thrown away.
 # These cells give that difference back as tone: the geometry repeats without

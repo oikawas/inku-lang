@@ -17,7 +17,7 @@ Primitive = Literal[
 ]
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
-    "hair",
+    "silverpoint",
     "pencil",
     "pen",
     "rotring",
@@ -459,7 +459,7 @@ class Instruction(BaseModel):
     weight: Weight = Field(
         default="pen",
         description=(
-            "hair=髪 / pencil=鉛筆 / pen=ペン / rotring=ロットリング"
+            "silverpoint=銀筆 / pencil=鉛筆 / pen=ペン / rotring=ロットリング"
             " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆"
             " / burin=ビュラン / drypoint=ドライポイント"
             " / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ"
@@ -502,6 +502,19 @@ class Instruction(BaseModel):
         default=None,
         description="閉じた図形の面の質感。line/arc では安全に無視または近似される。SVG固有の pattern/filter は入れない",
     )
+
+    @field_validator("weight", mode="before")
+    @classmethod
+    def _rename_hair_to_silverpoint(cls, v: object) -> object:
+        # `hair` was never a drawing material — nobody draws with head hair, and the
+        # physics the name carried (hard, no width response, almost no sway) is a
+        # silverpoint, not a brush. The tool is unchanged: the same 0.5 width and the
+        # same eight grammar values moved under the new name. Saved Scores hold the
+        # old name, so replace it here instead of dropping it — dropping would take
+        # the tool away and fall back to the default.
+        if v == "hair":
+            return "silverpoint"
+        return v
 
     @field_validator("sides", mode="before")
     @classmethod

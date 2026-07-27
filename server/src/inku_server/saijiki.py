@@ -152,7 +152,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_en="touches",
         marker_class="material",
         words=(
-            _w("髪", "hair", score_value="hair", **_PRUNED),  # P0-3 削除 (Score Weight は互換のため維持)
+            _w("銀筆", "silverpoint", score_value="silverpoint", **_PRUNED),
             _w("鉛筆", "pencil", score_value="pencil"),
             _w("ペン", "pen", default=True, score_value="pen"),
             _w("ロットリング", "rotring", score_value="rotring"),

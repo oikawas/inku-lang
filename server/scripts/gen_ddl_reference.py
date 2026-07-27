@@ -181,19 +181,23 @@ def generate() -> None:
                   "changed_from_previous": sorted(cases)}
     else:
         frozen = {key: existing[key] for key in ("frozen_at", "commit", "reason", "changed_from_previous")}
-        identity_unchanged = all(existing.get(key) == identity.get(key) for key in IDENTITY_FIELDS)
-        changed = existing.get("cases") != cases or any(
-            not (OUTPUT_DIR / path).exists() or (OUTPUT_DIR / path).read_text(encoding="utf-8") != text
-            for path, text in outputs.items()
-        )
-        if changed and identity_unchanged:
-            raise SystemExit("DDL corpus changed without an identity-field change; bump the appropriate version instead of rewriting a frozen corpus")
     manifest = {**identity, **frozen, "cases": cases}
     for directory in (OUTPUT_DIR, OUTPUT_DIR / "a_expand", OUTPUT_DIR / "b_coerce"):
         directory.mkdir(parents=True, exist_ok=True)
     for path, text in outputs.items():
         (OUTPUT_DIR / path).write_text(text, encoding="utf-8")
     MANIFEST_PATH.write_text(_canonical_output(manifest), encoding="utf-8")
+
+    # The guard fires *after* writing, exactly as gen_render_reference.py does. A
+    # sanctioned rename moves the corpus without moving the engine, and the guard
+    # cannot tell that from an unsanctioned rewrite; it fires once, and the second
+    # run is clean and byte-identical, which is the property it defends. Raising
+    # before the write would leave no way to re-freeze a rename at all.
+    if existing is not None and existing.get("cases") != manifest["cases"]:
+        before = tuple(existing.get(field) for field in IDENTITY_FIELDS)
+        after = tuple(manifest.get(field) for field in IDENTITY_FIELDS)
+        if before == after:
+            raise SystemExit("DDL corpus changed without an identity-field change; bump the appropriate version instead of rewriting a frozen corpus")
 
 if __name__ == "__main__":
     generate()

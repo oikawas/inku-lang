@@ -4,6 +4,7 @@
       "bytes": 86,
       "digest": "695dfc5052a003860fa8791db44c2103",
       "input": {
+        "composition_seed": null,
         "context_text": "Place one black square near the center. Draw three white horizontal lines.",
         "ddl": "Place one black square near the center. Draw three white horizontal lines.",
         "enable_plugins": true,
@@ -12,8 +13,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": null,
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-base-en.ddl",
       "part": "a_expand"
@@ -22,6 +22,7 @@
       "bytes": 178,
       "digest": "96355e117cbbbe0ebd4a58eb5e7b79a4",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -30,8 +31,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": null,
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-base-ja.ddl",
       "part": "a_expand"
@@ -40,6 +40,7 @@
       "bytes": 134,
       "digest": "9b00a63c97276bcd19e8cadbde1547f8",
       "input": {
+        "composition_seed": null,
         "context_text": "黒い線を三本引く。Nature.うねり。",
         "ddl": "黒い線を三本引く。Nature.うねり。",
         "enable_plugins": false,
@@ -48,8 +49,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": null,
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-plugin-disabled.ddl",
       "part": "a_expand"
@@ -58,6 +58,7 @@
       "bytes": 121,
       "digest": "6699b9b6022baf30b4c2a53a27b81aad",
       "input": {
+        "composition_seed": null,
         "context_text": "黒い線を三本引く。Nature.うねり。",
         "ddl": "黒い線を三本引く。Nature.うねり。",
         "enable_plugins": true,
@@ -66,8 +67,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": null,
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-plugin-enabled.ddl",
       "part": "a_expand"
@@ -76,6 +76,7 @@
       "bytes": 151,
       "digest": "df34ffb5dd8f45860233d493de097cff",
       "input": {
+        "composition_seed": null,
         "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
         "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
         "enable_plugins": true,
@@ -84,8 +85,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": null,
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-tenkei-auto.ddl",
       "part": "a_expand"
@@ -94,6 +94,7 @@
       "bytes": 70,
       "digest": "7d97e7ae8a53ec78fd6438db1cd732ae",
       "input": {
+        "composition_seed": null,
         "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
         "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
         "enable_plugins": true,
@@ -102,8 +103,7 @@
         "plugin_instructions_present": false,
         "tenkei": "none",
         "variation_amplitude": null,
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-tenkei-none.ddl",
       "part": "a_expand"
@@ -112,6 +112,7 @@
       "bytes": 151,
       "digest": "df34ffb5dd8f45860233d493de097cff",
       "input": {
+        "composition_seed": null,
         "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
         "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
         "enable_plugins": true,
@@ -120,8 +121,7 @@
         "plugin_instructions_present": false,
         "tenkei": "sparse",
         "variation_amplitude": null,
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-tenkei-sparse.ddl",
       "part": "a_expand"
@@ -130,6 +130,7 @@
       "bytes": 178,
       "digest": "96355e117cbbbe0ebd4a58eb5e7b79a4",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -138,8 +139,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": "large",
-        "variation_seed": null,
-        "vary_seed": null
+        "variation_seed": null
       },
       "output_path": "a_expand/A-variation-amplitude-only.ddl",
       "part": "a_expand"
@@ -148,6 +148,7 @@
       "bytes": 73,
       "digest": "a11d3f13c797008ee42d28623ae97ec9",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -156,8 +157,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": "large",
-        "variation_seed": 1,
-        "vary_seed": null
+        "variation_seed": 1
       },
       "output_path": "a_expand/A-variation-large-1.ddl",
       "part": "a_expand"
@@ -166,6 +166,7 @@
       "bytes": 73,
       "digest": "a11d3f13c797008ee42d28623ae97ec9",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -174,8 +175,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": "large",
-        "variation_seed": 12345,
-        "vary_seed": null
+        "variation_seed": 12345
       },
       "output_path": "a_expand/A-variation-large-12345.ddl",
       "part": "a_expand"
@@ -184,6 +184,7 @@
       "bytes": 163,
       "digest": "2bef99f976ca96467a6e7d84bf644f2f",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -192,8 +193,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": "medium",
-        "variation_seed": 1,
-        "vary_seed": null
+        "variation_seed": 1
       },
       "output_path": "a_expand/A-variation-medium-1.ddl",
       "part": "a_expand"
@@ -202,6 +202,7 @@
       "bytes": 280,
       "digest": "f3857bcc8e8684548f2122d6dfc4dd76",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -210,8 +211,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": "medium",
-        "variation_seed": 12345,
-        "vary_seed": null
+        "variation_seed": 12345
       },
       "output_path": "a_expand/A-variation-medium-12345.ddl",
       "part": "a_expand"
@@ -220,6 +220,7 @@
       "bytes": 178,
       "digest": "96355e117cbbbe0ebd4a58eb5e7b79a4",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -228,8 +229,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": null,
-        "variation_seed": 12345,
-        "vary_seed": null
+        "variation_seed": 12345
       },
       "output_path": "a_expand/A-variation-seed-only.ddl",
       "part": "a_expand"
@@ -238,6 +238,7 @@
       "bytes": 73,
       "digest": "a11d3f13c797008ee42d28623ae97ec9",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -246,8 +247,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": "small",
-        "variation_seed": 1,
-        "vary_seed": null
+        "variation_seed": 1
       },
       "output_path": "a_expand/A-variation-small-1.ddl",
       "part": "a_expand"
@@ -256,6 +256,7 @@
       "bytes": 193,
       "digest": "968fb78853d9103729ba1823aef7e825",
       "input": {
+        "composition_seed": null,
         "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
         "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
         "enable_plugins": true,
@@ -264,8 +265,7 @@
         "plugin_instructions_present": false,
         "tenkei": "auto",
         "variation_amplitude": "small",
-        "variation_seed": 12345,
-        "vary_seed": null
+        "variation_seed": 12345
       },
       "output_path": "a_expand/A-variation-small-12345.ddl",
       "part": "a_expand"
@@ -2079,8 +2079,8 @@
       "part": "b_coerce"
     },
     "B-trigger-auto": {
-      "bytes": 5207,
-      "digest": "a3b365e9293ac7adc92816e025053a57",
+      "bytes": 5214,
+      "digest": "63b55a8fb9f9567e4cc829e1d30bbeb8",
       "fired_branches": {
         "coerce_and_repair_instruction": 1,
         "with_color_delivery_repair": 1,

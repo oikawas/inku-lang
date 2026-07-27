@@ -1101,6 +1101,25 @@ version confirms the existing cases are byte-identical, then moves forward and
 freezes that identity as the artifact: **the proof sheet showing that adding a
 block moved none of the existing prints.**
 
+**Renaming a tool or a word does not raise a version** (author's ruling,
+2026-07-27, writing down the precedent set at v2.7.9). A rename such as `hair` →
+`silverpoint` **does move the string that comes out of the same input**, so it
+meets the letter of "when the output changes" above. But **only the name moved:
+the layer behaves identically** — the tool draws at the same width in the same
+hand. Raising the version would **put a generational boundary in the provenance
+of works that differ by a name and nothing else**.
+
+- **A rename re-freezes the corpus in place** rather than opening a new version
+  directory. Render engine 15 and the coerce golden were re-frozen that way at
+  v2.7.9. **The DDL corpus was missed in that same commit, and CI went red on
+  eight consecutive pushes** until v2.8.0 / Build 727.
+- **The identity guard cannot tell a sanctioned rename from an unsanctioned
+  rewrite.** It fires *after* writing, and **firing once while the second run
+  exits 0 byte-identical is the property it defends**. Accept the firing only
+  when you already know the change is a rename.
+- **Growing the vocabulary does raise the version** (above). **Adding a word and
+  renaming one are different acts.**
+
 `ddl_version` and `ddl_engine_version` **start counting at 1** (author's ruling,
 2026-07-24). No other version shares those numbers, which keeps the separate
 namespaces from being read as linked. They step in whole integers.

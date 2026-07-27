@@ -114,15 +114,17 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
     assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_824
-    assert _digest(composer.SYSTEM_PROMPT) == "ecd4fe5e3caafc60"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_989
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "1f4ecf4b698bf95b"
+    assert _digest(composer.SYSTEM_PROMPT) == "d2fb6501e7dfb7cb"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 41_001
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "e10449285df81420"
     # `hair` -> `silverpoint` の改名で、Stage 2 の素材語対応表 2 行と作例 8 件、
     # そして weight の enum と description が動いた。tool schema は 17_696 -> 17_713。
+    # 色選択の一行が `palette` を捨てて `抽象色` / `the abstract colors` になった
+    # (2026-07-27)。**日本語はバイト数が動かない**ので、長さだけを見る検査は素通りする。
     assert len(tool_json.encode("utf-8")) == 17_713
     assert _digest(tool_json) == "297548040c697b68"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a1bb4ff70488fb35"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "397195ed887f6adb"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "261373d0123a740f"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "f5bd29704e5906f2"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -224,8 +226,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     changed_tool = replace_description(changed_tool)
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "ad1f5d9ada727d7a"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "ecd4fe5e3caafc60"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "643b3a3256164d3a"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "d2fb6501e7dfb7cb"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

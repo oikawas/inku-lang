@@ -1142,3 +1142,14 @@ The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the r
 - **`artwork` appears nowhere in README or `manual/en/`** — the handoff's note was inaccurate. It survives only in the **historical entries** of `CHANGELOG.md` and `PROJECT_CONTEXT.md`, which are not rewritten.
 - **The `generation`, `image` and `create` that remain are faithful translations of 生成, 画像 and 作る** in the Japanese (README.ja's もう一度生成 / による生成です / 生成後は歳時記を参照し; the manual's 画像の作成方法 / バッチ生成 / Stage 2が作る). **Moving the English to the dictionary alone would break the pairing**, so it is left for the author to rule on.
 - **`SPEC.md`'s seven `scene-tone palette`s are held back for the same reason** — no counterpart term is findable in `SPEC.ja.md`, and a translation should not be invented ahead of the source. **The three `jitter`s are sound**, being an identifier and the signal sense.
+
+### v2.8.0 — call the six colors the six colors (Build 729, 2026-07-27)
+
+**The Stage 2 system prompt told the model to "choose palette by scene tone".** What it chooses there is **the six abstract colors**, never a color catalog — catalogs are server-owned and resolved after Stage 2. **`palette` is also a real field in the catalog JSON**, so **one word was carrying two meanings inside the implementation**. Both prompts now say the abstract colors.
+
+- **This moves the model.** The Stage 2 digests go **`a1bb4ff70488fb35` → `261373d0123a740f` (ja)** and **`397195ed887f6adb` → `f5bd29704e5906f2` (en)**.
+- **The Japanese prompt does not change length** (42,824 either way), so **a check that only measures bytes lets this through**; the pinned digests are what catch it. English goes 40,989 → 41,001.
+- **`SPEC.md` follows the wording it was mirroring** (`scene-tone palette` → `scene-tone color`, four places). **`SPEC.ja.md` has no passage for this rule at all** — the two SPECs have diverged down to their section numbering.
+- **The six remaining `palette`s in SPEC are sound**: four are identifiers in the catalog JSON, two are ordinary art vocabulary.
+- **Behavioural equivalence cannot be proven deterministically** — once a word in the prompt moves, only the model can say. **Every deterministic check is green**: server 1423 passed / 31 skipped.
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 729.

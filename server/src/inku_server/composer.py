@@ -104,7 +104,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **灰色の主題は background ではなく foreground の color="gray" として扱う。灰の濃淡だけで構成せず、黒・白・青・赤・緑の可視色を併用する**
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
 - **色とりどり・多色配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
-- **明示色が少ない場合は場のトーンで palette を選ぶ。春・花・温かい光は red/green/white、水・夜・冷気は blue/white/gray、森・葉・香りは green/white/gray。抽象色に収まらないニュアンスは color_hint に保持する**
+- **明示色が少ない場合は場のトーンで抽象色を選ぶ。春・花・温かい光は red/green/white、水・夜・冷気は blue/white/gray、森・葉・香りは green/white/gray。抽象色に収まらないニュアンスは color_hint に保持する**
 - **強い単色背景 (black/red/blue/green) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
 
 ## 配置と焦点
@@ -476,7 +476,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Treat gray subjects as foreground color="gray", not as the background. Do not build gray value-only drawings; combine gray with visible black, white, blue, red, or green foreground**
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
-- **When explicit colors are sparse, choose palette by scene tone. Spring/flowers/warm light → red/green/white; water/night/cold air → blue/white/gray; forest/leaves/fragrance → green/white/gray. Preserve unavailable nuance in color_hint**
+- **When explicit colors are sparse, choose the abstract colors by scene tone. Spring/flowers/warm light → red/green/white; water/night/cold air → blue/white/gray; forest/leaves/fragrance → green/white/gray. Preserve unavailable nuance in color_hint**
 - **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
 
 ## Placement and focus

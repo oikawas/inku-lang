@@ -28,7 +28,7 @@ inku-lang/
 - uv
 - Node.js and npm
 - Git or a deployment mechanism such as rsync
-- OS libraries required by CairoSVG
+- (No extra OS libraries: `resvg-py`, which rasterizes PNG output, ships as a wheel)
 - Optional: PostgreSQL, reverse proxy, and TLS certificate
 
 ```sh

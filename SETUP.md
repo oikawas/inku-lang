@@ -36,7 +36,7 @@ To run from source:
 - `uv`
 - Node.js 20 or newer is recommended
 - npm
-- An SVG rasterizer when PNG export is needed
+- `resvg-py` when PNG export is needed (installed by `uv sync`)
 
 To run in containers:
 
@@ -44,7 +44,9 @@ To run in containers:
 
 ### About PNG output
 
-PNG conversion **prefers resvg and falls back to CairoSVG**. The fallback still writes PNGs, but **the material filters (pencil / crayon / chalk / brush_thick) are lost from both the PNG and the Vision input**. Which backend is in use is logged once at server startup. PNG output is disabled when no rasterizer is installed at all.
+PNG conversion goes through **resvg alone. There is no fallback**. Where resvg is absent, PNG output raises instead of degrading quietly.
+
+CairoSVG used to stand behind it. It does not implement `feTurbulence` / `feDisplacementMap` / `feGaussianBlur`, and rather than failing it **drops them**: the ground grain and the material filters (pencil / crayon / chalk / brush_thick) vanished from the PNG, which came back looking clean. A rasterizer that quietly returns the wrong picture is worse than one that is missing. The backend in use and its version are logged once at server startup.
 
 ## Unpack
 

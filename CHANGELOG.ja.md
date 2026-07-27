@@ -3114,3 +3114,19 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **触っていないもの**: `interpreter.py` の few-shot 検索キーワード `"髪"`（作者が書く入力語を引く検索キーであり出力語彙ではない。ただし**銀筆を足していないので、語彙に戻った銀筆はこの細線の作例を引かない**）／`language_support/ja.py` `en.py` の `material_weight_hints`（銀筆の行が無い。`hair` の行も元から無く、改名による退行ではないが、**Stage 2 が weight を落としたときの救済経路が銀筆には無い**）／`brush_fine`（面相筆）と太さの軸／Android（`gen_android_reference.py` の 2 箇所は改名したが**生成器は未実行**で、Kotlin 実装と、凍結 fixture 36 件のうち `hair` を含む 3 件はそのまま）
 - **検証:** server **1411 passed / 30 skipped**（+9 は新設した判別検査）、cli **69 passed**、ruff clean、`npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**。判別テスト 4 本（置換経路の恒等化で本番 445 件が全て `ValidationError`／`GRAMMARS` の 1 値を動かすと 16 本だけ動く／`_PRUNED` に戻すと digest が改名前の値へ完全に一致する／生成器 2 回でバイト一致）
 - **記録**: 種が道具の「名前」をハッシュしているのが、改名に値段がつく理由である。**直すと全作品が一度動くので、それは engine の版に属する**
+
+---
+
+### v2.7.10 — PNG は resvg だけで焼く（Build 719、2026-07-27）
+
+**警告は前からあった。それでも誤らせた。** cairosvg は `feTurbulence` / `feDisplacementMap` / `feGaussianBlur` を実装しておらず、**失敗もせずに落とす**。地の粒も材質フィルタも消えた「きれいに見える PNG」が返り、**その絵が判断の材料に使われていた**（4 回）。CLI の stderr 警告・サーバーの起動時 WARNING・docstring・成果物へ記録する `png_rasterizer` と、注意書きは v2.2.1 から四重に置いてあった。**人を誤らせるのはログ行ではなく絵である**ため、文書化ではなく撤去を選んだ（作者指示 2026-07-27）。
+
+- **フォールバックは無くなった。** `rasterizer.py` から `_cairosvg_renderer` と `BACKEND_CAIROSVG` と `_BACKENDS` 表が消え、`svg_to_png` は resvg が無ければ `RasterizerUnavailable` を上げる。**これが唯一の振る舞いの変更**であり、resvg の入っていない環境では PNG 出力が静かに劣化するのではなく停止する（作者裁定済み）
+- **依存宣言 3 本を落とした。** `shared` / `server` / `cli` の `pyproject.toml` から `cairosvg>=2.7.0` を外し、lock 2 本から 145 行・148 行が消えた。`api.py` の起動ログはフォールバックの分岐を失い、`cli.py` は 1 回だけ出す警告と「resvg-py or cairosvg」というエラー文 3 か所を失った
+- **番人を 3 つ置いた。** ① 3 つの `pyproject.toml` を `tomllib` で読み、依存に `cairosvg` が無いこと ② `shared/src` / `server/src` / `cli/src` / `server/scripts` の全 `.py` に `import cairosvg` が無いこと（**行頭の import 文だけを見るので、なぜ消えたかを述べる散文は残せる**） ③ **入っていても到達不能であること** — `pytest.importorskip` で cairosvg が import できる環境だけ走り、resvg を塞いだうえで例外になることを確かめる
+- **増えた skip 1 はその 3 つ目である。** 依存を落とした結果 cairosvg が venv から消えたので、番人 ③ は skip になる。**入っている環境でだけ意味を持つ検査なので、これは正しい**
+- **副次: `server` の venv から `pillow` が消えた。** cairosvg の推移依存だったもので、`server` と `shared` のコードは `PIL` を一度も import していない。`cli` は `pillow>=12.0.0` を明示依存に持つので残る（**コンタクトシートを組む道具は `cli` の venv にある**）
+- **撤去しなかったもの**: `android/scripts/render_png_review.py` は `cairosvg.svg2png` を呼んだままである（番人 ② の走査範囲は `android/` を含まない）。**Android の目視レビュー用スクリプトであり、今回の撤去理由がそのまま当たる経路**なので、扱いは作者裁定を仰ぐ。`server/Dockerfile` の `libcairo2` も cairosvg のための OS 依存だが残っている
+- **文書 4 本を現在形に直した**: `SETUP.ja.md` / `SETUP.md`（「resvg を優先し CairoSVG はフォールバック」→ resvg のみ・不在なら停止）、`manual/ja/application-install.md` / `manual/en/application-install.md`（「CairoSVG が必要とする OS ライブラリ」→ resvg-py は wheel なので追加の OS ライブラリは要らない）。**過去の版を述べる CHANGELOG と PROJECT_CONTEXT の記述は履歴なので触っていない**
+- **検証:** server **1413 passed / 31 skipped**、cli **69 passed**、ruff clean（`server` / `cli` とも）、`npm run check` 0 errors / 2 warnings / 217 files。**SVG は 1 バイトも変わらない**ので参照コーパスは再凍結していない。render engine は `"15"` のまま
+- **記録**: 黙って劣化するフォールバックは、文書化ではなく撤去する。**「差が無い」と「差が写っていない」を区別できない道具を、絵を判断する経路に置かない**

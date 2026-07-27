@@ -28,7 +28,7 @@ inku-lang/
 - uv
 - Node.jsとnpm
 - Gitまたはrsyncなどの配置手段
-- CairoSVGが必要とするOSライブラリ
+- （PNG出力に使う `resvg-py` はwheelで入るため、OSライブラリの追加導入は要らない）
 - 任意: PostgreSQL、reverse proxy、TLS証明書
 
 ```sh

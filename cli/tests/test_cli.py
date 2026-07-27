@@ -295,10 +295,23 @@ def test_models_command_accepts_providers():
     assert args.color_catalog == "ink_season"
 
 
+def test_the_colophon_subcommand_replaced_okugaki_outright():
+    """奥書のサブコマンドは `colophon`。**ローマ字は残していない。**
+
+    辞書 (`web/src/lib/i18n/GLOSSARY.md`) が 奥書 = colophon と定めており、
+    打鍵する名前は `paint` / `refine` / `lineage` と同じ欄にある。
+    エイリアスを残さないのは作者裁定 (2026-07-27)。
+    """
+    parser = cli.build_parser()
+    assert parser.parse_args(["colophon", "node-1"]).func is cli.command_colophon
+    with pytest.raises(SystemExit):
+        parser.parse_args(["okugaki", "node-1"])
+
+
 def test_vision_commands_keep_model_alias_and_prefer_vision_model():
     parser = cli.build_parser()
-    legacy = parser.parse_args(["okugaki", "node-1", "--model", "legacy-vision"])
-    explicit = parser.parse_args(["okugaki", "node-1", "--vision-model", "new-vision"])
+    legacy = parser.parse_args(["colophon", "node-1", "--model", "legacy-vision"])
+    explicit = parser.parse_args(["colophon", "node-1", "--vision-model", "new-vision"])
     review = parser.parse_args(["vision-review", "out", "--vision-model", "review-vision"])
 
     assert legacy.model == "legacy-vision"

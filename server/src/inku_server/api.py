@@ -4112,7 +4112,7 @@ def api_vision_refine_advice(
     return VisionRefineAdviceResponse(**advice)
 
 
-@app.get("/api/lineage/{node_id}/okugaki", response_model=list[OkugakiItem], response_model_exclude_none=True)
+@app.get("/api/lineage/{node_id}/colophon", response_model=list[OkugakiItem], response_model_exclude_none=True)
 def api_okugaki_list(node_id: str, actor: dict = Depends(_current_user)) -> list[OkugakiItem]:
     branch = _db.get_lineage_branch(actor["id"], node_id)
     if branch is None:
@@ -4120,7 +4120,7 @@ def api_okugaki_list(node_id: str, actor: dict = Depends(_current_user)) -> list
     return [OkugakiItem(**item) for item in _db.list_okugaki(actor["id"], node_id)]
 
 
-@app.post("/api/lineage/{node_id}/okugaki", response_model=OkugakiItem, response_model_exclude_none=True)
+@app.post("/api/lineage/{node_id}/colophon", response_model=OkugakiItem, response_model_exclude_none=True)
 def api_okugaki_generate(
     node_id: str,
     body: OkugakiGenerateBody,
@@ -4159,10 +4159,10 @@ def api_okugaki_generate(
     return OkugakiItem(**item)
 
 
-@app.delete("/api/okugaki/{okugaki_id}")
-def api_okugaki_delete(okugaki_id: str, actor: dict = Depends(_current_user)) -> dict[str, bool]:
-    if not _db.delete_okugaki(actor["id"], okugaki_id):
-        raise HTTPException(status_code=404, detail="okugaki not found")
+@app.delete("/api/colophon/{colophon_id}")
+def api_okugaki_delete(colophon_id: str, actor: dict = Depends(_current_user)) -> dict[str, bool]:
+    if not _db.delete_okugaki(actor["id"], colophon_id):
+        raise HTTPException(status_code=404, detail="colophon not found")
     return {"ok": True}
 
 

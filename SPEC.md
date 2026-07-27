@@ -2114,7 +2114,7 @@ The Vision method is a finite advisory loop, not quality optimization or automat
 
 ## Colophon: Reading a Lineage
 
-A colophon (okugaki) is an append-only, first-person reading attached to one lineage branch from its root to the displayed work. It is neither a verdict nor a summary. It describes observable changes between generations and closes by verbalizing what remained invariant across the branch.
+A colophon is an append-only, first-person reading attached to one lineage branch from its root to the displayed work. It is neither a verdict nor a summary. It describes observable changes between generations and closes by verbalizing what remained invariant across the branch.
 
 - Each generation is read sequentially. The request for generation i contains only generations 0 through i, so later works cannot turn earlier choices into steps toward an alleged final form.
 - Inputs are existing lineage edge facts, captions, server-rasterized PNG pairs, and deterministic differences from the v1.80 feature mirror: composition family, primitives, colors, density, angles, and arrangement paths. No new quality metric is introduced. Vision images are bounded to a 512px single work or an aspect-correct 768×384 before/after pair.
@@ -2123,7 +2123,7 @@ A colophon (okugaki) is an append-only, first-person reading attached to one lin
 - Japanese and English evaluation terms are scanned as warnings only. A warning never forces rewriting, regeneration, or rejection.
 - The server appends the reader model and date as a mechanical signature. Records store the target node, branch snapshot, model, time, language, body, warnings, and fact sheet in the current user's scope.
 - Records can be appended or deleted, but never edited. Idempotency keys prevent duplicate saves, and lists are displayed oldest first.
-- The colophon is available only through the explicit Lineage action or `inku-cli okugaki` (the CLI subcommand keeps its name); `--dry-run` generates without saving. It never affects dh1, rh2, generation, variation, refinement selection, acceptance, quality functions, or branch recommendation.
+- The colophon is available only through the explicit Lineage action or `inku-cli colophon`; `--dry-run` generates without saving. It never affects dh1, rh2, generation, variation, refinement selection, acceptance, quality functions, or branch recommendation.
 
 v1.88 adds no automatic repair or generation branch. Its refinement accounting deliberately limits the new AI reading to a disconnected mirror, making teleological “best branch” narratives less likely to become application behavior.
 

@@ -2866,7 +2866,7 @@ def command_lineage(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_okugaki(args: argparse.Namespace) -> int:
+def command_colophon(args: argparse.Namespace) -> int:
     import uuid
 
     config = load_config()
@@ -2887,7 +2887,7 @@ def command_okugaki(args: argparse.Namespace) -> int:
         payload["model"] = vision_model
     data, _ = client.request(
         "POST",
-        f"/api/lineage/{node_id}/okugaki",
+        f"/api/lineage/{node_id}/colophon",
         data=payload,
         headers={"Idempotency-Key": str(uuid.uuid4())},
     )
@@ -3598,16 +3598,16 @@ def build_parser() -> argparse.ArgumentParser:
     lineage_show.set_defaults(func=command_lineage)
     lineage_promote.set_defaults(func=command_lineage)
 
-    okugaki = subparsers.add_parser("okugaki", help="recite one root-to-target lineage branch as an append-only reading")
-    _add_common_server_args(okugaki)
-    okugaki.add_argument("target", help="history item ID or lineage node ID")
-    okugaki.add_argument("--vision-model", help="Vision reader model (defaults to CLI/server Vision setting)")
-    okugaki.add_argument("--model", help="compatibility alias for --vision-model")
-    okugaki.add_argument("--language", choices=("ja", "en"), default="ja")
-    okugaki.add_argument("--dry-run", action="store_true", help="generate and print without saving")
-    okugaki.add_argument("--json", action="store_true", help="print the complete response as JSON")
-    okugaki.add_argument("--output", "-o", help="also write the recitation body to a UTF-8 file")
-    okugaki.set_defaults(func=command_okugaki)
+    colophon = subparsers.add_parser("colophon", help="recite one root-to-target lineage branch as an append-only reading")
+    _add_common_server_args(colophon)
+    colophon.add_argument("target", help="history item ID or lineage node ID")
+    colophon.add_argument("--vision-model", help="Vision reader model (defaults to CLI/server Vision setting)")
+    colophon.add_argument("--model", help="compatibility alias for --vision-model")
+    colophon.add_argument("--language", choices=("ja", "en"), default="ja")
+    colophon.add_argument("--dry-run", action="store_true", help="generate and print without saving")
+    colophon.add_argument("--json", action="store_true", help="print the complete response as JSON")
+    colophon.add_argument("--output", "-o", help="also write the recitation body to a UTF-8 file")
+    colophon.set_defaults(func=command_colophon)
 
     # refine
     refine = subparsers.add_parser("refine", help="generate refined options from an existing work")

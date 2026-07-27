@@ -183,3 +183,23 @@ def test_generate_signs_mechanically_and_storage_is_append_only_scoped_and_idemp
         db.delete_all(other["id"])
         assert db.delete_user(user["id"])
         assert db.delete_user(other["id"])
+
+
+# --- 奥書の道は colophon で通る (v2.8.0) -------------------------------------
+
+
+def test_the_routes_say_colophon_and_no_longer_say_okugaki():
+    """**API パスは `colophon`。ローマ字のパスは残していない**（作者裁定 2026-07-27）。
+
+    語を運んでいたのはパスだけである — `OkugakiItem` の応答フィールドに
+    `okugaki` という名前のものは一つも無い。したがって改名はパスで閉じる。
+
+    **DB のテーブル名・列名・`model_settings` の `okugaki_model` は動かさない。**
+    辞書 §6 が識別子を範囲の外に置いており、保存済みデータに触れるため。
+    """
+    from inku_server.api import app
+
+    paths = {route.path for route in app.routes if getattr(route, "path", "").startswith("/api/")}
+    assert "/api/lineage/{node_id}/colophon" in paths
+    assert "/api/colophon/{colophon_id}" in paths
+    assert not [path for path in paths if "okugaki" in path], "ローマ字のパスが残っている"

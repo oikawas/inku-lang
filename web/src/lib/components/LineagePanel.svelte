@@ -226,7 +226,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		okugakiLoading = true;
 		okugakiError = null;
 		try {
-			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/okugaki`, { credentials: 'include', cache: 'no-store' });
+			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/colophon`, { credentials: 'include', cache: 'no-store' });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			okugakiItems = await response.json();
 			okugakiLoadedTarget = nodeId;
@@ -257,7 +257,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		okugakiGenerating = true;
 		okugakiError = null;
 		try {
-			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/okugaki`, {
+			const response = await fetch(`/api/lineage/${encodeURIComponent(nodeId)}/colophon`, {
 				method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': createIdempotencyKey() },
 				body: JSON.stringify({ model: selectedOkugakiModel.trim(), language: isJapanese ? 'ja' : 'en', save: true })
 			});
@@ -276,7 +276,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	async function deleteOkugaki(item: OkugakiItem): Promise<void> {
 		if (!item.id || !confirm(t().okugakiDeleteConfirm)) return;
-		const response = await fetch(`/api/okugaki/${encodeURIComponent(item.id)}`, { method: 'DELETE', credentials: 'include' });
+		const response = await fetch(`/api/colophon/${encodeURIComponent(item.id)}`, { method: 'DELETE', credentials: 'include' });
 		if (response.ok) okugakiItems = okugakiItems.filter((entry) => entry.id !== item.id);
 		else okugakiError = (await response.text()) || `HTTP ${response.status}`;
 	}

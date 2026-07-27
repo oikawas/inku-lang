@@ -58,7 +58,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 添景 | **staffage** | 名詞。tooltip に "minor accompanying elements" を添える | ~~decoration~~, ~~props~~ |
 | 歳時記 | **Saijiki** | 固有名詞・大文字 | ~~almanac~~ 単独 |
 | 詞書 | **headnote** | 名詞。語彙ダイアログでのみ "kotobagaki" の注記可 | ~~caption~~, ~~Kotobagaki~~（ラベルとして） |
-| 奥書 | **colophon** | 名詞 | ~~Okugaki~~（ローマ字残しは不採用） |
+| 奥書 | **colophon** | 名詞。**CLI サブコマンドと API パスも `colophon`**（§6 の例外・v2.8.0） | ~~Okugaki~~（ローマ字残しは不採用） |
 | 系譜 | **lineage** | 名詞 | — |
 | 系譜全体図 | **lineage map**（ボタンは **Map**） | 名詞句 | ~~Overview~~ |
 | 世代 | **generation**（略 **Gen.**） | 名詞。**世代の意味のときだけ generation を使ってよい** | — |
@@ -159,6 +159,18 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `web/src/lib/i18n/ja.ts` | 日本語正本 |
 | 三項式・`getLang()` 分岐の**日本語側リテラル** | 同上 |
 | JSON Score の鍵 / API フィールド名 / SVG の class 名 / DB カラム名 / `rh3` 等の識別子 | 表示層の改修で識別子を動かさない |
+
+**例外が 1 つある — 奥書（2026-07-27 作者裁定、v2.8.0 で実施）。**
+**打鍵する名前は英語の術語で付ける**という先例（`paint` / `refine` / `lineage` が
+辞書語と一致している。辞書 :55 は「API `/api/paint` と一致」と明記する）に対し、
+**`okugaki` だけがローマ字で残っていた**ため、**CLI サブコマンド名と API パスを
+`colophon` へ移した**。エイリアスは残していない（互換が切れるので minor 採番）。
+
+**それでも動かさないもの**: DB のテーブル名・列名（`okugaki` テーブル）、
+`model_settings` の `okugaki_model`（**保存済みユーザー設定**）、
+モジュール名 `okugaki.py`、i18n の鍵 `okugaki*`。
+**鍵名のローマ字は例外ではなく通例である** — 変奏の鍵は `variation` という
+完璧な辞書語がありながら **`hensou*` のまま**である。禁じているのは表示に出る語であって、鍵ではない。
 
 **判断規則**: 変えようとしている文字列が Stage 1/2 プロンプト・Score・テスト fixture に届いているなら、
 **直さずに作者へ報告する**（歳時記カテゴリ名が先例）。

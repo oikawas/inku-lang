@@ -3209,3 +3209,41 @@ engine 13 の前例。**条件は「公開前に済ませること」**）。
   **材質ではなく演奏 seed を動かす**形に置き換えた（材質を固定したまま導出だけを揺らせる）
 - **検証:** server **1419 passed / 31 skipped**（+6）、cli **69 passed**、ruff clean、
   `npm run check` 0 errors / 2 warnings / 217 files。**render engine は `"15"` のまま**
+
+---
+
+### v2.8.0 — 奥書の道は colophon で通る（**互換が切れる**）（Build 722、2026-07-27）
+
+**打鍵する名前は英語の術語で付いている** — `paint` / `refine` / `lineage` はいずれも用語辞書と
+一致しており、辞書は「API `/api/paint` と一致」と**明記**している。**その欄でローマ字だったのは
+`okugaki` だけ**だったので、**CLI サブコマンド名と API パスを `colophon` へ移した**
+（作者裁定 2026-07-27）。**エイリアスは残していない。**
+
+- **minor 採番の理由は互換が切れることである。** 採番規則の「互換性が切れるとき（保存データ・
+  API・エディション ID の形式変更）」に当たる。**patch ではない**
+- **語を運んでいたのはパスだけだった** — 応答モデル `OkugakiItem` のフィールドは
+  `id` / `target_node_id` / `branch_snapshot` / `model` / `at` / `language` / `body` /
+  `warnings` / `fact_sheet` で、**`okugaki` という名前のフィールドは一つも無い**。
+  だから改名はパスで閉じる
+- **動かしたもの（4 経路）**:
+  `GET|POST /api/lineage/{node_id}/okugaki` → **`/colophon`**、
+  `DELETE /api/okugaki/{okugaki_id}` → **`/api/colophon/{colophon_id}`**、
+  CLI サブコマンド `okugaki` → **`colophon`**、web の fetch 3 か所
+- **動かしていないもの（辞書 §6 の識別子）**: DB のテーブル名 `okugaki` と索引
+  `uq_okugaki_user_idempotency`、**`model_settings` の `okugaki_model`（保存済みユーザー設定）**、
+  モジュール名 `okugaki.py`、i18n の鍵 `okugaki*`
+  - **鍵名のローマ字は例外ではなく通例である** — 変奏は `variation` という完璧な辞書語を
+    持ちながら、web の鍵は **`hensouAxis` / `hensouSmall` / `hensouMedium` / `hensouLarge` …
+    とローマ字のまま**である。辞書が禁じているのは**表示に出る語**であって、鍵ではない
+- **番人を 2 つ置いた**: ① `app.routes` に `okugaki` を含むパスが 1 本も無く、
+  `/api/lineage/{node_id}/colophon` と `/api/colophon/{colophon_id}` が在ること
+  ② CLI が `colophon` を受け、**`okugaki` では `SystemExit` になること**（エイリアス不在の確認）
+- **辞書に境界を書いた** — `GLOSSARY.md` の 奥書 の行に「CLI サブコマンドと API パスも colophon」
+  を追記し、**§6 に「例外が 1 つある」節**を足して、**何を動かして何を動かさないか**と
+  **`hensou*` が反例であること**を記録した
+- **文書 4 本を追随**: `SPEC.ja.md`（`inku-cli okugaki` → `colophon`）、
+  `SPEC.md`（**「(okugaki)」の併記と「the CLI subcommand keeps its name」を削除**）、
+  `manual/{ja,en}/cli-reference-for-ai.md`（§2.5 の見出しと用例）
+- **検証:** server **1420 passed / 31 skipped**（+1）、cli **70 passed**（+1）、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**。
+  **描画には触れていない**（render engine は `"15"`、SVG は不変）

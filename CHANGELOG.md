@@ -1055,3 +1055,19 @@ The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the r
   - **Two perturbations confirm it fails**: emptying the noise table, and killing the fibre branch.
 - **One existing check was rewritten.** `test_explicit_ground_seed_still_bypasses_the_derivation` asserted that paper and washi are identical under an explicit seed, **which is now false by design**. It varies **the performance seed instead of the material**, so the derivation can be shaken while the material is held fixed.
 - **Verification.** server **1419 passed / 31 skipped** (+6), cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files. **The render engine stays at `"15"`.**
+
+---
+
+### v2.8.0 — the colophon's road is named colophon (**a compatibility break**) (Build 722, 2026-07-27)
+
+**The names you type are English terms of art**: `paint`, `refine` and `lineage` all match the terminology dictionary, which **says so explicitly** of `/api/paint`. **`okugaki` was the only romaji left in that column**, so **the CLI subcommand and the API paths moved to `colophon`** (author's ruling, 2026-07-27). **No alias was kept.**
+
+- **The minor version is because compatibility breaks.** The numbering policy reserves minor for "when compatibility breaks (stored data, API, edition-ID format)". **This is not a patch.**
+- **Only the paths carried the word.** `OkugakiItem` returns `id`, `target_node_id`, `branch_snapshot`, `model`, `at`, `language`, `body`, `warnings` and `fact_sheet` — **not one field is named after it**. The rename therefore closes at the paths.
+- **What moved (four routes)**: `GET|POST /api/lineage/{node_id}/okugaki` → **`/colophon`**; `DELETE /api/okugaki/{okugaki_id}` → **`/api/colophon/{colophon_id}`**; the CLI subcommand `okugaki` → **`colophon`**; three `fetch` sites in the web client.
+- **What did not move (identifiers, per the dictionary's §6)**: the DB table `okugaki` and its index `uq_okugaki_user_idempotency`, **`okugaki_model` in `model_settings` (stored user settings)**, the module `okugaki.py`, and the i18n keys `okugaki*`.
+  - **Romaji in key names is the norm, not the exception.** Variation has a perfect dictionary word — `variation` — and its web keys are still **`hensouAxis`, `hensouSmall`, `hensouMedium`, `hensouLarge`**. What the dictionary forbids is **words that reach the screen**, not keys.
+- **Two sentinels**: ① no path in `app.routes` contains `okugaki`, and both `/api/lineage/{node_id}/colophon` and `/api/colophon/{colophon_id}` are present; ② the CLI accepts `colophon` and **raises `SystemExit` on `okugaki`** — the check that no alias survives.
+- **The boundary is written into the dictionary.** The 奥書 row now says the CLI subcommand and the API paths are `colophon` too, and **§6 gains an "there is one exception" passage** recording what moves, what does not, and **that `hensou*` is the counterexample**.
+- **Four documents follow**: `SPEC.ja.md` (`inku-cli okugaki` → `colophon`), `SPEC.md` (**dropping both the "(okugaki)" gloss and the claim that the CLI subcommand keeps its name**), and `manual/{ja,en}/cli-reference-for-ai.md` (the §2.5 heading and its usage line).
+- **Verification.** server **1420 passed / 31 skipped** (+1), cli **70 passed** (+1), ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` **788 strings / 36 exceptions / 0 errors**. **Nothing in the drawing was touched** — the render engine stays at `"15"` and no SVG moves.

@@ -1122,3 +1122,13 @@ The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the r
 - **The check was perturbed to watch it go red**: changing one tool name that coerce produces makes it exit 1 and print the way back (`git checkout -- server/reference/`).
 - **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 727.
 - **Verification (at Build 727).** server **1423 passed / 31 skipped**, cli **73 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, **both generators exit 0 byte-identical**.
+
+**The description gets its name on the typing side too, and two broken paths are fixed (Build 728).** `--original-text` **kept the retired third word in its spelling while the key it fills has been `description` since Build 725**. It becomes `--description`, **with no alias**, as the colophon and the staffage flag did; `refine generate --text` fills the same key and follows.
+
+- **That same rename had quietly broken two commands.** **`inspect` and `refine generate` build their payloads by hand instead of going through `_paint_payload`**, and both **kept posting `text` to `/api/paint` after Build 724** — a request carrying no `description` at all, which the required field turns into **a 422**. **All 73 cli tests stayed green, because they never reach a server.**
+- **What caught it was classifying every `*-text` flag** rather than fixing the named one. Had `--original-text` been treated alone, both would still be broken.
+- **The `paint` and `batch` help called the description a prompt**, a word the dictionary rejects for it; four strings are fixed. **`review evaluate --prompt` and its kin stay** — **there the word means the model's prompt**, a different referent, and only the description sense is banned.
+- **Four sentinels, and three perturbations to watch them go red**: an alias left behind, the help sliding back to `prompt`, and `inspect` reverting to the old key. **The `inspect` check swaps in a fake `ApiClient` and reads the outgoing payload** — a static scan cannot tell that key from the `"text"` in LLM provider payloads.
+- **The positional (`paint <text>`) does not move.** What you type there is the value, not the name.
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 728.
+- **Verification (at Build 728).** server **1423 passed / 31 skipped**, cli **76 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.

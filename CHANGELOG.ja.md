@@ -3367,3 +3367,26 @@ coerce ゴールデンを**版を上げずにその場で再凍結**したが、
 - **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 727 へ
 - **検証（Build 727 時点）:** server **1423 passed / 31 skipped**、cli **73 passed**、ruff clean、
   `npm run check` 0 errors / 2 warnings / 217 files、**両コーパスの生成器が exit 0 でバイト一致**
+
+**記述の語を打鍵する側でも揃え、壊れていた 2 経路を直した（Build 728）。**
+`--original-text` は**埋める先の鍵が Build 725 から `description` なのに、綴りに退役した
+第三の語 `text` を残していた**。`--description` へ移し、**エイリアスは残していない**
+（奥書・添景と同じ方針）。`refine generate --text` も同じ鍵を埋めていたので揃えた。
+
+- **同じ改名が 2 つのコマンドを黙って壊していた** — **`inspect` と `refine generate` は
+  `_paint_payload` を通らず自前で payload を組んでおり**、**Build 724 以降も旧鍵 `text` を
+  `/api/paint` へ送り続けていた**。`description` が必須なので、**その要求は 422 で落ちる**。
+  **cli のテストは実サーバを叩かないので 73 件が緑のまま気づけなかった**
+- **捕まえたのは「`*-text` 系の旗を全数分類した」から**である。`--original-text` だけを
+  名指しで直していたら、この 2 つは壊れたまま残った
+- **`paint` / `batch` の help が記述を `prompt` と呼んでいた**（辞書が退けている語）。
+  4 箇所を直した。**`review evaluate --prompt` などはそのまま** —
+  **あちらは LLM のプロンプトという別の指示対象**で、禁じられているのは記述を指す用法である
+- **番人を 4 つ置き、3 点の摂動で全部が赤くなることを確かめた**（エイリアス残存／
+  help が `prompt` へ戻る／`inspect` が旧鍵へ戻る）。
+  **`inspect` の検査は `ApiClient` を差し替えて送信そのものを覗く** —
+  静的な走査では LLM プロバイダ payload の `"text"` と区別がつかない
+- **位置引数（`paint <text>`）は動かしていない**。打鍵するのは値であって名前ではない
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 728 へ
+- **検証（Build 728 時点）:** server **1423 passed / 31 skipped**、cli **76 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files

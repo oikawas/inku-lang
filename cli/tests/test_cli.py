@@ -101,7 +101,7 @@ def test_paint_payload_drops_none_values():
 
 def test_paint_payload_separates_the_description_from_what_stage1_reads():
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--original-text", "一滴の墨"])
+    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--description", "一滴の墨"])
 
     payload = cli._paint_payload(args, "一滴の墨\n\n感情: 静か")
 
@@ -151,7 +151,7 @@ def test_paint_payload_includes_canvas_aspect():
 
 def test_compose_payload_for_ddl_input_mode():
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--original-text", "線"])
+    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--description", "線"])
 
     payload = cli._compose_payload(args, "白い背景に黒い線を一本引く。", stage2_model="s2", color_catalog="default")
 
@@ -358,7 +358,87 @@ def test_no_cli_flag_is_spelled_tenkei():
     assert not [flag for flag in flags if "tenkei" in flag]
 
 
-def test_vision_commands_keep_model_alias_and_prefer_vision_model():
+def test_the_description_flag_replaced_original_text_outright():
+    """作者の記述を渡す旗は `--description`。**エイリアスは残していない。**
+
+    埋める先の鍵が `description` なのに旗は `--original-text` で、**退役した第三の語
+    `text` を綴りに残していた**。奥書・添景と同じ方針 (2026-07-27 作者裁定)。
+    """
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--description", "一滴の墨"])
+    assert args.description == "一滴の墨"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["paint", "x", "--original-text", "一滴の墨"])
+
+    payload = cli._paint_payload(args, "一滴の墨\n\n感情: 静か")
+    assert payload["description"] == "一滴の墨"
+    assert payload["stage1_input"] == "一滴の墨\n\n感情: 静か"
+
+
+def _all_help_strings(parser) -> list[str]:
+    helps = [action.help for action in parser._actions if action.help]
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                helps.extend(_all_help_strings(sub))
+    return helps
+
+
+def test_no_cli_flag_says_original_text():
+    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。"""
+    flags = _all_option_strings(cli.build_parser())
+    assert "--description" in flags, "走査がサブパーサまで届いていない"
+    assert not [flag for flag in flags if "original" in flag]
+
+
+def test_the_drawing_commands_do_not_call_the_description_a_prompt():
+    """辞書は 記述 = description と定め `prompt` を退けている。help も表示に出る語である。
+
+    **走査は `paint` / `batch` に限る。** `review evaluate --prompt` などの `prompt` は
+    **LLM のプロンプトという別の指示対象**で、辞書が禁じているのは記述を指す用法のほう。
+    """
+    parser = cli.build_parser()
+    subparsers = next(
+        action for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
+    for name in ("paint", "batch"):
+        helps = _all_help_strings(subparsers.choices[name])
+        assert helps, f"{name} の help を集められていない"
+        assert not [text for text in helps if "prompt" in text.lower()], name
+
+
+def test_inspect_sends_the_description_key_to_paint(monkeypatch, tmp_path):
+    """**自前で payload を組む経路も `description` を送ること。**
+
+    Build 724 の改名は `_paint_payload` には当たったが、**`inspect` と
+    `refine generate` が自分で組んでいた payload 2 つを取りこぼした**。どちらも
+    旧鍵 `text` を送り続けており、`description` が必須になった要求は **422 で落ちていた**
+    (Build 728 で修正)。**ユニットテストは実サーバを叩かないので緑のままだった** —
+    捕まえるには送信そのものを覗くしかない。
+    """
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            return {"ddl": "中心に黒い円を置く。", "render_hash_short": "ABCD"}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        ["inspect", "一滴の墨", "--models", "m1", "--out-dir", str(tmp_path)]
+    )
+    assert cli.command_inspect(args) == 0
+
+    posts = [data for method, path, data in calls if path == "/api/paint"]
+    assert posts, "paint を叩いていない"
+    for payload in posts:
+        assert payload["description"] == "一滴の墨"
+        assert "text" not in payload
     parser = cli.build_parser()
     legacy = parser.parse_args(["colophon", "node-1", "--model", "legacy-vision"])
     explicit = parser.parse_args(["colophon", "node-1", "--vision-model", "new-vision"])

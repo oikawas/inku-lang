@@ -1116,7 +1116,7 @@ def _expand_case(name, ddl, **overrides):
         "ddl": ddl,
         "lang": "ja",
         "context_text": ddl,
-        "vary_seed": None,
+        "composition_seed": None,
         "enable_plugins": False,
         "plugin_instructions_present": False,
         "tenkei": "auto",
@@ -1143,7 +1143,7 @@ def ddl_expand_fixtures() -> None:
     corpus (`server/reference/ddl-engine-1/`), so the two agree where they overlap
     and a divergence points at one side. The rest exist to discriminate: variation
     seeds above 2**63 (a Long prints negative in Kotlin and every seeded key
-    shifts), a focus that has to resolve, `vary_seed` which only touches the
+    shifts), a focus that has to resolve, `composition_seed` which only touches the
     context, and `variation_report`, which is an output the DDL text does not show.
     """
     cases = [
@@ -1203,8 +1203,8 @@ def ddl_expand_fixtures() -> None:
             f"B-tenkei-en-{tenkei}", DDL_EXPAND_SENSORY_EN, lang="en",
             context_text=DDL_EXPAND_SENSORY_EN, tenkei=tenkei,
         ))
-    for vary_seed in (0, 12345, 2 ** 63 + 1):
-        cases.append(_expand_case(f"B-vary-seed-{vary_seed}", DDL_EXPAND_JA, vary_seed=vary_seed))
+    for composition_seed in (0, 12345, 2 ** 63 + 1):
+        cases.append(_expand_case(f"B-vary-seed-{composition_seed}", DDL_EXPAND_JA, composition_seed=composition_seed))
     cases.append(_expand_case("B-plugin-instructions-present", DDL_EXPAND_PLUGIN,
                               context_text=DDL_EXPAND_PLUGIN, enable_plugins=True,
                               plugin_instructions_present=True))

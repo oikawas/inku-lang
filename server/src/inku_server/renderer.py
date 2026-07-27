@@ -1967,17 +1967,57 @@ def _ground_dot_count(ground: CanvasGroundSpec, profile: str) -> int:
     return min(140, count)
 
 
+# 支持体ごとの雑音の性格。(x 倍率, y 倍率, numOctaves, 横方向のぼかし)
+# 粒の細かさは grain が決め、material はその粒の形を決める。
+_GROUND_MATERIAL_NOISE = {
+    "washi": (0.30, 1.70, 3, 0.0),
+    "ink_wash": (0.10, 0.85, 2, 2.4),
+}
+
+
 def _ground_filter_xml(ground: CanvasGroundSpec, seed: int, filter_id: str) -> str:
-    freq = {"fine": "0.95", "medium": "0.55", "coarse": "0.28", "none": "0.45"}.get(
-        ground.grain, "0.55"
+    """地の雑音。**要素を足さずに**支持体の違いを出す。
+
+    地は塗りつぶし 1 枚と、雑音をかけた 1 枚でできている。支持体の違いを
+    描画要素として積むと、DDL が明示した図形より地のほうが要素数を食う
+    （繊維を 38 本引いた版では、地だけで絵全体の 46% を占めた）。
+    支持体は雑音の性格であって、描くものではない。
+
+    - `washi` は楮の繊維が漉き込まれているので、雑音を一方向へ引き伸ばし、
+      直交する向きにもう一枚重ねて交差させる
+    - `ink_wash` は刷毛が横へ通っているので、横に長く引き伸ばして
+      さらに横方向へぼかす
+    """
+    base = {"fine": 0.95, "medium": 0.55, "coarse": 0.28, "none": 0.45}.get(
+        ground.grain, 0.55
     )
-    return (
-        f'<filter id="{filter_id}" x="0" y="0" width="100%" height="100%">'
-        f'<feTurbulence type="fractalNoise" baseFrequency="{freq}" numOctaves="2" seed="{seed % 9973}" result="noise"/>'
+    shape = _GROUND_MATERIAL_NOISE.get(ground.material)
+    tail = (
         '<feColorMatrix in="noise" type="saturate" values="0" result="mono"/>'
         '<feComponentTransfer in="mono"><feFuncA type="table" tableValues="0 1"/></feComponentTransfer>'
-        "</filter>"
     )
+    head = f'<filter id="{filter_id}" x="0" y="0" width="100%" height="100%">'
+    if shape is None:
+        return (
+            f"{head}"
+            f'<feTurbulence type="fractalNoise" baseFrequency="{base:g}" numOctaves="2" seed="{seed % 9973}" result="noise"/>'
+            f"{tail}</filter>"
+        )
+    fx, fy, octaves, blur = shape
+    warp = (
+        f'<feTurbulence type="fractalNoise" baseFrequency="{base * fx:g} {base * fy:g}"'
+        f' numOctaves="{octaves}" seed="{seed % 9973}" result="warp"/>'
+    )
+    if ground.material == "washi":
+        # 繊維は一方向には寝ていない。直交する二枚を交差させる。
+        cross = (
+            f'<feTurbulence type="fractalNoise" baseFrequency="{base * fy:g} {base * fx:g}"'
+            f' numOctaves="{octaves}" seed="{(seed + 7919) % 9973}" result="cross"/>'
+            '<feBlend in="warp" in2="cross" mode="multiply" result="noise"/>'
+        )
+        return f"{head}{warp}{cross}{tail}</filter>"
+    smear = f'<feGaussianBlur in="warp" stdDeviation="{blur:g} 0" result="noise"/>'
+    return f"{head}{warp}{smear}{tail}</filter>"
 
 
 def _render_canvas_ground(
@@ -2008,6 +2048,11 @@ def _render_canvas_ground(
             insert=(0, 0), size=(canvas.width, canvas.height), fill=tone, opacity=0.98
         )
     )
+    color = (
+        "#b8b8b8"
+        if ground.material == "mezzotint"
+        else ("#777777" if ground.material != "charcoal_ground" else "#222222")
+    )
     if profile == "display":
         fid = _safe_svg_id(f"ground_texture_{seed % 100000}")
         texture_opacity = min(0.18, max(0.02, ground.opacity))
@@ -2021,18 +2066,51 @@ def _render_canvas_ground(
             )
         )
         return group, _ground_filter_xml(ground, seed, fid)
-    color = (
-        "#b8b8b8"
-        if ground.material == "mezzotint"
-        else ("#777777" if ground.material != "charcoal_ground" else "#222222")
-    )
     count = _ground_dot_count(ground, profile)
+    if ground.material == "ink_wash":
+        # 刷毛が薄墨を通したあとの紙は、粒の見えかたが落ちる。
+        count = max(4, int(count * 0.6))
     radius = {"fine": 0.7, "medium": 1.1, "coarse": 1.8, "none": 0.6}.get(
         ground.grain, 1.0
     )
     for i in range(count):
         x = _hash01(i, seed, "ground-x") * canvas.width
         y = _hash01(i, seed, "ground-y") * canvas.height
+        if ground.material == "washi":
+            # 同じ数の粒を、繊維の向きに引き伸ばす。要素は増やさない。
+            angle = _hash01(i, seed, "fiber-angle") * math.tau
+            half = radius * (2.2 + _hash01(i, seed, "fiber-len") * 3.4)
+            dx, dy = math.cos(angle) * half, math.sin(angle) * half
+            bow = (_hash01(i, seed, "fiber-bow") - 0.5) * half * 0.5
+            group.add(
+                dwg.path(
+                    d=(
+                        f"M {x - dx:.6f} {y - dy:.6f} "
+                        f"Q {x - math.sin(angle) * bow:.6f} {y + math.cos(angle) * bow:.6f} "
+                        f"{x + dx:.6f} {y + dy:.6f}"
+                    ),
+                    fill="none",
+                    stroke=color,
+                    stroke_width=max(0.4, radius * 0.5),
+                    stroke_opacity=min(0.18, ground.opacity),
+                    stroke_linecap="round",
+                )
+            )
+            continue
+        if ground.material == "ink_wash":
+            # 刷毛の通ったところは濃い。粒の濃さを横帯で上下させる。
+            band = 0.55 + 0.45 * math.sin(
+                y / canvas.height * math.tau * 1.5 + _hash01(0, seed, "wash-phase") * math.tau
+            )
+            group.add(
+                dwg.circle(
+                    center=(x, y),
+                    r=radius * (0.55 + _hash01(i, seed, "ground-r") * 0.8),
+                    fill=color,
+                    opacity=min(0.18, ground.opacity) * band,
+                )
+            )
+            continue
         if ground.grain == "coarse" and i % 3 == 0:
             group.add(
                 dwg.line(

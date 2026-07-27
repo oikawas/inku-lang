@@ -58,7 +58,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 添景 | **staffage** | 名詞。tooltip に "minor accompanying elements" を添える | ~~decoration~~, ~~props~~ |
 | 歳時記 | **Saijiki** | 固有名詞・大文字 | ~~almanac~~ 単独 |
 | 詞書 | **headnote** | 名詞。語彙ダイアログでのみ "kotobagaki" の注記可 | ~~caption~~, ~~Kotobagaki~~（ラベルとして） |
-| 奥書 | **colophon** | 名詞 | ~~Okugaki~~（ローマ字残しは不採用） |
+| 奥書 | **colophon** | 名詞。**CLI サブコマンドと API パスも `colophon`**（§6 の例外・v2.8.0） | ~~Okugaki~~（ローマ字残しは不採用） |
 | 系譜 | **lineage** | 名詞 | — |
 | 系譜全体図 | **lineage map**（ボタンは **Map**） | 名詞句 | ~~Overview~~ |
 | 世代 | **generation**（略 **Gen.**） | 名詞。**世代の意味のときだけ generation を使ってよい** | — |
@@ -143,7 +143,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `image` | **Vision が実際に画像を見る**文脈 | `modelSelectionVisionHint` / `aiRefineVisionModeHint` / `aiRefineVisionReading` / `aiRefineVisionSourceError` |
 | `render*` | **サーバー側の技術設定・DB フィールド名・置換トークン** | `canvasSeedSummary`(`{render}`) / `settingsRenderConcurrency*`(5 件) / `historyReplayMissingSeed`(`render_seed`) / `replayComparisonTitle`(Renderer) |
 | `kotobagaki` | 語彙ダイアログの**注記としての一度だけ** | `appInfoVocabRows` |
-| `Moderate` | **変奏の強度・中** | `hensouMedium` / `hensouTooltipLarge` |
+| `Moderate` | **変奏の強度・中** | `variationMedium` / `variationTooltipLarge` |
 
 **新しく例外を足すときは、`i18n-lint.mjs` の該当リストとこの表を同じ commit で更新する。**
 例外に足す前に、まず訳語を変えられないかを考えること。
@@ -159,6 +159,50 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `web/src/lib/i18n/ja.ts` | 日本語正本 |
 | 三項式・`getLang()` 分岐の**日本語側リテラル** | 同上 |
 | JSON Score の鍵 / API フィールド名 / SVG の class 名 / DB カラム名 / `rh3` 等の識別子 | 表示層の改修で識別子を動かさない |
+
+**例外が 2 つある（どちらも同じ理由・同じ方針）。**
+
+**例外その一 — 奥書（2026-07-27 作者裁定、v2.8.0 で実施）。**
+**打鍵する名前は英語の術語で付ける**という先例（`paint` / `refine` / `lineage` が
+辞書語と一致している。辞書 :55 は「API `/api/paint` と一致」と明記する）に対し、
+**`okugaki` だけがローマ字で残っていた**ため、**CLI サブコマンド名と API パスを
+`colophon` へ移した**。エイリアスは残していない（互換が切れるので minor 採番）。
+
+**それでも動かさないもの**: DB のテーブル名・列名（`okugaki` テーブル）、
+`model_settings` の `okugaki_model`（**保存済みユーザー設定**）、
+モジュール名 `okugaki.py`、i18n の鍵 `okugaki*`。
+**鍵名のローマ字は本来なら通例であり、禁じているのは表示に出る語である。**
+ただし変奏については**辞書を完全に通すという作者裁定（2026-07-27）**により、
+**鍵まで `hensou*` → `variation*` へ揃えた**（v2.8.0）。
+
+**変奏では衝突が逆向きだった** — 辞書は `variation` を変奏だけに予約している
+（候補は `option`）のに、実装では**本物の変奏がローマ字 `hensou`** で、
+**変奏でない 4 種が `*_variation`** を名乗っていた。`touch_variation` → `touch_change`、
+`model_variation` → `model_comparison`、`layout_variation` → `layout_change`、
+`language_variation` → `language_comparison` とし、`hensou` → `variation` を戻した。
+**`vary_seed` は変奏ですらなく Stage 1.5 の構図 seed** なので `composition_seed` にした。
+
+> **hash と同一性 ID の材料は名前ではない。凍結する。**
+> rh2 payload の鍵 `vary_seed` と `ddl_expander` の salt `#hensou` / `#vary` は動かしていない。
+> **新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md` に記録がある。**
+
+**例外その二 — 添景（2026-07-27 作者裁定「奥書と同じ方針で」、v2.8.0 で実施）。**
+辞書は 添景 = **staffage** と定めており（:58）、**web は既にその語で表示していた**。
+ローマ字が残っていたのは**打鍵する側 1 箇所だけ** — CLI の旗 `--tenkei` である。
+**`--staffage` へ移し、エイリアスは残していない**（奥書と同じ）。
+help の文言も第三の語 `scenery` から `staffage` へ揃えた。
+
+**それでも動かさないもの**: API の要求・応答フィールド `tenkei`（server 27 箇所）、
+DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `tenkei.ts` と i18n 鍵。
+**鍵名のローマ字は通例**という上の規則がそのまま効く。
+番人は CLI 側に 2 つ置いた（`--tenkei` が `SystemExit` になること／
+**旗の一覧そのものに `tenkei` を含むものが無いこと**。名指しの一覧は穴を残すため）。
+
+> **歳時記のローマ字は別扱いである。** `/api/saijiki` と歳時記のカテゴリ鍵 9 個
+> （`katachi` / `katamuki` / `tezawari` / `tsuranari` / `iro` / `yuragi` / `basho` / `ugoki` / `wariai`）は
+> **辞書が 歳時記 = `Saijiki`（固有名詞・大文字）と定めているとおりで、ローマ字が正しい英語表記**である。
+> `renga` / `hacho` も同じ扱い。**`sumi` / `washi` は識別子ではなく DDL の語彙値**
+> （`sumi` は `black` の同義語として `ink` / `obsidian` / `黒` と並ぶ、記述者が書く語）。
 
 **判断規則**: 変えようとしている文字列が Stage 1/2 プロンプト・Score・テスト fixture に届いているなら、
 **直さずに作者へ報告する**（歳時記カテゴリ名が先例）。

@@ -37,7 +37,13 @@ REASON = (
     "other closed contour takes, so the material layer and the wild toggle reach it. "
     "The corner shapes and the pen gain the material layer they never had. And "
     "strength stops being distance: the outline offset multiplier and its floor are "
-    "gone, so every stratum rides the ink at the distance its own table always named."
+    "gone, so every stratum rides the ink at the distance its own table always named. "
+    "Folded in later, before the version was ever published: the sheet says how it was "
+    "made. plain, paper, washi and ink_wash had been one and the same in the ground "
+    "layer; washi now crosses two anisotropic turbulences and stretches its grains "
+    "along the fibre, and ink_wash smears its noise sideways and bands the grains "
+    "under the brush. Not one element is added - washi trades twenty circles for "
+    "twenty fibres and ink_wash draws fewer."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345

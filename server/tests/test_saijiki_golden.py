@@ -9,6 +9,13 @@ Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪
 - en: うごき の語順を日本語と同順へ修正 (2026-07-22)。web の歳時記パネルは
   両言語の表示リストを位置で突き合わせるため、引く=draw / 埋める=fill の対応が
   二言語語エントリから同順で導出される必要がある
+- ja/en: プロンプト内部矛盾の解消 (2026-07-27)。原則が禁じる語を後段の規則や
+  語彙表が要求していた 6 件を、作者裁定に沿って整合させた:
+  背景の定型を許可動詞へ (塗りつぶす→埋める)、てざわり必須規則の例外の明記、
+  原則5 を実態 (語彙 + 本書が定める定型) へ、未知対象の近似先から多角形を削除
+  (saijiki.py が歳時記語彙ではないと定めているため)、許可動詞へ 敷き詰める/tile を
+  追加 (うごき の語彙表と 1 語ずれていた)、en の rise/fall を運動語として書き分け
+  (かたむきの rising/falling は語彙)、ペン(既定) を既定値であって推奨値ではないと明示
 
 これ以外の差分 (空白・順序・行の脱落 = 組み立てバグ) はテスト失敗とする。
 """
@@ -32,12 +39,79 @@ _REORDERED_JA = (
     ("髪・", "銀筆・", 1),
     ("ビュラン・ドライポイントのいずれか", "ビュラン・ドライポイント・コンピュータのいずれか", 1),
     ("ビュラン、ドライポイント\n", "ビュラン、ドライポイント、コンピュータ\n", 1),
+    # --- 2026-07-27: 内部矛盾の解消 ---
+    (
+        "使える動作動詞: 置く、並べる、引く、散らす、埋める\n",
+        "使える動作動詞: 置く、並べる、引く、散らす、埋める、敷き詰める\n",
+        1,
+    ),
+    (
+        "5. 使えるのは Saijiki の語彙のみ\n",
+        "5. 使えるのは Saijiki の語彙と、本書が定める次の定型だけ: "
+        "「面: ...」「地: ...」の質感句、版画技法の固定句、関係の previous-object 句、色とりどりの色列挙\n",
+        1,
+    ),
+    (
+        "最も近いてざわりを選ぶ。毎回ペンに寄せない。",
+        "最も近いてざわりを選ぶ。ペンは未指定時の既定値であって推奨値ではない。機械的にペンへ寄せない。",
+        1,
+    ),
+    (
+        "てざわりのない線・弧の文を出力してはいけない。\n",
+        "てざわりのない線・弧の文を出力してはいけない。\n"
+        "ただし、関係（あいだ）の定型句・わりあい（半円・上弦・下弦・三日月）・かたむきだけを示す最小の文は、"
+        "てざわりを省いてよい。\n",
+        1,
+    ),
+    ("→ 「背景を○色で塗りつぶす。」", "→ 「背景を○色で埋める。」", 1),
+    (
+        "→ 「背景を黒で塗りつぶす。白い横線を中央に引く。」",
+        "→ 「背景を黒で埋める。白い横線を中央に引く。」",
+        1,
+    ),
+    ("「背景を灰で塗りつぶす」を出力してはいけない。", "「背景を灰で埋める」を出力してはいけない。", 1),
+    ("・線・弧・多角形で近似する。", "・線・弧で近似する。", 1),
 )
 _REORDERED_EN = (
     ("hair, ", "silverpoint, ", 2),
     ("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),
     ("burin, or drypoint.", "burin, drypoint, or computer.", 1),
     ("burin, drypoint\n", "burin, drypoint, computer\n", 1),
+    # --- 2026-07-27: 内部矛盾の解消 ---
+    (
+        "Forbidden: move, spread, flow, extend, rise, fall, scatter (as motion), sink, paint\n",
+        "Forbidden: move, spread, flow, extend, rise (as motion), fall (as motion), "
+        "scatter (as motion), sink, paint\n",
+        1,
+    ),
+    (
+        "Allowed action verbs: place, line up, draw, scatter (as arrangement), fill\n",
+        "Allowed action verbs: place, line up, draw, scatter (as arrangement), fill, tile\n"
+        '   - "rising" / "falling" as angle words (rising to the right / falling to the right) '
+        "are Saijiki vocabulary, not motion\n",
+        1,
+    ),
+    (
+        "5. Use only Saijiki vocabulary\n",
+        "5. Use only Saijiki vocabulary and the fixed phrases this document defines: "
+        '"Surface: ..." / "Ground: ..." texture phrases, printmaking phrases, '
+        "previous-object relation phrases, and the colorful color list\n",
+        1,
+    ),
+    (
+        "context. Do not default everything to pen.",
+        "context. Pen is the fallback default, not the recommended choice; "
+        "do not default everything to pen.",
+        1,
+    ),
+    (
+        'or "draw radial lines".\n',
+        'or "draw radial lines".\n'
+        "The only exception is a minimal sentence that states nothing but a relation phrase, "
+        "a proportion (semicircle, waxing, waning, crescent), or an angle.\n",
+        1,
+    ),
+    ("square, line, arc, or polygon.", "square, line, or arc.", 1),
 )
 
 

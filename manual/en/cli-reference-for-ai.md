@@ -40,7 +40,7 @@ uv run inku-cli refine generate PARENT_ID --kind layout -o ./test_output --png
 * **Choosing the `--kind` parameter**:
   * `touch`: Refine only line textures and weights (very fast; no LLM call).
   * `layout`: Reconstruct coordinates and size balance (Stage 2 LLM reconstruction).
-  * `reading`: Re-interpret the original prompt text (Stage 1.5 LLM re-interpretation).
+  * `reading`: Re-interpret the original description (Stage 1.5 LLM re-interpretation).
   * `color`: Apply a different color catalog (very fast; no LLM call).
 * **Expected Output**: A JSON object containing the refined child work's metadata.
 
@@ -111,16 +111,16 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * Manually imports a Score JSON as a child node connected to a parent.
 
-### 2.5 `okugaki`
+### 2.5 `colophon`
 
-* **`okugaki <ITEM_ID|NODE_ID> [--model M] [--language ja|en] [--dry-run] [--json] [-o FILE]`**
+* **`colophon <ITEM_ID|NODE_ID> [--model M] [--language ja|en] [--dry-run] [--json] [-o FILE]`**
   * Reads one root-to-target branch sequentially through a vision-capable model and writes a first-person recitation.
   * By default it appends a signed record. `--dry-run` prints without saving.
   * This is an observational mirror, not an evaluation or selection command, and must not feed generation, refinement, or branch choice.
 
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
-  * Runs multiple LLM backends in parallel to inspect and compare DDL interpretations and drawings for the same prompt.
+  * Runs multiple LLM backends in parallel to inspect and compare DDL interpretations and drawings for the same input text.
   * Essential for the AI to dynamically select the best Stage 1 model.
 
 ### 4. `review`

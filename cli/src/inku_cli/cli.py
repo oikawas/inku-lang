@@ -31,7 +31,6 @@ from inku_analysis import (
     motif_signatures as _motif_signatures,
 )
 from inku_analysis.rasterizer import (
-    BACKEND_CAIROSVG,
     RasterizerUnavailable,
     rasterizer_backend,
     rasterizer_info,
@@ -341,7 +340,7 @@ def _render_hash_for_score(
     score: dict[str, Any],
     *,
     render_seed: int | None = None,
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     render_build_number: str | None = None,
     render_engine_id: str | None = None,
     render_engine_version: str | None = None,
@@ -351,7 +350,7 @@ def _render_hash_for_score(
         "version": "rh2",
         "score": score or {},
         "render_seed": render_seed,
-        "vary_seed": vary_seed,
+        "composition_seed": composition_seed,
         "render_build_number": render_build_number,
         "render_engine_id": render_engine_id,
         "render_engine_version": render_engine_version,
@@ -538,24 +537,13 @@ def _read_text_argument(text: str | None, file_path: str | None) -> str:
         return text.strip()
     raise CliError("text is required")
 
-_rasterizer_warned = False
-
-
 def _rasterize_png(svg: str, **kwargs: int) -> bytes:
-    """Rasterize, warning once when the fallback backend is in use.
+    """Rasterize through resvg, the only supported backend.
 
-    A cairosvg fallback still writes a clean-looking PNG, it just silently omits the
-    material filters, so without this the degradation is invisible in the artifact.
+    There used to be a fallback here, and a warning to say it had been taken. Both
+    are gone: a backend that silently drops the material filters writes a PNG that
+    looks cleaner than the work is, and that PNG gets used to decide things.
     """
-    global _rasterizer_warned
-    if not _rasterizer_warned and rasterizer_backend() == BACKEND_CAIROSVG:
-        _rasterizer_warned = True
-        print(
-            "warning: resvg-py is not installed, so PNG output falls back to cairosvg, "
-            "which does not render the material filters (pencil / crayon / chalk / brush_thick). "
-            "The PNGs will look cleaner than the work actually is.",
-            file=sys.stderr,
-        )
     return svg_to_png(svg, **kwargs)
 
 
@@ -587,7 +575,7 @@ def _write_paint_outputs(
         try:
             png_path.write_bytes(_rasterize_png(str(result["svg"])))
         except RasterizerUnavailable as exc:
-            raise CliError("PNG output requires a rasterizer (resvg-py or cairosvg)") from exc
+            raise CliError("PNG output requires resvg-py") from exc
         paths["png"] = str(png_path)
         # Different backends and versions produce different pixels from one SVG.
         paths["png_rasterizer"] = rasterizer_info()
@@ -718,7 +706,7 @@ def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
     try:
         buffer = io.BytesIO(_rasterize_png(svg))
     except RasterizerUnavailable as exc:
-        raise CliError("analyze --replay requires a rasterizer (resvg-py or cairosvg)") from exc
+        raise CliError("analyze --replay requires resvg-py") from exc
     with Image.open(buffer) as image:
         image = image.convert("L").resize((cells, cells))
         pixels = list(image.getdata())
@@ -929,7 +917,7 @@ def command_ddl_compare(args: argparse.Namespace) -> int:
         for directory, items in zip(directories, collections):
             payload = items.get(key) or {}
             ddl = str(payload.get("ddl") or "")
-            original = original or payload.get("text") or payload.get("input") or payload.get("original_text")
+            original = original or payload.get("description") or payload.get("input") or payload.get("original_description")
             variants.append({
                 "artifact_set": str(directory), "ddl": ddl,
                 "saijiki_outside_ascii_terms": _ddl_unknown_terms(ddl),
@@ -957,7 +945,7 @@ def command_vision_review(args: argparse.Namespace) -> int:
         artifact = artifacts.get(image_path.stem, {})
         rows.append({
             "image": str(image_path),
-            "original": artifact.get("text") or artifact.get("input") or artifact.get("original_text"),
+            "original": artifact.get("description") or artifact.get("input") or artifact.get("original_description"),
             "blind_back_translation_ja": _nim_vision_chat(image_path, "入力文を推測せず、この抽象画に実際に見えるものだけを日本語一文で記述してください。", api_key=api_key, model=vision_model),
             "blind_back_translation_en": _nim_vision_chat(image_path, "Describe only what is visibly present in this abstract image in one English sentence. Do not infer its prompt.", api_key=api_key, model=vision_model),
         })
@@ -1274,7 +1262,7 @@ def _write_history_export(
     thumb_size: int,
 ) -> dict[str, Any]:
     if rasterizer_backend() is None:
-        raise CliError("history-export requires a rasterizer (resvg-py or cairosvg) for contact-sheet PNGs")
+        raise CliError("history-export requires resvg-py for contact-sheet PNGs")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     item_dir = out_dir / "items"
@@ -1729,7 +1717,7 @@ def _color_trace(
     catalog_data: dict[str, Any] | None = None,
     requested_text: str | None = None,
 ) -> dict[str, Any]:
-    text = requested_text or result.get("text")
+    text = requested_text or result.get("description")
     ddl = result.get("ddl")
     score = result.get("score")
     details = _score_color_details(score)
@@ -1859,8 +1847,10 @@ def _paint_payload(
         or DEFAULT_COLOR_CATALOG_ID
     )
     payload: dict[str, Any] = {
-        "text": text,
-        "original_text": args.original_text,
+        # description は作者が書いた記述。CLI は文脈を注入しないので、Stage 1 が読む
+        # 文字列は打った本文そのままになる。
+        "description": args.description or text,
+        "stage1_input": text,
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
         "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
         "include_thinking": args.include_thinking,
@@ -1872,8 +1862,8 @@ def _paint_payload(
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
-        "vary_seed": getattr(args, "vary_seed", None),
-        "tenkei": getattr(args, "tenkei", None),
+        "composition_seed": getattr(args, "composition_seed", None),
+        "tenkei": getattr(args, "staffage", None),
         "seed_text": getattr(args, "seed_text", None),
         "include_trace": getattr(args, "trace", False) or None,
     }
@@ -1895,15 +1885,15 @@ def _compose_payload(
     payload: dict[str, Any] = {
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
-        "original_text": args.original_text,
+        "description": args.description,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "auto_repair": True,
         "render_seed": getattr(args, "render_seed", None),
-        "vary_seed": getattr(args, "vary_seed", None),
-        "tenkei": getattr(args, "tenkei", None),
+        "composition_seed": getattr(args, "composition_seed", None),
+        "tenkei": getattr(args, "staffage", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -1918,7 +1908,7 @@ def _compose_response_as_paint_result(
     elapsed = int(elapsed_total_ms if elapsed_total_ms is not None else result.get("elapsed_ms") or 0)
     effective_ddl = str(result.get("ddl") or ddl)
     return {
-        "text": input_text,
+        "description": input_text,
         "ddl": effective_ddl,
         "score": result.get("score"),
         "svg": result.get("svg"),
@@ -2172,7 +2162,7 @@ def command_paint(args: argparse.Namespace) -> int:
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
     if input_mode == "ddl":
-        input_text = args.original_text or text
+        input_text = args.description or text
         raw_result, _ = _run_with_progress(
             "drawing from DDL",
             lambda: client.request("POST", "/api/compose", data=_compose_payload(
@@ -2221,7 +2211,7 @@ def command_paint(args: argparse.Namespace) -> int:
         )
     paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
     summary = {
-        "text": result.get("text"),
+        "text": result.get("description"),
         "input_mode": input_mode,
         **_model_summary(
             None if input_mode == "ddl" else stage1_model,
@@ -2297,7 +2287,7 @@ def command_batch(args: argparse.Namespace) -> int:
     )
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
-    vary_count = max(1, int(getattr(args, "vary", 1) or 1))
+    composition_count = max(1, int(getattr(args, "composition_count", 1) or 1))
     pending_timeout_retries: list[tuple[int, str, int | None]] = []
     result_index_by_line: dict[tuple[int, int | None], int] = {}
 
@@ -2308,7 +2298,7 @@ def command_batch(args: argparse.Namespace) -> int:
             else f"drawing {index}/{len(lines)}"
         )
         if input_mode == "ddl":
-            input_text = args.original_text or line
+            input_text = args.description or line
             raw_result, _ = _run_with_progress(
                 f"{progress_label} from DDL",
                 lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
@@ -2348,9 +2338,9 @@ def command_batch(args: argparse.Namespace) -> int:
                 )),
                 enabled=not args.no_progress,
             )
-        current_vary_seed = getattr(args, "vary_seed", None)
-        if vary_count > 1:
-            prefix = f"{args.prefix}-{index:03d}-v{current_vary_seed}" if args.prefix else f"inku-batch-{index:03d}-v{current_vary_seed}"
+        current_composition_seed = getattr(args, "composition_seed", None)
+        if composition_count > 1:
+            prefix = f"{args.prefix}-{index:03d}-v{current_composition_seed}" if args.prefix else f"inku-batch-{index:03d}-v{current_composition_seed}"
         else:
             prefix = f"{args.prefix}-{index:03d}" if args.prefix else f"inku-batch-{index:03d}"
         output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
@@ -2360,7 +2350,7 @@ def command_batch(args: argparse.Namespace) -> int:
         elapsed = int(result.get("elapsed_total_ms") or 0)
         entry = {
             "line": index,
-            "text": result.get("text"),
+            "text": result.get("description"),
             "input_mode": input_mode,
             **_model_summary(
                 None if input_mode == "ddl" else stage1_model,
@@ -2374,7 +2364,7 @@ def command_batch(args: argparse.Namespace) -> int:
             "color_trace": _color_trace(result, catalog_id=color_catalog, catalog_data=catalog_data, requested_text=line),
             "history_id": result.get("history_id"),
             "svg_profile": args.svg_profile,
-            "vary_seed": result.get("vary_seed"),
+            "composition_seed": result.get("composition_seed"),
             "elapsed_total_ms": elapsed,
             "tokens_in": tokens_in or None,
             "tokens_out": tokens_out or None,
@@ -2392,39 +2382,39 @@ def command_batch(args: argparse.Namespace) -> int:
             entry["server_timeout_retry_attempted"] = retry_timeout
         return entry
 
-    work_items = [(index, line, vary_index if vary_count > 1 else getattr(args, "vary_seed", None)) for index, line in enumerate(lines, start=1) for vary_index in range(vary_count)]
-    for ordinal, (index, line, vary_seed) in enumerate(work_items, start=1):
-        previous_vary_seed = getattr(args, "vary_seed", None)
-        args.vary_seed = vary_seed
+    work_items = [(index, line, composition_index if composition_count > 1 else getattr(args, "composition_seed", None)) for index, line in enumerate(lines, start=1) for composition_index in range(composition_count)]
+    for ordinal, (index, line, composition_seed) in enumerate(work_items, start=1):
+        previous_composition_seed = getattr(args, "composition_seed", None)
+        args.composition_seed = composition_seed
         try:
             entry = process_line(index, line)
-            key = (index, vary_seed)
+            key = (index, composition_seed)
             result_index_by_line[key] = len(results)
             results.append(entry)
             timeout_reasons = entry.get("server_timeout_reasons") or []
             if timeout_reasons:
-                pending_timeout_retries.append((index, line, vary_seed))
+                pending_timeout_retries.append((index, line, composition_seed))
                 print(
                     f"{ordinal}/{len(work_items)} server timeout ({', '.join(timeout_reasons)}); queued final retry",
                     file=sys.stderr,
                 )
             print(f"{ordinal}/{len(work_items)} ok line {index} {entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
-            failures.append({"line": index, "text": line, "vary_seed": vary_seed, "message": str(exc)})
+            failures.append({"line": index, "text": line, "composition_seed": composition_seed, "message": str(exc)})
             print(f"{ordinal}/{len(work_items)} failed line {index}: {exc}", file=sys.stderr)
             if not args.continue_on_error:
-                args.vary_seed = previous_vary_seed
+                args.composition_seed = previous_composition_seed
                 break
         finally:
-            args.vary_seed = previous_vary_seed
+            args.composition_seed = previous_composition_seed
     if pending_timeout_retries:
         print(f"server timeout final retry: {len(pending_timeout_retries)} item(s)", file=sys.stderr)
-    for index, line, vary_seed in pending_timeout_retries:
-        previous_vary_seed = getattr(args, "vary_seed", None)
-        args.vary_seed = vary_seed
+    for index, line, composition_seed in pending_timeout_retries:
+        previous_composition_seed = getattr(args, "composition_seed", None)
+        args.composition_seed = composition_seed
         try:
             retry_entry = process_line(index, line, retry_timeout=True)
-            original_result_index = result_index_by_line.get((index, vary_seed))
+            original_result_index = result_index_by_line.get((index, composition_seed))
             if original_result_index is not None:
                 results[original_result_index] = retry_entry
             else:
@@ -2438,10 +2428,10 @@ def command_batch(args: argparse.Namespace) -> int:
             else:
                 print(f"{index}/{len(lines)} final retry ok {retry_entry['elapsed_total_ms']}ms", file=sys.stderr)
         except CliError as exc:
-            failures.append({"line": index, "text": line, "vary_seed": vary_seed, "message": f"final retry failed: {exc}"})
+            failures.append({"line": index, "text": line, "composition_seed": composition_seed, "message": f"final retry failed: {exc}"})
             print(f"{index}/{len(lines)} final retry failed: {exc}", file=sys.stderr)
         finally:
-            args.vary_seed = previous_vary_seed
+            args.composition_seed = previous_composition_seed
 
     total_in = sum(int(result.get("tokens_in") or 0) for result in results)
     total_out = sum(int(result.get("tokens_out") or 0) for result in results)
@@ -2516,7 +2506,7 @@ def command_batch(args: argparse.Namespace) -> int:
         "failed": len(failures),
         "total": len(work_items),
         "prompt_total": len(lines),
-        "vary_count": vary_count,
+        "composition_count": composition_count,
         "input_mode": input_mode,
         **_model_summary(
             None if input_mode == "ddl" else stage1_model,
@@ -2714,7 +2704,7 @@ def command_render_score(args: argparse.Namespace) -> int:
     render_hash = _render_hash_for_score(
         score,
         render_seed=args.render_seed,
-        vary_seed=args.vary_seed,
+        composition_seed=args.composition_seed,
         render_build_number=render_build_number,
         render_engine_id="default",
         render_engine_version="2",
@@ -2734,7 +2724,7 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_canvas_aspect_id": args.canvas_aspect,
         "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
         "render_seed": args.render_seed,
-        "vary_seed": args.vary_seed,
+        "composition_seed": args.composition_seed,
         "svg_profile": args.svg_profile,
     }
     paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)
@@ -2878,7 +2868,7 @@ def command_lineage(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_okugaki(args: argparse.Namespace) -> int:
+def command_colophon(args: argparse.Namespace) -> int:
     import uuid
 
     config = load_config()
@@ -2899,7 +2889,7 @@ def command_okugaki(args: argparse.Namespace) -> int:
         payload["model"] = vision_model
     data, _ = client.request(
         "POST",
-        f"/api/lineage/{node_id}/okugaki",
+        f"/api/lineage/{node_id}/colophon",
         data=payload,
         headers={"Idempotency-Key": str(uuid.uuid4())},
     )
@@ -2936,18 +2926,18 @@ def command_refine(args: argparse.Namespace) -> int:
         if not parent_node_id:
             raise CliError(f"lineage node ID is missing on item {args.item_id}")
         
-        derivation_kind = "touch_variation"
+        derivation_kind = "touch_change"
         if args.kind == "touch":
-            derivation_kind = "touch_variation"
+            derivation_kind = "touch_change"
         elif args.kind == "layout":
-            derivation_kind = "layout_variation"
+            derivation_kind = "layout_change"
         elif args.kind == "reading":
             derivation_kind = "reinterpretation"
         elif args.kind == "color":
             derivation_kind = "catalog_change"
 
         params = {
-            "text": args.text or target.get("source_text") or target.get("input") or "",
+            "description": args.description or target.get("source_text") or target.get("input") or "",
             "save_history": args.save_history,
             "lineage_parent_node_id": parent_node_id,
             "derivation_kind": derivation_kind,
@@ -2955,22 +2945,22 @@ def command_refine(args: argparse.Namespace) -> int:
         
         if args.kind == "touch":
             params["render_seed"] = int(time.time() * 1000) & 0x7fffffff
-            params["vary_seed"] = target.get("vary_seed")
+            params["composition_seed"] = target.get("composition_seed")
             params["interpretation_seed"] = target.get("interpretation_seed")
             params["catalog_id"] = target.get("render_color_catalog_id")
         elif args.kind == "layout":
             params["render_seed"] = target.get("render_seed")
-            params["vary_seed"] = int(time.time() * 1000) & 0x7fffffff
+            params["composition_seed"] = int(time.time() * 1000) & 0x7fffffff
             params["interpretation_seed"] = target.get("interpretation_seed")
             params["catalog_id"] = target.get("render_color_catalog_id")
         elif args.kind == "reading":
             params["render_seed"] = target.get("render_seed")
-            params["vary_seed"] = target.get("vary_seed")
+            params["composition_seed"] = target.get("composition_seed")
             params["interpretation_seed"] = str(uuid.uuid4())
             params["catalog_id"] = target.get("render_color_catalog_id")
         elif args.kind == "color":
             params["render_seed"] = target.get("render_seed")
-            params["vary_seed"] = target.get("vary_seed")
+            params["composition_seed"] = target.get("composition_seed")
             params["interpretation_seed"] = target.get("interpretation_seed")
             params["random_color_catalog"] = True
             
@@ -3039,7 +3029,7 @@ def command_inspect(args: argparse.Namespace) -> int:
     for model in models:
         print(f"Running inspection with model: {model}...")
         params = {
-            "text": args.text,
+            "description": args.text,
             "stage1_model": model,
             "stage2_model": model,
             "save_history": False,
@@ -3389,10 +3379,10 @@ def _add_common_server_args(parser: argparse.ArgumentParser) -> None:
 def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> None:
     _add_common_server_args(parser)
     if batch:
-        parser.add_argument("--file", "-f", required=True, help="UTF-8 text file; one prompt per non-empty line, or '-'")
+        parser.add_argument("--file", "-f", required=True, help="UTF-8 text file; one description per non-empty line, or '-'")
     else:
-        parser.add_argument("text", nargs="?", help="prompt text")
-        parser.add_argument("--file", "-f", help="read prompt text from a UTF-8 file, or '-'")
+        parser.add_argument("text", nargs="?", help="the description to draw")
+        parser.add_argument("--file", "-f", help="read the description from a UTF-8 file, or '-'")
     parser.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
@@ -3401,20 +3391,22 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         "--input-mode",
         choices=["paint", "ddl"],
         default="paint",
-        help="paint: natural-language prompt through Stage 1; ddl: normalized DDL directly through Stage 2/render",
+        help="paint: a natural-language description through Stage 1; ddl: normalized DDL directly through Stage 2/render",
     )
     parser.add_argument("--stage1-provider", choices=PROVIDERS)
     parser.add_argument("--stage1-model")
     parser.add_argument("--stage2-provider", choices=PROVIDERS)
     parser.add_argument("--stage2-model")
-    parser.add_argument("--original-text")
+    # 埋める先の鍵と同じ綴りにする。位置引数は Stage 1 が読む文字列、こちらは作者が書いた記述。
+    parser.add_argument("--description", help="the description the author wrote, when the positional text is not it")
     parser.add_argument("--history-input")
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
-    parser.add_argument("--vary-seed", type=int, help="Stage 1.5 composition variation seed")
-    parser.add_argument("--tenkei", choices=["none", "sparse", "auto"], help="scenery level (v1.96): none / sparse / auto")
+    parser.add_argument("--composition-seed", type=int, help="Stage 1.5 composition variation seed")
+    # 打鍵する名前は辞書の英語 (添景 = staffage)。要求の鍵と DB 列は `tenkei` のまま。
+    parser.add_argument("--staffage", choices=["none", "sparse", "auto"], help="staffage level (v1.96): none / sparse / auto")
     parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")
@@ -3430,7 +3422,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")
-        parser.add_argument("--vary", type=int, default=1, help="generate N Stage 1.5 variations per prompt")
+        parser.add_argument("--composition-count", type=int, default=1, help="generate N Stage 1.5 variations per description")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
@@ -3515,7 +3507,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
     render_score.add_argument("--canvas-aspect", default="square")
     render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
-    render_score.add_argument("--vary-seed", type=int, help="record Stage 1.5 composition variation seed in output metadata")
+    render_score.add_argument("--composition-seed", type=int, help="record Stage 1.5 composition variation seed in output metadata")
     render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     render_score.add_argument("--color-catalog", help="server color catalog id")
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
@@ -3610,16 +3602,16 @@ def build_parser() -> argparse.ArgumentParser:
     lineage_show.set_defaults(func=command_lineage)
     lineage_promote.set_defaults(func=command_lineage)
 
-    okugaki = subparsers.add_parser("okugaki", help="recite one root-to-target lineage branch as an append-only reading")
-    _add_common_server_args(okugaki)
-    okugaki.add_argument("target", help="history item ID or lineage node ID")
-    okugaki.add_argument("--vision-model", help="Vision reader model (defaults to CLI/server Vision setting)")
-    okugaki.add_argument("--model", help="compatibility alias for --vision-model")
-    okugaki.add_argument("--language", choices=("ja", "en"), default="ja")
-    okugaki.add_argument("--dry-run", action="store_true", help="generate and print without saving")
-    okugaki.add_argument("--json", action="store_true", help="print the complete response as JSON")
-    okugaki.add_argument("--output", "-o", help="also write the recitation body to a UTF-8 file")
-    okugaki.set_defaults(func=command_okugaki)
+    colophon = subparsers.add_parser("colophon", help="recite one root-to-target lineage branch as an append-only reading")
+    _add_common_server_args(colophon)
+    colophon.add_argument("target", help="history item ID or lineage node ID")
+    colophon.add_argument("--vision-model", help="Vision reader model (defaults to CLI/server Vision setting)")
+    colophon.add_argument("--model", help="compatibility alias for --vision-model")
+    colophon.add_argument("--language", choices=("ja", "en"), default="ja")
+    colophon.add_argument("--dry-run", action="store_true", help="generate and print without saving")
+    colophon.add_argument("--json", action="store_true", help="print the complete response as JSON")
+    colophon.add_argument("--output", "-o", help="also write the recitation body to a UTF-8 file")
+    colophon.set_defaults(func=command_colophon)
 
     # refine
     refine = subparsers.add_parser("refine", help="generate refined options from an existing work")
@@ -3629,7 +3621,7 @@ def build_parser() -> argparse.ArgumentParser:
     refine_gen = refine_sub.add_parser("generate", help="generate a variation option from a work")
     refine_gen.add_argument("item_id", help="target history item ID to refine")
     refine_gen.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
-    refine_gen.add_argument("--text", help="override input text for layout/reading variations")
+    refine_gen.add_argument("--description", help="override the description for layout/reading variations")
     refine_gen.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
     refine_gen.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
     refine_gen.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")

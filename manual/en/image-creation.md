@@ -19,7 +19,7 @@ The left app rail provides settings, profile, theme, UI display language, and si
 ## 2. Paint the First Work
 
 1. Open the `describe` tab.
-2. Enter a short sentence in `prompt`.
+2. Write a short sentence in the description area.
 3. If needed, set `color catalog`, `model selection`, and `canvas`.
 4. Press `Paint`.
 5. Confirm that the work appears in `drawing` and is saved to regular history.
@@ -142,7 +142,7 @@ Open `Provenance` at the bottom of Canvas to inspect the selected work.
 | Prompts | Stage 1/2 system and user prompts |
 | JSON | Machine-readable top-level generation metadata plus JSON Score |
 
-JSON includes fields such as `stage1_instruction_lang`, `stage2_instruction_lang`, `render_seed`, `vary_seed`, `interpretation_seed`, `description_hash`, `derivation_kind`, and `derivation_metadata`. Keep top-level generation metadata distinct from the JSON Score itself.
+JSON includes fields such as `stage1_instruction_lang`, `stage2_instruction_lang`, `render_seed`, `composition_seed`, `interpretation_seed`, `description_hash`, `derivation_kind`, and `derivation_metadata`. Keep top-level generation metadata distinct from the JSON Score itself.
 
 ## 9. Follow Lineage
 
@@ -189,7 +189,7 @@ The UI shows the active line, progress, elapsed time, token counts, and current 
 
 ## 13. Demo
 
-The `demo` tab generates a short description from a seed phrase and repeatedly draws it. Configure DB saving, artifact saving, prompt model, display interval, and random color catalogs. When automatic DB saving is disabled, the current work can still be saved explicitly.
+The `demo` tab generates a short description from a seed phrase and repeatedly draws it. Configure DB saving, artifact saving, the model that writes the description, display interval, and random color catalogs. When automatic DB saving is disabled, the current work can still be saved explicitly.
 
 ## 14. Paint from the CLI
 

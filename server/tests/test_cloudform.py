@@ -377,7 +377,7 @@ def test_cloudform_render_does_not_add_contour_to_rh3_inputs() -> None:
     base = {
         "score": score,
         "render_seed": 22,
-        "vary_seed": 4,
+        "composition_seed": 4,
         "canvas_aspect": "square",
         "render_color_catalog_id": "default",
         "render_engine_id": "default",

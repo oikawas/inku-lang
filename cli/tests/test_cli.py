@@ -89,7 +89,7 @@ def test_paint_payload_drops_none_values():
 
     payload = cli._paint_payload(args, "一滴の墨")
 
-    assert payload["text"] == "一滴の墨"
+    assert payload["description"] == "一滴の墨"
     assert payload["stage1_model"] == "gemma"
     assert payload["save_history"] is True
     assert payload["include_thinking"] is False
@@ -97,6 +97,16 @@ def test_paint_payload_drops_none_values():
     assert "color_map" not in payload
     assert "stage2_model" not in payload
     assert "history_input" not in payload
+
+
+def test_paint_payload_separates_the_description_from_what_stage1_reads():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--description", "一滴の墨"])
+
+    payload = cli._paint_payload(args, "一滴の墨\n\n感情: 静か")
+
+    assert payload["description"] == "一滴の墨"
+    assert payload["stage1_input"] == "一滴の墨\n\n感情: 静か"
 
 
 def test_paint_payload_includes_trace_only_when_flag_set():
@@ -141,14 +151,14 @@ def test_paint_payload_includes_canvas_aspect():
 
 def test_compose_payload_for_ddl_input_mode():
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--original-text", "線"])
+    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--description", "線"])
 
     payload = cli._compose_payload(args, "白い背景に黒い線を一本引く。", stage2_model="s2", color_catalog="default")
 
     assert payload == {
         "ddl": "白い背景に黒い線を一本引く。",
         "model": "s2",
-        "original_text": "線",
+        "description": "線",
         "instruction_lang": "auto",
         "catalog_id": "default",
         "auto_repair": True,
@@ -229,7 +239,7 @@ def test_compose_response_as_paint_result_uses_effective_ddl():
         stage2_model="requested",
     )
 
-    assert result["text"] == "元入力"
+    assert result["description"] == "元入力"
     assert result["ddl"] == "展開後DDL。"
     assert result["stage1_model"] is None
     assert result["stage2_model"] == "resolved"
@@ -295,10 +305,143 @@ def test_models_command_accepts_providers():
     assert args.color_catalog == "ink_season"
 
 
-def test_vision_commands_keep_model_alias_and_prefer_vision_model():
+def test_the_colophon_subcommand_replaced_okugaki_outright():
+    """奥書のサブコマンドは `colophon`。**ローマ字は残していない。**
+
+    辞書 (`web/src/lib/i18n/GLOSSARY.md`) が 奥書 = colophon と定めており、
+    打鍵する名前は `paint` / `refine` / `lineage` と同じ欄にある。
+    エイリアスを残さないのは作者裁定 (2026-07-27)。
+    """
     parser = cli.build_parser()
-    legacy = parser.parse_args(["okugaki", "node-1", "--model", "legacy-vision"])
-    explicit = parser.parse_args(["okugaki", "node-1", "--vision-model", "new-vision"])
+    assert parser.parse_args(["colophon", "node-1"]).func is cli.command_colophon
+    with pytest.raises(SystemExit):
+        parser.parse_args(["okugaki", "node-1"])
+
+
+def test_the_staffage_flag_replaced_tenkei_outright():
+    """添景の旗は `--staffage`。**ローマ字は残していない。**
+
+    辞書 (`web/src/lib/i18n/GLOSSARY.md`) が 添景 = staffage と定めており、web は
+    既にその語で表示している。ローマ字が残っていたのは打鍵する側だけだった。
+    エイリアスを残さないのは奥書と同じ方針 (2026-07-27 作者裁定)。
+
+    **要求の鍵と DB 列は `tenkei` のまま**なので、送る payload の側も併せて見る。
+    """
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨", "--staffage", "sparse"])
+    assert args.staffage == "sparse"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["paint", "一滴の墨", "--tenkei", "sparse"])
+
+    # 打鍵する名前は動いたが、API の鍵は動いていない。
+    assert cli._paint_payload(args, "一滴の墨")["tenkei"] == "sparse"
+
+
+def _all_option_strings(parser) -> set[str]:
+    """サブパーサまで降りて旗を集める。
+
+    **上位パーサの `_actions` だけを見ると穴が開く** — 実際の旗はサブコマンド側に
+    付いているので、`--tenkei` をエイリアスとして残しても素通りした (摂動で実測)。
+    """
+    flags = {option for action in parser._actions for option in action.option_strings}
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                flags |= _all_option_strings(sub)
+    return flags
+
+
+def test_no_cli_flag_is_spelled_tenkei():
+    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。"""
+    flags = _all_option_strings(cli.build_parser())
+    assert "--staffage" in flags, "走査がサブパーサまで届いていない"
+    assert not [flag for flag in flags if "tenkei" in flag]
+
+
+def test_the_description_flag_replaced_original_text_outright():
+    """作者の記述を渡す旗は `--description`。**エイリアスは残していない。**
+
+    埋める先の鍵が `description` なのに旗は `--original-text` で、**退役した第三の語
+    `text` を綴りに残していた**。奥書・添景と同じ方針 (2026-07-27 作者裁定)。
+    """
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--description", "一滴の墨"])
+    assert args.description == "一滴の墨"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["paint", "x", "--original-text", "一滴の墨"])
+
+    payload = cli._paint_payload(args, "一滴の墨\n\n感情: 静か")
+    assert payload["description"] == "一滴の墨"
+    assert payload["stage1_input"] == "一滴の墨\n\n感情: 静か"
+
+
+def _all_help_strings(parser) -> list[str]:
+    helps = [action.help for action in parser._actions if action.help]
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                helps.extend(_all_help_strings(sub))
+    return helps
+
+
+def test_no_cli_flag_says_original_text():
+    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。"""
+    flags = _all_option_strings(cli.build_parser())
+    assert "--description" in flags, "走査がサブパーサまで届いていない"
+    assert not [flag for flag in flags if "original" in flag]
+
+
+def test_the_drawing_commands_do_not_call_the_description_a_prompt():
+    """辞書は 記述 = description と定め `prompt` を退けている。help も表示に出る語である。
+
+    **走査は `paint` / `batch` に限る。** `review evaluate --prompt` などの `prompt` は
+    **LLM のプロンプトという別の指示対象**で、辞書が禁じているのは記述を指す用法のほう。
+    """
+    parser = cli.build_parser()
+    subparsers = next(
+        action for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
+    for name in ("paint", "batch"):
+        helps = _all_help_strings(subparsers.choices[name])
+        assert helps, f"{name} の help を集められていない"
+        assert not [text for text in helps if "prompt" in text.lower()], name
+
+
+def test_inspect_sends_the_description_key_to_paint(monkeypatch, tmp_path):
+    """**自前で payload を組む経路も `description` を送ること。**
+
+    Build 724 の改名は `_paint_payload` には当たったが、**`inspect` と
+    `refine generate` が自分で組んでいた payload 2 つを取りこぼした**。どちらも
+    旧鍵 `text` を送り続けており、`description` が必須になった要求は **422 で落ちていた**
+    (Build 728 で修正)。**ユニットテストは実サーバを叩かないので緑のままだった** —
+    捕まえるには送信そのものを覗くしかない。
+    """
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            return {"ddl": "中心に黒い円を置く。", "render_hash_short": "ABCD"}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        ["inspect", "一滴の墨", "--models", "m1", "--out-dir", str(tmp_path)]
+    )
+    assert cli.command_inspect(args) == 0
+
+    posts = [data for method, path, data in calls if path == "/api/paint"]
+    assert posts, "paint を叩いていない"
+    for payload in posts:
+        assert payload["description"] == "一滴の墨"
+        assert "text" not in payload
+    parser = cli.build_parser()
+    legacy = parser.parse_args(["colophon", "node-1", "--model", "legacy-vision"])
+    explicit = parser.parse_args(["colophon", "node-1", "--vision-model", "new-vision"])
     review = parser.parse_args(["vision-review", "out", "--vision-model", "review-vision"])
 
     assert legacy.model == "legacy-vision"
@@ -328,7 +471,7 @@ def test_color_catalog_summary_uses_server_catalog_data():
 
 def test_color_trace_reports_missing_green():
     result = {
-        "text": "緑の葉が揺れる",
+        "description": "緑の葉が揺れる",
         "ddl": "緑の小さな楕円を散らす。",
         "score": {"instructions": [{"primitive": "ellipse", "color": "gray"}]},
     }
@@ -342,7 +485,7 @@ def test_color_trace_reports_missing_green():
 
 def test_color_trace_does_not_treat_words_as_green_leaf_marker():
     result = {
-        "text": "言えなかった言葉を白い余白に置く",
+        "description": "言えなかった言葉を白い余白に置く",
         "ddl": "言えなかった言葉のために白い余白を残す。",
         "score": {"instructions": [{"primitive": "ellipse", "color": "white"}]},
     }
@@ -356,7 +499,7 @@ def test_color_trace_does_not_treat_words_as_green_leaf_marker():
 
 def test_color_trace_does_not_read_crescent_as_scent():
     result = {
-        "text": "A single white crescent waits in an off-center dark field.",
+        "description": "A single white crescent waits in an off-center dark field.",
         "ddl": "Fill background with black. Place a white crescent arc in the upper right.",
         "score": {"instructions": [{"primitive": "arc", "color": "white"}]},
     }
@@ -374,7 +517,7 @@ def test_color_trace_detects_specific_leaf_terms_as_green():
 
 def test_color_trace_suppresses_negated_green_warning():
     result = {
-        "text": "言えなかった言葉を白い余白に置き、緑には寄せず黒い線だけを残す。",
+        "description": "言えなかった言葉を白い余白に置き、緑には寄せず黒い線だけを残す。",
         "ddl": "白い余白に黒い線だけを置く。",
         "score": {"instructions": [{"primitive": "line", "color": "black"}]},
     }
@@ -402,7 +545,7 @@ def test_timeout_prefers_args_then_config_then_default():
 
 def test_write_paint_outputs(tmp_path):
     result = {
-        "text": "一滴の墨",
+        "description": "一滴の墨",
         "ddl": "白い背景に黒い点を置く。",
         "score": {"canvas": {"width": 100, "height": 100}, "shapes": []},
         "svg": "<svg viewBox=\"0 0 10 10\"></svg>",
@@ -927,7 +1070,7 @@ def test_quality_metrics_does_not_treat_surface_as_face():
 
 def test_paper_words_do_not_request_white_by_themselves():
     trace = cli._color_trace(
-        {"text": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},
+        {"description": "新聞紙が迷うように回っている。", "ddl": "灰色の四角を置く。", "score": {"instructions": [{"primitive": "square", "color": "gray"}]}},
         catalog_id="default",
         catalog_data=CATALOG_DATA,
     )
@@ -943,7 +1086,7 @@ def test_render_hash_for_score_uses_rh2_semantics():
     render_hash = cli._render_hash_for_score(
         score,
         render_seed=1,
-        vary_seed=2,
+        composition_seed=2,
         render_build_number="449",
         render_engine_id="default",
         render_engine_version="2",
@@ -955,7 +1098,7 @@ def test_render_hash_for_score_uses_rh2_semantics():
     assert cli._render_hash_for_score(
         score,
         render_seed=1,
-        vary_seed=2,
+        composition_seed=2,
         render_build_number="449",
         render_engine_id="default",
         render_engine_version="2",
@@ -964,7 +1107,7 @@ def test_render_hash_for_score_uses_rh2_semantics():
     assert cli._render_hash_for_score(
         score,
         render_seed=2,
-        vary_seed=2,
+        composition_seed=2,
         render_build_number="449",
         render_engine_id="default",
         render_engine_version="2",
@@ -1194,22 +1337,23 @@ def test_png_output_records_the_rasterizer_that_produced_it(tmp_path, monkeypatc
     assert "png_rasterizer" not in without
 
 
-def test_cairosvg_fallback_warns_once_that_material_filters_are_missing(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(cli, "rasterizer_backend", lambda: cli.BACKEND_CAIROSVG)
-    monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
-    monkeypatch.setattr(cli, "_rasterizer_warned", False)
+def test_png_output_fails_when_resvg_is_absent(tmp_path, monkeypatch):
+    """There is no fallback to warn about any more -- it raises instead.
 
-    for prefix in ("one", "two"):
-        cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix=prefix, png=True)
+    A backend that drops the material filters writes a PNG that looks cleaner
+    than the work is, so the CLI would rather write nothing.
+    """
+    def unavailable(svg, **kwargs):
+        raise cli.RasterizerUnavailable("resvg-py is not installed")
 
-    stderr = capsys.readouterr().err
-    assert stderr.count("falls back to cairosvg") == 1
-    assert "material filters" in stderr
+    monkeypatch.setattr(cli, "svg_to_png", unavailable)
+
+    with pytest.raises(cli.CliError, match="resvg-py"):
+        cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="one", png=True)
 
 
 def test_no_warning_when_resvg_is_present(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "svg_to_png", lambda svg, **kwargs: b"png")
-    monkeypatch.setattr(cli, "_rasterizer_warned", False)
 
     cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="quiet", png=True)
 

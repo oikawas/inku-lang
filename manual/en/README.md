@@ -4,7 +4,7 @@ This manual explains how to use and operate the unreleased inku v1.85 baseline. 
 
 ## Audience
 
-- Image creators: people who create SVG / PNG images from short written prompts using the Web UI or CLI
+- Image creators: people who create SVG / PNG images from a few written words using the Web UI or CLI
 - System administrators: people who install inku on a server and manage the API, Web UI, database, logs, backups, users, and AI provider connections
 
 ## Documents

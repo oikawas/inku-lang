@@ -1,9 +1,11 @@
 import builtins
+import re
+import tomllib
+from pathlib import Path
 
 import pytest
 
 from inku_analysis.rasterizer import (
-    BACKEND_CAIROSVG,
     BACKEND_RESVG,
     RasterizerUnavailable,
     rasterizer_backend,
@@ -12,6 +14,7 @@ from inku_analysis.rasterizer import (
 )
 
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+REPO = Path(__file__).resolve().parents[2]
 
 PLAIN_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200">'
@@ -43,21 +46,94 @@ def _block_imports(monkeypatch, *names):
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
 
-def test_resvg_is_the_preferred_backend():
+def test_resvg_is_the_backend():
     assert rasterizer_backend() == BACKEND_RESVG
 
 
-def test_falls_back_to_cairosvg_when_resvg_is_absent(monkeypatch):
+def test_raises_when_resvg_is_absent(monkeypatch):
+    """There is no second backend. Without resvg, rasterizing fails loudly.
+
+    It used to fall through to cairosvg, which drops the material filters and
+    returns a PNG that looks cleaner than the work is.
+    """
     _block_imports(monkeypatch, "resvg_py")
-    assert rasterizer_backend() == BACKEND_CAIROSVG
-    assert svg_to_png(PLAIN_SVG, width=64).startswith(PNG_MAGIC)
-
-
-def test_raises_when_no_backend_is_installed(monkeypatch):
-    _block_imports(monkeypatch, "resvg_py", "cairosvg")
     assert rasterizer_backend() is None
     with pytest.raises(RasterizerUnavailable):
         svg_to_png(PLAIN_SVG, width=64)
+
+
+def test_installing_cairosvg_does_not_bring_a_fallback_back(monkeypatch):
+    """cairosvg being importable in some environment must not make it reachable."""
+    pytest.importorskip("cairosvg")
+    _block_imports(monkeypatch, "resvg_py")
+    with pytest.raises(RasterizerUnavailable):
+        svg_to_png(PLAIN_SVG, width=64)
+
+
+@pytest.mark.parametrize(
+    "pyproject",
+    ["shared/pyproject.toml", "server/pyproject.toml", "cli/pyproject.toml"],
+)
+def test_cairosvg_is_not_a_declared_dependency(pyproject):
+    data = tomllib.loads((REPO / pyproject).read_text(encoding="utf-8"))
+    declared = " ".join(data.get("project", {}).get("dependencies", []))
+    assert "cairosvg" not in declared, f"{pyproject} still declares cairosvg"
+
+
+# Directories that hold no source the repository ships: virtualenvs, dependency
+# trees, build output, caches, CLI run artifacts, and `no-git-sync`, the untracked
+# working area where past measurement scripts are kept as a record of what was run.
+_UNSCANNED_DIRS = frozenset(
+    {
+        ".git",
+        ".gradle",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "bench",
+        "build",
+        "dist",
+        "no-git-sync",
+        "node_modules",
+        "out",
+        "out2",
+        "site-packages",
+    }
+)
+
+
+def _repo_python_files():
+    """Every .py we own, found by exclusion rather than by a list of roots.
+
+    The first version of this named its four roots, which is why `android/scripts`
+    kept an `import cairosvg` through v2.7.10: a named list cannot fail to be
+    incomplete, it can only fail to say so.
+    """
+    for path in REPO.rglob("*.py"):
+        if _UNSCANNED_DIRS.isdisjoint(path.relative_to(REPO).parts):
+            yield path
+
+
+def test_no_source_file_imports_cairosvg():
+    """Prose may name it -- the module docstring explains why it is gone. Code may not."""
+    pattern = re.compile(r"^\s*(import\s+cairosvg|from\s+cairosvg\b)", re.M)
+    hits = [
+        path.relative_to(REPO)
+        for path in _repo_python_files()
+        if pattern.search(path.read_text(encoding="utf-8"))
+    ]
+    assert not hits, f"cairosvg is imported by {hits}"
+
+
+def test_the_scan_reaches_outside_the_python_packages():
+    """The guard above is only worth what it covers.
+
+    `android/scripts/` is the directory the named-roots version missed, so it is
+    named here -- not as the scope, but as proof the scope is wider than it was.
+    """
+    scanned = {path.relative_to(REPO).parts[0] for path in _repo_python_files()}
+    assert {"android", "cli", "server", "shared"} <= scanned, scanned
 
 
 @pytest.mark.parametrize(
@@ -69,15 +145,11 @@ def test_raises_when_no_backend_is_installed(monkeypatch):
         ({"width": 768, "height": 384}, b"\x00\x00\x03\x00\x00\x00\x01\x80"),
     ],
 )
-def test_output_size_matches_between_backends(monkeypatch, kwargs, expected_prefix):
+def test_output_size(kwargs, expected_prefix):
     """PNG IHDR carries width and height as big-endian uint32 at byte offset 16."""
-    resvg_png = svg_to_png(PLAIN_SVG, **kwargs)
-    assert resvg_png[16:24] == expected_prefix
-
-    with monkeypatch.context() as ctx:
-        _block_imports(ctx, "resvg_py")
-        cairo_png = svg_to_png(PLAIN_SVG, **kwargs)
-    assert cairo_png[16:24] == expected_prefix
+    png = svg_to_png(PLAIN_SVG, **kwargs)
+    assert png.startswith(PNG_MAGIC)
+    assert png[16:24] == expected_prefix
 
 
 def test_rasterizer_info_identifies_backend_and_version():
@@ -86,26 +158,12 @@ def test_rasterizer_info_identifies_backend_and_version():
     assert info["version"]
 
 
-def test_rasterizer_info_follows_the_fallback(monkeypatch):
+def test_rasterizer_info_is_empty_without_resvg(monkeypatch):
     _block_imports(monkeypatch, "resvg_py")
-    assert rasterizer_info()["backend"] == BACKEND_CAIROSVG
-
-
-def test_rasterizer_info_is_empty_without_a_backend(monkeypatch):
-    _block_imports(monkeypatch, "resvg_py", "cairosvg")
     assert rasterizer_info() == {}
 
 
-def test_resvg_renders_material_filters_that_cairosvg_drops(monkeypatch):
-    """The reason this module exists: cairosvg silently ignores feTurbulence /
-    feDisplacementMap, so the filtered and unfiltered circles rasterize identically."""
-    resvg_filtered = svg_to_png(FILTERED_SVG, width=256)
-    resvg_plain = svg_to_png(PLAIN_SVG, width=256)
-
-    with monkeypatch.context() as ctx:
-        _block_imports(ctx, "resvg_py")
-        cairo_filtered = svg_to_png(FILTERED_SVG, width=256)
-        cairo_plain = svg_to_png(PLAIN_SVG, width=256)
-
-    assert cairo_filtered == cairo_plain, "cairosvg was expected to drop the filter"
-    assert resvg_filtered != resvg_plain, "resvg was expected to render the filter"
+def test_resvg_renders_the_material_filters():
+    """The reason this module exists. A rasterizer that drops feTurbulence /
+    feDisplacementMap returns the filtered and unfiltered circles as one image."""
+    assert svg_to_png(FILTERED_SVG, width=256) != svg_to_png(PLAIN_SVG, width=256)

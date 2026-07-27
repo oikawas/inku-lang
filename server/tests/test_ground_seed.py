@@ -149,11 +149,66 @@ def test_p7b_density_keeps_the_leading_grains() -> None:
 
 
 def test_explicit_ground_seed_still_bypasses_the_derivation() -> None:
-    """`ground.seed` の明示指定は本版でも導出を通らない (本番 20 件中 2 件が使用)。"""
-    fixed_paper = _ground_layer(_score(_ground(material="paper", seed=13579)))
-    fixed_washi = _ground_layer(_score(_ground(material="washi", seed=13579)))
-    assert fixed_paper == fixed_washi
-    assert fixed_paper != _ground_layer(_score(_ground(material="paper")))
+    """`ground.seed` の明示指定は本版でも導出を通らない (本番 20 件中 2 件が使用)。
+
+    動かすのは**導出の入力である演奏 seed** である。材質を対にすると、
+    seed が一致していても粒の形そのものが違いうる (`washi`) ので、
+    主張が測れない。演奏 seed なら、材質を固定したまま導出だけを揺らせる。
+    """
+    moving = _ground_layer(_score(_ground(material="paper")), render_seed=98765)
+    assert moving != _ground_layer(
+        _score(_ground(material="paper"))
+    ), "この入力で差が出ないなら、下の一致は何も言っていない"
+
+    fixed = _ground_layer(_score(_ground(material="paper", seed=13579)))
+    assert fixed == _ground_layer(
+        _score(_ground(material="paper", seed=13579)), render_seed=98765
+    )
+    assert fixed != _ground_layer(_score(_ground(material="paper")))
+
+
+# --- 支持体は雑音の性格である (要素を増やさない) -----------------------------
+
+
+def _ground_marks(layer: str) -> list[str]:
+    return re.findall(r"<(?:circle|line|path|rect)\b[^>]*/>", layer)
+
+
+@pytest.mark.parametrize("material", ["washi", "ink_wash"])
+def test_material_changes_the_marks_not_only_the_seed(material: str) -> None:
+    """支持体を替えると**粒の描き方**が変わる。engine 15 まで 4 種は完全に同一だった。
+
+    **seed を明示して固定する。** 固定しないと `material` が導出 seed に入って
+    いるぶんで層が動いてしまい、描き分けの分岐を殺しても差が出る
+    (実測: 分岐を `if False` にしても素通りした)。
+    """
+    assert _ground_layer(
+        _score(_ground(material=material, seed=13579))
+    ) != _ground_layer(_score(_ground(material="paper", seed=13579)))
+
+
+def test_material_changes_the_filter_not_only_the_grains() -> None:
+    """display プロファイルでは粒ループを通らない。差は filter の中にある。"""
+    def _filter(material: str) -> str:
+        svg = render(_score(_ground(material=material)), svg_profile="display", render_seed=RENDER_SEED)
+        return re.search(r"<filter\b.*?</filter>", svg, re.S).group(0)
+
+    paper = _filter("paper")
+    assert "feBlend" in _filter("washi"), "washi は直交する二枚を交差させる"
+    assert "feGaussianBlur" in _filter("ink_wash"), "ink_wash は横へぼかす"
+    assert "feBlend" not in paper and "feGaussianBlur" not in paper
+
+
+@pytest.mark.parametrize("material", ["washi", "ink_wash"])
+def test_material_does_not_add_elements(material: str) -> None:
+    """**支持体は描くものではない。** 粒の形は変わっても、数は増えない。
+
+    繊維を 38 本引いた最初の版では、地だけで絵全体の 46% を占めた。
+    DDL が明示した図形は 2 つしかなかった。
+    """
+    paper = len(_ground_marks(_ground_layer(_score(_ground(material="paper", seed=13579)))))
+    other = len(_ground_marks(_ground_layer(_score(_ground(material=material, seed=13579)))))
+    assert other <= paper, f"{material} が地の要素を {paper} から {other} へ増やしている"
 
 
 # --- absorbency の退役 -------------------------------------------------------

@@ -107,7 +107,7 @@ COERCE_MARKERS = {
 def expand_intermediate(
     ddl: str,
     context_text: str | None = None,
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     *,
     plugin_instructions_present: bool = False,
     tenkei: str = "auto",
@@ -120,7 +120,7 @@ def expand_intermediate(
         ddl,
         lang="ja",
         context_text=context_text,
-        vary_seed=vary_seed,
+        composition_seed=composition_seed,
         plugin_instructions_present=plugin_instructions_present,
         tenkei=tenkei,
         focus=focus,

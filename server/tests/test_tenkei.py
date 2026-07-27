@@ -220,7 +220,7 @@ def test_api_interpret_pure_invocation_bypasses_stage1(plugin_dir, user_headers)
     r = client.post(
         "/api/interpret",
         headers=user_headers,
-        json={"text": "Sketch.双弧", "tenkei": "none"},
+        json={"description": "Sketch.双弧", "tenkei": "none"},
     )
     assert r.status_code == 200
     assert r.json()["ddl"] == "Sketch.双弧"
@@ -230,7 +230,7 @@ def test_api_interpret_rejects_invalid_tenkei(plugin_dir, user_headers):
     r = client.post(
         "/api/interpret",
         headers=user_headers,
-        json={"text": "Sketch.双弧", "tenkei": "loud"},
+        json={"description": "Sketch.双弧", "tenkei": "loud"},
     )
     assert r.status_code == 422
 
@@ -311,7 +311,7 @@ def test_history_post_inherits_tenkei_from_parent(db_user, plugin_dir):
             "score": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]},
             "at": 3201,
             "lineage_parent_node_id": root["lineage_node_id"],
-            "derivation_kind": "touch_variation",
+            "derivation_kind": "touch_change",
         },
     )
     assert r.status_code == 200

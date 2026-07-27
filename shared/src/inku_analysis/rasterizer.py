@@ -1,11 +1,17 @@
 """SVG to PNG rasterization shared by the inku server and CLI.
 
-cairosvg does not implement feTurbulence / feDisplacementMap / feGaussianBlur and
-silently drops them, so the material filters (pencil, crayon, chalk, brush_thick)
-disappear from every PNG path while remaining visible in the browser. resvg renders
-all three, so it is preferred; cairosvg stays as a fallback for installations that
-lack it. Both backends agree on intrinsic size, aspect-preserving scaling from a
-single width or height, and a transparent background.
+**resvg is the only backend, and that is deliberate.**
+
+cairosvg used to stand behind it for installations without resvg. It does not
+implement feTurbulence / feDisplacementMap / feGaussianBlur, and rather than
+failing it drops them: a filtered rect comes back as one flat colour. Every
+material filter — the ground of every sheet, pencil, crayon, chalk, thick-brush —
+vanishes from the PNG while remaining visible in a browser, and the PNG still
+looks clean. A rasterizer that quietly returns the wrong picture is worse than
+one that is missing, because a wrong picture gets used to decide things. It was,
+repeatedly.
+
+So there is no fallback. Where resvg is absent, rasterizing raises.
 
 This module is deliberately not re-exported from the package root: the analysis
 mirror in ``__init__`` stays independent of rendering, and this is a rendering tool.
@@ -16,11 +22,10 @@ from __future__ import annotations
 from typing import Callable
 
 BACKEND_RESVG = "resvg"
-BACKEND_CAIROSVG = "cairosvg"
 
 
 class RasterizerUnavailable(RuntimeError):
-    """No rasterizer backend is installed."""
+    """resvg is not installed."""
 
 
 def _resvg_renderer() -> Callable[..., bytes] | None:
@@ -40,55 +45,30 @@ def _resvg_renderer() -> Callable[..., bytes] | None:
     return render
 
 
-def _cairosvg_renderer() -> Callable[..., bytes] | None:
-    try:
-        import cairosvg
-    except ImportError:
-        return None
-
-    def render(svg: str, width: int | None, height: int | None) -> bytes:
-        kwargs: dict[str, int] = {}
-        if width is not None:
-            kwargs["output_width"] = width
-        if height is not None:
-            kwargs["output_height"] = height
-        return cairosvg.svg2png(bytestring=svg.encode("utf-8"), **kwargs)
-
-    return render
-
-
-_BACKENDS = ((BACKEND_RESVG, _resvg_renderer), (BACKEND_CAIROSVG, _cairosvg_renderer))
-
-
 def rasterizer_backend() -> str | None:
-    """Return the backend name that would be used, or None when none is installed.
+    """Return the backend name that would be used, or None when it is not installed.
 
-    Not cached: tests swap backends by patching ``sys.modules``, and the probe is a
-    plain import lookup once the module is loaded.
+    Not cached: tests swap the backend by patching ``sys.modules``, and the probe is
+    a plain import lookup once the module is loaded.
     """
-    for name, factory in _BACKENDS:
-        if factory() is not None:
-            return name
-    return None
+    return BACKEND_RESVG if _resvg_renderer() is not None else None
 
 
 def rasterizer_info() -> dict[str, str]:
     """Identify the backend that would rasterize, for recording alongside PNG output.
 
-    Two machines with different backends, or different versions of one backend,
-    produce different pixels from the same SVG, so artifacts carry this to stay
-    comparable. Returns an empty dict when no backend is installed.
+    Two machines running different versions of resvg produce different pixels from
+    the same SVG, so artifacts carry this to stay comparable. Returns an empty dict
+    when resvg is not installed.
     """
-    backend = rasterizer_backend()
-    if backend is None:
+    if rasterizer_backend() is None:
         return {}
-    distribution = "resvg-py" if backend == BACKEND_RESVG else BACKEND_CAIROSVG
     try:
         from importlib.metadata import version
 
-        return {"backend": backend, "version": version(distribution)}
+        return {"backend": BACKEND_RESVG, "version": version("resvg-py")}
     except Exception:
-        return {"backend": backend}
+        return {"backend": BACKEND_RESVG}
 
 
 def svg_to_png(svg: str, *, width: int | None = None, height: int | None = None) -> bytes:
@@ -98,10 +78,12 @@ def svg_to_png(svg: str, *, width: int | None = None, height: int | None = None)
     one scales the other to preserve the aspect ratio. The background stays
     transparent unless the SVG paints one.
 
-    Raises RasterizerUnavailable when neither backend is installed.
+    Raises RasterizerUnavailable when resvg is not installed. There is no second
+    backend to fall back to; see the module docstring for why.
     """
-    for _name, factory in _BACKENDS:
-        render = factory()
-        if render is not None:
-            return render(svg, width, height)
-    raise RasterizerUnavailable("no SVG rasterizer is installed (expected resvg-py or cairosvg)")
+    render = _resvg_renderer()
+    if render is None:
+        raise RasterizerUnavailable(
+            "resvg-py is not installed, and it is the only supported SVG rasterizer"
+        )
+    return render(svg, width, height)

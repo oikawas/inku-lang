@@ -396,7 +396,7 @@ Outside the core live namespaced **plugin words** such as `Nature.wind`. A plugi
 
 Interpretation and structuring are separated because they demand different abilities: interpretation is associative and creative; structuring is mechanical and rule-abiding. Each stage can be tuned independently, and API models, local LLMs, and NVIDIA NIM-style endpoints can be selected per stage. **The choice of model is itself a creative variable.**
 
-Non-determinism lives in exactly two places: the renderer's performance (performance seed) and your explicit operations (another composition, another interpretation). The default path is always deterministic, and history's `render_seed` / `vary_seed` / `render_hash` (work edition ID) let any saved work be reproduced exactly. That is why each gallery work above carries its seed.
+Non-determinism lives in exactly two places: the renderer's performance (performance seed) and your explicit operations (another composition, another interpretation). The default path is always deterministic, and history's `render_seed` / `composition_seed` / `render_hash` (work edition ID) let any saved work be reproduced exactly. That is why each gallery work above carries its seed.
 
 ---
 

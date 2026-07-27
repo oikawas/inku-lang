@@ -145,7 +145,7 @@ Resolved values are recorded as `instruction_lang_requested`, `instruction_lang_
 
 ## 6. Renderer and Replay
 
-`render_seed` controls touch, `vary_seed` supports layout variation, and `interpretation_seed` supports reading variation. `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or layout.
+`render_seed` controls touch, `composition_seed` supports layout variation, and `interpretation_seed` supports reading variation. `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or layout.
 
 History replay uses the saved Score, color catalog, canvas, seeds, and render-engine version. Engine version is recorded for audit; bit-identical output across different engine versions is not assumed.
 

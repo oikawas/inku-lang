@@ -44,7 +44,7 @@ SCORE_A = {
 BASE_ITEM = {
     "score": SCORE_A,
     "render_seed": 12345,
-    "vary_seed": None,
+    "composition_seed": None,
     "render_build_number": "693",
     "render_engine_id": "default",
     "render_engine_version": "10",
@@ -64,9 +64,9 @@ def test_render_hash_v3_excludes_build_and_score_generation_seeds() -> None:
     variants = (
         {**BASE_ITEM, "render_build_number": "694"},
         {**BASE_ITEM, "render_build_number": "700"},
-        {**BASE_ITEM, "vary_seed": 999},
-        {**BASE_ITEM, "vary_seed": 2**63 + 1},
-        {**BASE_ITEM, "render_build_number": "700", "vary_seed": 999},
+        {**BASE_ITEM, "composition_seed": 999},
+        {**BASE_ITEM, "composition_seed": 2**63 + 1},
+        {**BASE_ITEM, "render_build_number": "700", "composition_seed": 999},
         {**BASE_ITEM, "render_seed": "12345"},
     )
 

@@ -191,7 +191,7 @@ possibilities by selectively applying:
 
 - mathematical and geometric laws
 - spatial paths and non-central focus
-- scene-tone palette choices
+- scene-tone color choices
 - music-derived structures such as counterpoint, canon, and harmonic ratios
 - painting and material techniques such as perspective, chiaroscuro, drawing,
   pointillism, watercolor, oil-paint layering, patchwork, fresco, and sumi ink
@@ -223,7 +223,7 @@ in the response and in `history.focus`.
 Stage 1.5 is the application's own layer: it is deterministic, uses no LLM,
 and the author does not intervene in its individual parameters — by design
 principle, not by implementation convenience. The author's handles are the
-input text, `vary_seed`, `tenkei`, and **variation** (強度/amplitude + seed).
+input text, `composition_seed`, `tenkei`, and **variation** (強度/amplitude + seed).
 The author writes, the application shakes, the author chooses.
 
 Variation (v2.0, "hensou") shakes the expansion layer as a whole in one
@@ -269,7 +269,7 @@ guard is intentionally not applied to multi-motif DDL.
 When Stage 2 cannot return usable instructions because of timeout, empty output,
 or transient model failure, the server may produce a deterministic fallback
 Score.  This fallback is still expected to preserve the DDL's visible essentials:
-quantity, placement path, material words, palette tone, and enough shape variety
+quantity, placement path, material words, scene tone, and enough shape variety
 to remain reviewable.
 
 ### Renderer: Performance
@@ -534,7 +534,7 @@ snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
 `render_hash` is the work-edition identifier. SVG text, input text, normalized DDL, and raw LLM responses are never part of the hash payload.
 
-**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`vary_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
+**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`composition_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
 
 **`render_wild` joined the material in engine 12; the format name stays `rh3`.** Extending the material does make a separate hash space, but **`render_engine_version` sits inside the same payload**, so a value computed under the old material always contains `"11"` or lower and one under the new always contains `"12"` or higher. The two can never coincide, so no `rh4` is needed. **This argument holds only because the engine version moved at the same time; the material must never be extended on its own.**
 
@@ -585,7 +585,7 @@ groups together exceed `MAX_EXPANDED_PRIMITIVES` (400), the largest is
 represented first and the budget is rechecked before the next one gives way, so
 the small groups a reader could have counted stay literal.
 
-Current scene-tone palette behavior uses abstract colors only:
+The scene-tone rule currently chooses from the abstract colors alone:
 
 - spring, flowers, buds, and warm light lean toward red / green / white
 - water, night, moon, rain, mist, and cold air lean toward blue / white / gray
@@ -815,9 +815,9 @@ The natural-language prompt is not reinterpreted by `Draw from DDL`.
 The drawing tab also exposes two explicit regeneration actions. **Another
 performance** keeps the same Score and asks only the renderer for a new
 performance seed. **Another composition** keeps the user-facing text as the
-identity of the work but increments a `vary_seed` for Stage 1.5 selection, so
+identity of the work but increments a `composition_seed` for Stage 1.5 selection, so
 composition family, focus, and technique candidates can change without making
-the default path nondeterministic. The same text plus the same `vary_seed` and
+the default path nondeterministic. The same text plus the same `composition_seed` and
 `render_seed` is reproducible from metadata.
 
 Since v1.98 single drawing calls `POST /api/paint/stream` (NDJSON): a `stage1`
@@ -1101,6 +1101,25 @@ version confirms the existing cases are byte-identical, then moves forward and
 freezes that identity as the artifact: **the proof sheet showing that adding a
 block moved none of the existing prints.**
 
+**Renaming a tool or a word does not raise a version** (author's ruling,
+2026-07-27, writing down the precedent set at v2.7.9). A rename such as `hair` →
+`silverpoint` **does move the string that comes out of the same input**, so it
+meets the letter of "when the output changes" above. But **only the name moved:
+the layer behaves identically** — the tool draws at the same width in the same
+hand. Raising the version would **put a generational boundary in the provenance
+of works that differ by a name and nothing else**.
+
+- **A rename re-freezes the corpus in place** rather than opening a new version
+  directory. Render engine 15 and the coerce golden were re-frozen that way at
+  v2.7.9. **The DDL corpus was missed in that same commit, and CI went red on
+  eight consecutive pushes** until v2.8.0 / Build 727.
+- **The identity guard cannot tell a sanctioned rename from an unsanctioned
+  rewrite.** It fires *after* writing, and **firing once while the second run
+  exits 0 byte-identical is the property it defends**. Accept the firing only
+  when you already know the change is a rename.
+- **Growing the vocabulary does raise the version** (above). **Adding a word and
+  renaming one are different acts.**
+
 `ddl_version` and `ddl_engine_version` **start counting at 1** (author's ruling,
 2026-07-24). No other version shares those numbers, which keeps the separate
 namespaces from being read as linked. They step in whole integers.
@@ -1113,7 +1132,7 @@ comes from `score`, `render_seed`, `render_wild`, the render engine's ID and ver
   changes, so it gave a new edition ID to a drawing that had not changed by a single
   byte. It stays as provenance: worth keeping as history, not worth putting in the
   definition of sameness.
-- **The Score-side seed (`vary_seed`) is excluded too** — a different Score already
+- **The Score-side seed (`composition_seed`) is excluded too** — a different Score already
   yields a different ID.
 - **`rh2` is retained as legacy and never recalculated.** `rh2` and `rh3` are
   separate hash spaces and must not be compared to decide sameness.
@@ -1447,6 +1466,51 @@ The four new cases (`C-groundseed-auto-*`) are **the first in the corpus's histo
 times across all 347 cases** and the layer this version rewrote could not be tested by the
 corpus at all.
 
+### 12.9 A PNG Is a Copy of the Performance (v2.7.10, v2.7.11)
+
+**The SVG is the original; a PNG is an image taken of it.** The image may be smaller, and it
+may be coarser. **It may not leave anything out.**
+
+#### No rasterizer that drops things in silence
+
+**The PNG path may not use an implementation that skips SVG filters it has not implemented.**
+The filters at stake are at least `feTurbulence`, `feDisplacementMap` and `feGaussianBlur`.
+They make **the whole of the ground grain and the material layer**, and a PNG that has skipped
+them still reads as a finished picture.
+
+**This is a rule about observation, not about performance or fidelity.** A PNG that came
+through such an implementation **cannot distinguish "there is no difference" from "the
+difference did not come through"**. In inku, whether a work is kept, whether an engine version
+is raised, and whether a port is identical are all decided by **reading two pictures side by
+side**. Put a lossy copier in that path and **every one of those judgements breaks quietly**.
+
+#### `cairosvg` is not to be used
+
+**`cairosvg` is prohibited** (author's ruling 2026-07-27, removed in v2.7.10). It implements
+none of the three filters above and **skips them without raising and without warning**. During
+a session in 2026-07 the clean-looking PNGs it produced **came within reach of being used as
+evidence four times**. Warnings existed in four places: the CLI's stderr, the server's startup
+log, the module docstring, and the `png_rasterizer` record in every artifact. **None of them
+helped, because what misleads a reader is the picture, not the log line.** Hence the
+disposition this section fixes: **remove, do not document**.
+
+#### An implementation that is wrong is worse than one that is missing
+
+**There is no fallback.** The only implementation is `resvg` (`resvg-py`), and **where it is
+absent PNG output stops rather than degrading quietly**. A missing PNG is visible; a PNG with
+the texture gone is not.
+
+#### How it is held
+
+`shared/src/inku_analysis/rasterizer.py` is **the only entrance**, and the server, the CLI and
+the Android comparison harness all go through it. Three sentinels: **① it is in no dependency
+declaration ② no `.py` in the repository imports it ③ it stays unreachable even where the
+environment has it.**
+
+> **Sentinel ②'s scope is written as what it does not look at, not as what it does.**
+> v2.7.10 named four roots and so missed `android/scripts/`. **A named list can fail to be
+> complete; what it cannot do is say so.**
+
 ## 13. CLI
 
 `inku-cli` is a command-line client for controlling the inku server through the
@@ -1558,7 +1622,7 @@ The reference implementation currently includes:
 - shared kiwi progress mascot for single drawing and DDL replay
 - integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
   token/time display, and cancellable `/api/compose` replay
-- scene-tone palette strategy, richer fallback Scores, sensory visibility
+- scene-tone color strategy, richer fallback Scores, sensory visibility
   safeguards, and broader primitive use within the current schema
 - renderer material effects, wobble, rotation, arrangement paths, density/fade,
   and canvas aspect support
@@ -1750,7 +1814,7 @@ Detailed implementation history remains in the canonical Japanese spec.
 
 Version 1.52 materializes post-selection through two explicit regeneration
 paths. `render_seed` supports another performance without an LLM call.
-`vary_seed` supports another composition by mixing an explicit counter into the
+`composition_seed` supports another composition by mixing an explicit counter into the
 Stage 1.5 selection seed while preserving the default rule that the same input
 produces the same expansion. The vary path changes composition-family, focus,
 and technique selection; it does not intentionally change Stage 1
@@ -1762,7 +1826,7 @@ rates. Coerce repair parts use input-derived placement and shape variation
 instead of fixed coordinates, and adjacent focal reactions fire only for
 isolated visual events.
 
-Build 442 verification confirmed that the `vary_seed` path is implemented
+Build 442 verification confirmed that the `composition_seed` path is implemented
 through the API, CLI, and web UI. A 5-prompt x 5-vary run succeeded 25/25 with
 no fallback, and JP/EN 30-sample repair-part measurement reduced
 `adjacent_reaction` from 56/60 to 14/60.
@@ -1898,8 +1962,8 @@ guard, and the relation-drop blocking item.
 
 Version 1.60 moves the project from quality-loop closure to a one-person playable 1.0 candidate: another person should be able to set up inku from the README, write a visual tanka, consult Saijiki, read interpretation feedback, choose with vary, save, and replay a result.
 
-- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `vary_seed`, `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
-- History now stores `vary_seed`, and the history manager can replay a saved Score with its saved seed.
+- `render_hash` is redefined as an `rh2:<sha256>` work-edition identifier computed from the saved JSON Score, `render_seed`, `composition_seed` (the rh2 payload keeps the frozen key name `vary_seed`), `render_build_number`, `render_color_catalog_id`, and render-engine metadata. SVG text, input text, normalized DDL, and raw LLM responses are excluded. Existing 64-character hashes remain legacy display-compatible values.
+- History now stores `composition_seed`, and the history manager can replay a saved Score with its saved seed.
 - The input panel shows approximate post-processing interpretation feedback using ink-density shading. This does not change the Stage 1 schema or prompt.
 - The canvas displays the input text as a caption by default, treating the relation between words and image as part of the work.
 - The English and Japanese READMEs now include Quick Start setup, provider/API-key guidance, two-stage regeneration, the six-color Saijiki constraint, and history replay.
@@ -2069,7 +2133,7 @@ The Vision method is a finite advisory loop, not quality optimization or automat
 
 ## Colophon: Reading a Lineage
 
-A colophon (okugaki) is an append-only, first-person reading attached to one lineage branch from its root to the displayed work. It is neither a verdict nor a summary. It describes observable changes between generations and closes by verbalizing what remained invariant across the branch.
+A colophon is an append-only, first-person reading attached to one lineage branch from its root to the displayed work. It is neither a verdict nor a summary. It describes observable changes between generations and closes by verbalizing what remained invariant across the branch.
 
 - Each generation is read sequentially. The request for generation i contains only generations 0 through i, so later works cannot turn earlier choices into steps toward an alleged final form.
 - Inputs are existing lineage edge facts, captions, server-rasterized PNG pairs, and deterministic differences from the v1.80 feature mirror: composition family, primitives, colors, density, angles, and arrangement paths. No new quality metric is introduced. Vision images are bounded to a 512px single work or an aspect-correct 768×384 before/after pair.
@@ -2078,7 +2142,7 @@ A colophon (okugaki) is an append-only, first-person reading attached to one lin
 - Japanese and English evaluation terms are scanned as warnings only. A warning never forces rewriting, regeneration, or rejection.
 - The server appends the reader model and date as a mechanical signature. Records store the target node, branch snapshot, model, time, language, body, warnings, and fact sheet in the current user's scope.
 - Records can be appended or deleted, but never edited. Idempotency keys prevent duplicate saves, and lists are displayed oldest first.
-- The colophon is available only through the explicit Lineage action or `inku-cli okugaki` (the CLI subcommand keeps its name); `--dry-run` generates without saving. It never affects dh1, rh2, generation, variation, refinement selection, acceptance, quality functions, or branch recommendation.
+- The colophon is available only through the explicit Lineage action or `inku-cli colophon`; `--dry-run` generates without saving. It never affects dh1, rh2, generation, variation, refinement selection, acceptance, quality functions, or branch recommendation.
 
 v1.88 adds no automatic repair or generation branch. Its refinement accounting deliberately limits the new AI reading to a disconnected mirror, making teleological “best branch” narratives less likely to become application behavior.
 

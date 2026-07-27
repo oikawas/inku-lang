@@ -3114,3 +3114,376 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **触っていないもの**: `interpreter.py` の few-shot 検索キーワード `"髪"`（作者が書く入力語を引く検索キーであり出力語彙ではない。ただし**銀筆を足していないので、語彙に戻った銀筆はこの細線の作例を引かない**）／`language_support/ja.py` `en.py` の `material_weight_hints`（銀筆の行が無い。`hair` の行も元から無く、改名による退行ではないが、**Stage 2 が weight を落としたときの救済経路が銀筆には無い**）／`brush_fine`（面相筆）と太さの軸／Android（`gen_android_reference.py` の 2 箇所は改名したが**生成器は未実行**で、Kotlin 実装と、凍結 fixture 36 件のうち `hair` を含む 3 件はそのまま）
 - **検証:** server **1411 passed / 30 skipped**（+9 は新設した判別検査）、cli **69 passed**、ruff clean、`npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**。判別テスト 4 本（置換経路の恒等化で本番 445 件が全て `ValidationError`／`GRAMMARS` の 1 値を動かすと 16 本だけ動く／`_PRUNED` に戻すと digest が改名前の値へ完全に一致する／生成器 2 回でバイト一致）
 - **記録**: 種が道具の「名前」をハッシュしているのが、改名に値段がつく理由である。**直すと全作品が一度動くので、それは engine の版に属する**
+
+---
+
+### v2.7.10 — PNG は resvg だけで焼く（Build 719、2026-07-27）
+
+**警告は前からあった。それでも誤らせた。** cairosvg は `feTurbulence` / `feDisplacementMap` / `feGaussianBlur` を実装しておらず、**失敗もせずに落とす**。地の粒も材質フィルタも消えた「きれいに見える PNG」が返り、**その絵が判断の材料に使われていた**（4 回）。CLI の stderr 警告・サーバーの起動時 WARNING・docstring・成果物へ記録する `png_rasterizer` と、注意書きは v2.2.1 から四重に置いてあった。**人を誤らせるのはログ行ではなく絵である**ため、文書化ではなく撤去を選んだ（作者指示 2026-07-27）。
+
+- **フォールバックは無くなった。** `rasterizer.py` から `_cairosvg_renderer` と `BACKEND_CAIROSVG` と `_BACKENDS` 表が消え、`svg_to_png` は resvg が無ければ `RasterizerUnavailable` を上げる。**これが唯一の振る舞いの変更**であり、resvg の入っていない環境では PNG 出力が静かに劣化するのではなく停止する（作者裁定済み）
+- **依存宣言 3 本を落とした。** `shared` / `server` / `cli` の `pyproject.toml` から `cairosvg>=2.7.0` を外し、lock 2 本から 145 行・148 行が消えた。`api.py` の起動ログはフォールバックの分岐を失い、`cli.py` は 1 回だけ出す警告と「resvg-py or cairosvg」というエラー文 3 か所を失った
+- **番人を 3 つ置いた。** ① 3 つの `pyproject.toml` を `tomllib` で読み、依存に `cairosvg` が無いこと ② `shared/src` / `server/src` / `cli/src` / `server/scripts` の全 `.py` に `import cairosvg` が無いこと（**行頭の import 文だけを見るので、なぜ消えたかを述べる散文は残せる**） ③ **入っていても到達不能であること** — `pytest.importorskip` で cairosvg が import できる環境だけ走り、resvg を塞いだうえで例外になることを確かめる
+- **増えた skip 1 はその 3 つ目である。** 依存を落とした結果 cairosvg が venv から消えたので、番人 ③ は skip になる。**入っている環境でだけ意味を持つ検査なので、これは正しい**
+- **副次: `server` の venv から `pillow` が消えた。** cairosvg の推移依存だったもので、`server` と `shared` のコードは `PIL` を一度も import していない。`cli` は `pillow>=12.0.0` を明示依存に持つので残る（**コンタクトシートを組む道具は `cli` の venv にある**）
+- **撤去しなかったもの**: `android/scripts/render_png_review.py` は `cairosvg.svg2png` を呼んだままである（番人 ② の走査範囲は `android/` を含まない）。**Android の目視レビュー用スクリプトであり、今回の撤去理由がそのまま当たる経路**なので、扱いは作者裁定を仰ぐ。`server/Dockerfile` の `libcairo2` も cairosvg のための OS 依存だが残っている
+- **文書 4 本を現在形に直した**: `SETUP.ja.md` / `SETUP.md`（「resvg を優先し CairoSVG はフォールバック」→ resvg のみ・不在なら停止）、`manual/ja/application-install.md` / `manual/en/application-install.md`（「CairoSVG が必要とする OS ライブラリ」→ resvg-py は wheel なので追加の OS ライブラリは要らない）。**過去の版を述べる CHANGELOG と PROJECT_CONTEXT の記述は履歴なので触っていない**
+- **検証:** server **1413 passed / 31 skipped**、cli **69 passed**、ruff clean（`server` / `cli` とも）、`npm run check` 0 errors / 2 warnings / 217 files。**SVG は 1 バイトも変わらない**ので参照コーパスは再凍結していない。render engine は `"15"` のまま
+- **記録**: 黙って劣化するフォールバックは、文書化ではなく撤去する。**「差が無い」と「差が写っていない」を区別できない道具を、絵を判断する経路に置かない**
+
+---
+
+### v2.7.11 — 番人は、見る場所ではなく見ない場所で書く（Build 720、2026-07-27）
+
+v2.7.10 の取りこぼし 2 件と、**規則そのものを SPEC へ書く**という作者裁定（2026-07-27）の反映。
+
+- **`android/scripts/render_png_review.py` を resvg へ替えた。** 休眠スクリプトではなく、
+  `headless_render_compare.sh` と `headless_batch_compare.sh` から `PNG_REVIEW=true` のときに
+  呼ばれる**現役の目視ハーネス**である。**server と Android の SVG を PNG 化して差分を増幅し、
+  3 枚並べたシートと `metrics.json` を作る道具**なので、**フィルタを落とすラスタライザを挟むと
+  「両方とも平らに潰れた場所で一致する」**。v2.7.10 で cli から依存宣言を落とした結果、
+  **`uv sync` 済みの環境では既に ImportError で落ちる状態だった**
+  - 実測: `feDisplacementMap` の scale だけが違う 2 枚を通すと **mean 9.5% / rms 27.4% の差**を出す。
+    **cairosvg ならフィルタごと飛ぶので差 0 になる組**である
+- **番人②の走査範囲を「名指し」から「リポジトリ全体 − 除外」へ変えた。**
+  v2.7.10 は `shared/src` / `server/src` / `cli/src` / `server/scripts` の 4 根を名指ししたので、
+  `android/` を見ていなかった。**名指しの一覧は不完全になりうるが、不完全だと言うことはできない**
+  - 除外は 14 個（`.git` / `.gradle` / `.pytest_cache` / `.ruff_cache` / `.venv` / `__pycache__` /
+    `bench` / `build` / `dist` / `no-git-sync` / `node_modules` / `out` / `out2` / `site-packages`）
+  - **走査が実際に外へ届いていることを見る検査を足した**（`android` / `cli` / `server` / `shared` の
+    4 つが走査結果に含まれること）。**番人の値打ちは覆う範囲までしかない**
+  - **摂動で確かめた**: `android/scripts/render_png_review.py` に `import cairosvg` を戻すと落ちる
+- **走査を広げて分かったこと（直していない）**: 追跡外の `no-git-sync/` に **cairosvg を呼ぶ
+  過去の測定スクリプトが 3 本**ある（`fable5/render_with_relations.py`、
+  `rfc/phase0-scripts/ab.py`、`rfc/phase0-scripts/ps_ab.py`）。**何を回したかの記録**なので
+  書き換えず、走査からも外した。**venv から cairosvg が消えているので、再実行すると ImportError で止まる**
+  （`render_with_relations.py` だけは ImportError を捕まえて PNG 生成を飛ばす。**絵は出ない**ので安全側）
+- **SPEC に規則を書いた（作者裁定）** — `SPEC.ja.md` **§15.12「PNG は演奏を写す」** /
+  `SPEC.md` **§12.9**。①黙って落とすラスタライザを使わない（対象は少なくとも `feTurbulence` /
+  `feDisplacementMap` / `feGaussianBlur`。**性能や画質ではなく観測の話**である）
+  ②**`cairosvg` は使用を禁じる** ③無い実装より誤る実装のほうが悪い（フォールバックを置かない）
+  ④守り方（唯一の入口と番人 3 つ、**②の走査範囲は見ない場所で書く**）
+- **`server/Dockerfile` の `libcairo2` は今回落としていない** — **次回の配布で落とす**という
+  作者裁定（2026-07-27）。リリース runbook に **A-1b** として手順を起票した（一度きり・済んだら削除）
+- **検証:** server **1414 passed / 31 skipped**（+1 は走査範囲の検査）、cli **69 passed**、
+  ruff clean、`npm run check` 0 errors / 2 warnings / 217 files。**SVG は 1 バイトも変わらない**
+
+---
+
+### v2.7.12 — 紙が、どう作られたかを言う（render engine 15 へ畳む）（Build 721、2026-07-27）
+
+**`plain` / `paper` / `washi` / `ink_wash` は地の層で完全に同一だった。** 分岐していたのは
+`mezzotint` と `charcoal_ground` だけで、`material` は種の材料に入るだけだった。
+**作者裁定で engine 15 へ畳んだ**（版を上げない。本番 DB に engine 15 の作品が 0 件・未公開・
+engine 13 の前例。**条件は「公開前に済ませること」**）。
+
+- **最初の実装は却下相当だった。** 繊維と刷毛を**描画要素として積んだ**ところ、既定プロファイルで
+  地が 2 要素 → 40 要素になり、**絵全体の 46%** を占めた。**DDL が明示した図形は 2 つしかない**
+- **直した方針: 支持体は雑音の性格であって、描くものではない。**
+  `display` はフィルタの中（**`washi` = 異方性乱流を直交 2 枚で交差させる `feBlend`**、
+  **`ink_wash` = 横へ引き伸ばして `feGaussianBlur` でぼかす**）、
+  `editable` は**地が既に描いている粒の形**を変える（washi は同じ数の粒を繊維へ引き伸ばし、
+  ink_wash は粒を横帯で濃淡させる）
+- **要素は 1 つも増えない。凍結物がそれを言っている** — `C-ground-washi` は
+  **circle 20 → 0 / path 1 → 21**（総数 21 のまま）、`C-ground-ink_wash` は
+  **circle 20 → 12**（`count × 0.6` で**減る**）
+- **数値は作者が実物を見て決めた。** 比較シート `material-sheet.png` の 2 行のうち
+  **`tone=warm grain=coarse opacity=0.18` の行を採る**（2026-07-27 裁定）＝
+  **washi をこれ以上強めない**。0.18 は既に全経路の上限（`min(0.18, ground.opacity)`）である
+- **コーパスは engine 15 のまま再凍結した。** 動いたのは **350 件中 3 件**
+  （`C-ground-washi` / `C-ground-ink_wash` / `C-groundseed-auto-washi`）。
+  **`changed_from_previous` を作り直しても 318 件で完全一致**することを先に実測してから採用し、
+  **2 回目の生成が exit 0 でバイト一致**することを確かめた。manifest の `reason` に畳んだ旨を追記
+- **Android の期待値は動かなかった。** 再生成した 36 件が **`31ff75d`（engine 15 の凍結）と
+  バイト一致**する。**Android の参照ケースは地を 1 件も持たない**ためで、
+  **「畳むと Android の期待値が作り直しになる」という前提は実測で外れた**。
+  `feat/android-engine15` の契約はそのまま着手できる
+- **検査面を新設した（実装には付いていなかった）** — `test_ground_seed.py` に 5 件。
+  材質が**粒の描き方**を変えること（washi / ink_wash）、**filter のほうも**変わること
+  （`feBlend` / `feGaussianBlur` の有無）、**要素数が増えないこと**
+  - **seed を明示して固定する**のが要点。**固定しないと `material` が導出 seed に入っているぶんで
+    層が動き、描き分けの分岐を `if False` にしても素通りした**（実測。主張と違う理由で通る検査だった）
+  - **摂動 2 種で落ちることを確認**（雑音表を空にする / 繊維の分岐を殺す）
+- **既存検査 1 件を書き直した** — `test_explicit_ground_seed_still_bypasses_the_derivation` は
+  「明示 seed なら paper と washi は同一」と主張していたが、**材質が描き分けられた今は偽**である。
+  **材質ではなく演奏 seed を動かす**形に置き換えた（材質を固定したまま導出だけを揺らせる）
+- **検証:** server **1419 passed / 31 skipped**（+6）、cli **69 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files。**render engine は `"15"` のまま**
+
+---
+
+### v2.8.0 — 奥書の道は colophon で通る（**互換が切れる**）（Build 722、2026-07-27）
+
+**打鍵する名前は英語の術語で付いている** — `paint` / `refine` / `lineage` はいずれも用語辞書と
+一致しており、辞書は「API `/api/paint` と一致」と**明記**している。**その欄でローマ字だったのは
+`okugaki` だけ**だったので、**CLI サブコマンド名と API パスを `colophon` へ移した**
+（作者裁定 2026-07-27）。**エイリアスは残していない。**
+
+- **minor 採番の理由は互換が切れることである。** 採番規則の「互換性が切れるとき（保存データ・
+  API・エディション ID の形式変更）」に当たる。**patch ではない**
+- **語を運んでいたのはパスだけだった** — 応答モデル `OkugakiItem` のフィールドは
+  `id` / `target_node_id` / `branch_snapshot` / `model` / `at` / `language` / `body` /
+  `warnings` / `fact_sheet` で、**`okugaki` という名前のフィールドは一つも無い**。
+  だから改名はパスで閉じる
+- **動かしたもの（4 経路）**:
+  `GET|POST /api/lineage/{node_id}/okugaki` → **`/colophon`**、
+  `DELETE /api/okugaki/{okugaki_id}` → **`/api/colophon/{colophon_id}`**、
+  CLI サブコマンド `okugaki` → **`colophon`**、web の fetch 3 か所
+- **動かしていないもの（辞書 §6 の識別子）**: DB のテーブル名 `okugaki` と索引
+  `uq_okugaki_user_idempotency`、**`model_settings` の `okugaki_model`（保存済みユーザー設定）**、
+  モジュール名 `okugaki.py`、i18n の鍵 `okugaki*`
+  - **鍵名のローマ字は例外ではなく通例である** — 変奏は `variation` という完璧な辞書語を
+    持ちながら、web の鍵は **`hensouAxis` / `hensouSmall` / `hensouMedium` / `hensouLarge` …
+    とローマ字のまま**である。辞書が禁じているのは**表示に出る語**であって、鍵ではない
+- **番人を 2 つ置いた**: ① `app.routes` に `okugaki` を含むパスが 1 本も無く、
+  `/api/lineage/{node_id}/colophon` と `/api/colophon/{colophon_id}` が在ること
+  ② CLI が `colophon` を受け、**`okugaki` では `SystemExit` になること**（エイリアス不在の確認）
+- **辞書に境界を書いた** — `GLOSSARY.md` の 奥書 の行に「CLI サブコマンドと API パスも colophon」
+  を追記し、**§6 に「例外が 1 つある」節**を足して、**何を動かして何を動かさないか**と
+  **`hensou*` が反例であること**を記録した
+- **文書 4 本を追随**: `SPEC.ja.md`（`inku-cli okugaki` → `colophon`）、
+  `SPEC.md`（**「(okugaki)」の併記と「the CLI subcommand keeps its name」を削除**）、
+  `manual/{ja,en}/cli-reference-for-ai.md`（§2.5 の見出しと用例）
+- **検証:** server **1420 passed / 31 skipped**（+1）、cli **70 passed**（+1）、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**。
+  **描画には触れていない**（render engine は `"15"`、SVG は不変）
+
+**変奏の語も同じ版で通した（Build 723）。** 奥書は「1 語がローマ字」だったが、
+**変奏は衝突が逆向き**だった — 辞書は `variation` を**変奏だけ**に予約している
+（候補は `option`。「~~variation~~（変奏と衝突）」）のに、実装では
+**本物の変奏がローマ字 `hensou` で、変奏でない 4 種が `*_variation`** を名乗っていた。
+
+- **系譜の derivation kind を入れ替えた（保存済みの値）**: `hensou` → **`variation`**（本番 7 行）、
+  `touch_variation` → `touch_change`（25）、`model_variation` → `model_comparison`（11）、
+  `layout_variation` → `layout_change`（6）、`language_variation` → `language_comparison`（1）。
+  本番 0 件の 4 種（`render_engine_` / `age_` / `hacho_` / `external_seed_`）も `_change` へ揃えた
+- **`vary_seed` → `composition_seed`（186 箇所）。これは変奏ですらない** —
+  SPEC §12 が「記述者が持つ口は 入力テキスト・`vary_seed`・`tenkei`・そして**変奏**」と
+  **並べて**書いており、Stage 1.5 の**構図**の seed である。
+  **変奏の seed は `variation_seed`、強度は `variation_amplitude` で、どちらも改名していない**
+- **CLI の旗も移した**: `--vary-seed` → `--composition-seed`、`--vary N` → `--composition-count N`
+- **web の i18n 鍵まで揃えた**（`hensou*` → `variation*` 14 個ほか）。
+  **鍵名のローマ字は本来なら通例**だが、「辞書を完全に通す」という作者裁定による
+- **保存済みデータは migration で移す。壊さない** — 起動時に
+  `history.vary_seed` 列を `composition_seed` へ RENAME し、`lineage_edges.derivation_kind` を
+  表で UPDATE する。**本番 DB の複製で実測**（件数 25/11/7/6/1 が保存され、`composition_seed` は 9 件）、
+  **2 回目は 0 行＝冪等**
+- **凍結したもの（改名すると壊れる）**: **rh2 payload の鍵 `vary_seed`** は
+  **同一性 ID の材料**なので名前のまま置いた。**改名したら保存済み全作品の rh2 が動き、
+  検査が実際に捕まえた**（`test_legacy_render_hash_v2_calculation_remains_available`）。
+  `ddl_expander` の salt `#hensou` / `#vary` も hash の材料なので不変
+- **新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md` に記録した**（作者指示）。
+  外部スクリプトが動かなくなったときはここを引く
+- **採番は v2.8.0 のまま**（**未公開なので畳む**。タグ最新は `v2.7.2`）。Build だけ 723 へ
+- **検証（Build 723 時点）:** server **1420 passed / 31 skipped**、cli **70 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**
+
+**記述の語も同じ版で通した（Build 724）。** 辞書は **記述 = `description`（動詞は write）** と定め
+`prompt` を禁じているのに、**要求の主フィールドだけが `text` という第三の語**だった。
+
+- **`text` → `description`、`original_text` → `original_description`**。
+  `/api/paint` / `/api/paint/stream` / `/api/interpret` / `/api/compose` の要求、
+  `/api/paint` の応答、CLI の成果物 JSON、web の送信すべて
+- **`dh1`（記述の同一性 ID）は影響を受けない** — `description_hash()` は**値だけ**を hash しており
+  鍵名を含まない（実測して確かめてから着手した。`rh2` で痛い目を見た直後だったため）
+- **改名していない `"text"` が 4 つある** — **LLM プロバイダへ送る payload**
+  （Anthropic の content block、Gemini の `parts`）。**外部 API の契約である**
+- **`history` の DB 列 `input` は第三の語のまま残っている**（server 9 箇所・web 30 箇所）。
+  **記述を指す語が `description` と `input` の 2 つになった**ので、次の一手として測ってある
+- **検証（Build 724 時点）:** server **1420 passed / 31 skipped**、cli **70 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files
+
+**その語の付け先を、同じ版で直した（Build 725）。** Build 724 は語を移したが、
+**`description` を「作者が書いた記述」ではなく「文脈を注入したあとの、Stage 1 へ渡す文字列」に
+与えてしまい**、作者の本文のほうが `original_description` へ降格していた。
+**辞書の語が指すのは作者が書いたものである。**
+
+- **`description` = 作者が書いた記述**（`/api/interpret` と `/api/paint` では必須）。
+  **Stage 1 が実際に読む文字列には `stage1_input` という別の名前を与えた**（省略可）。
+  **省略した要求では記述そのものが Stage 1 へ渡る**ので、文脈を注入しない client は
+  `description` だけ送ればよい
+- **`/api/compose` の `original_description` も `description` へ**（省略可。DDL だけで叩けるため）。
+  web の送信 4 箇所がこの経路（契約は 3 箇所と見積もっていたが、実測は 4 箇所だった）
+- **`input` は据え置き**（作者裁定）。保存・表示される本文であって記述とは限らない —
+  本番 1780 件のうち **DDL 風が 4 件・空が 38 件**で、中立な語のほうが筋が通る
+- **内部の関数引数は 1 つも動かしていない** — `composer.py` の `original_description` と
+  `_call_compose_detail` の引数は**初めから意味が正しい**（Stage 2 へ渡す作者の原文）。
+  **片側だけ動かすと `TypeError` になり、1 回目の着手はそれで 42 件赤にした。**
+  動かしてよいのは **① Pydantic のフィールド定義 ② `req.` の読み出し ③ client の送信本体**の 3 つだけ
+- **判別テストを 4 本足した** — `stage1_input` を省いた要求で Stage 1 が `description` を読むこと、
+  送った要求では `stage1_input` を読むこと、**そのとき履歴に残るのは `description` のほう**であること
+  （augmented が保存されない）、CLI の payload が両者を分けること。
+  **実装を 2 点摂動して、それぞれが実際に赤くなることを確かめてから戻した**
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 725 へ
+- **検証（Build 725 時点）:** server **1423 passed / 31 skipped**、cli **71 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files
+
+**残っていたローマ字も同じ版で通した（Build 726）。** 打鍵する名前を全数
+（CLI サブコマンド 46・オプション 84・API パス 61）調べたところ、
+**奥書と同じ形はあと 1 つだけだった** — **添景の旗 `--tenkei`**。
+
+- **辞書は 添景 = `staffage` と既に定めており（GLOSSARY :58）、web はその語で表示していた。**
+  **ローマ字が残っていたのは打鍵する側 1 箇所だけ**だった。`--staffage` へ移し、
+  **エイリアスは残していない**（奥書と同じ方針・2026-07-27 作者裁定）
+- **help の文言は第三の語だった** — `scenery level` と書かれており、
+  `tenkei` でも `staffage` でもなかった。`staffage` へ揃えた
+- **動かしていないもの**: API の要求・応答フィールド `tenkei`（server 27 箇所）、
+  DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `tenkei.ts` と i18n 鍵。
+  **鍵名のローマ字は通例**という規則がそのまま効く。**外部スクリプトが直すのは旗の綴りだけ**で、
+  payload を組み立てている側は触らなくてよい
+- **番人を 2 つ置いた** — `--tenkei` が `SystemExit` になること、**旗の一覧そのものに
+  `tenkei` を含むものが無いこと**。**2 本目は最初 上位パーサしか見ておらず、
+  エイリアスを残す摂動を素通りさせた**（実際の旗はサブパーサ側に付いている）。
+  **サブパーサまで降りるよう直してから、摂動で 2 本とも赤くなることを確かめた**
+- **`/api/saijiki` と歳時記のカテゴリ鍵 9 個はローマ字のままでよい** — 辞書が
+  歳時記 = `Saijiki`（固有名詞・大文字）と定めているとおりで、**ローマ字が正しい英語表記**である。
+  `renga` / `hacho` も同じ扱い。**`sumi` / `washi` は識別子ではなく DDL の語彙値**
+  （`sumi` は `black` の同義語として `ink` / `obsidian` / `黒` と並ぶ、記述者が書く語）
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 726 へ
+- **検証（Build 726 時点）:** server **1423 passed / 31 skipped**、cli **73 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**
+
+**CI を 8 回ぶりに緑へ戻した（Build 727）。** v2.7.9 の銀筆改名は、render コーパスと
+coerce ゴールデンを**版を上げずにその場で再凍結**したが、**DDL コーパスだけ同じ commit で
+取りこぼされ**、以後すべての push で `ddl-engine` job が落ちていた（`render-engine` は毎回緑）。
+
+- **再凍結が運んだのは改名 2 種だけ** — `B-trigger-auto` の coerce 出力の道具名と、
+  **`vary_seed` を記録したままだった manifest の入力 15 件**。ケース ID の増減は無く、
+  **`ddl_engine_version` は 1 のまま**（render engine が 15 のまま据え置かれたのと同じ理由）
+- **仕組みは引き継ぎの記述と違っていた** — 凍結物の `hair` は
+  「保存値を validator が書き換える」ものではなく、**coerce 自身が生産していた道具名**だった。
+  **摂動を validator に当てたら空振りし、`coerce/compose.py` の literal に当てて初めて動いた**
+- **ガードは書き込みの後に発火するようにした**（render 生成器と同じ順）。
+  **手前で止めると、裁定済みの改名を再凍結する道が構造的に無い**。
+  **1 回目に発火し 2 回目が exit 0 でバイト一致する**のがガードの守りたい性質である
+- **SPEC §15.6 に「改名では版を上げない」を条文化した**（日英）。v2.7.9 の判断が条文に無く、
+  字義どおりなら発火する状態だった。**語彙を増やすのと名前を替えるのは別**である
+- **`check_frozen_corpora.py` を足した** — CI と同じものを手元で回す。
+  **テストは代替にならない**（`test_*_reference.py` は凍結物と manifest の整合しか見ず**再生成しない**）ので、
+  **1423 件が緑のままコーパスがずれる**。実際 3 回ともそうなった。
+  **CI は最後の砦（別 OS での再現性）であって検出器ではない**、という置き方に改めた
+- **摂動で赤を確認した** — `coerce` が生産する道具名を 1 箇所変えると検査が exit 1 を返し、
+  復旧手順（`git checkout -- server/reference/`）まで案内することを見た
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 727 へ
+- **検証（Build 727 時点）:** server **1423 passed / 31 skipped**、cli **73 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、**両コーパスの生成器が exit 0 でバイト一致**
+
+**記述の語を打鍵する側でも揃え、壊れていた 2 経路を直した（Build 728）。**
+`--original-text` は**埋める先の鍵が Build 725 から `description` なのに、綴りに退役した
+第三の語 `text` を残していた**。`--description` へ移し、**エイリアスは残していない**
+（奥書・添景と同じ方針）。`refine generate --text` も同じ鍵を埋めていたので揃えた。
+
+- **同じ改名が 2 つのコマンドを黙って壊していた** — **`inspect` と `refine generate` は
+  `_paint_payload` を通らず自前で payload を組んでおり**、**Build 724 以降も旧鍵 `text` を
+  `/api/paint` へ送り続けていた**。`description` が必須なので、**その要求は 422 で落ちる**。
+  **cli のテストは実サーバを叩かないので 73 件が緑のまま気づけなかった**
+- **捕まえたのは「`*-text` 系の旗を全数分類した」から**である。`--original-text` だけを
+  名指しで直していたら、この 2 つは壊れたまま残った
+- **`paint` / `batch` の help が記述を `prompt` と呼んでいた**（辞書が退けている語）。
+  4 箇所を直した。**`review evaluate --prompt` などはそのまま** —
+  **あちらは LLM のプロンプトという別の指示対象**で、禁じられているのは記述を指す用法である
+- **番人を 4 つ置き、3 点の摂動で全部が赤くなることを確かめた**（エイリアス残存／
+  help が `prompt` へ戻る／`inspect` が旧鍵へ戻る）。
+  **`inspect` の検査は `ApiClient` を差し替えて送信そのものを覗く** —
+  静的な走査では LLM プロバイダ payload の `"text"` と区別がつかない
+- **位置引数（`paint <text>`）は動かしていない**。打鍵するのは値であって名前ではない
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 728 へ
+- **検証（Build 728 時点）:** server **1423 passed / 31 skipped**、cli **76 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files
+
+### 2026-07-27 — 英語ドキュメントの用語（**採番なし**・ドキュメントのみ）
+
+**README と `manual/en/` を辞書に照らして全数走査し、直したのは 6 箇所だけだった。**
+**ずれの本体は英語ではなく日本語の正本にあった。**
+
+- **英語だけが禁止語 `prompt` を使っていた 6 箇所**を `description` / 日本語どおりの語へ直した。
+  対応する日本語は `指示`欄 / 記述文 / 指示文 / 短い言葉 / 入力テキスト / 指示文生成モデル で、
+  **どれも「プロンプト」とは書いていない**。ここは英語側の一方的なずれである
+- **残る `prompt` 7 件はすべて正当**: 日本語も「プロンプト」と書いている 2 件（生成 AI 批評の一節・
+  UI の JSON/プロンプト表示）、**LLM のプロンプトを指す** 4 件（Prompts パネル・`--prompt` 旗）、
+  **コマンド例のファイル名 `prompts.txt`**（日英で同一の識別子なので動かさない）
+- **`artwork` は README にも `manual/en/` にも 1 件も無かった**（引き継ぎの記述は不正確だった）。
+  出現するのは `CHANGELOG.md` と `PROJECT_CONTEXT.md` の**歴史的記述**だけで、これは書き換えない
+- **`generation` / `image` / `create` の残存は、いずれも日本語の 生成 / 画像 / 作る を忠実に訳したもの**
+  である（README.ja「もう一度生成」「による生成です」「生成後は歳時記を参照し」、
+  manual/ja「画像の作成方法」「バッチ生成」「Stage 2が作る」）。
+  **英語だけを辞書へ寄せると日英の対応が壊れる**ので、**手を付けずに作者裁定へ回す**
+- **`SPEC.md` の `scene-tone palette` 7 件も同じ理由で保留** — `SPEC.ja.md` に対応する語が
+  見つからず、正本を確かめないまま訳語を作れない。**`jitter` 3 件は識別子と信号の意味で正当**
+
+### v2.8.0 — 六色を六色と呼ぶ（Build 729、2026-07-27）
+
+**Stage 2 のシステムプロンプトが「場のトーンで palette を選ぶ」と書いていた。**
+そこで選ばせているのは**六つの抽象色**であって色カタログではない
+（カタログは server-owned で、Stage 2 のあとに解決される）。
+**しかも `palette` はカタログ JSON の実在するフィールド名**でもあり、
+**実装の中で一語が二つの意味を運んでいた**。日英とも「抽象色 / the abstract colors」に改めた。
+
+- **これはモデルの挙動を動かす変更である。** Stage 2 digest は
+  **`a1bb4ff70488fb35` → `261373d0123a740f`（日）／`397195ed887f6adb` → `f5bd29704e5906f2`（英）**
+- **日本語プロンプトはバイト数が動かない**（42,824 のまま）。
+  **長さだけを見る検査は素通りする**ので、捕まえるのは digest の固定値のほう。
+  英語は 40,989 → 41,001
+- **`SPEC.md` は写していた文言のほうを追随させた**（`scene-tone palette` → `scene-tone color` ほか 4 箇所）。
+  **`SPEC.ja.md` にこの規則の記述は無い**（日英 SPEC は節番号ごと乖離している）
+- **SPEC に残る `palette` 6 件は正当** — カタログ JSON の識別子 4 件と、一般的な美術語 2 件
+- **挙動が同じであることは決定的には確かめられない**（プロンプトの語を変えた以上、
+  LLM を回さないと分からない）。**決定的な検査はすべて緑**: server 1423 passed / 31 skipped
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 729 へ
+
+### v2.9.0 — プロンプトが禁じて、かつ要求していた六つ（Build 730、2026-07-27）
+
+**原則が禁じる語を、後段の規則・語彙表・作例のほうが要求していた。**
+明文の禁止をすべて拾い、同じプロンプトの残り全部と機械的に突き合わせて六件見つけた。
+二件（日本語の「塗りつぶす」・英語の `rise` / `fall`）は別セッションの発見で、残り四件は今回の検査。
+
+- **日本語の背景の定型を許可動詞へ**: 「背景を○色で塗りつぶす。」→**「背景を○色で埋める。」**。
+  原則2 は `塗りつぶす` を禁止動詞に挙げながら、§背景色 がその語で書けと命じ、作例 7 件が従っていた。
+  **英語側は最初から `Fill background with X.` で衝突していない**（`fill` は許可動詞）。
+  **矛盾は翻訳で片側にだけ生じていた**
+- **解析側はすべて旧表現を受け続ける**ので、保存済み作品はそのまま演奏できる。
+  Stage 2 の規則が新旧両方を名指し、`ddl_expander` の灰背景是正が `(?:塗りつぶす|埋める)` にマッチする。
+  **残る背景検出（`api.py` の色判定・`compose.py` の節分割・`explicit_surface` マーカー）は
+  `背景を` で判定していて動詞を見ない**ため無改修。**coerce に触っていないので凍結コーパスが動かない**
+- **英語の `rise` / `fall` を運動語として書き分けた**（`rise (as motion), fall (as motion)`）。
+  **同じ行の `scatter` は既に `(as motion)` / `(as arrangement)` と書き分けてあった**のに、
+  かたむきの `rising` / `falling` には適用されていなかった。角度語である旨の一行も足した
+- **「てざわりのない線・弧の文を出力してはいけない」に、自分の作例が違反していた** —
+  日 20 文 / 英 9 文。**規則が悪例として名指しした「放射状に線を引く」が、
+  作例に「放射状に細い線を八本引く。」としてほぼ原文で実在した**。
+  関係・わりあい・かたむきだけを示す最小文を例外として明記し、**実作例 11 文にてざわりを補った**
+- **原則5「使えるのは Saijiki の語彙のみ」を、語彙表に無い 13 語が破っていた**（面・地・版画技法・
+  色とりどり等）。**原則5 のほうを実態へ書き換えた**（語彙 + 本書が定める定型）。語彙表は不変なので
+  reference §1・web 表示・SPEC / README への波及が無い
+- **未知対象の近似先から `多角形` / `polygon` を削った** — `saijiki.py` が
+  「歳時記語彙ではない」と明記した隠しマーカーを、本文が出力させていた。
+  Stage 2 の polygon 規則（`sides=5-8`）と coerce の `shape_intent_markers` 経由の生成は不変
+- **許可動詞に `敷き詰める` / `tile` を追加** — うごき の語彙表は 6 語、原則2 の許可動詞は 5 語で、
+  §配置選択 は「敷き詰める」の出力を要求していた
+- **`ペン(既定)` を「既定値であって推奨値ではない」と明記** — 語彙表が既定と宣言する道具を、
+  本文が二箇所で「寄せるな」と禁じていた
+- **作例 1 件が禁止語 `広げる` を使っていた**（「半径を広げて並べる」）。
+  これだけは後段のどの規則も正当化していない、素の違反だった
+
+**検査の副作用**
+
+- **Stage 1 の golden は Build 591 の fixture のまま**にし、差分を `_REORDERED_JA` / `_REORDERED_EN` へ
+  **宣言**として 14 件追加した。**宣言のない差分は今も失敗する**
+- **プロンプトの固定値を 20 個再凍結**（Stage 1 base 6・actual 3・base 共通 1・Stage 2 6・
+  歳時記摂動 2・スキーマ摂動 2）。Stage 1 base 日 `9c8064958c8e3960` → **`f56778ec689949f8`**、
+  Stage 2 combined 日 `261373d0123a740f` → **`b5b40bbc27885eb1`** / 英 `f5bd29704e5906f2` → **`778f6a6e2dfa124f`**
+- **例プールの 1 件が選ばれなくなった** — 英語の雪の例にてざわりを補った結果、
+  てざわり補充の fallback が発火しなくなり、置換先が 1 つずれて砂の例が k=5 の枠から外れた。
+  テストは「プールから消えていないこと」へ置き換えた
+- **`SPEC.ja.md` の Stage 1.5 の作例が灰背景のままだった**（`_avoid_gray_background` が白へ書き換えるので、
+  仕様の例のほうが実装より古かった）。今回まとめて是正した
+- **README の DDL は書き換えない** — あれは seed 付きで保存された実出力の引用である。
+  旧表現は解析側が受け続けるので、記録はそのまま再現できる
+
+**`埋める` は既に「面を要素で埋める」の意味を持つ**（Stage 2 の密度規則に「密集/埋める=120〜350」がある）。
+決定的な層は `背景を` で判定するので機械的な誤りは起きないが、**LLM が密度指示と読む余地は残る**。
+緩和として Stage 2 の背景規則へ「この文は面を要素で埋める指示ではないので、密度・数量の規則を当てない」を
+日英とも明記した。**LLM は一度も回していないので、効いているかは未確認**。
+
+決定的な検査はすべて緑: server **1424 passed / 31 skipped**、ruff・cli 76・
+`npm run check` 0 errors・`lint:i18n` 0 errors・**凍結コーパスは両方バイト一致**。

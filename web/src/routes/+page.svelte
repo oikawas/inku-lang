@@ -70,7 +70,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v2.7.9';
+	const APP_VERSION = 'v2.9.0';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -103,7 +103,7 @@
 		render_canvas_aspect_ratio?: number | null;
 		render_seed?: number | null;
 		render_wild?: boolean | null;
-		vary_seed?: number | null;
+		composition_seed?: number | null;
 		interpretation_seed?: string | null;
 		seed_text?: string | null;
 		instruction_lang_requested?: string | null;
@@ -132,9 +132,9 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
-	type DerivationKind = 'touch_variation' | 'layout_variation' | 'catalog_change' | 'reinterpretation' | 'model_variation' | 'language_variation' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'hensou';
-	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'hensou';
-	type HensouAmplitude = 'small' | 'medium' | 'large';
+	type DerivationKind = 'touch_change' | 'layout_change' | 'catalog_change' | 'reinterpretation' | 'model_comparison' | 'language_comparison' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'variation';
+	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
+	type VariationAmplitude = 'small' | 'medium' | 'large';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
@@ -383,7 +383,7 @@
 		renderCanvasAspectRatio?: number | null;
 		renderSeed?: number | null;
 		renderWild?: boolean | null;
-		varySeed?: number | null;
+		compositionSeed?: number | null;
 		tokensIn: number | null;
 		tokensOut: number | null;
 		tokensInStage2: number | null;
@@ -2596,7 +2596,7 @@
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
 		wild?: boolean;
-		varySeed?: number;
+		compositionSeed?: number;
 		// 変奏 (v2.0): 両方そろって初めてサーバーが展開層をずらす。
 		variationAmplitude?: string;
 		variationSeed?: number;
@@ -2701,8 +2701,8 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 			signal: options.signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				text: augmented,
-				original_text: text,
+				description: text,
+				stage1_input: augmented,
 				stage1_model: resolvedStage1Model,
 				stage2_model: resolvedStage2Model,
 				include_thinking: includeThinking,
@@ -2711,7 +2711,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				render_seed: options.renderSeed,
 				wild: options.wild ?? false,
-				vary_seed: options.varySeed,
+				composition_seed: options.compositionSeed,
 				variation_amplitude: options.variationAmplitude ?? null,
 				variation_seed: options.variationSeed ?? null,
 				interpretation_seed: options.interpretationSeed,
@@ -2780,8 +2780,8 @@ if (unreadWords.length > 0) {
 			signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				text: augmented,
-				original_text: text,
+				description: text,
+				stage1_input: augmented,
 				model: resolvedStage1Model,
 				include_thinking: includeThinking,
 				instruction_lang: langOverride ?? instructionLang,
@@ -2830,7 +2830,7 @@ if (unreadWords.length > 0) {
 		render_canvas_aspect_ratio?: number | null;
 		render_seed?: number | null;
 		render_wild?: boolean | null;
-		vary_seed?: number | null;
+		composition_seed?: number | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -2847,7 +2847,7 @@ if (unreadWords.length > 0) {
 			body: JSON.stringify({
 				ddl: currentDdl,
 				model: resolvedStage2Model,
-				original_text: originalText,
+				description: originalText,
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				catalog_id: renderOptions.catalogId ?? selectedCatalog,
@@ -2880,7 +2880,7 @@ if (unreadWords.length > 0) {
 			render_canvas_aspect_ratio?: number | null;
 			render_seed?: number | null;
 			render_wild?: boolean | null;
-			vary_seed?: number | null;
+			composition_seed?: number | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
 			tokens_out: number | null;
@@ -3292,7 +3292,7 @@ if (unreadWords.length > 0) {
 				body: JSON.stringify({
 					ddl,
 					model: resolvedStage2Model,
-					original_text: replayInput,
+					description: replayInput,
 					instruction_lang: instructionLang,
 					ui_lang: uiLang,
 					catalog_id: selectedCatalog,
@@ -3321,7 +3321,7 @@ if (unreadWords.length > 0) {
 				render_canvas_aspect_ratio?: number | null;
 				render_seed?: number | null;
 				render_wild?: boolean | null;
-				vary_seed?: number | null;
+				composition_seed?: number | null;
 				instruction_lang_requested?: string | null;
 				instruction_lang_resolved?: string | null;
 				ui_lang?: string | null;
@@ -3346,7 +3346,7 @@ if (unreadWords.length > 0) {
 				render_canvas_aspect_id: d.render_canvas_aspect_id,
 				render_canvas_aspect_ratio: d.render_canvas_aspect_ratio,
 				render_seed: d.render_seed,
-				vary_seed: d.vary_seed,
+				composition_seed: d.composition_seed,
 				instruction_lang_requested: d.instruction_lang_requested,
 				instruction_lang_resolved: d.instruction_lang_resolved,
 				ui_lang: d.ui_lang,
@@ -3623,7 +3623,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), vary_seed: it.vary_seed == null ? null : Number(it.vary_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3963,7 +3963,7 @@ if (unreadWords.length > 0) {
 						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
 						renderSeed: composed.render_seed ?? null,
 						renderWild: composed.render_wild ?? null,
-						varySeed: composed.vary_seed ?? null,
+						compositionSeed: composed.composition_seed ?? null,
 						tokensIn: interpreted.tokens_in,
 						tokensOut: interpreted.tokens_out,
 						tokensInStage2: composed.tokens_in,
@@ -4093,7 +4093,7 @@ if (unreadWords.length > 0) {
 						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
 						renderSeed: composed.render_seed ?? null,
 						renderWild: composed.render_wild ?? null,
-						varySeed: composed.vary_seed ?? null,
+						compositionSeed: composed.composition_seed ?? null,
 						tokensIn: interpreted.tokens_in,
 						tokensOut: interpreted.tokens_out,
 						tokensInStage2: composed.tokens_in,
@@ -4169,7 +4169,7 @@ if (unreadWords.length > 0) {
 				render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
 				render_seed: item.renderSeed ?? null,
 				render_wild: item.renderWild ?? null,
-				vary_seed: item.varySeed ?? null,
+				composition_seed: item.compositionSeed ?? null,
 				instruction_lang_requested: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
 				instruction_lang_resolved: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
 				ui_lang: getLang(),
@@ -4177,7 +4177,7 @@ if (unreadWords.length > 0) {
 				countGeneration: true,
 				sourceText: item.input,
 				lineageParentNodeId: item.lineageParentNodeId ?? null,
-				derivationKind: item.lineageParentNodeId ? (item.comparisonKind === 'language' ? 'language_variation' : 'model_variation') : null,
+				derivationKind: item.lineageParentNodeId ? (item.comparisonKind === 'language' ? 'language_comparison' : 'model_comparison') : null,
 				derivationMetadata: item.comparisonKind === 'language'
 					? { comparison_mode: item.compareMode, stage1_language: item.stage1Lang, stage2_language: item.stage2Lang }
 					: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model },
@@ -4415,7 +4415,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		render_canvas_aspect_id: composed.render_canvas_aspect_id,
 		render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
 		render_seed: composed.render_seed,
-		vary_seed: composed.vary_seed,
+		composition_seed: composed.composition_seed,
 		instruction_lang_requested: composed.instruction_lang_requested,
 		instruction_lang_resolved: composed.instruction_lang_resolved,
 		ui_lang: composed.ui_lang,
@@ -4469,7 +4469,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		render_canvas_aspect_id: composed.render_canvas_aspect_id,
 		render_canvas_aspect_ratio: composed.render_canvas_aspect_ratio,
 		render_seed: composed.render_seed,
-		vary_seed: composed.vary_seed,
+		composition_seed: composed.composition_seed,
 		instruction_lang_requested: composed.instruction_lang_requested,
 		instruction_lang_resolved: composed.instruction_lang_resolved,
 		ui_lang: composed.ui_lang,
@@ -4713,7 +4713,7 @@ $effect(() => {
 			derivation_kind: it.derivation_kind as DerivationKind | null | undefined,
 			derivation_metadata: it.derivation_metadata,
 			render_seed: it.render_seed == null ? null : Number(it.render_seed),
-			vary_seed: it.vary_seed == null ? null : Number(it.vary_seed),
+			composition_seed: it.composition_seed == null ? null : Number(it.composition_seed),
 			interpretation_seed: it.interpretation_seed ?? null,
 			variation_amplitude: it.variation_amplitude ?? null,
 			variation_seed: it.variation_seed == null ? null : Number(it.variation_seed),
@@ -4953,7 +4953,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			});
 			if (!r.ok) throw await apiError(r);
 			const svg = await r.text();
-			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_variation' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
+			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_change' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
 			displayedHistoryItem = null;
 			historyCursor = -1;
 			outputTab = 'canvas';
@@ -4980,9 +4980,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		error = null;
 		try {
 			const usedSeeds = new Set<number>();
-			if (Number.isFinite(result.vary_seed ?? NaN)) usedSeeds.add(Number(result.vary_seed));
+			if (Number.isFinite(result.composition_seed ?? NaN)) usedSeeds.add(Number(result.composition_seed));
 			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
-			const r = await paintOne(source, { varySeed: nextVarySeed, historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_variation' : null, derivationMetadata: { vary_seed: nextVarySeed } });
+			const r = await paintOne(source, { compositionSeed: nextVarySeed, historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_change' : null, derivationMetadata: { composition_seed: nextVarySeed } });
 			ddl = r.source_ddl ?? r.ddl;
 			expandedDdl = r.ddl;
 			ddlGeneratedBaseline = ddl;
@@ -5101,7 +5101,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				ddl: ddl ?? '',
 				catalog_id: refinementCatalogId(),
 				canvas_aspect: refinementCanvasAspectId(),
-				vary_seed: result.vary_seed,
+				composition_seed: result.composition_seed,
 				interpretation_seed: result.interpretation_seed,
 				seed_text: normalizedSeedText,
 			}),
@@ -5121,13 +5121,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				history_at: null,
 				lineage_node_id: null,
 				lineage_parent_node_id: currentLineageParentId(),
-				derivation_kind: currentLineageParentId() ? 'touch_variation' : null,
+				derivation_kind: currentLineageParentId() ? 'touch_change' : null,
 				derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: data.render_seed, seed_text: normalizedSeedText },
 			},
 		};
 	}
 
-	async function composeVariationCandidate(varySeed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+	async function composeVariationCandidate(compositionSeed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const baseDdl = ddl ?? "";
 		const r = await apiFetch("/api/compose", {
@@ -5136,21 +5136,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				ddl: baseDdl,
-				original_text: source,
+				description: source,
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
 				catalog_id: refinementCatalogId(),
 				canvas_aspect: refinementCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
-				vary_seed: varySeed,
+				composition_seed: compositionSeed,
 				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
 		if (!r.ok) throw await apiError(r);
 		const data = await r.json();
-		return { id: `comp-${varySeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_variation' : null, derivation_metadata: { vary_seed: varySeed } } };
+		return { id: `comp-${compositionSeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? 'layout_change' : null, derivation_metadata: { composition_seed: compositionSeed } } };
 	}
 
 	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
@@ -5198,7 +5198,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				catalog_id: catalogId,
 				canvas_aspect: refinementCanvasAspectId(),
 				render_seed: result.render_seed,
-				vary_seed: result.vary_seed,
+				composition_seed: result.composition_seed,
 				interpretation_seed: result.interpretation_seed,
 			}),
 		});
@@ -5223,7 +5223,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		};
 	}
 
-	async function hensouVariationCandidate(amplitude: HensouAmplitude, seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+	async function variationCandidateLabel(amplitude: VariationAmplitude, seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = input.trim();
 		const baseDdl = ddl ?? "";
 		const r = await apiFetch("/api/compose", {
@@ -5232,7 +5232,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				ddl: baseDdl,
-				original_text: source,
+				description: source,
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
@@ -5248,13 +5248,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (!r.ok) throw await apiError(r);
 		const data = await r.json();
 		return {
-			id: `hensou-${amplitude}-${seed}`,
+			id: `variation-${amplitude}-${seed}`,
 			label,
 			selected: false,
 			result: {
 				...composeCandidateResult(source, baseDdl, data),
 				lineage_parent_node_id: currentLineageParentId(),
-				derivation_kind: currentLineageParentId() ? 'hensou' : null,
+				derivation_kind: currentLineageParentId() ? 'variation' : null,
 				derivation_metadata: { variation_amplitude: amplitude, variation_seed: seed },
 			},
 		};
@@ -5278,7 +5278,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	// 変奏の seed はサーバーが採番する。seed 空間の管理と重複回避を UI に持ち込まない。
-	async function allocateHensouSeeds(amplitude: HensouAmplitude, count: number): Promise<number[]> {
+	async function allocateVariationSeeds(amplitude: VariationAmplitude, count: number): Promise<number[]> {
 		const r = await apiFetch("/api/variation/seeds", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -5288,7 +5288,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return (await r.json()).seeds as number[];
 	}
 
-	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: HensouAmplitude) {
+	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) {
 		if (!result || variationGridBusy || loading) return;
 		const source = input.trim();
 		if (!source || !ddl) return;
@@ -5318,8 +5318,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				? t().canvasVaryComposition
 				: kind === "reading"
 					? t().canvasVaryInterpretation
-					: kind === "hensou"
-						? t().hensouTitle
+					: kind === "variation"
+						? t().variationTitle
 						: t().canvasVaryColor;
 		variationGridStatus = null;
 		variationGridDone = 0;
@@ -5329,28 +5329,28 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		}, 3000);
 		try {
 			const usedVarySeeds = new Set<number>();
-			if (Number.isFinite(result.vary_seed ?? NaN)) usedVarySeeds.add(Number(result.vary_seed));
+			if (Number.isFinite(result.composition_seed ?? NaN)) usedVarySeeds.add(Number(result.composition_seed));
 			for (const candidate of variationCandidates) {
-				if (Number.isFinite(candidate.result.vary_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.vary_seed));
+				if (Number.isFinite(candidate.result.composition_seed ?? NaN)) usedVarySeeds.add(Number(candidate.result.composition_seed));
 			}
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
 			// 変奏の seed 採番はサーバー側なので、候補生成前に count 個まとめて確保する。
-			const hensouSeeds = kind === "hensou" ? await allocateHensouSeeds(amplitude ?? "medium", count) : [];
+			const variationSeeds = kind === "variation" ? await allocateVariationSeeds(amplitude ?? "medium", count) : [];
 			const jobs = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
 					return () => renderWordTouchCandidate(normalizedTouchWords, t().canvasVaryPerformance, abortController.signal);
 				}
 				if (kind === "layout") {
-					const varySeed = createSafeIntegerSeed(usedVarySeeds);
-					usedVarySeeds.add(varySeed);
-					return () => composeVariationCandidate(varySeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
+					const compositionSeed = createSafeIntegerSeed(usedVarySeeds);
+					usedVarySeeds.add(compositionSeed);
+					return () => composeVariationCandidate(compositionSeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
 				}
 				if (kind === "reading") {
 					return () => interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
 				}
-				if (kind === "hensou") {
-					return () => hensouVariationCandidate(amplitude ?? "medium", hensouSeeds[index], t().hensouTitle + " " + sequence, abortController.signal);
+				if (kind === "variation") {
+					return () => variationCandidateLabel(amplitude ?? "medium", variationSeeds[index], t().variationTitle + " " + sequence, abortController.signal);
 				}
 				const catalogId = catalogIds[index];
 				return () => renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
@@ -5755,7 +5755,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (result.render_color_catalog_sub !== undefined) payload.render_color_catalog_sub = result.render_color_catalog_sub;
 		if (result.render_color_map !== undefined) payload.render_color_map = result.render_color_map;
 		if (result.render_seed !== undefined) payload.render_seed = result.render_seed;
-		if (result.vary_seed !== undefined) payload.vary_seed = result.vary_seed;
+		if (result.composition_seed !== undefined) payload.composition_seed = result.composition_seed;
 		if (result.interpretation_seed !== undefined) payload.interpretation_seed = result.interpretation_seed;
 		if (result.description_hash !== undefined) payload.description_hash = result.description_hash;
 		payload.elapsed_ms = displayedHistoryItem?.elapsed_ms ?? result.elapsed_total_ms;

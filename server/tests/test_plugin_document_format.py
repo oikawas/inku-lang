@@ -164,13 +164,13 @@ def test_pipeline_expands_before_stage15_and_stage2(monkeypatch, tmp_path: Path)
     monkeypatch.setattr(api_module, "DOCUMENT_PLUGIN_MANAGER", manager)
     monkeypatch.setattr(api_module, "compose", fake_compose)
     explicit = api_module._call_compose_detail(
-        "Sketch.双弧を描く。", original_text="Sketch.双弧を描く", lang="ja"
+        "Sketch.双弧を描く。", original_description="Sketch.双弧を描く", lang="ja"
     )
     natural = api_module._call_compose_detail(
-        "中央に形を置く。", original_text="双弧を中央に置く", lang="ja"
+        "中央に形を置く。", original_description="双弧を中央に置く", lang="ja"
     )
     ordinary = api_module._call_compose_detail(
-        "中央に円を置く。", original_text="静かな円", lang="ja"
+        "中央に円を置く。", original_description="静かな円", lang="ja"
     )
     assert explicit.plugin_provenance and natural.plugin_provenance
     assert not ordinary.plugin_provenance

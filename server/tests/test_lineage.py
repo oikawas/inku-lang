@@ -54,7 +54,7 @@ def test_lineage_records_explicit_derivation_and_tombstone():
             1001,
             render_seed=2,
             lineage_parent_node_id=root["lineage_node_id"],
-            derivation_kind="touch_variation",
+            derivation_kind="touch_change",
             derivation_metadata={"render_seed_from": 1, "render_seed_to": 2},
         ))
 
@@ -66,7 +66,7 @@ def test_lineage_records_explicit_derivation_and_tombstone():
             root["lineage_node_id"],
             child["lineage_node_id"],
         }
-        assert lineage["edges"][0]["derivation_kind"] == "touch_variation"
+        assert lineage["edges"][0]["derivation_kind"] == "touch_change"
         assert next(node for node in lineage["nodes"] if node["id"] == root["lineage_node_id"])["child_count"] == 1
         assert next(node for node in lineage["nodes"] if node["id"] == child["lineage_node_id"])["child_count"] == 0
 
@@ -75,7 +75,7 @@ def test_lineage_records_explicit_derivation_and_tombstone():
             "\u5225\u306e\u5b50",
             1002,
             lineage_parent_node_id=root["lineage_node_id"],
-            derivation_kind="layout_variation",
+            derivation_kind="layout_change",
         ))
         partial = db.get_lineage(user["id"], child["lineage_node_id"], descendant_depth=0)
         assert partial is not None

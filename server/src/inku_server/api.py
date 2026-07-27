@@ -168,21 +168,14 @@ _apply_stored_render_concurrency()
 def _log_rasterizer_backend() -> None:
     """Announce the PNG backend at boot.
 
-    A cairosvg fallback still writes clean-looking PNGs, it just silently omits the
-    material filters, so both the saved artwork and the Vision input degrade with no
-    other trace. Logged once per process rather than per rasterization.
+    resvg is the only one; there is no fallback to notice having taken. Logged once
+    per process rather than per rasterization.
     """
-    from inku_analysis.rasterizer import BACKEND_CAIROSVG, rasterizer_info
+    from inku_analysis.rasterizer import rasterizer_info
 
     info = rasterizer_info()
     if not info:
-        _logger.warning("no SVG rasterizer is installed; PNG output is disabled")
-    elif info["backend"] == BACKEND_CAIROSVG:
-        _logger.warning(
-            "PNG rasterizer fell back to cairosvg %s; material filters "
-            "(pencil / crayon / chalk / brush_thick) will not be rendered into PNG or Vision input",
-            info.get("version", "?"),
-        )
+        _logger.warning("resvg is not installed; PNG output is disabled")
     else:
         _logger.info("PNG rasterizer: %s %s", info["backend"], info.get("version", "?"))
 
@@ -548,8 +541,8 @@ def _validated_variation_amplitude(value: str | None) -> str | None:
     return None
 
 
-def _coerce_context(ddl: str, original_text: str | None = None) -> str:
-    original = (original_text or "").strip()
+def _coerce_context(ddl: str, original_description: str | None = None) -> str:
+    original = (original_description or "").strip()
     normalized = ddl.strip()
     if original and original != normalized:
         return f"{original}\n{normalized}"
@@ -870,7 +863,7 @@ class ComposeRequest(BaseModel):
     model: str | None = Field(
         default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
     )
-    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述 (省略可)")
+    description: str | None = Field(default=None, max_length=100_000, description="作者が書いた記述 (省略可)")
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
     ui_lang: str | None = Field(default=None, description="UI表示言語")
     color_map: dict[str, str] | None = Field(default=None, description="Deprecated: ignored; catalog_id is resolved server-side")
@@ -883,7 +876,7 @@ class ComposeRequest(BaseModel):
     lineage_parent_node_id: str | None = Field(default=None, description="添景水準の継承元 lineage ノード (v1.97)。保存には関与しない")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
-    vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
+    composition_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
@@ -917,7 +910,7 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     render_wild: bool | None = None
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
@@ -944,8 +937,8 @@ class ComposeResponse(BaseModel):
 
 
 class InterpretRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
-    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
+    description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
+    stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
     model: str | None = Field(
         default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
     )
@@ -968,8 +961,8 @@ class InterpretResponse(BaseModel):
 
 
 class PaintRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=100_000, description="自由な自然言語の記述")
-    original_text: str | None = Field(default=None, max_length=100_000, description="元のユーザー記述")
+    description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
+    stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
     include_thinking: bool = Field(default=False, description="Stage 1 の思考を返すか")
@@ -998,14 +991,14 @@ class PaintRequest(BaseModel):
     variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
-    vary_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
+    composition_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
 
 
 class PaintResponse(BaseModel):
-    text: str
+    description: str
     ddl: str
     # 入力側 DDL (展開前)。ddl は Stage 2 に渡った展開後。
     source_ddl: str | None = None
@@ -1035,7 +1028,7 @@ class PaintResponse(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     render_wild: bool | None = None
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     tenkei: str | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
@@ -1100,7 +1093,7 @@ class RenderScoreRequest(BaseModel):
     canvas_aspect: str | None = None
     render_seed: int | None = None
     wild: bool = False
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
 
@@ -1123,7 +1116,7 @@ class RenderScoreResponse(BaseModel):
     render_canvas_aspect_id: str
     render_canvas_aspect_ratio: float
     render_seed: int
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     render_hash: str
@@ -1226,7 +1219,7 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect_ratio: float | None = None
     render_seed: int | None = None
     render_wild: bool | None = None
-    vary_seed: int | None = None
+    composition_seed: int | None = None
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$")
     interpretation_seed: str | None = None
     seed_text: str | None = None
@@ -2686,10 +2679,10 @@ def _call_compose_detail(
     ddl: str,
     *,
     model: str | None = None,
-    original_text: str | None = None,
+    original_description: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
-    vary_seed: int | None = None,
+    composition_seed: int | None = None,
     include_trace: bool = False,
     tenkei: str = "auto",
     focus: str | None = None,
@@ -2699,17 +2692,17 @@ def _call_compose_detail(
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
         ddl,
-        source_text=original_text,
+        source_text=original_description,
         lang=lang,
-        seed_text=original_text or ddl,
+        seed_text=original_description or ddl,
     )
     plugin_expanded_ddl = plugin_expansion.ddl  # trace: after plugin expansion
     variation_report: dict = {}
     ddl = expand_intermediate_for_lang(
         plugin_expansion.ddl,
         lang=lang,
-        context_text=original_text,
-        vary_seed=vary_seed,
+        context_text=original_description,
+        composition_seed=composition_seed,
         plugin_instructions_present=bool(plugin_expansion.instructions),
         tenkei=tenkei,
         focus=focus,
@@ -2758,7 +2751,7 @@ def _call_compose_detail(
         def run_compose():
             kwargs: dict = {
                 "model": model,
-                "original_text": original_text,
+                "original_description": original_description,
                 "system_prompt": prompt,
                 "lang": lang,
                 "prompt_metadata": prompt_metadata,
@@ -3020,7 +3013,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
-        req.original_text or req.ddl,
+        req.description or req.ddl,
         instruction_lang_requested,
         ui_lang=ui_lang,
     )
@@ -3034,10 +3027,10 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         compose_detail = _call_compose_detail(
             req.ddl,
             model=resolved_stage2_model,
-            original_text=req.original_text,
+            original_description=req.description,
             system_prompt=None,
             lang=instruction_lang_resolved,
-            vary_seed=req.vary_seed,
+            composition_seed=req.composition_seed,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
             variation_amplitude=resolved_variation_amplitude,
@@ -3061,7 +3054,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             score = coerce_score(
                 score,
                 branch_report=branch_counts,
-                ddl=_coerce_context(compose_detail.ddl, req.original_text),
+                ddl=_coerce_context(compose_detail.ddl, req.description),
                 tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )
@@ -3086,7 +3079,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "render_wild": req.wild,
-        "vary_seed": req.vary_seed,
+        "composition_seed": req.composition_seed,
         "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
         "variation_amplitude": resolved_variation_amplitude,
@@ -3103,7 +3096,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     render_metadata = {
         **render_metadata,
         **_render_hash_metadata(
-            input_text=req.original_text or req.ddl,
+            input_text=req.description or req.ddl,
             ddl=compose_detail.ddl,
             score=score,
             svg=svg,
@@ -3144,19 +3137,22 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 @app.post("/api/interpret")
 def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
-    source_text = req.original_text or req.text
+    source_text = req.description
+    # Stage 1 が読むのは、記述に文脈を注入したあとの文字列。注入しない client は
+    # stage1_input を送ってこないので、そのときは記述そのものを読む。
+    stage1_text = req.stage1_input or req.description
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
         source_text, instruction_lang_requested, ui_lang=ui_lang
     )
     resolved_tenkei = req.tenkei or "auto"
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
-            detail = InterpretDetail(ddl=req.text.strip(), thinking=None, raw=None)
+            detail = InterpretDetail(ddl=stage1_text.strip(), thinking=None, raw=None)
         else:
             detail = _call_interpret_detail(
-                req.text,
+                stage1_text,
                 model=_resolved_stage1_model(req.model, actor),
                 include_thinking=req.include_thinking,
                 system_prompt_prefix=None,
@@ -3271,7 +3267,7 @@ def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
     background, foreground = _fallback_background_from_text(text, lang=lang)
     accent = "青" if foreground == "黒" and ("白" in text or "雪" in text) else "灰色"
     return (
-        f"背景を{background}で塗りつぶす。"
+        f"背景を{background}で埋める。"
         f"{foreground}い細い斜めの線を三本並べる。"
         f"{accent}の小さな点を十二個、画面全体に点々と散らす。"
     )
@@ -3382,7 +3378,7 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
             **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
             "render_seed": render_seed,
             "render_wild": req.wild,
-            "vary_seed": req.vary_seed,
+            "composition_seed": req.composition_seed,
             "interpretation_seed": req.interpretation_seed,
             "seed_text": seed_text,
         }
@@ -3523,7 +3519,9 @@ def _paint_events(
     complete PaintResponse).
     """
     t0 = time.perf_counter()
-    source_text = req.original_text or req.text
+    source_text = req.description
+    # Stage 1 が読むのは、記述に文脈を注入したあとの文字列 (api_interpret と同じ規約)。
+    stage1_text = req.stage1_input or req.description
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
@@ -3539,14 +3537,14 @@ def _paint_events(
         req.variation_seed if resolved_variation_amplitude is not None else None
     )
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(req.text):
+        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
             interpret_detail_result = InterpretDetail(
-                ddl=req.text.strip(), raw=req.text.strip() if req.include_trace else None
+                ddl=stage1_text.strip(), raw=stage1_text.strip() if req.include_trace else None
             )
         else:
             interpret_detail_result = _call_interpret_detail(
-                req.text,
+                stage1_text,
                 model=resolved_stage1_model,
                 include_thinking=req.include_thinking,
                 lang=instruction_lang_resolved,
@@ -3580,7 +3578,7 @@ def _paint_events(
         compose_detail = _call_compose_detail(
             ddl,
             model=resolved_stage2_model,
-            original_text=source_text,
+            original_description=source_text,
             lang=instruction_lang_resolved,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
@@ -3634,7 +3632,7 @@ def _paint_events(
         "ui_lang": ui_lang,
         "render_seed": render_seed,
         "render_wild": req.wild,
-        "vary_seed": req.vary_seed,
+        "composition_seed": req.composition_seed,
         "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
         "variation_amplitude": resolved_variation_amplitude,
@@ -3750,7 +3748,7 @@ def _paint_events(
     )
     _carriage = _carriage_warnings(compose_detail.ddl, score) or None
     response = PaintResponse(
-        text=source_text,
+        description=source_text,
         ddl=ddl,
         source_ddl=compose_detail.source_ddl or None,
         thinking=interpret_detail_result.thinking,
@@ -4119,7 +4117,7 @@ def api_vision_refine_advice(
     return VisionRefineAdviceResponse(**advice)
 
 
-@app.get("/api/lineage/{node_id}/okugaki", response_model=list[OkugakiItem], response_model_exclude_none=True)
+@app.get("/api/lineage/{node_id}/colophon", response_model=list[OkugakiItem], response_model_exclude_none=True)
 def api_okugaki_list(node_id: str, actor: dict = Depends(_current_user)) -> list[OkugakiItem]:
     branch = _db.get_lineage_branch(actor["id"], node_id)
     if branch is None:
@@ -4127,7 +4125,7 @@ def api_okugaki_list(node_id: str, actor: dict = Depends(_current_user)) -> list
     return [OkugakiItem(**item) for item in _db.list_okugaki(actor["id"], node_id)]
 
 
-@app.post("/api/lineage/{node_id}/okugaki", response_model=OkugakiItem, response_model_exclude_none=True)
+@app.post("/api/lineage/{node_id}/colophon", response_model=OkugakiItem, response_model_exclude_none=True)
 def api_okugaki_generate(
     node_id: str,
     body: OkugakiGenerateBody,
@@ -4166,10 +4164,10 @@ def api_okugaki_generate(
     return OkugakiItem(**item)
 
 
-@app.delete("/api/okugaki/{okugaki_id}")
-def api_okugaki_delete(okugaki_id: str, actor: dict = Depends(_current_user)) -> dict[str, bool]:
-    if not _db.delete_okugaki(actor["id"], okugaki_id):
-        raise HTTPException(status_code=404, detail="okugaki not found")
+@app.delete("/api/colophon/{colophon_id}")
+def api_okugaki_delete(colophon_id: str, actor: dict = Depends(_current_user)) -> dict[str, bool]:
+    if not _db.delete_okugaki(actor["id"], colophon_id):
+        raise HTTPException(status_code=404, detail="colophon not found")
     return {"ok": True}
 
 
@@ -4227,7 +4225,7 @@ def api_history_post(
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
             "render_seed": render_seed,
-            "vary_seed": body.vary_seed,
+            "composition_seed": body.composition_seed,
             # v1.97: 保存時に水準を確定する（renderer 専用派生でも系統の水準が途切れない）
             "tenkei": _resolved_tenkei(body.tenkei, actor, body.lineage_parent_node_id),
             "focus": body.focus if body.focus in FOCUS_IDS else None,

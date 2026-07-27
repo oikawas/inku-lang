@@ -1004,3 +1004,178 @@ and a frozen corpus of their own.
 - **Left untouched**: the few-shot search keyword `"髪"` in `interpreter.py` (a key for retrieving what the *author* writes, not output vocabulary — but **since 銀筆 was not added, the word that just returned to the vocabulary does not retrieve that thin-line example**); `material_weight_hints` in `language_support/ja.py` and `en.py` (no silverpoint row, and no `hair` row before it either — not a regression, but **there is no rescue path when Stage 2 drops the weight**); `brush_fine` and the axis of thickness; Android (the two lines in `gen_android_reference.py` were renamed but **the generator was not run**, so the Kotlin implementation still says `hair`, as do 3 of the 36 frozen fixtures).
 - **Verification.** server **1411 passed / 30 skipped** (+9 are the new discriminating checks), cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` **788 strings / 36 exceptions / 0 errors**. Four perturbations, all of which failed as intended: making the replacement path the identity function (all 445 production works raise `ValidationError`), moving one `GRAMMARS` value (exactly 16 SVG bodies move), restoring `_PRUNED` (the digests return to their pre-rename values exactly), and running the generator twice (byte-identical).
 - **On the record**: the reason a rename has a price is that the seed hashes the tool's *name*. **Fixing that moves every work once, so it belongs to an engine version.**
+
+---
+
+### v2.7.10 — PNG is burned by resvg alone (Build 719, 2026-07-27)
+
+**The warnings had been there all along, and they still let it mislead.** cairosvg does not implement `feTurbulence` / `feDisplacementMap` / `feGaussianBlur`, and rather than failing it **drops them**. A PNG came back with the ground grain and the material filters gone and nothing to show for it but a cleaner-looking picture — **and that picture was used to decide things** (four times). A stderr warning in the CLI, a startup WARNING on the server, the module docstring, and a `png_rasterizer` record written into every artifact: the caution had been laid down four ways since v2.2.1. **What misleads a reader is the picture, not the log line**, so the fallback was removed rather than documented further (author's instruction, 2026-07-27).
+
+- **There is no fallback any more.** `_cairosvg_renderer`, `BACKEND_CAIROSVG` and the `_BACKENDS` table are gone from `rasterizer.py`, and `svg_to_png` raises `RasterizerUnavailable` when resvg is absent. **This is the one behavioural change**: where resvg is missing, PNG output stops instead of degrading quietly (ruled acceptable by the author).
+- **Three dependency declarations were dropped.** `cairosvg>=2.7.0` left the `pyproject.toml` of `shared`, `server` and `cli`, taking 145 and 148 lines out of the two lock files. `api.py`'s startup log lost its fallback branch, and `cli.py` lost the warn-once and three "resvg-py or cairosvg" error messages.
+- **Three sentinels were put in.** ① the three `pyproject.toml` files, read through `tomllib`, declare no `cairosvg`; ② no `.py` under `shared/src`, `server/src`, `cli/src` or `server/scripts` imports it (**the pattern matches import statements at line start only, so the prose explaining why it is gone can stay**); ③ **it stays unreachable even where it is installed** — `pytest.importorskip` runs the check only in an environment that can import cairosvg, then blocks resvg and asserts the raise.
+- **The one added skip is that third sentinel.** Dropping the dependency took cairosvg out of the venv, so it skips. **The check only means anything where cairosvg is present, so this is correct.**
+- **A side effect: `pillow` left the `server` venv.** It was a transitive dependency of cairosvg, and neither `server` nor `shared` imports `PIL` anywhere. `cli` declares `pillow>=12.0.0` directly and keeps it (**the tool for assembling contact sheets lives in the `cli` venv**).
+- **What was not removed**: `android/scripts/render_png_review.py` still calls `cairosvg.svg2png` (sentinel ② does not scan `android/`). **It is a script for reviewing renders by eye, which is exactly the path the removal was about**, so its disposition goes to the author. `libcairo2` in `server/Dockerfile`, an OS dependency that existed for cairosvg, also remains.
+- **Four documents were brought back to the present tense**: `SETUP.ja.md` / `SETUP.md` ("prefers resvg and falls back to CairoSVG" → resvg alone, raising when absent) and `manual/ja/application-install.md` / `manual/en/application-install.md` ("OS libraries required by CairoSVG" → resvg-py ships as a wheel and needs none). **Passages in CHANGELOG and PROJECT_CONTEXT that describe past versions are history and were left alone.**
+- **Verification.** server **1413 passed / 31 skipped**, cli **69 passed**, ruff clean (both `server` and `cli`), `npm run check` 0 errors / 2 warnings / 217 files. **Not one byte of SVG changes**, so no reference corpus was refrozen. The render engine stays at `"15"`.
+- **On the record**: a fallback that degrades in silence gets removed, not documented. **Keep a tool that cannot tell "there is no difference" from "the difference did not come through" out of the path where pictures are judged.**
+
+---
+
+### v2.7.11 — a sentinel is written as where it does not look (Build 720, 2026-07-27)
+
+The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the rule itself belongs in SPEC**.
+
+- **`android/scripts/render_png_review.py` now goes through resvg.** It is not a dormant script: `headless_render_compare.sh` and `headless_batch_compare.sh` call it whenever `PNG_REVIEW=true`. **It rasterizes the server's and Android's SVG, amplifies the difference, and writes a three-panel sheet plus `metrics.json`** — so a rasterizer that drops filters makes it **agree precisely where both sides have been flattened**. Dropping the declaration from `cli` in v2.7.10 had already left it raising `ImportError` in any re-synced environment.
+  - Measured: two SVGs differing only in `feDisplacementMap` scale come out **9.5% mean / 27.4% rms apart**. **Under cairosvg the filter goes with them and the difference is zero.**
+- **Sentinel ②'s scope moved from a list of roots to the whole repository minus exclusions.** v2.7.10 named `shared/src`, `server/src`, `cli/src` and `server/scripts`, and so never looked at `android/`. **A named list can fail to be complete; what it cannot do is say so.**
+  - Fourteen exclusions (`.git`, `.gradle`, `.pytest_cache`, `.ruff_cache`, `.venv`, `__pycache__`, `bench`, `build`, `dist`, `no-git-sync`, `node_modules`, `out`, `out2`, `site-packages`).
+  - **A check was added that the scan actually reaches outside the Python packages** (all of `android`, `cli`, `server`, `shared` appear in its results). **A sentinel is worth exactly what it covers.**
+  - **Confirmed by perturbation**: restoring `import cairosvg` to `android/scripts/render_png_review.py` fails the guard.
+- **What widening the scan turned up (left alone)**: three past measurement scripts under the untracked `no-git-sync/` call cairosvg (`fable5/render_with_relations.py`, `rfc/phase0-scripts/ab.py`, `rfc/phase0-scripts/ps_ab.py`). They are **a record of what was run**, so they were neither rewritten nor scanned. With cairosvg gone from the venvs, re-running them raises `ImportError` — except `render_with_relations.py`, which catches it and skips PNG generation, so **no picture comes out at all**, which is the safe side.
+- **The rule is now in SPEC (author's ruling)** — `SPEC.ja.md` **§15.12 "A PNG is a copy of the performance"** and `SPEC.md` **§12.9**: ① no rasterizer that drops things in silence (at least `feTurbulence`, `feDisplacementMap`, `feGaussianBlur` — **a rule about observation, not about performance or fidelity**); ② **`cairosvg` is prohibited**; ③ an implementation that is wrong is worse than one that is missing (no fallback); ④ how it is held (one entrance, three sentinels, **and ②'s scope written as what it does not look at**).
+- **`libcairo2` was not dropped from `server/Dockerfile` this time** — the author ruled it goes **at the next distribution** (2026-07-27). It is filed in the release runbook as **A-1b** (one-off; delete the section once done).
+- **Verification.** server **1414 passed / 31 skipped** (+1 is the scan-reach check), cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files. **Not one byte of SVG changes.**
+
+---
+
+### v2.7.12 — the sheet says how it was made (folded into render engine 15) (Build 721, 2026-07-27)
+
+**`plain`, `paper`, `washi` and `ink_wash` were one and the same in the ground layer.** Only `mezzotint` and `charcoal_ground` branched; `material` otherwise did nothing but enter the seed. **The author ruled it folded into engine 15** rather than given a version of its own: no production work carries engine 15, it is unpublished, and engine 13 set the precedent. **The condition is that it happen before publication.**
+
+- **The first version was a rejection.** Drawing the fibres and the brush as elements took the ground from 2 elements to 40 under the default profile — **46% of the whole picture**, in a work **whose DDL named two shapes**.
+- **The direction that replaced it: the support is the character of the noise, not something drawn.** In `display` the difference lives inside the filter (**`washi` crosses two anisotropic turbulences with `feBlend`**; **`ink_wash` stretches one sideways and smears it with `feGaussianBlur`**). In `editable` it changes **the shape of the grains the ground already draws** — washi stretches the same grains along the fibre, ink_wash bands them under the brush.
+- **Not one element is added, and the frozen corpus says so**: `C-ground-washi` goes **circle 20 → 0, path 1 → 21** (twenty-one either way), and `C-ground-ink_wash` goes **circle 20 → 12** (`count x 0.6` — fewer).
+- **The author set the number by looking at the work.** Of the two rows in the comparison sheet `material-sheet.png`, **the `tone=warm grain=coarse opacity=0.18` row is the one taken** (ruling, 2026-07-27) — **washi is not to be strengthened further**. 0.18 is already the ceiling on every path (`min(0.18, ground.opacity)`).
+- **The corpus was refrozen as engine 15.** **Three of its 350 cases moved** (`C-ground-washi`, `C-ground-ink_wash`, `C-groundseed-auto-washi`). Recomputing `changed_from_previous` from scratch was measured first and **reproduced the same 318 entries exactly**, and **a second generator run exits 0 byte-identical**. The manifest's `reason` records what was folded in.
+- **The Android expectations did not move.** Regenerating all 36 fixtures gives output **byte-identical to `31ff75d`**, the engine-15 freeze, because **not one Android reference case carries a ground**. **The assumption that folding would force the expectations to be rebuilt is measured false**, and the `feat/android-engine15` contract can be started as written.
+- **A test surface was added, since the implementation arrived without one** — five checks in `test_ground_seed.py`: that the material changes **how the grains are drawn** (washi, ink_wash), that **the filter changes too** (presence of `feBlend` / `feGaussianBlur`), and that **the element count does not grow**.
+  - The point is **pinning the seed explicitly**. **Without it the layer moves by however much `material` contributes to the derived seed, and killing the drawing branch with `if False` slips straight through** (measured — a check that passed for a reason other than its claim).
+  - **Two perturbations confirm it fails**: emptying the noise table, and killing the fibre branch.
+- **One existing check was rewritten.** `test_explicit_ground_seed_still_bypasses_the_derivation` asserted that paper and washi are identical under an explicit seed, **which is now false by design**. It varies **the performance seed instead of the material**, so the derivation can be shaken while the material is held fixed.
+- **Verification.** server **1419 passed / 31 skipped** (+6), cli **69 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files. **The render engine stays at `"15"`.**
+
+---
+
+### v2.8.0 — the colophon's road is named colophon (**a compatibility break**) (Build 722, 2026-07-27)
+
+**The names you type are English terms of art**: `paint`, `refine` and `lineage` all match the terminology dictionary, which **says so explicitly** of `/api/paint`. **`okugaki` was the only romaji left in that column**, so **the CLI subcommand and the API paths moved to `colophon`** (author's ruling, 2026-07-27). **No alias was kept.**
+
+- **The minor version is because compatibility breaks.** The numbering policy reserves minor for "when compatibility breaks (stored data, API, edition-ID format)". **This is not a patch.**
+- **Only the paths carried the word.** `OkugakiItem` returns `id`, `target_node_id`, `branch_snapshot`, `model`, `at`, `language`, `body`, `warnings` and `fact_sheet` — **not one field is named after it**. The rename therefore closes at the paths.
+- **What moved (four routes)**: `GET|POST /api/lineage/{node_id}/okugaki` → **`/colophon`**; `DELETE /api/okugaki/{okugaki_id}` → **`/api/colophon/{colophon_id}`**; the CLI subcommand `okugaki` → **`colophon`**; three `fetch` sites in the web client.
+- **What did not move (identifiers, per the dictionary's §6)**: the DB table `okugaki` and its index `uq_okugaki_user_idempotency`, **`okugaki_model` in `model_settings` (stored user settings)**, the module `okugaki.py`, and the i18n keys `okugaki*`.
+  - **Romaji in key names is the norm, not the exception.** Variation has a perfect dictionary word — `variation` — and its web keys are still **`hensouAxis`, `hensouSmall`, `hensouMedium`, `hensouLarge`**. What the dictionary forbids is **words that reach the screen**, not keys.
+- **Two sentinels**: ① no path in `app.routes` contains `okugaki`, and both `/api/lineage/{node_id}/colophon` and `/api/colophon/{colophon_id}` are present; ② the CLI accepts `colophon` and **raises `SystemExit` on `okugaki`** — the check that no alias survives.
+- **The boundary is written into the dictionary.** The 奥書 row now says the CLI subcommand and the API paths are `colophon` too, and **§6 gains an "there is one exception" passage** recording what moves, what does not, and **that `hensou*` is the counterexample**.
+- **Four documents follow**: `SPEC.ja.md` (`inku-cli okugaki` → `colophon`), `SPEC.md` (**dropping both the "(okugaki)" gloss and the claim that the CLI subcommand keeps its name**), and `manual/{ja,en}/cli-reference-for-ai.md` (the §2.5 heading and its usage line).
+- **Verification.** server **1420 passed / 31 skipped** (+1), cli **70 passed** (+1), ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` **788 strings / 36 exceptions / 0 errors**. **Nothing in the drawing was touched** — the render engine stays at `"15"` and no SVG moves.
+
+**The same version carries the variation vocabulary too (Build 723).** The colophon was one romaji word; **variation was a collision running the wrong way**. The dictionary reserves `variation` for **the variation alone** (candidates are `option`), yet the implementation had **the real variation as romaji `hensou` while four things that are not variations were called `*_variation`**.
+
+- **The lineage derivation kinds were swapped (stored values)**: `hensou` → **`variation`** (7 rows in production), `touch_variation` → `touch_change` (25), `model_variation` → `model_comparison` (11), `layout_variation` → `layout_change` (6), `language_variation` → `language_comparison` (1). The four with no rows (`render_engine_`, `age_`, `hacho_`, `external_seed_`) follow to `_change`.
+- **`vary_seed` → `composition_seed` (186 sites). It was never the variation's seed** — SPEC §12 lists "the description, `vary_seed`, `tenkei`, **and the variation**" **side by side**; it is the Stage 1.5 **composition** seed. **The variation's own `variation_seed` and `variation_amplitude` are unchanged.**
+- **The CLI flags moved too**: `--vary-seed` → `--composition-seed`, `--vary N` → `--composition-count N`.
+- **The web i18n keys were brought along** (`hensou*` → `variation*`, fourteen of them, and more). **Romaji in key names would normally be the norm**; the author ruled the dictionary applied in full.
+- **Stored data is migrated, not broken.** At startup `history.vary_seed` is RENAMEd to `composition_seed` and `lineage_edges.derivation_kind` is UPDATEd by table. **Measured against a copy of the production database** (counts 25/11/7/6/1 preserved, `composition_seed` still 9 rows), and **a second run touches zero rows**.
+- **What was frozen, because renaming it breaks things**: **the key `vary_seed` inside the rh2 payload** is **material of an identity ID**, so the name stays and the value comes from the new column. **Renaming it moved the rh2 of every stored work, and the check caught it** (`test_legacy_render_hash_v2_calculation_remains_available`). The `#hensou` / `#vary` salts in `ddl_expander` are hash material and stay for the same reason.
+- **The old-to-new mapping is recorded in `no-git-sync/opus5/name_convantion/RENAMES.md`** (at the author's instruction) — the place to look when an external script stops working.
+- **The version stays v2.8.0**: it is unpublished, so this folds in rather than minting another (the newest tag is `v2.7.2`). Only the build number moves, to 723.
+- **Verification (at Build 723).** server **1420 passed / 31 skipped**, cli **70 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` **788 strings / 36 exceptions / 0 errors**.
+
+**The same version carries the description too (Build 724).** The dictionary sets 記述 = **`description`** (the verb is write) and bans `prompt`, yet **the main request field was a third word, `text`**.
+
+- **`text` → `description`, `original_text` → `original_description`** across the requests to `/api/paint`, `/api/paint/stream`, `/api/interpret` and `/api/compose`, the `/api/paint` response, the CLI's artifact JSON, and everything the web client sends.
+- **`dh1`, the description's identity, is untouched** — `description_hash()` hashes **the value alone** and carries no key name (measured before starting, having just been burned by `rh2`).
+- **Four `"text"` keys were left alone**: the payloads sent to the LLM providers (Anthropic content blocks, Gemini `parts`). **Those are someone else's API contract.**
+- **The DB column `input` on `history` is still a third word** (nine server sites, thirty in the web client), so **the description now goes by two names**; it is measured and filed as the next step.
+- **Verification (at Build 724).** server **1420 passed / 31 skipped**, cli **70 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.
+
+**The same version corrects what that word was attached to (Build 725).** Build 724 moved the word but hung it on the wrong string: **`description` held the augmented text — the description with context injected — and the author's own line was demoted to `original_description`.** The dictionary word names what the author wrote.
+
+- **`description` is the author's description** (required on `/api/interpret` and `/api/paint`), and **the string Stage 1 actually reads gets its own name, `stage1_input`** (optional). **Omit it and the description itself goes to Stage 1**, so a client that injects no context sends only `description`.
+- **`/api/compose` loses `original_description` the same way**: its prose field is the author's description, so it is called that (optional there, since the endpoint can be driven by DDL alone). Four web call sites use that path — the contract had estimated three.
+- **`input` stays** (the author's ruling). It is the body that gets saved and displayed, which is not always prose: of 1780 saved works four are DDL-shaped and 38 are empty, so the neutral word still fits.
+- **Not one internal argument moved.** `composer.py`'s `original_description` and the argument to `_call_compose_detail` already mean the right thing — the author's original text on its way to Stage 2. **Moving one side of that pair without the other raises `TypeError`, which is how the first attempt went 42 tests red.** What may move is only **the Pydantic field definitions, the `req.` reads, and what the clients send**.
+- **Four discriminating tests were added**: Stage 1 reads `description` when `stage1_input` is omitted, reads `stage1_input` when it is sent, **the history then stores the `description` rather than the augmented text**, and the CLI payload keeps the two apart. **The implementation was perturbed at two points to confirm each one actually goes red, then restored.**
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 725.
+- **Verification (at Build 725).** server **1423 passed / 31 skipped**, cli **71 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.
+
+**The same version carries the last of the romaji (Build 726).** Every name you type was counted — 46 CLI subcommands, 84 flags, 61 API paths — and **exactly one more had the colophon's shape**: the staffage flag, `--tenkei`.
+
+- **The dictionary had already settled 添景 as `staffage`** (GLOSSARY :58) **and the web client already displayed it that way**. The romaji survived only where you type it. It becomes `--staffage`, **with no alias** — the same call the colophon got (author's ruling, 2026-07-27).
+- **The help text was a third word**: it read `scenery level`, neither `tenkei` nor `staffage`. It now reads `staffage`.
+- **Unmoved**: the request and response field `tenkei` (27 sites in the server), the DB column `history.tenkei`, internal identifiers such as `tenkei_for_node()`, and the web client's `tenkei.ts` and i18n keys. **Romaji in key names is the norm**, and that rule still governs. **An outside script changes the spelling of the flag and nothing else** — whatever assembles the payload is untouched.
+- **Two sentinels guard it**: `--tenkei` exits, and **no flag in the parser is spelled `tenkei`**. **The second one first read only the top-level parser and let an alias straight through** when the change was perturbed — the real flags hang off the subparsers. **It was fixed to walk them, and then perturbed again to watch both go red.**
+- **`/api/saijiki` and the nine Saijiki category keys stay romaji, correctly**: the dictionary sets 歳時記 = `Saijiki`, a capitalized proper noun, so **the romaji is the right English**. `renga` and `hacho` are the same class. **`sumi` and `washi` are not identifiers but DDL vocabulary** — `sumi` sits beside `ink`, `obsidian` and `黒` as a synonym for black, a word the describer types.
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 726.
+- **Verification (at Build 726).** server **1423 passed / 31 skipped**, cli **73 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` **788 / 36 exceptions / 0 errors**.
+
+**CI is green again after eight red pushes (Build 727).** The silverpoint rename at v2.7.9 re-froze the render corpus and the coerce golden **in place, without raising a version** — and **missed the DDL corpus in that same commit**. Every push since has failed the `ddl-engine` job while `render-engine` stayed green.
+
+- **The re-freeze carries two renames and nothing else**: the tool name in `B-trigger-auto`'s coerced output, and **fifteen manifest inputs that still recorded `vary_seed`**. No case id moves, and **`ddl_engine_version` stays 1**, for the reason the render engine stayed 15.
+- **The mechanism was not what the handoff recorded.** The `hair` in the frozen file was not a stored value being rewritten by a validator — **coerce produced that tool name itself**. **Perturbing the validator changed nothing; only perturbing the literal in `coerce/compose.py` moved the corpus.**
+- **The guard now fires after writing**, as the render generator's does. Raising before the write left **no way at all to re-freeze a sanctioned rename**; firing once and exiting 0 byte-identical on the second run is the property the guard defends.
+- **SPEC §15.6 now says renames do not raise a version** (both languages). The v2.7.9 ruling was never written down, and the letter of the rule fires on any rename. **Adding a word and renaming one are different acts.**
+- **`check_frozen_corpora.py` runs what CI runs, locally.** **The test suite cannot stand in for it**: `test_*_reference.py` compares the frozen files with the manifest and **never regenerates**, so **a corpus drifts while all 1423 tests stay green** — which is exactly what happened all three times. **CI is the backstop, and the Linux re-run is the only thing it alone can prove; it is not the detector.**
+- **The check was perturbed to watch it go red**: changing one tool name that coerce produces makes it exit 1 and print the way back (`git checkout -- server/reference/`).
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 727.
+- **Verification (at Build 727).** server **1423 passed / 31 skipped**, cli **73 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files, **both generators exit 0 byte-identical**.
+
+**The description gets its name on the typing side too, and two broken paths are fixed (Build 728).** `--original-text` **kept the retired third word in its spelling while the key it fills has been `description` since Build 725**. It becomes `--description`, **with no alias**, as the colophon and the staffage flag did; `refine generate --text` fills the same key and follows.
+
+- **That same rename had quietly broken two commands.** **`inspect` and `refine generate` build their payloads by hand instead of going through `_paint_payload`**, and both **kept posting `text` to `/api/paint` after Build 724** — a request carrying no `description` at all, which the required field turns into **a 422**. **All 73 cli tests stayed green, because they never reach a server.**
+- **What caught it was classifying every `*-text` flag** rather than fixing the named one. Had `--original-text` been treated alone, both would still be broken.
+- **The `paint` and `batch` help called the description a prompt**, a word the dictionary rejects for it; four strings are fixed. **`review evaluate --prompt` and its kin stay** — **there the word means the model's prompt**, a different referent, and only the description sense is banned.
+- **Four sentinels, and three perturbations to watch them go red**: an alias left behind, the help sliding back to `prompt`, and `inspect` reverting to the old key. **The `inspect` check swaps in a fake `ApiClient` and reads the outgoing payload** — a static scan cannot tell that key from the `"text"` in LLM provider payloads.
+- **The positional (`paint <text>`) does not move.** What you type there is the value, not the name.
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 728.
+- **Verification (at Build 728).** server **1423 passed / 31 skipped**, cli **76 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.
+
+### 2026-07-27 — English documentation vocabulary (**no version**; documentation only)
+
+**README and `manual/en/` were swept against the dictionary, and only six places needed changing. The drift lives in the Japanese source, not in the English.**
+
+- **Six places where the English alone used the banned word `prompt`** now say `description`, or whatever the Japanese says. The Japanese counterparts read `指示`欄 / 記述文 / 指示文 / 短い言葉 / 入力テキスト / 指示文生成モデル — **not one of them says プロンプト**. That is English drifting on its own.
+- **The seven remaining `prompt`s are all sound**: two where the Japanese says プロンプト as well (the passage criticising generative AI, and the UI's JSON/prompt views), four where the word means **the model's prompt** (the Prompts panel, the `--prompt` flag), and **the filename `prompts.txt`** in a command example, which is an identifier and identical in both languages.
+- **`artwork` appears nowhere in README or `manual/en/`** — the handoff's note was inaccurate. It survives only in the **historical entries** of `CHANGELOG.md` and `PROJECT_CONTEXT.md`, which are not rewritten.
+- **The `generation`, `image` and `create` that remain are faithful translations of 生成, 画像 and 作る** in the Japanese (README.ja's もう一度生成 / による生成です / 生成後は歳時記を参照し; the manual's 画像の作成方法 / バッチ生成 / Stage 2が作る). **Moving the English to the dictionary alone would break the pairing**, so it is left for the author to rule on.
+- **`SPEC.md`'s seven `scene-tone palette`s are held back for the same reason** — no counterpart term is findable in `SPEC.ja.md`, and a translation should not be invented ahead of the source. **The three `jitter`s are sound**, being an identifier and the signal sense.
+
+### v2.8.0 — call the six colors the six colors (Build 729, 2026-07-27)
+
+**The Stage 2 system prompt told the model to "choose palette by scene tone".** What it chooses there is **the six abstract colors**, never a color catalog — catalogs are server-owned and resolved after Stage 2. **`palette` is also a real field in the catalog JSON**, so **one word was carrying two meanings inside the implementation**. Both prompts now say the abstract colors.
+
+- **This moves the model.** The Stage 2 digests go **`a1bb4ff70488fb35` → `261373d0123a740f` (ja)** and **`397195ed887f6adb` → `f5bd29704e5906f2` (en)**.
+- **The Japanese prompt does not change length** (42,824 either way), so **a check that only measures bytes lets this through**; the pinned digests are what catch it. English goes 40,989 → 41,001.
+- **`SPEC.md` follows the wording it was mirroring** (`scene-tone palette` → `scene-tone color`, four places). **`SPEC.ja.md` has no passage for this rule at all** — the two SPECs have diverged down to their section numbering.
+- **The six remaining `palette`s in SPEC are sound**: four are identifiers in the catalog JSON, two are ordinary art vocabulary.
+- **Behavioural equivalence cannot be proven deterministically** — once a word in the prompt moves, only the model can say. **Every deterministic check is green**: server 1423 passed / 31 skipped.
+- **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 729.
+
+### v2.9.0 — the six the prompt both forbade and required (Build 730, 2026-07-27)
+
+**A rule forbade a word that a later rule, the vocabulary table, or an example required.** Every explicit prohibition was collected and intersected mechanically with the rest of the same prompt; six of these came out. Two (the Japanese 塗りつぶす and the English `rise` / `fall`) were found in another session, the other four here.
+
+- **The Japanese background sentence moves to an allowed verb**: 「背景を○色で塗りつぶす。」 → **「背景を○色で埋める。」**. Principle 2 listed 塗りつぶす among the forbidden verbs while the Background section ordered the model to write it, and seven examples obeyed. **The English side never collided** — it has always said `Fill background with X.`, and `fill` is an allowed verb. **Each of the two contradictions exists on one side of the translation only.**
+- **Every parser keeps accepting the old wording**, so saved works still perform. The Stage 2 rule names both forms and the gray-background rewrite in `ddl_expander` matches either verb. **The remaining background detectors — the color test in `api.py`, the clause split in `compose.py`, the `explicit_surface` markers — key on `背景を` and never look at the verb**, so they are untouched. **coerce is untouched, so the frozen corpora do not move.**
+- **English `rise` / `fall` are now split as motion senses** (`rise (as motion), fall (as motion)`), with a line stating that the angle words `rising` / `falling` are Saijiki vocabulary. **`scatter` on the very same line already carried that split** (`as motion` / `as arrangement`); it had simply never been applied to rise and fall.
+- **The touchless-line rule was broken by its own examples** — 20 Japanese sentences and 9 English ones. **The bad example the rule names, "draw radial lines", was present near-verbatim as an example output.** Sentences that state nothing but a relation, a proportion, or an angle are now a declared exception, and **the eleven drawing examples were given a touch**.
+- **Principle 5 ("Saijiki vocabulary only") was broken by thirteen words not in the table** (surface, ground, printmaking phrases, the colorful list). **Principle 5 is what changed**, to name the fixed phrases this document defines. The vocabulary table is untouched, so nothing propagates to reference §1, the web display, or SPEC / README.
+- **`多角形` / `polygon` leaves the unknown-object fallback** — `saijiki.py` marks it as a hidden marker that is deliberately *not* Saijiki vocabulary, and the prompt was ordering it emitted anyway. The Stage 2 polygon rule (`sides=5-8`) and generation through coerce's `shape_intent_markers` are unchanged.
+- **The allowed action verbs gain `敷き詰める` / `tile`** — the movements table had six, this list had five, and the Placement section required the sixth.
+- **Pen is now stated to be the fallback default rather than the recommended choice**, which is what `pen (default)` in the vocabulary table has always meant; two passages told the model not to reach for it.
+- **One example used the forbidden verb 広げる** ("widening the radius"). Unlike the others, no later rule stood behind it.
+
+**Side effects of the checks**
+
+- **The Stage 1 golden keeps its Build 591 fixture**; the fourteen diffs are declared in `_REORDERED_JA` / `_REORDERED_EN`, so **undeclared drift still fails**.
+- **Twenty pinned prompt values were re-frozen** (6 Stage 1 base, 3 actual, 1 shared base, 6 Stage 2, 2 saijiki perturbation, 2 schema perturbation). Stage 1 base ja `9c8064958c8e3960` → **`f56778ec689949f8`**; Stage 2 combined ja `261373d0123a740f` → **`b5b40bbc27885eb1`**, en `f5bd29704e5906f2` → **`778f6a6e2dfa124f`**.
+- **One example dropped out of the selected set.** Giving the English snow example a touch stopped the touch-backfill from firing, which shifted the replacement slot by one and pushed the sand example out of the five. The test now pins that it is still in the pool.
+- **`SPEC.ja.md`'s Stage 1.5 example still showed a gray background**, which `_avoid_gray_background` rewrites to white — the specification's example was older than the implementation. Corrected here.
+- **README's DDL blocks are not rewritten.** They quote real saved output with its seed; the old wording is still accepted by every parser, so the record remains reproducible.
+
+**`埋める` already means "fill an area with elements"** — Stage 2's density rule reads 密集/埋める=120〜350. The deterministic layers decide on `背景を` and cannot get this wrong, but **the model may still read the sentence as a density cue**. Both Stage 2 prompts now say the sentence is not a request to fill an area with elements and that the density and count rules do not apply to it. **No model was run, so this mitigation is unverified.**
+
+Every deterministic check is green: server **1424 passed / 31 skipped**, ruff, cli 76, `npm run check` 0 errors, `lint:i18n` 0 errors, **both frozen corpora byte-identical**.

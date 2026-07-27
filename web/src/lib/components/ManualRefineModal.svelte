@@ -17,7 +17,7 @@
 	let colorCatalogs = $state<ColorCatalog[]>([]);
 	let selectedCatalog = $state('');
 
-	let derivationKind = $state<string>('touch_variation');
+	let derivationKind = $state<string>('touch_change');
 	let ddlText = $state('');
 	let saijikiText = $state('');
 
@@ -25,8 +25,8 @@
 	let errorText = $state('');
 
 	const kinds = $derived([
-		{ id: 'touch_variation', label: t().refineCostTouch },
-		{ id: 'layout_variation', label: t().refineCostLayout },
+		{ id: 'touch_change', label: t().refineCostTouch },
+		{ id: 'layout_change', label: t().refineCostLayout },
 		{ id: 'catalog_change', label: t().refineCostColor },
 		{ id: 'reinterpretation', label: t().refineCostReading }
 	]);

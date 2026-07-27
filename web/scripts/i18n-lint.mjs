@@ -30,10 +30,10 @@ const FIXED = {
 	canvasVaryComposition: 'Another composition',
 	canvasVaryInterpretation: 'Another reading',
 	canvasVaryColor: 'Another catalog',
-	hensouTitle: 'Variation',
-	hensouSmall: 'Subtle',
-	hensouMedium: 'Moderate',
-	hensouLarge: 'Sweeping',
+	variationTitle: 'Variation',
+	variationSmall: 'Subtle',
+	variationMedium: 'Moderate',
+	variationLarge: 'Sweeping',
 	submitBtn: 'Paint',
 	wildButton: 'Wild',
 };
@@ -96,7 +96,7 @@ const RESTRICTED = [
 	{
 		// One word, one sense: Moderate is the middle variation amplitude and nothing else.
 		word: 'Moderate', re: /\bmoderate\b/i, instead: 'for speed use Medium',
-		keys: ['hensouMedium', 'hensouTooltipLarge'],
+		keys: ['variationMedium', 'variationTooltipLarge'],
 		texts: [],
 	},
 ];

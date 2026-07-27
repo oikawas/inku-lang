@@ -88,7 +88,9 @@ def test_expand_intermediate_ddl_selects_focused_layers():
 
     assert "ランダム" not in expanded
     assert "背景を灰" not in expanded
-    assert "背景を白で塗りつぶす" in expanded
+    # 旧表現「塗りつぶす」の入力も受け、出力は現行の「埋める」へ寄せる
+    assert "背景を白で埋める" in expanded
+    assert "塗りつぶす" not in expanded
     assert "画面全体に点々と十二個" in expanded
     assert "正五角形" not in expanded
     assert "中心から" not in expanded
@@ -98,7 +100,17 @@ def test_expand_intermediate_ddl_selects_focused_layers():
     assert expanded.count("。") <= ddl.count("。") + 8
     assert expanded.count("小さな円") <= ddl.count("小さな円")
     assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角", "斜め線", "細い弧"))
-    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "焦点"))
+    # 「寄り」= 端寄りの焦点。背景文の文言変更で expander の seed が動き、
+    # この入力では角度語ではなく端寄り配置が選ばれるようになった (2026-07-27)
+    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "焦点", "寄り"))
+
+
+def test_avoid_gray_background_accepts_both_wordings():
+    """灰背景の是正は、現行の「埋める」と保存済み作品の「塗りつぶす」の両方に効く。"""
+    for ddl in ("背景を灰で埋める。黒い線を一本引く。", "背景を灰色で塗りつぶす。黒い線を一本引く。"):
+        expanded = expand_intermediate_ddl(ddl)
+        assert "背景を白で埋める" in expanded
+        assert "背景を灰" not in expanded
 
 
 def test_expand_intermediate_ddl_is_idempotent_after_expansion():
@@ -295,20 +307,20 @@ def test_expand_intermediate_ddl_composition_family_rewrites_diagonal_bias():
 
 
 
-def test_expand_intermediate_ddl_vary_seed_default_is_backward_compatible():
+def test_expand_intermediate_ddl_composition_seed_default_is_backward_compatible():
     ddl = "青い線を三本引く。"
     context = "リズムのある水面に反復する音が広がる"
 
-    assert expand_intermediate_ddl(ddl, context_text=context, vary_seed=None) == expand_intermediate_ddl(ddl, context_text=context)
+    assert expand_intermediate_ddl(ddl, context_text=context, composition_seed=None) == expand_intermediate_ddl(ddl, context_text=context)
 
 
-def test_expand_intermediate_ddl_vary_seed_is_deterministic_and_diverse():
+def test_expand_intermediate_ddl_composition_seed_is_deterministic_and_diverse():
     ddl = "青い線を三本引く。"
     context = "リズムのある水面に反復する音が広がる"
 
-    first = expand_intermediate_ddl(ddl, context_text=context, vary_seed=3)
-    second = expand_intermediate_ddl(ddl, context_text=context, vary_seed=3)
-    variants = {expand_intermediate_ddl(ddl, context_text=context, vary_seed=seed) for seed in range(10)}
+    first = expand_intermediate_ddl(ddl, context_text=context, composition_seed=3)
+    second = expand_intermediate_ddl(ddl, context_text=context, composition_seed=3)
+    variants = {expand_intermediate_ddl(ddl, context_text=context, composition_seed=seed) for seed in range(10)}
 
     assert first == second
     assert len(variants) >= 3

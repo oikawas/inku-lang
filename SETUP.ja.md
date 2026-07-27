@@ -36,7 +36,7 @@
 - `uv`
 - Node.js 20 以上を推奨
 - npm
-- SVGからPNGを生成する場合、SVGラスタライザ
+- SVGからPNGを生成する場合、`resvg-py`（`uv sync` で入る）
 
 コンテナで動かす場合:
 
@@ -44,7 +44,9 @@
 
 ### PNG出力について
 
-PNG変換は **resvg を優先し、CairoSVG はフォールバックである**。CairoSVGに落ちた場合もPNGは生成されるが、**材質フィルタ（pencil / crayon / chalk / brush_thick）がPNGとVision入力から失われる**。どちらのバックエンドが使われているかは、サーバー起動時のログに1度だけ出力される。ラスタライザが1つも入っていない場合はPNG出力が無効になる。
+PNG変換は **resvg だけで行う。フォールバックは無い**。resvgが入っていない環境では、PNG出力は静かに劣化するのではなく例外で停止する。
+
+以前はCairoSVGがうしろに控えていたが、CairoSVGは `feTurbulence` / `feDisplacementMap` / `feGaussianBlur` を実装しておらず、**失敗もせずに落とす**。地の粒も材質フィルタ（pencil / crayon / chalk / brush_thick）も消えたPNGが、見た目はきれいなまま返っていた。誤った絵を黙って返すラスタライザは、無いものより悪い。使われているバックエンドとその版は、サーバー起動時のログに1度だけ出力される。
 
 ## 展開
 

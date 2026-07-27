@@ -264,7 +264,7 @@ internal object ServerScoreRepairFactory {
             )
             "paper_shard" -> listOf(
                 JSONObject().put("primitive", "square").put("position", JSONArray(listOf(0.56 - offset, 0.36 + offset))).put("size", JSONArray(listOf(0.13, 0.09))).put("rotation", -24).put("color", color).put("color_hint", "paper_shard motif restored from DDL intent"),
-                JSONObject().put("primitive", "line").put("from", JSONArray(listOf(0.55 - offset, 0.43 + offset))).put("to", JSONArray(listOf(0.70 - offset, 0.37 + offset))).put("color", color).put("weight", "hair").put("color_hint", "paper_shard motif restored from DDL intent"),
+                JSONObject().put("primitive", "line").put("from", JSONArray(listOf(0.55 - offset, 0.43 + offset))).put("to", JSONArray(listOf(0.70 - offset, 0.37 + offset))).put("color", color).put("weight", "silverpoint").put("color_hint", "paper_shard motif restored from DDL intent"),
             )
             "ripple_knot" -> listOf(
                 JSONObject().put("primitive", "arc").put("center", JSONArray(listOf(0.62 - offset, 0.58))).put("radius", 0.10).put("angle_start", 25).put("angle_end", 210).put("color", if (background != "blue") "blue" else "white").put("color_hint", "ripple_knot motif restored from DDL intent"),
@@ -272,7 +272,7 @@ internal object ServerScoreRepairFactory {
             )
             else -> listOf(
                 JSONObject().put("primitive", "triangle").put("position", JSONArray(listOf(0.50 - offset, 0.27 + offset))).put("size", JSONArray(listOf(0.18, 0.15))).put("rotation", -12).put("color", color).put("color_hint", "mountain_sign motif restored from DDL intent"),
-                JSONObject().put("primitive", "line").put("from", JSONArray(listOf(0.59 - offset, 0.25 + offset))).put("to", JSONArray(listOf(0.59 - offset, 0.45 + offset))).put("color", color).put("weight", "hair").put("color_hint", "mountain_sign motif restored from DDL intent"),
+                JSONObject().put("primitive", "line").put("from", JSONArray(listOf(0.59 - offset, 0.25 + offset))).put("to", JSONArray(listOf(0.59 - offset, 0.45 + offset))).put("color", color).put("weight", "silverpoint").put("color_hint", "mountain_sign motif restored from DDL intent"),
             )
         }
     }

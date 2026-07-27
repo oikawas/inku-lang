@@ -3487,3 +3487,23 @@ coerce ゴールデンを**版を上げずにその場で再凍結**したが、
 
 決定的な検査はすべて緑: server **1424 passed / 31 skipped**、ruff・cli 76・
 `npm run check` 0 errors・`lint:i18n` 0 errors・**凍結コーパスは両方バイト一致**。
+
+---
+
+### Android `2.1.2-android.1` — 描画層が render engine 15 へ追随（銀筆・種の allowlist・プロンプト同期・明示個数の免除）（android Build 148090 据え置き、2026-07-27）
+
+**engine 14 から 15 への追随に加え、`hair` → `silverpoint` の改名、server プロンプトの複製の同期、明示個数の免除までを 1 契約でまとめた。** これで Android は server と同じ render engine 15 を名乗る。テストは **71 件（うち失敗 20）→ 89 件 / 失敗 0**。
+
+- **段 1 seed 鍵:** manifest の `vary_seed` を `composition_seed` へ。契約は 1 か所を名指ししていたが、**実際に読んでいた test は 3 ファイル**あった（Phase3a / 3b / 3d）。`WebDdlExpander` の引数名 `varySeed` と salt `#vary` は凍結対象なので不変。
+- **段 2 engine 15:** 印の種を allowlist（`color` / `color_hint` / `at` / `relation` を落とし `arrangement` は `jitter` だけ）、`cloudform` を手描き経路へ、角のある図形と `pen` に材質層、**強さは距離ではない**（`OUTLINE_OFFSET_GAIN` 2.8 → 1.0、下限 0.0035 → 0.0）。**変更 1 だけで失敗 19 → 11**。
+- **地の種は移していない** — Kotlin に canvas ground の描画経路が存在せず、`_texture_seed` に対応する行が 1 つも無い。**移す先が無いので実施しなかったと記録する**。
+- **段 3 銀筆:** 契約の 22 箇所に加え **2 箇所**（埋め込みスキーマの enum と description、線幅表のキー）。保存済みデータの置換は `ServerScoreCompat.kt` を新設し、**coerce 側と renderer 側の両方から呼ぶ** — server は pydantic の validator が一点を押さえるが、Android には対応する一点が無いため。
+- **段 4 プロンプトの番人:** 4 定数を丸ごと差し替え、SHA-256 を `PromptFingerprintTest` で固定。**「manifest にある全ての名前が検査対象に入っているか」も別テストで見る**（手で並べた一覧は追加された prompt を黙って見逃すため）。
+- **段 5 明示個数:** `ServerScoreCounts.kt` を新設。**真の障害物は契約が名指しした 3 関数のどれでもなく `temperQuietSymbolicShape` の範囲だった** — server は角のある図形かつ `color_hint` が coerce 自身の捏造を示すときだけ効くが、Kotlin は円・楕円・弧まで含み `color_hint` のゲートが無く、**記述が明示した個数が governor に届く前に 8 個へ切られていた**。server どおりに絞って 42/50 → **50/50**。
+- **契約に無かったが直した 7 件:** `burin` / `drypoint` の材質輪郭（server に一度も存在しない）を削除、surface グループの位置を材質輪郭の後ろへ、`performedOutline` の粒が render seed で撒かれていたのを instruction seed へ、粒の広がりの強度（1.8）を発生源へ、直線の粒の個数表を直線専用（18 / 34 / 26）へ、縦負荷判定を server に合わせ、engine 14 を固定していた Kotlin 側の主張 2 つを**凍結参照に合わせて**是正。
+- **検査の穴が 2 つ見つかった（実装ではなく検査の側）:** ①角のある図形の材質層は**実装ごと消しても 85/0 の緑**だった（参照コーパス 25 件に triangle も polygon も 0 件）。②粒の摂動も落ちなかった（**個数だけを固定していたので 48 個が全部動いても緑**）。前者は `CornerShapeMaterialLayerTest` を新設、後者は**位置の digest** へ替えて閉じた。
+- **摂動は 10 通り実施し、すべて実際に落ちることを確かめてから戻した。** 置換表を恒等にすると 5 件、`outline_offset` 倍率を 2.8 に戻すと 6 件、明示個数の免除を殺すと 3 件。
+- **参照コーパスは 1 バイトも変更していない**（`git diff 60d64c3..HEAD -- server_reference/` が空）。判別点は **`05_circle_rotring` 不変 × `12_cloudform_rotring` 可動**で、engine 14 の凍結と `cmp` して確認済み。
+- **未対応（報告のみ・裁定が要る）:** 埋め込み Stage 2 tool スキーマが server と **237 行**乖離（`canvas` の地・`background` の旧表現・`weight` の説明。**地を Stage 2 に見せると Android が描けない支持体を要求されうる**）、server の temper 3 つのうち Kotlin は 1 つだけ（**個数には影響しない**ことを確認済み）、`surfaceSeed` が全 dump でなく allowlist 版を使っている、`renderHash` の engine 版フォールバックが server に無い既定値である、UI の「render engine」表示が **`1` のまま**。
+- **`server` / `web` / `cli` / `shared` は 1 バイトも変更していない。** `ANDROID_SPEC.ja.md` / `ANDROID_SPEC.md` は未追随のまま。
+- **検証:** 実装セッションの実測で `testDebugUnitTest --rerun-tasks` が **89 件 / failures 0 / errors 0 / skipped 0**（20 XML）。**受け入れの再テストは作者裁定により行っていない**ため、git 管理セッションでは Android のテストを回していない。`android/BUILD_NUMBER` はパッケージを作る task でしか自動採番されないので **148090 のまま**。

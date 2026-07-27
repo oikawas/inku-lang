@@ -3,6 +3,7 @@ package app.inku.mobile.render
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.pipeline.RenderRequest
+import app.inku.mobile.pipeline.ServerScoreCompat
 import java.security.MessageDigest
 import kotlin.math.cos
 import kotlin.math.max
@@ -14,7 +15,9 @@ import org.json.JSONObject
 
 class DefaultSvgRenderer : SvgRenderer {
     override fun render(request: RenderRequest): RenderResult {
-        val score = JSONObject(request.scoreJson)
+        // Saved works carry retired tool names. Migrate before anything reads `weight`,
+        // the way the server's Instruction validator does on the way in.
+        val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = ColorCatalogs.get(request.colorCatalogId)
         val colors = catalog.renderMap
@@ -75,7 +78,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val svg = applyMasterGrid(rawSvg)
         val metadata = JSONObject()
             .put("render_engine_id", "default")
-            .put("render_engine_version", "14")
+            .put("render_engine_version", "15")
             .put("render_canvas_aspect", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_id", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_ratio", CanvasAspects.ratioFor(request.canvasAspect))
@@ -136,13 +139,13 @@ class DefaultSvgRenderer : SvgRenderer {
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         if (wild && performed.isNotEmpty()) {
-                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * Math.PI * r, center = cx to cy, renderSeed = renderSeed)
+                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * Math.PI * r, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialCircleOutline(ins, attrs, cx, cy, r, unit)
                         }
                     } else ""
                     val fg = fillGroup ?: ""
-                    """<g>$body$fg$band$surfaceGroup$outline</g>"""
+                    """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
                     val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
                     val base = if (needsPathVariation(variation)) {
@@ -154,7 +157,7 @@ class DefaultSvgRenderer : SvgRenderer {
                     }
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) materialCircleOutline(ins, attrs, cx, cy, r, unit) else ""
-                    if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$surfaceGroup$outline</g>""" else base
+                    if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
             }
             "ellipse" -> {
@@ -180,13 +183,13 @@ class DefaultSvgRenderer : SvgRenderer {
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         if (wild && performed.isNotEmpty()) {
-                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = approxPerimeter, center = cx to cy, renderSeed = renderSeed)
+                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = approxPerimeter, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit)
                         }
                     } else ""
                     val fg = fillGroup ?: ""
-                    """<g>$body$fg$band$surfaceGroup$outline</g>"""
+                    """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
                     val base = if (needsPathVariation(variation)) {
                         val pts = ServerRendererGeometry.variedCirclePoints(cx, cy, rx, ry, variation, seedForInstruction(ins, renderSeed), ins, width, height, unit)
@@ -197,7 +200,7 @@ class DefaultSvgRenderer : SvgRenderer {
                     }
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit) else ""
-                    if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$surfaceGroup$outline</g>""" else base
+                    if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
             }
             "square" -> {
@@ -225,13 +228,13 @@ class DefaultSvgRenderer : SvgRenderer {
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
                         if (wild && performed.isNotEmpty()) {
-                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * (w + h), center = (x + w / 2.0) to (y + h / 2.0), renderSeed = renderSeed)
+                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * (w + h), center = (x + w / 2.0) to (y + h / 2.0), renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialRectOutline(ins, attrs, x, y, w, h, unit)
                         }
                     } else ""
                     val fg = fillGroup ?: ""
-                    """<g>$body$fg$band$surfaceGroup$outline</g>"""
+                    """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
                     val base = if (needsPathVariation(variation)) {
                         val rectPts = ServerRendererGeometry.rectPoints(x, y, w, h, 80)
@@ -243,7 +246,7 @@ class DefaultSvgRenderer : SvgRenderer {
                     }
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) materialRectOutline(ins, attrs, x, y, w, h, unit) else ""
-                    if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$surfaceGroup$outline</g>""" else base
+                    if (surfaceGroup.isNotEmpty() || usesMaterialOutline(weight)) """<g>$base$outline$surfaceGroup</g>""" else base
                 }
             }
             "triangle" -> {
@@ -266,14 +269,23 @@ class DefaultSvgRenderer : SvgRenderer {
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
-                    val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
-                            val pathLen = points.indices.sumOf { i -> kotlin.math.hypot(points[(i+1)%points.size].first - points[i].first, points[(i+1)%points.size].second - points[i].second) }
-                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = pathLen, center = cx to cy, renderSeed = renderSeed)
-                        } else ""
+                    // engine 15: this function had no material-outline call at all, so triangle
+                    // and polygon were the only closed figures left bare across all five tools
+                    // that own a material layer. There is no analytic outline helper for a shape
+                    // with arbitrary corners, so the strata are drawn from the performed
+                    // centreline, wild or not - nothing frozen is being preserved here.
+                    val outline = if (usesMaterialOutline(weight) && performed.isNotEmpty()) {
+                        ServerRendererMaterial.performedOutline(
+                            ins, attrs, performed, unit,
+                            closed = true,
+                            pathLenPx = closedPathLength(performed),
+                            center = pointsCenter(bodyPts),
+                            renderSeed = renderSeed,
+                            instructionSeed = seedForInstruction(ins, renderSeed)
+                        )
                     } else ""
                     val fg = fillGroup ?: ""
-                    """<g>$body$fg$surfaceGroup$band$outline</g>"""
+                    """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
                     val pts = if (needsPathVariation(variation)) {
                         val pos = ins.optJSONArray("position")
@@ -310,14 +322,23 @@ class DefaultSvgRenderer : SvgRenderer {
                     val body = renderBodyShape("polygon", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bodyPts)
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
-                    val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
-                            val pathLen = rawPoints.indices.sumOf { i -> kotlin.math.hypot(rawPoints[(i+1)%rawPoints.size].first - rawPoints[i].first, rawPoints[(i+1)%rawPoints.size].second - rawPoints[i].second) }
-                            ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = pathLen, center = cx to cy, renderSeed = renderSeed)
-                        } else ""
+                    // engine 15: this function had no material-outline call at all, so triangle
+                    // and polygon were the only closed figures left bare across all five tools
+                    // that own a material layer. There is no analytic outline helper for a shape
+                    // with arbitrary corners, so the strata are drawn from the performed
+                    // centreline, wild or not - nothing frozen is being preserved here.
+                    val outline = if (usesMaterialOutline(weight) && performed.isNotEmpty()) {
+                        ServerRendererMaterial.performedOutline(
+                            ins, attrs, performed, unit,
+                            closed = true,
+                            pathLenPx = closedPathLength(performed),
+                            center = pointsCenter(bodyPts),
+                            renderSeed = renderSeed,
+                            instructionSeed = seedForInstruction(ins, renderSeed)
+                        )
                     } else ""
                     val fg = fillGroup ?: ""
-                    """<g>$body$fg$surfaceGroup$band$outline</g>"""
+                    """<g>$body$fg$band$outline$surfaceGroup</g>"""
                 } else {
                     val pts = if (needsPathVariation(variation)) {
                         ServerRendererGeometry.variedPolygonPoints(rawPoints, variation, seedForInstruction(ins, renderSeed), cx, cy, ins, width, height, unit)
@@ -363,10 +384,45 @@ class DefaultSvgRenderer : SvgRenderer {
                     weight = weight,
                     pointCount = 49
                 )
-                val (fillGroup, _) = interiorFill(ins, attrs, contour.points, unit, renderSeed)
-                val classAttr = """class="cloudform contour-v1 stroke-engine-touch""""
-                val pathStr = """<path d="${contour.pathD}" fill="$fill" $common $classAttr/>"""
-                if (fillGroup != null) """<g>$pathStr$fillGroup</g>""" else pathStr
+                // engine 15: the cloudform handed its Catmull-Rom path straight to the
+                // document, so it had never once entered the stroke engine - while its class
+                // claimed stroke-engine-touch, which was false. The dense polyline the
+                // interior fill already samples now goes down the same road square, circle
+                // and polygon take, so all three material mechanisms and the wild toggle
+                // arrive together. The contour generator itself is untouched.
+                val sampled = ServerRendererGeometry.sampleClosedCatmullRom(contour.points)
+                val (fillGroup, regionFill) = interiorFill(ins, attrs, sampled, unit, renderSeed, wild)
+                val hand = usesHandStroke(weight)
+                // The class names only what is true: rotring stays geometric.
+                val classAttr = "cloudform contour-v1" + (if (hand) " stroke-engine-touch" else "")
+                val pathStr = when {
+                    hand -> renderBodyShape("cloudform", ins, attrs, regionFill, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, emptyList(), pathD = contour.pathD, classAttr = classAttr)
+                    fillGroup != null -> """<path class="$classAttr" d="${contour.pathD}" fill="none" $common/>"""
+                    else -> """<path class="$classAttr" d="${contour.pathD}" fill="$fill" $common/>"""
+                }
+                if (fillGroup == null && !hand) {
+                    pathStr
+                } else {
+                    val sb = StringBuilder("<g>").append(pathStr)
+                    if (fillGroup != null) sb.append(fillGroup)
+                    if (hand) {
+                        val (band, performed) = renderContourHandStroke(ins, attrs, sampled, emptySet(), unit, width, height, renderSeed, wild)
+                        sb.append(band)
+                        if (usesMaterialOutline(weight)) {
+                            sb.append(
+                                ServerRendererMaterial.performedOutline(
+                                    ins, attrs, performed, unit,
+                                    closed = true,
+                                    pathLenPx = closedPathLength(performed),
+                                    center = pointsCenter(sampled),
+                                    renderSeed = renderSeed,
+                                    instructionSeed = seedForInstruction(ins, renderSeed)
+                                )
+                            )
+                        }
+                    }
+                    sb.append("</g>").toString()
+                }
             }
 
             else -> ""
@@ -742,7 +798,9 @@ class DefaultSvgRenderer : SvgRenderer {
         regionFill: Boolean,
         cx: Double, cy: Double, rx: Double, ry: Double,
         x: Double, y: Double, w: Double, h: Double,
-        pts: List<Pair<Double, Double>>
+        pts: List<Pair<Double, Double>>,
+        pathD: String? = null,
+        classAttr: String? = null
     ): String {
         val fillVal = if (regionFill) attrs.fill else "none"
         val fillOpacityAttr = if (regionFill && attrs.fillOpacity != null) """ fill-opacity="${attrs.fillOpacity}"""" else ""
@@ -784,8 +842,28 @@ class DefaultSvgRenderer : SvgRenderer {
                 val ptsStr = pts.joinToString(" ") { "${fmt(it.first)},${fmt(it.second)}" }
                 """<polygon points="$ptsStr" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
             }
+            "cloudform" -> {
+                val cls = if (classAttr != null) """class="$classAttr" """ else ""
+                """<path $cls d="$pathD" fill="$fillVal"$fillOpacityAttr $strokeAttr/>"""
+            }
             else -> ""
         }
+    }
+
+    // Perimeter of a closed polyline, and the centre used to settle the normal direction
+    // by majority vote. Mirrors _closed_path_length / _points_center in renderer.py.
+    private fun closedPathLength(path: List<Pair<Double, Double>>): Double {
+        if (path.size < 2) return 0.0
+        return path.indices.sumOf { i ->
+            val a = path[i]
+            val b = path[(i + 1) % path.size]
+            kotlin.math.hypot(b.first - a.first, b.second - a.second)
+        }
+    }
+
+    private fun pointsCenter(path: List<Pair<Double, Double>>): Pair<Double, Double> {
+        if (path.isEmpty()) return 0.0 to 0.0
+        return (path.sumOf { it.first } / path.size) to (path.sumOf { it.second } / path.size)
     }
 
     private fun polygon(points: List<Pair<Double, Double>>, fill: String, common: String): String {
@@ -1191,6 +1269,11 @@ class DefaultSvgRenderer : SvgRenderer {
         return value
     }
 
+    // render engine 15: the seed key is an allowlist, not the whole instruction dump.
+    // Fields the performance never consumes - color, color_hint, at, relation, and every
+    // arrangement field but jitter - used to re-roll the marks, so an annotation coerce
+    // wrote onto an instruction changed the drawing. Mirrors _SEED_INSTRUCTION_FIELDS and
+    // _SEED_ARRANGEMENT_FIELDS in renderer.py, in that order.
     private fun serverInstructionJson(ins: JSONObject): String {
         return buildString {
             append("{")
@@ -1208,15 +1291,23 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"filled\":"); append(ins.optBoolean("filled", false))
             append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
             append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
-            append(",\"color\":"); append(jsonString(ins.optString("color", "black")))
-            append(",\"color_hint\":"); append(stringOrNull(ins, "color_hint"))
+            // server pops the two defaults so a plain instruction keeps the shorter key.
+            val mode = ins.optString("mode", "additive")
+            if (mode != "additive") { append(",\"mode\":"); append(jsonString(mode)) }
+            if (ins.has("carve_depth") && !ins.isNull("carve_depth")) {
+                append(",\"carve_depth\":"); append(jsonString(ins.optString("carve_depth")))
+            }
             append(",\"variation\":"); append(variationJson(ins, ins.optJSONObject("variation")))
-            append(",\"arrangement\":"); append(arrangementJson(ins.optJSONObject("arrangement")))
-            append(",\"at\":null")
-            append(",\"relation\":null")
+            append(",\"arrangement\":"); append(seedArrangementJson(ins.optJSONObject("arrangement")))
             append(",\"surface\":"); append(surfaceJson(ins.optJSONObject("surface")))
             append("}")
         }
+    }
+
+    // Only jitter survives into the seed key (_SEED_ARRANGEMENT_FIELDS).
+    private fun seedArrangementJson(arr: JSONObject?): String {
+        if (arr == null) return "null"
+        return "{\"jitter\":${doubleJson(arr.optDouble("jitter", 0.12))}}"
     }
 
     private fun surfaceJson(surface: JSONObject?): String {
@@ -1636,7 +1727,7 @@ class DefaultSvgRenderer : SvgRenderer {
                 val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
                 val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
                 val performed = stroke.samples.map { it.x to it.y }
-                sb.append(ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = false, pathLenPx = arcLen, center = cx to cy, renderSeed = renderSeed))
+                sb.append(ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = false, pathLenPx = arcLen, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed)))
             } else {
                 sb.append(materialArcOutline(ins, attrs, cx, cy, r, startDeg, endDeg, unit))
             }

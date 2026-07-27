@@ -265,9 +265,12 @@ class DefaultSvgRendererPhase2fTest {
         val svg23 = renderSvgForReference("23_square_filled_wild")
         org.junit.Assert.assertNotEquals("23_square_filled_wild must diverge from 03_square_filled", svg03, svg23)
 
+        // engine 15 put cloudform on the shared closed-contour road, so the wild toggle
+        // reaches it now. The two frozen references differ; the exemption is down to the
+        // machine poles alone (25_line_computer_wild below still matches 17).
         val svg11 = renderSvgForReference("11_cloudform_pencil")
         val svg24 = renderSvgForReference("24_cloudform_pencil_wild")
-        org.junit.Assert.assertEquals("24_cloudform_pencil_wild must be identical to 11_cloudform_pencil", svg11, svg24)
+        org.junit.Assert.assertNotEquals("24_cloudform_pencil_wild must diverge from 11_cloudform_pencil", svg11, svg24)
 
         val svg17 = renderSvgForReference("17_line_computer")
         val svg25 = renderSvgForReference("25_line_computer_wild")

@@ -23,7 +23,7 @@ data class ToolGrammar(
 )
 
 val GRAMMARS: Map<String, ToolGrammar> = mapOf(
-    "hair" to ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012),
+    "silverpoint" to ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012),
     "pencil" to ToolGrammar(0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05),
     "pen" to ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022),
     "rotring" to ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),

@@ -1183,7 +1183,7 @@ def test_compose_retry_reason_only_retries_empty_instructions():
 def test_stage1_fallback_does_not_treat_dawn_as_night():
     ddl = api_module._fallback_ddl_from_text("夜明けの湖で、最初の光が水のしわをほどく。", lang="ja")
 
-    assert ddl.startswith("背景を白で塗りつぶす。")
+    assert ddl.startswith("背景を白で埋める。")
     assert "背景を黒" not in ddl
 
 

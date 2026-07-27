@@ -193,7 +193,7 @@ def _avoid_gray_background(text: str, *, lang: str) -> str:
             text,
             flags=re.IGNORECASE,
         )
-    return re.sub(r"背景を灰(?:色)?で塗りつぶす。?", "背景を白で塗りつぶす。", text)
+    return re.sub(r"背景を灰(?:色)?で(?:塗りつぶす|埋める)。?", "背景を白で埋める。", text)
 
 
 def _seed(text: str, salt: str) -> int:

@@ -3267,7 +3267,7 @@ def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
     background, foreground = _fallback_background_from_text(text, lang=lang)
     accent = "青" if foreground == "黒" and ("白" in text or "雪" in text) else "灰色"
     return (
-        f"背景を{background}で塗りつぶす。"
+        f"背景を{background}で埋める。"
         f"{foreground}い細い斜めの線を三本並べる。"
         f"{accent}の小さな点を十二個、画面全体に点々と散らす。"
     )

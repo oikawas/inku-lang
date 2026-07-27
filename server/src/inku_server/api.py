@@ -2577,7 +2577,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
                 "angle_end": 205,
                 "rotation": -18,
                 "color": support_color,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "fallback negative space support",
                 "arrangement": {
                     "count": 3,

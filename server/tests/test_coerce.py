@@ -1757,7 +1757,7 @@ def test_coerce_score_adds_surface_tension_for_heavy_surface_context():
 
     assert len(fixed.instructions) == 2
     assert fixed.instructions[1].primitive == "arc"
-    assert fixed.instructions[1].weight == "hair"
+    assert fixed.instructions[1].weight == "silverpoint"
     assert "surface tension restored" in (fixed.instructions[1].color_hint or "")
 
 
@@ -2165,7 +2165,7 @@ def test_coerce_score_adds_edge_light_event_for_dark_light_context():
                     "from": [0.24, 0.12],
                     "to": [0.24, 0.88],
                     "color": "blue",
-                    "weight": "hair",
+                    "weight": "silverpoint",
                 }
             ],
         }
@@ -2238,7 +2238,7 @@ def test_coerce_score_keeps_english_action_residue_visible():
                     "from": [0.48, 0.50],
                     "to": [0.52, 0.50],
                     "color": "gray",
-                    "weight": "hair",
+                    "weight": "silverpoint",
                     "color_hint": "bow",
                 }
             ],

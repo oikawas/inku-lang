@@ -232,7 +232,7 @@ def test_stage15_added_lines_and_arcs_always_name_a_touch():
         "青い鉛筆の円を中央に置く。黒い鉛筆の横線を三本引く。",
         context_text="静かな水面の反射と細い波",
     )
-    touches = ("髪", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント")
+    touches = ("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント")
 
     for sentence in expanded.split("。"):
         if "線" in sentence or "弧" in sentence:

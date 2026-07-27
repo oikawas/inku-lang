@@ -555,7 +555,7 @@ def _motion_floor_instruction(*, ddl: str | None, background: str) -> Instructio
             "angle_end": 330,
             "rotation": -16,
             "color": color,
-            "weight": "hair",
+            "weight": "silverpoint",
             "color_hint": "motion floor restored as a small directional trace",
             "arrangement": {
                 "count": 3,
@@ -886,7 +886,7 @@ def _visual_event_recipe(
                 "angle_end": 214,
                 "rotation": -20,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event type sound_in_space restored as a spatial echo",
                 "arrangement": {
                     "count": 2,
@@ -909,7 +909,7 @@ def _visual_event_recipe(
                 "from": [0.36, 0.54],
                 "to": [0.70, 0.38],
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event type vanishing_outline restored as a fading contour",
                 "arrangement": {
                     "count": 2,
@@ -933,7 +933,7 @@ def _visual_event_recipe(
                 "angle_end": 232,
                 "rotation": 15,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event type inherited_memory restored as a three-part memory sequence",
                 "arrangement": {
                     "count": 3,
@@ -956,7 +956,7 @@ def _visual_event_recipe(
                 "from": [0.36, 0.52],
                 "to": [0.72, 0.39],
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event type temporal_chain restored as an ordered reaction path",
                 "arrangement": {
                     "count": 3,
@@ -982,7 +982,7 @@ def _visual_event_recipe(
                 "angle_end": 206,
                 "rotation": -22,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event type anticipatory_shift restored as an early hinge",
                 "arrangement": {
                     "count": 2,
@@ -1008,7 +1008,7 @@ def _visual_event_recipe(
                 "angle_end": 238,
                 "rotation": -26,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event type brief_arrival_departure restored as an arrival-leaving trace",
                 "arrangement": {
                     "count": 2,
@@ -1071,7 +1071,7 @@ def _visual_event_instruction(
                 "from": [0.33, 0.24],
                 "to": [0.68, 0.63],
                 "color": "white" if background != "white" else visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as diagonal afternoon light",
                 "arrangement": {
                     "count": 2,
@@ -1095,7 +1095,7 @@ def _visual_event_instruction(
                 "angle_end": 342,
                 "rotation": 10,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as hidden foot rhythm",
                 "arrangement": {
                     "count": 3,
@@ -1117,7 +1117,7 @@ def _visual_event_instruction(
                 "from": [0.27, 0.34],
                 "to": [0.45, 0.38],
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as doubled river road",
                 "arrangement": {
                     "count": 2,
@@ -1167,7 +1167,7 @@ def _visual_event_instruction(
                 "angle_end": 232,
                 "rotation": 15,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as an inherited bow sequence",
                 "arrangement": {
                     "count": 3,
@@ -1188,7 +1188,7 @@ def _visual_event_instruction(
                 "from": [0.39, 0.48],
                 "to": [0.72, 0.36],
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as a chain reaction",
                 "arrangement": {
                     "count": 3,
@@ -1211,7 +1211,7 @@ def _visual_event_instruction(
                 "size": [0.11, 0.034],
                 "rotation": -16,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as a tilted-room drop",
                 "arrangement": {
                     "count": 2,
@@ -1237,7 +1237,7 @@ def _visual_event_instruction(
                 "angle_end": 185,
                 "rotation": -26,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as a small sensory drift",
                 "arrangement": {
                     "count": 2,
@@ -1257,7 +1257,7 @@ def _visual_event_instruction(
                 "from": [0.54, 0.42],
                 "to": [0.75, 0.38],
                 "color": "blue" if background != "blue" else "white",
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as a thin reflected cut",
                 "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
@@ -1301,7 +1301,7 @@ def _visual_event_instruction(
                 "angle_end": 210,
                 "rotation": 24,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "visual event restored as a small offbeat arc",
                 "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
@@ -1368,7 +1368,7 @@ def _visual_event_instruction(
             "angle_end": _seed_choice(ddl, "focal-pulse-angle-end", (192, 220, 245, 272)),
             "rotation": _seed_choice(ddl, "focal-pulse-rotation", (-28, -12, 8, 22)),
             "color": color,
-            "weight": "hair",
+            "weight": "silverpoint",
             "color_hint": "visual event restored as a small focal pulse",
             "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
         }
@@ -1722,7 +1722,7 @@ def _adjacent_reaction_instruction(
     data: dict[str, Any] = {
             "primitive": primitive,
             "color": color,
-            "weight": "hair",
+            "weight": "silverpoint",
             "color_hint": "visual event adjacent reaction added to hold focal event",
             "arrangement": {
                 "count": _seed_choice(ddl, "adjacent-reaction-count", (1, 2)),
@@ -1817,7 +1817,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "to": [0.82, 0.38],
                 "rotation": -7,
                 "color": visible,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "silence/layer energy restored as a long optical trace",
                 "arrangement": {
                     "count": 4,
@@ -1865,7 +1865,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "to": [0.84, 0.24],
                 "rotation": -8,
                 "color": light_color,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "edge light event restored as a small cutting point",
                 "arrangement": {
                     "count": 2,
@@ -1890,7 +1890,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "angle_end": _seed_choice(ddl, "vanishing-trace-angle-end", (292, 315, 334, 350)),
                 "rotation": _seed_choice(ddl, "vanishing-trace-rotation", (-32, -18, -4, 16)),
                 "color": trace_color,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "vanishing trace restored with a fading endpoint",
                 "arrangement": {
                     "count": 3,
@@ -2006,7 +2006,7 @@ def _with_surface_tension(
             "angle_end": 342,
             "rotation": -4,
             "color": color,
-            "weight": "hair",
+            "weight": "silverpoint",
             "color_hint": "surface tension restored as a quiet shadow trace",
         }
     )
@@ -2035,7 +2035,7 @@ def _quiet_expression_accent(*, ddl: str | None, background: str) -> Instruction
                 "angle_start": 205,
                 "angle_end": 325,
                 "color": color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black"),
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "quiet expression accent restored after density governance",
                 "arrangement": {
                     "count": 3,
@@ -2586,7 +2586,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
                 "from": [0.55 - offset, 0.43 + offset],
                 "to": [0.70 - offset, 0.37 + offset],
                 "color": color,
-                "weight": "hair",
+                "weight": "silverpoint",
                 "color_hint": "paper_shard motif restored from DDL intent",
             }),
         ]
@@ -2624,7 +2624,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
             "from": [0.59 - offset, 0.25 + offset],
             "to": [0.59 - offset, 0.45 + offset],
             "color": color,
-            "weight": "hair",
+            "weight": "silverpoint",
             "color_hint": "mountain_sign motif restored from DDL intent",
         }),
     ]

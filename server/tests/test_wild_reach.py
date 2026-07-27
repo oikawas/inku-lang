@@ -24,7 +24,7 @@ REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 
 TOOLS = (
     "brush_thick", "brush_thin", "burin", "chalk", "computer", "crayon",
-    "drypoint", "hair", "pen", "pencil", "rotring",
+    "drypoint", "pen", "pencil", "rotring", "silverpoint",
 )
 PRIMITIVES = ("line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform")
 GEOMETRY: dict[str, dict] = {

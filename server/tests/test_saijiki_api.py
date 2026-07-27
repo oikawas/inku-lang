@@ -87,7 +87,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("右上がり", "rising"), ("右下がり", "falling"), ("回転", "rotated"),
     ),
     "tezawari": (
-        ("鉛筆", "pencil"), ("ペン", "pen"), ("ロットリング", "rotring"), ("クレヨン", "crayon"),
+        ("銀筆", "silverpoint"), ("鉛筆", "pencil"), ("ペン", "pen"), ("ロットリング", "rotring"), ("クレヨン", "crayon"),
         ("チョーク", "chalk"), ("細筆", "fine-brush"), ("太筆", "thick-brush"),
         ("ビュラン", "burin"), ("ドライポイント", "drypoint"),
         ("コンピュータ", "computer"),
@@ -134,12 +134,16 @@ def test_display_lists_pair_ja_and_en_by_position():
 def test_pruned_words_absent_from_display():
     words = {w for cat in saijiki.display_categories("ja") for w in cat["words"]}
     words |= {w for cat in saijiki.display_categories("en") for w in cat["words"]}
-    # P0-3 (髪/hair), P0-2b (描く), P0-1a (彫る) removed from display; aida kept.
-    assert "髪" not in words and "hair" not in words
+    # P0-2b (描く), P0-1a (彫る) removed from display; aida kept.
     assert "描く" not in words and "彫る" not in words
     assert any(cat["key"] == "aida" for cat in saijiki.display_categories("ja"))
-    # Weight enum still carries hair for replay/rh2 compatibility.
+    # P0-3 pruned 髪/hair in 2026-07-18. The name was the problem, not the tool, so
+    # 2026-07-27 renamed it to 銀筆/silverpoint and put it back on display. The old
+    # name survives nowhere — the rename is a replacement, not a second entry.
+    assert "髪" not in words and "hair" not in words
+    assert "銀筆" in words and "silverpoint" in words
     from inku_server import schema
     from typing import get_args
 
-    assert "hair" in get_args(schema.Weight)
+    assert "hair" not in get_args(schema.Weight)
+    assert "silverpoint" in get_args(schema.Weight)

@@ -28,7 +28,7 @@ CLOUDFORM = {"primitive": "cloudform", "center": [0.50, 0.50], "size": [0.48, 0.
 # (engine 13 の裁定)、`rotring` は機械の極なので手描き合成に入らない。
 WILD_REACHES = (
     "brush_thick", "brush_thin", "burin", "chalk", "crayon",
-    "drypoint", "hair", "pen", "pencil",
+    "drypoint", "pen", "pencil", "silverpoint",
 )
 WILD_IMMUNE = ("computer", "rotring")
 

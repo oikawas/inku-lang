@@ -113,6 +113,22 @@ export function modelsForProvider(provider: Provider): ModelOption[] {
 // added without threading a catalog through every one of them.
 let registeredProviderIds = new Set<Provider>(PROVIDER_GROUPS.map((group) => group.id));
 let registeredModelOwners = ownersOf(PROVIDER_GROUPS);
+let registeredProviderLabels = providerLabelsOf(PROVIDER_GROUPS);
+let registeredModelLabels = modelLabelsOf(PROVIDER_GROUPS);
+
+function providerLabelsOf(groups: ProviderGroup[]): Map<Provider, string> {
+	const labels = new Map<Provider, string>();
+	for (const group of groups) if (group.label) labels.set(group.id, group.label);
+	return labels;
+}
+
+function modelLabelsOf(groups: ProviderGroup[]): Map<string, string> {
+	const labels = new Map<string, string>();
+	for (const group of groups) {
+		for (const model of group.models) if (model.label) labels.set(`${group.id}:${model.id}`, model.label);
+	}
+	return labels;
+}
 
 function ownersOf(groups: ProviderGroup[]): Map<string, Set<Provider>> {
 	const owners = new Map<string, Set<Provider>>();
@@ -141,6 +157,37 @@ export function registerModelCatalog(groups: ProviderGroup[]): void {
 	}
 	registeredProviderIds = ids;
 	registeredModelOwners = owners;
+	registeredProviderLabels = new Map([...registeredProviderLabels, ...providerLabelsOf(groups)]);
+	registeredModelLabels = new Map([...registeredModelLabels, ...modelLabelsOf(groups)]);
+}
+
+/** The provider's own name, falling back to its id when the catalog has none. */
+export function providerLabel(provider: Provider, groups?: ProviderGroup[]): string {
+	const id = String(provider ?? '');
+	if (!id) return '';
+	const fromArgument = groups?.find((group) => group.id === id)?.label;
+	return fromArgument || registeredProviderLabels.get(id) || id;
+}
+
+/**
+ * How a model is named on screen: "<provider> / <model>".
+ *
+ * A model id alone does not say where it runs, and since gpt-oss:20b is served
+ * by two providers the name is not even unique. Every place that shows a model
+ * to a person goes through here.
+ */
+export function modelDisplayName(
+	modelId: string | null | undefined,
+	groups?: ProviderGroup[],
+	stageProvider: Provider = DEFAULT_PROVIDER
+): string {
+	const ref = String(modelId ?? '').trim();
+	if (!ref) return '';
+	const { provider, model } = resolveModelRef(ref, groups, stageProvider);
+	const fromArgument = groups?.find((group) => group.id === provider)?.models.find((item) => item.id === model)?.label;
+	const name = fromArgument || registeredModelLabels.get(`${provider}:${model}`) || model;
+	const owner = providerLabel(provider, groups);
+	return owner ? `${owner} / ${name}` : name;
 }
 
 /**

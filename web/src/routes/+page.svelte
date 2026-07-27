@@ -30,9 +30,12 @@
 		DEFAULT_PROVIDER,
 		DEFAULT_MODEL,
 		modelsForProvider,
+		modelDisplayName,
+		providerLabel,
 		providerOfModel,
 		qualifiedModelId,
 		registerModelCatalog,
+		resolveModelRef,
 		splitModelRef,
 		type Provider,
 		type ProviderGroup,
@@ -2513,12 +2516,12 @@
 	let activeRunTokensIn = $state<number | null>(null);
 	let activeRunTokensOut = $state<number | null>(null);
 
-	// Model names shown by every running indicator.
+	// Model names shown by every running indicator, provider first.
 	const stage1ModelLabel = $derived(
-		availableModelCatalog.find((group) => group.id === stage1Provider)?.models.find((model) => model.id === stage1Model)?.label ?? stage1Model
+		modelDisplayName(qualifiedModelId(stage1Provider, stage1Model), availableModelCatalog, stage1Provider)
 	);
 	const stage2ModelLabel = $derived(
-		availableModelCatalog.find((group) => group.id === stage2Provider)?.models.find((model) => model.id === stage2Model)?.label ?? stage2Model
+		modelDisplayName(qualifiedModelId(stage2Provider, stage2Model), availableModelCatalog, stage2Provider)
 	);
 
 	// Flows that issue several paints per run keep their own running totals.
@@ -5590,8 +5593,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		displayLatestBatchRender();
 	}
 
-	function shortModel(m: string | null | undefined): string {
-		if (!m) return '';
+	function shortModelName(m: string): string {
 		if (m.includes('opus')) return 'opus';
 		if (m.includes('haiku')) return 'haiku';
 		if (m.includes('sonnet')) return 'sonnet';
@@ -5601,11 +5603,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return (m.split('/').pop() ?? m).slice(0, 8);
 	}
 
-	function statusModelName(m: string | null | undefined): string {
+	// The narrow history columns keep the shortened model name, but they still
+	// say which provider ran it: the same id can be served by two of them.
+	function shortModel(m: string | null | undefined): string {
 		if (!m) return '';
-		const bareModel = m.includes(':') ? m.split(':').slice(1).join(':') : m;
-		const model = modelsFor(providerOfModel(m)).find((option) => option.id === m || option.id === bareModel);
-		return model?.label ?? m;
+		const { provider, model } = resolveModelRef(m);
+		const owner = providerLabel(provider);
+		const short = shortModelName(model);
+		return owner ? `${owner}/${short}` : short;
+	}
+
+	function statusModelName(m: string | null | undefined): string {
+		return modelDisplayName(m);
 	}
 
 	function catalogName(id: string | null | undefined): string {

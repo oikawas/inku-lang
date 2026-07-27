@@ -7,7 +7,7 @@
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
 	import { t } from '$lib/i18n/index.svelte';
-	import { qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+	import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 
 	export type LineageNode = {
@@ -643,8 +643,8 @@ $effect(() => {
 											<dt>{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
 											<dt>dh1</dt><dd>{shortHash(node.description_hash)}</dd>
 											<dt>rh2</dt><dd>{shortHash(node.render_hash)}</dd>
-											<dt>Stage 1</dt><dd>{node.history.stage1_model ?? '—'}</dd>
-											<dt>Stage 2</dt><dd>{node.history.stage2_model ?? '—'}</dd>
+											<dt>Stage 1</dt><dd>{node.history.stage1_model ? modelDisplayName(node.history.stage1_model) : '—'}</dd>
+											<dt>Stage 2</dt><dd>{node.history.stage2_model ? modelDisplayName(node.history.stage2_model) : '—'}</dd>
 											<dt>seed</dt><dd>{node.history.render_seed ?? '—'} / {node.history.composition_seed ?? '—'} / {node.history.interpretation_seed ?? '—'}</dd>
 											<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(edge?.derivation_kind)}</dd>
 										</dl>

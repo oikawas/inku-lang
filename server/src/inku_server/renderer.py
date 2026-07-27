@@ -1916,9 +1916,18 @@ def _score_canvas_ground(score: Score) -> CanvasGroundSpec | None:
 
 
 def _texture_seed(
-    score: Score, kind: str, render_seed: int | None, index: int = 0
+    ground: CanvasGroundSpec, kind: str, render_seed: int | None, index: int = 0
 ) -> int:
-    payload = score.model_dump(mode="json", by_alias=True)
+    """支持体の同一性だけから質感 seed を作る (render engine 15)。
+
+    engine 14 までは Score 全体の dump をハッシュしていたため、地と無関係な変更 —
+    instruction に coerce が書き込む色注記や、描画に一度も読まれない `absorbency` —
+    が地の粒配置を動かしていた。地の seed が決めているのは「どの紙か」であって
+    「どれだけ濃いか」ではないので、材質と紙目、そして演奏 seed だけを材料にする。
+    `opacity` を上げれば同じ紙が濃くなり、`density` を上げれば同じ紙に粒が足される
+    (先頭の粒は動かない)。`tone` は色調であって支持体ではない。
+    """
+    payload = {"material": ground.material, "grain": ground.grain}
     key = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     if render_seed is not None:
         key += f":render:{render_seed}"
@@ -1975,7 +1984,7 @@ def _render_canvas_ground(
     seed = int(
         ground.seed
         if ground.seed is not None
-        else _texture_seed(score, "canvas-ground", render_seed)
+        else _texture_seed(ground, "canvas-ground", render_seed)
     )
     tone = _ground_tone_color(ground, bg)
     group = dwg.g(id="layer_01_canvas_ground")

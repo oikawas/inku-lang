@@ -117,10 +117,12 @@ def test_stage2_prompt_and_tool_expected_values():
     assert _digest(composer.SYSTEM_PROMPT) == "1dd998b61016daf0"
     assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_947
     assert _digest(composer.SYSTEM_PROMPT_EN) == "f7f202b29f16392a"
-    assert len(tool_json.encode("utf-8")) == 18_021
-    assert _digest(tool_json) == "76e0c2b9d23a47f9"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "88fd68b059e412c8"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "c037afbbf2d6dec2"
+    # render engine 15 で `ground.absorbency` を退役させた分だけ tool schema が縮む
+    # (18_021 -> 17_696)。系統プロンプト本文の 2 件は動いていない。
+    assert len(tool_json.encode("utf-8")) == 17_696
+    assert _digest(tool_json) == "c1f0297268da2bd2"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "d33cd2269158e84f"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "2665585415fec6df"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -222,7 +224,7 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     changed_tool = replace_description(changed_tool)
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "606ee64ce26be1cf"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a9196f95581a9098"
     assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "1dd998b61016daf0"
 
 

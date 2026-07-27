@@ -835,8 +835,9 @@ def test_retired_fields_are_dropped_from_saved_scores() -> None:
 
     pentala の保存済み 1780 件のうち contact が 41 件で使われている (thickness は
     0 件)。`extra="forbid"` があるので、落とす経路が無いと再生時に ValidationError
-    で弾かれる。absorbency は退役していない — 値は読まれないが、地の texture seed が
-    Score 全体のハッシュなので、消すと地を持つ 23 件の粒配置が変わる。
+    で弾かれる。absorbency も render engine 15 で退役した (地の texture seed が Score
+    全体のハッシュでなくなり、消しても粒配置が動かなくなったため)。そちらの落とし
+    経路は `test_ground_seed.py` が持つ。
     """
     score = Score.model_validate(
         {

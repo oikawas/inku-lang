@@ -1849,7 +1849,7 @@ def _paint_payload(
     payload: dict[str, Any] = {
         # description は作者が書いた記述。CLI は文脈を注入しないので、Stage 1 が読む
         # 文字列は打った本文そのままになる。
-        "description": args.original_text or text,
+        "description": args.description or text,
         "stage1_input": text,
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
         "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
@@ -1885,7 +1885,7 @@ def _compose_payload(
     payload: dict[str, Any] = {
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
-        "description": args.original_text,
+        "description": args.description,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
@@ -2162,7 +2162,7 @@ def command_paint(args: argparse.Namespace) -> int:
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
     if input_mode == "ddl":
-        input_text = args.original_text or text
+        input_text = args.description or text
         raw_result, _ = _run_with_progress(
             "drawing from DDL",
             lambda: client.request("POST", "/api/compose", data=_compose_payload(
@@ -2298,7 +2298,7 @@ def command_batch(args: argparse.Namespace) -> int:
             else f"drawing {index}/{len(lines)}"
         )
         if input_mode == "ddl":
-            input_text = args.original_text or line
+            input_text = args.description or line
             raw_result, _ = _run_with_progress(
                 f"{progress_label} from DDL",
                 lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
@@ -2937,7 +2937,7 @@ def command_refine(args: argparse.Namespace) -> int:
             derivation_kind = "catalog_change"
 
         params = {
-            "text": args.text or target.get("source_text") or target.get("input") or "",
+            "description": args.description or target.get("source_text") or target.get("input") or "",
             "save_history": args.save_history,
             "lineage_parent_node_id": parent_node_id,
             "derivation_kind": derivation_kind,
@@ -3029,7 +3029,7 @@ def command_inspect(args: argparse.Namespace) -> int:
     for model in models:
         print(f"Running inspection with model: {model}...")
         params = {
-            "text": args.text,
+            "description": args.text,
             "stage1_model": model,
             "stage2_model": model,
             "save_history": False,
@@ -3379,10 +3379,10 @@ def _add_common_server_args(parser: argparse.ArgumentParser) -> None:
 def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> None:
     _add_common_server_args(parser)
     if batch:
-        parser.add_argument("--file", "-f", required=True, help="UTF-8 text file; one prompt per non-empty line, or '-'")
+        parser.add_argument("--file", "-f", required=True, help="UTF-8 text file; one description per non-empty line, or '-'")
     else:
-        parser.add_argument("text", nargs="?", help="prompt text")
-        parser.add_argument("--file", "-f", help="read prompt text from a UTF-8 file, or '-'")
+        parser.add_argument("text", nargs="?", help="the description to draw")
+        parser.add_argument("--file", "-f", help="read the description from a UTF-8 file, or '-'")
     parser.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
@@ -3391,13 +3391,14 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         "--input-mode",
         choices=["paint", "ddl"],
         default="paint",
-        help="paint: natural-language prompt through Stage 1; ddl: normalized DDL directly through Stage 2/render",
+        help="paint: a natural-language description through Stage 1; ddl: normalized DDL directly through Stage 2/render",
     )
     parser.add_argument("--stage1-provider", choices=PROVIDERS)
     parser.add_argument("--stage1-model")
     parser.add_argument("--stage2-provider", choices=PROVIDERS)
     parser.add_argument("--stage2-model")
-    parser.add_argument("--original-text")
+    # 埋める先の鍵と同じ綴りにする。位置引数は Stage 1 が読む文字列、こちらは作者が書いた記述。
+    parser.add_argument("--description", help="the description the author wrote, when the positional text is not it")
     parser.add_argument("--history-input")
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
@@ -3421,7 +3422,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")
-        parser.add_argument("--composition-count", type=int, default=1, help="generate N Stage 1.5 variations per prompt")
+        parser.add_argument("--composition-count", type=int, default=1, help="generate N Stage 1.5 variations per description")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
@@ -3620,7 +3621,7 @@ def build_parser() -> argparse.ArgumentParser:
     refine_gen = refine_sub.add_parser("generate", help="generate a variation option from a work")
     refine_gen.add_argument("item_id", help="target history item ID to refine")
     refine_gen.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
-    refine_gen.add_argument("--text", help="override input text for layout/reading variations")
+    refine_gen.add_argument("--description", help="override the description for layout/reading variations")
     refine_gen.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
     refine_gen.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
     refine_gen.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")

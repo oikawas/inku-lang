@@ -1132,3 +1132,13 @@ The two things v2.7.10 missed, and the author's ruling (2026-07-27) that **the r
 - **The positional (`paint <text>`) does not move.** What you type there is the value, not the name.
 - **The version stays v2.8.0** (folded into the unpublished version). Only the build number moves, to 728.
 - **Verification (at Build 728).** server **1423 passed / 31 skipped**, cli **76 passed**, ruff clean, `npm run check` 0 errors / 2 warnings / 217 files.
+
+### 2026-07-27 — English documentation vocabulary (**no version**; documentation only)
+
+**README and `manual/en/` were swept against the dictionary, and only six places needed changing. The drift lives in the Japanese source, not in the English.**
+
+- **Six places where the English alone used the banned word `prompt`** now say `description`, or whatever the Japanese says. The Japanese counterparts read `指示`欄 / 記述文 / 指示文 / 短い言葉 / 入力テキスト / 指示文生成モデル — **not one of them says プロンプト**. That is English drifting on its own.
+- **The seven remaining `prompt`s are all sound**: two where the Japanese says プロンプト as well (the passage criticising generative AI, and the UI's JSON/prompt views), four where the word means **the model's prompt** (the Prompts panel, the `--prompt` flag), and **the filename `prompts.txt`** in a command example, which is an identifier and identical in both languages.
+- **`artwork` appears nowhere in README or `manual/en/`** — the handoff's note was inaccurate. It survives only in the **historical entries** of `CHANGELOG.md` and `PROJECT_CONTEXT.md`, which are not rewritten.
+- **The `generation`, `image` and `create` that remain are faithful translations of 生成, 画像 and 作る** in the Japanese (README.ja's もう一度生成 / による生成です / 生成後は歳時記を参照し; the manual's 画像の作成方法 / バッチ生成 / Stage 2が作る). **Moving the English to the dictionary alone would break the pairing**, so it is left for the author to rule on.
+- **`SPEC.md`'s seven `scene-tone palette`s are held back for the same reason** — no counterpart term is findable in `SPEC.ja.md`, and a translation should not be invented ahead of the source. **The three `jitter`s are sound**, being an identifier and the signal sense.

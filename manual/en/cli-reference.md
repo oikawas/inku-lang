@@ -83,7 +83,7 @@ Create or import variations derived from an existing parent work.
   Directly imports a locally adjusted Score JSON as a child node connected to a parent.
 
 ### 3. Model Inspection (inspect)
-Compare how different models interpret and draw the same prompt.
+Compare how different models interpret and draw the same description.
 
 ```sh
 uv run inku-cli inspect "Draw a blue line" --models "qwen/qwen3.5-397b-a17b,google/gemma-4-31b-it" -o ./inspection --png

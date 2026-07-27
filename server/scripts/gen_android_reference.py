@@ -1265,6 +1265,74 @@ def prompt_fixtures() -> None:
     (OUT / "prompts.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
+def count_preservation_fixtures() -> None:
+    """明示された個数が密度ガバナーと予算を素通りすることの期待値。
+
+    Android は `_with_context_density_governor` と 2 つの予算関数を
+    `LocalFallbackPipeline` へ移植しているが、v2.7.6 の「明示個数は免除する」が
+    入っていない。server 側の 50 ケースをそのまま渡し、**Android が移植した
+    3 関数だけ**を通した結果を焼く。coerce 全体ではないので apples-to-apples。
+    """
+    from inku_server.coerce.compose import _with_context_density_governor
+    from inku_server.coerce.normalize import (
+        _with_per_instruction_density_budget,
+        _with_total_density_budget,
+    )
+
+    source = json.loads(
+        (
+            pathlib.Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "count_preservation_cases.json"
+        ).read_text(encoding="utf-8")
+    )
+    cases = []
+    for case in source["cases"]:
+        score = Score.model_validate(case["score"])
+        instructions = _with_context_density_governor(
+            list(score.instructions),
+            ddl=case["ddl"],
+            background=score.background,
+        )
+        instructions = _with_per_instruction_density_budget(instructions)
+        instructions = _with_total_density_budget(instructions)
+        counts = [
+            (ins.arrangement.count if ins.arrangement is not None else 1)
+            for ins in instructions
+        ]
+        cases.append(
+            {
+                "id": case["id"],
+                "lang": case["lang"],
+                "kind": case["kind"],
+                "ddl": case["ddl"],
+                "requested": case["requested"],
+                "score": case["score"],
+                "expected_counts": counts,
+                "requested_survives": case["requested"] in counts,
+            }
+        )
+    literal = [case for case in cases if case["kind"] == "literal"]
+    represented = [case for case in cases if case["kind"] == "represented"]
+    out = {
+        "note": (
+            "Android が移植した 3 関数 (withContextDensityGovernor, "
+            "withPerInstructionDensityBudget, withTotalDensityBudget) を "
+            "この順で通した結果。expected_counts と完全一致すること。"
+            "literal は要求値がそのまま残り、represented は仕様の帯 80-120 へ代表化される。"
+            "**両方が要る** — 全部を素通しにすると represented が壊れ、"
+            "全部を代表化すると literal が壊れる。"
+        ),
+        "representative_count": source["representative_count"],
+        "requested_counts": source["requested_counts"],
+        "literal_total": len(literal),
+        "literal_requested_survives": sum(1 for case in literal if case["requested_survives"]),
+        "represented_total": len(represented),
+        "represented_counts": sorted({count for case in represented for count in case["expected_counts"]}),
+        "total": len(cases),
+        "cases": cases,
+    }
+    (OUT / "count_preservation.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
@@ -1276,6 +1344,7 @@ def main() -> None:
     fill_and_arc_fixtures()
     cloudform_and_relation_fixtures()
     ddl_expand_fixtures()
+    count_preservation_fixtures()
     prompt_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")

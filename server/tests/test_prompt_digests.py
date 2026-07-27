@@ -27,12 +27,12 @@ def empty_plugin_vocabulary(monkeypatch):
 @pytest.mark.parametrize(
     ("lang", "tenkei", "expected_bytes", "expected_digest"),
     [
-        ("ja", "auto", 17_971, "3000bee8a2e241d6"),
-        ("ja", "sparse", 18_281, "194d36c765218595"),
-        ("ja", "none", 18_353, "0f4495440b181fce"),
-        ("en", "auto", 16_850, "e680f73ee6fab57a"),
-        ("en", "sparse", 17_079, "ec03b0fbdd7e70ae"),
-        ("en", "none", 17_215, "65932837ce9e6c9e"),
+        ("ja", "auto", 17_989, "9c8064958c8e3960"),
+        ("ja", "sparse", 18_299, "9611bb45f60f8d84"),
+        ("ja", "none", 18_371, "13c6a78a48754fb1"),
+        ("en", "auto", 16_876, "aefd57e0c1b96d62"),
+        ("en", "sparse", 17_105, "5875b2dfbf8efaeb"),
+        ("en", "none", 17_241, "3e2aa70c5836b67f"),
     ],
 )
 def test_stage1_prompt_base_digest_expected_values(
@@ -54,9 +54,9 @@ def test_stage1_prompt_base_digest_expected_values(
 @pytest.mark.parametrize(
     ("text", "lang", "expected_bytes", "expected_digest"),
     [
-        ("中心に円を置く。", "ja", 18_658, "373b7cbf3134c8d5"),
-        ("雨上がりの水面に光が散る。", "ja", 18_806, "43b077215a31f374"),
-        ("Place one circle at the center.", "en", 17_524, "204745e66dcef798"),
+        ("中心に円を置く。", "ja", 18_676, "6e5f8516c79b585d"),
+        ("雨上がりの水面に光が散る。", "ja", 18_824, "61408791d3b6285f"),
+        ("Place one circle at the center.", "en", 17_550, "9260d3b7e9822f4b"),
     ],
 )
 def test_stage1_actual_prompt_digest_expected_values(
@@ -77,7 +77,7 @@ def test_stage1_base_digest_excludes_input_dependent_examples():
         "雨上がりの水面に光が散る。"
     )
     assert _digest(first_prompt) != _digest(second_prompt)
-    assert _digest(first_base) == _digest(second_base) == "3000bee8a2e241d6"
+    assert _digest(first_base) == _digest(second_base) == "9c8064958c8e3960"
 
 
 @pytest.mark.usefixtures("empty_plugin_vocabulary")
@@ -113,16 +113,16 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_795
-    assert _digest(composer.SYSTEM_PROMPT) == "1dd998b61016daf0"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_947
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "f7f202b29f16392a"
-    # render engine 15 で `ground.absorbency` を退役させた分だけ tool schema が縮む
-    # (18_021 -> 17_696)。系統プロンプト本文の 2 件は動いていない。
-    assert len(tool_json.encode("utf-8")) == 17_696
-    assert _digest(tool_json) == "c1f0297268da2bd2"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "d33cd2269158e84f"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "2665585415fec6df"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 42_824
+    assert _digest(composer.SYSTEM_PROMPT) == "ecd4fe5e3caafc60"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 40_989
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "1f4ecf4b698bf95b"
+    # `hair` -> `silverpoint` の改名で、Stage 2 の素材語対応表 2 行と作例 8 件、
+    # そして weight の enum と description が動いた。tool schema は 17_696 -> 17_713。
+    assert len(tool_json.encode("utf-8")) == 17_713
+    assert _digest(tool_json) == "297548040c697b68"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a1bb4ff70488fb35"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "397195ed887f6adb"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -175,8 +175,8 @@ def test_saijiki_word_changes_both_stage1_base_digests(monkeypatch):
         for category in original_categories
     )
     expected = {
-        "ja": (18_007, "7671738818af4a48"),
-        "en": (16_868, "75f2108fbcd9b4f2"),
+        "ja": (18_025, "dfed709447d38a7b"),
+        "en": (16_894, "7dedd64a7ce750be"),
     }
     for lang, prefix in (
         ("ja", interpreter.SYSTEM_PROMPT_PREFIX),
@@ -224,8 +224,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     changed_tool = replace_description(changed_tool)
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a9196f95581a9098"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "1dd998b61016daf0"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "ad1f5d9ada727d7a"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "ecd4fe5e3caafc60"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

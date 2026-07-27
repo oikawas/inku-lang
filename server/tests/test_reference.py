@@ -68,11 +68,13 @@ def test_saijiki_enums_match_schema() -> None:
 
 def test_saijiki_prose_categories_track_enum_sizes() -> None:
     saijiki = _ref()["saijiki"]
-    # てざわり (touches) covers the Weight enum except pruned vocabulary (v1.92:
-    # 髪/hair was removed from the saijiki while the enum keeps it for replay).
+    # てざわり (touches) covers the Weight enum exactly. v1.92 pruned 髪/hair from
+    # the saijiki while the enum kept it for replay; the 2026-07-27 rename to
+    # 銀筆/silverpoint put the word back, so the two sides line up again.
     weight_count = len(get_args(schema.Weight))
-    assert len(saijiki["core_categories_ja"]["てざわり"]) == weight_count - 1
-    assert "hair" in get_args(schema.Weight)
+    assert len(saijiki["core_categories_ja"]["てざわり"]) == weight_count
+    assert "silverpoint" in get_args(schema.Weight)
+    assert "hair" not in get_args(schema.Weight)
     # en form surfaces are Primitive values, minus polygon (collected in schema).
     forms_en = set(saijiki["core_categories_en"]["forms"])
     primitives = set(get_args(schema.Primitive))

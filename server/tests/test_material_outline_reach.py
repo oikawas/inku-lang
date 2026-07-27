@@ -7,8 +7,9 @@
 段 4b — `pen` は本体のストロークしか持たない。`_uses_material_outline()` は材質層
 3 機構のうち 1 つしか見ないので、この関数で数えると `raster-bleed` (computer) と
 `burr` (drypoint) を取り落とし、裸の道具を 4 つと誤る。実際に何も持たないのは
-`hair` と `pen` の 2 つだったが、**`hair` は全面廃止が決まったので層を与えない**
-(作者裁定 2026-07-27)。残る `pen` は本番 3261 instruction で 1 位である。
+`hair` と `pen` の 2 つだった。`hair` は 2026-07-27 に `silverpoint` へ改名された
+(全面廃止案は同日に退けられた) が、材質層は与えていない。残る `pen` は本番
+3261 instruction で 1 位である。
 """
 
 from __future__ import annotations
@@ -41,7 +42,7 @@ GEOMETRY: dict[str, dict] = {
 # engine 12 から数値が動いていない 5 道具。
 FROZEN_MATERIAL_TOOLS = ("pencil", "crayon", "chalk", "brush_thin", "brush_thick")
 BARE_TOOLS = ("pen",)
-NO_MATERIAL_OUTLINE = ("rotring", "computer", "drypoint", "burin", "hair")
+NO_MATERIAL_OUTLINE = ("rotring", "computer", "drypoint", "burin", "silverpoint")
 
 
 def _svg(primitive: str, weight: str, *, wild: bool = False) -> str:
@@ -161,10 +162,10 @@ def test_d9_the_other_tools_did_not_gain_a_material_outline(
     "primitive",
     ("line", "arc", "circle", "ellipse", "square", "triangle", "polygon", "cloudform"),
 )
-def test_d12_pen_leaves_two_strata_and_hair_none(primitive: str) -> None:
-    """D-12 (判別): `pen` = 2 本の穂先。`hair` は廃止予定なので 0 本のまま。"""
+def test_d12_pen_leaves_two_strata_and_silverpoint_none(primitive: str) -> None:
+    """D-12 (判別): `pen` = 2 本の穂先。`silverpoint` は材質層を持たないので 0 本。"""
     assert _outline_count(primitive, "pen") == 2
-    assert _outline_count(primitive, "hair") == 0
+    assert _outline_count(primitive, "silverpoint") == 0
 
 
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
@@ -230,7 +231,7 @@ def test_every_stratum_rides_the_ink_it_belongs_to() -> None:
     """材質輪郭は墨の帯に沿う — 帯の実測半幅の 3 倍より遠くへは出ない。
 
     engine 14 まで強度レベル s1 が `outline_offset` に 2.8 倍と 3.5px の下限を
-    掛けており、痕跡は帯の半幅の 4.5 倍 (pencil)・6.5 倍 (chalk)・14 倍 (hair) まで
+    掛けており、痕跡は帯の半幅の 4.5 倍 (pencil)・6.5 倍 (chalk)・14 倍 (silverpoint) まで
     離れて、痕跡でなく別の輪郭に見えていた。engine 15 で距離側の倍率と下限を
     外し、強さは濃さ (`outline_opacity` の 1.8 と下限 0.50) だけで持つ。
 

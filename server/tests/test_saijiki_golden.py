@@ -3,8 +3,9 @@
 fixture (tests/fixtures/prompts/) は構造化前 (Build 591 / v1.91 クローズ時点) の
 Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪と語順修正のみ:
 
-- ja: 「髪、」「髪・」の除去 (P0-3)、「描く、」×2 の除去 (P0-2b) — 2026-07-18
-- en: "hair, " ×2 の除去 (P0-3) — 2026-07-18
+- ja: 「描く、」×2 の除去 (P0-2b) — 2026-07-18
+- ja/en: 「髪」→「銀筆」/ "hair" -> "silverpoint" の改名 (2026-07-27)。P0-3 で削剪した
+  語だが、画材として存在しない名前だったのが理由なので、改名して語彙へ戻した
 - en: うごき の語順を日本語と同順へ修正 (2026-07-22)。web の歳時記パネルは
   両言語の表示リストを位置で突き合わせるため、引く=draw / 埋める=fill の対応が
   二言語語エントリから同順で導出される必要がある
@@ -22,15 +23,18 @@ from inku_server.plugins.document_format import _CORE_MARKERS, _SAIJIKI_MARKERS,
 _FIXTURES = Path(__file__).parent / "fixtures" / "prompts"
 
 # (置換対象, 期待出現回数)。回数を固定して、意図しない箇所への波及を検出する。
-_ALLOWED_JA = (("髪、", 1), ("髪・", 1), ("描く、", 2))
-_ALLOWED_EN = (("hair, ", 2),)
+_ALLOWED_JA = (("描く、", 2),)
+_ALLOWED_EN: tuple[tuple[str, int], ...] = ()
 
 # (置換対象, 置換後, 期待出現回数)。削剪では表せない許可差分 (語順修正)。
 _REORDERED_JA = (
+    ("髪、", "銀筆、", 1),
+    ("髪・", "銀筆・", 1),
     ("ビュラン・ドライポイントのいずれか", "ビュラン・ドライポイント・コンピュータのいずれか", 1),
     ("ビュラン、ドライポイント\n", "ビュラン、ドライポイント、コンピュータ\n", 1),
 )
 _REORDERED_EN = (
+    ("hair, ", "silverpoint, ", 2),
     ("line-up, fill, scatter, draw, tile", "line-up, draw, scatter, fill, tile", 1),
     ("burin, or drypoint.", "burin, drypoint, or computer.", 1),
     ("burin, drypoint\n", "burin, drypoint, computer\n", 1),
@@ -90,7 +94,7 @@ _EXPECTED_CORE_MARKERS = {
         "線", "円", "楕円", "三角", "四角", "多角形", "弧", "雲形",
         "置く", "引く", "並べる", "散らす", "敷き詰める", "埋める",  # 描く 削剪
         "触れる", "沿う", "切る", "触れない", "間に",
-        "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ",  # 髪 削剪
+        "銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ",
         "白", "黒", "青", "赤", "緑", "灰",
         "細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む",
         "水平", "垂直", "斜め", "右上がり", "右下がり", "回転",
@@ -102,7 +106,7 @@ _EXPECTED_CORE_MARKERS = {
         "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform",
         "place", "draw", "arrange", "scatter", "tile", "fill",
         "touching", "along", "cutting", "not touching", "between",
-        "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer",  # hair 削剪
+        "silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer",
         "white", "black", "blue", "red", "green", "gray",
         "fine", "large", "slowly", "quickly", "swaying", "undulating", "trembling", "blurring",
         "horizontal", "vertical", "diagonal", "rising", "falling", "rotated",
@@ -126,7 +130,9 @@ def test_shape_markers_match_golden() -> None:
 def test_saijiki_marker_table_excludes_pruned_words() -> None:
     assert "髪" not in _SAIJIKI_MARKERS["material"]["ja"]
     assert "hair" not in _SAIJIKI_MARKERS["material"]["en"]
-    assert _SAIJIKI_MARKERS["material"]["ja"][0] == "鉛筆"
+    # 銀筆 は 2026-07-27 に語彙へ戻したので、材質マーカーの先頭に立つ。
+    assert _SAIJIKI_MARKERS["material"]["ja"][0] == "銀筆"
+    assert _SAIJIKI_MARKERS["material"]["en"][0] == "silverpoint"
 
 
 def test_relation_literal_markers_match_golden() -> None:
@@ -160,6 +166,7 @@ def test_prompt_parse_equals_table_reference() -> None:
 
 def test_display_categories_exclude_pruned_and_hidden_words() -> None:
     for lang, pruned, hidden in (("ja", {"髪", "描く"}, {"多角形"}), ("en", {"hair"}, {"polygon"})):
+        # 「髪」/"hair" はどの表面としても残らない — 改名であって併存ではない。
         categories = saijiki.display_categories(lang)
         words = {word for category in categories for word in category["words"]}
         assert not (pruned & words)

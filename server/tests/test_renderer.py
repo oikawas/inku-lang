@@ -1631,7 +1631,9 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # engine 11 と同じ 1444 個で、動いたのは値だけである。
     # engine 10 まではこのダイジェストが素のバイト列だったため macOS でしか通らな
     # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
-    assert digest == "75afbfb92840cc922e87edd598c25b45937e7d651aaf6d9c806ade157636f33e"
+    # engine 15 (演奏 seed の allowlist 化 + 材質輪郭の距離是正) で再採取。
+    # ここは既定 weight の pen を使うので、pen が材質輪郭を持った分も入っている。
+    assert digest == "a822b5cf5eb09d9b8176d3b79f7d9f94890a9421c2956dad069b2983ac49cc67"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

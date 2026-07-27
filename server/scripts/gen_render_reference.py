@@ -27,13 +27,17 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-25"
+FROZEN_AT = "2026-07-27"
 REASON = (
-    "One drawing, one lattice: the quantized grid is now the canvas's paper, so its "
-    "pitch no longer follows the length of what is drawn on it. The wild toggle "
-    "reaches past straight lines to contours, arcs, fills and hatches, and where it "
-    "does, the material outline is drawn from the performed centreline instead of "
-    "the geometry it left behind."
+    "The seed of a mark is made only of what makes it physically another mark, so "
+    "where it sits, what it relates to and what it is annotated with no longer "
+    "change the hand. The ground's seed names the paper - material and grain - so "
+    "raising the opacity darkens the same sheet instead of dealing a new one, and "
+    "absorbency, which nothing ever read, is retired. cloudform joins the road every "
+    "other closed contour takes, so the material layer and the wild toggle reach it. "
+    "The corner shapes and the pen gain the material layer they never had. And "
+    "strength stops being distance: the outline offset multiplier and its floor are "
+    "gone, so every stratum rides the ink at the distance its own table always named."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345

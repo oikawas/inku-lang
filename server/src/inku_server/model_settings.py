@@ -224,7 +224,11 @@ def default_user_model_settings() -> dict[str, Any]:
         "stage2_model": "google/gemma-4-31b-it",
         "vision_provider": "nvidia",
         "vision_model": "meta/llama-3.2-90b-vision-instruct",
-        "okugaki_model": "nvidia:meta/llama-3.2-90b-vision-instruct",
+        # v2.9.1: okugaki used to keep one qualified string while every other
+        # stage kept a (provider, model) pair. The pair is the canonical form;
+        # the single string is still read (see normalize_user_model_settings).
+        "okugaki_provider": "nvidia",
+        "okugaki_model": "meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models": [],
         "instruction_caption_visible": True,
     }
@@ -342,17 +346,32 @@ def _normalize_selected_model_ids(value: Any) -> list[str]:
     return clean
 
 
+_USER_PROVIDER_KEYS = ("stage1_provider", "stage2_provider", "vision_provider", "okugaki_provider")
+_USER_MODEL_KEYS = ("stage1_model", "stage2_model", "vision_model", "okugaki_model")
+
+
 def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     default = default_user_model_settings()
     if not isinstance(settings, dict):
         return default
     clean = dict(default)
-    for key in ("stage1_provider", "stage2_provider", "vision_provider"):
+    for key in _USER_PROVIDER_KEYS:
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = str(settings[key])
-    for key in ("stage1_model", "stage2_model", "vision_model", "okugaki_model"):
+    for key in _USER_MODEL_KEYS:
         if isinstance(settings.get(key), str) and settings[key].strip():
             clean[key] = settings[key].strip()
+    # v2.9.1: read both shapes, write the pair. Values stored before the pair
+    # existed carry the provider inside okugaki_model ("openai:gpt-4.1-mini").
+    # The prefix is authoritative when present because it is what the picker
+    # actually wrote. Only builtin provider ids are recognised here: this
+    # function is called once per user row and must not read the stored
+    # catalog. A custom provider's qualified value simply stays a single
+    # string, which qualify_model_ref() then leaves alone.
+    okugaki_prefix, okugaki_bare = split_model_ref(str(clean["okugaki_model"]), None)
+    if okugaki_prefix:
+        clean["okugaki_provider"] = okugaki_prefix
+        clean["okugaki_model"] = okugaki_bare
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
     clean["instruction_caption_visible"] = settings.get("instruction_caption_visible") is not False
     return clean
@@ -360,10 +379,10 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
 
 def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, Any]) -> dict[str, Any]:
     clean = normalize_user_model_settings(current)
-    for key in ("stage1_provider", "stage2_provider", "vision_provider"):
+    for key in _USER_PROVIDER_KEYS:
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = str(patch[key])
-    for key in ("stage1_model", "stage2_model", "vision_model", "okugaki_model"):
+    for key in _USER_MODEL_KEYS:
         if isinstance(patch.get(key), str) and patch[key].strip():
             clean[key] = patch[key].strip()
     if "instruction_caption_visible" in patch:
@@ -504,23 +523,87 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
     return normalize_model_settings(clean)
 
 
+def _known_provider_ids(settings: dict[str, Any] | None) -> set[str]:
+    """Provider ids the reference may be qualified with.
+
+    A dict carrying "providers" is taken as a catalog and read directly rather
+    than normalized: normalize_model_settings() deep-copies the whole catalog,
+    and splitting a reference only needs the keys.
+    """
+    if isinstance(settings, dict) and isinstance(settings.get("providers"), dict):
+        return {str(provider_id) for provider_id in settings["providers"]}
+    return set(BUILTIN_PROVIDER_IDS)
+
+
+def split_model_ref(ref: str, settings: dict[str, Any] | None) -> tuple[str | None, str]:
+    """Split "provider:model"; return (None, ref) when it is not qualified.
+
+    _normalize_provider_id keeps only [a-z0-9_-], so a provider id can never
+    contain ":". The first colon is therefore the only possible split point and
+    the model id is free to carry as many colons as it likes -- "gpt-oss:20b"
+    and "qwen3.5:4b-q4_K_M" both survive the round trip.
+    """
+    text = str(ref or "")
+    index = text.find(":")
+    if index <= 0:
+        return None, text
+    head, rest = text[:index], text[index + 1 :]
+    if rest and head in _known_provider_ids(settings):
+        return head, rest
+    return None, text
+
+
+def qualify_model_ref(provider: str, ref: str, settings: dict[str, Any] | None) -> str:
+    """Prefix the provider unless the reference is already qualified.
+
+    The test is "qualified by a known provider", not "starts with my own id",
+    so passing a reference that names a different provider leaves it alone
+    instead of producing "ollama:ollama-cloud:gemma4:31b".
+    """
+    clean_provider = str(provider or "").strip()
+    clean_ref = str(ref or "").strip()
+    if not clean_provider or not clean_ref:
+        return clean_ref
+    known, _ = split_model_ref(clean_ref, settings)
+    return clean_ref if known else f"{clean_provider}:{clean_ref}"
+
+
+def _providers_owning_model(model_id: str, catalog: dict[str, Any]) -> list[str]:
+    owners: list[str] = []
+    for provider_id, provider in catalog.get("providers", {}).items():
+        if not provider.get("active", True):
+            continue
+        if any(str(model.get("id")) == model_id for model in provider.get("models", [])):
+            owners.append(str(provider_id))
+    return owners
+
+
 def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any]) -> tuple[str, str]:
+    """Resolve a model reference to (provider, model). Three rules, no guessing.
+
+    1. explicit qualification wins
+    2. sole ownership -- exactly one configured provider lists this model id
+    3. the stage default
+
+    Rule 2 must be *exactly* one: "gpt-oss:20b" is offered by both ollama and
+    ollama-cloud, so nothing in the string can decide between them and the
+    reference falls to rule 3 rather than being guessed. There is deliberately
+    no default landing provider; the old rules sent everything unrecognised to
+    ovms, whose endpoint answers /health long after it stops serving models.
+    """
+    stage_key = "stage1_provider" if stage == "stage1" else "stage2_provider"
     if not model:
         clean = normalize_user_model_settings(settings)
-        provider_id = clean["stage1_provider"] if stage == "stage1" else clean["stage2_provider"]
         model_id = clean["stage1_model"] if stage == "stage1" else clean["stage2_model"]
-        return str(provider_id), str(model_id)
-    if ":" in model:
-        prefix, model_id = model.split(":", 1)
-        if prefix in normalize_model_settings(settings)["providers"] and model_id:
-            return prefix, model_id
-    if model.startswith("anthropic:"):
-        return "anthropic", model.removeprefix("anthropic:")
-    if model.startswith("gemini-"):
-        return "gemini", model
-    if "/" in model:
-        return "nvidia", model
-    return "ovms", model
+        return str(clean[stage_key]), str(model_id)
+    catalog = normalize_model_settings(settings)
+    provider_id, model_id = split_model_ref(model, catalog)
+    if provider_id:
+        return provider_id, model_id
+    owners = _providers_owning_model(model, catalog)
+    if len(owners) == 1:
+        return owners[0], model
+    return str(normalize_user_model_settings(settings)[stage_key]), model
 
 
 def provider_concurrency_limit(provider_id: str) -> int:

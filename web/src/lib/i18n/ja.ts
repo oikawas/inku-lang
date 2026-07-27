@@ -468,7 +468,7 @@ export const ja: LangPack = {
 	settingsModelAddServiceButton: 'サービス追加',
 	settingsModelEditServiceTitle: 'AIサービス名を編集',
 	settingsModelServiceId: 'サービスID',
-	settingsModelServiceIdHelp: 'サービスIDは、内部的にそのAIサービスを識別するための一意なキーです。\n用途: DB内の接続設定キー、Stage 1 / Stage 2 の接続先参照、API呼び出し時の provider 判定、同名サービスの重複防止。\n画面に見せる名前は「サービス名」です。サービスIDは変更に弱い内部IDなので、英数字とハイフン中心で、あとから変えない前提の短い名前にしてください。\n例: openai, anthropic, gemini, ollama, ovms, my-openai, local-qwen',
+	settingsModelServiceIdHelp: 'サービスIDは、内部的にそのAIサービスを識別するための一意なキーです。\n用途: DB内の接続設定キー、Stage 1 / Stage 2 の接続先参照、API呼び出し時の provider 判定、同名サービスの重複防止。\n画面に見せる名前は「サービス名」です。サービスIDは変更に弱い内部IDなので、英数字とハイフン中心で、あとから変えない前提の短い名前にしてください。\nモデル名の先頭と同じIDは避けてください。「サービスID:モデル」の形で書くとき、最初のコロンまでがサービスIDとして読まれます。\n例: openai, anthropic, gemini, ollama, ovms, my-openai, local-qwen',
 	settingsModelServiceName: 'サービス名',
 	settingsModelServiceKind: '接続形式',
 	settingsModelRequiresApiKey: 'APIキーが必要',

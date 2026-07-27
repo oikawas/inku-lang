@@ -1,0 +1,285 @@
+{
+  "note": [
+    "Model reference resolution, asserted by both languages from this one file.",
+    "server/tests/test_model_ref_qualification.py and web/scripts/model-ref-check.mjs",
+    "read it; the server test also checks that `catalog` still equals",
+    "default_model_settings(), so the table cannot drift away from the product.",
+    "Rules: 1 explicit qualification, 2 sole ownership among active providers,",
+    "3 the stage default. There is no guessing and no default landing provider."
+  ],
+  "catalog": {
+    "openai": [
+      "gpt-5.1",
+      "gpt-5.1-mini",
+      "gpt-4.1",
+      "gpt-4.1-mini"
+    ],
+    "anthropic": [
+      "claude-opus-4-7",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5-20251001"
+    ],
+    "gemini": [
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite"
+    ],
+    "nvidia": [
+      "mistralai/mistral-nemotron",
+      "meta/llama-3.1-70b-instruct",
+      "meta/llama-3.2-3b-instruct",
+      "qwen/qwen3-next-80b-a3b-instruct",
+      "poolside/laguna-xs-2.1",
+      "nvidia/ising-calibration-1-35b-a3b",
+      "nvidia/llama-3.3-nemotron-super-49b-v1",
+      "nvidia/nemotron-nano-12b-v2-vl",
+      "google/gemma-4-31b-it",
+      "meta/llama-3.3-70b-instruct",
+      "mistralai/mistral-large-3-675b-instruct-2512",
+      "qwen/qwen3.5-397b-a17b",
+      "z-ai/glm-5.2",
+      "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+      "deepseek-ai/deepseek-v4-flash",
+      "openai/gpt-oss-120b",
+      "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      "minimaxai/minimax-m3",
+      "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+      "deepseek-ai/deepseek-v4-pro",
+      "minimaxai/minimax-m2.7",
+      "nvidia/nemotron-3-super-120b-a12b",
+      "bytedance/seed-oss-36b-instruct",
+      "nvidia/nvidia-nemotron-nano-9b-v2",
+      "meta/llama-3.1-8b-instruct",
+      "mistralai/mistral-medium-3.5-128b",
+      "mistralai/mistral-small-4-119b-2603",
+      "nvidia/nemotron-3-ultra-550b-a55b",
+      "mistralai/mixtral-8x7b-instruct-v0.1",
+      "openai/gpt-oss-20b",
+      "stepfun-ai/step-3.7-flash",
+      "google/gemma-3n-e2b-it",
+      "google/gemma-3n-e4b-it",
+      "meta/llama-3.2-11b-vision-instruct",
+      "nvidia/nemotron-3-nano-30b-a3b",
+      "meta/llama-3.2-1b-instruct",
+      "meta/llama-3.2-90b-vision-instruct",
+      "meta/llama-4-maverick-17b-128e-instruct",
+      "mistralai/ministral-14b-instruct-2512",
+      "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "stepfun-ai/step-3.5-flash",
+      "thinkingmachines/inkling",
+      "qwen/qwen3.5-122b-a10b",
+      "qwen/qwen3-coder-480b-a35b-instruct"
+    ],
+    "ollama": [
+      "llama3.2",
+      "gpt-oss:20b",
+      "qwen3:8b"
+    ],
+    "ollama-cloud": [
+      "gemma4:31b",
+      "deepseek-v4-flash",
+      "deepseek-v4-pro",
+      "glm-5.1",
+      "glm-5.2",
+      "gpt-oss:20b",
+      "gpt-oss:120b",
+      "kimi-k2.5",
+      "kimi-k2.6",
+      "kimi-k2.7-code",
+      "minimax-m2.5",
+      "minimax-m2.7",
+      "minimax-m3",
+      "mistral-large-3:675b",
+      "nemotron-3-nano:30b",
+      "nemotron-3-super",
+      "nemotron-3-ultra",
+      "qwen3.5:397b"
+    ],
+    "ovms": [
+      "qwen3-api",
+      "qwen-api",
+      "gemma3-12b-api",
+      "gemma3-4b-api"
+    ]
+  },
+  "stage_defaults": {
+    "stage1_provider": "nvidia",
+    "stage2_provider": "nvidia"
+  },
+  "cases": [
+    {
+      "ref": "nvidia:google/gemma-4-31b-it",
+      "provider": "nvidia",
+      "model": "google/gemma-4-31b-it",
+      "rule": "explicit"
+    },
+    {
+      "ref": "ollama:gpt-oss:20b",
+      "provider": "ollama",
+      "model": "gpt-oss:20b",
+      "rule": "explicit"
+    },
+    {
+      "ref": "ollama-cloud:gpt-oss:20b",
+      "provider": "ollama-cloud",
+      "model": "gpt-oss:20b",
+      "rule": "explicit"
+    },
+    {
+      "ref": "ollama-cloud:gemma4:31b",
+      "provider": "ollama-cloud",
+      "model": "gemma4:31b",
+      "rule": "explicit"
+    },
+    {
+      "ref": "google/gemma-4-31b-it",
+      "provider": "nvidia",
+      "model": "google/gemma-4-31b-it",
+      "rule": "sole"
+    },
+    {
+      "ref": "gemini-2.5-pro",
+      "provider": "gemini",
+      "model": "gemini-2.5-pro",
+      "rule": "sole"
+    },
+    {
+      "ref": "qwen-api",
+      "provider": "ovms",
+      "model": "qwen-api",
+      "rule": "sole"
+    },
+    {
+      "ref": "llama3.2",
+      "provider": "ollama",
+      "model": "llama3.2",
+      "rule": "sole"
+    },
+    {
+      "ref": "gemma4:31b",
+      "provider": "ollama-cloud",
+      "model": "gemma4:31b",
+      "rule": "sole"
+    },
+    {
+      "ref": "claude-opus-4-7",
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "rule": "sole"
+    },
+    {
+      "ref": "gpt-oss:20b",
+      "provider": "nvidia",
+      "model": "gpt-oss:20b",
+      "rule": "stage",
+      "why": "ollama and ollama-cloud both offer it; nothing in the string decides"
+    },
+    {
+      "ref": "qwen3.5:4b-q4_K_M",
+      "provider": "nvidia",
+      "model": "qwen3.5:4b-q4_K_M",
+      "rule": "stage",
+      "why": "no catalog lists it; the ollama catalog holds only llama3.2, gpt-oss:20b, qwen3:8b"
+    },
+    {
+      "ref": "meta/llama-x",
+      "provider": "nvidia",
+      "model": "meta/llama-x",
+      "rule": "stage",
+      "why": "used to be nvidia because of the slash; now the stage default, which happens to be nvidia too"
+    },
+    {
+      "ref": "my-model",
+      "provider": "nvidia",
+      "model": "my-model",
+      "rule": "stage",
+      "why": "used to land on ovms; this is the one behaviour the new rules change"
+    }
+  ],
+  "stage_dependent": {
+    "note": "Rule 3 reads the stage, so the same reference resolves differently per stage.",
+    "stage_defaults": {
+      "stage1_provider": "ollama",
+      "stage2_provider": "anthropic"
+    },
+    "cases": [
+      {
+        "ref": "my-model",
+        "stage1": "ollama",
+        "stage2": "anthropic"
+      },
+      {
+        "ref": "gpt-oss:20b",
+        "stage1": "ollama",
+        "stage2": "anthropic"
+      },
+      {
+        "ref": "llama3.2",
+        "stage1": "ollama",
+        "stage2": "ollama",
+        "why": "rule 2 wins before the stage is consulted"
+      }
+    ]
+  },
+  "ambiguity": {
+    "note": "Rule 2 demands exactly one owner. Removing one owner makes it decide again.",
+    "ref": "gpt-oss:20b",
+    "owners": [
+      "ollama",
+      "ollama-cloud"
+    ],
+    "deactivate": "ollama",
+    "provider_when_deactivated": "ollama-cloud"
+  },
+  "qualify": [
+    {
+      "provider": "ollama",
+      "ref": "gemma4:31b",
+      "expected": "ollama:gemma4:31b"
+    },
+    {
+      "provider": "ollama",
+      "ref": "ollama-cloud:gemma4:31b",
+      "expected": "ollama-cloud:gemma4:31b",
+      "why": "already qualified by a known provider; must not become ollama:ollama-cloud:..."
+    },
+    {
+      "provider": "ollama",
+      "ref": "ollama:gpt-oss:20b",
+      "expected": "ollama:gpt-oss:20b"
+    },
+    {
+      "provider": "ollama",
+      "ref": "qwen3.5:4b-q4_K_M",
+      "expected": "ollama:qwen3.5:4b-q4_K_M",
+      "why": "qwen3.5 is not a provider id, so the colon belongs to the model"
+    }
+  ],
+  "round_trip": [
+    {
+      "provider": "ollama-cloud",
+      "model": "gemma4:31b"
+    },
+    {
+      "provider": "ollama",
+      "model": "gpt-oss:20b"
+    },
+    {
+      "provider": "ollama",
+      "model": "qwen3.5:4b-q4_K_M"
+    },
+    {
+      "provider": "nvidia",
+      "model": "google/gemma-4-31b-it"
+    }
+  ],
+  "never_ovms": {
+    "note": "The old rules sent everything unrecognised to ovms, whose endpoint answers /health long after it stops serving models.",
+    "refs": [
+      "my-model",
+      "qwen3.5:4b-q4_K_M",
+      "gpt-oss:20b",
+      "totally-unknown-model"
+    ]
+  }
+}

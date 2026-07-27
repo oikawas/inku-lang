@@ -445,7 +445,11 @@ def test_current_user_model_selection_is_persisted(auth_context):
     assert updated.json()["model_settings"]["stage1_provider"] == "openai"
     assert updated.json()["model_settings"]["stage2_model"] == "gemini:gemini-2.5-flash"
     assert updated.json()["model_settings"]["vision_model"] == "meta/llama-3.2-90b-vision-instruct"
-    assert updated.json()["model_settings"]["okugaki_model"] == "openai:gpt-4.1-mini"
+    # v2.9.1: okugaki is stored as a (provider, model) pair like every other
+    # stage. A single qualified string sent by an older client is still read;
+    # it is split on the way in and written back as the pair.
+    assert updated.json()["model_settings"]["okugaki_provider"] == "openai"
+    assert updated.json()["model_settings"]["okugaki_model"] == "gpt-4.1-mini"
     assert updated.json()["model_settings"]["model_inspection_selected_models"] == []
 
     comparison_models = [
@@ -475,7 +479,8 @@ def test_current_user_model_selection_is_persisted(auth_context):
     assert me.status_code == 200
     assert me.json()["model_settings"]["stage1_model"] == "openai:gpt-5.1-mini"
     assert me.json()["model_settings"]["vision_provider"] == "nvidia"
-    assert me.json()["model_settings"]["okugaki_model"] == "openai:gpt-4.1-mini"
+    assert me.json()["model_settings"]["okugaki_provider"] == "openai"
+    assert me.json()["model_settings"]["okugaki_model"] == "gpt-4.1-mini"
     assert me.json()["model_settings"]["model_inspection_selected_models"] == [
         "nvidia:google/gemma-4-31b-it",
         "openai:gpt-5.1",
@@ -579,6 +584,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     body = {
         "save_db": True,
         "save_files": False,
+        "prompt_provider": "nvidia",
         "prompt_model": "meta/llama-3.3-70b-instruct",
         "seed_phrase": "短い冬の情景を生成",
         "interval_seconds": 45,
@@ -592,6 +598,17 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     persisted = client.get("/api/auth/me/demo-settings", headers=headers)
     assert persisted.status_code == 200
     assert persisted.json() == body
+
+    # v2.9.1: the demo prompt model is a pair too. A client that still sends one
+    # qualified string is read, and the pair comes back.
+    legacy = client.put(
+        "/api/auth/me/demo-settings",
+        headers=headers,
+        json={**body, "prompt_provider": "nvidia", "prompt_model": "ollama:gpt-oss:20b"},
+    )
+    assert legacy.status_code == 200
+    assert legacy.json()["prompt_provider"] == "ollama"
+    assert legacy.json()["prompt_model"] == "gpt-oss:20b"
 
     invalid = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "interval_seconds": 0})
     assert invalid.status_code == 422

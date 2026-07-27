@@ -369,6 +369,9 @@ _LOG_RETENTION_DEFAULT_SETTINGS = {
 _DEMO_DEFAULT_SETTINGS = {
     "save_db": False,
     "save_files": False,
+    # v2.9.1: the provider is kept beside the model, as every stage does. The
+    # picker used to hand over a provider that was thrown away here.
+    "prompt_provider": "nvidia",
     "prompt_model": "google/gemma-4-31b-it",
     "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
     "interval_seconds": 30,
@@ -2473,11 +2476,24 @@ def _normalize_demo_settings(settings: dict) -> dict:
         clean["save_files"] = bool(settings["save_files"])
     if "random_color_catalog" in settings:
         clean["random_color_catalog"] = bool(settings["random_color_catalog"])
+    if "prompt_provider" in settings:
+        provider = settings["prompt_provider"]
+        if not isinstance(provider, str) or not provider.strip():
+            raise ValueError("demo prompt provider is required")
+        clean["prompt_provider"] = provider.strip()
     if "prompt_model" in settings:
         model = settings["prompt_model"]
         if not isinstance(model, str) or not model.strip():
             raise ValueError("demo prompt model is required")
         clean["prompt_model"] = model.strip()
+    # Values stored before prompt_provider existed carry the provider inside
+    # prompt_model. Read both shapes, write the pair.
+    from .model_settings import split_model_ref
+
+    prompt_prefix, prompt_bare = split_model_ref(str(clean["prompt_model"]), None)
+    if prompt_prefix:
+        clean["prompt_provider"] = prompt_prefix
+        clean["prompt_model"] = prompt_bare
     if "seed_phrase" in settings:
         phrase = settings["seed_phrase"]
         if not isinstance(phrase, str):

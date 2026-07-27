@@ -3524,6 +3524,25 @@ def _offset_performed_path(
     ]
 
 
+def _closed_path_length(path: list[tuple[float, float]]) -> float:
+    """閉じた折れ線の周長 (px)。粒の個数を周長比例で決めるのに使う。"""
+    if len(path) < 2:
+        return 0.0
+    return sum(
+        math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(path, path[1:] + path[:1])
+    )
+
+
+def _points_center(path: list[tuple[float, float]]) -> tuple[float, float]:
+    """法線の向きを多数決で決めるための図形中心。厳密な重心である必要はない。"""
+    if not path:
+        return (0.0, 0.0)
+    return (
+        sum(x for x, _ in path) / len(path),
+        sum(y for _, y in path) / len(path),
+    )
+
+
 def _add_material_performed_outline(
     dwg: svgwrite.Drawing,
     group,
@@ -4357,7 +4376,7 @@ def _render_corner_shape(
     group.add(dwg.polygon(points=points, **body_attrs))
     if fill_group is not None:
         group.add(fill_group)
-    contour_group, _performed = _render_contour_hand_stroke(
+    contour_group, performed = _render_contour_hand_stroke(
         dwg,
         ins,
         contour,
@@ -4369,6 +4388,24 @@ def _render_corner_shape(
         wild=wild,
     )
     group.add(contour_group)
+    # engine 15: この関数には材質輪郭の呼び出しが無かったので、triangle と polygon
+    # だけが 5 道具すべてで裸のまま残っていた (square は自前の分岐に持っている)。
+    # 角のある閉図形に幾何版の輪郭ヘルパーは無いため、演奏後の中心線から引く。
+    # wild の有無で作り方を変えないのは、ここに凍結された幾何版が無く、engine 14 の
+    # 教訓 (材質が墨から離れる) をそのまま適用できるからである。
+    if _uses_material_outline(ins.weight):
+        _add_material_performed_outline(
+            dwg,
+            group,
+            ins,
+            attrs,
+            performed,
+            canvas,
+            render_seed,
+            closed=True,
+            path_len_px=_closed_path_length(performed),
+            center=_points_center(points),
+        )
     return _apply_rotation(group, ins, canvas)
 
 
@@ -4632,7 +4669,7 @@ def _render_instruction(
         if fill_group is not None:
             group.add(fill_group)
         if hand:
-            contour_group, _performed = _render_contour_hand_stroke(
+            contour_group, performed = _render_contour_hand_stroke(
                 dwg,
                 ins,
                 sampled,
@@ -4644,6 +4681,19 @@ def _render_instruction(
                 wild=wild,
             )
             group.add(contour_group)
+            if _uses_material_outline(ins.weight):
+                _add_material_performed_outline(
+                    dwg,
+                    group,
+                    ins,
+                    attrs,
+                    performed,
+                    canvas,
+                    render_seed,
+                    closed=True,
+                    path_len_px=_closed_path_length(performed),
+                    center=_points_center(sampled),
+                )
         return _apply_rotation(group, ins, canvas)
 
     if ins.primitive == "square":

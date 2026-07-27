@@ -920,7 +920,9 @@ def test_render_textured_pink_variation_keeps_valid_svg_filter_attribute():
     svg = render(score)
     ElementTree.fromstring(svg)
     # v2.2 (engine 8): 塗り本体と輪郭の帯がそれぞれ質感 filter を持つ。
-    assert svg.count('filter="url(#texture-chalk)"') == 2
+    # engine 15 で triangle にも材質輪郭が届いた分だけ 2 つ増え、square / circle と
+    # 同じ 4 になった (どちらも以前から 4 だった)。
+    assert svg.count('filter="url(#texture-chalk)"') == 4
     assert svg.count('filter="url(#blur-medium)"') == 0
 
 

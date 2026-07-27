@@ -3097,3 +3097,20 @@ docs のみ。コード・描画・API は無変更で、`render_engine_version`
 - **`hair` の材質層は与えたうえで撤去した**（作者裁定「`hair` の全面廃止が妥当」）。廃止される道具に層を足しても削られるだけなので、段 4b は `pen` のみになった。**廃止本体は別契約**
 - **範囲の限定**: 「count を変えても筆致が保たれる」は **`layout="scatter"` のときだけ**成立する。`horizontal` / `vertical` / `radial` / `grid` では 12 → 13 で先頭 12 本も動く。種の漏れではなく、**区間を個数で割る配置では位置が動くのが当然**である
 - **検証:** server **1402 passed / 30 skipped**（着手時 1268 / 6 failed / 30）、cli **69 passed**、ruff clean、`npm run check` 0 errors / 2 warnings / 217 files。**生成器を 2 回回して凍結物がバイト一致**（CI のガードが通る状態）
+
+---
+
+### v2.7.9 — 銀筆（Build 718、2026-07-27）
+
+**`hair` は筆ではなかった。** 0.5px・stiffness 0.93・energy_width 0.08 という値は、手の道具のなかで最も細く最も揺れない線であり、それは**銀筆**の物理である。engine 15 では「全面廃止」と裁定されていたが、**廃止すると `pencil` に寄せることになり線が 3 倍太くなる**ため、作者裁定が**改名**へ変わった（2026-07-27）。
+
+- **改名は絵を動かす。** 演奏 seed の材料に `weight` が入っているので、道具名の文字列が変われば同じ Score が別の演奏になる。**`A-hair-line` と `A-silverpoint-line` は 2299 → 2306 バイト、座標 126 個のうち 120 個が動いた**。作者は比較シート 2 枚を見たうえでこれを払うと裁定した
+- **動いたのは名前を持つ 16 件だけ。** コーパス 350 件のうち `A-silverpoint-*` 8 件と `E-wild-silverpoint-*` 8 件が入れ替わり、**共通の 334 件はマニフェスト entry がバイト差 0・SVG 実体 302 本が全部バイト一致**。coerce ゴールデン 39 件のうち採り直したのは 10 件で、**旧 expected の `hair` を `silverpoint` へ置換すると新 expected と完全一致する**
+- **保存済み作品は読み込み時に置換する。** `Instruction.weight` の `field_validator(mode="before")` が `hair` を `silverpoint` へ書き換える。**pentala の本番 DB で `hair` を持つ 445 件を全部引いて replay し、444 件が受理され `silverpoint` が 581 instruction**。受理されなかった 1 件は `Weight` enum に一度も入っていない `rope` を持つ作品で、**改名前から replay 不能**だった
+- **`GRAMMARS` と幅の値は 1 つも変えていない。** 変更行は `stroke_engine.py` / `renderer.py` の 3 行で、キー文字列以外の全文字が一致する。**8 値と機械の極の付属 3 値を直接ピンする検査を新設**し（`test_silverpoint_rename.py`）、「手の道具でもっとも揺れない・もっとも膨らまない・`rotring` より細い」という順位も入れた
+- **これが唯一の振る舞いの変更**: 歳時記の登録から `_PRUNED` を外し、**銀筆を語彙へ戻した**。てざわりは 10 語から 11 語になり、**材質マーカーの先頭が `鉛筆` → `銀筆`** に変わる。Stage 1 のプロンプトに載るので、第一段階がこの語を出力しうる。**H1（銀筆が実際に選ばれるか）を測るには語彙に無ければならない**ため
+- **プロンプト digest の固定値を 16 個採り直した。** Stage 1 base / actual の日英、Stage 2 の `SYSTEM_PROMPT` 日英・tool schema、`_stage2_prompt_digest` 日英、判別値 3 つ。**Stage 1 の golden fixture は差し替えていない** — `test_saijiki_golden.py` の許可差分が「削剪」から「改名」へ移っただけで済み、**fixture は Build 591 の実物のまま**である
+- **engine の版は上げていない。** `render_engines/default.py` は `"15"` のまま。**段 4 の入れ替えを行った最初の 1 回だけ生成器の同一性ガードが発火した** — ガードは「`cases` が動いたのに identity フィールドが動いていない」で判定するので、**版を上げない改名と、凍結物の無断書き換えを区別できない**。2 回目以降は exit 0 でバイト一致
+- **触っていないもの**: `interpreter.py` の few-shot 検索キーワード `"髪"`（作者が書く入力語を引く検索キーであり出力語彙ではない。ただし**銀筆を足していないので、語彙に戻った銀筆はこの細線の作例を引かない**）／`language_support/ja.py` `en.py` の `material_weight_hints`（銀筆の行が無い。`hair` の行も元から無く、改名による退行ではないが、**Stage 2 が weight を落としたときの救済経路が銀筆には無い**）／`brush_fine`（面相筆）と太さの軸／Android（`gen_android_reference.py` の 2 箇所は改名したが**生成器は未実行**で、Kotlin 実装と凍結 fixture 36 件は `hair` のまま）
+- **検証:** server **1411 passed / 30 skipped**（+9 は新設した判別検査）、cli **69 passed**、ruff clean、`npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**。判別テスト 4 本（置換経路の恒等化で本番 445 件が全て `ValidationError`／`GRAMMARS` の 1 値を動かすと 16 本だけ動く／`_PRUNED` に戻すと digest が改名前の値へ完全に一致する／生成器 2 回でバイト一致）
+- **記録**: 種が道具の「名前」をハッシュしているのが、改名に値段がつく理由である。**直すと全作品が一度動くので、それは engine の版に属する**

@@ -461,12 +461,12 @@ The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
 
-Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is the v1.92 snapshot.
+Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is the v2.7.9 snapshot.
 
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touches | てざわり | pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
+| touches | てざわり | silverpoint, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
 | continuity | つらなり | solid (default), dashed, dotted, dash-dot |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
@@ -487,7 +487,7 @@ This sits in a different layer from variation (Stage 1.5). Variation is a determ
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | colors | いろ | white, black (default), blue, red, green, gray |
 
-In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision; the Score `Weight` enum keeps `hair` so that saved works replay unchanged.
+In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision. In v2.7.9 the second of those came back under the name it should have had: `hair` was never a brush but a **silverpoint** — 0.5px, the least wavering line a hand can draw — and it is now 銀筆 / silverpoint, first in the touches list. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
 `Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
 

@@ -354,7 +354,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 | Category (EN) | Category (JA) | Vocabulary |
 |---|---|---|
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touches | てざわり | pen, pencil, rotring, fine-brush, thick-brush, crayon, chalk, burin, drypoint |
+| touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |

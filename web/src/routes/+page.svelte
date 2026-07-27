@@ -3606,6 +3606,14 @@ if (unreadWords.length > 0) {
 		historyManager.applyStarState(item);
 		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred, note: hasNote ? item.note : displayedHistoryItem.note };
+		if (lineageGraph) {
+			lineageGraph = {
+				...lineageGraph,
+				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
+					? { ...node, history: { ...node.history, starred: item.starred, note: hasNote ? item.note : node.history.note } }
+					: node)
+			};
+		}
 	}
 
 	async function toggleHistoryStar(item: HistoryStarTarget | null | undefined, event?: Event): Promise<void> {
@@ -4364,6 +4372,18 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 	outputTab = 'lineage';
 	lineageDetached = false;
 	await fetchLineage(node.id, true);
+}
+
+// 系譜タブ: ダブルクリックは作品タブへ移す（シングルクリックは選択のまま）。
+async function openLineageNodeInCanvas(node: LineageNode): Promise<void> {
+	if (!node.history) return;
+	loadIterationItem(node.history);
+	outputTab = 'canvas';
+}
+
+async function toggleLineageStar(node: LineageNode, event?: Event): Promise<void> {
+	if (!node.history?.id) return;
+	await toggleHistoryStar({ id: node.history.id, starred: !!node.history.starred }, event);
 }
 
 function lineageCatalogId(node: LineageNode): string {
@@ -6350,6 +6370,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{lineageError}
 				isJapanese={getLang() === 'ja'}
 				onOpenLineageNode={openLineageNode}
+				onOpenLineageNodeInCanvas={openLineageNodeInCanvas}
+				onToggleLineageStar={toggleLineageStar}
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}

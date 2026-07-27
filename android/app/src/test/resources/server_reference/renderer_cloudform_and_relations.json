@@ -1,7 +1,7 @@
 {
   "tool_energy_lateral": [
     {
-      "weight": "hair",
+      "weight": "silverpoint",
       "energy_lateral": 0.05,
       "touch_gain": 0.0009
     },
@@ -96,25 +96,25 @@
   ],
   "base_radius": [
     {
-      "weight": "hair",
+      "weight": "silverpoint",
       "seed": "9726217665353932459",
       "theta": 0.0,
       "value": 0.926575454814
     },
     {
-      "weight": "hair",
+      "weight": "silverpoint",
       "seed": "9726217665353932459",
       "theta": 0.785398163397,
       "value": 0.934318923155
     },
     {
-      "weight": "hair",
+      "weight": "silverpoint",
       "seed": "9726217665353932459",
       "theta": 2.094395102393,
       "value": 0.948780979749
     },
     {
-      "weight": "hair",
+      "weight": "silverpoint",
       "seed": "9726217665353932459",
       "theta": 4.838052686528,
       "value": 0.903575945194
@@ -436,8 +436,8 @@
   ],
   "cloudform_contour": [
     {
-      "case": "hair-plain",
-      "weight": "hair",
+      "case": "silverpoint-plain",
+      "weight": "silverpoint",
       "performance_seed": 12345,
       "variation": null,
       "point_count": 49,

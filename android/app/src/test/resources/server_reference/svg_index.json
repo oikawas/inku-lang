@@ -16,19 +16,20 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 3903,
+    "bytes": 4347,
     "counts": {
       "path": 1,
       "polyline": 0,
       "polygon": 0,
-      "circle": 1,
+      "circle": 3,
       "ellipse": 0,
       "line": 0,
       "rect": 1,
       "g": 7
     },
     "classes": [
-      "contour-stroke-v1 controls-62 events-1"
+      "contour-stroke-v1 controls-62 events-0",
+      "material-outline"
     ]
   },
   "02_line_brush": {
@@ -51,7 +52,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 7404,
+    "bytes": 7379,
     "counts": {
       "path": 1,
       "polyline": 3,
@@ -64,7 +65,7 @@
     },
     "classes": [
       "material-outline",
-      "stroke-engine-v1 controls-39 events-2"
+      "stroke-engine-v1 controls-39 events-1"
     ]
   },
   "03_square_filled": {
@@ -88,9 +89,9 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 58533,
+    "bytes": 46718,
     "counts": {
-      "path": 49,
+      "path": 36,
       "polyline": 0,
       "polygon": 0,
       "circle": 60,
@@ -100,8 +101,8 @@
       "g": 8
     },
     "classes": [
-      "contour-stroke-v1 controls-80 events-2",
-      "fill-stroke-v1 strokes-48",
+      "contour-stroke-v1 controls-80 events-0",
+      "fill-stroke-v1 strokes-35",
       "material-outline"
     ]
   },
@@ -136,7 +137,7 @@
       "g": 6
     },
     "classes": [
-      "arc-stroke-v1 controls-46 events-0",
+      "arc-stroke-v1 controls-46 events-2",
       "material-outline"
     ]
   },
@@ -195,7 +196,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 98645,
+    "bytes": 99129,
     "counts": {
       "path": 42,
       "polyline": 0,
@@ -203,11 +204,12 @@
       "circle": 0,
       "ellipse": 0,
       "line": 0,
-      "rect": 2,
+      "rect": 4,
       "g": 8
     },
     "classes": [
       "contour-stroke-v1 controls-96 events-0",
+      "material-outline",
       "surface-stroke-v1 hatch-spacing-22.500"
     ]
   },
@@ -423,19 +425,20 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 11881,
+    "bytes": 12325,
     "counts": {
       "path": 1,
       "polyline": 0,
       "polygon": 1,
-      "circle": 0,
+      "circle": 2,
       "ellipse": 0,
       "line": 0,
       "rect": 1,
       "g": 7
     },
     "classes": [
-      "contour-stroke-v1 controls-157 events-1"
+      "contour-stroke-v1 controls-157 events-1",
+      "material-outline"
     ]
   },
   "08_circle_perlin": {
@@ -463,19 +466,20 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 11881,
+    "bytes": 12325,
     "counts": {
       "path": 1,
       "polyline": 0,
       "polygon": 1,
-      "circle": 0,
+      "circle": 2,
       "ellipse": 0,
       "line": 0,
       "rect": 1,
       "g": 7
     },
     "classes": [
-      "contour-stroke-v1 controls-157 events-0"
+      "contour-stroke-v1 controls-157 events-0",
+      "material-outline"
     ]
   },
   "09_line_white": {
@@ -506,7 +510,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 12719,
+    "bytes": 12721,
     "counts": {
       "path": 1,
       "polyline": 2,
@@ -549,9 +553,9 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 7502,
+    "bytes": 8008,
     "counts": {
-      "path": 1,
+      "path": 3,
       "polyline": 1,
       "polygon": 0,
       "circle": 0,
@@ -561,7 +565,8 @@
       "g": 6
     },
     "classes": [
-      "arc-stroke-v1 controls-95 events-0"
+      "arc-stroke-v1 controls-95 events-0",
+      "material-outline"
     ]
   },
   "11_cloudform_pencil": {
@@ -584,19 +589,21 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 4261,
+    "bytes": 31842,
     "counts": {
-      "path": 1,
+      "path": 2,
       "polyline": 0,
-      "polygon": 0,
-      "circle": 0,
+      "polygon": 2,
+      "circle": 45,
       "ellipse": 0,
       "line": 0,
       "rect": 1,
-      "g": 5
+      "g": 7
     },
     "classes": [
-      "cloudform contour-v1 stroke-engine-touch"
+      "cloudform contour-v1 stroke-engine-touch",
+      "contour-stroke-v1 controls-245 events-1",
+      "material-outline"
     ]
   },
   "12_cloudform_rotring": {
@@ -619,7 +626,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 4226,
+    "bytes": 4206,
     "counts": {
       "path": 1,
       "polyline": 0,
@@ -631,7 +638,7 @@
       "g": 5
     },
     "classes": [
-      "cloudform contour-v1 stroke-engine-touch"
+      "cloudform contour-v1"
     ]
   },
   "13_touching_arcs": {
@@ -668,9 +675,9 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 4190,
+    "bytes": 5202,
     "counts": {
-      "path": 4,
+      "path": 8,
       "polyline": 0,
       "polygon": 0,
       "circle": 0,
@@ -680,7 +687,8 @@
       "g": 8
     },
     "classes": [
-      "arc-stroke-v1 controls-31 events-0"
+      "arc-stroke-v1 controls-31 events-0",
+      "material-outline"
     ]
   },
   "14_region_then_relation": {
@@ -738,7 +746,7 @@
     },
     "classes": [
       "arc-stroke-v1 controls-22 events-0",
-      "arc-stroke-v1 controls-22 events-2",
+      "arc-stroke-v1 controls-22 events-1",
       "material-outline"
     ]
   },
@@ -762,7 +770,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": true,
-    "bytes": 7391,
+    "bytes": 7387,
     "counts": {
       "path": 1,
       "polyline": 3,
@@ -775,7 +783,7 @@
     },
     "classes": [
       "material-outline",
-      "stroke-engine-v1 controls-39 events-2"
+      "stroke-engine-v1 controls-39 events-1"
     ],
     "wild_off_twin": "02_line_brush"
   },
@@ -796,11 +804,11 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": true,
-    "bytes": 3903,
+    "bytes": 7001,
     "counts": {
       "path": 1,
       "polyline": 0,
-      "polygon": 0,
+      "polygon": 2,
       "circle": 1,
       "ellipse": 0,
       "line": 0,
@@ -808,7 +816,8 @@
       "g": 7
     },
     "classes": [
-      "contour-stroke-v1 controls-62 events-1"
+      "contour-stroke-v1 controls-62 events-0",
+      "material-outline"
     ],
     "wild_off_twin": "01_circle_pen"
   },
@@ -843,7 +852,7 @@
       "g": 6
     },
     "classes": [
-      "arc-stroke-v1 controls-46 events-0",
+      "arc-stroke-v1 controls-46 events-2",
       "material-outline"
     ],
     "wild_off_twin": "04_arc_crayon"
@@ -869,9 +878,9 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": true,
-    "bytes": 61939,
+    "bytes": 50124,
     "counts": {
-      "path": 49,
+      "path": 36,
       "polyline": 0,
       "polygon": 2,
       "circle": 60,
@@ -881,8 +890,8 @@
       "g": 8
     },
     "classes": [
-      "contour-stroke-v1 controls-80 events-2",
-      "fill-stroke-v1 strokes-48",
+      "contour-stroke-v1 controls-80 events-0",
+      "fill-stroke-v1 strokes-35",
       "material-outline"
     ],
     "wild_off_twin": "03_square_filled"
@@ -907,19 +916,21 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": true,
-    "bytes": 4261,
+    "bytes": 31842,
     "counts": {
-      "path": 1,
+      "path": 2,
       "polyline": 0,
-      "polygon": 0,
-      "circle": 0,
+      "polygon": 2,
+      "circle": 45,
       "ellipse": 0,
       "line": 0,
       "rect": 1,
-      "g": 5
+      "g": 7
     },
     "classes": [
-      "cloudform contour-v1 stroke-engine-touch"
+      "cloudform contour-v1 stroke-engine-touch",
+      "contour-stroke-v1 controls-245 events-1",
+      "material-outline"
     ],
     "wild_off_twin": "11_cloudform_pencil"
   },

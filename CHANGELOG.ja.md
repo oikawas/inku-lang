@@ -3167,3 +3167,45 @@ v2.7.10 の取りこぼし 2 件と、**規則そのものを SPEC へ書く**�
   作者裁定（2026-07-27）。リリース runbook に **A-1b** として手順を起票した（一度きり・済んだら削除）
 - **検証:** server **1414 passed / 31 skipped**（+1 は走査範囲の検査）、cli **69 passed**、
   ruff clean、`npm run check` 0 errors / 2 warnings / 217 files。**SVG は 1 バイトも変わらない**
+
+---
+
+### v2.7.12 — 紙が、どう作られたかを言う（render engine 15 へ畳む）（Build 721、2026-07-27）
+
+**`plain` / `paper` / `washi` / `ink_wash` は地の層で完全に同一だった。** 分岐していたのは
+`mezzotint` と `charcoal_ground` だけで、`material` は種の材料に入るだけだった。
+**作者裁定で engine 15 へ畳んだ**（版を上げない。本番 DB に engine 15 の作品が 0 件・未公開・
+engine 13 の前例。**条件は「公開前に済ませること」**）。
+
+- **最初の実装は却下相当だった。** 繊維と刷毛を**描画要素として積んだ**ところ、既定プロファイルで
+  地が 2 要素 → 40 要素になり、**絵全体の 46%** を占めた。**DDL が明示した図形は 2 つしかない**
+- **直した方針: 支持体は雑音の性格であって、描くものではない。**
+  `display` はフィルタの中（**`washi` = 異方性乱流を直交 2 枚で交差させる `feBlend`**、
+  **`ink_wash` = 横へ引き伸ばして `feGaussianBlur` でぼかす**）、
+  `editable` は**地が既に描いている粒の形**を変える（washi は同じ数の粒を繊維へ引き伸ばし、
+  ink_wash は粒を横帯で濃淡させる）
+- **要素は 1 つも増えない。凍結物がそれを言っている** — `C-ground-washi` は
+  **circle 20 → 0 / path 1 → 21**（総数 21 のまま）、`C-ground-ink_wash` は
+  **circle 20 → 12**（`count × 0.6` で**減る**）
+- **数値は作者が実物を見て決めた。** 比較シート `material-sheet.png` の 2 行のうち
+  **`tone=warm grain=coarse opacity=0.18` の行を採る**（2026-07-27 裁定）＝
+  **washi をこれ以上強めない**。0.18 は既に全経路の上限（`min(0.18, ground.opacity)`）である
+- **コーパスは engine 15 のまま再凍結した。** 動いたのは **350 件中 3 件**
+  （`C-ground-washi` / `C-ground-ink_wash` / `C-groundseed-auto-washi`）。
+  **`changed_from_previous` を作り直しても 318 件で完全一致**することを先に実測してから採用し、
+  **2 回目の生成が exit 0 でバイト一致**することを確かめた。manifest の `reason` に畳んだ旨を追記
+- **Android の期待値は動かなかった。** 再生成した 36 件が **`31ff75d`（engine 15 の凍結）と
+  バイト一致**する。**Android の参照ケースは地を 1 件も持たない**ためで、
+  **「畳むと Android の期待値が作り直しになる」という前提は実測で外れた**。
+  `feat/android-engine15` の契約はそのまま着手できる
+- **検査面を新設した（実装には付いていなかった）** — `test_ground_seed.py` に 5 件。
+  材質が**粒の描き方**を変えること（washi / ink_wash）、**filter のほうも**変わること
+  （`feBlend` / `feGaussianBlur` の有無）、**要素数が増えないこと**
+  - **seed を明示して固定する**のが要点。**固定しないと `material` が導出 seed に入っているぶんで
+    層が動き、描き分けの分岐を `if False` にしても素通りした**（実測。主張と違う理由で通る検査だった）
+  - **摂動 2 種で落ちることを確認**（雑音表を空にする / 繊維の分岐を殺す）
+- **既存検査 1 件を書き直した** — `test_explicit_ground_seed_still_bypasses_the_derivation` は
+  「明示 seed なら paper と washi は同一」と主張していたが、**材質が描き分けられた今は偽**である。
+  **材質ではなく演奏 seed を動かす**形に置き換えた（材質を固定したまま導出だけを揺らせる）
+- **検証:** server **1419 passed / 31 skipped**（+6）、cli **69 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files。**render engine は `"15"` のまま**

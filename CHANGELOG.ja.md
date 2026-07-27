@@ -3342,3 +3342,28 @@ engine 13 の前例。**条件は「公開前に済ませること」**）。
 - **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 726 へ
 - **検証（Build 726 時点）:** server **1423 passed / 31 skipped**、cli **73 passed**、ruff clean、
   `npm run check` 0 errors / 2 warnings / 217 files、`npm run lint:i18n` **788 / 36 例外 / 0 errors**
+
+**CI を 8 回ぶりに緑へ戻した（Build 727）。** v2.7.9 の銀筆改名は、render コーパスと
+coerce ゴールデンを**版を上げずにその場で再凍結**したが、**DDL コーパスだけ同じ commit で
+取りこぼされ**、以後すべての push で `ddl-engine` job が落ちていた（`render-engine` は毎回緑）。
+
+- **再凍結が運んだのは改名 2 種だけ** — `B-trigger-auto` の coerce 出力の道具名と、
+  **`vary_seed` を記録したままだった manifest の入力 15 件**。ケース ID の増減は無く、
+  **`ddl_engine_version` は 1 のまま**（render engine が 15 のまま据え置かれたのと同じ理由）
+- **仕組みは引き継ぎの記述と違っていた** — 凍結物の `hair` は
+  「保存値を validator が書き換える」ものではなく、**coerce 自身が生産していた道具名**だった。
+  **摂動を validator に当てたら空振りし、`coerce/compose.py` の literal に当てて初めて動いた**
+- **ガードは書き込みの後に発火するようにした**（render 生成器と同じ順）。
+  **手前で止めると、裁定済みの改名を再凍結する道が構造的に無い**。
+  **1 回目に発火し 2 回目が exit 0 でバイト一致する**のがガードの守りたい性質である
+- **SPEC §15.6 に「改名では版を上げない」を条文化した**（日英）。v2.7.9 の判断が条文に無く、
+  字義どおりなら発火する状態だった。**語彙を増やすのと名前を替えるのは別**である
+- **`check_frozen_corpora.py` を足した** — CI と同じものを手元で回す。
+  **テストは代替にならない**（`test_*_reference.py` は凍結物と manifest の整合しか見ず**再生成しない**）ので、
+  **1423 件が緑のままコーパスがずれる**。実際 3 回ともそうなった。
+  **CI は最後の砦（別 OS での再現性）であって検出器ではない**、という置き方に改めた
+- **摂動で赤を確認した** — `coerce` が生産する道具名を 1 箇所変えると検査が exit 1 を返し、
+  復旧手順（`git checkout -- server/reference/`）まで案内することを見た
+- **採番は v2.8.0 のまま**（未公開版へ畳む）。Build だけ 727 へ
+- **検証（Build 727 時点）:** server **1423 passed / 31 skipped**、cli **73 passed**、ruff clean、
+  `npm run check` 0 errors / 2 warnings / 217 files、**両コーパスの生成器が exit 0 でバイト一致**

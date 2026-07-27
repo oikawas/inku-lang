@@ -31,7 +31,6 @@ from inku_analysis import (
     motif_signatures as _motif_signatures,
 )
 from inku_analysis.rasterizer import (
-    BACKEND_CAIROSVG,
     RasterizerUnavailable,
     rasterizer_backend,
     rasterizer_info,
@@ -538,24 +537,13 @@ def _read_text_argument(text: str | None, file_path: str | None) -> str:
         return text.strip()
     raise CliError("text is required")
 
-_rasterizer_warned = False
-
-
 def _rasterize_png(svg: str, **kwargs: int) -> bytes:
-    """Rasterize, warning once when the fallback backend is in use.
+    """Rasterize through resvg, the only supported backend.
 
-    A cairosvg fallback still writes a clean-looking PNG, it just silently omits the
-    material filters, so without this the degradation is invisible in the artifact.
+    There used to be a fallback here, and a warning to say it had been taken. Both
+    are gone: a backend that silently drops the material filters writes a PNG that
+    looks cleaner than the work is, and that PNG gets used to decide things.
     """
-    global _rasterizer_warned
-    if not _rasterizer_warned and rasterizer_backend() == BACKEND_CAIROSVG:
-        _rasterizer_warned = True
-        print(
-            "warning: resvg-py is not installed, so PNG output falls back to cairosvg, "
-            "which does not render the material filters (pencil / crayon / chalk / brush_thick). "
-            "The PNGs will look cleaner than the work actually is.",
-            file=sys.stderr,
-        )
     return svg_to_png(svg, **kwargs)
 
 
@@ -587,7 +575,7 @@ def _write_paint_outputs(
         try:
             png_path.write_bytes(_rasterize_png(str(result["svg"])))
         except RasterizerUnavailable as exc:
-            raise CliError("PNG output requires a rasterizer (resvg-py or cairosvg)") from exc
+            raise CliError("PNG output requires resvg-py") from exc
         paths["png"] = str(png_path)
         # Different backends and versions produce different pixels from one SVG.
         paths["png_rasterizer"] = rasterizer_info()
@@ -718,7 +706,7 @@ def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
     try:
         buffer = io.BytesIO(_rasterize_png(svg))
     except RasterizerUnavailable as exc:
-        raise CliError("analyze --replay requires a rasterizer (resvg-py or cairosvg)") from exc
+        raise CliError("analyze --replay requires resvg-py") from exc
     with Image.open(buffer) as image:
         image = image.convert("L").resize((cells, cells))
         pixels = list(image.getdata())
@@ -1274,7 +1262,7 @@ def _write_history_export(
     thumb_size: int,
 ) -> dict[str, Any]:
     if rasterizer_backend() is None:
-        raise CliError("history-export requires a rasterizer (resvg-py or cairosvg) for contact-sheet PNGs")
+        raise CliError("history-export requires resvg-py for contact-sheet PNGs")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     item_dir = out_dir / "items"

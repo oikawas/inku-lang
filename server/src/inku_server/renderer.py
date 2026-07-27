@@ -368,8 +368,17 @@ def _material_gain(key: str) -> float:
     return MATERIAL_INTENSITY[MATERIAL_INTENSITY_LEVEL].get(key, 0.0)
 
 
-def _outline_offset_px(offset: float, canvas: CanvasSize) -> float:
-    """材質輪郭の法線オフセット。符号を保ったまま下限を課す。"""
+def _outline_offset_px(
+    offset: float, canvas: CanvasSize, *, floored: bool = True
+) -> float:
+    """材質輪郭の法線オフセット。符号を保ったまま下限を課す。
+
+    `floored=False` は下限を外す。下限 (s1 で 3.5px) は表に 5 道具しかなく、
+    どれも基準幅 1.5〜8.0px だった頃に決めた絶対値である。それより細い道具では
+    痕跡が墨から遠く離れてしまい、痕跡でなく別の輪郭に見える。
+    """
+    if not floored:
+        return offset
     floor = _material_gain("outline_offset_floor_ratio") * canvas.unit
     if floor <= 0 or abs(offset) >= floor:
         return offset
@@ -3299,11 +3308,20 @@ _MATERIAL_OUTLINE_SPECS: dict[str, list[tuple[float, float, float, float, str]]]
     # 抑制されている。痕跡は毛の分かれなので 1 本だけ、offset は全道具で最小
     # (基準幅 0.5px の 1.2 倍)、dash は長い off でたまにしか現れない。
     "hair": [(-0.6, 0.30, 0.0, 0.14, "2,23")],
-    # pen (つけペン) の痕跡は割れた 2 本の穂先で、線の両岸そのものを走る。
-    # offset ±1.0 は基準幅 2.0px のちょうど半分＝帯の縁。dash は brush_thin の
-    # 22,9 より細かく pencil の 1,7 より連続寄りで、穂先らしくほぼ途切れない。
-    "pen": [(-1.0, 0.38, 0.0, 0.24, "14,3"), (1.0, 0.34, 0.0, 0.20, "12,4")],
+    # pen (つけペン) の痕跡は割れた 2 本の穂先。offset は gain 2.8 が掛かった
+    # 実効値で ±1.40px となり、基準幅 2.0px の帯の縁 (±1.0) のすぐ外を
+    # 走る。s1 の下限 3.5px を通すと痕跡が墨から 3.5px 離れ、閉輪郭で二重の輪＝
+    # 見当ズレの影に見えたので (作者目視 2026-07-27 で差し戻し)、pen だけ下限を
+    # 外している (`_OUTLINE_OFFSET_FLOOR_EXEMPT`)。dash は brush_thin の 22,9 より
+    # 細かく pencil の 1,7 より連続寄りで、穂先らしくほぼ途切れない。
+    "pen": [(-0.50, 0.38, 0.0, 0.24, "14,3"), (0.50, 0.34, 0.0, 0.20, "12,4")],
 }
+
+# 材質輪郭の offset 下限 (s1 で 3.5px) を外す道具。下限は表に 5 道具しかなく、
+# どれも基準幅 1.5〜8.0px だった頃の絶対値なので、それより細い道具に当てると
+# 痕跡が墨から離れて別の輪郭に見える。ここに入れた道具だけ表の値がそのまま出る。
+# **既存 5 道具は入れない** — 入れると凍結された出力が動く。
+_OUTLINE_OFFSET_FLOOR_EXEMPT = frozenset({"pen"})
 
 # (基準個数, spread_px, radius_px, opacity)。個数は周長比例の基準値。
 _SPECK_SPECS: dict[str, tuple[int, float, float, float]] = {
@@ -3324,9 +3342,10 @@ def _material_outline_profile(
     base_width = _stroke_width_px(weight, canvas)
     offset_gain = _material_gain("outline_offset")
     opacity_gain = _material_gain("outline_opacity")
+    floored = weight not in _OUTLINE_OFFSET_FLOOR_EXEMPT
     return [
         (
-            _outline_offset_px(offset * scale * offset_gain, canvas),
+            _outline_offset_px(offset * scale * offset_gain, canvas, floored=floored),
             abs_width * scale + base_width * width_ratio,
             _outline_opacity(opacity * opacity_gain),
             _scale_dash(dash, scale),
@@ -3669,8 +3688,12 @@ def _material_line_group(
     def _layer_opacity(value: float) -> float:
         return _outline_opacity(value * opacity_gain)
 
+    floored = ins.weight not in _OUTLINE_OFFSET_FLOOR_EXEMPT
+
     def _layer_offset(amount: float) -> float:
-        return _outline_offset_px(amount * scale * offset_gain, canvas)
+        return _outline_offset_px(
+            amount * scale * offset_gain, canvas, floored=floored
+        )
 
     dash_units = length / max(1e-6, scale)
 
@@ -3759,8 +3782,8 @@ def _material_line_group(
         layer_attrs["stroke_opacity"] = _layer_opacity(0.14)
         _emit_layer(-0.6, layer_attrs, 2.0, 23.0, 0)
     elif ins.weight == "pen":
-        # 割れた 2 本の穂先。線の両岸を対称に走り、ほとんど途切れない。
-        for k, amount in enumerate((-1.0, 1.0)):
+        # 割れた 2 本の穂先。帯の縁 (基準幅 2.0px の半分) のすぐ外を走る。
+        for k, amount in enumerate((-0.50, 0.50)):
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = (0.38 - k * 0.04) * scale
             layer_attrs["stroke_opacity"] = _layer_opacity(0.24 - k * 0.04)

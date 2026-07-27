@@ -253,7 +253,7 @@ def primitive_fixtures() -> None:
             (21, 0.9, 49),       # three would fire; the cap keeps two
             (31, 0.9, 49),       # four would fire; the cap keeps two
             (12, 0.55, 49),      # same seed, lower rate
-            (2, 0.04, 49),       # hair: rate too low to fire
+            (2, 0.04, 49),       # silverpoint: rate too low to fire
             (18, 0.9, 8),        # short run: the window is range(3, 5)
             (68, 0.9, 8),        # both window slots fire
             (12345, 0.9, 4),     # empty window
@@ -945,7 +945,7 @@ def fill_and_arc_fixtures() -> None:
 
 
 WEIGHTS_ALL = (
-    "hair", "pencil", "pen", "rotring", "crayon",
+    "silverpoint", "pencil", "pen", "rotring", "crayon",
     "chalk", "brush_thin", "brush_thick", "burin", "drypoint",
     # engine 13. Its lateral energy is 0.34, so the cloudform touch term is not
     # zero: a port that treats the computer as "rotring with a lattice" lands on

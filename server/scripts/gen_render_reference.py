@@ -44,7 +44,7 @@ DEFAULT_RENDER_SEED = 12345
 
 TOOLS = (
     "brush_thick", "brush_thin", "burin", "chalk", "computer", "crayon",
-    "drypoint", "hair", "pen", "pencil", "rotring",
+    "drypoint", "pen", "pencil", "rotring", "silverpoint",
 )
 PRIMITIVES = (
     "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform",

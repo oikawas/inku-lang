@@ -58,14 +58,6 @@
     "A-drypoint-polygon",
     "A-drypoint-square",
     "A-drypoint-triangle",
-    "A-hair-arc",
-    "A-hair-circle",
-    "A-hair-cloudform",
-    "A-hair-ellipse",
-    "A-hair-line",
-    "A-hair-polygon",
-    "A-hair-square",
-    "A-hair-triangle",
     "A-pen-arc",
     "A-pen-circle",
     "A-pen-cloudform",
@@ -83,6 +75,14 @@
     "A-pencil-square",
     "A-pencil-triangle",
     "A-rotring-cloudform",
+    "A-silverpoint-arc",
+    "A-silverpoint-circle",
+    "A-silverpoint-cloudform",
+    "A-silverpoint-ellipse",
+    "A-silverpoint-line",
+    "A-silverpoint-polygon",
+    "A-silverpoint-square",
+    "A-silverpoint-triangle",
     "B-perlin-broad-arc-brush_thick",
     "B-perlin-broad-arc-pencil",
     "B-perlin-broad-circle-brush_thick",
@@ -286,14 +286,6 @@
     "E-wild-fill-triangle-brush_thick",
     "E-wild-fill-triangle-crayon",
     "E-wild-fill-triangle-pencil",
-    "E-wild-hair-arc",
-    "E-wild-hair-circle",
-    "E-wild-hair-cloudform",
-    "E-wild-hair-ellipse",
-    "E-wild-hair-line",
-    "E-wild-hair-polygon",
-    "E-wild-hair-square",
-    "E-wild-hair-triangle",
     "E-wild-pen-arc",
     "E-wild-pen-circle",
     "E-wild-pen-cloudform",
@@ -311,6 +303,14 @@
     "E-wild-pencil-square",
     "E-wild-pencil-triangle",
     "E-wild-rotring-cloudform",
+    "E-wild-silverpoint-arc",
+    "E-wild-silverpoint-circle",
+    "E-wild-silverpoint-cloudform",
+    "E-wild-silverpoint-ellipse",
+    "E-wild-silverpoint-line",
+    "E-wild-silverpoint-polygon",
+    "E-wild-silverpoint-square",
+    "E-wild-silverpoint-triangle",
     "E-wild-surface-aquatint-pen",
     "E-wild-surface-aquatint-pencil",
     "E-wild-surface-bleed-pen",
@@ -4345,574 +4345,6 @@
         "contour-stroke-v1 controls-70 events-1"
       ]
     },
-    "A-hair-arc": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "arc",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": 0.27,
-              "sides": null,
-              "position": null,
-              "size": null,
-              "angle_start": 15.0,
-              "angle_end": 285.0,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "61e10513820b1055bf866b4ad59058e7",
-      "bytes": 3896,
-      "counts": {
-        "path": 2,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 6
-      },
-      "classes": [
-        "arc-stroke-v1 controls-62 events-0"
-      ]
-    },
-    "A-hair-circle": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "circle",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": 0.24,
-              "sides": null,
-              "position": null,
-              "size": null,
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "4b7e21b96ab576568d7ea5f110c56902",
-      "bytes": 4480,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 1,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-74 events-0"
-      ]
-    },
-    "A-hair-cloudform": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "cloudform",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": null,
-              "sides": null,
-              "position": null,
-              "size": [
-                0.48,
-                0.32
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "17fc7d2a37d8d53019d87b7ac1486916",
-      "bytes": 16057,
-      "counts": {
-        "path": 2,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "cloudform contour-v1 stroke-engine-touch",
-        "contour-stroke-v1 controls-245 events-0"
-      ]
-    },
-    "A-hair-ellipse": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "ellipse",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": null,
-              "sides": null,
-              "position": null,
-              "size": [
-                0.48,
-                0.3
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "07e9d2f280eec519ccd679a60c2017ef",
-      "bytes": 3876,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 1,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-61 events-0"
-      ]
-    },
-    "A-hair-line": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "line",
-              "from": [
-                0.18,
-                0.5
-              ],
-              "to": [
-                0.82,
-                0.5
-              ],
-              "center": null,
-              "radius": null,
-              "sides": null,
-              "position": null,
-              "size": null,
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "cd45eaf8b9a6cfc94167e6a4f893ae9e",
-      "bytes": 2299,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 6
-      },
-      "classes": [
-        "stroke-engine-v1 controls-31 events-0"
-      ]
-    },
-    "A-hair-polygon": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "polygon",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": 0.25,
-              "sides": 7,
-              "position": null,
-              "size": null,
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "bea879c5e13686c8a99aad162d4ad40b",
-      "bytes": 6760,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 1,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-119 events-0"
-      ]
-    },
-    "A-hair-square": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "square",
-              "from": null,
-              "to": null,
-              "center": null,
-              "radius": null,
-              "sides": null,
-              "position": [
-                0.28,
-                0.28
-              ],
-              "size": [
-                0.44,
-                0.44
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "c23f75b4758b56d7cfda7038fdca8dab",
-      "bytes": 5172,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 2,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-88 events-0"
-      ]
-    },
-    "A-hair-triangle": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "triangle",
-              "from": null,
-              "to": null,
-              "center": null,
-              "radius": null,
-              "sides": null,
-              "position": [
-                0.28,
-                0.28
-              ],
-              "size": [
-                0.44,
-                0.44
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": false
-      },
-      "digest": "d827bf57c00cdaaf556c164eb02498dd",
-      "bytes": 4321,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 1,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-70 events-0"
-      ]
-    },
     "A-pen-arc": {
       "input": {
         "score": {
@@ -6617,6 +6049,574 @@
         "g": 5
       },
       "classes": []
+    },
+    "A-silverpoint-arc": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "arc",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": 0.27,
+              "sides": null,
+              "position": null,
+              "size": null,
+              "angle_start": 15.0,
+              "angle_end": 285.0,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "7962306d76fe5fb527ca878bf0bed450",
+      "bytes": 3903,
+      "counts": {
+        "path": 2,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 6
+      },
+      "classes": [
+        "arc-stroke-v1 controls-62 events-0"
+      ]
+    },
+    "A-silverpoint-circle": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "circle",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": 0.24,
+              "sides": null,
+              "position": null,
+              "size": null,
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "af971db13a9b980630e56a90a4b31b82",
+      "bytes": 4487,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 1,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-74 events-0"
+      ]
+    },
+    "A-silverpoint-cloudform": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "cloudform",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": null,
+              "sides": null,
+              "position": null,
+              "size": [
+                0.48,
+                0.32
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "a27dc36bbd689d37c32c68215d905577",
+      "bytes": 16064,
+      "counts": {
+        "path": 2,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "cloudform contour-v1 stroke-engine-touch",
+        "contour-stroke-v1 controls-245 events-0"
+      ]
+    },
+    "A-silverpoint-ellipse": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "ellipse",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": null,
+              "sides": null,
+              "position": null,
+              "size": [
+                0.48,
+                0.3
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "ebd07d39c3fa763c301fe692936ade1b",
+      "bytes": 3883,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 1,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-61 events-0"
+      ]
+    },
+    "A-silverpoint-line": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "line",
+              "from": [
+                0.18,
+                0.5
+              ],
+              "to": [
+                0.82,
+                0.5
+              ],
+              "center": null,
+              "radius": null,
+              "sides": null,
+              "position": null,
+              "size": null,
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "5767e90ae0cd13b77cc116fb9a9d724b",
+      "bytes": 2306,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 6
+      },
+      "classes": [
+        "stroke-engine-v1 controls-31 events-0"
+      ]
+    },
+    "A-silverpoint-polygon": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "polygon",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": 0.25,
+              "sides": 7,
+              "position": null,
+              "size": null,
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "f7328b8e69bf31d9ab4ea688d8579565",
+      "bytes": 6767,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 1,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-119 events-0"
+      ]
+    },
+    "A-silverpoint-square": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "square",
+              "from": null,
+              "to": null,
+              "center": null,
+              "radius": null,
+              "sides": null,
+              "position": [
+                0.28,
+                0.28
+              ],
+              "size": [
+                0.44,
+                0.44
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "70f88709925e63d778f968bdd5c46c2b",
+      "bytes": 5179,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 2,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-88 events-0"
+      ]
+    },
+    "A-silverpoint-triangle": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "triangle",
+              "from": null,
+              "to": null,
+              "center": null,
+              "radius": null,
+              "sides": null,
+              "position": [
+                0.28,
+                0.28
+              ],
+              "size": [
+                0.44,
+                0.44
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": false
+      },
+      "digest": "ea404927dd2bc485816baae80779ed2c",
+      "bytes": 4328,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 1,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-70 events-0"
+      ]
     },
     "B-perlin-broad-arc-brush_thick": {
       "input": {
@@ -22724,574 +22724,6 @@
         "material-outline"
       ]
     },
-    "E-wild-hair-arc": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "arc",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": 0.27,
-              "sides": null,
-              "position": null,
-              "size": null,
-              "angle_start": 15.0,
-              "angle_end": 285.0,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "f2e932cbf5b0d849fdc066f455039167",
-      "bytes": 3896,
-      "counts": {
-        "path": 2,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 6
-      },
-      "classes": [
-        "arc-stroke-v1 controls-62 events-0"
-      ]
-    },
-    "E-wild-hair-circle": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "circle",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": 0.24,
-              "sides": null,
-              "position": null,
-              "size": null,
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "0c7d3a2709d12cd5a8655e95d181125e",
-      "bytes": 4480,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 1,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-74 events-0"
-      ]
-    },
-    "E-wild-hair-cloudform": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "cloudform",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": null,
-              "sides": null,
-              "position": null,
-              "size": [
-                0.48,
-                0.32
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "b888daf356edc241aafea8bea37a742f",
-      "bytes": 16057,
-      "counts": {
-        "path": 2,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "cloudform contour-v1 stroke-engine-touch",
-        "contour-stroke-v1 controls-245 events-0"
-      ]
-    },
-    "E-wild-hair-ellipse": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "ellipse",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": null,
-              "sides": null,
-              "position": null,
-              "size": [
-                0.48,
-                0.3
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "3f147b497b4bad982f9ba95497ae12d8",
-      "bytes": 3876,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 1,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-61 events-0"
-      ]
-    },
-    "E-wild-hair-line": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "line",
-              "from": [
-                0.18,
-                0.5
-              ],
-              "to": [
-                0.82,
-                0.5
-              ],
-              "center": null,
-              "radius": null,
-              "sides": null,
-              "position": null,
-              "size": null,
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "38a9ec036dbc7c6a9188a1628e6e60b4",
-      "bytes": 2299,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 6
-      },
-      "classes": [
-        "stroke-engine-v1 controls-31 events-0"
-      ]
-    },
-    "E-wild-hair-polygon": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "polygon",
-              "from": null,
-              "to": null,
-              "center": [
-                0.5,
-                0.5
-              ],
-              "radius": 0.25,
-              "sides": 7,
-              "position": null,
-              "size": null,
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "5d7d8d067bbb61263788ebaa99dc3e8d",
-      "bytes": 6760,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 1,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-119 events-0"
-      ]
-    },
-    "E-wild-hair-square": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "square",
-              "from": null,
-              "to": null,
-              "center": null,
-              "radius": null,
-              "sides": null,
-              "position": [
-                0.28,
-                0.28
-              ],
-              "size": [
-                0.44,
-                0.44
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "95385304d84269f42ec6081a4319367e",
-      "bytes": 5172,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 0,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 2,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-88 events-0"
-      ]
-    },
-    "E-wild-hair-triangle": {
-      "input": {
-        "score": {
-          "version": "0.1.0",
-          "canvas": {
-            "aspect": "square",
-            "ground": null
-          },
-          "background": "white",
-          "presence": null,
-          "instructions": [
-            {
-              "primitive": "triangle",
-              "from": null,
-              "to": null,
-              "center": null,
-              "radius": null,
-              "sides": null,
-              "position": [
-                0.28,
-                0.28
-              ],
-              "size": [
-                0.44,
-                0.44
-              ],
-              "angle_start": null,
-              "angle_end": null,
-              "rotation": null,
-              "filled": false,
-              "style": "solid",
-              "weight": "hair",
-              "mode": "additive",
-              "carve_depth": null,
-              "color": "black",
-              "color_hint": null,
-              "variation": null,
-              "arrangement": null,
-              "at": null,
-              "relation": null,
-              "surface": null
-            }
-          ]
-        },
-        "render_seed": 12345,
-        "color_map": {
-          "white": "#ffffff",
-          "black": "#111111",
-          "blue": "#2c3e91",
-          "red": "#a2342a",
-          "green": "#2f6b3a",
-          "gray": "#888888"
-        },
-        "svg_profile": "editable",
-        "wild": true
-      },
-      "digest": "d526e5f78a43e35ab3061e4fdd915dbe",
-      "bytes": 4321,
-      "counts": {
-        "path": 1,
-        "polyline": 0,
-        "polygon": 1,
-        "circle": 0,
-        "ellipse": 0,
-        "line": 0,
-        "rect": 1,
-        "g": 7
-      },
-      "classes": [
-        "contour-stroke-v1 controls-70 events-0"
-      ]
-    },
     "E-wild-pen-arc": {
       "input": {
         "score": {
@@ -24996,6 +24428,574 @@
         "g": 5
       },
       "classes": []
+    },
+    "E-wild-silverpoint-arc": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "arc",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": 0.27,
+              "sides": null,
+              "position": null,
+              "size": null,
+              "angle_start": 15.0,
+              "angle_end": 285.0,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "ff0accb7834f33d5971aef50e4f14ee6",
+      "bytes": 3903,
+      "counts": {
+        "path": 2,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 6
+      },
+      "classes": [
+        "arc-stroke-v1 controls-62 events-0"
+      ]
+    },
+    "E-wild-silverpoint-circle": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "circle",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": 0.24,
+              "sides": null,
+              "position": null,
+              "size": null,
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "fa481bfb784b226ebe0d5a4a623f8a83",
+      "bytes": 4487,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 1,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-74 events-0"
+      ]
+    },
+    "E-wild-silverpoint-cloudform": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "cloudform",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": null,
+              "sides": null,
+              "position": null,
+              "size": [
+                0.48,
+                0.32
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "f743ee89dd064b1866fea43cf8b4feb9",
+      "bytes": 16064,
+      "counts": {
+        "path": 2,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "cloudform contour-v1 stroke-engine-touch",
+        "contour-stroke-v1 controls-245 events-0"
+      ]
+    },
+    "E-wild-silverpoint-ellipse": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "ellipse",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": null,
+              "sides": null,
+              "position": null,
+              "size": [
+                0.48,
+                0.3
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "eadd7e14ccaa730f81550429a6ea8098",
+      "bytes": 3883,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 1,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-61 events-0"
+      ]
+    },
+    "E-wild-silverpoint-line": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "line",
+              "from": [
+                0.18,
+                0.5
+              ],
+              "to": [
+                0.82,
+                0.5
+              ],
+              "center": null,
+              "radius": null,
+              "sides": null,
+              "position": null,
+              "size": null,
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "619b0e77d7aebd28768e3e9c6119d625",
+      "bytes": 2306,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 6
+      },
+      "classes": [
+        "stroke-engine-v1 controls-31 events-0"
+      ]
+    },
+    "E-wild-silverpoint-polygon": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "polygon",
+              "from": null,
+              "to": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "radius": 0.25,
+              "sides": 7,
+              "position": null,
+              "size": null,
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "75c704096ea5ac73e88d685f1d90cf82",
+      "bytes": 6767,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 1,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-119 events-0"
+      ]
+    },
+    "E-wild-silverpoint-square": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "square",
+              "from": null,
+              "to": null,
+              "center": null,
+              "radius": null,
+              "sides": null,
+              "position": [
+                0.28,
+                0.28
+              ],
+              "size": [
+                0.44,
+                0.44
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "5a3c646596697314c8e103b1ecf6c79e",
+      "bytes": 5179,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 0,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 2,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-88 events-0"
+      ]
+    },
+    "E-wild-silverpoint-triangle": {
+      "input": {
+        "score": {
+          "version": "0.1.0",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "background": "white",
+          "presence": null,
+          "instructions": [
+            {
+              "primitive": "triangle",
+              "from": null,
+              "to": null,
+              "center": null,
+              "radius": null,
+              "sides": null,
+              "position": [
+                0.28,
+                0.28
+              ],
+              "size": [
+                0.44,
+                0.44
+              ],
+              "angle_start": null,
+              "angle_end": null,
+              "rotation": null,
+              "filled": false,
+              "style": "solid",
+              "weight": "silverpoint",
+              "mode": "additive",
+              "carve_depth": null,
+              "color": "black",
+              "color_hint": null,
+              "variation": null,
+              "arrangement": null,
+              "at": null,
+              "relation": null,
+              "surface": null
+            }
+          ]
+        },
+        "render_seed": 12345,
+        "color_map": {
+          "white": "#ffffff",
+          "black": "#111111",
+          "blue": "#2c3e91",
+          "red": "#a2342a",
+          "green": "#2f6b3a",
+          "gray": "#888888"
+        },
+        "svg_profile": "editable",
+        "wild": true
+      },
+      "digest": "99fb927e95d37a9e4486d6001a9341f3",
+      "bytes": 4328,
+      "counts": {
+        "path": 1,
+        "polyline": 0,
+        "polygon": 1,
+        "circle": 0,
+        "ellipse": 0,
+        "line": 0,
+        "rect": 1,
+        "g": 7
+      },
+      "classes": [
+        "contour-stroke-v1 controls-70 events-0"
+      ]
     },
     "E-wild-surface-aquatint-pen": {
       "input": {

@@ -34,6 +34,7 @@ the hatch spacing (`surface-stroke-v1 hatch-spacing-22.500`).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import pathlib
@@ -1227,6 +1228,43 @@ def ddl_expand_fixtures() -> None:
     (OUT / "ddl_expand.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
+def prompt_fixtures() -> None:
+    """Android が抱えるプロンプトの複製が server から離れたことを検出させる。
+
+    Android は端末内で全パイプラインを回すので Stage 1 / Stage 2 のプロンプトを
+    Kotlin の定数として複製している。CI は Android を回さないため、この複製が
+    黙って古くなる。指紋を焼いて Kotlin 側で突き合わせる。
+
+    LiteRT 専用の短縮プロンプト (`*_LITERT`) はここに含めない。端末内の小さな
+    モデル向けに意図して別物にしてあり、server に対応物が無い。
+    """
+    from inku_server.composer import SYSTEM_PROMPT as STAGE2_JA
+    from inku_server.composer import SYSTEM_PROMPT_EN as STAGE2_EN
+    from inku_server.interpreter import SYSTEM_PROMPT_PREFIX as STAGE1_JA
+    from inku_server.interpreter import SYSTEM_PROMPT_PREFIX_EN as STAGE1_EN
+
+    mirrored = {
+        "STAGE1_PROMPT_PREFIX_JA": STAGE1_JA,
+        "STAGE1_PROMPT_PREFIX_EN": STAGE1_EN,
+        "STAGE2_SYSTEM_PROMPT_JA": STAGE2_JA,
+        "STAGE2_SYSTEM_PROMPT_EN": STAGE2_EN,
+    }
+    out = {
+        "note": (
+            "Kotlin の同名定数は server のこれと一字一句同じであること。"
+            "LiteRT 用の短縮プロンプトは対象外。"
+        ),
+        "prompts": {
+            name: {
+                "bytes": len(text.encode("utf-8")),
+                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            }
+            for name, text in mirrored.items()
+        },
+    }
+    (OUT / "prompts.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
@@ -1238,6 +1276,7 @@ def main() -> None:
     fill_and_arc_fixtures()
     cloudform_and_relation_fixtures()
     ddl_expand_fixtures()
+    prompt_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

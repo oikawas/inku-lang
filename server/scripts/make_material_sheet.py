@@ -46,7 +46,7 @@ def score_for(material: str, tone: str, grain: str, opacity: float) -> Score:
 
 
 def png_of(score: Score) -> Image.Image:
-    svg = renderer.render(score, render_seed=SEED)
+    svg = renderer.render(score, render_seed=SEED, svg_profile="editable")
     png = cairosvg.svg2png(bytestring=svg.encode("utf-8"),
                            output_width=TILE, output_height=TILE)
     return Image.open(__import__("io").BytesIO(png)).convert("RGB")
@@ -59,7 +59,7 @@ rows = [
 
 sheet = Image.new("RGB", (TILE * len(MATERIALS), (TILE + 34) * len(rows) + 34), "white")
 draw = ImageDraw.Draw(sheet)
-draw.text((12, 12), "material: the four that were identical  (same Score, same seed)", fill="black")
+draw.text((12, 12), "material (editable profile: the ground draws marks)  same Score, same seed", fill="black")
 y = 34
 for label, tone, grain, opacity in rows:
     draw.text((12, y + 8), label, fill="black")
@@ -74,6 +74,7 @@ sheet.save(path)
 print("wrote", path)
 
 for material in MATERIALS:
-    svg = renderer.render(score_for(material, "off_white", "medium", 0.14), render_seed=SEED)
+    svg = renderer.render(score_for(material, "off_white", "medium", 0.14), render_seed=SEED,
+                          svg_profile="editable")
     (OUT / f"{material}.svg").write_text(svg, encoding="utf-8")
     print(f"{material:10} {len(svg):7} bytes")

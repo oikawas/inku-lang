@@ -631,7 +631,9 @@ Detail: [changelog v2.4.4](../history/changelog-v1.72-v2.4.md)
 
 **With no reference corpus, there is no mechanical answer to "what moved".**
 The record is in the changelog archives and in the prose of `SPEC.md`, which states the reason for
-each bump inline (the lines in `SPEC.md`: 5 → 301, 6 → 310, 7 → 329, 8 → 347, 10 → 391).
+each bump inline (in "Renderer: Performance" under "The Two-Stage Architecture" in `SPEC.md`, and
+in 13.11 of `SPEC.ja.md`. **Not named by line number** — those rot whenever the document is
+rearranged).
 
 **For this range you can tell that the drawing changed, but not which drawings changed or by how
 much.** That the freezing began at engine 10 is itself the reason for the gap.

@@ -29,7 +29,7 @@ interpreted by LLMs and rendered as abstract SVG drawings.
 inku is not a drawing program in the usual sense.  It treats the written
 description as the durable work, and the rendered SVG as one performance of that
 work.  The same description may be rendered again later, with controlled
-variation, while preserving the underlying score.
+sway, while preserving the underlying score.
 
 The project stands at the intersection of three traditions:
 
@@ -50,7 +50,7 @@ DDL is designed as a language for writing visual tanka.
 ## 2. Design Principles
 
 1. Descriptions must remain human-readable.
-2. Variation is part of the specification, not a bug. It exists at two scales: micro variation in line wobble, blur, grain, and texture; and macro variation in composition and placement resolved by the renderer.
+2. Sway is part of the specification, not a bug. It exists at two scales: micro sway in line wobble, blur, grain, and texture; and macro sway in composition and placement resolved by the renderer.
 3. Emotional adjectives are excluded from core vocabulary.
 4. Physical, spatial, material, and motion words are preferred.
 5. Coordinates are normalized ratios, not fixed pixels.
@@ -367,7 +367,7 @@ Benchmarks focus on:
 - whether Stage 2 preserves all DDL elements in JSON Score
 - whether deterministic fallback keeps enough DDL content to be reviewable
 - whether the renderer makes DDL features visible
-- whether the output has enough negative space, variation, and artistic focus
+- whether the output has enough negative space, sway, and artistic focus
 
 Current render-core tuning records explicit quality metrics for the work in CLI benchmark summaries: `constraint_adherence`, `negative_space_pressure`, `motion_energy`, `color_resonance`, `visual_event`, and `figurative_risk`. These judge metrics are regression sensors, not final acceptance gates or substitutes for human selection. Build 448 confirmed divergence between machine scoring and human review, especially JP #23, so the metrics should not be retuned merely to raise preferred works. Fallback use, server hard timeouts, motif hints, presence counts, color traces, and compositional markers are recorded separately. Queue or retry duration is diagnostic only and is not treated as a primary quality metric, because free inference endpoints can be dominated by external queue behavior.
 
@@ -472,7 +472,7 @@ never exceeds its cap (under `none` only the focus axis moves). The four
 existing refinement kinds keep their one-axis-chisel meaning; variation is a
 distinct operation that shakes several axes at once, presented in the UI as
 the fifth refinement radio. Terminology: variation (hensou) belongs to Stage 1.5 — a
-deterministic variation of the score; yuragi (wobble) belongs to the renderer's
+deterministic variation of the score; yuragi (sway) belongs to the renderer's
 nondeterministic performance. The replay contract (same Score + same seed =
 same work) is untouched, since variation happens before the Score exists and
 is not an rh2 ingredient.
@@ -491,7 +491,7 @@ or differently colored instructions merely because the DDL says "trembling",
 applies a narrow deterministic contract guard for single-primitive DDL with
 motion or texture modifiers: it keeps only instructions matching the requested
 primitive and explicit color, drops unrequested auxiliary marks, and applies
-the missing motion as variation on the requested primitive when possible.  The
+the missing motion as sway on the requested primitive when possible.  The
 guard is intentionally not applied to multi-motif DDL.
 
 When Stage 2 cannot return usable instructions because of timeout, empty output,
@@ -511,9 +511,9 @@ The renderer converts JSON Score into SVG.  It owns visual realization:
 - SVG filters and texture effects
 - canvas aspect handling
 
-The renderer is allowed to produce controlled variation, but it must preserve
-the JSON Score's intent.  Renderer performance has two scales: micro variation
-(line wobble, blur, grain, material texture) and macro variation (seeded
+The renderer is allowed to produce controlled sway, but it must preserve
+the JSON Score's intent.  Renderer performance has two scales: micro sway
+(line wobble, blur, grain, material texture) and macro sway (seeded
 resolution of regions and relations).  Each render may carry a `render_seed`;
 providing the same seed makes replay reproducible while leaving the canonical
 Score stable.
@@ -524,7 +524,7 @@ Score stable.
 > bumps to 5, 6, 7, 8 and 10 as they happened, in the middle of describing the renderer; the index
 > is where to look when the question is "which version changed what".
 
-Since v1.99 variation is performed not only on lines but also on arcs and
+Since v1.99 sway is performed not only on lines but also on arcs and
 closed shapes (circle, ellipse, triangle, square, polygon). The gate mirrors
 the line gate: quality in {perlin, wave, white} and dimensions intersecting
 {position_x, position_y, radius} (radius being a shape's natural axis). Closed
@@ -534,7 +534,7 @@ contact contract holds. The pink (blur) and quality=none paths are unchanged.
 Because the same Score and seed now render differently for affected works, the
 render engine version was bumped to 5; saved SVGs are untouched.
 
-v2.0.5 gave wave-quality variation a performance-seed-derived phase (it was a
+v2.0.5 gave wave-quality sway a performance-seed-derived phase (it was a
 fixed-phase sine before, so the waveform never changed across seeds). The phase
 is derived deterministically from the seed; closure of closed contours at
 integer frequencies, exact arc endpoints, and fixed polygon corners are all
@@ -571,7 +571,7 @@ paths). The contour is drawn as a filled band of outer and inner banks
 (`class="contour-stroke-v1"`, fill-rule evenodd). Corners are pinned to their
 ideal positions as brush seams; cornerless closed contours close their seam
 with a linear ramp. All hand-drawn weights participate; rotring keeps its
-geometric contour. The band's centerline is the contour after variation is
+geometric contour. The band's centerline is the contour after sway is
 performed, and material outlines and specks coexist with the band. Dashed and
 dotted styles keep a thinned geometric contour since the line style itself is
 the description. Body elements stay geometric (with `stroke="none"` for solid
@@ -599,8 +599,8 @@ is suppressed (fill = the material's default way of covering; `surface` = an
 explicit printmaking expression). Surface hatch / crosshatch lines also moved
 from geometric lines to brushwork bands (`class="surface-stroke-v1"`;
 centerline, angle, spacing, and count unchanged; rotring keeps geometric
-lines). Variations that are not performed are now excluded from the seed key,
-so the presence of an inactive variation no longer changes the rendered bytes
+lines). Sways that are not performed are now excluded from the seed key,
+so the presence of an inactive sway no longer changes the rendered bytes
 (per-primitive inactivity rules; for cloudform only `dimensions` is inactive
 since its contour generator always consumes quality / amplitude / frequency).
 Because the same Score and seed render differently, the render engine version
@@ -609,7 +609,7 @@ was bumped to 9.
 v2.3.1 performs arcs as hand-drawn stroke bands too (`class="arc-stroke-v1"`),
 closing the last exclusion left by v2.2.0. All hand-drawn weights participate;
 rotring and non-hand-drawn weights keep the geometric arc. The band's
-centerline is the arc after variation is performed, with both endpoints pinned
+centerline is the arc after sway is performed, with both endpoints pinned
 to their intended values. **The geometric arc remains as an invisible intent
 element (`stroke="none"`)**: the touching (contact) contract is verified by
 reading this intent arc back from the rendered SVG, so the arc extractor needs
@@ -689,10 +689,10 @@ payloads.
 
 ---
 
-## 13. The Design of Variation
+## 13. The Design of Sway
 
-Variation is intentional.  DDL does not attempt to eliminate all model or
-renderer variation.  It uses variation as part of the medium, while keeping the
+Sway is intentional.  DDL does not attempt to eliminate all model or
+renderer sway.  It uses sway as part of the medium, while keeping the
 score, schema, and renderer boundaries explicit.
 
 ---
@@ -707,7 +707,7 @@ Cloudform does not imitate a meteorological cloud. The name refers to a family o
 
 The renderer combines two deterministic periodic processes:
 
-1. A seamless multi-octave 1/f signal modulates a closed polar radius. Existing variation words distribute energy across low lobes or fine high-frequency detail.
+1. A seamless multi-octave 1/f signal modulates a closed polar radius. Existing sway words distribute energy across low lobes or fine high-frequency detail.
 2. A second periodic signal runs along the base curve arc length and creates bays and waists. Its displacement is clamped by local radius and curvature. A strictly positive single-valued polar radius provides the structural self-intersection guarantee; this is geometry safety, not an aesthetic governor.
 
 The contour uses the shared tool grammar, so pencil and rotring produce different edge qualities. Existing surface values such as wash, stipple, hatch, and aquatint fill its interior. Carve mode can cut an irregular light from a dark ground. Output follows the renderer point budget and closed Bezier fitting rules.
@@ -716,7 +716,7 @@ The contour uses the shared tool grammar, so pencil and rotring produce differen
 
 Cloudform introduces no modifier category:
 
-- variation controls octave distribution and contour behavior;
+- sway controls octave distribution and contour behavior;
 - proportion controls aspect, including tall, wide, and full-width haze-like bands;
 - touch controls edge quality;
 - surface and color control the interior;
@@ -733,7 +733,7 @@ Cloudform frequency and context are recorded by the motif ledger as a diagnostic
 
 Contour synthesis uses the existing performance identity and does not change rh2 inputs. The Score remains the score and the contour remains a performed value.
 
-What this version gains is a form without a fixed definition: variation becomes the form itself, and the contour can invite projection by the viewer. What it loses is the previous uniformity in which every core form was geometrically definable. The strict selection boundary makes it harder for cloudform to become an escape hatch for uncertain interpretation.
+What this version gains is a form without a fixed definition: sway becomes the form itself, and the contour can invite projection by the viewer. What it loses is the previous uniformity in which every core form was geometrically definable. The strict selection boundary makes it harder for cloudform to become an escape hatch for uncertain interpretation.
 
 ---
 
@@ -796,7 +796,7 @@ Relations are sequential. `along`, `not_touching`, `cutting`, and `touching` ref
 
 An instruction that carries both a region (`at`) and a relation (such as plugin-member double arcs) is placed by its region first and then resolved by its relation (v1.94); for touching, the previous instruction’s endpoints decide the final position, so the region acts as chain-start information. Unresolvable relations discovered only at performance time (degenerate geometry, grid layouts, endpointless priors) are likewise dropped with a recorded warning.
 
-For `touching`, both the current and previous instruction must be a line or arc. The renderer takes the previous instruction’s performed endpoints and pins the current endpoints to them. For an arc with chord length `c` and signed performed sagitta `b`, it reconstructs the minor arc with `r=c²/(8|b|)+|b|/2`; its center lies opposite the bulge, and a previous arc makes the new arc bulge to the opposite side by default. Minor-arc winding uses the same shared convention as SVG arc rendering. Variation and stroke performance keep both endpoints fixed and act only on the interior. Closed forms and endpointless targets are rejected drop-only with a recorded warning. Degenerate performed geometry also drops the relation at render time; no coordinate repair or governor is introduced.
+For `touching`, both the current and previous instruction must be a line or arc. The renderer takes the previous instruction’s performed endpoints and pins the current endpoints to them. For an arc with chord length `c` and signed performed sagitta `b`, it reconstructs the minor arc with `r=c²/(8|b|)+|b|/2`; its center lies opposite the bulge, and a previous arc makes the new arc bulge to the opposite side by default. Minor-arc winding uses the same shared convention as SVG arc rendering. Sway and stroke performance keep both endpoints fixed and act only on the interior. Closed forms and endpointless targets are rejected drop-only with a recorded warning. Degenerate performed geometry also drops the relation at render time; no coordinate repair or governor is introduced.
 
 Endpoint, tangent, and sagitta verification is performed in canvas coordinates after composing every drawing transform, including rotations on ancestor groups.
 

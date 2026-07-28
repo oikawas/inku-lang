@@ -6791,6 +6791,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--ddl-btn-border-hover: #bd8f34;
 		--ddl-btn-fg-hover:     #4f360b;
 		--ddl-btn-shadow:       0 1px 3px rgba(108,74,16,0.12);
+		/* 系譜で、起点からスター付き作品までの経路を引く色 */
+		--star-path:    #d97a1f;
 	}
 
 	:global(html[data-theme='dark']) {
@@ -6821,6 +6823,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--border:       #38342f;
 		--border2:      #514b43;
 		--danger:       #ff9a86;
+		--star-path:    #f0a44f;
 	}
 
 	/* DDL token palette (v1.98): one definition for every surface that renders

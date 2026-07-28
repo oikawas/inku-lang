@@ -149,6 +149,24 @@
 		}
 		return ids;
 	});
+	// Every edge on a root-to-star path. A starred work is a destination, so the
+	// route that produced it is drawn in orange all the way back to the origin.
+	const starPathEdgeIds = $derived.by(() => {
+		const ids = new Set<string>();
+		for (const node of graph?.nodes ?? []) {
+			if (!node.history?.starred) continue;
+			let current: string | null = node.id;
+			const seen = new Set<string>();
+			while (current && !seen.has(current)) {
+				seen.add(current);
+				const edge = edgeByChild.get(current);
+				if (!edge) break;
+				ids.add(edge.id);
+				current = edge.parent_node_id;
+			}
+		}
+		return ids;
+	});
 	const visibleNodeIds = $derived.by(() => {
 		if (overviewOpen) return new Set((graph?.nodes ?? []).map((node) => node.id));
 		const visible = new Set(ancestorIds);
@@ -563,9 +581,13 @@ $effect(() => {
 						<marker id="lineage-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
 							<path d="M 0 0 L 7 3.5 L 0 7 z"></path>
 						</marker>
+						<marker id="lineage-arrowhead-star" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+							<path class="star-head" d="M 0 0 L 7 3.5 L 0 7 z"></path>
+						</marker>
 					</defs>
 					{#each arrowPaths as arrow (arrow.id)}
-						<path class="lineage-arrow" class:tombstone-arrow={arrow.tombstone} d={arrow.path} marker-end="url(#lineage-arrowhead)"></path>
+						{@const onStarPath = starPathEdgeIds.has(arrow.id)}
+						<path class="lineage-arrow" class:tombstone-arrow={arrow.tombstone} class:star-arrow={onStarPath} d={arrow.path} marker-end={onStarPath ? 'url(#lineage-arrowhead-star)' : 'url(#lineage-arrowhead)'}></path>
 					{/each}
 				</svg>
 				{#each columns as [depth, nodes] (depth)}
@@ -788,6 +810,9 @@ $effect(() => {
 	.lineage-arrow { fill: none; stroke: color-mix(in srgb, var(--fg2) 72%, transparent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 	.lineage-arrow.tombstone-arrow { stroke-dasharray: 5 4; }
 	.lineage-arrows marker path { fill: var(--fg2); }
+	/* Root-to-star route. */
+	.lineage-arrow.star-arrow { stroke: var(--star-path); stroke-width: 2; }
+	.lineage-arrows marker path.star-head { fill: var(--star-path); }
 	.lineage-column { position: relative; z-index: 1; width: 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 14px 18px; }
 	.lineage-columns.horizontal .lineage-column { flex: 0 0 210px; width: 210px; min-width: 210px; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 14px; }
 	.lineage-column.menu-layer { z-index: 20; }

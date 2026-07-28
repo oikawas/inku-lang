@@ -6757,6 +6757,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--panel2:       #faf9f6;
 		--canvas-paper: #fffdf8;
 		--tooltip-bg:   rgba(26,25,23,0.92);
+		/* Tooltips keep a dark plate in both themes, so their label is one value. */
+		--tooltip-fg:   #ffffff;
 		--floating-control-bg: rgba(255,255,255,0.9);
 		--floating-control-hover: #fff;
 		--floating-control-disabled-bg: rgba(255,255,255,0.72);
@@ -6775,6 +6777,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--border:       #d4d0c8;
 		--border2:      #c4c0b8;
 		--danger:       #a2342a;
+		/* Fill pair for destructive buttons. --danger itself is a text colour and
+		   flips to a pale red in dark, so a filled control cannot borrow it. The
+		   saturated red carries enough contrast on both themes, so — like
+		   --ddl-btn-* — this pair has one value (author's ruling, 2026-07-28). */
+		--danger-bg:    #c0392b;
+		--danger-fg:    #ffffff;
 		--r:            4px;
 		--r-lg:         8px;
 		/* 小型ボタン (ghost / ツールバー) の寸法。テーマに依らないので light 側にのみ置く。
@@ -6793,6 +6801,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--ddl-btn-shadow:       0 1px 3px rgba(108,74,16,0.12);
 		/* 系譜で、起点からスター付き作品までの経路を引く色 */
 		--star-path:    #d97a1f;
+		/* 星を付けた状態のボタン。5 コンポーネントが同じリテラルを複製し、
+		   ダークの値を持っていたのは履歴マネージャの 1 箇所だけだった。
+		   その 1 箇所の値をダーク側の正本として採った。 */
+		--star-fg:      #d59b21;
+		--star-bg:      #fff6ce;
+		--star-border:  rgba(213,155,33,0.45);
+		/* サムネイルの上に浮く星の台座。下地は作品そのもの (どちらのテーマでも
+		   紙の色) なので、--floating-control-* と違いテーマで反転させない。 */
+		--thumb-plate-bg:     rgba(255,255,255,0.86);
+		--thumb-plate-fg:     rgba(40,36,30,0.42);
+		--thumb-plate-border: rgba(0,0,0,0.12);
 	}
 
 	:global(html[data-theme='dark']) {
@@ -6824,6 +6843,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--border2:      #514b43;
 		--danger:       #ff9a86;
 		--star-path:    #f0a44f;
+		--star-fg:      #ffd166;
+		--star-bg:      rgba(213,155,33,0.18);
+		--star-border:  rgba(255,209,102,0.55);
 	}
 
 	/* DDL token palette (v1.98): one definition for every surface that renders

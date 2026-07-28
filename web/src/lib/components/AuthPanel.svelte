@@ -241,7 +241,7 @@
 	}
 	.inline-message {
 		border: 1px solid var(--border);
-		background: rgba(255,255,255,0.72);
+		background: var(--panel2);
 		border-radius: var(--r);
 		padding: 8px 10px;
 		font-size: 12px;

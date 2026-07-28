@@ -961,10 +961,10 @@
 		z-index: 31;
 		width: 22px;
 		height: 22px;
-		border: 1px solid rgba(0,0,0,0.12);
+		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
-		background: rgba(255,255,255,0.88);
-		color: rgba(40,36,30,0.42);
+		background: var(--thumb-plate-bg);
+		color: var(--thumb-plate-fg);
 		font-size: 14px;
 		line-height: 1;
 		cursor: pointer;
@@ -972,7 +972,7 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.thumb-star.starred { color: #d59b21; background: #fff6ce; border-color: rgba(213,155,33,0.45); }
+	.thumb-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	.table-thumb-cell { position: relative; width: 66px; }
 	.table-thumb-select {
 		display: block;
@@ -1048,19 +1048,14 @@
 		padding: 0;
 	}
 	.hash-row-star.starred {
-		color: #d59b21;
-		background: #fff6ce;
-		border-color: rgba(213,155,33,0.45);
+		color: var(--star-fg);
+		background: var(--star-bg);
+		border-color: var(--star-border);
 	}
 	:global(html[data-theme='dark']) .hash-row-star {
 		color: #b8c0cc;
 		border-color: rgba(255,255,255,0.22);
 		background: rgba(255,255,255,0.06);
-	}
-	:global(html[data-theme='dark']) .hash-row-star.starred {
-		color: #ffd166;
-		background: rgba(213,155,33,0.18);
-		border-color: rgba(255,209,102,0.55);
 	}
 	.hash-chip {
 		align-self: flex-end;
@@ -1161,8 +1156,8 @@
 		padding: var(--btn-sm-padding);
 		border: none;
 		border-radius: var(--btn-sm-radius);
-		background: #c0392b;
-		color: #fff;
+		background: var(--danger-bg);
+		color: var(--danger-fg);
 		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 		font-family: inherit;

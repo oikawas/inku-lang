@@ -499,16 +499,16 @@
 		vertical-align: bottom;
 	}
 	.create-btn {
-		background: #fff7e8;
-		border-color: #d8b36a;
-		color: #6c4a10;
+		background: var(--ddl-btn-bg);
+		border-color: var(--ddl-btn-border);
+		color: var(--ddl-btn-fg);
 		font-weight: 600;
-		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+		box-shadow: var(--ddl-btn-shadow);
 	}
 	.create-btn:hover {
-		background: #ffefd0;
-		border-color: #bd8f34;
-		color: #4f360b;
+		background: var(--ddl-btn-bg-hover);
+		border-color: var(--ddl-btn-border-hover);
+		color: var(--ddl-btn-fg-hover);
 	}
 	.current-selection {
 		display: flex;

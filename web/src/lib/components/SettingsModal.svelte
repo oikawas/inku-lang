@@ -1880,7 +1880,7 @@
 		padding: 7px 9px;
 		border-radius: var(--r);
 		background: var(--tooltip-bg);
-		color: #fff;
+		color: var(--tooltip-fg);
 		font-size: 11px;
 		line-height: 1.5;
 		text-align: left;
@@ -2044,7 +2044,7 @@
 		padding: 7px 9px;
 		border-radius: var(--r);
 		background: var(--tooltip-bg);
-		color: #fff;
+		color: var(--tooltip-fg);
 		box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 		font-size: 11px;
 		line-height: 1.45;

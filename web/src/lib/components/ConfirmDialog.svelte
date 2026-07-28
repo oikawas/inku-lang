@@ -64,7 +64,7 @@ type ConfirmAction = {
 	.ghost-btn:hover { background: var(--bg2); }
 	.danger-btn, .confirm-btn {
 		padding: var(--btn-sm-padding); border: none; border-radius: var(--btn-sm-radius);
-		color: #fff; font-size: var(--btn-sm-font-size); cursor: pointer; font-family: inherit;
+		font-size: var(--btn-sm-font-size); cursor: pointer; font-family: inherit;
 	}
 	/* The second action starts a drawing, so it wears the paint shell (no ▶ mark). */
 	.paint-action {
@@ -78,7 +78,7 @@ type ConfirmAction = {
 		font-family: inherit;
 	}
 	.paint-action:hover { background: var(--action-hover); border-color: var(--action-hover); }
-	.danger-btn { background: #c0392b; }
+	.danger-btn { background: var(--danger-bg); color: var(--danger-fg); }
 	.confirm-btn {
 		background: var(--accent);
 		color: var(--accent-fg);

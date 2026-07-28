@@ -124,13 +124,7 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     # it moved into the two archives below, where it is now countable.
     ("CHANGELOG.ja.md", "CHANGELOG.md", "entries", None),
     ("docs/history/changelog-v1.72-v2.4.ja.md", "docs/history/changelog-v1.72-v2.4.md", "entries", None),
-    (
-        "docs/history/changelog-v0.1-v1.71.ja.md",
-        "docs/history/changelog-v0.1-v1.71.md",
-        "entries",
-        "73 entries, Japanese only. The English file does not exist yet "
-        "(ledger I-032)",
-    ),
+    ("docs/history/changelog-v0.1-v1.71.ja.md", "docs/history/changelog-v0.1-v1.71.md", "entries", None),
 )
 
 # Unpublished documents that published documents already name, frozen as they

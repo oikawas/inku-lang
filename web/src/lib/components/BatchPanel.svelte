@@ -132,6 +132,9 @@
 	}
 </script>
 
+<div class="batch-label">
+	<span class="batch-label-text"><strong>{t().batchSectionLabel}</strong>{t().batchSectionHint}</span>
+</div>
 <div class="batch-wrap">
 	<div class="line-nums" aria-hidden="true">
 		<!-- The gutter is a plain block, so it is scrolled by hand to stay level
@@ -231,6 +234,15 @@
 {/if}
 
 <style>
+	/* Same shape as the label over the description box in InputPanel. */
+	.batch-label {
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--fg2);
+		font-weight: 400;
+	}
+	.batch-label-text { min-width: 0; }
+	.batch-label strong { font-weight: 600; color: var(--fg); }
 	.batch-wrap {
 		display: flex;
 		border: 1px solid var(--border2);

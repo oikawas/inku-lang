@@ -62,6 +62,8 @@ export interface LangPack {
 	modeDemo: string;
 	inputPlaceholder: string;
 	ddlEditPlaceholder: string;
+	batchSectionLabel: string;
+	batchSectionHint: string;
 	batchPlaceholder: string;
 	batchCount: (n: number) => string;
 	batchHistoryLabel: string;
@@ -80,7 +82,8 @@ export interface LangPack {
 	demoSaveFiles: string;
 	demoRandomColorCatalog: string;
 	demoPromptModel: string;
-	demoSeedPhrase: string;
+	demoSectionLabel: string;
+	demoSectionHint: string;
 	demoInterval: string;
 	demoTimeout: string;
 	demoStart: string;

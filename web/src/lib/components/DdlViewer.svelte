@@ -43,7 +43,7 @@
 	{#if onPaint}
 		<div class="ddl-viewer-actions">
 			<Tooltip placement="left" text={t().tooltipDdlPaint}>
-				<button class="ghost-btn" type="button" disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</button>
+				<button class="ddl-new-btn" type="button" disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</button>
 			</Tooltip>
 		</div>
 	{/if}
@@ -99,19 +99,22 @@
 		justify-content: flex-end;
 		margin-top: -2px;
 	}
-	.ghost-btn {
+	/* Same amber shell as the 指示書 edit / new buttons above the viewer. */
+	.ddl-new-btn {
 		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
+		border: 1px solid var(--ddl-btn-border);
 		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
+		background: var(--ddl-btn-bg);
+		color: var(--ddl-btn-fg);
 		font-family: inherit;
+		font-size: var(--btn-sm-font-size);
+		font-weight: 600;
+		box-shadow: var(--ddl-btn-shadow);
 		white-space: nowrap;
+		cursor: pointer;
 	}
-	.ghost-btn:hover:not(:disabled) { background: var(--bg2); }
-	.ghost-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+	.ddl-new-btn:hover:not(:disabled) { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
+	.ddl-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 	.ddl-expanded {
 		display: flex;
 		flex-direction: column;

@@ -6765,6 +6765,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--btn-sm-font-size: 11px;
 		--btn-sm-padding:   4px 10px;
 		--btn-sm-radius:    var(--r);
+		/* 指示書 (DDL) を扱うボタンの琥珀色。3 コンポーネントで同じリテラルが
+		   複製されていたものをトークン化した (Build 739)。両テーマ共通。 */
+		--ddl-btn-bg:           #fff7e8;
+		--ddl-btn-border:       #d8b36a;
+		--ddl-btn-fg:           #6c4a10;
+		--ddl-btn-bg-hover:     #ffefd0;
+		--ddl-btn-border-hover: #bd8f34;
+		--ddl-btn-fg-hover:     #4f360b;
+		--ddl-btn-shadow:       0 1px 3px rgba(108,74,16,0.12);
 	}
 
 	:global(html[data-theme='dark']) {
@@ -6911,18 +6920,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ddl-tools-section { flex-direction: row; justify-content: flex-end; gap: 6px; }
 	.ddl-new-btn {
 		padding: var(--btn-sm-padding);
-		border: 1px solid #d8b36a;
+		border: 1px solid var(--ddl-btn-border);
 		border-radius: var(--btn-sm-radius);
-		background: #fff7e8;
-		color: #6c4a10;
+		background: var(--ddl-btn-bg);
+		color: var(--ddl-btn-fg);
 		font-family: inherit;
 		font-size: var(--btn-sm-font-size);
 		font-weight: 600;
-		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+		box-shadow: var(--ddl-btn-shadow);
 		white-space: nowrap;
 		cursor: pointer;
 	}
-	.ddl-new-btn:hover:not(:disabled) { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
+	.ddl-new-btn:hover:not(:disabled) { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
 	.ddl-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 	/* thinking */

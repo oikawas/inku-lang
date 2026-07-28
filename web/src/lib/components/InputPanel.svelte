@@ -380,10 +380,10 @@
 			onStop={onStop}
 		/>
 	{:else}
-		{@render inputSettings()}
 		<DemoPanel
 			{runTokensIn}
 			{runTokensOut}
+			{inputSettings}
 			bind:settings={demoSettings}
 			providerGroups={demoModelProviderGroups}
 			running={demoRunning}

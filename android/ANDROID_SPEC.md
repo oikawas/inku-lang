@@ -2006,6 +2006,30 @@ Per contract `antigravity-android-engine12.md` §4d, the edition ID migration to
 - XML test aggregation (`app/build/test-results/testDebugUnitTest/*.xml`) confirms 66 out of 66 unit tests pass (100% PASS / 0 failures / 0 errors / 0 skipped).
 - `gradle :app:assembleDebug` succeeded, incrementing `android/BUILD_NUMBER` to `148087`.
 
+## 2026-07-25 render engine 12 Catch-up Stage 4b′ (re-porting the material outline layer, and exact-match verification of `points` / `stroke-dasharray`)
+
+In accordance with contract `antigravity-android-engine12.md` §9, completed the re-porting of the rejected material outline layer (`<polyline class="material-outline">`) and the exact string comparison tests for the `points` coordinate sequence and the `stroke-dasharray` dash values.
+
+### Implementation and catch-up detail
+
+1. **Straight port and bug fixes in `ServerRendererMaterial.kt`**:
+   - Removed the `scale` that was applied twice inside `outlineOffsetPx`, matching the `_outline_offset_px` formula exactly.
+   - Corrected the seed stringification in `hash01` to `${seed.toULong()}:$salt:$i` (unsigned uint64, decimal representation).
+   - Unified the formatting of `variedDashPattern` (3 decimal places) and `scaleDash` (`fmt`, 6 decimal places) with the Python implementation.
+2. **Seed and path propagation fixes in `DefaultSvgRenderer.kt`**:
+   - In `renderHandStroke` and `materialLineGroup`, propagated the normalized 64-bit uint64 seed (`seedLong`) derived from `seedForInstruction` as the `instructionSeed` parameter.
+   - When a `variation` (tremor or wave) is present, bound the `centerline` (the waved centre line) to `materialCenterline`.
+3. **Added exact-match comparison tests for `points` and `stroke-dasharray` (`DefaultSvgRendererPhase2fTest.kt`)**:
+   - Added `testMaterialOutlinePointsAndDashArrayExactParity`.
+   - For the four cases `02_line_brush`, `09_line_white`, `14_region_then_relation` and `15_line_brush_wild`, verified with `assertEquals` that the `points` coordinate string and the `stroke-dasharray` array of `<polyline class="material-outline">` match the reference SVG exactly.
+4. **Mutation testing (discriminating power)**:
+   - Confirmed that perturbing the `floor` coefficient `0.0035` in `outlineOffsetPx` by `1e-6` (to `0.003500001`) does make `testMaterialOutlinePointsAndDashArrayExactParity` **FAIL**.
+
+### Verification
+
+- Self-aggregation of `app/build/test-results/testDebugUnitTest/*.xml` shows all 68 unit tests passing (**PASS 68 / Failures 0 / Errors 0 / Skipped 0**).
+- `android/BUILD_NUMBER` incremented to **`148088`**.
+
 ## 2026-07-26 render engine 14 Catch-up Stage 5a/5b/5c/5d (stroke_engine terms, grid quantization, raster bleed, performed outline, touch vocabulary alignment)
 
 In accordance with contract `antigravity-android-engine14.md`, completed Android implementation catch-up for render engine 14, `rh3` hash verification, and Saijiki touch vocabulary alignment (10 terms).

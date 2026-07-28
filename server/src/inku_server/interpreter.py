@@ -105,6 +105,16 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 「黒い細線」「白い横線」「放射状に線を引く」のような、てざわりのない線・弧の文を出力してはいけない。
 ただし、関係（あいだ）の定型句・わりあい（半円・上弦・下弦・三日月）・かたむきだけを示す最小の文は、てざわりを省いてよい。
 
+# 太さ — てざわりとは別に書く
+
+線の太さは、てざわりとは別に書く。既定より細いときだけ書く（太い指定は無い）。
+
+- 細い、細線、糸のような、髪のような → 「細い」と明記する
+- 極細、きわめて細い、引っかき傷のような → 「極細」と明記する
+
+太さは DDL に明示する: 「極細の黒い線」「細いペンの横線」。
+太さを理由にてざわりを変えない。細さの語があってもてざわりは質感から選ぶ。
+
 # 数量表現
 
 数量詞が含まれる場合、**色・素材・方向・サイズとともに 1 文に**まとめよ。
@@ -962,6 +972,16 @@ Choose burin or drypoint only when the input explicitly names that technique.
 Write the touch explicitly in normalized DDL: "thin pencil line", "chalk horizontal line", "short crayon line", "fine-brush vertical line".
 Never output a touchless line or arc such as "thin black line", "white horizontal line", or "draw radial lines".
 The only exception is a minimal sentence that states nothing but a relation phrase, a proportion (semicircle, waxing, waning, crescent), or an angle.
+
+# Thinness — written separately from the touch
+
+Line thinness is written separately from the touch. Write it only when the line is thinner than the tool's default; there is no thicker side.
+
+- thin, fine line, threadlike, hairlike → write "thin"
+- extra fine, extremely thin, scratchlike → write "extra fine"
+
+Write the thinness explicitly in normalized DDL: "extra fine black line", "thin pen horizontal line".
+Never change the touch because of thinness. Choose the touch from texture even when a thinness word is present.
 
 # Quantity
 

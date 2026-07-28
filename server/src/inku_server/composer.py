@@ -365,6 +365,24 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 入力: 斜めの線を中央に引く。
 出力: {"instructions":[{"primitive":"line","from":[0.25,0.5],"to":[0.75,0.5],"rotation":45}]}
 
+# 太さ → thinness 変換 (必須)
+
+正規化DDL に太さ語が含まれる場合は必ず thinness フィールドに反映せよ。省略は禁止。
+太さ語が無い場合は thinness を書かない (道具の既定の太さになる)。
+
+| 太さ語 | thinness 値 |
+|---|---|
+| 細い / 細線 / 糸のような / 髪のような | fine |
+| 極細 / きわめて細い / 引っかき傷のような | extra_fine |
+
+太さ語は weight を変えない。両方あれば両方書く。
+
+入力: 極細の黒い線を中央に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"thinness":"extra_fine"}]}
+
+入力: 細いペンの横線を中央に引く。
+出力: {"instructions":[{"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"weight":"pen","thinness":"fine"}]}
+
 # てざわり → weight 変換 (必須)
 
 正規化DDL に素材語が含まれる場合は必ず weight フィールドに反映せよ。省略は禁止。
@@ -713,6 +731,24 @@ Output: {"instructions":[{"primitive":"ellipse","center":[0.48,0.20],"size":[0.4
 
 Input: Place a tall rectangle at center.
 Output: {"instructions":[{"primitive":"square","position":[0.425,0.325],"size":[0.15,0.35]}]}
+
+# Thinness → thinness (required)
+
+When the normalized DDL contains a thinness word, always set the thinness field. Omission is forbidden.
+When there is no thinness word, omit thinness (the tool draws at its default width).
+
+| thinness word | thinness value |
+|---|---|
+| thin / fine line / threadlike / hairlike | fine |
+| extra fine / extremely thin / scratchlike | extra_fine |
+
+A thinness word never changes weight. When both are present, write both.
+
+Input: Draw an extra fine black line at center.
+Output: {"instructions":[{"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"thinness":"extra_fine"}]}
+
+Input: Draw a thin pen horizontal line at center.
+Output: {"instructions":[{"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"weight":"pen","thinness":"fine"}]}
 
 # Touches → weight (required)
 

@@ -1341,7 +1341,12 @@ def test_canvas_ground_non_display_profiles_remain_filter_free():
         )
 
 
-def test_render_display_surface_stipple_is_clipped_to_shape():
+def test_render_display_surface_stipple_follows_the_shape_without_a_clip():
+    """engine 16: 粒は輪郭の内側から引くので display の clipPath が要らない。
+
+    engine 15 までは bbox に一様乱数で撒いてはみ出した分を display だけが
+    clipPath で隠しており、editable では図形の外に粒が出ていた。
+    """
     score = Score.model_validate(
         {
             "instructions": [
@@ -1359,9 +1364,8 @@ def test_render_display_surface_stipple_is_clipped_to_shape():
     svg = render(score, render_seed=123)
 
     assert 'id="surface_000_000_stipple"' in svg
-    assert "<clipPath" in svg
-    assert 'clip-path="url(#clip_surface_000_000_stipple_' in svg
-    assert svg.count("<circle") > 10
+    assert "clip_surface_000_000_stipple" not in svg
+    assert svg.count("surface-stroke-v1") > 10
 
 
 def test_render_editable_surface_has_stable_group_id_without_filters():
@@ -1633,7 +1637,10 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
     # engine 15 (演奏 seed の allowlist 化 + 材質輪郭の距離是正) で再採取。
     # ここは既定 weight の pen を使うので、pen が材質輪郭を持った分も入っている。
-    assert digest == "a822b5cf5eb09d9b8176d3b79f7d9f94890a9421c2956dad069b2983ac49cc67"
+    # engine 16 段 3 (太さの軸) で再採取。`thinness` が演奏 seed の allowlist に
+    # 入った (C-7) ので、値が既定の None でも seed 鍵が変わる。幅そのものは
+    # 動いていない (thinness=None の倍率は 1.0)。
+    assert digest == "3caad55448f0a0a3f4c97b3f084b55dad143783a37e934f6283b58597d7ecc8c"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

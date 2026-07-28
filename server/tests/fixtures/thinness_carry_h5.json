@@ -1,0 +1,170 @@
+{
+  "ddl": "背景を黒で埋める。\n中央に黒い太筆の太い縦線を一本引く。\n黒い太筆の細い縦線を左右に百二十本並べる。\n白の細筆の細い縦線を、中央の太い線の周囲に二十四本、上から下へ並べる。\n白の細筆の細い線を、上から下へ波打つ軌跡に沿って六十本散らす。",
+  "score_stage2": {
+    "version": "0.1.0",
+    "canvas": "square",
+    "background": "black",
+    "presence": null,
+    "instructions": [
+      {
+        "primitive": "line",
+        "from": [
+          0.5,
+          0.0
+        ],
+        "to": [
+          0.5,
+          1.0
+        ],
+        "center": null,
+        "radius": null,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": "巨木の幹",
+        "variation": {
+          "amplitude": "fine",
+          "frequency": "medium",
+          "quality": "perlin",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ]
+        },
+        "arrangement": {
+          "count": 1,
+          "layout": "vertical",
+          "rows": null,
+          "cols": null,
+          "jitter": 0.12,
+          "path": "none",
+          "color_cycle": [],
+          "margin": 0.1,
+          "center": null,
+          "radius": null,
+          "density": "none",
+          "cluster_count": null,
+          "fade": "none",
+          "preserve_space": false,
+          "rhythm_spacing": "none"
+        },
+        "at": null,
+        "relation": null,
+        "surface": null,
+        "thinness": "fine"
+      },
+      {
+        "primitive": "line",
+        "from": [
+          0.5,
+          0.0
+        ],
+        "to": [
+          0.5,
+          1.0
+        ],
+        "center": null,
+        "radius": null,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": {
+          "amplitude": "fine",
+          "frequency": "medium",
+          "quality": "perlin",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ]
+        },
+        "arrangement": {
+          "count": 120,
+          "layout": "horizontal",
+          "rows": null,
+          "cols": null,
+          "jitter": 0.12,
+          "path": "none",
+          "color_cycle": [],
+          "margin": 0.45,
+          "center": null,
+          "radius": null,
+          "density": "none",
+          "cluster_count": null,
+          "fade": "none",
+          "preserve_space": false,
+          "rhythm_spacing": "none"
+        },
+        "at": null,
+        "relation": null,
+        "surface": null,
+        "thinness": "fine"
+      },
+      {
+        "primitive": "line",
+        "from": [
+          0.5,
+          0.0
+        ],
+        "to": [
+          0.5,
+          1.0
+        ],
+        "center": null,
+        "radius": null,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "white",
+        "color_hint": null,
+        "variation": {
+          "amplitude": "fine",
+          "frequency": "medium",
+          "quality": "perlin",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ]
+        },
+        "arrangement": null,
+        "at": {
+          "region": [
+            0.42,
+            0.0,
+            0.58,
+            1.0
+          ]
+        },
+        "relation": null,
+        "surface": null,
+        "thinness": "extra_fine"
+      }
+    ]
+  }
+}

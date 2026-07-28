@@ -29,6 +29,7 @@ Weight = Literal[
     "drypoint",
     "computer",
 ]
+Thinness = Literal["fine", "extra_fine"]
 Color = Literal["white", "black", "blue", "red", "green", "gray"]
 SurfaceTexture = Literal[
     "none",
@@ -463,6 +464,13 @@ class Instruction(BaseModel):
             " / crayon=クレヨン / chalk=チョーク / brush_thin=細筆 / brush_thick=太筆"
             " / burin=ビュラン / drypoint=ドライポイント"
             " / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ"
+        ),
+    )
+    thinness: Optional[Thinness] = Field(
+        default=None,
+        description=(
+            "線の細さ。道具の既定より細く引く指定。fine=細い / extra_fine=極細。"
+            "省略時は道具の既定。太くする指定は無い"
         ),
     )
     mode: InstructionMode = Field(

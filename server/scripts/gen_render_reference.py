@@ -27,23 +27,25 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-27"
+FROZEN_AT = "2026-07-28"
 REASON = (
-    "The seed of a mark is made only of what makes it physically another mark, so "
-    "where it sits, what it relates to and what it is annotated with no longer "
-    "change the hand. The ground's seed names the paper - material and grain - so "
-    "raising the opacity darkens the same sheet instead of dealing a new one, and "
-    "absorbency, which nothing ever read, is retired. cloudform joins the road every "
-    "other closed contour takes, so the material layer and the wild toggle reach it. "
-    "The corner shapes and the pen gain the material layer they never had. And "
-    "strength stops being distance: the outline offset multiplier and its floor are "
-    "gone, so every stratum rides the ink at the distance its own table always named. "
-    "Folded in later, before the version was ever published: the sheet says how it was "
-    "made. plain, paper, washi and ink_wash had been one and the same in the ground "
-    "layer; washi now crosses two anisotropic turbulences and stretches its grains "
-    "along the fibre, and ink_wash smears its noise sideways and bands the grains "
-    "under the brush. Not one element is added - washi trades twenty circles for "
-    "twenty fibres and ink_wash draws fewer."
+    "A surface is played, not filled in. Six of the eight texture words had been "
+    "circles scattered by a uniform random inside the bounding box - they never saw "
+    "the shape they belonged to - and bleed was a single ellipse behind a blur. All "
+    "six now run through stroke synthesis and follow the contour, and the display "
+    "profile draws the same marks the editable one does instead of a filter over a "
+    "clipped rectangle; hatch and crosshatch, which already took that road, do not "
+    "move. A tiny fill is placed rather than scanned. Below a short side of about "
+    "three percent of the canvas the scan could not fit its three lines and the "
+    "interior collapsed to a flat region fill; a mark that small is one touch of the "
+    "tool, so it is drawn as one dab. Above the boundary nothing changes. And "
+    "thinness becomes a dimension of its own: asking for a thin line had meant "
+    "naming a thinner tool, so the request bent the choice of tool. The eleven tool "
+    "widths are untouched and no tool goes below the thinnest of them, so the order "
+    "of the tool vocabulary survives being thinned. The axis joins the seed of a "
+    "mark, so a line asked to be thin is played by another hand as well as drawn "
+    "narrower - which is why nearly every case moves, and why the ones that do not "
+    "are again rotring and computer."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -70,7 +72,8 @@ BASE_INSTRUCTION: dict[str, Any] = {
     "primitive": "line", "from": [0.18, 0.50], "to": [0.82, 0.50],
     "center": None, "radius": None, "sides": None, "position": None,
     "size": None, "angle_start": None, "angle_end": None, "rotation": None,
-    "filled": False, "style": "solid", "weight": "pen", "mode": "additive",
+    "filled": False, "style": "solid", "weight": "pen", "thinness": None,
+    "mode": "additive",
     "carve_depth": None, "color": "black", "color_hint": None,
     "variation": None, "arrangement": None, "at": None, "relation": None,
     "surface": None,
@@ -126,6 +129,7 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
           aspect: str = "square", ground: dict[str, Any] | None = None,
           render_seed: int = DEFAULT_RENDER_SEED,
           color_map: dict[str, str] = DEFAULT_COLOR_MAP,
+          svg_profile: str = SVG_PROFILE,
           wild: bool = False) -> None:
     if case_id in cases:
         raise ValueError(f"duplicate case ID: {case_id}")
@@ -133,7 +137,7 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
         "score": _score(instruction, aspect=aspect, ground=ground),
         "render_seed": render_seed,
         "color_map": copy.deepcopy(color_map),
-        "svg_profile": SVG_PROFILE,
+        "svg_profile": svg_profile,
         "wild": wild,
     }
 
@@ -168,6 +172,40 @@ def build_inputs() -> dict[str, dict[str, Any]]:
             surface["texture"] = texture
             _case(cases, f"C-surface-{texture}-{tool}",
                   _instruction("square", weight=tool, filled=False, surface=surface))
+
+    # Tiny fills. Everything below the measured boundary is placed as one dab
+    # rather than scanned; above it the interior is still filled with strokes.
+    # The boundary is a short side of 2.9%-3.2% of the canvas, measured across
+    # five tools and six seeds, so 1% is safely below and 3.4% safely above.
+    _case(cases, "C-tinyfill-circle-pen",
+          _instruction("circle", weight="pen", radius=0.005, filled=True))
+    _case(cases, "C-tinyfill-circle-rotring",
+          _instruction("circle", weight="rotring", radius=0.005, filled=True))
+    _case(cases, "C-tinyfill-square-brush_thick",
+          _instruction("square", weight="brush_thick", position=[0.495, 0.495],
+                       size=[0.01, 0.01], filled=True))
+    _case(cases, "C-tinyfill-boundary-pen",
+          _instruction("circle", weight="pen", radius=0.017, filled=True))
+
+    # The thinness axis. Three tools spanning the width table (0.5 / 2.0 / 8.0)
+    # times the two thinness values, plus one case that states the default
+    # explicitly: naming the default must draw exactly what omitting it draws.
+    for tool in ("silverpoint", "pen", "brush_thick"):
+        for thinness in ("fine", "extra_fine"):
+            _case(cases, f"C-thinness-{thinness}-{tool}",
+                  _instruction("line", weight=tool, thinness=thinness))
+    _case(cases, "C-thinness-default-pen",
+          _instruction("line", weight="pen", thinness=None))
+
+    # The corpus is 100% `editable`, but production renders `display`. Every
+    # display-only branch of the surface layer was therefore never executed once
+    # in 350 cases. These four run the profile the author actually looks at.
+    for texture in ("wash", "bleed", "grain", "hatch"):
+        surface = copy.deepcopy(BASE_SURFACE)
+        surface["texture"] = texture
+        _case(cases, f"C-display-surface-{texture}-pen",
+              _instruction("square", weight="pen", filled=False, surface=surface),
+              svg_profile="display")
 
     for material in ("plain", "paper", "washi", "ink_wash", "charcoal_ground", "mezzotint"):
         ground = copy.deepcopy(BASE_GROUND)
@@ -241,9 +279,9 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                   _instruction("square", weight=tool, filled=False, surface=surface),
                   wild=True)
 
-    expected = {"A": 88, "B": 72, "C": 43, "D": 28, "E": 119}
+    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 350:
+    if actual != expected or len(cases) != 365:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

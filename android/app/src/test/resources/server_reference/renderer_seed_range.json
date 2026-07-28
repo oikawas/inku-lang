@@ -430,6 +430,7 @@
         "filled": false,
         "style": "solid",
         "weight": "brush_thick",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -441,7 +442,7 @@
         "surface": null
       },
       "performance_seed": null,
-      "seed": 11774114535793696935,
+      "seed": 10822395006982551220,
       "variation_seed_fields": null
     },
     {
@@ -467,6 +468,7 @@
         "filled": false,
         "style": "solid",
         "weight": "brush_thick",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -478,7 +480,7 @@
         "surface": null
       },
       "performance_seed": 12345,
-      "seed": 15237328475297385426,
+      "seed": 13031316310122858979,
       "variation_seed_fields": null
     },
     {
@@ -504,6 +506,7 @@
         "filled": false,
         "style": "solid",
         "weight": "pencil",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -522,7 +525,7 @@
         "surface": null
       },
       "performance_seed": 12345,
-      "seed": 249749175657303179,
+      "seed": 5511971836730225760,
       "variation_seed_fields": [
         "amplitude",
         "dimensions",
@@ -550,6 +553,7 @@
         "filled": false,
         "style": "solid",
         "weight": "pen",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -561,7 +565,7 @@
         "surface": null
       },
       "performance_seed": 12345,
-      "seed": 12155974875154284982,
+      "seed": 11528463854510909083,
       "variation_seed_fields": null
     },
     {
@@ -584,6 +588,7 @@
         "filled": false,
         "style": "solid",
         "weight": "pen",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -603,7 +608,7 @@
         "surface": null
       },
       "performance_seed": 12345,
-      "seed": 1800990228647394340,
+      "seed": 7236431248481473474,
       "variation_seed_fields": [
         "amplitude",
         "dimensions",
@@ -631,6 +636,7 @@
         "filled": false,
         "style": "solid",
         "weight": "pen",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -649,7 +655,7 @@
         "surface": null
       },
       "performance_seed": 12345,
-      "seed": 11421651824308200273,
+      "seed": 4172103606578839547,
       "variation_seed_fields": [
         "amplitude",
         "quality"
@@ -678,6 +684,7 @@
         "filled": true,
         "style": "solid",
         "weight": "pencil",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -689,7 +696,7 @@
         "surface": null
       },
       "performance_seed": 12345,
-      "seed": 6924515411119286126,
+      "seed": 14545965189036574497,
       "variation_seed_fields": null
     },
     {
@@ -712,6 +719,7 @@
         "filled": false,
         "style": "solid",
         "weight": "crayon",
+        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -723,7 +731,7 @@
         "surface": null
       },
       "performance_seed": 12345,
-      "seed": 2313828666149693142,
+      "seed": 2285881073873778754,
       "variation_seed_fields": null
     }
   ]

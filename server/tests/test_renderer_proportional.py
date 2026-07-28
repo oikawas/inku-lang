@@ -5,6 +5,7 @@
 """
 
 import math
+import statistics
 from xml.etree import ElementTree
 
 import pytest
@@ -99,16 +100,30 @@ def test_amplitude_px_is_exactly_proportional_to_representative_size():
 def test_closed_contour_amplitude_scales_with_shape_size(
     quality: str, tolerance: float
 ):
-    """図形サイズ 2 倍 → 揺らぎオフセットの絶対量も約 2 倍 (閉輪郭)。"""
+    """図形サイズ 2 倍 → 揺らぎオフセットの絶対量も約 2 倍 (閉輪郭)。
+
+    比は 1 回の演奏では決まらない。最大変位は包絡線の推定量にすぎず、雑音系は
+    引きによって大きく振れる (engine 15 の材料で 8 seed を測ると 1.41〜4.02、
+    engine 16 で 0.92〜2.23)。単一の draw で留めると「たまたま当たった引き」を
+    留めることになるので、seed をまたいだ中央値で見る。
+    """
     variation = {
         "quality": quality,
         "amplitude": "medium",
         "frequency": "medium",
         "dimensions": ["radius"],
     }
-    small = _max_radial_deviation(render(_circle_score(0.1, **variation)), 100.0)
-    large = _max_radial_deviation(render(_circle_score(0.2, **variation)), 200.0)
-    assert large / small == pytest.approx(2.0, rel=tolerance)
+    ratios = []
+    for render_seed in (None, 1, 2, 3, 7, 11, 12345, 999):
+        kwargs = {} if render_seed is None else {"render_seed": render_seed}
+        small = _max_radial_deviation(
+            render(_circle_score(0.1, **variation), **kwargs), 100.0
+        )
+        large = _max_radial_deviation(
+            render(_circle_score(0.2, **variation), **kwargs), 200.0
+        )
+        ratios.append(large / small)
+    assert statistics.median(ratios) == pytest.approx(2.0, rel=tolerance)
 
 
 def test_open_curve_amplitude_scales_with_shape_size():

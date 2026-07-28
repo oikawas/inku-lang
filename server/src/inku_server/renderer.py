@@ -63,6 +63,17 @@ WEIGHT_TO_STROKE_WIDTH: dict[str, float] = {
     "computer": 2.0,
 }
 
+# 太さの軸 (engine 16 段 3)。道具の既定幅に掛ける係数で、細い側にしか無い。
+# 記述者は px を書かず、「細い」「極細」とだけ書く。
+THINNESS_TO_WIDTH_SCALE: dict[str | None, float] = {
+    None: 1.0,
+    "fine": 0.6,
+    "extra_fine": 0.35,
+}
+
+# どの道具をどれだけ細く引いても、最も細い道具 (銀筆) より細くはならない。
+MIN_STROKE_WIDTH: float = WEIGHT_TO_STROKE_WIDTH["silverpoint"]
+
 COLOR_MAP: dict[str, str] = {
     "white": "#ffffff",
     "black": "#111111",
@@ -397,9 +408,17 @@ def _unit_scale(canvas: CanvasSize) -> float:
     return canvas.unit / CANVAS_PX
 
 
-def _stroke_width_px(weight: str, canvas: CanvasSize) -> float:
-    """weight の線幅 (px)。canvas.unit 相対 (unit=1000 で表の値そのもの)。"""
-    return WEIGHT_TO_STROKE_WIDTH[weight] * _unit_scale(canvas)
+def _stroke_width_px(
+    weight: str, canvas: CanvasSize, thinness: str | None = None
+) -> float:
+    """weight と thinness の線幅 (px)。canvas.unit 相対 (unit=1000 で表の値そのもの)。
+
+    太さは道具が内包する寸法で、thinness はそれを細い側へ寄せるだけの係数である
+    (太い側は無い)。銀筆は最も細い道具なので、どの道具をどれだけ細く引いても
+    銀筆の既定より細くはならない — 道具の順序は太さの指定では壊れない。
+    """
+    width = WEIGHT_TO_STROKE_WIDTH[weight] * THINNESS_TO_WIDTH_SCALE[thinness]
+    return max(width, MIN_STROKE_WIDTH) * _unit_scale(canvas)
 
 
 def _grid_step_px(weight: str, canvas: CanvasSize) -> float:
@@ -515,6 +534,7 @@ _SEED_INSTRUCTION_FIELDS = (
     "filled",
     "style",
     "weight",
+    "thinness",
     "mode",
     "carve_depth",
     "variation",
@@ -2177,64 +2197,52 @@ def _shape_bbox(
     return None
 
 
-def _add_shape_to_clip(
-    dwg: svgwrite.Drawing,
-    clip,
+def _surface_contour(
     ins: Instruction,
     canvas: CanvasSize,
     *,
     render_seed: int | None,
     ins_idx: int,
     mark_idx: int,
-) -> None:
+) -> list[tuple[float, float]] | None:
+    """surface が従う閉輪郭 (px)。粒も滲みもこの線から引く。
+
+    engine 15 まで surface は `_shape_bbox` の中に一様乱数を撒いており、三角形にも
+    雲形にも同じ矩形の散らばりが出ていた (外へはみ出す分を display だけが clipPath
+    で隠していた)。ここを輪郭に替えると、粒の位置が図形の形に従い、プロファイル
+    による差も消える。輪郭は幾何そのもの (`variation` は通さない)。雲形だけは輪郭の
+    生成に演奏 seed が要るので、本体と同じ引数で引き直す。
+    """
     if ins.primitive == "circle" and ins.center is not None and ins.radius is not None:
         cx, cy = _px(ins.center, canvas)
-        clip.add(dwg.circle(center=(cx, cy), r=ins.radius * canvas.unit))
-    elif ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
+        r = ins.radius * canvas.unit
+        return _circle_points(
+            cx, cy, r, r, _stroke_sample_count(2 * math.pi * r, canvas)
+        )
+    if ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
         cx, cy = _px(ins.center, canvas)
-        clip.add(
-            dwg.ellipse(
-                center=(cx, cy),
-                r=(ins.size[0] * canvas.width / 2, ins.size[1] * canvas.height / 2),
-            )
+        rx = ins.size[0] * canvas.width / 2
+        ry = ins.size[1] * canvas.height / 2
+        return _circle_points(
+            cx, cy, rx, ry, _stroke_sample_count(_ellipse_perimeter(rx, ry), canvas)
         )
-    elif (
-        ins.primitive == "square" and ins.position is not None and ins.size is not None
-    ):
-        x, y = _px(ins.position, canvas)
-        clip.add(
-            dwg.rect(
-                insert=(x, y),
-                size=(ins.size[0] * canvas.width, ins.size[1] * canvas.height),
-            )
-        )
-    elif (
-        ins.primitive == "triangle"
+    if (
+        ins.primitive in ("square", "triangle")
         and ins.position is not None
         and ins.size is not None
     ):
         x, y = _px(ins.position, canvas)
         w = ins.size[0] * canvas.width
         h = ins.size[1] * canvas.height
-        clip.add(dwg.polygon(points=[(x + w / 2, y), (x, y + h), (x + w, y + h)]))
-    elif (
-        ins.primitive == "polygon" and ins.center is not None and ins.radius is not None
-    ):
+        if ins.primitive == "square":
+            return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+        return [(x + w / 2, y), (x + w, y + h), (x, y + h)]
+    if ins.primitive == "polygon" and ins.center is not None and ins.radius is not None:
         cx, cy = _px(ins.center, canvas)
-        clip.add(
-            dwg.polygon(
-                points=_polygon_points(
-                    cx,
-                    cy,
-                    ins.radius * canvas.unit,
-                    ins.sides or 5,
-                    ins.rotation or 0.0,
-                )
-            )
+        return _polygon_points(
+            cx, cy, ins.radius * canvas.unit, ins.sides or 5, ins.rotation or 0.0
         )
-    elif (
-        ins.primitive == "cloudform" and ins.center is not None and ins.size is not None
-    ):
+    if ins.primitive == "cloudform" and ins.center is not None and ins.size is not None:
         cx, cy = _px(ins.center, canvas)
         contour = generate_cloudform_contour(
             (cx, cy),
@@ -2245,7 +2253,22 @@ def _add_shape_to_clip(
             variation=ins.variation,
             weight=ins.weight,
         )
-        clip.add(dwg.path(d=contour.path_d))
+        return list(sample_closed_catmull_rom(contour.points))
+    return None
+
+
+def _point_in_polygon(px: float, py: float, contour: list[tuple[float, float]]) -> bool:
+    """交差数による内外判定。凹形 (雲形) もそのまま扱える。"""
+    inside = False
+    count = len(contour)
+    for index in range(count):
+        ax, ay = contour[index]
+        bx, by = contour[(index + 1) % count]
+        if (ay > py) != (by > py):
+            t = (py - ay) / (by - ay)
+            if px < ax + (bx - ax) * t:
+                inside = not inside
+    return inside
 
 
 def _surface_color(ins: Instruction, cmap: dict[str, str]) -> str:
@@ -2262,6 +2285,195 @@ def _surface_line_angle(surface: SurfaceSpec) -> float:
     }.get(surface.direction, math.pi / 4)
 
 
+SURFACE_MARK_MAX = 90
+SURFACE_DAB_SAMPLES = 5
+SURFACE_WASH_LAYERS = 2
+SURFACE_BLEED_RINGS = 3
+
+
+def _surface_stroke_seed(seed: int, index: int) -> int:
+    """surface の 1 筆ごとの seed。塗りや輪郭と波形を共有させない。"""
+    digest = hashlib.sha256(f"{seed}:surface-stroke:{index}".encode("utf-8")).digest()
+    return struct.unpack("<Q", digest[:8])[0]
+
+
+def _surface_scatter(
+    contour: list[tuple[float, float]], count: int, seed: int
+) -> list[tuple[float, float]]:
+    """輪郭の内部に位置を撒く。走査線と輪郭の交点区間から引く。
+
+    `_render_fill_strokes` と同じ `_scanline_segments` を使うので、凹形も交点対の
+    まま扱え、bbox の外へ粒が出ることがない。走査線に沿う方向と法線方向の両方に
+    hash で散らすため、行として読めるほどは揃わない。
+    """
+    if count <= 0 or len(contour) < 3:
+        return []
+    angle = _fill_scan_angle(seed)
+    xs = [point[0] for point in contour]
+    ys = [point[1] for point in contour]
+    diagonal = max(1e-6, math.hypot(max(xs) - min(xs), max(ys) - min(ys)))
+    rows = max(2, int(round(math.sqrt(count * 1.6))))
+    spacing = diagonal / rows
+    segments = _scanline_segments(contour, angle, spacing, seed)
+    lengths = [
+        math.hypot(end[0] - start[0], end[1] - start[1])
+        for _, start, end in segments
+    ]
+    total = sum(lengths)
+    if total <= 0.0:
+        return []
+    nx, ny = -math.sin(angle), math.cos(angle)
+    points: list[tuple[float, float]] = []
+    for index, ((_, start, end), length) in enumerate(zip(segments, lengths)):
+        share = count * length / total
+        taken = int(share)
+        if _hash01(index, seed, "surface-share") < share - taken:
+            taken += 1
+        for j in range(taken):
+            salt_index = index * 4096 + j
+            u = (j + _hash01(salt_index, seed, "surface-u")) / taken
+            px = start[0] + (end[0] - start[0]) * u
+            py = start[1] + (end[1] - start[1]) * u
+            drift = (_hash01(salt_index, seed, "surface-n") - 0.5) * spacing * 0.8
+            qx, qy = px + nx * drift, py + ny * drift
+            if _point_in_polygon(qx, qy, contour):
+                px, py = qx, qy
+            points.append((px, py))
+    return points
+
+
+def _surface_dab(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    canvas: CanvasSize,
+    point: tuple[float, float],
+    radius: float,
+    color: str,
+    opacity: float,
+    *,
+    seed: int,
+    index: int,
+    wild: bool,
+    use_filters: bool,
+    class_: str | None = None,
+) -> None:
+    """粒を 1 つ置く。1 点 = 1 筆。
+
+    粒は円ではなく、道具を一度当てた痕跡である。幅は道具と粒の大きさの太い方 —
+    細い道具でも粒は粒の大きさを持ち、太筆なら筆の幅が出る — で、長さは
+    `surface.scale` が決める。rotring だけは engine 8 の裁定どおり幾何のままに
+    するので、位置だけが輪郭由来になる。
+
+    幅を道具の線幅だけで決めると、同じ `scale` の粒が engine 15 の円の 1/3.6 の
+    墨しか置かず、面が消えた (実測: 正方形内部の平均濃度 1.74 → 0.48)。
+    """
+    px, py = point
+    if not _uses_hand_stroke(ins.weight):
+        attrs: dict = {
+            "center": (px, py),
+            "r": radius,
+            "fill": color,
+            "opacity": opacity,
+            "stroke": "none",
+        }
+        if class_:
+            attrs["class_"] = class_
+        group.add(dwg.circle(**attrs))
+        return
+    angle = _hash01(index, seed, "surface-dab-angle") * math.pi
+    length = radius * (1.9 + _hash01(index, seed, "surface-dab-length") * 1.6)
+    ux = math.cos(angle) * length / 2
+    uy = math.sin(angle) * length / 2
+    centerline = [
+        (
+            px - ux + 2 * ux * i / (SURFACE_DAB_SAMPLES - 1),
+            py - uy + 2 * uy * i / (SURFACE_DAB_SAMPLES - 1),
+        )
+        for i in range(SURFACE_DAB_SAMPLES)
+    ]
+    stroke = synthesize_along(
+        centerline,
+        max(_stroke_width_px(ins.weight, canvas, ins.thinness), radius * 1.3),
+        ins.weight,
+        _surface_stroke_seed(seed, index),
+        closed=False,
+        grid_step=_grid_step_px(ins.weight, canvas),
+        wild=wild,
+    )
+    path_attrs = {
+        "d": contour_stroke_path(stroke),
+        "fill": color,
+        "fill_opacity": opacity,
+        "stroke": "none",
+        "class_": f"surface-stroke-v1{' ' + class_ if class_ else ''}",
+    }
+    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+        path_attrs["filter"] = f"url(#texture-{ins.weight})"
+    group.add(dwg.path(**path_attrs))
+
+
+def _surface_sweep(
+    dwg: svgwrite.Drawing,
+    group,
+    ins: Instruction,
+    canvas: CanvasSize,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    width: float,
+    color: str,
+    opacity: float,
+    *,
+    seed: int,
+    index: int,
+    wild: bool,
+    use_filters: bool,
+) -> None:
+    """走査線 1 本を 1 筆として引く。薄墨の層はこれを重ねて作る。"""
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    if length <= 0.0:
+        return
+    if not _uses_hand_stroke(ins.weight):
+        group.add(
+            dwg.line(
+                start=start,
+                end=end,
+                stroke=color,
+                stroke_width=width,
+                stroke_opacity=opacity,
+                stroke_linecap="round",
+            )
+        )
+        return
+    count = max(2, _stroke_sample_count(length, canvas))
+    centerline = [
+        (
+            start[0] + (end[0] - start[0]) * i / (count - 1),
+            start[1] + (end[1] - start[1]) * i / (count - 1),
+        )
+        for i in range(count)
+    ]
+    stroke = synthesize_along(
+        centerline,
+        width,
+        ins.weight,
+        _surface_stroke_seed(seed, index),
+        closed=False,
+        grid_step=_grid_step_px(ins.weight, canvas),
+        wild=wild,
+    )
+    path_attrs = {
+        "d": contour_stroke_path(stroke),
+        "fill": color,
+        "fill_opacity": opacity,
+        "stroke": "none",
+        "class_": "surface-stroke-v1",
+    }
+    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+        path_attrs["filter"] = f"url(#texture-{ins.weight})"
+    group.add(dwg.path(**path_attrs))
+
+
 def _render_surface_vectors(
     dwg: svgwrite.Drawing,
     group,
@@ -2270,8 +2482,9 @@ def _render_surface_vectors(
     cmap: dict[str, str],
     *,
     seed: int,
-    clipped: bool,
+    contour: list[tuple[float, float]],
     wild: bool = False,
+    use_filters: bool = False,
 ) -> None:
     surface = ins.surface
     bbox = _shape_bbox(ins, canvas)
@@ -2283,25 +2496,61 @@ def _render_surface_vectors(
     density = max(0.02, surface.density)
     scale = max(0.04, surface.scale)
     area_factor = max(0.2, min(1.8, (w * h) / (canvas.unit * canvas.unit * 0.18)))
-    if surface.texture in {"stipple", "grain", "paper_grain", "wash"}:
-        count = int((22 + density * 120) * area_factor)
+    if surface.texture in {"stipple", "grain", "paper_grain"}:
+        count = min(SURFACE_MARK_MAX, int((22 + density * 120) * area_factor))
         radius = max(0.45, canvas.unit * (0.002 + scale * 0.004))
-        if surface.texture == "wash":
-            count = max(8, int(count * 0.28))
-            radius *= 3.5
-            opacity *= 0.42
-        for i in range(min(count, 180 if clipped else 90)):
-            px = x + _hash01(i, seed, "surface-x") * w
-            py = y + _hash01(i, seed, "surface-y") * h
-            group.add(
-                dwg.circle(
-                    center=(px, py),
-                    r=radius * (0.55 + _hash01(i, seed, "surface-r") * 1.1),
-                    fill=color,
-                    opacity=opacity * (0.45 + _hash01(i, seed, "surface-o") * 0.55),
-                    stroke="none",
-                )
+        for index, point in enumerate(_surface_scatter(contour, count, seed)):
+            _surface_dab(
+                dwg,
+                group,
+                ins,
+                canvas,
+                point,
+                radius * (0.55 + _hash01(index, seed, "surface-r") * 1.1),
+                color,
+                opacity * (0.45 + _hash01(index, seed, "surface-o") * 0.55),
+                seed=seed,
+                index=index,
+                wild=wild,
+                use_filters=use_filters,
             )
+    elif surface.texture == "wash":
+        # 薄墨は粒ではなく層である。同じ図形を角度違いに 2 度掃き、重なった所だけが
+        # 濃くなる。走査線は `_render_fill_strokes` と同じ機構で輪郭に切られる。
+        # 間隔を筆の幅より広く取るのは、隙間なく塗ると織物に見えるからである
+        # (最初の実装は間隔 22px に幅 14〜21px を 2 層重ねて布地になった)。
+        spacing = max(10.0, canvas.unit * (0.052 - density * 0.024))
+        index = 0
+        base_angle = _fill_scan_angle(seed)
+        for layer in range(SURFACE_WASH_LAYERS):
+            layer_seed = seed + layer * 7919
+            # 層は角度を変えない。二度目の掃きが一度目とほぼ同じ向きだから、重なりは
+            # 濃淡になる。無関係な角度で重ねると格子になり、薄墨でなく織物に見えた。
+            angle = base_angle + (
+                _hash01(layer, seed, "wash-angle") - 0.5
+            ) * math.radians(16)
+            segments = _scanline_segments(contour, angle, spacing, layer_seed)
+            for _, start, end in segments:
+                width = max(
+                    _stroke_width_px(ins.weight, canvas, ins.thinness),
+                    spacing * (0.44 + _hash01(index, seed, "wash-width") * 0.30),
+                )
+                _surface_sweep(
+                    dwg,
+                    group,
+                    ins,
+                    canvas,
+                    start,
+                    end,
+                    width,
+                    color,
+                    opacity * 0.42,
+                    seed=seed,
+                    index=index,
+                    wild=wild,
+                    use_filters=use_filters,
+                )
+                index += 1
     elif surface.texture in {"hatch", "crosshatch"}:
         angle = _surface_line_angle(surface)
         spacing = max(5.0, canvas.unit * (0.010 + (1.0 - density) * 0.025))
@@ -2377,43 +2626,96 @@ def _render_surface_vectors(
     elif surface.texture == "aquatint":
         steps = surface.tone_steps
         band = w / steps
-        for step in range(steps):
-            step_density = density * (step + 1) / steps
-            count = min(
-                120, max(5, int((18 + step_density * 90) * area_factor / steps))
-            )
+        radius = max(0.45, canvas.unit * (0.0015 + scale * 0.0025))
+        # 帯は図形の中で濃度が段になること。粒そのものは他の粒系と同じ機構なので、
+        # 一度だけ輪郭から撒き、どの帯に落ちたかで残す確率と濃度を決める。
+        count = min(SURFACE_MARK_MAX, max(5, int((18 + density * 90) * area_factor)))
+        for index, point in enumerate(_surface_scatter(contour, count, seed)):
+            step = min(steps - 1, max(0, int((point[0] - x) / band))) if band > 0 else 0
             boundary_jitter = (
                 (_hash01(step, seed, "aquatint-boundary") - 0.5) * band * 0.08
             )
-            for i in range(count):
-                px = (
-                    x
-                    + step * band
-                    + boundary_jitter
-                    + _hash01(i, seed + step * 101, "aquatint-x") * band
+            shifted = (point[0] + boundary_jitter, point[1])
+            if not _point_in_polygon(shifted[0], shifted[1], contour):
+                shifted = point
+            _surface_dab(
+                dwg,
+                group,
+                ins,
+                canvas,
+                shifted,
+                radius,
+                color,
+                opacity * (0.35 + 0.65 * (step + 1) / steps),
+                seed=seed,
+                index=index,
+                wild=wild,
+                use_filters=use_filters,
+                class_=f"aquatint-step-{step + 1}",
+            )
+    elif surface.texture == "bleed":
+        # 「端が滲む」は端の話である。engine 15 までは bbox 中心の楕円を 1 個置いて
+        # いたので、三角にも雲形にも同じ楕円が出て、端は滲んでいなかった。輪郭を
+        # 外へ押し出した帯を重ねる。押し出す量は頂点ごとに揺れるので、同心の輪郭
+        # ではなく染み出しとして読める。
+        blur = max(1.0, canvas.unit * (0.010 + surface.bleed * 0.030))
+        normals = centerline_normals(contour, True)
+        center = _points_center(contour)
+        outward = sum(
+            (point[0] - center[0]) * nx + (point[1] - center[1]) * ny
+            for point, (nx, ny) in zip(contour, normals)
+        )
+        sign = 1.0 if outward >= 0.0 else -1.0
+        for ring in range(SURFACE_BLEED_RINGS):
+            # 内側の輪は輪郭に重なる。滲みは縁の両側に起こるので、帯は縁から外へ
+            # 立ち上がるのであって、図形から離れた所に輪が浮くのではない。
+            level = ring / (SURFACE_BLEED_RINGS - 1) if SURFACE_BLEED_RINGS > 1 else 0.0
+            pushed = []
+            for i, (point, (nx, ny)) in enumerate(zip(contour, normals)):
+                seep = (
+                    sign
+                    * blur
+                    * level
+                    * (0.55 + _hash01(i + ring * 613, seed, "bleed-seep") * 0.9)
                 )
-                py = y + _hash01(i, seed + step * 101, "aquatint-y") * h
+                pushed.append((point[0] + nx * seep, point[1] + ny * seep))
+            ring_opacity = min(0.30, opacity * 0.55) * (1.0 - level * 0.55)
+            ring_width = max(1.2, blur * (1.05 - level * 0.45))
+            if not _uses_hand_stroke(ins.weight):
                 group.add(
-                    dwg.circle(
-                        center=(px, py),
-                        r=max(0.45, canvas.unit * (0.0015 + scale * 0.0025)),
-                        fill=color,
-                        opacity=opacity * (0.35 + 0.65 * (step + 1) / steps),
-                        stroke="none",
-                        class_=f"aquatint-step-{step + 1}",
+                    dwg.polygon(
+                        points=pushed,
+                        fill="none",
+                        stroke=color,
+                        stroke_width=ring_width,
+                        stroke_opacity=ring_opacity,
                     )
                 )
-    elif surface.texture == "bleed":
-        blur = max(1.0, canvas.unit * (0.006 + surface.bleed * 0.018))
-        group.add(
-            dwg.ellipse(
-                center=(x + w / 2, y + h / 2),
-                r=(w / 2 + blur, h / 2 + blur),
-                fill=color,
-                opacity=min(0.26, opacity * 0.42),
-                stroke="none",
+                continue
+            stroke = synthesize_along(
+                pushed,
+                ring_width,
+                ins.weight,
+                _surface_stroke_seed(seed, 90000 + ring),
+                closed=True,
+                grid_step=_grid_step_px(ins.weight, canvas),
+                wild=wild,
             )
-        )
+            path_attrs = {
+                "d": contour_stroke_path(stroke),
+                "fill": color,
+                "fill_opacity": ring_opacity,
+                "fill_rule": "evenodd",
+                "stroke": "none",
+                "class_": f"surface-stroke-v1 bleed-ring-{ring + 1}",
+            }
+            if (
+                use_filters
+                and ins.weight in TEXTURE_FILTER_WEIGHTS
+                and ins.weight != "drypoint"
+            ):
+                path_attrs["filter"] = f"url(#texture-{ins.weight})"
+            group.add(dwg.path(**path_attrs))
 
 
 def _render_surface_texture(
@@ -2427,7 +2729,17 @@ def _render_surface_texture(
     ins_idx: int,
     mark_idx: int,
     wild: bool = False,
+    use_filters: bool = False,
 ):
+    """図形の面の質感を描く。
+
+    engine 16: display と editable で機構を揃える。engine 15 までは `wash` と
+    `bleed` が display でだけ feTurbulence をかけた矩形になっており、同じ語が
+    プロファイル次第で無関係な 2 つの絵になっていた。両者とも輪郭から筆致で描き、
+    プロファイルの差は他の層と同じく材質フィルタの有無だけにする。粒が輪郭の
+    内側から引かれるようになったので、display の clipPath も要らない (`bleed` は
+    外へ染み出すので、clip はむしろ描いたものを消してしまう)。
+    """
     surface = ins.surface
     if (
         surface is None
@@ -2435,46 +2747,24 @@ def _render_surface_texture(
         or ins.primitive not in _CLOSED_SHAPES
     ):
         return None, None
+    contour = _surface_contour(
+        ins, canvas, render_seed=render_seed, ins_idx=ins_idx, mark_idx=mark_idx
+    )
+    if contour is None or len(contour) < 3:
+        return None, None
     seed = _surface_seed(ins, ins_idx, mark_idx, render_seed)
     gid = _safe_svg_id(f"surface_{ins_idx:03d}_{mark_idx:03d}_{surface.texture}")
     group = dwg.g(id=gid)
-    if profile == "display":
-        clip_id = _safe_svg_id(f"clip_{gid}_{seed % 100000}")
-        clip = dwg.defs.add(dwg.clipPath(id=clip_id))
-        _add_shape_to_clip(
-            dwg,
-            clip,
-            ins,
-            canvas,
-            render_seed=render_seed,
-            ins_idx=ins_idx,
-            mark_idx=mark_idx,
-        )
-        group["clip-path"] = f"url(#{clip_id})"
-        if surface.texture in {"wash", "bleed"}:
-            fid = _safe_svg_id(f"surface_filter_{gid}_{seed % 100000}")
-            bbox = _shape_bbox(ins, canvas)
-            if bbox is not None:
-                x, y, w, h = bbox
-                color = _surface_color(ins, cmap)
-                rect = dwg.rect(
-                    insert=(x, y),
-                    size=(w, h),
-                    fill=color,
-                    opacity=min(0.55, surface.opacity),
-                    filter=f"url(#{fid})",
-                )
-                group.add(rect)
-                return (
-                    group,
-                    f'<filter id="{fid}" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="0.18" numOctaves="2" seed="{seed % 9973}" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="{fmt(1.5 + surface.bleed * 9)}"/><feGaussianBlur stdDeviation="{fmt(surface.bleed * 5)}"/></filter>',
-                )
-        _render_surface_vectors(
-            dwg, group, ins, canvas, cmap, seed=seed, clipped=True, wild=wild
-        )
-        return group, None
     _render_surface_vectors(
-        dwg, group, ins, canvas, cmap, seed=seed, clipped=False, wild=wild
+        dwg,
+        group,
+        ins,
+        canvas,
+        cmap,
+        seed=seed,
+        contour=contour,
+        wild=wild,
+        use_filters=use_filters and profile == "display",
     )
     return group, None
 
@@ -2664,6 +2954,7 @@ def render(
                 ins_idx=ins_idx,
                 mark_idx=mark_idx,
                 wild=wild,
+                use_filters=use_filters,
             )
             if surface_group is not None:
                 instruction_group.add(surface_group)
@@ -3041,7 +3332,7 @@ def _stroke_attrs(
     hint = _norm_label(ins.color_hint or "")
     attrs = {
         "stroke": color,
-        "stroke_width": _stroke_width_px(ins.weight, canvas),
+        "stroke_width": _stroke_width_px(ins.weight, canvas, ins.thinness),
         "fill": color if do_fill else "none",
         "stroke_linecap": weight_style.get("stroke_linecap", "round"),
     }
@@ -3399,14 +3690,18 @@ _SPECK_SPECS: dict[str, tuple[int, float, float, float]] = {
 
 
 def _material_outline_profile(
-    weight: str, canvas: CanvasSize
+    weight: str, canvas: CanvasSize, thinness: str | None = None
 ) -> list[tuple[float, float, float, str | None]]:
-    """材質輪郭の (offset, 線幅, opacity, dasharray)。すべて canvas.unit 相対。"""
+    """材質輪郭の (offset, 線幅, opacity, dasharray)。すべて canvas.unit 相対。
+
+    細く引いた線の材質層は墨と同じだけ細くなる。基準を公称幅に据え置くと、
+    墨だけが細って材質が取り残される。
+    """
     spec = _MATERIAL_OUTLINE_SPECS.get(weight)
     if not spec:
         return []
     scale = _unit_scale(canvas)
-    base_width = _stroke_width_px(weight, canvas)
+    base_width = _stroke_width_px(weight, canvas, thinness)
     offset_gain = _material_gain("outline_offset")
     opacity_gain = _material_gain("outline_opacity")
     return [
@@ -3453,7 +3748,7 @@ def _add_material_circle_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.circle(
                 center=(cx, cy),
@@ -3490,7 +3785,7 @@ def _add_material_ellipse_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.ellipse(
                 center=(cx, cy),
@@ -3527,7 +3822,7 @@ def _add_material_rect_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.rect(
                 insert=(x - offset, y - offset),
@@ -3565,7 +3860,7 @@ def _add_material_arc_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.path(
                 d=_arc_path_d(cx, cy, max(0.0, r + offset), start_deg, end_deg),
@@ -3660,7 +3955,7 @@ def _add_material_performed_outline(
     OFF の出力は幾何版のまま 1 バイトも動かさない。
     """
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         points = _offset_performed_path(path, offset, closed, center)
         element = dwg.polygon if closed else dwg.polyline
         group.add(
@@ -3850,7 +4145,7 @@ def _material_line_group(
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = max(
                 0.8 * scale,
-                _stroke_width_px(ins.weight, canvas)
+                _stroke_width_px(ins.weight, canvas, ins.thinness)
                 * (0.25 if ins.weight == "crayon" else 0.30),
             )
             layer_attrs["stroke_opacity"] = _layer_opacity(
@@ -3921,7 +4216,7 @@ def _render_hand_stroke(
     wild: bool = False,
 ):
     length = math.hypot(end[0] - start[0], end[1] - start[1])
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     grid_step = _grid_step_px(ins.weight, canvas)
     stroke = synthesize_stroke(
         start,
@@ -4069,7 +4364,7 @@ def _fill_scan_angle(seed: int) -> float:
 def _fill_scan_spacing(ins: Instruction, canvas: CanvasSize) -> float:
     """走査線の間隔。完全被覆は狙わない (実際の塗りも紙目を残す)。"""
     return max(
-        _stroke_width_px(ins.weight, canvas) * FILL_SPACING_WIDTH_GAIN,
+        _stroke_width_px(ins.weight, canvas, ins.thinness) * FILL_SPACING_WIDTH_GAIN,
         canvas.unit * FILL_SPACING_UNIT_RATIO,
     )
 
@@ -4141,11 +4436,11 @@ def _render_fill_strokes(
     塗りは領域 fill ではなく、細かいストロークで内側を埋めること。走査線と輪郭の
     交点で筆を切るため各筆の端点は輪郭上に乗り、縁が揃う。走査線が
     `FILL_MIN_SCANLINES` 本に満たない微小図形では None を返し、呼び出し側が
-    領域 fill に縮退する (点のような粒子が輪郭だけになって消えるのを防ぐ)。
+    `_render_fill_dab` へ回す (engine 16 まではここで領域 fill へ縮退していた)。
     """
     if len(contour) < 3:
         return None
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     grid_step = _grid_step_px(ins.weight, canvas)
     seed = _seed_for_instruction(ins, render_seed)
     segments = _scanline_segments(
@@ -4211,6 +4506,87 @@ def _render_fill_strokes(
     return group
 
 
+FILL_DAB_SAMPLES = 5
+# 円のように長短の軸が等しい図形での運びの下限 (長い方の軸に対する比)。
+# 端の taper (`_edge_window`) が両端の 16% ずつを削るので、運びが短すぎると全幅の
+# 平坦部が残らず、図形の内側が空いて輪郭だけの絵になる — 縮退が防いでいた当の失敗
+# である。0.30 では engine 15 の領域 fill の 56〜92% の墨しか置かなかった。
+# 0.90 で 85〜105%、1.10 では 115% まで行き過ぎる (実測は結果レポート §段2)。
+FILL_DAB_MIN_TRAVEL = 0.90
+
+
+def _render_fill_dab(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+    wild: bool = False,
+):
+    """微小な塗りを「塗る」のでなく「置く」。1 筆の打点として描く。
+
+    走査線が `FILL_MIN_SCANLINES` 本に届かない図形は、内部を走査して埋める対象では
+    なく、物としては筆を一度置いた跡である。engine 15 まではここで領域 fill へ
+    縮退しており、内部を持つ本番 instruction の 78% が平坦な塗りになっていた
+    (その 99.3% が短辺 2% 未満の粒である)。
+
+    筆は図形の長い方の軸に沿って運び、幅は短い方の軸が決める。円のように両軸が
+    等しい図形では運びが短くなり、細長い図形では一本の長い筆になる。新しい機構は
+    要らない — engine 12 以降の筆致文法が「一筆の始まりと終わり」を既に持っている。
+    """
+    if len(contour) < 3:
+        return None
+    xs = [point[0] for point in contour]
+    ys = [point[1] for point in contour]
+    width_px = max(xs) - min(xs)
+    height_px = max(ys) - min(ys)
+    if width_px <= 0.0 and height_px <= 0.0:
+        return None
+    cx = (max(xs) + min(xs)) / 2
+    cy = (max(ys) + min(ys)) / 2
+    along_x = width_px >= height_px
+    long_axis = width_px if along_x else height_px
+    short_axis = height_px if along_x else width_px
+    # 運びは「長い方 − 短い方」。円では 0 になるので下限を置き、点にならないようにする。
+    travel = max(long_axis - short_axis, long_axis * FILL_DAB_MIN_TRAVEL)
+    half = travel / 2
+    start = (cx - half, cy) if along_x else (cx, cy - half)
+    end = (cx + half, cy) if along_x else (cx, cy + half)
+    centerline = [
+        (
+            start[0] + (end[0] - start[0]) * i / (FILL_DAB_SAMPLES - 1),
+            start[1] + (end[1] - start[1]) * i / (FILL_DAB_SAMPLES - 1),
+        )
+        for i in range(FILL_DAB_SAMPLES)
+    ]
+    seed = _seed_for_instruction(ins, render_seed)
+    stroke = synthesize_along(
+        centerline,
+        max(_stroke_width_px(ins.weight, canvas, ins.thinness), short_axis),
+        ins.weight,
+        _fill_stroke_seed(seed, 0),
+        closed=False,
+        grid_step=_grid_step_px(ins.weight, canvas),
+        wild=wild,
+    )
+    path_attrs = {
+        "d": contour_stroke_path(stroke),
+        "fill": attrs.get("stroke", "#111111"),
+        "fill_opacity": float(
+            attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0))
+        ),
+        "stroke": "none",
+    }
+    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+        path_attrs["filter"] = f"url(#texture-{ins.weight})"
+    group = dwg.g(class_="fill-dab-v1")
+    group.add(dwg.path(**path_attrs))
+    return group
+
+
 def _interior_fill(
     dwg: svgwrite.Drawing,
     ins: Instruction,
@@ -4222,10 +4598,11 @@ def _interior_fill(
     use_filters: bool,
     wild: bool = False,
 ) -> tuple[object | None, bool]:
-    """内部表現を返す。戻り値は (塗りストローク群, 領域 fill に縮退したか)。
+    """内部表現を返す。戻り値は (内部の描画, 領域 fill に縮退したか)。
 
     rotring (製図ペン) は engine 8 で輪郭を筆致から外してあるのと同じ理由で、
-    塗りも機械の塗り = 領域 fill のままにする。
+    塗りも機械の塗り = 領域 fill のままにする。手の道具では、走査線に届かない
+    微小な図形も領域 fill にはせず、1 筆の打点として置く (engine 16 段 2)。
     """
     if not _fills_interior(ins):
         return None, False
@@ -4234,6 +4611,11 @@ def _interior_fill(
     group = _render_fill_strokes(
         dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters, wild=wild
     )
+    if group is None:
+        group = _render_fill_dab(
+            dwg, ins, contour, attrs, canvas, render_seed,
+            use_filters=use_filters, wild=wild,
+        )
     return (None, True) if group is None else (group, False)
 
 
@@ -4255,7 +4637,7 @@ def _render_contour_hand_stroke(
     戻り値の 2 つめは演奏後の中心線。材質層がこれに追随できるように返す
     (幾何から引くと墨だけが動いて材質が取り残される)。
     """
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     stroke = synthesize_along(
         contour,
         base_width,
@@ -4349,7 +4731,7 @@ def _render_arc_hand_stroke(
         centerline = _arc_points(
             cx, cy, r, ins.angle_start, ins.angle_end, _stroke_sample_count(arc_len, canvas)
         )
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     stroke = synthesize_along(
         centerline,
         base_width,

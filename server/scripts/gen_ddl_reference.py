@@ -20,15 +20,21 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-24"
-REASON = "Freeze the first deterministic DDL-layer reference corpus at engine 1."
+FROZEN_AT = "2026-07-28"
+REASON = (
+    "The Score gains a thinness axis. Thinness had been a property of the tool "
+    "name, so asking for a thin line asked for a different tool; it is a dimension, "
+    "not a touch, and it now has its own field. The DDL layer's behaviour is "
+    "unchanged - every instruction dump simply carries one more key."
+)
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
 
 BASE_INSTRUCTION: dict[str, Any] = {
     "primitive": "line", "from": [0.18, 0.50], "to": [0.82, 0.50],
     "center": None, "radius": None, "sides": None, "position": None,
     "size": None, "angle_start": None, "angle_end": None, "rotation": None,
-    "filled": False, "style": "solid", "weight": "pen", "mode": "additive",
+    "filled": False, "style": "solid", "weight": "pen", "thinness": None,
+    "mode": "additive",
     "carve_depth": None, "color": "black", "color_hint": None,
     "variation": None, "arrangement": None, "at": None, "relation": None,
     "surface": None,

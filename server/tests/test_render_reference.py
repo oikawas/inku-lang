@@ -35,11 +35,17 @@ def test_render_reference_case_counts() -> None:
     # engine 15 で C 群が 40 → 43。`ground.seed` を明示しない 4 件を足し
     # (それまでコーパスは `_texture_seed` を一度も呼んでいなかった)、
     # `absorbency` の退役でその判別ケースが `C-ground-paper` の重複になったので外した。
-    assert len(cases) == 350
+    # engine 16 で C 群が 43 -> 51。コーパスは 350 件すべてが `editable` で、
+    # 本番既定の `display` 固有の分岐を一度も実行していなかったので `display` を
+    # 通す 4 件 (`C-display-surface-*`) を足し、微小な塗りの機構が切り替わる
+    # 境界の両側を留める 4 件 (`C-tinyfill-*`) を足した。
+    # 段 3 で C 群が 51 -> 58。太さの軸 (`thinness`) は道具 3 種 × 2 段の 6 件と、
+    # 既定を明示した 1 件 (`C-thinness-default-pen`) で留める。
+    assert len(cases) == 365
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E")
-    } == {"A": 88, "B": 72, "C": 43, "D": 28, "E": 119}
+    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -57,9 +63,27 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
         assert set(score) == score_fields
         assert set(score["instructions"][0]) == instruction_fields
         assert set(case["color_map"]) == set(generator.DEFAULT_COLOR_MAP)
-        assert case["svg_profile"] == "editable"
+        assert case["svg_profile"] in ("editable", "display")
         assert isinstance(case["render_seed"], int)
         assert isinstance(case["wild"], bool)
+
+
+def test_render_reference_keeps_the_display_profile_covered() -> None:
+    """本番既定の `display` を通るケースが消えないように数で留める。
+
+    engine 15 までコーパスは 100% `editable` で、作者が見ている経路 (フィルタ・
+    clip) を 1 件も実行していなかった。
+    """
+    cases = _generator().build_inputs()
+    display = sorted(
+        case_id for case_id, case in cases.items() if case["svg_profile"] == "display"
+    )
+    assert display == [
+        "C-display-surface-bleed-pen",
+        "C-display-surface-grain-pen",
+        "C-display-surface-hatch-pen",
+        "C-display-surface-wash-pen",
+    ]
 
 
 def test_engine_15_left_only_the_machine_poles_untouched() -> None:
@@ -105,8 +129,33 @@ def test_render_reference_discriminator_cases() -> None:
         assert high["input"]["render_seed"] > 2**63
         assert high["digest"] != ordinary["digest"]
 
+    # engine 16 段 2。engine 15 では「走査線で埋めていない」としか言えなかったが
+    # (縮退先が領域 fill だったので class が出なかった)、いまは打点であることまで
+    # 言える。境界の上側は走査のままであることと対にして留める。
     tiny = cases["D-size-tiny-filled-circle"]
     assert not any("fill-stroke-v1" in name for name in tiny["classes"])
+    assert "fill-dab-v1" in tiny["classes"]
+    boundary = cases["C-tinyfill-boundary-pen"]
+    assert any(name.startswith("fill-stroke-v1") for name in boundary["classes"])
+    assert "fill-dab-v1" not in boundary["classes"]
+    # 機械の極は大きさに依らず領域 fill のまま (class を 1 つも出さない)。
+    assert cases["C-tinyfill-circle-rotring"]["classes"] == []
+
+    # engine 16 段 1。本番既定の display が筆致を通ること。
+    display = cases["C-display-surface-wash-pen"]
+    assert "surface-stroke-v1" in display["classes"]
+
+    # engine 16 段 3。太さは絵を変えるが、銀筆は下限にいるので幅が変わらない
+    # (それでも演奏 seed には入っているので手は変わる = C-7 の帰結)。
+    thin = {
+        key: cases[f"C-thinness-{key}"]
+        for key in (
+            "default-pen", "fine-pen", "extra_fine-pen",
+            "fine-silverpoint", "extra_fine-silverpoint",
+        )
+    }
+    assert len({case["digest"] for case in thin.values()}) == 5
+    assert thin["fine-silverpoint"]["bytes"] == thin["extra_fine-silverpoint"]["bytes"]
 
 
 def _resolve_svg(case_id: str) -> pathlib.Path:

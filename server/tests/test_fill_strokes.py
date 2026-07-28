@@ -263,10 +263,14 @@ def test_surface_hatch_is_played_as_strokes(texture: str):
 
 
 @pytest.mark.parametrize("texture", ["stipple", "grain", "wash", "aquatint", "bleed"])
-def test_surface_grains_stay_geometric(texture: str):
-    """粒と滲みは筆致ではないので現状維持。"""
+def test_surface_grains_are_played_as_strokes(texture: str):
+    """engine 16: 粒と滲みも筆致になる。
+
+    engine 15 までは hatch / crosshatch だけが `synthesize_along` を通っており、
+    残りの texture は一様乱数の円 (bleed は楕円 1 個) だった。
+    """
     svg = _render(SHAPES["square"], weight="pencil", surface={"texture": texture})
-    assert "surface-stroke-v1" not in svg
+    assert "surface-stroke-v1" in svg
 
 
 def test_rotring_surface_hatch_stays_geometric():

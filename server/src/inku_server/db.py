@@ -227,7 +227,7 @@ class UserAccountRow(Base):
     password_hash = Column(Text, nullable=False)
     role          = Column(String, nullable=False, index=True)
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
-    ui_theme      = Column(String, nullable=False, default="light")
+    ui_theme      = Column(String, nullable=False, default="dark")
     settings_tab  = Column(String, nullable=False, default="db")
     model_settings = Column(Text, nullable=False, default="{}")
     image_generation_count = Column(Integer, nullable=False, default=0)

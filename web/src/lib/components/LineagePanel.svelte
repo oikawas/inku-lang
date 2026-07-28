@@ -6,6 +6,7 @@
 	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
+	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
 	import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -36,6 +37,8 @@
 		error: string | null;
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
+		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
+		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
@@ -63,7 +66,7 @@
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -146,6 +149,24 @@
 		}
 		return ids;
 	});
+	// Every edge on a root-to-star path. A starred work is a destination, so the
+	// route that produced it is drawn in orange all the way back to the origin.
+	const starPathEdgeIds = $derived.by(() => {
+		const ids = new Set<string>();
+		for (const node of graph?.nodes ?? []) {
+			if (!node.history?.starred) continue;
+			let current: string | null = node.id;
+			const seen = new Set<string>();
+			while (current && !seen.has(current)) {
+				seen.add(current);
+				const edge = edgeByChild.get(current);
+				if (!edge) break;
+				ids.add(edge.id);
+				current = edge.parent_node_id;
+			}
+		}
+		return ids;
+	});
 	const visibleNodeIds = $derived.by(() => {
 		if (overviewOpen) return new Set((graph?.nodes ?? []).map((node) => node.id));
 		const visible = new Set(ancestorIds);
@@ -179,9 +200,7 @@
 	}
 
 	function operationLabel(kind?: string): string {
-		const ja: Record<string, string> = { touch_change: 'タッチ', layout_change: '構図', catalog_change: '色', reinterpretation: '解釈', model_comparison: 'モデル', language_comparison: '言語', ddl_edit: 'DDL編集', description_edit: '記述編集', replay: '再描画', canvas_aspect_change: 'キャンバス変更' };
-		const en: Record<string, string> = { touch_change: 'Touch', layout_change: 'Layout', catalog_change: 'Color', reinterpretation: 'Reading', model_comparison: 'Model', language_comparison: 'Language', ddl_edit: 'DDL edit', description_edit: 'Description edit', replay: 'Replay', canvas_aspect_change: 'Canvas change' };
-		return (isJapanese ? ja : en)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
+		return derivationKindLabel(kind, isJapanese);
 	}
 
 function toggleCheckedHistory(historyId: string): void {
@@ -217,6 +236,8 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	async function openNode(node: LineageNode): Promise<void> {
 		if (overviewOpen) closeOverview();
+		// 選択中の作品を押し直しても取り直さない（ダブルクリックで二重に取りにいかないため）
+		else if (node.id === graph?.focus_node_id) return;
 		await onOpenNode(node);
 	}
 
@@ -560,9 +581,13 @@ $effect(() => {
 						<marker id="lineage-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
 							<path d="M 0 0 L 7 3.5 L 0 7 z"></path>
 						</marker>
+						<marker id="lineage-arrowhead-star" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+							<path class="star-head" d="M 0 0 L 7 3.5 L 0 7 z"></path>
+						</marker>
 					</defs>
 					{#each arrowPaths as arrow (arrow.id)}
-						<path class="lineage-arrow" class:tombstone-arrow={arrow.tombstone} d={arrow.path} marker-end="url(#lineage-arrowhead)"></path>
+						{@const onStarPath = starPathEdgeIds.has(arrow.id)}
+						<path class="lineage-arrow" class:tombstone-arrow={arrow.tombstone} class:star-arrow={onStarPath} d={arrow.path} marker-end={onStarPath ? 'url(#lineage-arrowhead-star)' : 'url(#lineage-arrowhead)'}></path>
 					{/each}
 				</svg>
 				{#each columns as [depth, nodes] (depth)}
@@ -577,6 +602,18 @@ $effect(() => {
 	<label class="card-check" aria-label={isJapanese ? '一括操作の対象にする' : 'Check for bulk actions'}>
 		<input type="checkbox" checked={checkedHistoryIds.includes(node.history.id)} onclick={(event) => event.stopPropagation()} onpointerdown={(event) => event.stopPropagation()} onchange={() => toggleCheckedHistory(node.history?.id as string)} />
 	</label>
+	{/if}
+	{#if node.history?.id}
+		<button
+			type="button"
+			class="card-star"
+			class:starred={!!node.history.starred}
+			title={node.history.starred ? t().starOn : t().starOff}
+			aria-label={node.history.starred ? t().starOn : t().starOff}
+			aria-pressed={!!node.history.starred}
+			onpointerdown={(event) => event.stopPropagation()}
+			onclick={(event) => { event.stopPropagation(); void onToggleStar(node, event); }}
+		>★</button>
 	{/if}
 	<span class="identity-marks">
 		{#if node.id === graph.focus_node_id}<span class="active-mark">{isJapanese ? '表示中' : 'Displayed'}</span>{/if}
@@ -600,11 +637,11 @@ $effect(() => {
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-					{isJapanese ? '指示を編集' : 'Edit the instructions'}
+					{isJapanese ? '記述を編集' : 'Edit the description'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
-				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
+				{isJapanese ? '指示書を編集' : 'Edit instructions'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
@@ -622,7 +659,7 @@ $effect(() => {
 {/if}
 </div>
 
-								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted work')} onclick={() => openNode(node)}>
+								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted work')} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
 									</div>
@@ -676,7 +713,7 @@ $effect(() => {
 	<div class="lineage-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="lineage-edit-title" tabindex="-1">
 			<header>
 				<div>
-					<h2 id="lineage-edit-title">{editMode === 'description' ? (isJapanese ? '記述を編集' : 'Edit description') : (isJapanese ? 'DDLを編集' : 'Edit DDL')}</h2>
+					<h2 id="lineage-edit-title">{editMode === 'description' ? (isJapanese ? '記述を編集' : 'Edit description') : (isJapanese ? '指示書を編集' : 'Edit instructions')}</h2>
 					<p>{isJapanese ? '描画すると、選択した作品の子として系譜へ保存します。' : 'Drawing saves a new child of the chosen work.'}</p>
 				</div>
 				<button type="button" disabled={editDrawing} aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeEditDialog}>×</button>
@@ -758,8 +795,8 @@ $effect(() => {
 	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }
 	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
 	/* 寸法は header button 側 (--btn-sm-*) に従う。ここでは色だけを上書きする。 */
-	.detach-btn { background: #fff7e8; border-color: #d8b36a; color: #6c4a10; font-weight: 600; box-shadow: 0 1px 3px rgba(108,74,16,0.12); white-space: nowrap; }
-	.detach-btn:hover { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
+	.detach-btn { background: var(--ddl-btn-bg); border-color: var(--ddl-btn-border); color: var(--ddl-btn-fg); font-weight: 600; box-shadow: var(--ddl-btn-shadow); white-space: nowrap; }
+	.detach-btn:hover { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
@@ -773,6 +810,9 @@ $effect(() => {
 	.lineage-arrow { fill: none; stroke: color-mix(in srgb, var(--fg2) 72%, transparent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 	.lineage-arrow.tombstone-arrow { stroke-dasharray: 5 4; }
 	.lineage-arrows marker path { fill: var(--fg2); }
+	/* Root-to-star route. */
+	.lineage-arrow.star-arrow { stroke: var(--star-path); stroke-width: 2; }
+	.lineage-arrows marker path.star-head { fill: var(--star-path); }
 	.lineage-column { position: relative; z-index: 1; width: 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 14px 18px; }
 	.lineage-columns.horizontal .lineage-column { flex: 0 0 210px; width: 210px; min-width: 210px; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 14px; }
 	.lineage-column.menu-layer { z-index: 20; }
@@ -785,6 +825,9 @@ $effect(() => {
 	.lineage-card.trashed { opacity: .62; filter: grayscale(.35); }
 	.card-toolbar { position: relative; z-index: 3; min-height: 22px; margin-bottom: 6px; padding-right: 26px; display: flex; align-items: flex-start; gap: 5px; }
 	.card-check { flex: 0 0 auto; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
+	/* 作品の星。押しても作品は切り替えない（選択はカード本体） */
+	.card-star { flex: 0 0 auto; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg3); font-size: 10px; line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
 	.lineage-edit-backdrop { position: fixed; inset: 0; z-index: 1460; width: 100%; height: 100%; border: 0; padding: 0; background: #0009; cursor: default; }
 	.lineage-edit-dialog { position: fixed; z-index: 1461; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(780px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
@@ -797,7 +840,9 @@ $effect(() => {
 	.lineage-edit-dialog > footer :global(.tenkei-inline) { margin-right: auto; }
 	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
-	.lineage-edit-dialog > footer .edit-draw { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+	/* Same shell as the main paint button (no ▶ mark: footer buttons carry none). */
+	.lineage-edit-dialog > footer .edit-draw { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); font-weight: 700; }
+	.lineage-edit-dialog > footer .edit-draw:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
 	.lineage-edit-dialog button:disabled, .lineage-edit-dialog textarea:disabled { opacity: .55; cursor: default; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
@@ -821,7 +866,7 @@ $effect(() => {
 	/* メニュー見出し: 帯を敷いて項目と明確に分ける */
 	.card-dropdown-title { margin-bottom: 4px; padding: 7px 13px; border-bottom: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--fg); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; }
 	.card-dropdown-origin { display: block; margin-top: 2px; color: var(--fg2); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.02em; }
-	.card-main { display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
+	.card-main { user-select: none; display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: .7rem; }

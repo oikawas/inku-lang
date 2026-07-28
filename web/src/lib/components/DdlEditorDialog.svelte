@@ -488,10 +488,23 @@
 		cursor: not-allowed;
 		opacity: 0.5;
 	}
-	.ddled-draw {
-		background: var(--accent);
-		color: var(--accent-fg);
-		border-color: var(--accent);
+	/* Same shell as the main paint button (no ▶ mark: footer buttons carry none).
+	   Scoped under .ddled-foot: the `.ddled-foot button` rule above is one element
+	   selector more specific, so a bare `.ddled-draw` never painted the button. */
+	.ddled-foot .ddled-draw {
+		background: var(--action-bg);
+		color: var(--action-fg);
+		border-color: var(--action-bg);
+	}
+	.ddled-foot .ddled-draw:hover:not(:disabled) {
+		background: var(--action-hover);
+		border-color: var(--action-hover);
+	}
+	.ddled-foot .ddled-draw:disabled {
+		background: var(--action-disabled-bg);
+		color: var(--action-disabled-fg);
+		border-color: var(--action-disabled-bg);
+		opacity: 1;
 	}
 	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }
 	.ddled-cancel:hover:not(:disabled) {

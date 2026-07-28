@@ -93,7 +93,26 @@
 </main>
 
 <style>
+	/*
+		The screen was written in one set of light literals, so it stayed on cream
+		paper after dark became the release default (Build 744). The washes, the
+		glow, the panel and the language switcher are now local tokens with a dark
+		set below, and the screen follows data-theme like the rest of the app.
+		The background work itself is unchanged: it is ink on white paper in both
+		themes, and the washes decide how far it surfaces.
+	*/
 	.login-screen {
+		--login-wash-a: rgba(250, 249, 246, 0.96);
+		--login-wash-b: rgba(250, 249, 246, 0.86);
+		--login-wash-c: rgba(250, 249, 246, 0.34);
+		--login-paper-top: rgba(245, 241, 232, 0.92);
+		--login-paper-bottom: rgba(234, 229, 216, 0.74);
+		--login-glow-inner: rgba(255, 255, 255, 0);
+		--login-glow-outer: rgba(250, 249, 246, 0.58);
+		--login-panel-bg: rgba(250, 249, 246, 0.94);
+		--login-panel-border: rgba(90, 83, 68, 0.22);
+		--login-panel-shadow: 0 18px 54px rgba(40, 35, 24, 0.18);
+		--login-lang-bg: rgba(255, 255, 255, 0.72);
 		min-height: 100vh;
 		display: grid;
 		place-items: center;
@@ -101,27 +120,40 @@
 		position: relative;
 		overflow: hidden;
 		background:
-			linear-gradient(90deg, rgba(250, 249, 246, 0.96) 0%, rgba(250, 249, 246, 0.86) 42%, rgba(250, 249, 246, 0.34) 100%),
-			linear-gradient(180deg, rgba(245, 241, 232, 0.92) 0%, rgba(234, 229, 216, 0.74) 100%),
+			linear-gradient(90deg, var(--login-wash-a) 0%, var(--login-wash-b) 42%, var(--login-wash-c) 100%),
+			linear-gradient(180deg, var(--login-paper-top) 0%, var(--login-paper-bottom) 100%),
 			url('/login-background.svg') right 17% center / min(1120px, 112vw) auto no-repeat,
 			var(--bg);
 		color: var(--fg);
+	}
+	:global(html[data-theme='dark']) .login-screen {
+		--login-wash-a: rgba(23, 23, 22, 0.97);
+		--login-wash-b: rgba(23, 23, 22, 0.88);
+		--login-wash-c: rgba(23, 23, 22, 0.46);
+		--login-paper-top: rgba(29, 28, 27, 0.88);
+		--login-paper-bottom: rgba(18, 18, 17, 0.76);
+		--login-glow-inner: rgba(0, 0, 0, 0);
+		--login-glow-outer: rgba(10, 10, 9, 0.62);
+		--login-panel-bg: rgba(36, 35, 33, 0.94);
+		--login-panel-border: rgba(238, 233, 223, 0.16);
+		--login-panel-shadow: 0 18px 54px rgba(0, 0, 0, 0.52);
+		--login-lang-bg: rgba(255, 255, 255, 0.06);
 	}
 	.login-screen::before {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: radial-gradient(circle at 72% 44%, rgba(255, 255, 255, 0) 0 34%, rgba(250, 249, 246, 0.58) 76%);
+		background: radial-gradient(circle at 72% 44%, var(--login-glow-inner) 0 34%, var(--login-glow-outer) 76%);
 		pointer-events: none;
 	}
 	.login-panel {
 		width: min(420px, calc(100vw - 32px));
 		position: relative;
 		z-index: 1;
-		background: rgba(250, 249, 246, 0.94);
+		background: var(--login-panel-bg);
 		border-radius: var(--r);
-		box-shadow: 0 18px 54px rgba(40, 35, 24, 0.18);
-		border: 1px solid rgba(90, 83, 68, 0.22);
+		box-shadow: var(--login-panel-shadow);
+		border: 1px solid var(--login-panel-border);
 		-webkit-backdrop-filter: blur(10px);
 		backdrop-filter: blur(10px);
 		display: flex;
@@ -167,7 +199,7 @@
 		padding: 0 8px;
 		border: none;
 		border-right: 1px solid var(--border2);
-		background: rgba(255, 255, 255, 0.72);
+		background: var(--login-lang-bg);
 		color: var(--fg2);
 		font-family: inherit;
 		font-size: 11px;
@@ -201,6 +233,8 @@
 		font-size: 13px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
 		font-family: inherit;
 	}
 	.login-submit {
@@ -241,7 +275,7 @@
 	}
 	.inline-message {
 		border: 1px solid var(--border);
-		background: rgba(255,255,255,0.72);
+		background: var(--panel2);
 		border-radius: var(--r);
 		padding: 8px 10px;
 		font-size: 12px;

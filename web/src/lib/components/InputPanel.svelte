@@ -30,6 +30,8 @@
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		singleRunning: boolean;
+		/** The run shows its status elsewhere (the instruction sheet draws its own). */
+		hideRunStatus?: boolean;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		singleDdlReady: boolean;
@@ -73,8 +75,6 @@
 		onSelectTenkei: (level: TenkeiLevel) => void;
 		wildEnabled: boolean;
 		onSelectWild: (value: boolean) => void;
-		showKiwi: boolean;
-		showCrab: boolean;
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
@@ -106,6 +106,7 @@
 		batchNonEmpty,
 		batchRunning,
 		singleRunning,
+		hideRunStatus = false,
 		runTokensIn,
 		runTokensOut,
 		singleDdlReady,
@@ -149,8 +150,6 @@
 		onSelectTenkei,
 		wildEnabled,
 		onSelectWild,
-		showKiwi,
-		showCrab,
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
@@ -331,7 +330,7 @@
 
 		{@render inputSettings()}
 
-		{#if singleRunning}
+		{#if singleRunning && !hideRunStatus}
 			<div class="gen-status-wrap">
 			<RunStatus
 				label={stageLabel || t().stageDdlGenerating}
@@ -374,7 +373,6 @@
 			{error}
 			{batchPromptHistory}
 			bind:randomColorCatalog={batchRandomColorCatalog}
-			{showCrab}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}
@@ -382,10 +380,10 @@
 			onStop={onStop}
 		/>
 	{:else}
-		{@render inputSettings()}
 		<DemoPanel
 			{runTokensIn}
 			{runTokensOut}
+			{inputSettings}
 			bind:settings={demoSettings}
 			providerGroups={demoModelProviderGroups}
 			running={demoRunning}
@@ -496,16 +494,16 @@
 		vertical-align: bottom;
 	}
 	.create-btn {
-		background: #fff7e8;
-		border-color: #d8b36a;
-		color: #6c4a10;
+		background: var(--ddl-btn-bg);
+		border-color: var(--ddl-btn-border);
+		color: var(--ddl-btn-fg);
 		font-weight: 600;
-		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+		box-shadow: var(--ddl-btn-shadow);
 	}
 	.create-btn:hover {
-		background: #ffefd0;
-		border-color: #bd8f34;
-		color: #4f360b;
+		background: var(--ddl-btn-bg-hover);
+		border-color: var(--ddl-btn-border-hover);
+		color: var(--ddl-btn-fg-hover);
 	}
 	.current-selection {
 		display: flex;

@@ -1,9 +1,10 @@
 <!--
-	inku-lang cube mascot. A 5x5 pixel "cube" that orbits (mascot-spin) while each
-	pixel does a vortex-breathe, with a few incubator pixels blinking between inku
-	palette colours. Ported from no-git-sync/mascot/gemini15/18.html. The pixel
+	Incu, the default mascot. A 5x5 pixel "cube" that orbits (mascot-spin) while
+	each pixel does a vortex-breathe, with a few incubator pixels blinking between
+	inku palette colours. Ported from no-git-sync/mascot/gemini15/18.html. The pixel
 	colours are identical in light and dark mode (only the page paper differs in the
 	reference), so this component is theme-independent and sits on a transparent box.
+	The other mascot is YuragiMascot; RunStatus picks between them.
 -->
 <div class="inku-mascot-box" aria-hidden="true">
 	<div class="mascot-wrapper">

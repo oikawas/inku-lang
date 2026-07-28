@@ -37,7 +37,6 @@
 		error: string | null;
 		batchPromptHistory: string[];
 		randomColorCatalog: boolean;
-		showCrab: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -70,7 +69,6 @@
 		error,
 		batchPromptHistory,
 		randomColorCatalog = $bindable(false),
-		showCrab,
 		stage1ModelLabel,
 		stage2ModelLabel,
 		onRememberBatchPrompt,
@@ -134,6 +132,9 @@
 	}
 </script>
 
+<div class="batch-label">
+	<span class="batch-label-text"><strong>{t().batchSectionLabel}</strong>{t().batchSectionHint}</span>
+</div>
 <div class="batch-wrap">
 	<div class="line-nums" aria-hidden="true">
 		<!-- The gutter is a plain block, so it is scrolled by hand to stay level
@@ -233,13 +234,30 @@
 {/if}
 
 <style>
+	/* Same shape as the label over the description box in InputPanel. */
+	.batch-label {
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--fg2);
+		font-weight: 400;
+	}
+	.batch-label-text { min-width: 0; }
+	.batch-label strong { font-weight: 600; color: var(--fg); }
 	.batch-wrap {
 		display: flex;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
 		overflow: hidden;
+		/* The box is sized here, not by the textarea: the gutter is a plain block
+		   whose content is as tall as the line count, so leaving the height to the
+		   children let a long batch stretch the box past the bottom of the panel.
+		   Resizing moves the gutter and the text together. */
+		height: clamp(200px, 42vh, 640px);
+		resize: vertical;
+		min-height: 120px;
 	}
 	.line-nums {
+		flex: 0 0 auto;
 		background: var(--bg2); border-right: 1px solid var(--border);
 		padding: 9px 6px; font-size: 13px; line-height: 1.65;
 		text-align: right; color: var(--fg3); user-select: none;
@@ -254,16 +272,14 @@
 		border-radius: 0;
 		background: transparent; color: var(--fg);
 		font-family: inherit; font-size: 13px; line-height: 1.65;
-		resize: vertical; outline: none;
+		resize: none; outline: none;
 		white-space: pre;
 		overflow-wrap: normal;
 		overflow: auto;
 		position: relative;
 		z-index: 1;
-		/* Sized to the window, not to the line count: a long batch scrolls inside
-		   the box instead of pushing the run button off the bottom of the panel.
-		   Still draggable, so a taller box is one gesture away. */
-		height: clamp(200px, 42vh, 640px);
+		/* Fills the box; the box itself carries the height and the resize grip. */
+		height: 100%;
 	}
 	.batch-ta:focus { border-color: var(--accent); }
 	.batch-ta:read-only {

@@ -1,5 +1,6 @@
 <script module lang="ts">
 	declare const __BUILD_NUMBER__: string;
+	declare const __BUILD_DATE__: string;
 </script>
 
 <script lang="ts">
@@ -21,6 +22,7 @@
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
+	import RunStatus from '$lib/components/RunStatus.svelte';
 	import ProfileModal from '$lib/components/ProfileModal.svelte';
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
@@ -42,6 +44,7 @@
 		type ModelOption
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
+	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
@@ -67,16 +70,19 @@
 	const CATALOG_KEY         = 'inku-color-catalog';
 	const TENKEI_KEY          = 'inku-tenkei';
 	const WILD_KEY            = 'inku-wild';
-	const SHOW_BIRDS_KEY      = 'inku-show-birds';
-	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
-	const SHOW_CRAB_KEY       = 'inku-show-crab';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v2.9.3';
+	const APP_VERSION = 'v2.9.4';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
+	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
+	const buildDateLabel = $derived.by(() => {
+		const stamp = new Date(__BUILD_DATE__);
+		if (Number.isNaN(stamp.getTime())) return null;
+		return stamp.toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
+	});
 	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
@@ -465,7 +471,7 @@
 	let settingsTab  = $state<SettingsTab>('connection');
 	let pngMenuOpen  = $state(false);
 	let userMenuOpen = $state(false);
-	let darkMode     = $state(false);
+	let darkMode     = $state(true);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
 	let canvasAspectEnabled = $state(true);
@@ -506,8 +512,6 @@
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
 	let currentRenderEngineVersion = $state<string | null>(null);
-	let showKiwi = $state(true);
-	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
@@ -840,7 +844,9 @@
 	}
 
 	function applyUserTheme(user: UserItem | null) {
-		darkMode = user?.ui_theme === 'dark';
+		// No stored preference (signed out, or a row without one) follows the
+		// release default rather than falling back to light.
+		darkMode = (user?.ui_theme ?? 'dark') === 'dark';
 	}
 
 	function modelsFor(provider: Provider) {
@@ -2375,8 +2381,6 @@
 
 	function persistMiscSettings() {
 		try {
-			localStorage.setItem(SHOW_KIWI_KEY, showKiwi ? '1' : '0');
-			localStorage.setItem(SHOW_CRAB_KEY, showCrab ? '1' : '0');
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
 			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
@@ -2917,7 +2921,15 @@ if (unreadWords.length > 0) {
 	// stay on the artwork on screen instead of chasing every new line. It clears
 	// when that artwork is not in the newest window, rather than pointing at a
 	// neighbour.
+	// While the reader has paged back through the strip, a finished batch line or
+	// demo render must not drag them to the newest page. Only the count moves;
+	// the window itself is refetched when the run ends (refreshHistoryAfterRun).
+	// The same guard already protects the strip from externally saved works.
 	async function refreshHistoryAfterServerSave() {
+		if (historyOffset !== 0) {
+			if (!historyStarredOnly) historyTotal += 1;
+			return;
+		}
 		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
 		await fetchHistoryOffset(0);
 		if (!activeHistoryId) {
@@ -2925,6 +2937,13 @@ if (unreadWords.length > 0) {
 			return;
 		}
 		historyCursor = historyItems.findIndex((item) => item.id === activeHistoryId);
+	}
+
+	// Catch the paged-away strip up once the run is over, staying on the page the
+	// reader chose. Page 0 needs nothing: it was refreshed after every save.
+	async function refreshHistoryAfterRun() {
+		if (!authToken || historyOffset === 0) return;
+		await fetchHistoryOffset(historyOffset, { preserveSelection: true });
 	}
 
 	function sleep(ms: number): Promise<void> {
@@ -3024,6 +3043,7 @@ if (unreadWords.length > 0) {
 			}
 		}
 		if (demoRunId === runId) {
+			await refreshHistoryAfterRun();
 			demoTimedOut = Date.now() >= timeoutAt;
 			demoCurrentStartedAt = null;
 			stopTimer();
@@ -3063,6 +3083,7 @@ if (unreadWords.length > 0) {
 
 	function stopDemo() {
 		demoRunId += 1;
+		void refreshHistoryAfterRun();
 		demoTimedOut = false;
 		demoCurrentStartedAt = null;
 		loading = false;
@@ -3236,6 +3257,7 @@ if (unreadWords.length > 0) {
 					}
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
+				await refreshHistoryAfterRun();
 				if (batchFailures.length > 0) {
 					setBatchFailureReport({
 						success: batchSuccess,
@@ -3599,6 +3621,14 @@ if (unreadWords.length > 0) {
 		historyManager.applyStarState(item);
 		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
 		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, starred: item.starred, note: hasNote ? item.note : displayedHistoryItem.note };
+		if (lineageGraph) {
+			lineageGraph = {
+				...lineageGraph,
+				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
+					? { ...node, history: { ...node.history, starred: item.starred, note: hasNote ? item.note : node.history.note } }
+					: node)
+			};
+		}
 	}
 
 	async function toggleHistoryStar(item: HistoryStarTarget | null | undefined, event?: Event): Promise<void> {
@@ -4357,6 +4387,18 @@ async function openLineageNode(node: LineageNode): Promise<void> {
 	outputTab = 'lineage';
 	lineageDetached = false;
 	await fetchLineage(node.id, true);
+}
+
+// 系譜タブ: ダブルクリックは作品タブへ移す（シングルクリックは選択のまま）。
+async function openLineageNodeInCanvas(node: LineageNode): Promise<void> {
+	if (!node.history) return;
+	loadIterationItem(node.history);
+	outputTab = 'canvas';
+}
+
+async function toggleLineageStar(node: LineageNode, event?: Event): Promise<void> {
+	if (!node.history?.id) return;
+	await toggleHistoryStar({ id: node.history.id, starred: !!node.history.starred }, event);
 }
 
 function lineageCatalogId(node: LineageNode): string {
@@ -5942,6 +5984,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		window.addEventListener('focus', onHistoryWindowFocus);
 
 		initLang();
+		initMascot();
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null; if (p1) stage1Provider = p1;
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
@@ -5950,11 +5993,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
 			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
 			const wild = localStorage.getItem(WILD_KEY); if (wild !== null) wildEnabled = wild === '1';
-			const kiwi = localStorage.getItem(SHOW_KIWI_KEY);
-			const birds = localStorage.getItem(SHOW_BIRDS_KEY);
-			if (kiwi !== null) showKiwi = kiwi !== '0';
-			else if (birds !== null) showKiwi = birds !== '0';
-			const crab = localStorage.getItem(SHOW_CRAB_KEY); if (crab !== null) showCrab = crab !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
@@ -5978,7 +6016,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
+		pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -6047,6 +6085,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{batchNonEmpty}
 						{batchRunning}
 						{singleRunning}
+						hideRunStatus={reloading}
 						singleDdlReady={ddl !== null}
 						{batchActiveLine}
 						{batchActiveDdlHighlighted}
@@ -6081,15 +6120,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{demoError}
 						lockNonDemo={demoRunning}
 						{canSubmit}
-						generationDisabled={variationGridBusy}
+						generationDisabled={variationGridBusy || reloading}
 						{error}
 						{stageLabel}
 						{tenkeiLevel}
 						onSelectTenkei={setTenkeiLevel}
 						{wildEnabled}
 						onSelectWild={setWildEnabled}
-						{showKiwi}
-						{showCrab}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -6137,10 +6174,30 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
+					<!-- 指示書から描画したときの状況表示。入力欄ではなくボタンの下に出す -->
+					{#snippet ddlRunStatus()}
+						<RunStatus
+							label={stageLabel || t().stageDdlGenerating}
+							stage2Model={stage2ModelLabel}
+							elapsedMs={liveMs}
+							tokensIn={activeRunTokensIn}
+							tokensOut={activeRunTokensOut}
+							onStop={stopDdlRender}
+						/>
+					{/snippet}
+
 					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
 						<section class="panel-section">
-							<DdlViewer {ddl} {expandedDdl} label={t().ddlLabel} expandedLabel={t().ddlExpandedLabel} />
+							<DdlViewer
+								{ddl}
+								{expandedDdl}
+								label={t().ddlLabel}
+								expandedLabel={t().ddlExpandedLabel}
+								onPaint={() => { void replay(); }}
+								paintDisabled={loading || reloading || variationGridBusy}
+								runStatus={reloading ? ddlRunStatus : null}
+							/>
 						</section>
 					{/if}
 
@@ -6343,6 +6400,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{lineageError}
 				isJapanese={getLang() === 'ja'}
 				onOpenLineageNode={openLineageNode}
+				onOpenLineageNodeInCanvas={openLineageNodeInCanvas}
+				onToggleLineageStar={toggleLineageStar}
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}
@@ -6474,8 +6533,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:newGroupName
 		bind:editGroupName
 		{editGroupId}
-		bind:showKiwi
-		bind:showCrab
 		bind:autoRepairEnabled={ddlAutoRepairEnabled}
 		bind:pngAlphaWhite
 		{exportTemplates}
@@ -6546,6 +6603,26 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			<button class="app-info-close" onclick={() => (appInfoOpen = false)} aria-label={t().appInfoClose}>×</button>
 		</div>
 		<div class="app-info-body">
+			<dl class="app-info-meta">
+				<div>
+					<dt>{t().appInfoVersionLabel}</dt>
+					<dd>{APP_VERSION}</dd>
+				</div>
+				<div>
+					<dt>{t().appInfoBuildDateLabel}</dt>
+					<dd>{buildDateLabel ?? t().historyVersionNotRecorded}</dd>
+				</div>
+				{#if developerMode}
+					<div>
+						<dt>{t().appInfoBuildLabel}</dt>
+						<dd>{__BUILD_NUMBER__}</dd>
+					</div>
+				{/if}
+				<div>
+					<dt>{t().appInfoRepositoryLabel}</dt>
+					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
+				</div>
+			</dl>
 			<section>
 				<h2>{t().appInfoConceptTitle}</h2>
 				<p>{t().appInfoConceptBody}</p>
@@ -6575,22 +6652,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				<div class="app-info-creator">{t().appInfoCreatorName}</div>
 				<p>{t().appInfoCreatorBody}</p>
 			</section>
-			<dl class="app-info-meta">
-				<div>
-					<dt>{t().appInfoVersionLabel}</dt>
-					<dd>{APP_VERSION}</dd>
-				</div>
-				{#if developerMode}
-					<div>
-						<dt>{t().appInfoBuildLabel}</dt>
-						<dd>{__BUILD_NUMBER__}</dd>
-					</div>
-				{/if}
-				<div>
-					<dt>{t().appInfoRepositoryLabel}</dt>
-					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
-				</div>
-			</dl>
 		</div>
 	</div>
 {/if}
@@ -6700,6 +6761,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--panel2:       #faf9f6;
 		--canvas-paper: #fffdf8;
 		--tooltip-bg:   rgba(26,25,23,0.92);
+		/* Tooltips keep a dark plate in both themes, so their label is one value. */
+		--tooltip-fg:   #ffffff;
 		--floating-control-bg: rgba(255,255,255,0.9);
 		--floating-control-hover: #fff;
 		--floating-control-disabled-bg: rgba(255,255,255,0.72);
@@ -6718,6 +6781,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--border:       #d4d0c8;
 		--border2:      #c4c0b8;
 		--danger:       #a2342a;
+		/* Fill pair for destructive buttons. --danger itself is a text colour and
+		   flips to a pale red in dark, so a filled control cannot borrow it. The
+		   saturated red carries enough contrast on both themes, so — like
+		   --ddl-btn-* — this pair has one value (author's ruling, 2026-07-28). */
+		--danger-bg:    #c0392b;
+		--danger-fg:    #ffffff;
 		--r:            4px;
 		--r-lg:         8px;
 		/* 小型ボタン (ghost / ツールバー) の寸法。テーマに依らないので light 側にのみ置く。
@@ -6725,6 +6794,28 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--btn-sm-font-size: 11px;
 		--btn-sm-padding:   4px 10px;
 		--btn-sm-radius:    var(--r);
+		/* 指示書 (DDL) を扱うボタンの琥珀色。3 コンポーネントで同じリテラルが
+		   複製されていたものをトークン化した (Build 739)。両テーマ共通。 */
+		--ddl-btn-bg:           #fff7e8;
+		--ddl-btn-border:       #d8b36a;
+		--ddl-btn-fg:           #6c4a10;
+		--ddl-btn-bg-hover:     #ffefd0;
+		--ddl-btn-border-hover: #bd8f34;
+		--ddl-btn-fg-hover:     #4f360b;
+		--ddl-btn-shadow:       0 1px 3px rgba(108,74,16,0.12);
+		/* 系譜で、起点からスター付き作品までの経路を引く色 */
+		--star-path:    #d97a1f;
+		/* 星を付けた状態のボタン。5 コンポーネントが同じリテラルを複製し、
+		   ダークの値を持っていたのは履歴マネージャの 1 箇所だけだった。
+		   その 1 箇所の値をダーク側の正本として採った。 */
+		--star-fg:      #d59b21;
+		--star-bg:      #fff6ce;
+		--star-border:  rgba(213,155,33,0.45);
+		/* サムネイルの上に浮く星の台座。下地は作品そのもの (どちらのテーマでも
+		   紙の色) なので、--floating-control-* と違いテーマで反転させない。 */
+		--thumb-plate-bg:     rgba(255,255,255,0.86);
+		--thumb-plate-fg:     rgba(40,36,30,0.42);
+		--thumb-plate-border: rgba(0,0,0,0.12);
 	}
 
 	:global(html[data-theme='dark']) {
@@ -6755,6 +6846,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--border:       #38342f;
 		--border2:      #514b43;
 		--danger:       #ff9a86;
+		--star-path:    #f0a44f;
+		--star-fg:      #ffd166;
+		--star-bg:      rgba(213,155,33,0.18);
+		--star-border:  rgba(255,209,102,0.55);
 	}
 
 	/* DDL token palette (v1.98): one definition for every surface that renders
@@ -6871,18 +6966,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ddl-tools-section { flex-direction: row; justify-content: flex-end; gap: 6px; }
 	.ddl-new-btn {
 		padding: var(--btn-sm-padding);
-		border: 1px solid #d8b36a;
+		border: 1px solid var(--ddl-btn-border);
 		border-radius: var(--btn-sm-radius);
-		background: #fff7e8;
-		color: #6c4a10;
+		background: var(--ddl-btn-bg);
+		color: var(--ddl-btn-fg);
 		font-family: inherit;
 		font-size: var(--btn-sm-font-size);
 		font-weight: 600;
-		box-shadow: 0 1px 3px rgba(108,74,16,0.12);
+		box-shadow: var(--ddl-btn-shadow);
 		white-space: nowrap;
 		cursor: pointer;
 	}
-	.ddl-new-btn:hover:not(:disabled) { background: #ffefd0; border-color: #bd8f34; color: #4f360b; }
+	.ddl-new-btn:hover:not(:disabled) { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
 	.ddl-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 	/* thinking */

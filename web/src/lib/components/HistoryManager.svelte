@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Tooltip from './Tooltip.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
@@ -494,12 +495,12 @@
 		<div class="history-head-left">
 			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
 			<div class="settings-tabs history-mode-tabs">
-				<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
-				<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
+				<button class:active={historyManagerTab === 'thumbs'} title={t().tooltipHistoryThumbsTab} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
+				<button class:active={historyManagerTab === 'list'} title={t().tooltipHistoryListTab} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
 			</div>
 			<div class="settings-tabs history-group-tabs">
-				<button class:active={historyDisplayMode === 'chronological'} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
-				<button class:active={historyDisplayMode === 'lineage'} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
+				<button class:active={historyDisplayMode === 'chronological'} title={t().tooltipHistoryChronological} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
+				<button class:active={historyDisplayMode === 'lineage'} title={t().tooltipHistoryLineageGrouped} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
 			</div>
 			<span class="history-manager-count">
 				{#if historyDisplayMode === 'lineage'}
@@ -514,70 +515,101 @@
 		<div class="history-head-actions">
 			<div class="history-manager-pager">
 				{#if historyDisplayMode === 'lineage'}
-					<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(0)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyLatest}</button>
-					<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyPrev}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
+						<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(0)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyLatest}</button>
+					</Tooltip>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryPrevPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyPrev}</button>
+					</Tooltip>
 					<span>{lineageGroupLoading ? t().historyLoading : (lineageGroupPage + 1) + ' / ' + lineageGroupTotalPages}</span>
-					<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage + 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyNext}</button>
-					<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(lineageGroupTotalPages - 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyFirst}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryNextPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage + 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyNext}</button>
+					</Tooltip>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryFirstPage}>
+						<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(lineageGroupTotalPages - 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyFirst}</button>
+					</Tooltip>
 				{:else}
-					<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyLatest}</button>
-					<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
+						<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyLatest}</button>
+					</Tooltip>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryPrevPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
+					</Tooltip>
 					<span>{historyManagerLoading ? t().historyLoading : (historyManagerPage + 1) + ' / ' + historyManagerTotalPages}</span>
-					<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
-					<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyFirst}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryNextPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
+					</Tooltip>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryFirstPage}>
+						<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyFirst}</button>
+					</Tooltip>
 				{/if}
 			</div>
-			<button class="catalog-close" onclick={onClose}>×</button>
+			<Tooltip placement="bottom-left" text={t().tooltipHistoryClose}>
+				<button class="catalog-close" onclick={onClose} aria-label={t().tooltipHistoryClose}>×</button>
+			</Tooltip>
 		</div>
 	</div>
 	<div class="history-tools">
 		<div class="history-tool-group">
-			<button class="ghost-btn" onclick={onSelectAll}>{t().historySelectAll}</button>
-			<button
-				class="ghost-btn"
-				class:ghost-active={historyManagerStarredOnly}
-				onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
-			>{t().historyStarredOnly}</button>
-			<button
-				class="ghost-btn"
-				class:ghost-active={historyManagerView === 'trash'}
-				onclick={() => onSetView(historyManagerView === 'trash' ? 'active' : 'trash')}
-			>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
+			<Tooltip placement="bottom-right" text={t().tooltipHistorySelectAll}>
+				<button class="ghost-btn" onclick={onSelectAll}>{t().historySelectAll}</button>
+			</Tooltip>
+			<Tooltip placement="bottom-right" text={t().tooltipHistoryStarredOnly}>
+				<button
+					class="ghost-btn"
+					class:ghost-active={historyManagerStarredOnly}
+					onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
+				>{t().historyStarredOnly}</button>
+			</Tooltip>
+			<Tooltip placement="bottom-right" text={t().tooltipHistoryTrashView}>
+				<button
+					class="ghost-btn"
+					class:ghost-active={historyManagerView === 'trash'}
+					onclick={() => onSetView(historyManagerView === 'trash' ? 'active' : 'trash')}
+				>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
+			</Tooltip>
 			{#if historyManagerView === 'active'}
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryMoveToTrash}>
 				<button
 					class="ghost-btn bulk-trash"
 					type="button"
 					onclick={() => onAskTrash(selectedHistoryIds)}
 					disabled={selectedHistoryIds.length === 0}
-					title={t().historyMoveToTrash}
 					aria-label={t().historyMoveToTrash}
 				>
 					<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
 					{#if selectedHistoryIds.length > 0}<span>{selectedHistoryIds.length}</span>{/if}
 				</button>
+				</Tooltip>
 			{:else}
-				<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
-				<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryRestoreSelected}>
+					<button class="ghost-btn" onclick={() => onAskRestore(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyRestoreSelected}</button>
+				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryPermanentDelete}>
+					<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
+				</Tooltip>
 			{/if}
-			<button
-				class="ghost-btn"
-				type="button"
-				onclick={() => downloadContactSheet('review')}
-				disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
-				title={t().historyContactSheetHint}
-			>
-				{contactSheetBusy === 'review' ? t().historyContactSheetBusy : t().historyContactSheet}
-				{#if contactSheetBusy === null && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
-			</button>
-			<button
-				class="ghost-btn"
-				type="button"
-				onclick={() => downloadContactSheet('ai')}
-				disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
-				title={t().historyContactSheetAiHint}
-			>
-				{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
-			</button>
+			<Tooltip placement="bottom-left" wide text={t().historyContactSheetHint}>
+				<button
+					class="ghost-btn"
+					type="button"
+					onclick={() => downloadContactSheet('review')}
+					disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
+				>
+					{contactSheetBusy === 'review' ? t().historyContactSheetBusy : t().historyContactSheet}
+					{#if contactSheetBusy === null && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
+				</button>
+			</Tooltip>
+			<Tooltip placement="bottom-left" wide text={t().historyContactSheetAiHint}>
+				<button
+					class="ghost-btn"
+					type="button"
+					onclick={() => downloadContactSheet('ai')}
+					disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
+				>
+					{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
+				</button>
+			</Tooltip>
 			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
 		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
@@ -592,7 +624,7 @@
 				{#each lineageGroups as group (group.root_node_id)}
 					<article class="lineage-history-group" class:current-lineage={currentLineageRootId === group.root_node_id}>
 						<div class="lineage-group-head">
-							<button class="lineage-representative" type="button" onclick={() => loadItemAndClose(group.representative)}>
+							<button class="lineage-representative" type="button" title={t().historyOpenItemTitle} onclick={() => loadItemAndClose(group.representative)}>
 								<HistoryThumbnail item={group.representative} scope={'lineage-group-' + group.root_node_id} size="mini" />
 							</button>
 							<div class="lineage-group-summary">
@@ -600,31 +632,31 @@
 								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {formatHistoryDate(group.latest_at)}</span>
 								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
 							</div>
-							<button class="ghost-btn" type="button" onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
+							<button class="ghost-btn" type="button" title={t().historyLineageExpandTitle} onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
 								{expandedRootIds.includes(group.root_node_id) ? t().historyLineageCollapse : t().historyLineageExpand}
 							</button>
 						</div>
 						{#if expandedRootIds.includes(group.root_node_id)}
-							<div class="lineage-group-tools"><button class="ghost-btn" type="button" disabled={!lineageGroupItems[group.root_node_id]} onclick={() => selectLineageGroup(group.root_node_id)}>{t().historySelectLineage}</button></div>
+							<div class="lineage-group-tools"><button class="ghost-btn" type="button" title={t().historySelectLineageTitle} disabled={!lineageGroupItems[group.root_node_id]} onclick={() => selectLineageGroup(group.root_node_id)}>{t().historySelectLineage}</button></div>
 							{#if lineageMemberLoadingIds.includes(group.root_node_id)}
 								<div class="lineage-history-message">{t().historyLoading}</div>
 							{:else}
 								<div class="lineage-member-grid">
 									{#each lineageGroupItems[group.root_node_id] ?? [] as it (it.id ?? it.at)}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
-											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} onclick={() => it.id && onToggleSelection(it.id)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
-											<button class="lineage-member-main" type="button" onclick={() => loadItemAndClose(it)}>
+											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => it.id && onToggleSelection(it.id)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
+											<button class="lineage-member-main" type="button" title={t().historyOpenItemTitle} onclick={() => loadItemAndClose(it)}>
 												<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
 												<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
 											</button>
 											<div class="lineage-member-actions">
-												<button class="hash-row-star" class:starred={!!it.starred} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
+												<button class="hash-row-star" class:starred={!!it.starred} title={it.starred ? t().starOn : t().starOff} aria-label={it.starred ? t().starOn : t().starOff} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
 												{#if historyManagerView === 'active'}
-													<button class="ghost-btn" onclick={(event) => replayItemAndClose(it, event)}>{t().historyReplay}</button>
-													<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
+													<button class="ghost-btn" title={t().historyReplayTitle} onclick={(event) => replayItemAndClose(it, event)}>{t().historyReplay}</button>
+													<button class="ghost-btn icon-trash-btn" title={t().historyTrashItemTitle} onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
 												{:else}
-													<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
-													<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
+													<button class="ghost-btn" title={t().historyRestoreTitle} onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
+													<button class="danger-btn" title={t().historyPermanentDeleteTitle} onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
 												{/if}
 											</div>
 										</div>
@@ -645,6 +677,7 @@
 	type="button"
 	class="manager-check selection-checkbox"
 	class:checked={!!it.id && selectedHistoryIds.includes(it.id)}
+	title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
 	role="checkbox"
 	aria-checked={!!it.id && selectedHistoryIds.includes(it.id)}
 	aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
@@ -652,6 +685,7 @@
 ><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 						<div
 							class="thumb manager-thumb"
+							title={t().historyOpenItemTitle}
 							onclick={() => loadItemAndClose(it)}
 							onkeydown={(event) => handleThumbKeydown(event, it)}
 							role="button"
@@ -673,7 +707,7 @@
 								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
 								{#if historyManagerView === 'active'}
 									<button class="ghost-btn history-replay-btn" onclick={(event) => replayItemAndClose(it, event)} title={t().historyReplayTitle}>{t().historyReplay}</button>
-									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().deleteButton} aria-label={t().deleteButton}>
+									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().historyTrashItemTitle} aria-label={t().deleteButton}>
 										<svg viewBox="2 2 20 20" aria-hidden="true">
 											<path d="M3 6h18" />
 											<path d="M8 6V4h8v2" />
@@ -683,8 +717,8 @@
 										</svg>
 									</button>
 								{:else}
-									<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
-									<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
+									<button class="ghost-btn" title={t().historyRestoreTitle} onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
+									<button class="danger-btn" title={t().historyPermanentDeleteTitle} onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
 								{/if}
 							</div>
 						</div>
@@ -701,14 +735,14 @@
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr>
-							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
+							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
 							<td class="table-thumb-cell">
 								<button
 									class="table-thumb-select"
 									onclick={() => loadItemAndClose(it)}
 									disabled={historyManagerView !== 'active'}
-									title={t().historyImageHeader}
-									aria-label={t().historyImageHeader}
+									title={t().historyOpenItemTitle}
+									aria-label={t().historyOpenItemTitle}
 								>
 									<HistoryThumbnail item={it} scope="table" size="mini" />
 								</button>
@@ -728,7 +762,7 @@
 							<td>
 								{#if historyManagerView === 'active'}
 									<button class="ghost-btn history-replay-btn" onclick={(event) => replayItemAndClose(it, event)} title={t().historyReplayTitle}>{t().historyReplay}</button>
-									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().deleteButton} aria-label={t().deleteButton}>
+									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().historyTrashItemTitle} aria-label={t().deleteButton}>
 										<svg viewBox="2 2 20 20" aria-hidden="true">
 											<path d="M3 6h18" />
 											<path d="M8 6V4h8v2" />
@@ -738,8 +772,8 @@
 										</svg>
 									</button>
 								{:else}
-									<button class="ghost-btn" onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
-									<button class="danger-btn" onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
+									<button class="ghost-btn" title={t().historyRestoreTitle} onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
+									<button class="danger-btn" title={t().historyPermanentDeleteTitle} onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
 								{/if}
 							</td>
 						</tr>
@@ -961,10 +995,10 @@
 		z-index: 31;
 		width: 22px;
 		height: 22px;
-		border: 1px solid rgba(0,0,0,0.12);
+		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
-		background: rgba(255,255,255,0.88);
-		color: rgba(40,36,30,0.42);
+		background: var(--thumb-plate-bg);
+		color: var(--thumb-plate-fg);
 		font-size: 14px;
 		line-height: 1;
 		cursor: pointer;
@@ -972,7 +1006,7 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.thumb-star.starred { color: #d59b21; background: #fff6ce; border-color: rgba(213,155,33,0.45); }
+	.thumb-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	.table-thumb-cell { position: relative; width: 66px; }
 	.table-thumb-select {
 		display: block;
@@ -1048,19 +1082,14 @@
 		padding: 0;
 	}
 	.hash-row-star.starred {
-		color: #d59b21;
-		background: #fff6ce;
-		border-color: rgba(213,155,33,0.45);
+		color: var(--star-fg);
+		background: var(--star-bg);
+		border-color: var(--star-border);
 	}
 	:global(html[data-theme='dark']) .hash-row-star {
 		color: #b8c0cc;
 		border-color: rgba(255,255,255,0.22);
 		background: rgba(255,255,255,0.06);
-	}
-	:global(html[data-theme='dark']) .hash-row-star.starred {
-		color: #ffd166;
-		background: rgba(213,155,33,0.18);
-		border-color: rgba(255,209,102,0.55);
 	}
 	.hash-chip {
 		align-self: flex-end;
@@ -1161,8 +1190,8 @@
 		padding: var(--btn-sm-padding);
 		border: none;
 		border-radius: var(--btn-sm-radius);
-		background: #c0392b;
-		color: #fff;
+		background: var(--danger-bg);
+		color: var(--danger-fg);
 		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 		font-family: inherit;

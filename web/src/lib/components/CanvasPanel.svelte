@@ -11,15 +11,16 @@
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
+	import { derivationKindLabel, type DerivationKind } from '$lib/derivation';
 	import type { ModelOption } from '$lib/models';
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
-	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; instruction_lang_resolved?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
@@ -158,6 +159,8 @@
 		lineageError: string | null;
 		isJapanese: boolean;
 		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
+		onOpenLineageNodeInCanvas: (node: LineageNode) => void | Promise<void>;
+		onToggleLineageStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
@@ -311,6 +314,8 @@
 		lineageError = null,
 		isJapanese = true,
 		onOpenLineageNode,
+		onOpenLineageNodeInCanvas,
+		onToggleLineageStar,
 		onDrawLineageDescription,
 		onDrawLineageDdl,
 		onOpenLineageDdlEditor,
@@ -339,6 +344,8 @@
 	let presentationMode = $state(false);
 	let generationInfoOpen = $state(false);
 	let generationInfoTab = $state<'details' | 'prompts' | 'score'>('details');
+	let generationInfoEl = $state<HTMLElement | null>(null);
+	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
 	let refineView = $state<'adjust' | 'compare' | 'language'>('adjust');
 	let refineModalOpen = $state(false);
 	// 推敲要素の選択は前回の指定を引き継ぐ。
@@ -494,14 +501,51 @@
 		if (bytes < 1024) return `${bytes} B`;
 		return `${(bytes / 1024).toFixed(1)} KB`;
 	};
+	const detailRequestedLang = $derived(statusHistoryItem?.instruction_lang_requested ?? result?.instruction_lang_requested ?? '');
+	const detailUiLang = $derived(statusHistoryItem?.ui_lang ?? result?.ui_lang ?? '');
+	const detailFocus = $derived(statusHistoryItem?.focus ?? result?.focus ?? '');
+	const detailSeedText = $derived(statusHistoryItem?.seed_text ?? result?.seed_text ?? '');
+	// 暴れる: null は「この列を持つ前の作品」で、OFF とは別の状態。
+	const detailWild = $derived(statusHistoryItem?.render_wild ?? result?.render_wild ?? null);
+	const detailVariationAmplitude = $derived(statusHistoryItem?.variation_amplitude ?? result?.variation_amplitude ?? '');
+	const detailVariationSeed = $derived(statusHistoryItem?.variation_seed ?? result?.variation_seed ?? null);
+	const detailCatalogSub = $derived(statusHistoryItem?.render_color_catalog_sub ?? result?.render_color_catalog_sub ?? '');
+	const detailCanvasRatio = $derived(statusHistoryItem?.render_canvas_aspect_ratio ?? result?.render_canvas_aspect_ratio ?? null);
+	const detailStage1PromptDigest = $derived(statusHistoryItem?.stage1_prompt_digest ?? result?.stage1_prompt_digest ?? '');
+	const detailStage1PromptBaseDigest = $derived(statusHistoryItem?.stage1_prompt_base_digest ?? result?.stage1_prompt_base_digest ?? '');
+	const detailStage2PromptDigest = $derived(statusHistoryItem?.stage2_prompt_digest ?? result?.stage2_prompt_digest ?? '');
+	const detailDerivationKind = $derived(statusHistoryItem?.derivation_kind ?? result?.derivation_kind ?? null);
+	const detailBatchRunId = $derived(statusHistoryItem?.batch_run_id ?? '');
+	const detailBatchLine = $derived(statusHistoryItem?.batch_line_number ?? null);
+	const detailNote = $derived((statusHistoryItem?.note ?? '').trim());
+	const variationAmplitudeLabel = (amplitude: string) =>
+		amplitude === 'small' ? t().variationSmall
+		: amplitude === 'medium' ? t().variationMedium
+		: amplitude === 'large' ? t().variationLarge
+		: amplitude;
+	// 由来の群は、系譜も派生もバッチもコメントも無い作品では丸ごと出さない。
+	const hasOriginDetails = $derived(
+		statusGeneration != null || detailDerivationKind != null || !!detailBatchRunId || !!detailNote
+	);
 </script>
 
-<svelte:window onkeydown={(event) => {
-	if (event.key !== 'Escape') return;
-	if (refineModalOpen) closeRefineModal();
-	else if (generationInfoOpen) generationInfoOpen = false;
-	else if (presentationMode) closePresentationMode();
-}} />
+<svelte:window
+	onkeydown={(event) => {
+		if (event.key !== 'Escape') return;
+		if (refineModalOpen) closeRefineModal();
+		else if (generationInfoOpen) generationInfoOpen = false;
+		else if (presentationMode) closePresentationMode();
+	}}
+	onpointerdown={(event) => {
+		// 生成情報ドロワーは、外を押したら閉じる。開閉ボタン自身は自分でトグルする。
+		if (!generationInfoOpen) return;
+		const target = event.target as Node | null;
+		if (!target) return;
+		if (generationInfoEl?.contains(target)) return;
+		if (generationInfoToggleEl?.contains(target)) return;
+		generationInfoOpen = false;
+	}}
+/>
 
 <div class="right-panel">
 	<div class="right-tabs">
@@ -980,7 +1024,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
 			{/if}
 		</div>
 
@@ -1012,7 +1056,7 @@
 	</div>
 
 	{#if generationInfoOpen}
-		<aside class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}>
+		<aside bind:this={generationInfoEl} class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}>
 			<header class="generation-info-head">
 				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</strong>
 				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
@@ -1024,28 +1068,91 @@
 			</div>
 			<div class="generation-info-content">
 				{#if generationInfoTab === 'details'}
+					{#snippet term(label: string, hint: string)}
+						<dt><Tooltip placement="right" text={hint}><span>{label}</span></Tooltip></dt>
+					{/snippet}
 					<div class="generation-details">
-						<dl>
-							<dt>{isJapanese ? '\u4f5c\u6210\u65e5' : 'Created'}</dt><dd>{currentRenderedAt ?? '-'}</dd>
-							<dt>Stage 1 ({isJapanese ? '\u89e3\u91c8' : 'Interpretation'})</dt><dd>{statusStage1Model}</dd>
-							<dt>Stage 2 ({isJapanese ? '\u63cf\u753b' : 'Performance'})</dt><dd>{statusStage2Model}</dd>
-							<dt>Stage 1 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage1Lang)}</dd>
-							<dt>Stage 2 {isJapanese ? '\u8a00\u8a9e' : 'Language'}</dt><dd>{displayLanguageName(detailStage2Lang)}</dd>
-							<dt>{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</dt><dd>{statusCatalogName}</dd>
-							<dt>{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</dt><dd>{statusCanvasName}</dd>
-							<dt>{isJapanese ? '添景' : 'Staffage'}</dt><dd>{statusTenkei ? tenkeiLabel(statusTenkei, isJapanese) : '-'}</dd>
-							<dt>render seed</dt><dd>{detailRenderSeed ?? '-'}</dd>
-							<dt>{isJapanese ? '\u914d\u7f6e seed' : 'Composition seed'}</dt><dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
-							<dt>{isJapanese ? '\u89e3\u91c8 seed' : 'Interpretation seed'}</dt><dd>{detailInterpretationSeed ?? '-'}</dd>
-							<dt>render hash</dt><dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
-							<dt>description hash</dt><dd><code>{detailDescriptionHash || '-'}</code></dd>
-							<dt>render engine</dt><dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
-							<dt>{t().generationDdlVersions}</dt><dd>{detailDdlVersion || t().historyVersionNotRecorded} / {detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>
-							<dt>Build</dt><dd>{detailBuild || '-'}</dd>
-							<dt>{isJapanese ? 'SVG サイズ' : 'SVG size'}</dt><dd>{formatBytes(detailSvgBytes)}</dd>
-							<dt>{isJapanese ? '\u51e6\u7406\u6642\u9593' : 'Elapsed'}</dt><dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
-							<dt>tokens in / out</dt><dd>{detailTokensIn ?? '-'} / {detailTokensOut ?? '-'}</dd>
-						</dl>
+						<section class="detail-group">
+							<h4>{t().provenanceSectionInterpretation}</h4>
+							<dl>
+								{@render term(`Stage 1 (${isJapanese ? '解釈' : 'Interpretation'})`, t().provenanceHintStage1Model)}<dd>{statusStage1Model}</dd>
+								{@render term(`Stage 1 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage1Lang)}<dd>{displayLanguageName(detailStage1Lang)}</dd>
+								{@render term(t().provenanceLabelLangRequested, t().provenanceHintLangRequested)}<dd>{detailRequestedLang ? displayLanguageName(detailRequestedLang) : '-'}</dd>
+								{@render term(isJapanese ? '解釈 seed' : 'Interpretation seed', t().provenanceHintInterpretationSeed)}<dd>{detailInterpretationSeed ?? '-'}</dd>
+								{#if interpretFallbackReason}
+									{@render term(t().provenanceLabelInterpretFallback, t().provenanceHintInterpretFallback)}<dd>{interpretFallbackReason}</dd>
+								{/if}
+							</dl>
+						</section>
+						<section class="detail-group">
+							<h4>{t().provenanceSectionPerformance}</h4>
+							<dl>
+								{@render term(`Stage 2 (${isJapanese ? '描画' : 'Performance'})`, t().provenanceHintStage2Model)}<dd>{statusStage2Model}</dd>
+								{@render term(`Stage 2 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage2Lang)}<dd>{displayLanguageName(detailStage2Lang)}</dd>
+								{@render term(t().provenanceLabelFocus, t().provenanceHintFocus)}<dd>{detailFocus || '-'}</dd>
+								{#if detailVariationAmplitude}
+									{@render term(t().provenanceLabelVariation, t().provenanceHintVariation)}<dd>{variationAmplitudeLabel(detailVariationAmplitude)}</dd>
+								{/if}
+								{#if detailVariationSeed != null}
+									{@render term(t().provenanceLabelVariationSeed, t().provenanceHintVariationSeed)}<dd>{detailVariationSeed}</dd>
+								{/if}
+								{@render term(isJapanese ? '配置 seed' : 'Composition seed', t().provenanceHintCompositionSeed)}<dd>{detailVarySeed ?? t().seedBaseLabel}</dd>
+								{@render term('render seed', t().provenanceHintRenderSeed)}<dd>{detailRenderSeed ?? '-'}</dd>
+								{@render term(t().provenanceLabelSeedText, t().provenanceHintSeedText)}<dd>{detailSeedText || '-'}</dd>
+								{@render term(t().provenanceLabelWild, t().provenanceHintWild)}<dd>{detailWild == null ? t().historyVersionNotRecorded : detailWild ? t().provenanceWildOn : t().provenanceWildOff}</dd>
+								{@render term(isJapanese ? '添景' : 'Staffage', t().provenanceHintStaffage)}<dd>{statusTenkei ? tenkeiLabel(statusTenkei, isJapanese) : '-'}</dd>
+								{@render term(isJapanese ? '色カタログ' : 'Color catalog', t().provenanceHintCatalog)}<dd>{statusCatalogName}</dd>
+								{#if detailCatalogSub}
+									{@render term(t().provenanceLabelCatalogSub, t().provenanceHintCatalogSub)}<dd>{detailCatalogSub}</dd>
+								{/if}
+								{@render term(isJapanese ? 'キャンバス' : 'Canvas', t().provenanceHintCanvas)}<dd>{statusCanvasName}</dd>
+								{@render term(t().provenanceLabelCanvasRatio, t().provenanceHintCanvasRatio)}<dd>{detailCanvasRatio == null ? '-' : detailCanvasRatio.toFixed(3)}</dd>
+								{@render term(isJapanese ? 'SVG サイズ' : 'SVG size', t().provenanceHintSvgSize)}<dd>{formatBytes(detailSvgBytes)}</dd>
+							</dl>
+						</section>
+						<section class="detail-group">
+							<h4>{t().provenanceSectionIdentity}</h4>
+							<dl>
+								{@render term('render hash', t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
+								{@render term('description hash', t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
+								{@render term('render engine', t().provenanceHintRenderEngine)}<dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
+								{@render term(t().provenanceLabelDdlSpec, t().provenanceHintDdlSpec)}<dd>{detailDdlVersion || t().historyVersionNotRecorded}</dd>
+								{@render term(t().provenanceLabelTransformLayer, t().provenanceHintTransformLayer)}<dd>{detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>
+								{@render term(t().provenanceLabelStage1PromptDigest, t().provenanceHintStage1PromptDigest)}<dd><code>{detailStage1PromptDigest || t().historyVersionNotRecorded}</code></dd>
+								{@render term(t().provenanceLabelStage1PromptBaseDigest, t().provenanceHintStage1PromptBaseDigest)}<dd><code>{detailStage1PromptBaseDigest || t().historyVersionNotRecorded}</code></dd>
+								{@render term(t().provenanceLabelStage2PromptDigest, t().provenanceHintStage2PromptDigest)}<dd><code>{detailStage2PromptDigest || t().historyVersionNotRecorded}</code></dd>
+								{@render term('Build', t().provenanceHintBuild)}<dd>{detailBuild || '-'}</dd>
+							</dl>
+						</section>
+						{#if hasOriginDetails}
+							<section class="detail-group">
+								<h4>{t().provenanceSectionOrigin}</h4>
+								<dl>
+									{#if statusGeneration != null}
+										{@render term(t().provenanceLabelGeneration, t().provenanceHintGeneration)}<dd>{statusGeneration}</dd>
+									{/if}
+									{@render term(t().provenanceLabelDerivation, t().provenanceHintDerivation)}<dd>{derivationKindLabel(detailDerivationKind, isJapanese)}</dd>
+									{#if detailBatchRunId}
+										{@render term(t().provenanceLabelBatchRun, t().provenanceHintBatchRun)}<dd><code>{detailBatchRunId}</code></dd>
+									{/if}
+									{#if detailBatchLine != null}
+										{@render term(t().provenanceLabelBatchLine, t().provenanceHintBatchLine)}<dd>{detailBatchLine}</dd>
+									{/if}
+									{#if detailNote}
+										{@render term(t().provenanceLabelComment, t().provenanceHintComment)}<dd class="detail-note">{detailNote}</dd>
+									{/if}
+								</dl>
+							</section>
+						{/if}
+						<section class="detail-group">
+							<h4>{t().provenanceSectionRun}</h4>
+							<dl>
+								{@render term(isJapanese ? '作成日' : 'Created', t().provenanceHintCreated)}<dd>{currentRenderedAt ?? '-'}</dd>
+								{@render term(isJapanese ? '処理時間' : 'Elapsed', t().provenanceHintElapsed)}<dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
+								{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn ?? '-'} / {detailTokensOut ?? '-'}</dd>
+								{@render term(t().provenanceLabelUiLang, t().provenanceHintUiLang)}<dd>{detailUiLang ? displayLanguageName(detailUiLang) : '-'}</dd>
+							</dl>
+						</section>
 					</div>
 				{:else}
 					<OutputTabsContent
@@ -1099,6 +1206,7 @@
 		</Tooltip>
 		<Tooltip placement="top" text={isJapanese ? '\u9078\u629e\u4e2d\u4f5c\u54c1\u306e\u751f\u6210\u60c5\u5831\u3092\u8868\u793a' : 'Show the provenance, prompts, and JSON of the chosen work'}>
 			<button
+				bind:this={generationInfoToggleEl}
 				type="button"
 				class="generation-info-button"
 				class:active={generationInfoOpen}
@@ -1518,7 +1626,7 @@
 	.refine-save-btn { border: 1px solid var(--action-bg); border-radius: var(--r); background: var(--action-bg); color: var(--action-fg); cursor: pointer; }
 	.refine-save-btn:hover:not(:disabled) { background: var(--action-hover); }
 	.refine-save-btn:disabled { border-color: var(--border); background: var(--bg2); color: var(--fg3); cursor: not-allowed; }
-	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: #fff; font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
+	.variation-ddl-popup { position: absolute; z-index: 8; left: 10px; right: 10px; bottom: calc(100% - 10px); display: none; max-height: 220px; overflow: auto; padding: 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; box-shadow: 0 8px 24px rgba(0,0,0,.24); pointer-events: none; }
 	.variation-card-wrap:hover .variation-ddl-popup { display: block; }
 	/* 候補はウインドウの残り高さに収める。行は等分し、カードは行の高さを埋める。 */
 	/* 候補が 1 枚なら 1 列にしてダイアログ幅いっぱいに見せる */
@@ -1772,9 +1880,9 @@
 		cursor: pointer;
 	}
 	.model-result-star.starred {
-		color: #d59b21;
-		border-color: rgba(213,155,33,0.55);
-		background: #fff7dc;
+		color: var(--star-fg);
+		border-color: var(--star-border);
+		background: var(--star-bg);
 	}
 	.model-result-star:disabled { opacity: 0.45; cursor: not-allowed; }
 	.model-inspection-card pre {
@@ -1846,7 +1954,7 @@
 	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
 	.interpret-fallback-badge { position: absolute; top: 12px; right: 12px; z-index: 5; padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
 	:global(html[data-theme='dark']) .interpret-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
-	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: white; box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
+	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
 	.nearby-mirror { position: absolute; right: 64px; bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); box-shadow: 0 2px 10px #0002; color: var(--fg3); font-size: 0.68rem; z-index: 4; }
 	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: white; border: 1px solid var(--border); cursor: pointer; }
 	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
@@ -2054,8 +2162,18 @@
 	.generation-info-tabs button.active { border-bottom-color: var(--fg); color: var(--fg); font-weight: 600; }
 	.generation-info-content { min-height: 0; flex: 1; display: flex; padding: 10px; overflow: hidden; }
 	.generation-details { width: 100%; overflow: auto; padding: 8px 10px; }
+	.detail-group + .detail-group { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+	.detail-group h4 {
+		margin: 0 0 8px;
+		color: var(--fg2);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: .04em;
+	}
 	.generation-details dl { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: 12px; }
-	.generation-details dt { color: var(--fg3); }
+	.generation-details dt { min-width: 0; color: var(--fg3); }
+	.generation-details dt :global(.tooltip-wrap) { max-width: 100%; }
+	.detail-note { white-space: pre-wrap; }
 	.generation-details dd { min-width: 0; margin: 0; color: var(--fg); overflow-wrap: anywhere; }
 	.generation-details code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 	.detail-copy-row { display: flex; align-items: flex-start; gap: 8px; }
@@ -2145,7 +2263,7 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.star-btn.starred { color: #d59b21; border-color: rgba(213,155,33,0.55); background: #fff7dc; }
+	.star-btn.starred { color: var(--star-fg); border-color: var(--star-border); background: var(--star-bg); }
 	.star-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.status-star { flex-shrink: 0; }
 	.png-wrap { position: relative; }

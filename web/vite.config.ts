@@ -49,7 +49,10 @@ function startupBannerPlugin() {
 
 export default defineConfig({
 	define: {
-		__BUILD_NUMBER__: JSON.stringify(String(buildNumber))
+		__BUILD_NUMBER__: JSON.stringify(String(buildNumber)),
+		// The build date is the mtime of BUILD_NUMBER, the same source the server
+		// banner reads (api.py:_build_date). A fresh clone stamps its own mtime.
+		__BUILD_DATE__: JSON.stringify(buildDate)
 	},
 	plugins: [startupBannerPlugin(), sveltekit()],
 	server: {

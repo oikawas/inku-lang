@@ -304,10 +304,10 @@
 		z-index: 20;
 		width: 18px;
 		height: 18px;
-		border: 1px solid rgba(0,0,0,0.12);
+		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
-		background: rgba(255,255,255,0.86);
-		color: rgba(40,36,30,0.42);
+		background: var(--thumb-plate-bg);
+		color: var(--thumb-plate-fg);
 		font-size: 10px;
 		line-height: 1;
 		cursor: pointer;
@@ -315,7 +315,7 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.thumb-star.starred { color: #d59b21; background: #fff6ce; border-color: rgba(213,155,33,0.45); }
+	.thumb-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	.thumb-tooltip {
 		position: absolute;
 		bottom: calc(100% + 6px);
@@ -324,7 +324,7 @@
 		opacity: 0;
 		pointer-events: none;
 		background: var(--tooltip-bg);
-		color: #fff;
+		color: var(--tooltip-fg);
 		font-size: 11px;
 		border-radius: var(--r);
 		padding: 8px 10px;
@@ -351,7 +351,7 @@
 	.tooltip-row span { color: rgba(255,255,255,0.62); }
 	.tooltip-row strong {
 		font-weight: 500;
-		color: #fff;
+		color: var(--tooltip-fg);
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}

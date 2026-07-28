@@ -30,7 +30,7 @@ type ConfirmAction = {
 			{/if}
 			<button class={action.destructive ? 'danger-btn' : 'confirm-btn'} onclick={onRun}>{action.runLabel ?? (action.destructive ? t().deleteButton : t().confirmRun)}</button>
 			{#if action.secondaryRun}
-				<button class="ghost-btn" onclick={() => { const run = action.secondaryRun; onCancel(); run?.(); }}>{action.secondaryLabel ?? t().confirmRun}</button>
+				<button class="paint-action" onclick={() => { const run = action.secondaryRun; onCancel(); run?.(); }}>{action.secondaryLabel ?? t().confirmRun}</button>
 			{/if}
 		</div>
 	</div>
@@ -64,9 +64,21 @@ type ConfirmAction = {
 	.ghost-btn:hover { background: var(--bg2); }
 	.danger-btn, .confirm-btn {
 		padding: var(--btn-sm-padding); border: none; border-radius: var(--btn-sm-radius);
-		color: #fff; font-size: var(--btn-sm-font-size); cursor: pointer; font-family: inherit;
+		font-size: var(--btn-sm-font-size); cursor: pointer; font-family: inherit;
 	}
-	.danger-btn { background: #c0392b; }
+	/* The second action starts a drawing, so it wears the paint shell (no ▶ mark). */
+	.paint-action {
+		padding: var(--btn-sm-padding);
+		border: 1px solid var(--action-bg);
+		border-radius: var(--btn-sm-radius);
+		background: var(--action-bg);
+		color: var(--action-fg);
+		font-size: var(--btn-sm-font-size);
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.paint-action:hover { background: var(--action-hover); border-color: var(--action-hover); }
+	.danger-btn { background: var(--danger-bg); color: var(--danger-fg); }
 	.confirm-btn {
 		background: var(--accent);
 		color: var(--accent-fg);

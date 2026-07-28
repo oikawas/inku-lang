@@ -11,9 +11,11 @@
 	 * sits at the right end of an existing button row (dialog footers, the
 	 * comparison panel heads) and therefore carries no frame of its own.
 	 */
-	import InkuMascot from './InkuMascot.svelte';
+	import IncuMascot from './IncuMascot.svelte';
+	import YuragiMascot from './YuragiMascot.svelte';
 	import StopButton from './StopButton.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { getMascot } from '$lib/mascot.svelte';
 
 	type Props = {
 		label: string;
@@ -78,7 +80,9 @@
 </script>
 
 <div class="run-status" class:inline={variant === 'inline'} aria-live="polite">
-	<div class="run-mascot"><InkuMascot /></div>
+	<div class="run-mascot">
+		{#if getMascot() === 'yuragi'}<YuragiMascot />{:else}<IncuMascot />{/if}
+	</div>
 	<div class="run-info">
 		<span class="run-label">{label}</span>
 		{#if modelLine}<span class="run-model">{modelLine}</span>{/if}

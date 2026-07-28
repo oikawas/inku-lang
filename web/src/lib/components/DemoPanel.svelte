@@ -5,9 +5,13 @@
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
+	import type { Snippet } from 'svelte';
 
 	type Props = {
 		settings: DemoSettings;
+		/* The shared button row and settings readout, rendered by the parent.
+		   Named apart from `settings`, which is this tab's own run settings. */
+		inputSettings?: Snippet;
 		providerGroups: ProviderGroup[];
 		running: boolean;
 		timedOut: boolean;
@@ -40,6 +44,7 @@
 
 	let {
 		settings = $bindable(),
+		inputSettings,
 		providerGroups,
 		running,
 		timedOut,
@@ -116,6 +121,21 @@
 
 <div class="demo-panel">
 	<div class="demo-grid">
+		<label class="wide seed-field">
+			<span class="seed-label"><strong>{t().demoSectionLabel}</strong>{t().demoSectionHint}</span>
+			<textarea
+				value={settings.seed_phrase}
+				rows="3"
+				disabled={running}
+				spellcheck="false"
+				oninput={(event) => updateSettings({ seed_phrase: (event.currentTarget as HTMLTextAreaElement).value })}
+			></textarea>
+		</label>
+		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={qualifiedModelId(settings.prompt_provider, settings.prompt_model)} {providerGroups} disabled={running} onSelect={(provider: Provider, model: string) => updateSettings({ prompt_provider: provider, prompt_model: model })} /></div>
+		<!-- The shared button row and the settings readout follow the model that
+		     reads the seed phrase, so the tab is read top to bottom in the order
+		     it is filled in. -->
+		<div class="wide demo-shared-settings">{@render inputSettings?.()}</div>
 		<label class="check-row">
 			<input
 				type="checkbox"
@@ -142,17 +162,6 @@
 				onchange={(event) => updateSettings({ random_color_catalog: (event.currentTarget as HTMLInputElement).checked })}
 			/>
 			<span>{t().demoRandomColorCatalog}</span>
-		</label>
-		<div class="wide"><ModelCardPicker label={t().demoPromptModel} selectedModel={qualifiedModelId(settings.prompt_provider, settings.prompt_model)} {providerGroups} disabled={running} onSelect={(provider: Provider, model: string) => updateSettings({ prompt_provider: provider, prompt_model: model })} /></div>
-		<label class="wide">
-			<span>{t().demoSeedPhrase}</span>
-			<textarea
-				value={settings.seed_phrase}
-				rows="3"
-				disabled={running}
-				spellcheck="false"
-				oninput={(event) => updateSettings({ seed_phrase: (event.currentTarget as HTMLTextAreaElement).value })}
-			></textarea>
 		</label>
 		<label>
 			<span>{t().demoInterval}</span>
@@ -244,6 +253,14 @@
 
 <style>
 	.demo-panel { display: flex; flex-direction: column; gap: 10px; }
+	/* The seed phrase leads the panel, so its label carries the section heading
+	   and matches the label over the description box in InputPanel. */
+	.seed-label {
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--fg2);
+	}
+	.seed-label strong { font-weight: 600; color: var(--fg); }
 	.demo-grid {
 
 		display: grid;
@@ -263,6 +280,8 @@
 		min-height: 30px;
 	}
 	.wide { grid-column: 1 / -1; }
+	/* The parent lays these two out with a 6px column gap; the grid gap is 8px. */
+	.demo-shared-settings { display: flex; flex-direction: column; gap: 6px; }
 	input,
 	textarea {
 		border: 1px solid var(--border2);

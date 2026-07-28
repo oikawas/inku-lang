@@ -1,22 +1,24 @@
 <script lang="ts">
 	type Props = {
 		disabled?: boolean;
+		/** The ▶ mark. Off for buttons that repeat a drawing rather than start one. */
+		icon?: boolean;
+		/** Full panel width (the main paint button) or shrink to the label. */
+		block?: boolean;
 		onclick: () => void | Promise<void>;
 		children: import('svelte').Snippet;
 	};
 
-	let { disabled = false, onclick, children }: Props = $props();
+	let { disabled = false, icon = true, block = true, onclick, children }: Props = $props();
 </script>
 
-<button class="paint-btn" {onclick} {disabled}>
-	<span class="paint-icon" aria-hidden="true">▶</span>
+<button class="paint-btn" class:block {onclick} {disabled}>
+	{#if icon}<span class="paint-icon" aria-hidden="true">▶</span>{/if}
 	<span>{@render children()}</span>
 </button>
 
 <style>
 	.paint-btn {
-		width: 100%;
-		margin-top: 8px;
 		padding: 9px;
 		font-size: 14px;
 		font-weight: 500;
@@ -32,6 +34,10 @@
 		gap: 8px;
 		font-family: inherit;
 		transition: background 0.15s;
+	}
+	.paint-btn.block {
+		width: 100%;
+		margin-top: 8px;
 	}
 	.paint-btn:hover:not(:disabled) { background: var(--action-hover); }
 	.paint-btn:disabled {

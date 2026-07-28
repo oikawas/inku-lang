@@ -46,7 +46,7 @@
 		padding: 6px 8px;
 		border-radius: var(--r);
 		background: var(--tooltip-bg);
-		color: white;
+		color: var(--tooltip-fg);
 		font-size: 11px;
 		line-height: 1.45;
 		font-weight: 400;

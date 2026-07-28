@@ -88,13 +88,24 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "SPEC.ja.md",
         "SPEC.md",
         "shape",
-        "these two are not translations of each other. Measured 2026-07-28: "
-        "both happen to carry 23 h2 sections, but they are different documents "
-        "-- ja §5 is the three-stage pipeline where en §5 is the core "
-        "vocabulary, ja §12 is the two-stage architecture where en §12 is "
-        "security and operations, and the engine record covers 13-15 in "
-        "Japanese and 5-10 in English. Deciding what to do about that is "
-        "ledger I-032; until then no shape check is meaningful here",
+        "these two are not translations of each other -- ja §5 is the "
+        "three-stage pipeline where en §5 is the core vocabulary, ja §12 is "
+        "the two-stage architecture where en §12 is security and operations. "
+        "Stage 4b of ledger I-032 moved the engine record out of both (ja "
+        "§15.4-15.12 and en §12.1-12.9, which did mirror each other h3 for h3) "
+        "into docs/spec/render-engine-history.*, and the implementation "
+        "inventory out of en §15. What still diverges is the concept side: "
+        "roughly 1345 lines exist only in Japanese. Closing that is stage 4c; "
+        "until then no shape check is meaningful here",
+    ),
+    (
+        "docs/spec/implementation-status.ja.md",
+        "docs/spec/implementation-status.md",
+        "shape",
+        "English only, and deliberately so. This is the inventory of what is "
+        "built, which the 2026-07-28 ruling puts on the operational side: "
+        "Japanese is canonical for the concepts, English carries operations. "
+        "The Japanese file is not owed and is not planned",
     ),
     # Split on 2026-07-28. The current file carries v2.5.0 onward and the two
     # languages hold the same 30 entries, so this pair needs no exception any
@@ -179,7 +190,16 @@ def check_parity() -> list[str]:
     for ja_name, en_name, mode, exception in PAIRS:
         ja, en = REPO_ROOT / ja_name, REPO_ROOT / en_name
         if not ja.exists():
-            problems.append(f"missing: {ja_name} (the Japanese version is the original)")
+            # Japanese is the original, so its absence is normally the error.
+            # The exception is a document that is operational by ruling rather
+            # than conceptual: those are written in English and owe no
+            # Japanese version. Declare it, the same as an absent English one.
+            if exception:
+                print(f"  declared difference: {ja_name} is absent -- {exception}")
+            else:
+                problems.append(
+                    f"missing: {ja_name} (the Japanese version is the original)"
+                )
             continue
         if not en.exists():
             # A whole language version that has not been written yet is a

@@ -29,7 +29,6 @@ from __future__ import annotations
 import pathlib
 import re
 import subprocess
-import sys
 
 SERVER_DIR = pathlib.Path(__file__).resolve().parents[1]
 REPO_ROOT = SERVER_DIR.parent

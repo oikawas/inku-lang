@@ -572,3 +572,21 @@ Every deterministic check is green: server **1424 passed / 31 skipped**, ruff, c
 **Verification:** `npm run check` 0 errors / 2 warnings / 217 files, `npm run lint:i18n` 788 / 36 / 0, `npm run lint:models` 56 checks passed. **The server, the CLI and the renderer were not touched**, so pytest and the frozen corpora are out of scope.
 
 **Noticed, not fixed:** the web's **static fallback catalog lists only three `ollama-cloud` models** where the server has 18, so in the moment before the server catalog arrives `gpt-oss:20b` looks singly-owned and reads as `Ollama`. **Once the catalog is registered it becomes ambiguous and falls to the stage's provider**, as the rule intends. This dates from v2.9.1 and is not a property of the display rule.
+
+### 2026-07-29 — The documentation rebuilt in three layers, with Japanese and English saying the same thing (**no version**; documentation only)
+
+**Split into a reading layer, a specification layer and an archive layer, with the English SPEC rebuilt into the Japanese section structure.** Every stage of ledger [I-032].
+
+- **A check was written.** `server/scripts/check_docs.py` verifies **(1) the shape of the two languages** (per document, one of `shape` / `sections` / `entries`; **13 pairs**), **(2) where relative links land**, and **(3) the non-published paths a published document names** (frozen). **An undeclared difference is red.**
+- **Things moved to the archive.** The changelog became the current file plus two archives, and the engine version history moved to `docs/spec/render-engine-history`. `SPEC.ja` went from 2253 to **1836 lines**
+- **The READMEs were shortened.** `README.ja.md` 539 -> 295 lines and `README.md` 585 -> 318. Quick Start rose from 74% of the way down to 33% and 38%. **The three pairs taken out live in `docs/guide/`** (`gallery`, `how-it-works`, `revision`)
+- **The English SPEC was rebuilt into the Japanese section structure.** After aligning the section numbers one to one, section 13 was written, then 4, 8 and 9, then 7 and 14, then 10 with 5 and 6, and finally 12. **Section 12 went from four subsections to thirteen.** `SPEC.md` went from 1269 to **2907 lines**
+- **The 76 missing English changelog entries were written.** The first archive had no English file at all and now has one (**73 entries, 2169 lines**, matching the Japanese heading for heading and in order), and the second gained v1.85, v1.86 and v1.86.1
+
+**Three things learned, which apply to the next bilingual work**
+
+- **Measuring the correspondence between documents by their h2 titles is wrong.** The English section 12 was titled "Security and Operations", but **only its first 51 lines were about operations**; the remaining 504 corresponded one to one, down to h3 and h4, with the Japanese sections 15.4 through 15.12. **A title goes stale before its contents do**
+- **A stage that writes a section in English leaves the older English of the same content elsewhere.** Of the 186 lines in the English section 12's Renderer subsection, **about 110 duplicated 13.11, 13.8, 8.4 and 4.7**. **Before deleting, the identifier sets were compared and every paragraph of the old section was matched mechanically against the new document** — 17 surfaced, of which **2 were genuinely English-only content that would have been lost**
+- **Before believing a statement that no English version exists, grep the other documents.** The English text of v1.85, v1.86 and v1.86.1 **was in `SPEC.md` under Accounting for Refinement, where the Japanese SPEC had no such subsections** — the two languages were filing the same records in different places. **The GLOSSARY and `lint:i18n` policy buried inside v1.85 was the only statement of it in either SPEC**, so it moved to 7.8 rather than down into an archive entry
+
+**Japanese barely moved outside the READMEs** (`SPEC.ja.md` did not change by a single line through stage 4c). **Two declared differences remain**: English sections 15 and 17 are deliberately not written, and the operational sections from 18 onward stand in English alone. **`check_docs.py` green, server 1487 passed / 31 skipped, cli 76 passed, ruff green.**

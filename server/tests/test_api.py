@@ -135,7 +135,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["developer_mode"] is False
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "16"
-    assert data["ddl_version"] == "1"
+    assert data["ddl_version"] == "2"
     assert data["ddl_engine_version"] == "2"
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
@@ -1360,7 +1360,7 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
     }
     assert r.json()["render_engine_id"] == "default"
     assert r.json()["render_engine_version"] == "16"
-    assert r.json()["ddl_version"] == "1"
+    assert r.json()["ddl_version"] == "2"
     assert r.json()["ddl_engine_version"] == "2"
     assert r.json()["render_canvas_aspect"] == "square"
     assert r.json()["render_canvas_aspect_id"] == "square"
@@ -1397,7 +1397,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
     }
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "16"
-    assert data["ddl_version"] == "1"
+    assert data["ddl_version"] == "2"
     assert data["ddl_engine_version"] == "2"
     assert data["render_canvas_aspect"] == "square"
     assert data["render_canvas_aspect_id"] == "square"
@@ -2090,7 +2090,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_color_profile"]["id"] == "srgb"
     assert item["render_engine_id"] == "default"
     assert item["render_engine_version"] == "16"
-    assert item["ddl_version"] == "1"
+    assert item["ddl_version"] == "2"
     assert item["ddl_engine_version"] == "2"
     assert item["render_canvas_aspect"] == "wide"
     assert item["render_canvas_aspect_id"] == "wide"

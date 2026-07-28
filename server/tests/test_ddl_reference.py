@@ -31,7 +31,7 @@ def _aliases(model) -> set[str]:
 
 def test_ddl_reference_versions_and_parts() -> None:
     manifest = _manifest()
-    assert DDL_VERSION == "1"
+    assert DDL_VERSION == "2"
     # engine 2 (2026-07-28): `Instruction` が `thinness` を得たので、この層の
     # 凍結出力は振る舞いが変わらないまま dump の形だけが変わった。凍結済みの
     # ディレクトリは書き換えないという規約に従い、次の版へ焼いた。

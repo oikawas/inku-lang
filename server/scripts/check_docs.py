@@ -54,6 +54,9 @@ PROSE_DOC = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:ja\.)?md)`")
 #                    never mirrored. It still catches a whole record present in
 #                    one language and missing in the other, which is the way
 #                    these documents actually break.
+# mode "entries"  -- only the number of ### entries must match. For the
+#                    changelogs, where an entry's body is written independently
+#                    in each language but every version must appear in both.
 PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("README.ja.md", "README.md", "shape", None),
     ("SETUP.ja.md", "SETUP.md", "shape", None),
@@ -71,12 +74,24 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "SPEC.md carries an English-only section 15 'Current Implementation "
         "Status' that the Japanese original has no counterpart for",
     ),
+    # Split on 2026-07-28. The current file carries v2.5.0 onward and the two
+    # languages hold the same 30 entries, so this pair needs no exception any
+    # more: every new version must land in both. The backlog did not vanish --
+    # it moved into the two archives below, where it is now countable.
+    ("CHANGELOG.ja.md", "CHANGELOG.md", "entries", None),
     (
-        "CHANGELOG.ja.md",
-        "CHANGELOG.md",
-        "sections",
-        "the English CHANGELOG starts at v1.72; entries v0.1..v1.71 are "
-        "Japanese-only (ledger I-032 tracks the translation)",
+        "docs/history/changelog-v1.72-v2.4.ja.md",
+        "docs/history/changelog-v1.72-v2.4.md",
+        "entries",
+        "47 Japanese entries against 44 English: v1.85, v1.86 and v1.86.1 have "
+        "no English text (ledger I-032)",
+    ),
+    (
+        "docs/history/changelog-v0.1-v1.71.ja.md",
+        "docs/history/changelog-v0.1-v1.71.md",
+        "entries",
+        "73 entries, Japanese only. The English file does not exist yet "
+        "(ledger I-032)",
     ),
 )
 
@@ -141,15 +156,24 @@ def check_parity() -> list[str]:
     problems = []
     for ja_name, en_name, mode, exception in PAIRS:
         ja, en = REPO_ROOT / ja_name, REPO_ROOT / en_name
-        for path in (ja, en):
-            if not path.exists():
-                problems.append(f"missing: {path.relative_to(REPO_ROOT)}")
-        if not (ja.exists() and en.exists()):
+        if not ja.exists():
+            problems.append(f"missing: {ja_name} (the Japanese version is the original)")
+            continue
+        if not en.exists():
+            # A whole language version that has not been written yet is a
+            # difference like any other: declare it, or it fails.
+            if exception:
+                print(f"  declared difference: {en_name} is absent -- {exception}")
+            else:
+                problems.append(f"missing: {en_name}")
             continue
         ja_shape, en_shape = _heading_shape(ja), _heading_shape(en)
         if mode == "sections":
             ja_shape = [level for level in ja_shape if level == 2]
             en_shape = [level for level in en_shape if level == 2]
+        elif mode == "entries":
+            ja_shape = [level for level in ja_shape if level == 3]
+            en_shape = [level for level in en_shape if level == 3]
         if ja_shape == en_shape:
             if exception:
                 problems.append(
@@ -179,12 +203,12 @@ def check_prose_references(tracked: set[str]) -> list[str]:
     """Freeze the set of internal documents that published documents name.
 
     The CHANGELOG cites the work report behind each entry, and those reports
-    live in ``no-git-sync/``. A reader on GitHub cannot open them. Whether that
-    is provenance worth keeping or a defect worth cleaning up is the author's
-    call, so this check does not decide it: it freezes the set that exists
-    today (22 paths, 52 occurrences, measured 2026-07-28) and fails when a new
-    one appears. The count is printed either way, so the size of the backlog
-    stays visible instead of being forgotten.
+    live in ``no-git-sync/``. A reader on GitHub cannot open them. **The author
+    ruled on 2026-07-28 that this is fine**: the citation records that a report
+    exists, which is worth keeping even though the reader cannot follow it. So
+    the set is frozen as it stood that day (22 paths, 51 occurrences) rather
+    than cleaned up, and a new one fails. The count is printed either way, so
+    the size stays visible instead of being forgotten.
 
     Only paths that carry a directory are considered: a bare `AGENTS.md` in
     prose is a name, not a route, and the reader is not being sent anywhere.

@@ -4412,7 +4412,7 @@ def _render_fill_strokes(
     塗りは領域 fill ではなく、細かいストロークで内側を埋めること。走査線と輪郭の
     交点で筆を切るため各筆の端点は輪郭上に乗り、縁が揃う。走査線が
     `FILL_MIN_SCANLINES` 本に満たない微小図形では None を返し、呼び出し側が
-    領域 fill に縮退する (点のような粒子が輪郭だけになって消えるのを防ぐ)。
+    `_render_fill_dab` へ回す (engine 16 まではここで領域 fill へ縮退していた)。
     """
     if len(contour) < 3:
         return None
@@ -4482,6 +4482,82 @@ def _render_fill_strokes(
     return group
 
 
+FILL_DAB_SAMPLES = 5
+FILL_DAB_MIN_TRAVEL = 0.30
+
+
+def _render_fill_dab(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+    wild: bool = False,
+):
+    """微小な塗りを「塗る」のでなく「置く」。1 筆の打点として描く。
+
+    走査線が `FILL_MIN_SCANLINES` 本に届かない図形は、内部を走査して埋める対象では
+    なく、物としては筆を一度置いた跡である。engine 15 まではここで領域 fill へ
+    縮退しており、内部を持つ本番 instruction の 78% が平坦な塗りになっていた
+    (その 99.3% が短辺 2% 未満の粒である)。
+
+    筆は図形の長い方の軸に沿って運び、幅は短い方の軸が決める。円のように両軸が
+    等しい図形では運びが短くなり、細長い図形では一本の長い筆になる。新しい機構は
+    要らない — engine 12 以降の筆致文法が「一筆の始まりと終わり」を既に持っている。
+    """
+    if len(contour) < 3:
+        return None
+    xs = [point[0] for point in contour]
+    ys = [point[1] for point in contour]
+    width_px = max(xs) - min(xs)
+    height_px = max(ys) - min(ys)
+    if width_px <= 0.0 and height_px <= 0.0:
+        return None
+    cx = (max(xs) + min(xs)) / 2
+    cy = (max(ys) + min(ys)) / 2
+    along_x = width_px >= height_px
+    long_axis = width_px if along_x else height_px
+    short_axis = height_px if along_x else width_px
+    # 運びは「長い方 − 短い方」。円では 0 になるので下限を置き、点にならないようにする。
+    travel = max(long_axis - short_axis, long_axis * FILL_DAB_MIN_TRAVEL)
+    half = travel / 2
+    start = (cx - half, cy) if along_x else (cx, cy - half)
+    end = (cx + half, cy) if along_x else (cx, cy + half)
+    centerline = [
+        (
+            start[0] + (end[0] - start[0]) * i / (FILL_DAB_SAMPLES - 1),
+            start[1] + (end[1] - start[1]) * i / (FILL_DAB_SAMPLES - 1),
+        )
+        for i in range(FILL_DAB_SAMPLES)
+    ]
+    seed = _seed_for_instruction(ins, render_seed)
+    stroke = synthesize_along(
+        centerline,
+        max(_stroke_width_px(ins.weight, canvas), short_axis),
+        ins.weight,
+        _fill_stroke_seed(seed, 0),
+        closed=False,
+        grid_step=_grid_step_px(ins.weight, canvas),
+        wild=wild,
+    )
+    path_attrs = {
+        "d": contour_stroke_path(stroke),
+        "fill": attrs.get("stroke", "#111111"),
+        "fill_opacity": float(
+            attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0))
+        ),
+        "stroke": "none",
+    }
+    if use_filters and ins.weight in TEXTURE_FILTER_WEIGHTS and ins.weight != "drypoint":
+        path_attrs["filter"] = f"url(#texture-{ins.weight})"
+    group = dwg.g(class_="fill-dab-v1")
+    group.add(dwg.path(**path_attrs))
+    return group
+
+
 def _interior_fill(
     dwg: svgwrite.Drawing,
     ins: Instruction,
@@ -4493,10 +4569,11 @@ def _interior_fill(
     use_filters: bool,
     wild: bool = False,
 ) -> tuple[object | None, bool]:
-    """内部表現を返す。戻り値は (塗りストローク群, 領域 fill に縮退したか)。
+    """内部表現を返す。戻り値は (内部の描画, 領域 fill に縮退したか)。
 
     rotring (製図ペン) は engine 8 で輪郭を筆致から外してあるのと同じ理由で、
-    塗りも機械の塗り = 領域 fill のままにする。
+    塗りも機械の塗り = 領域 fill のままにする。手の道具では、走査線に届かない
+    微小な図形も領域 fill にはせず、1 筆の打点として置く (engine 16 段 2)。
     """
     if not _fills_interior(ins):
         return None, False
@@ -4505,6 +4582,11 @@ def _interior_fill(
     group = _render_fill_strokes(
         dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters, wild=wild
     )
+    if group is None:
+        group = _render_fill_dab(
+            dwg, ins, contour, attrs, canvas, render_seed,
+            use_filters=use_filters, wild=wild,
+        )
     return (None, True) if group is None else (group, False)
 
 

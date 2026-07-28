@@ -35,14 +35,15 @@ def test_render_reference_case_counts() -> None:
     # engine 15 で C 群が 40 → 43。`ground.seed` を明示しない 4 件を足し
     # (それまでコーパスは `_texture_seed` を一度も呼んでいなかった)、
     # `absorbency` の退役でその判別ケースが `C-ground-paper` の重複になったので外した。
-    # engine 16 で C 群が 43 -> 47。コーパスは 350 件すべてが `editable` で、
-    # 本番既定の `display` 固有の分岐を一度も実行していなかったので、
-    # `display` を通す 4 件 (`C-display-surface-*`) を足した。
-    assert len(cases) == 354
+    # engine 16 で C 群が 43 -> 51。コーパスは 350 件すべてが `editable` で、
+    # 本番既定の `display` 固有の分岐を一度も実行していなかったので `display` を
+    # 通す 4 件 (`C-display-surface-*`) を足し、微小な塗りの機構が切り替わる
+    # 境界の両側を留める 4 件 (`C-tinyfill-*`) を足した。
+    assert len(cases) == 358
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E")
-    } == {"A": 88, "B": 72, "C": 47, "D": 28, "E": 119}
+    } == {"A": 88, "B": 72, "C": 51, "D": 28, "E": 119}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:

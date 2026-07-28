@@ -170,6 +170,20 @@ def build_inputs() -> dict[str, dict[str, Any]]:
             _case(cases, f"C-surface-{texture}-{tool}",
                   _instruction("square", weight=tool, filled=False, surface=surface))
 
+    # Tiny fills. Everything below the measured boundary is placed as one dab
+    # rather than scanned; above it the interior is still filled with strokes.
+    # The boundary is a short side of 2.9%-3.2% of the canvas, measured across
+    # five tools and six seeds, so 1% is safely below and 3.4% safely above.
+    _case(cases, "C-tinyfill-circle-pen",
+          _instruction("circle", weight="pen", radius=0.005, filled=True))
+    _case(cases, "C-tinyfill-circle-rotring",
+          _instruction("circle", weight="rotring", radius=0.005, filled=True))
+    _case(cases, "C-tinyfill-square-brush_thick",
+          _instruction("square", weight="brush_thick", position=[0.495, 0.495],
+                       size=[0.01, 0.01], filled=True))
+    _case(cases, "C-tinyfill-boundary-pen",
+          _instruction("circle", weight="pen", radius=0.017, filled=True))
+
     # The corpus is 100% `editable`, but production renders `display`. Every
     # display-only branch of the surface layer was therefore never executed once
     # in 350 cases. These four run the profile the author actually looks at.
@@ -252,9 +266,9 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                   _instruction("square", weight=tool, filled=False, surface=surface),
                   wild=True)
 
-    expected = {"A": 88, "B": 72, "C": 47, "D": 28, "E": 119}
+    expected = {"A": 88, "B": 72, "C": 51, "D": 28, "E": 119}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 354:
+    if actual != expected or len(cases) != 358:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

@@ -10,25 +10,25 @@
 </tr>
 </table>
 
-`inku` is the reference implementation of DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No drawing skill or tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the start — and from there you build the image up.
+`inku` is the reference application for DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No experience with drawing and no tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the start — and from there you build the image up.
 
 ```
 A blue line slowly loosens across the night water.
 ```
 
-That sentence is interpreted, written into a score (drawing data in JSON), and performed (by inku's own rendering engine) into a picture. Generate again from the same sentence — not by AI, but by seeded variation — and a slightly different picture comes back. Every work you generate is kept under generational management as lineage: build variations on a work (by hand or through AI-assisted refinement), choose from the candidates lined up before you, and a new generation is born. **The back-and-forth of writing and choosing** is how creation works in inku.
+That sentence is interpreted, becomes a score, and is performed by the renderer into a picture. Draw again from the same sentence and variation brings back a slightly different picture. Works are kept as lineage and saved generation by generation. You build variations on your own work, refine it, choose from the candidates lined up before you, and a new generation is born — **the back-and-forth of writing and choosing** is how creation works in inku.
 
-inku stands at the crossing of ideas learned from three cultural traditions — and it is the result, or perhaps the ongoing process, of thinking about how generative-AI technology should be applied at that crossing.
+inku was born at the crossing of ideas learned from three cultural traditions, and it is an application that thinks about how generative-AI technology should be applied there. Generative AI is used, but this is not a prompt lottery.
 
-| Tradition | What it gives inku |
+| Culture / tradition | What it gives inku |
 |---|---|
-| **Sol LeWitt's instruction art** | The idea that the description itself is the work; the concept from which this application began |
+| **Sol LeWitt's instruction art** | The idea that the description itself is the work; the concept the application grew out of |
 | **Bonsai** | The practice that constraint is not limitation but concentration |
 | **Tanka** | The form in which the type silences the self, and presentation replaces assertion |
 
-As of 2026, generative image and picture making hides its own process from the creator; it might fairly be called incantatory — write a prompt, then pray, and repeat. The DDL concept takes the opposite path: it splits the generation process into layers, and the human interprets, selects, and edits the AI's interventions at each layer while finishing the work.
+As of 2026, generative image making hides its process from the creator; it might fairly be called incantatory — write a prompt, then pray, and repeat. The DDL concept splits the generation process into layers, alternating generative AI with deterministically programmed algorithms.
 
-inku is built on LLMs, but each layer is placed under strict constraints. Constraints on vocabulary, primitives, and coordinates are not limits on what can be made. They are the instruments by which you make a work and render your intention visible.
+inku is built on LLMs, but the elements an instruction is made of — vocabulary, primitives, coordinates — are placed under strict constraints, programmed to take up the author's intent while holding the form. Those constraints are not limits on what can be made. They are the instruments by which you make a work and render your intention visible.
 
 ---
 

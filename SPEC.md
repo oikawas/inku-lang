@@ -9,6 +9,10 @@ the canonical source because the author works in Japanese.  When the
 specification changes, update `SPEC.ja.md` first, then refresh this English
 version.
 
+Sections 1 to 17 follow the Japanese file section for section, so a number
+means the same thing in both languages.  Sections 18 onward carry the
+operational side of the reference implementation and exist only in English.
+
 For ordinary development, start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
 and read only the specification sections relevant to the task. Chronological
 release history is maintained separately in [CHANGELOG.md](CHANGELOG.md), with
@@ -39,11 +43,147 @@ The name `inku` comes from the Japanese reading of "ink".  It also points to
 the material nature of writing and to the sumi-ink world that informs the visual
 palette.
 
+DDL is designed as a language for writing visual tanka.
+
 ---
 
-## 2. Core Idea
+## 2. Design Principles
 
-DDL is designed as a language for writing visual tanka.
+1. Descriptions must remain human-readable.
+2. Variation is part of the specification, not a bug. It exists at two scales: micro variation in line wobble, blur, grain, and texture; and macro variation in composition and placement resolved by the renderer.
+3. Emotional adjectives are excluded from core vocabulary.
+4. Physical, spatial, material, and motion words are preferred.
+5. Coordinates are normalized ratios, not fixed pixels.
+6. Output is still image SVG; the viewer moves, not the image.
+7. The input language is constrained enough to support iteration.
+8. Optional concrete worlds belong in plugins, not the core language.
+9. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (see "Principles that outlast a version" in the [render engine version history](docs/spec/render-engine-history.md)).
+
+DDL avoids words such as "beautifully" or "powerfully" in the core.  The system
+should express such ideas through visible choices: number, placement, material,
+line behavior, color, weight, and negative space.
+
+---
+
+## 3. Core Vocabulary
+
+The vocabulary dictionary is called Saijiki, following the haiku term for a
+seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
+at all times.
+
+Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is the v2.7.9 snapshot.
+
+| English | Japanese | Vocabulary |
+| --- | --- | --- |
+| forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
+| touches | てざわり | silverpoint, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
+| continuity | つらなり | solid (default), dashed, dotted, dash-dot |
+| motions | うごき | place, line-up, draw, scatter, fill, tile |
+| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
+
+### Wild (engine 12; its reach in engine 14)
+
+**Separate from the vocabulary, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — wild.
+
+- **One switch for the whole work**, not per stroke and not per tool. **In engine 12 it reached only the line primitive** (circles, ellipses, triangles, squares, polygons, arcs, fills and hatches came out byte-identical with it on). **Engine 14 extends it to contours, arcs, fills and hatches**, so the implementation now matches the description
+- **It removes only the amplitude ceiling and the ban on self-intersection.** Endpoint pinning and determinism hold when it is on: the same Score, the same seed, and the same state render the same SVG every time
+- **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed wild and performed plainly are different works**
+- **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when it is on. **A machine has nothing to unleash**
+
+This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance.
+| relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
+| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
+| angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
+| proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
+| colors | いろ | white, black (default), blue, red, green, gray |
+
+In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision. In v2.7.9 the second of those came back under the name it should have had: `hair` was never a brush but a **silverpoint** — 0.5px, the least wavering line a hand can draw — and it is now 銀筆 / silverpoint, first in the touches list. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
+
+`Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
+
+The core color vocabulary is the six abstract colors that authors can write: white, black, blue, red, green, and gray. Color catalogs are server-owned metadata that change how those six colors are resolved at render time; they are not vocabulary extensions. Yellow and orange appear in some catalog palettes and can be reached through palette resolution or `color_hint`, but they are not added to the core color vocabulary.
+
+Colors in JSON Score are abstract color names.  Rendering resolves them through
+the selected color catalog.  The server is the source of truth for color
+catalog definitions and exposes them through `/api/color-catalogs`; clients
+select a `catalog_id` rather than owning their own catalog tables.  When user
+instructions include color nuance, the system may preserve `color_hint` so
+Stage 2 and rendering can resolve the best catalog color without losing intent.
+The default catalog is a neutral baseline, not a cultural default.  Additional
+catalog ids use material-, light-, and technique-based names to avoid presenting
+a country, ethnicity, food, festival, empire, or tourism marker as a complete
+palette identity: `ink_season`, `fresco_study`, `open_air_light`,
+`ink_porcelain`, `cool_material`, `dye_earth`, `desert_mineral`,
+`vivid_material`, `weathered_heritage`, and `sea_stone`.
+Catalog `map` values must preserve the meaning of the abstract colors
+`white / black / blue / red / green / gray`; stronger identity colors belong in
+`palette` rather than replacing structural colors.  The Build 265 review leaves
+`open_air_light`, `dye_earth`, and `desert_mineral` as known tuning targets:
+their dark backgrounds, high-chroma accents, or paper/sand tones can dominate
+quiet prompts, so future tuning should adjust core brightness and saturation
+instead of branching into prompt-specific exceptions.
+Build 266 lightens those three catalogs' core colors to reduce background and
+dark-color dominance.  Catalog `sub` remains the English UI description, while
+`sub_ja` carries the Japanese UI description.  Palette color names use `name` as
+the English canonical label and may include `name_ja`; the Japanese UI displays
+those entries as `English（日本語）`, while the English UI displays `name` only.
+
+Render JSON produced by the server records the concrete render context.  Paint,
+compose, the JSON tab, and saved artifact JSON include the resolved
+`stage1_model` / `stage2_model` that were actually used, plus
+`render_build_number`, `render_color_profile`, `render_engine_id`,
+`render_engine_version`, `render_canvas_aspect`, `render_hash`,
+`render_hash_short`, `render_color_catalog_id`, `render_color_catalog_name`,
+`render_color_catalog_sub`, `render_color_map`,
+`instruction_lang_requested`, `instruction_lang_resolved`, `ui_lang`, and `render_seed`, where
+abstract colors and `palette:<name>` entries are expanded to the exact
+`#RRGGBB` codes used for SVG rendering.  The current engine metadata is
+`render_engine_id: "default"` and
+`render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
+snapshot is not duplicated in render JSON because `render_color_map` is the
+concrete color record needed for replay and audit.
+`render_hash` is the work-edition identifier. SVG text, input text, normalized DDL, and raw LLM responses are never part of the hash payload.
+
+**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`composition_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
+
+**`render_wild` joined the material in engine 12; the format name stays `rh3`.** Extending the material does make a separate hash space, but **`render_engine_version` sits inside the same payload**, so a value computed under the old material always contains `"11"` or lower and one under the new always contains `"12"` or higher. The two can never coincide, so no `rh4` is needed. **This argument holds only because the engine version moved at the same time; the material must never be extended on its own.**
+
+**`rh2` (v1.60 through v2.4.4) is retained as legacy and never recalculated.** Stored `rh2:` rows keep their values and no destructive migration runs, matching how the earlier 64-character hex hashes were left in place. **`rh2` and `rh3` are separate hash spaces and must not be compared to decide whether two works are the same edition.** The startup backfill writes `rh3` only for rows whose `render_hash` is empty. `render_hash_short` — the four-character uppercase suffix used in the UI and CLI — is unchanged across both forms.
+`score.canvas` remains the score-level canvas instruction, while
+`render_canvas_aspect` records the canvas aspect actually used for this rendered
+artifact.  In normal server-generated output they match, but both are retained
+so render metadata remains visible even when old records or imported Scores are
+inspected.
+`render_canvas_aspect_id` is the explicit canvas aspect identifier for new
+metadata, and `render_canvas_aspect_ratio` records the actual rendered
+width/height ratio as a number.  `render_canvas_aspect` remains for
+compatibility; old records can be backfilled in responses by deriving the new id
+and ratio from it.
+
+---
+
+## 4. Plugin Model
+
+Vocabulary plugins are UTF-8 declarative documents, not executable code. One `.inku-plugin.md` file contains a front-matter manifest and word entries. The manifest requires `namespace`, `name`, semantic `version`, `authors`, `languages`, `license`, and Japanese/English descriptions. Each entry provides namespaced identity, Japanese/English surfaces and `fires_on` nouns, optional bilingual Saijiki notes, and equivalent bilingual expansion templates. Arbitrary code, URLs, and file references are forbidden.
+
+The pipeline order is **Stage 1 output -> plugin expansion -> core-only DDL -> Stage 1.5 -> Stage 2**. Templates may use core normalized DDL plus bounded expansion forms: deterministic `N to M` repetition (with unit-preserving singulars, and Build 591 multi-word English units such as `leaf forms`, `blades`, `cloudforms`, `spots`, `arcs`); a `member name: definition` local composite inlined at each member (Build 591; undefined references are rejected at load); `note:` comment lines that carry no expansion (Build 591); an `anchor` whose region determines separate member bands, including a Build 591 `anchor ... at N to M spots` nested repetition (spots x per-anchor members, depth two, each spot its own band); and symbolic `{region: ...}` translation, whose canonical key list is published by reference §3 and includes a `bottom band`, with an `upper-left to lower-right diagonal band` resolved as a computation (member sub-regions along a descending diagonal) rather than a rectangle. The same input chooses the same count, member regions, and rotations.
+
+Core DDL with explicit numeric regions after expansion is already composition-resolved. Stage 1.5 still performs normalization but must not append a separate finished-work recipe or auxiliary shapes, and Stage 2 must not retain support instructions beyond the explicit region count. This cap applies to Score instruction count; it does not freeze `arrangement.count` inside each instruction. Visible multiplicity can therefore remain model-dependent: for the minimal twin-arcs fixture, Mistral stays at two arcs while Qwen may repeat the two instructions into more than two visible arcs. Build 590 accepts this as a known limitation.
+
+The load-time validator rejects the whole document with explicit reasons for missing manifest fields, reserved namespace or qualified-word collisions, recursion or non-core plugin references, more than 48 instructions per word, repeated members stamped at fixed coordinates, and URL/file references. This is syntax validation before execution, not a governor of the work itself. Runtime closure or budget failure drops the expansion without repair, records a warning, and leaves a normal core approximation. Build 591 adds unknown region keys and undefined member references to the load-time rejections, exempts comment lines from the closure check, and removes the silent center fallback (an unknown key at runtime falls back to the default band with a recorded warning). Since v1.92 the closure marker table (shapes, verbs, relations, and the Saijiki modifier categories) is derived from the saijiki table; reference §1 and §3 always show the current values.
+
+An explicit qualified term always fires. Stage 1 may resolve a `fires_on` noun only when it is the stated subject; it must not extend firing to metaphors, unclear subjects, or unknown objects. When several `fires_on` phrases match at the same position, only the longest wins (Build 591, removing substring mis-fires — e.g. the input "枯草" no longer also fires the "草" undergrowth word); phrases at different positions still fire independently. Only the loaded surface/trigger vocabulary is injected into Stage 1, never template bodies. Stage 1.5 and coerce cannot introduce plugin words. Input-term-to-qualified-term provenance is returned by the API and stored in ordinary derivation metadata, while plugin documents and dependencies remain absent from Score, canonical DB work data, and rh2.
+
+`server/plugins/` is signature-checked so add/delete changes appear without a restart; management APIs and `inku-cli plugin list / validate / reload` expose status, rejection reasons, validation, and forced reload. Settings shows loaded/rejected documents, while Saijiki distinguishes qualified plugin words and bilingual notes. Removing a plugin must not change replay SVG or rh2 for a saved work because replay uses the already saved core Score and seeds.
+
+The built-in `canvas-aspect` system plugin remains separate and uses its existing hook and per-user plugin storage. Vocabulary plugin documents do not gain that code-level hook.
+
+### Short-Form Guide
+The writing surface carries only a non-blocking length hint. Japanese input uses roughly 31 characters as a tanka-like guide; English input uses roughly 12 words. The UI must not block longer text or display evaluative copy about length. It may show only a numeric counter and a subtle density change when the guide is exceeded, so the form is present without scolding the writer.
+
+---
+
+## 5. The Three-Layer Pipeline
 
 The author writes a short description.  The system interprets it into a
 controlled DDL vocabulary, expands it through deterministic filters, structures
@@ -76,9 +216,9 @@ of truth.
 | 詞書 | Headnote | The description raised beside the finished work — kotobagaki, the note set beside a poem |
 | 読み取り | Reading | Rebuilding candidates by re-reading the words (another interpretation) |
 
-Variation is intentional.  DDL does not attempt to eliminate all model or
-renderer variation.  It uses variation as part of the medium, while keeping the
-score, schema, and renderer boundaries explicit.
+---
+
+## 6. The Base Language Question
 
 The UI display language and the instruction language are separate metadata.
 The writing tab does not ask users to choose a language: normal generation
@@ -136,25 +276,113 @@ reactions without increasing overall density.
 
 ---
 
-## 3. Design Principles
+## 7. Web Application
 
-1. Descriptions must remain human-readable.
-2. Variation is part of the specification, not a bug. It exists at two scales: micro variation in line wobble, blur, grain, and texture; and macro variation in composition and placement resolved by the renderer.
-3. Emotional adjectives are excluded from core vocabulary.
-4. Physical, spatial, material, and motion words are preferred.
-5. Coordinates are normalized ratios, not fixed pixels.
-6. Output is still image SVG; the viewer moves, not the image.
-7. The input language is constrained enough to support iteration.
-8. Optional concrete worlds belong in plugins, not the core language.
-9. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (Section 12.5).
+The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (`SPEC.ja.md` §12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
-DDL avoids words such as "beautifully" or "powerfully" in the core.  The system
-should express such ideas through visible choices: number, placement, material,
-line behavior, color, weight, and negative space.
+The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
+
+Each Lineage-card work menu offers, under the heading "Edit the work" and in this order: drawing elements, description, DDL, model, language, autonomous refinement, and moving the work to trash (item labels are shortened to the target noun). The dialogs opened by the three comparison actions are titled "Edit drawing elements", "Edit models", and "Edit languages". Description and DDL editing open modal dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. The three comparison actions target the selected card and open the corresponding existing Refine subview in a modal dialog; they do not duplicate comparison logic. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry. Trash is visually separated from comparison actions with an explicit high-contrast result label.
+
+Major UI areas:
+
+- App rail: compact navigation with an explicit expand/collapse toggle, user
+  menu, profile, settings, language and theme controls
+- Input panel: single drawing, batch drawing, and demo modes
+- DDL editor: editable normalized DDL embedded in the single drawing flow, with
+  Saijiki word highlighting and an expanded dialog editor
+- Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
+- History strip: recent works, hover metadata, star markers, pagination
+- History manager: larger history view, trash, restore, permanent delete, star filter
+- Settings modal: models, color catalogs, DB status, plugin status, export
+  templates, users, theme
+
+The status bar displays the current render context:
+
+- Stage 1 model
+- Stage 2 model
+- color catalog
+- canvas aspect
+- star state for the current history item
+- SVG / PNG export controls
+
+For history display, model, catalog, and canvas values come from the history
+item when available.  For active editing, they come from the current selections.
+The canvas panel header also shows the selected work's color catalog, canvas,
+and creation time.  The color catalog button in the input panel displays the
+currently selected catalog name and truncates long names with an ellipsis.
+
+The settings modal's "other" tab includes history-selection behavior controls.
+Users can choose independently whether selecting a history item updates the UI's
+current canvas aspect and color catalog to the history item's values, or keeps
+the current UI selections.  This setting affects only the UI selection state;
+the saved history SVG is displayed as stored and is not re-rendered.
+
+The canvas panel also supports viewing-oriented controls.  A fullscreen icon in
+the drawing tab opens presentation mode, which maximizes the current SVG and
+shows a compact control bar for history navigation, latest item, star toggle,
+instruction caption toggle, and close.  Escape closes presentation mode.  A
+caption icon in the drawing tab toggles an instruction caption.  In normal
+canvas view, the caption uses 10% left and right margins relative to the drawing
+tab and is clipped inside that tab.  In presentation mode, the caption uses 10%
+left and right margins relative to the window.  Captions display the original
+user-facing instruction text, not the internally augmented Stage 1 prompt; this
+keeps emotion-hint or system prompt material out of presentation captions.
+
+The history DB remains the source of truth for renders saved by the web UI,
+`inku-cli`, Android headless CLI, and other API clients.  The web UI periodically
+refreshes the latest normal history page while the signed-in user is viewing the
+latest non-filtered history.  It also refreshes when the browser window regains
+focus or a hidden tab becomes visible.  This allows CLI-saved renders to appear
+in the history strip without a manual reload, while preserving the currently
+selected history item when it is still present.  The UI does not auto-replace
+history while the user is viewing starred-only history, search results, older
+history pages, or while a history request is already in flight.
+
+PNG export options are managed as per-user templates in the settings modal's
+export tab.  Each template has a name, description, and y-axis height in pixels.
+The default templates are `PNG 1024px` and `PNG 2048px`.  The status bar PNG
+menu is generated from these templates, and export width is computed from the
+current canvas aspect ratio.
 
 ---
 
-## 4. Pipeline
+## 11. Testing and Evaluation
+
+The project evaluates quality through several layers:
+
+- backend tests for API, DB, schema, composer, interpreter, renderer, and
+  deterministic fallback behavior
+- frontend Svelte check and production build
+- CLI-based benchmark generation
+- saved benchmark summaries and contact sheets
+- visual review of generated SVG/PNG output
+- stress tests using invalid, ambiguous, emotional, conversational, and
+  contradictory instructions
+
+Benchmarks focus on:
+
+- whether Stage 1 preserves the whole input context
+- whether Stage 1.5 expands without overpacking techniques
+- whether Stage 2 preserves all DDL elements in JSON Score
+- whether deterministic fallback keeps enough DDL content to be reviewable
+- whether the renderer makes DDL features visible
+- whether the output has enough negative space, variation, and artistic focus
+
+Current render-core tuning records explicit quality metrics for the work in CLI benchmark summaries: `constraint_adherence`, `negative_space_pressure`, `motion_energy`, `color_resonance`, `visual_event`, and `figurative_risk`. These judge metrics are regression sensors, not final acceptance gates or substitutes for human selection. Build 448 confirmed divergence between machine scoring and human review, especially JP #23, so the metrics should not be retuned merely to raise preferred works. Fallback use, server hard timeouts, motif hints, presence counts, color traces, and compositional markers are recorded separately. Queue or retry duration is diagnostic only and is not treated as a primary quality metric, because free inference endpoints can be dominated by external queue behavior.
+
+For NVIDIA free API testing, elapsed time is treated as operational metadata,
+not as an artistic quality signal.  Queue delays can indicate service pressure,
+but they do not exclude a successful work from aesthetic or structural review.
+
+---
+
+**The inventory of what is currently implemented moved to
+[current implementation status](docs/spec/implementation-status.md) on 2026-07-28.**
+
+---
+
+## 12. The Two-Stage Architecture
 
 ### Stage 1: Interpretation
 
@@ -461,104 +689,68 @@ payloads.
 
 ---
 
-## 5. Core Vocabulary
+## 13. The Design of Variation
 
-The vocabulary dictionary is called Saijiki, following the haiku term for a
-seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
-at all times.
-
-Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is the v2.7.9 snapshot.
-
-| English | Japanese | Vocabulary |
-| --- | --- | --- |
-| forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touches | てざわり | silverpoint, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
-| continuity | つらなり | solid (default), dashed, dotted, dash-dot |
-| motions | うごき | place, line-up, draw, scatter, fill, tile |
-| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
-
-### Wild (engine 12; its reach in engine 14)
-
-**Separate from the vocabulary, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — wild.
-
-- **One switch for the whole work**, not per stroke and not per tool. **In engine 12 it reached only the line primitive** (circles, ellipses, triangles, squares, polygons, arcs, fills and hatches came out byte-identical with it on). **Engine 14 extends it to contours, arcs, fills and hatches**, so the implementation now matches the description
-- **It removes only the amplitude ceiling and the ban on self-intersection.** Endpoint pinning and determinism hold when it is on: the same Score, the same seed, and the same state render the same SVG every time
-- **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed wild and performed plainly are different works**
-- **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when it is on. **A machine has nothing to unleash**
-
-This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance.
-| relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
-| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
-| angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
-| proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
-| colors | いろ | white, black (default), blue, red, green, gray |
-
-In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision. In v2.7.9 the second of those came back under the name it should have had: `hair` was never a brush but a **silverpoint** — 0.5px, the least wavering line a hand can draw — and it is now 銀筆 / silverpoint, first in the touches list. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
-
-`Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
-
-The core color vocabulary is the six abstract colors that authors can write: white, black, blue, red, green, and gray. Color catalogs are server-owned metadata that change how those six colors are resolved at render time; they are not vocabulary extensions. Yellow and orange appear in some catalog palettes and can be reached through palette resolution or `color_hint`, but they are not added to the core color vocabulary.
-
-Colors in JSON Score are abstract color names.  Rendering resolves them through
-the selected color catalog.  The server is the source of truth for color
-catalog definitions and exposes them through `/api/color-catalogs`; clients
-select a `catalog_id` rather than owning their own catalog tables.  When user
-instructions include color nuance, the system may preserve `color_hint` so
-Stage 2 and rendering can resolve the best catalog color without losing intent.
-The default catalog is a neutral baseline, not a cultural default.  Additional
-catalog ids use material-, light-, and technique-based names to avoid presenting
-a country, ethnicity, food, festival, empire, or tourism marker as a complete
-palette identity: `ink_season`, `fresco_study`, `open_air_light`,
-`ink_porcelain`, `cool_material`, `dye_earth`, `desert_mineral`,
-`vivid_material`, `weathered_heritage`, and `sea_stone`.
-Catalog `map` values must preserve the meaning of the abstract colors
-`white / black / blue / red / green / gray`; stronger identity colors belong in
-`palette` rather than replacing structural colors.  The Build 265 review leaves
-`open_air_light`, `dye_earth`, and `desert_mineral` as known tuning targets:
-their dark backgrounds, high-chroma accents, or paper/sand tones can dominate
-quiet prompts, so future tuning should adjust core brightness and saturation
-instead of branching into prompt-specific exceptions.
-Build 266 lightens those three catalogs' core colors to reduce background and
-dark-color dominance.  Catalog `sub` remains the English UI description, while
-`sub_ja` carries the Japanese UI description.  Palette color names use `name` as
-the English canonical label and may include `name_ja`; the Japanese UI displays
-those entries as `English（日本語）`, while the English UI displays `name` only.
-
-Render JSON produced by the server records the concrete render context.  Paint,
-compose, the JSON tab, and saved artifact JSON include the resolved
-`stage1_model` / `stage2_model` that were actually used, plus
-`render_build_number`, `render_color_profile`, `render_engine_id`,
-`render_engine_version`, `render_canvas_aspect`, `render_hash`,
-`render_hash_short`, `render_color_catalog_id`, `render_color_catalog_name`,
-`render_color_catalog_sub`, `render_color_map`,
-`instruction_lang_requested`, `instruction_lang_resolved`, `ui_lang`, and `render_seed`, where
-abstract colors and `palette:<name>` entries are expanded to the exact
-`#RRGGBB` codes used for SVG rendering.  The current engine metadata is
-`render_engine_id: "default"` and
-`render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
-snapshot is not duplicated in render JSON because `render_color_map` is the
-concrete color record needed for replay and audit.
-`render_hash` is the work-edition identifier. SVG text, input text, normalized DDL, and raw LLM responses are never part of the hash payload.
-
-**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`composition_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
-
-**`render_wild` joined the material in engine 12; the format name stays `rh3`.** Extending the material does make a separate hash space, but **`render_engine_version` sits inside the same payload**, so a value computed under the old material always contains `"11"` or lower and one under the new always contains `"12"` or higher. The two can never coincide, so no `rh4` is needed. **This argument holds only because the engine version moved at the same time; the material must never be extended on its own.**
-
-**`rh2` (v1.60 through v2.4.4) is retained as legacy and never recalculated.** Stored `rh2:` rows keep their values and no destructive migration runs, matching how the earlier 64-character hex hashes were left in place. **`rh2` and `rh3` are separate hash spaces and must not be compared to decide whether two works are the same edition.** The startup backfill writes `rh3` only for rows whose `render_hash` is empty. `render_hash_short` — the four-character uppercase suffix used in the UI and CLI — is unchanged across both forms.
-`score.canvas` remains the score-level canvas instruction, while
-`render_canvas_aspect` records the canvas aspect actually used for this rendered
-artifact.  In normal server-generated output they match, but both are retained
-so render metadata remains visible even when old records or imported Scores are
-inspected.
-`render_canvas_aspect_id` is the explicit canvas aspect identifier for new
-metadata, and `render_canvas_aspect_ratio` records the actual rendered
-width/height ratio as a number.  `render_canvas_aspect` remains for
-compatibility; old records can be backfilled in responses by deriving the new id
-and ratio from it.
+Variation is intentional.  DDL does not attempt to eliminate all model or
+renderer variation.  It uses variation as part of the medium, while keeping the
+score, schema, and renderer boundaries explicit.
 
 ---
 
-## 6. JSON Score
+## 14. The Design of Relation
+
+Cloudform is the first closed form whose visible identity is decided by the performance rather than by a geometric definition. The Score stores only process parameters such as center, size, variation, touch, surface, relation, and placement. It never stores contour coordinates. The renderer derives the contour from the Score, instruction index, and performance seed, so the same seed reproduces the same contour while another performance produces another contour.
+
+Cloudform does not imitate a meteorological cloud. The name refers to a family of irregular curves: a form with a grammar of irregularity, related to cloud rulers, yamato-e haze, suhama paper forms, and suminagashi. It extends the principle that the description persists and the rendering is a one-time performance from placement and touch into form itself.
+
+### Contour performance
+
+The renderer combines two deterministic periodic processes:
+
+1. A seamless multi-octave 1/f signal modulates a closed polar radius. Existing variation words distribute energy across low lobes or fine high-frequency detail.
+2. A second periodic signal runs along the base curve arc length and creates bays and waists. Its displacement is clamped by local radius and curvature. A strictly positive single-valued polar radius provides the structural self-intersection guarantee; this is geometry safety, not an aesthetic governor.
+
+The contour uses the shared tool grammar, so pencil and rotring produce different edge qualities. Existing surface values such as wash, stipple, hatch, and aquatint fill its interior. Carve mode can cut an irregular light from a dark ground. Output follows the renderer point budget and closed Bezier fitting rules.
+
+### Composition with existing vocabulary
+
+Cloudform introduces no modifier category:
+
+- variation controls octave distribution and contour behavior;
+- proportion controls aspect, including tall, wide, and full-width haze-like bands;
+- touch controls edge quality;
+- surface and color control the interior;
+- relations resolve against the performed contour and its bounding box;
+- place, motion, and arrangement position it, and arranged instances receive distinct contours.
+
+### Selection boundary
+
+Stage 1 may select cloudform only when the author explicitly writes cloudform, or when the instructed subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle. It is never a fallback for an unknown or unclear object. Unknown objects continue to be approximated with existing defined primitives. Stage 1.5 and coerce cannot inject cloudform. Stage 2 only transcribes the normalized form into primitive cloudform with center and size; it never asks an LLM for contour coordinates or control points.
+
+Cloudform frequency and context are recorded by the motif ledger as a diagnostic mirror only. They do not create a governor, floor, generation gate, or automatic preference.
+
+### Determinism and accounting
+
+Contour synthesis uses the existing performance identity and does not change rh2 inputs. The Score remains the score and the contour remains a performed value.
+
+What this version gains is a form without a fixed definition: variation becomes the form itself, and the contour can invite projection by the viewer. What it loses is the previous uniformity in which every core form was geometrically definable. The strict selection boundary makes it harder for cloudform to become an escape hatch for uncertain interpretation.
+
+---
+
+## 16. Licensing
+
+The intended license direction is:
+
+- core DDL specification: permissive license such as CC0 or MIT
+- reference implementation: MIT or Apache-2.0
+- Saijiki vocabulary data: CC BY or CC BY-SA, if community contribution begins
+
+The language should remain reusable by other implementations while preserving
+the reference implementation as one concrete path.
+
+---
+
+## 18. JSON Score
 
 JSON Score is the machine-readable score produced by Stage 2.  It is not the
 final work; it is the structure that the renderer performs.
@@ -615,45 +807,7 @@ files, PNG files, and other artifacts are derived outputs.
 
 ---
 
-## Cloudform Design (v1.89.1)
-
-Cloudform is the first closed form whose visible identity is decided by the performance rather than by a geometric definition. The Score stores only process parameters such as center, size, variation, touch, surface, relation, and placement. It never stores contour coordinates. The renderer derives the contour from the Score, instruction index, and performance seed, so the same seed reproduces the same contour while another performance produces another contour.
-
-Cloudform does not imitate a meteorological cloud. The name refers to a family of irregular curves: a form with a grammar of irregularity, related to cloud rulers, yamato-e haze, suhama paper forms, and suminagashi. It extends the principle that the description persists and the rendering is a one-time performance from placement and touch into form itself.
-
-### Contour performance
-
-The renderer combines two deterministic periodic processes:
-
-1. A seamless multi-octave 1/f signal modulates a closed polar radius. Existing variation words distribute energy across low lobes or fine high-frequency detail.
-2. A second periodic signal runs along the base curve arc length and creates bays and waists. Its displacement is clamped by local radius and curvature. A strictly positive single-valued polar radius provides the structural self-intersection guarantee; this is geometry safety, not an aesthetic governor.
-
-The contour uses the shared tool grammar, so pencil and rotring produce different edge qualities. Existing surface values such as wash, stipple, hatch, and aquatint fill its interior. Carve mode can cut an irregular light from a dark ground. Output follows the renderer point budget and closed Bezier fitting rules.
-
-### Composition with existing vocabulary
-
-Cloudform introduces no modifier category:
-
-- variation controls octave distribution and contour behavior;
-- proportion controls aspect, including tall, wide, and full-width haze-like bands;
-- touch controls edge quality;
-- surface and color control the interior;
-- relations resolve against the performed contour and its bounding box;
-- place, motion, and arrangement position it, and arranged instances receive distinct contours.
-
-### Selection boundary
-
-Stage 1 may select cloudform only when the author explicitly writes cloudform, or when the instructed subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle. It is never a fallback for an unknown or unclear object. Unknown objects continue to be approximated with existing defined primitives. Stage 1.5 and coerce cannot inject cloudform. Stage 2 only transcribes the normalized form into primitive cloudform with center and size; it never asks an LLM for contour coordinates or control points.
-
-Cloudform frequency and context are recorded by the motif ledger as a diagnostic mirror only. They do not create a governor, floor, generation gate, or automatic preference.
-
-### Determinism and accounting
-
-Contour synthesis uses the existing performance identity and does not change rh2 inputs. The Score remains the score and the contour remains a performed value.
-
-What this version gains is a form without a fixed definition: variation becomes the form itself, and the contour can invite projection by the viewer. What it loses is the previous uniformity in which every core form was geometrically definable. The strict selection boundary makes it harder for cloudform to become an escape hatch for uncertain interpretation.
-
-## 7. Canvas Model
+## 19. Canvas Model
 
 Coordinates remain normalized from `0.0` to `1.0`. Canvas aspect changes do not
 change DDL coordinates. Changing the aspect clears the rendered display and shows
@@ -684,100 +838,7 @@ accidental stretching.
 
 ---
 
-## 8. Plugin Model
-
-Vocabulary plugins are UTF-8 declarative documents, not executable code. One `.inku-plugin.md` file contains a front-matter manifest and word entries. The manifest requires `namespace`, `name`, semantic `version`, `authors`, `languages`, `license`, and Japanese/English descriptions. Each entry provides namespaced identity, Japanese/English surfaces and `fires_on` nouns, optional bilingual Saijiki notes, and equivalent bilingual expansion templates. Arbitrary code, URLs, and file references are forbidden.
-
-The pipeline order is **Stage 1 output -> plugin expansion -> core-only DDL -> Stage 1.5 -> Stage 2**. Templates may use core normalized DDL plus bounded expansion forms: deterministic `N to M` repetition (with unit-preserving singulars, and Build 591 multi-word English units such as `leaf forms`, `blades`, `cloudforms`, `spots`, `arcs`); a `member name: definition` local composite inlined at each member (Build 591; undefined references are rejected at load); `note:` comment lines that carry no expansion (Build 591); an `anchor` whose region determines separate member bands, including a Build 591 `anchor ... at N to M spots` nested repetition (spots x per-anchor members, depth two, each spot its own band); and symbolic `{region: ...}` translation, whose canonical key list is published by reference §3 and includes a `bottom band`, with an `upper-left to lower-right diagonal band` resolved as a computation (member sub-regions along a descending diagonal) rather than a rectangle. The same input chooses the same count, member regions, and rotations.
-
-Core DDL with explicit numeric regions after expansion is already composition-resolved. Stage 1.5 still performs normalization but must not append a separate finished-work recipe or auxiliary shapes, and Stage 2 must not retain support instructions beyond the explicit region count. This cap applies to Score instruction count; it does not freeze `arrangement.count` inside each instruction. Visible multiplicity can therefore remain model-dependent: for the minimal twin-arcs fixture, Mistral stays at two arcs while Qwen may repeat the two instructions into more than two visible arcs. Build 590 accepts this as a known limitation.
-
-The load-time validator rejects the whole document with explicit reasons for missing manifest fields, reserved namespace or qualified-word collisions, recursion or non-core plugin references, more than 48 instructions per word, repeated members stamped at fixed coordinates, and URL/file references. This is syntax validation before execution, not a governor of the work itself. Runtime closure or budget failure drops the expansion without repair, records a warning, and leaves a normal core approximation. Build 591 adds unknown region keys and undefined member references to the load-time rejections, exempts comment lines from the closure check, and removes the silent center fallback (an unknown key at runtime falls back to the default band with a recorded warning). Since v1.92 the closure marker table (shapes, verbs, relations, and the Saijiki modifier categories) is derived from the saijiki table; reference §1 and §3 always show the current values.
-
-An explicit qualified term always fires. Stage 1 may resolve a `fires_on` noun only when it is the stated subject; it must not extend firing to metaphors, unclear subjects, or unknown objects. When several `fires_on` phrases match at the same position, only the longest wins (Build 591, removing substring mis-fires — e.g. the input "枯草" no longer also fires the "草" undergrowth word); phrases at different positions still fire independently. Only the loaded surface/trigger vocabulary is injected into Stage 1, never template bodies. Stage 1.5 and coerce cannot introduce plugin words. Input-term-to-qualified-term provenance is returned by the API and stored in ordinary derivation metadata, while plugin documents and dependencies remain absent from Score, canonical DB work data, and rh2.
-
-`server/plugins/` is signature-checked so add/delete changes appear without a restart; management APIs and `inku-cli plugin list / validate / reload` expose status, rejection reasons, validation, and forced reload. Settings shows loaded/rejected documents, while Saijiki distinguishes qualified plugin words and bilingual notes. Removing a plugin must not change replay SVG or rh2 for a saved work because replay uses the already saved core Score and seeds.
-
-The built-in `canvas-aspect` system plugin remains separate and uses its existing hook and per-user plugin storage. Vocabulary plugin documents do not gain that code-level hook.
-
----
-
-## 8.6 Short-Form Guide
-
-The writing surface carries only a non-blocking length hint. Japanese input uses roughly 31 characters as a tanka-like guide; English input uses roughly 12 words. The UI must not block longer text or display evaluative copy about length. It may show only a numeric counter and a subtle density change when the guide is exceeded, so the form is present without scolding the writer.
-
-## 9. Web Application
-
-The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (`SPEC.ja.md` §12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
-
-The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
-
-Each Lineage-card work menu offers, under the heading "Edit the work" and in this order: drawing elements, description, DDL, model, language, autonomous refinement, and moving the work to trash (item labels are shortened to the target noun). The dialogs opened by the three comparison actions are titled "Edit drawing elements", "Edit models", and "Edit languages". Description and DDL editing open modal dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. The three comparison actions target the selected card and open the corresponding existing Refine subview in a modal dialog; they do not duplicate comparison logic. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry. Trash is visually separated from comparison actions with an explicit high-contrast result label.
-
-Major UI areas:
-
-- App rail: compact navigation with an explicit expand/collapse toggle, user
-  menu, profile, settings, language and theme controls
-- Input panel: single drawing, batch drawing, and demo modes
-- DDL editor: editable normalized DDL embedded in the single drawing flow, with
-  Saijiki word highlighting and an expanded dialog editor
-- Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
-- History strip: recent works, hover metadata, star markers, pagination
-- History manager: larger history view, trash, restore, permanent delete, star filter
-- Settings modal: models, color catalogs, DB status, plugin status, export
-  templates, users, theme
-
-The status bar displays the current render context:
-
-- Stage 1 model
-- Stage 2 model
-- color catalog
-- canvas aspect
-- star state for the current history item
-- SVG / PNG export controls
-
-For history display, model, catalog, and canvas values come from the history
-item when available.  For active editing, they come from the current selections.
-The canvas panel header also shows the selected work's color catalog, canvas,
-and creation time.  The color catalog button in the input panel displays the
-currently selected catalog name and truncates long names with an ellipsis.
-
-The settings modal's "other" tab includes history-selection behavior controls.
-Users can choose independently whether selecting a history item updates the UI's
-current canvas aspect and color catalog to the history item's values, or keeps
-the current UI selections.  This setting affects only the UI selection state;
-the saved history SVG is displayed as stored and is not re-rendered.
-
-The canvas panel also supports viewing-oriented controls.  A fullscreen icon in
-the drawing tab opens presentation mode, which maximizes the current SVG and
-shows a compact control bar for history navigation, latest item, star toggle,
-instruction caption toggle, and close.  Escape closes presentation mode.  A
-caption icon in the drawing tab toggles an instruction caption.  In normal
-canvas view, the caption uses 10% left and right margins relative to the drawing
-tab and is clipped inside that tab.  In presentation mode, the caption uses 10%
-left and right margins relative to the window.  Captions display the original
-user-facing instruction text, not the internally augmented Stage 1 prompt; this
-keeps emotion-hint or system prompt material out of presentation captions.
-
-The history DB remains the source of truth for renders saved by the web UI,
-`inku-cli`, Android headless CLI, and other API clients.  The web UI periodically
-refreshes the latest normal history page while the signed-in user is viewing the
-latest non-filtered history.  It also refreshes when the browser window regains
-focus or a hidden tab becomes visible.  This allows CLI-saved renders to appear
-in the history strip without a manual reload, while preserving the currently
-selected history item when it is still present.  The UI does not auto-replace
-history while the user is viewing starred-only history, search results, older
-history pages, or while a history request is already in flight.
-
-PNG export options are managed as per-user templates in the settings modal's
-export tab.  Each template has a name, description, and y-axis height in pixels.
-The default templates are `PNG 1024px` and `PNG 2048px`.  The status bar PNG
-menu is generated from these templates, and export width is computed from the
-current canvas aspect ratio.
-
----
-
-## 10. Modes
+## 20. Modes
 
 ### Single Drawing
 
@@ -883,7 +944,7 @@ context.
 
 ---
 
-## 11. History and Data Integrity
+## 21. History and Data Integrity
 
 History is stored in the server DB.  The DB record is the source of truth for:
 
@@ -962,7 +1023,7 @@ different emoji sets that match their roles.
 
 ---
 
-## 12. Security and Operations
+## 22. Security and Operations
 
 The web app includes authentication, user roles, sessions, per-user settings,
 user profile editing, and user management.  Passwords are stored as salted
@@ -1016,7 +1077,9 @@ exchange mechanism with the local server.
 **The record of each engine version moved to the [render engine history](docs/spec/render-engine-history.md) on 2026-07-28.**
 Release distribution, deterministic layers, versions and identity IDs, the reference corpus, the engine not going backwards, how a PNG is treated, and what each version changed are canonical there.
 
-## 13. CLI
+---
+
+## 23. CLI
 
 `inku-cli` is a command-line client for controlling the inku server through the
 API.  Its initial purpose is to support automated prompt/image generation,
@@ -1065,38 +1128,21 @@ outputs, making benchmark review less dependent on manual image assembly.
 
 ---
 
-## 14. Testing and Evaluation
+## 24. Source of Truth
 
-The project evaluates quality through several layers:
+`SPEC.ja.md` is canonical.  This file is the maintained English public version.
 
-- backend tests for API, DB, schema, composer, interpreter, renderer, and
-  deterministic fallback behavior
-- frontend Svelte check and production build
-- CLI-based benchmark generation
-- saved benchmark summaries and contact sheets
-- visual review of generated SVG/PNG output
-- stress tests using invalid, ambiguous, emotional, conversational, and
-  contradictory instructions
+When updating the specification:
 
-Benchmarks focus on:
-
-- whether Stage 1 preserves the whole input context
-- whether Stage 1.5 expands without overpacking techniques
-- whether Stage 2 preserves all DDL elements in JSON Score
-- whether deterministic fallback keeps enough DDL content to be reviewable
-- whether the renderer makes DDL features visible
-- whether the output has enough negative space, variation, and artistic focus
-
-Current render-core tuning records explicit quality metrics for the work in CLI benchmark summaries: `constraint_adherence`, `negative_space_pressure`, `motion_energy`, `color_resonance`, `visual_event`, and `figurative_risk`. These judge metrics are regression sensors, not final acceptance gates or substitutes for human selection. Build 448 confirmed divergence between machine scoring and human review, especially JP #23, so the metrics should not be retuned merely to raise preferred works. Fallback use, server hard timeouts, motif hints, presence counts, color traces, and compositional markers are recorded separately. Queue or retry duration is diagnostic only and is not treated as a primary quality metric, because free inference endpoints can be dominated by external queue behavior.
-
-For NVIDIA free API testing, elapsed time is treated as operational metadata,
-not as an artistic quality signal.  Queue delays can indicate service pressure,
-but they do not exclude a successful work from aesthetic or structural review.
+1. Update `SPEC.ja.md` first.
+2. Refresh this English `SPEC.md` to reflect the same intent.
+3. Keep public English wording concise and readable.
+4. Do not introduce English-only behavior that is absent from the Japanese
+   source.
+5. Keep current contracts in the specification and chronological implementation
+   detail in the changelog.
 
 ---
-
-**The inventory of what is currently implemented moved to
-[current implementation status](docs/spec/implementation-status.md) on 2026-07-28.**
 
 ## Accounting for Refinement
 
@@ -1209,17 +1255,6 @@ Build 555 unifies reset of target-owned transient UI state, including model-comp
 
 Build 556 fixes the stacking order that placed the lineage overview above its delete confirmation, making the trash action appear unresponsive. Confirmation dialogs now occupy the top interaction layer above full-screen overlays, so deletion can be confirmed or cancelled without closing the overview.
 
-## 16. Licensing
-
-The intended license direction is:
-
-- core DDL specification: permissive license such as CC0 or MIT
-- reference implementation: MIT or Apache-2.0
-- Saijiki vocabulary data: CC BY or CC BY-SA, if community contribution begins
-
-The language should remain reusable by other implementations while preserving
-the reference implementation as one concrete path.
-
 ---
 
 ## Autonomous Refinement Methods
@@ -1232,6 +1267,8 @@ Lineage's autonomous refinement is a bounded run of 1–10 generations whose fin
 Either method may include variation (`SPEC.ja.md` §12.13) among the enabled refinement elements (up to five). Only while variation is enabled, an amplitude choice (small/medium/large, default medium) is shown; the chosen amplitude applies to every variation generation in the run, and seeds are server-issued.
 
 The Vision method is a finite advisory loop, not quality optimization or automatic acceptance. Vision must not score, rank, accept, reject, praise, condemn, or discard a generated work. Intermediate generations remain `lineage_only`, the final generation enters regular history, and all generations remain in lineage. Derivation metadata records the method, Vision model, observation, and next direction, while the modal shows the latest advice. The model may be changed between runs but remains fixed during one run. Only the human may save, promote, star, or finally choose a work.
+
+---
 
 ## Colophon: Reading a Lineage
 
@@ -1248,22 +1285,8 @@ A colophon is an append-only, first-person reading attached to one lineage branc
 
 v1.88 adds no automatic repair or generation branch. Its refinement accounting deliberately limits the new AI reading to a disconnected mirror, making teleological “best branch” narratives less likely to become application behavior.
 
-## 17. Source of Truth
-
-`SPEC.ja.md` is canonical.  This file is the maintained English public version.
-
-When updating the specification:
-
-1. Update `SPEC.ja.md` first.
-2. Refresh this English `SPEC.md` to reflect the same intent.
-3. Keep public English wording concise and readable.
-4. Do not introduce English-only behavior that is absent from the Japanese
-   source.
-5. Keep current contracts in the specification and chronological implementation
-   detail in the changelog.
-
 ---
 
-## 18. Changelog
+## Changelog
 
 Chronological public release notes are maintained in [CHANGELOG.md](CHANGELOG.md). The more detailed Japanese history is in [CHANGELOG.ja.md](CHANGELOG.ja.md), and [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the short developer entry point.

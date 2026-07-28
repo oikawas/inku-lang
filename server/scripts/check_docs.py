@@ -88,15 +88,19 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "SPEC.ja.md",
         "SPEC.md",
         "shape",
-        "these two are not translations of each other -- ja §5 is the "
-        "three-stage pipeline where en §5 is the core vocabulary, ja §12 is "
-        "the two-stage architecture where en §12 is security and operations. "
-        "Stage 4b of ledger I-032 moved the engine record out of both (ja "
-        "§15.4-15.12 and en §12.1-12.9, which did mirror each other h3 for h3) "
-        "into docs/spec/render-engine-history.*, and the implementation "
-        "inventory out of en §15. What still diverges is the concept side: "
-        "roughly 1345 lines exist only in Japanese. Closing that is stage 4c; "
-        "until then no shape check is meaningful here",
+        "stage 4c-0 of ledger I-032 gave the English file the section order "
+        "of the Japanese one, so the numbers now mean the same thing in both "
+        "(they did not before: ja §5 was the pipeline where en §5 was the "
+        "core vocabulary). Two differences remain and only one of them will "
+        "close. (1) The concept sections, roughly 1345 lines, exist only in "
+        "Japanese; stages 4c-1..4c-4 write them, and until then English is "
+        "missing §8, §9, §10, §13 (a stub), §15 and §17. (2) The operational "
+        "sections -- JSON Score, Canvas Model, Modes, History, Security, CLI, "
+        "Source of Truth, some 490 lines numbered §18 onward -- exist only in "
+        "English and are not owed a translation: the 2026-07-28 ruling makes "
+        "Japanese canonical for the concepts and English the carrier of "
+        "operations. So this pair will never pass a shape check, and saying "
+        "stage 4c closes it would be wrong",
     ),
     (
         "docs/spec/implementation-status.ja.md",

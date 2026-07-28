@@ -65,6 +65,17 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "shape",
         None,
     ),
+    # Split out of the README on 2026-07-28 so the Quick Start rises out of the
+    # bottom quarter of the page. Each of these was one section of the README
+    # and is translated as one text, so "shape" is the right level here too.
+    ("docs/guide/gallery.ja.md", "docs/guide/gallery.md", "shape", None),
+    (
+        "docs/guide/how-it-works.ja.md",
+        "docs/guide/how-it-works.md",
+        "shape",
+        None,
+    ),
+    ("docs/guide/revision.ja.md", "docs/guide/revision.md", "shape", None),
     ("SETUP.ja.md", "SETUP.md", "shape", None),
     ("PROJECT_CONTEXT.ja.md", "PROJECT_CONTEXT.md", "shape", None),
     (

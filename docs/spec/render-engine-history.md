@@ -20,6 +20,13 @@ four places — prose in `SPEC.md` (engines 5 through 10), `SPEC.ja.md` §15.9�
 the version actually moved go into `server/reference/render-engine-<version>/`, while the manifest
 carries the digest of every case.
 
+**The block cannot be restored, but the prints can be kept.** Freezing is the proof print that makes
+that possible: the **actual output** from a fixed set of inputs (the SVG, its element counts,
+classes, and a coordinate digest) is stored, and CI fails if regenerating an existing case is not
+byte-identical. When it differs, the drawing changed, and the engine version rises. **A version
+number carries only one bit: that something moved. What moved, and how, can only be answered by
+comparing the outputs themselves.**
+
 ## The versions
 
 **"Moved" and "unchanged" are measured**, from the manifest's `changed_from_previous` and the number

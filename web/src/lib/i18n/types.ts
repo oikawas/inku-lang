@@ -539,9 +539,8 @@ export interface LangPack {
 	settingsExportTemplateDelete: string;
 	settingsExportTemplateSaveFailed: string;
 	settingsHistoryLabel: string;
-	settingsShowBirds: string;
-	settingsShowKiwi: string;
-	settingsShowCrab: string;
+	settingsMascotIncu: string;
+	settingsMascotYuragi: string;
 	settingsPngAlpha: string;
 	settingsSaveReplay: string;
 	settingsHistorySelectionTitle: string;

@@ -44,6 +44,7 @@
 		type ModelOption
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
+	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
@@ -69,9 +70,6 @@
 	const CATALOG_KEY         = 'inku-color-catalog';
 	const TENKEI_KEY          = 'inku-tenkei';
 	const WILD_KEY            = 'inku-wild';
-	const SHOW_BIRDS_KEY      = 'inku-show-birds';
-	const SHOW_KIWI_KEY       = 'inku-show-kiwi';
-	const SHOW_CRAB_KEY       = 'inku-show-crab';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
@@ -514,8 +512,6 @@
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
 	let currentRenderEngineVersion = $state<string | null>(null);
-	let showKiwi = $state(true);
-	let showCrab = $state(true);
 	let pngAlphaWhite = $state(false);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
@@ -2385,8 +2381,6 @@
 
 	function persistMiscSettings() {
 		try {
-			localStorage.setItem(SHOW_KIWI_KEY, showKiwi ? '1' : '0');
-			localStorage.setItem(SHOW_CRAB_KEY, showCrab ? '1' : '0');
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
 			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
@@ -5990,6 +5984,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		window.addEventListener('focus', onHistoryWindowFocus);
 
 		initLang();
+		initMascot();
 		try {
 			const p1 = localStorage.getItem(PROVIDER_STAGE1_KEY) as Provider | null; if (p1) stage1Provider = p1;
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
@@ -5998,11 +5993,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
 			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
 			const wild = localStorage.getItem(WILD_KEY); if (wild !== null) wildEnabled = wild === '1';
-			const kiwi = localStorage.getItem(SHOW_KIWI_KEY);
-			const birds = localStorage.getItem(SHOW_BIRDS_KEY);
-			if (kiwi !== null) showKiwi = kiwi !== '0';
-			else if (birds !== null) showKiwi = birds !== '0';
-			const crab = localStorage.getItem(SHOW_CRAB_KEY); if (crab !== null) showCrab = crab !== '0';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
@@ -6026,7 +6016,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		showKiwi; showCrab; pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
+		pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -6137,8 +6127,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onSelectTenkei={setTenkeiLevel}
 						{wildEnabled}
 						onSelectWild={setWildEnabled}
-						{showKiwi}
-						{showCrab}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -6545,8 +6533,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:newGroupName
 		bind:editGroupName
 		{editGroupId}
-		bind:showKiwi
-		bind:showCrab
 		bind:autoRepairEnabled={ddlAutoRepairEnabled}
 		bind:pngAlphaWhite
 		{exportTemplates}

@@ -37,7 +37,6 @@
 		error: string | null;
 		batchPromptHistory: string[];
 		randomColorCatalog: boolean;
-		showCrab: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -70,7 +69,6 @@
 		error,
 		batchPromptHistory,
 		randomColorCatalog = $bindable(false),
-		showCrab,
 		stage1ModelLabel,
 		stage2ModelLabel,
 		onRememberBatchPrompt,

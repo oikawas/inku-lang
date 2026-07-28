@@ -75,8 +75,6 @@
 		onSelectTenkei: (level: TenkeiLevel) => void;
 		wildEnabled: boolean;
 		onSelectWild: (value: boolean) => void;
-		showKiwi: boolean;
-		showCrab: boolean;
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
@@ -152,8 +150,6 @@
 		onSelectTenkei,
 		wildEnabled,
 		onSelectWild,
-		showKiwi,
-		showCrab,
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
@@ -377,7 +373,6 @@
 			{error}
 			{batchPromptHistory}
 			bind:randomColorCatalog={batchRandomColorCatalog}
-			{showCrab}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}

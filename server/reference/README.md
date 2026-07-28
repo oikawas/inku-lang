@@ -27,7 +27,16 @@ server/reference/
 ├── render-engine-15/
 │   ├── manifest.json
 │   └── <permanent-case-id>.svg
-└── ddl-engine-1/
+├── render-engine-16/
+│   ├── manifest.json
+│   └── <permanent-case-id>.svg
+├── ddl-engine-1/
+│   ├── manifest.json
+│   ├── a_expand/
+│   │   └── <permanent-case-id>.ddl
+│   └── b_coerce/
+│       └── <permanent-case-id>.json
+└── ddl-engine-2/
     ├── manifest.json
     ├── a_expand/
     │   └── <permanent-case-id>.ddl
@@ -53,7 +62,8 @@ all 220 bodies because the master grid moved every case; engine 12 holds 199;
 engine 15 holds 318 of its 350.
 
 The corpus grows with the vocabulary, so the case count belongs to the version:
-220 for engines 10-12, 228 for engine 13, 347 for engine 14, 350 for engine 15.
+220 for engines 10-12, 228 for engine 13, 347 for engine 14, 350 for engine 15,
+365 for engine 16.
 
 ## What engine 12 changed
 
@@ -120,6 +130,51 @@ and `-paper-opacity` are the first cases in the corpus's history to leave
 not be tested by this corpus at all. `C-ground-field-absorbency` was dropped:
 with the field retired it renders byte-identically to `C-ground-paper`, and two
 IDs for one drawing misleads the reader.
+
+## What engine 16 changed
+
+Engine 16 is three changes, each about a mark being made rather than a region
+being filled in.
+
+- **A surface is played.** Six of the eight texture words - `stipple`, `grain`,
+  `paper_grain`, `wash`, `aquatint`, `bleed` - were circles scattered by a
+  uniform random inside the bounding box, so they never saw the shape they
+  belonged to, and `bleed` was one ellipse behind a blur. All six now go through
+  stroke synthesis and follow the contour. The `display` profile draws the same
+  marks the `editable` one draws instead of a filter over a clipped rectangle
+- **A tiny fill is placed, not scanned.** Below a short side of roughly three
+  percent of the canvas the scan could not fit its three lines, so the interior
+  collapsed to a flat region fill. A mark that small is one touch of the tool
+  and is now drawn as one dab
+- **Thinness is a dimension.** Asking for a thin line had only one way to be
+  said - name a thinner tool - so the request bent the choice of tool. The Score
+  carries `thinness` (`fine` / `extra_fine`, no thicker side). The eleven tool
+  widths are unchanged and nothing goes below the thinnest of them. The axis
+  joins the seed of a mark, so a line asked to be thin is played by a different
+  hand as well as drawn narrower
+
+**333 of the 365 cases moved. The 32 that did not are the version's real
+description.**
+
+- **Every unchanged case is `rotring` or `computer`** (14 in group A, 14 in the
+  wild group E, and 4 filled squares in group D). Their grammars are all zeros,
+  so they consume no seed: an axis that changes the hand cannot reach a tool
+  that has no hand. The machine pole stood still through engines 12, 15 and 16
+- **`C-tinyfill-circle-rotring` is unchanged for a second reason as well.** The
+  drafting pen keeps its region fill at every size, so the dab never applies to
+  it. Its manifest entry carries no classes at all
+- **`hatch` and `crosshatch` did not need stage 1.** Those eight cases already
+  went through stroke synthesis, and they are byte-identical to engine 15 when
+  compared with engine 15's seed material. They moved here only because the
+  thinness axis entered the seed - not because the surface work touched them
+- **The 31 fills above the size boundary are unchanged in mechanism.** Same
+  reason: their bytes move with the seed, not with stage 2
+
+The seven `C-thinness-*` cases pin the axis. `C-thinness-default-pen` states the
+default explicitly and must draw what omitting the field draws. The two
+`silverpoint` cases have identical byte counts and different digests: the
+thinnest tool cannot be thinned, so its width does not move, but the axis is in
+its seed, so its hand does.
 
 ## `render-engine-10` cannot be regenerated outside macOS
 

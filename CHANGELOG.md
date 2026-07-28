@@ -656,3 +656,60 @@ A fill too small for scan lines had **degraded into a region fill**. **The degra
 **Verification:** server **1596 passed / 31 skipped**, cli **76 passed**, ruff green (`src tests scripts`), `check_frozen_corpora.py` **byte-identical twice in a row**, `npm run check` 0 errors / 2 warnings / 217 files, `check_docs.py` green. **At acceptance the core of each of the three stages was perturbed: returning the contour to the bounding box turns four S-3 cases red, making the thinness scale the identity turns thirteen T-1 cases red, and removing the branch into the dab turns fifteen F cases red.**
 
 **Recorded but not fixed**: **Stage 2 fills `thinness` in a measured 10%** of works, and the 96% observed at design time did not reproduce. The deterministic layers — schema, prompt, coerce, renderer — are all green, so **whether it is carried remains a question about the LLM layer** (ledger I-036). **Android is still on engine 15** (I-029; the four prompt constants' fingerprints have been re-baked, so the Kotlin side is red by design).
+
+### v2.9.4 — the provenance drawer says what every row means, and the instruction sheet is called by its name (UI adjustments, fourth round) (Build 755, 2026-07-29)
+
+**Thirty-two instructions from the author, worked through in Builds 733 to 753.** All stages of ledger I-002. **Build 749 is absent: `refactor/engine-16` drew it from the same counter first, so this round went 748 → 750.**
+
+#### The provenance drawer's detail tab — 19 rows to 38
+
+Every field of `HistoryItem` (`api.py`) and `PaintResponse` was matched against the detail tab's nineteen rows, and **the eighteen attributes it had never shown were added** (author's ruling: "everything in groups A and B"). **All 38 headings carry a tooltip, under five subheadings** (Interpretation / Performance / Identity / Origin / Run).
+
+- **`render_wild` is three-state** — `null` means a work saved before the column existed and must be told apart from off. **It displays as "not recorded"**
+- Added: `seed_text` / `variation_amplitude` / `variation_seed` / `focus` / `interpret_fallback` (previously only a badge on the canvas) / the three prompt digests / `instruction_lang_requested` (previously only the resolved language) / `note` / `lineage_generation` / `derivation_kind` / `batch_run_id` / `batch_line_number` / `ui_lang` / `render_color_catalog_sub` / `render_canvas_aspect_ratio`
+- **The Origin group is omitted entirely for a work that has none of its four items**
+- **The drawer closes on a click outside the window** as well (Escape is unchanged)
+- **`derivation.ts` is new**: the derivation-kind table moved out of `LineagePanel` so that `CanvasPanel` shares it together with its type
+- **Thirteen attributes were left out**: the resolved color map, things already in the caption, things on the prompts tab, a server-internal path, the lineage ID group, and `starred`, which the star button already says
+
+#### The instruction sheet by its name
+
+**The nine keys naming the thing the writer edits now say 指示書** (`DDLを編集` → `指示書を編集` and the rest). **The technical spellings stay** — the DDL version in provenance, "normalized DDL", "Stage 2 user input (normalized DDL)", "the composition of the source work (DDL)". The guide is titled "指示書（DDL）簡易ガイド" and carries a sentence defining DDL.
+
+- **A "paint from the instruction sheet" button sits at the bottom right of the instruction box** on the description tab. It wires up the existing `replay()` (`/api/compose`, Stage 2 only) — no new drawing path and no new derivation kind. It is disabled while the DDL is empty and while a run is in flight
+- **The run status and stop button appear beneath that button** (`InputPanel` suppresses its own with `hideRunStatus`)
+- **Every modal's paint button now uses the `--action-*` fill** (five were accent-filled). **No ▶ is added**
+
+#### Dark is the default
+
+**The `ui_theme` default for new users and the signed-out screen's initial value are now `dark`** (the author ruled against changing existing users). **`AuthPanel` carried only one hard-coded light set**, so those literals became local tokens and a dark set was placed under `html[data-theme='dark']`. **The background work (`/login-background.svg`) is not inverted** — white paper with ink lines is a material, held to the same rule that keeps `--canvas-paper` paper in dark.
+
+#### The lineage tab
+
+- **A card can star and unstar a work.** `updateHistoryStarState` now updates `lineageGraph` too; it had reached only three paths, so a star on the lineage tab changed nothing when pressed
+- **Double click opens the work in the canvas** (single click still selects). **A double click runs the single-click handler twice**, so `openNode` gained a guard against re-fetching the work already selected
+- **The edges from the origin to a starred node are drawn in orange**, arrowheads included
+
+#### The mascots
+
+**Two of them are settled: a cube named Incu and a crab named Yuragi** (two checkboxes that did nothing became two radio buttons). `KiwiMascot` and `CrabMascot` are deleted, along with three dead localStorage keys and three dead i18n keys. **The choice is not threaded through props but held as module state, like the language pack** — `RunStatus` is called from ten places, and a prop would add the same argument to all ten.
+
+#### Explaining the history manager
+
+**The clipping boxes were counted first** — a `Tooltip` bubble is `position: absolute` and is cut by any ancestor with `overflow`. `.history-modal`, both `.settings-tabs`, and the three lists all qualify.
+
+- **Inside a clipping box, the browser's own `title`** (it obeys the window and nothing else); **outside, `Tooltip`, all opening downward**
+- **Two `title` strings that only restated their label** were replaced with what the button does
+- **Aligning the four tabs onto bubbles would mean removing `.settings-tabs`' `overflow: hidden`** and moving the corner radius onto each button — a rebuild of the segmented control. **Left undecided**
+
+#### Also
+
+Version and build date moved to the top of the info modal (**the date is the mtime of `BUILD_NUMBER`, injected by `vite.config.ts` as `__BUILD_DATE__`**; no separate file) / `inku` looks like a button one can press / the batch description box no longer breaks its layout, its height having moved to the outer frame / the batch and demo tabs gained labels and the demo's fields were reordered / the demo's shared settings sit under its own two fields.
+
+#### The GLOSSARY gained exceptions (author-approved)
+
+**Six keys for `prompt` and two for `generat`** were added to `GLOSSARY.md` §5-2 and `i18n-lint.mjs` in the same commit. **A prompt digest is the fingerprint of the prompt itself**, so the glossary's substitution (description for prompt) would change its meaning. **`generat` falls under §2, "generation only when generation is meant".**
+
+**Verification:** `npm run check` **0 errors / 2 warnings / 218 files**, `npm run lint:i18n` **877 / 44 / 0 / 0**, `npm run lint:models` 56, server **1596 passed / 31 skipped**, cli **76**, ruff green. **Drawing is untouched**, so the frozen corpora do not apply.
+
+**Fixed at acceptance, absent from the implementation report**: **`test_current_user_theme_can_be_updated` had lost its discriminating power.** When Build 744 made dark the default, the test's `"light"` strings were replaced mechanically with `"dark"`, leaving it **patching dark onto a default of dark** — so **commenting out `row.ui_theme = ui_theme` in `update_user_settings` leaves it green** (measured). **It now asks for the non-default side, reads it back, and was confirmed to fail under that perturbation.**

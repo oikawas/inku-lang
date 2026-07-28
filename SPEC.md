@@ -456,7 +456,195 @@ reactions without increasing overall density.
 
 ---
 
-## 7. Web Application
+## 7. UI Design Policy
+
+### 7.1 A UI That Assumes Repetition
+
+DDL is not finished in one pass.  The round trip — **description -> output ->
+description again** — is a premise of the design.
+
+### 7.2 Screen Composition (in concept)
+
+**Phase 1: Initial (instruction generation)**
+
+```text
+[drawing area]
+    |
+[instruction input area]  <- write the first idea
+    |
+[DRAW button]
+```
+
+**Phase 2: Next (instruction generation)**
+
+```text
+[output of the prev. inst]   [output of the next inst]
+      |                             |
+[show the previous            [write the new
+ description]                  description]
+                                    |
+                             [DRAW button]
+```
+
+The difference between old and new is made visible in color, so that what
+changed and what was added can be seen.  It is designed as **the trace of
+refinement**: not a programmer's diff, but the visualization of a process of
+paring a text down.
+
+### 7.3 LLM Model Inspection
+
+A view that puts several LLM models side by side — Gemma 4 and Opus 4.7, for
+instance.  The same description goes to different models and the differences in
+the output are seen.  It makes visible the principle that **the choice of model
+is itself a creative variable**.
+
+### 7.4 The Design of the Instruction Box
+
+**The basic stance: the opposite of IntelliSense**
+
+IntelliSense reduces mistakes by offering candidates *before* you write.  DDL
+takes the opposite view: **the moment of making lives inside the writer's
+hesitation**.  In the stillness where the hand stops for an instant while about
+to write "place," the realization arrives that "line up is closer."  When
+candidates keep appearing, thought is pulled toward them and no gap is left in
+which to look inward.
+
+**What is adopted**
+
+1. **A blank writing area**: nothing is offered while writing.  Close to the
+   purity of a tanka manuscript sheet
+2. **The vocabulary dictionary placed elsewhere, as Saijiki**: the writer goes to
+   consult it actively
+3. **Interpretation feedback after writing**: the words written take on a color
+   showing the degree of interpretation (§7.6)
+
+**What is rejected**
+
+| Design | Why it is rejected |
+|---|---|
+| IntelliSense-style autocompletion | it takes away the still time of making; too procedural |
+| a permanently displayed list of choices | it forces the order "look outward, then draw from within," which is the reverse of the order of making |
+
+**The grounds for the design**
+
+Nobody writes a tanka while keeping a list of seasonal words in view.  You write
+the word that rose from inside you, and check the seasonal word afterwards.
+**From the inside out, then confirmed on the outside** — that is the right order.
+
+### 7.5 Saijiki
+
+DDL's vocabulary dictionary is called **Saijiki**.  The English edition keeps the
+name.
+
+**Grounds for the name**
+
+- the internationalization of haiku has already given the word some recognition
+  among English speakers
+- it states plainly that the concept comes from Japan
+- leaving an untranslatable word untranslated agrees in itself with DDL's respect
+  for language
+- for an English speaker, the very act of opening a button labeled "Saijiki"
+  becomes an experience of seeing vocabulary from another culture's point of view
+
+**Category structure**
+
+Saijiki displays 10 categories — forms, angles, touches, continuity, colors,
+movements, places, motions, proportions, relations — together with the qualified
+words of any loaded plugin.  The current values of the vocabulary are given by
+the §3.1 table and by reference §1, and the web Saijiki display is served from
+that same saijiki table (v1.92: `GET /api/saijiki` plus a synchronized store over
+the snapshot bundled into the build).
+
+The Japanese category names are written in hiragana.  Kanji is stiff; hiragana
+lowers the threshold of writing.  The English category names are forms / angles /
+touches / continuity / colors / movements / places / motions / proportions /
+relations.
+
+**Placement policy**
+
+- it is not shown in the writing area
+- it is opened actively, from a `Saijiki` button in the UI
+- it stays closed while writing and opens only when the writer is unsure
+- it is designed so that Saijiki is not something you look at but something you
+  go to look at
+
+The Saijiki drawer is read-only (v1.98).  Clicking a vocabulary chip shows a
+preview rather than inserting the word; insertion happens only in the inline
+Saijiki inside the DDL editor dialog, which also shows the qualified words of
+loaded plugins.  The open/close toggle sits in the toolbar below the canvas.
+
+### 7.6 Interpretation Feedback
+
+After DRAW is pressed, **a color showing the degree of interpretation** is
+applied to the text that was written.
+
+**The thinking behind it**
+
+- where IntelliSense offers candidates *before* writing, this gives feedback
+  *after* writing
+- it is close to the feeling of a teacher marking a tanka in red afterwards —
+  except that it is **not a correction but a presentation of how it was read**
+- the message is "the LLM read it this way," never "right" or "wrong"
+
+**Expression through color (a proposal)**
+
+Expressed in the density of ink.  Assertive colors are avoided.  The feeling of
+calligraphy.
+
+| State | Expression |
+|---|---|
+| a word interpreted with certainty | dark ink |
+| a word interpreted vaguely | pale ink |
+| a word not interpreted | nearly transparent, faint |
+
+Where extended vocabulary is used — the Nature plugin and the like — one
+candidate is to express it in a soft color distinct from ink, a pale vermilion
+for instance.
+
+**Cautions in the design**
+
+- the color must not become an evaluation.  If the writer shrinks, making stops
+- say "the LLM could not be certain," not "it could not be interpreted."  The
+  cause is presented as a limit on the LLM's side, not on the writer's
+- explain what the colors mean explicitly in the UI
+
+**A further form: showing the gap in interpretation**
+
+Beside the word that was written, how the LLM read it is noted in small type:
+
+```text
+佇ませる [place with stillness]
+```
+
+The writer can see the gap between "the words I wrote" and "the LLM's
+interpretation."  That gap is itself material for writing the next description.
+
+- "if the LLM read it as *place quietly*, then next time I can simply write
+  *place*"
+- "no — *佇ませる* is closer to what I meant.  That the LLM could not read it
+  means there is something here I have not yet seen"
+
+Either reaction is creative.  **The gap generates the thought.**
+
+### 7.7 Making the Difference Visible (the Course of Refining a Description)
+
+The principle behind §7.2's "the difference between old and new is made visible
+in color":
+
+- it is designed not as a programmer's diff but as **the visualization of a
+  process of paring a text down**
+- what changed and what was added can be seen
+- it remains as the trace of refinement
+
+Combined with §7.6's interpretation feedback, the writer can confirm both "the
+part I rewrote" and "the degree to which the LLM read it" on a single screen.
+
+### 7.8 The Reference Web Application
+
+What follows records what the reference interface actually provides.  It is
+operational rather than conceptual and has no Japanese counterpart: under the
+2026-07-28 ruling, Japanese is canonical for the concepts and English carries the
+operations.
 
 The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (`SPEC.ja.md` §12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
@@ -580,7 +768,8 @@ replace those figures with plain operational words, so that someone touching the
 app for the first time can predict what a button does: performance is shown as
 touch, composition as layout, and interpretation as reading.  How the Refine tab
 realizes this — the five refinement kinds, model comparison, language
-comparison, and the Lineage card menu — is in "Web Application" above.
+comparison, and the Lineage card menu — is in §7.8, "The Reference Web
+Application."
 
 ---
 
@@ -1478,41 +1667,306 @@ contours and specks coexist with the band. The render engine version went to 10.
 
 ## 14. The Design of Relation
 
-Cloudform is the first closed form whose visible identity is decided by the performance rather than by a geometric definition. The Score stores only process parameters such as center, size, variation, touch, surface, relation, and placement. It never stores contour coordinates. The renderer derives the contour from the Score, instruction index, and performance seed, so the same seed reproduces the same contour while another performance produces another contour.
+### 14.1 Why Relation
 
-Cloudform does not imitate a meteorological cloud. The name refers to a family of irregular curves: a form with a grammar of irregularity, related to cloud rulers, yamato-e haze, suhama paper forms, and suminagashi. It extends the principle that the description persists and the rendering is a one-time performance from placement and touch into form itself.
+The expressive power of tanka comes not from a rich vocabulary but from devices
+of relation between words — engo (associated words), kakekotoba (pivot words),
+kire (the cut), enjambment.  The infinite holds inside a form of thirty-one
+sounds because relation between elements is what carries the meaning.
 
-### Contour performance
+LeWitt's Wall Drawings are the same.  Their vocabulary is a poorer set than
+inku's — lines and a few colors — and yet most of an instruction sheet is a
+description of relation (lines not touching, inside the circle, from the midpoint
+of the left side toward the upper right corner).  What the viewer reads is not
+the individual line either, but the gradient of density, the tension, and the
+interval that arise between lines.
 
-The renderer combines two deterministic periodic processes:
+The current JSON Score is a flat juxtaposition of instructions and holds no
+vocabulary for the relation between elements.  Place, line up, fill, and scatter
+are all unary verbs.  That absence produced two consequences:
 
-1. A seamless multi-octave 1/f signal modulates a closed polar radius. Existing sway words distribute energy across low lobes or fine high-frequency detail.
-2. A second periodic signal runs along the base curve arc length and creates bays and waists. Its displacement is clamped by local radius and curvature. A strictly positive single-valued polar radius provides the structural self-intersection guarantee; this is geometry safety, not an aesthetic governor.
+1. output looks like independent parts set side by side
+2. the grammar of composition exists only in Stage 1.5's fixed technique recipes,
+   so the same auxiliary layer repeats (contrapuntal contrary-motion diagonals,
+   for instance)
 
-The contour uses the shared tool grammar, so pencil and rotring produce different edge qualities. Existing surface values such as wash, stipple, hatch, and aquatint fill its interior. Carve mode can cut an irregular light from a dark ground. Output follows the renderer point budget and closed Bezier fitting rules.
+A vocabulary of relation adds a predicate — syntax — to the core rather than a
+noun.  It sits well with the principle that the form pares away the ego: a
+grammar of relation is a form that forces compositional judgment on the writer,
+not a license for free rein.  It contradicts neither plugin principle 1 (limited
+to a macro over vocabulary) nor the Go-like restraint.
 
-### Composition with existing vocabulary
+### 14.2 Observable Relation Vocabulary
 
-Cloudform introduces no modifier category:
+The distinction §13.3 draws between emotion words and motion words extends to
+relation.  Only physical, externally observable relations are allowed into the
+core.
 
-- sway controls octave distribution and contour behavior;
-- proportion controls aspect, including tall, wide, and full-width haze-like bands;
-- touch controls edge quality;
-- surface and color control the interior;
-- relations resolve against the performed contour and its bounding box;
-- place, motion, and arrangement position it, and arranged instances receive distinct contours.
+**The initial set is limited to these five words:**
 
-### Selection boundary
+| Word (ja) | Word (en) | Meaning | `relation.type` |
+|---|---|---|---|
+| 沿う | along | placed along the path or direction of the preceding element | `along` |
+| 触れない | not touching | approaches the preceding element without contact | `not_touching` |
+| 切る | cutting | crosses the preceding element and makes a visual break (the *kire*, the cut, of tanka) | `cutting` |
+| 間に | between | placed in the region between the preceding two elements | `between` |
+| 触れる | touching | contacts the preceding element; coinciding endpoints compose a closed form | `touching` |
 
-Stage 1 may select cloudform only when the author explicitly writes cloudform, or when the instructed subject itself is amorphous, such as cloud, smoke, haze, stain, island silhouette, or puddle. It is never a fallback for an unknown or unclear object. Unknown objects continue to be approximated with existing defined primitives. Stage 1.5 and coerce cannot inject cloudform. Stage 2 only transcribes the normalized form into primitive cloudform with center and size; it never asks an LLM for contour coordinates or control points.
+**Words excluded**: nestle up to, answer, converse with, resonate with — words of
+intent and personification, not observable from outside.
 
-Cloudform frequency and context are recorded by the motif ledger as a diagnostic mirror only. They do not create a governor, floor, generation gate, or automatic preference.
+As of the v1.52 close, `relation` in the JSON Score appears only where the
+normalized DDL carries an explicit previous-object phrase.  The fixed phrases are
+`前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に` in
+Japanese, and `along the previous line` / `not touching the previous shape` /
+`cutting the previous line` / `between the previous two` in English.  `touching`
+is used only where `前の線に触れる` / `前の弧に両端で触れる` or `touching the
+previous line` / `touching the previous arc at both ends` makes the contact
+explicit; it is never granted spontaneously.  Notions that arrive from natural
+language — around, on the same beat, leading or lagging, near or far — are not
+relations, and are expressed through position, path, rotation, and spacing.
 
-### Determinism and accounting
+**Second-round candidates (judged after measurement)**: overlapping, set apart,
+same direction, opposite direction, thinner than, continuing.  They are added
+only once measurement shows the current words to be expressively insufficient.
+`continuing` was confirmed to work mechanically in sketches but showed no
+decisive expressive value: the persuasiveness of a withered leaf turned out to be
+rate-limited by the cloudform's surface and ground expression instead.  It is to
+be retested after that expression improves, and stays a second-round candidate
+until then, following the §4.11 procedure — a final judgment reserved, with its
+accounting.
 
-Contour synthesis uses the existing performance identity and does not change rh2 inputs. The Score remains the score and the contour remains a performed value.
+### 14.3 The JSON Score Schema
 
-What this version gains is a form without a fixed definition: sway becomes the form itself, and the contour can invite projection by the viewer. What it loses is the previous uniformity in which every core form was geometrically definable. The strict selection boundary makes it harder for cloudform to become an escape hatch for uncertain interpretation.
+An optional `relation` field is added to an instruction.
+
+```json
+{
+  "primitive": "arc",
+  "weight": "brush_thin",
+  "relation": {
+    "type": "not_touching",
+    "gap": "narrow"
+  }
+}
+```
+
+| Field | Values | Meaning |
+|---|---|---|
+| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` | the kind of relation |
+| `gap` | `narrow` / `medium` / `wide` | a guide distance; the concrete value is resolved by the performance |
+
+**The referent is always the immediately preceding instruction — an implicit
+prev reference.**  Only `between` refers to the preceding two elements.
+Arbitrary reference by id is not introduced.  Why:
+
+- hallucinated, circular, and forward references cannot arise structurally
+- a light model (Stage 2) takes on no new cognitive load of reference
+  resolution; a relation is a pass-through copy
+- it matches LeWitt's craftsman procedure: look at the line already drawn, then
+  place the next one
+
+Should reference by id become necessary, that too is considered as a second round
+once measurement shows the need.
+
+### 14.4 Sequential Resolution and the Performance (Macro Sway)
+
+Relations are resolved by the renderer, at performance time.  The renderer holds
+no constraint solver.  It processes instructions in order and places each one by
+referring to the **settled** position and contour of the preceding element —
+sequential resolution.
+
+- `not_touching, gap=narrow` -> a distance and bearing within a fixed range of
+  the preceding element's contour, drawn per performance
+- `along` -> position, phase, and length decided per performance inside a band
+  that follows the preceding element's path
+- `cutting` -> the crossing angle and the intersection with the preceding
+  element, decided per performance within a range
+- `between` -> decided inside the region between the preceding two elements
+- `touching` -> applies to line and arc only; the element's two endpoints are made
+  to coincide with the two endpoints of the preceding line or arc as the
+  performance realized them
+
+Under `touching`, when the element is an arc: let the settled endpoints of the
+preceding element be P1 and P2, the chord length `c=|P2-P1|`, and the signed
+sagitta of the performed arc `b`.  The minor arc is reconstructed with
+`r=c²/(8|b|)+|b|/2`.  Its center sits at `r-|b|` from the midpoint of the chord,
+on the side opposite the bulge, and the sweep angle is always under 180°.  When
+the preceding element is itself an arc, the bulge defaults to the opposite side.
+The sign and sweep conventions of the minor arc share a single implementation
+with the renderer's SVG arc drawing.  `variation` and the stroke hold the
+endpoints fixed and act only on the intermediate span.  For a closed form, a
+preceding element without endpoints, or a degenerate chord or sagitta, the
+relation is dropped — no repair by coordinate estimation, and no governor.
+
+Endpoints, tangents, and sagitta are verified in the canvas coordinate system,
+with every drawing transform composed, including rotations on ancestor groups.
+
+Because a relation is a relative specification, everything chained to a referent
+moves when the referent moves.  That is what makes the macro sway hold: the
+relation — the order written into the score — is preserved while the composition
+changes every time.  §13.1's definition, fine movement inside order, extends from
+the tremble of a line to the scale of composition without its principle changing.
+
+An instruction that carries both a region (`at`) and a relation — twin arcs from
+a plugin member, for instance — applies the region placement first and resolves
+the relation afterwards (v1.94).  Under `touching` the preceding element's
+performed endpoints settle the position, so the region is treated as the starting
+point of the chain and as information.
+
+A relation that cannot be resolved — the preceding element is a background fill
+with no contour, say — is dropped by the validator or by coerce, with a warning
+recorded.  Unresolvability that becomes apparent only at performance time
+(degenerate geometry, grid placement, a preceding element with no endpoints) is
+likewise dropped by the renderer with a warning recorded (v1.94).  The
+instruction is then drawn with ordinary placement and no relation — graceful
+degradation.
+
+### 14.5 The Shift in Stage 1.5's Role
+
+Stage 1.5 moves from "injecting a finished-work recipe" to "attaching a relation
+predicate to instructions that already exist."
+
+| The old recipe | Its replacement by relation |
+|---|---|
+| contrapuntal contrary motion (a fixed layer of opposing diagonals) | `cutting` against the main element (once second-round vocabulary lands, "opposite direction") |
+| a stippled ground (a fixed scatter) | a scatter that avoids the main element: `not_touching, gap=wide` |
+| a bias in the margin (a fixed margin) | held away from the main element with `not_touching, gap=wide` |
+| the auxiliary lines of one-point perspective | converging on the main element with `along` |
+| a round (repetition shifted sideways) | a chain of `along, gap=narrow` on the preceding element |
+
+Stage 1.5's output thereby becomes **subordinate** to the elements of the input.
+When the input changes, what the relation attaches to changes with it, so
+repetition of the same auxiliary layer becomes structurally unlikely.
+
+### 14.6 Constraints and Prohibitions
+
+Given the lesson of tune_bench Builds 346 through 436 — an accumulation of
+one-directional repair layers contracted the output distribution — the following
+hold when relation is introduced.
+
+1. **Do not build a relation-repair governor.**  An invalid relation is not
+   repaired; the validator or coerce drops it with a warning recorded.  The drop
+   rate is measured by the benchmark and lowered by improving the prompt and the
+   schema, never by repairing
+2. at most one relation per instruction
+3. the coerce layer **must not add** a relation.  Only Stage 1 (from the
+   description) and Stage 1.5 (from the composition) may add one; coerce is
+   allowed only to delete an invalid one
+4. the benchmark continuously measures relation usage rate, type distribution, and
+   drop rate, and inspects for convergence onto a particular type.  No floor is
+   set on the firing rate, however — a floor enforces a style (the lesson of the
+   Build 428 focal-event floor)
+
+### 14.7 Display in Saijiki
+
+A relations (あいだ) category is added to Saijiki.  Laid over the notion of *ma*,
+the interval, it shows that the vocabulary of relation is not mere geometric
+specification but words for writing negative space and tension.  Displayed as:
+along, not touching, cutting, between, touching.
+
+---
+
+### 14.9 The Design of Cloudform (v1.89.1)
+
+#### 14.9.1 Why Cloudform
+
+> The cloud outside the window is never the same shape twice, and people watch
+> it without tiring.  To have a work looked at the way one looks out of a
+> window — cloudform is the form for that.
+
+A circle or a square comes from its definition.  Cloudform has no definition.
+Then who decides the contour — **the performance decides**.  The score records
+only the parameters of the process (the character and the size of the sway, the
+material), and the renderer generates the contour from the performance seed.
+From the same score, a different cloud every time.
+
+"The description persists, the performance is one-time" has until now acted on
+placement and on touch.  Cloudform extends the principle to form itself.  A
+circle that sways is still a circle, but for a cloudform the realized value of
+the sway is its identity.
+
+Cloudform does not imitate a meteorological cloud.  The name follows the cloud
+ruler: a shaping word for a **family** of irregular curves, not the cloud of
+weather.  Yamato-e haze, the suhama forms of decorated paper, suminagashi
+marbling — Japanese form-making has stylized the indefinite not as arbitrariness
+but as a form that carries a grammar of irregularity.  Cloudform stands in that
+line.  Just as LeWitt's "lines not straight, not touching" defined a line by
+negation and by process, cloudform defines a plane by process.
+
+#### 14.9.2 The Generative Process (the Contour Is Decided by the Performance)
+
+The contour is generated by a two-stage deterministic synthesis.  All of it
+depends on the performance seed, and the same seed reproduces the same contour.
+
+1. **The base closed curve**: a closed curve whose polar radius r(θ) carries a
+   seamless multi-octave 1/f signal.  Low-frequency components make a few large
+   lobes ("undulating largely"), high-frequency components make fine unevenness
+   ("swaying finely").  The sway vocabulary maps onto the octave distribution
+2. **Normal displacement**: a second periodic signal running along the arc length
+   of the base curve displaces it along the normal, creating bays and waists —
+   suhama-like concavities.  The displacement amplitude is clamped geometrically
+   against local radius and curvature, so self-intersection is structurally
+   prevented; a strictly positive single-valued polar radius supplies that
+   guarantee.  This is not a governor, but the same kind of geometric safety as
+   the existing "safe drawing"
+
+The edge quality of the contour is carried by the stroke engine, the tool
+grammar — a pencil cloudform and a rotring cloudform are different things.  The
+interior is filled by surface (wash, stipple, hatch, aquatint, and so on).
+Combined with `mode: carve` it can cut an irregular light out of a dark ground.
+Output passes through Bezier fitting and obeys the point budget.
+
+#### 14.9.3 Composition With Existing Vocabulary (No New Modifier)
+
+Every modifier a cloudform takes is expressed in existing vocabulary:
+
+- **sway** -> the octave distribution of the contour (finely / largely /
+  undulating / trembling / blurring)
+- **proportion** -> the aspect ratio (a tall cloudform, a wide or full-width one —
+  a band of haze is written this way)
+- **touch** -> the stroke of the contour (the tool grammar)
+- **surface / color** -> the texture and the color of the interior
+- **relation** -> a cloudform can be referred to as "the previous shape";
+  sequential resolution works against its settled contour and bounding box
+- **place / motion** -> its placement (several scattered cloudforms each receive
+  their own contour)
+
+#### 14.9.4 The Selection Rule (Not an Escape Hatch)
+
+Cloudform is not "the approximation for when you do not know."  To preserve
+condensation by constraint:
+
+1. Stage 1 may select cloudform only when (a) the description explicitly writes
+   雲形 / "cloudform", or (b) the instructed subject is itself amorphous — cloud,
+   smoke, haze, stain, island silhouette, puddle, and the like
+2. an unknown or unclear subject continues to be approximated with the existing
+   forms.  Cloudform is never a fallback
+3. Stage 1.5 and coerce cannot inject or add a cloudform (§10.4 applies).  Stage 2
+   only transcribes the normalized form into the primitive cloudform with center
+   and size; it never asks an LLM for contour coordinates or control points
+4. the frequency and the context of cloudform use are watched as a mirror by the
+   motif ledger (see "Accounting for Refinement").  No governor, no floor, no
+   generation gate, no automatic preference
+
+#### 14.9.5 Determinism and Identity
+
+Contour generation is a deterministic derivation from the performance seed; it
+adds no new source of randomness and no new hash input.  The specification for
+computing rh2 is unchanged.  The score holds only the process parameters of the
+cloudform — center, size, `variation`, touch, surface, relation, placement — and
+stores no contour coordinates.  The contour is a realized value of the
+performance.
+
+#### 14.9.6 Accounting for the Form
+
+- **Gained**: a form that does not come from a definition.  The first form in
+  which sway is not decoration but the body of the form itself.  A contour that
+  invites the viewer's projection — design principle 5, "the viewer is what
+  moves," acts most strongly here
+- **Lost**: the uniformity of a vocabulary in which form means a definable
+  figure.  The risk of becoming an escape hatch when interpretation falters
+  (sealed by §14.9.4)
 
 ---
 

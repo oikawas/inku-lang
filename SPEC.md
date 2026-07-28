@@ -290,6 +290,12 @@ resolution of regions and relations).  Each render may carry a `render_seed`;
 providing the same seed makes replay reproducible while leaving the canonical
 Score stable.
 
+> **The render engine versions have their own index:
+> [docs/spec/render-engine-history.md](docs/spec/render-engine-history.md).** It lists every
+> version newest-first with the measured moved/unchanged counts. The paragraphs below record the
+> bumps to 5, 6, 7, 8 and 10 as they happened, in the middle of describing the renderer; the index
+> is where to look when the question is "which version changed what".
+
 Since v1.99 variation is performed not only on lines but also on arcs and
 closed shapes (circle, ellipse, triangle, square, polygon). The gate mirrors
 the line gate: quality in {perlin, wave, white} and dimensions intersecting

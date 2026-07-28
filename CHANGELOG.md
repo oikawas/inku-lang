@@ -11,6 +11,8 @@ This file records changes chronologically. If a historical note conflicts with t
 | [v1.72 through v2.4](docs/history/changelog-v1.72-v2.4.md) | 2026-07 | 44 | from the refine-and-compare UI to freezing the reference corpora |
 | [v0.1 through v1.71](docs/history/changelog-v0.1-v1.71.ja.md) | 2026-04-02 to 2026-05 | 73 | **Japanese only.** From the first sketch to the Stage 1.5 groundwork |
 
+**To follow the drawing versions alone, see [docs/spec/render-engine-history.md](docs/spec/render-engine-history.md)**, which lists render engine 1 through 15 newest-first with the moved and unchanged counts for each.
+
 ---
 
 ### v2.5.0 — de-regularizing the performance, and "unleashed" (render engine 12) (Build 706, 2026-07-25)

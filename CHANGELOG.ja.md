@@ -11,6 +11,8 @@
 | [v0.1 〜 v1.71](docs/history/changelog-v0.1-v1.71.ja.md) | 2026-04-02 〜 2026-05 | 73 | 着想から Stage 1.5 の整備まで。**「起源」もここ** |
 | [v1.72 〜 v2.4 系](docs/history/changelog-v1.72-v2.4.ja.md) | 2026-07 | 47 | 推敲 UI の再構成から参照コーパスの凍結まで |
 
+**描画の版だけを追うなら [docs/spec/render-engine-history.ja.md](docs/spec/render-engine-history.ja.md)。** render engine 1〜15 を新しい順に並べ、版ごとに動いた件数と不変の件数を持つ。
+
 ---
 
 ### v2.5.0 — 演奏の脱・規則化と「暴れる」（render engine 12）（Build 706、2026-07-25）

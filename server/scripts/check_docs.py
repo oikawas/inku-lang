@@ -59,6 +59,12 @@ PROSE_DOC = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:ja\.)?md)`")
 #                    in each language but every version must appear in both.
 PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("README.ja.md", "README.md", "shape", None),
+    (
+        "docs/spec/render-engine-history.ja.md",
+        "docs/spec/render-engine-history.md",
+        "shape",
+        None,
+    ),
     ("SETUP.ja.md", "SETUP.md", "shape", None),
     ("PROJECT_CONTEXT.ja.md", "PROJECT_CONTEXT.md", "shape", None),
     (
@@ -71,8 +77,13 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "SPEC.ja.md",
         "SPEC.md",
         "shape",
-        "SPEC.md carries an English-only section 15 'Current Implementation "
-        "Status' that the Japanese original has no counterpart for",
+        "these two are not translations of each other. Measured 2026-07-28: "
+        "both happen to carry 23 h2 sections, but they are different documents "
+        "-- ja §5 is the three-stage pipeline where en §5 is the core "
+        "vocabulary, ja §12 is the two-stage architecture where en §12 is "
+        "security and operations, and the engine record covers 13-15 in "
+        "Japanese and 5-10 in English. Deciding what to do about that is "
+        "ledger I-032; until then no shape check is meaningful here",
     ),
     # Split on 2026-07-28. The current file carries v2.5.0 onward and the two
     # languages hold the same 30 entries, so this pair needs no exception any

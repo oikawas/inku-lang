@@ -81,16 +81,6 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
 
-### Wild (engine 12; its reach in engine 14)
-
-**Separate from the vocabulary, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — wild.
-
-- **One switch for the whole work**, not per stroke and not per tool. **In engine 12 it reached only the line primitive** (circles, ellipses, triangles, squares, polygons, arcs, fills and hatches came out byte-identical with it on). **Engine 14 extends it to contours, arcs, fills and hatches**, so the implementation now matches the description
-- **It removes only the amplitude ceiling and the ban on self-intersection.** Endpoint pinning and determinism hold when it is on: the same Score, the same seed, and the same state render the same SVG every time
-- **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed wild and performed plainly are different works**
-- **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when it is on. **A machine has nothing to unleash**
-
-This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance.
 | relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
@@ -694,6 +684,513 @@ payloads.
 Sway is intentional.  DDL does not attempt to eliminate all model or
 renderer sway.  It uses sway as part of the medium, while keeping the
 score, schema, and renderer boundaries explicit.
+
+### 13.1 Sway Is Not Randomness
+
+Sway is not simply randomness.
+
+- **Randomness**: disorder. What happens cannot be predicted.
+- **Sway**: fine movement inside order. The core intent holds still while the surface moves.
+
+The bend of a bonsai branch is sway. It is not a tree that grew at random: a
+gardener decided the basic form, and nature moves the detail from there. Reciting
+a tanka is sway too. The 5-7-5-7-7 form does not change, but the pitch, the
+pauses, and the breath differ every time.
+
+DDL's sway is sway in this sense.
+
+### 13.2 The Three Roles Sway Plays
+
+**Role 1: it minimizes the author's intervention.**
+Sway made only of numbers and motion words carries no feeling and no intent.
+"Chance" makes the final decision in the author's place — the same structure as
+LeWitt writing the instructions and then leaving them to the draftsman's hand.
+
+**Role 2: it guarantees that the output happens once.**
+The same description yields something different every time. The description
+remains; the output disappears. This structure is what makes the metaphor of
+performance real rather than decorative.
+
+**Role 3: it makes room for the viewer.**
+A perfectly mechanical output is finished. With sway, there is room for the
+viewer to read the sway as meaningful — the way a Rothko color field is not
+perfectly flat but holds a faint movement.
+
+### 13.3 Motion Words and Emotion Words
+
+In anything written about sway, **motion words and emotion words are kept
+strictly apart**.
+
+**Motion words (allowed):**
+
+```
+swaying finely, undulating slowly, scattering, trembling faintly, shifting, blurring
+```
+
+These describe physical movement. They are behavior observable from outside.
+They describe how the work behaves, not what the work is worth.
+
+**Emotion words (excluded):**
+
+```
+swaying beautifully, swaying delicately, swaying gracefully, swaying boldly, swaying violently
+```
+
+These are the writer's subjective judgment — an intervention in the work. They
+run against DDL's principle of excluding emotional vocabulary.
+
+**The boundary (left to the LLM's reading):**
+
+```
+slightly, a little (degree expressions, but leaning toward feeling)
+```
+
+In tanka too, "a beautiful flower" is judgment while "a flower swaying in the
+wind" is observation. DDL judges by the same distinction, and Stage 1's reading
+is what decides the boundary case.
+
+### 13.4 The Three Layers of Sway
+
+Sway arises from three layers. Priority runs **plugin > motion word > material**.
+
+```
+[sway inherent to the material]  (always present; the writer does not think about it)
+  the natural sway of pencil, brush, chalk and the rest
+
+  ↓ overridden when the writer specifies
+
+[sway named by a motion word]  (the writer can write this)
+  finely, slowly, scattering, trembling
+
+  ↓ overridden again when a plugin is named
+
+[sway caused by a phenomenon, via the Nature plugin]  (called explicitly)
+  Nature.風 (wind), Nature.うねり (swell)
+```
+
+The three layers match the way bonsai is thought about:
+
+- the **material** (the species) has its own nature
+- the **gardener's hand** enters (motion words)
+- **the environment** (wind, season) is laid over it (plugins)
+
+#### Wild (engine 12; its reach in engine 14)
+
+**Separate from the three layers, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — wild.
+
+- **One switch for the whole work**, not per stroke and not per tool. **In engine 12 it reached only the line primitive** (circles, ellipses, triangles, squares, polygons, arcs, fills and hatches came out byte-identical with it on). **Engine 14 extends it to contours, arcs, fills and hatches**, so the implementation now matches the description
+- **It removes only the amplitude ceiling and the ban on self-intersection.** Endpoint pinning and determinism hold when it is on: the same Score, the same seed, and the same state render the same SVG every time
+- **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed wild and performed plainly are different works**
+- **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when it is on. **A machine has nothing to unleash**
+
+This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance. (The table of layers is in the [render engine version history](docs/spec/render-engine-history.md).)
+
+### 13.5 Weight Decides the Quality of Sway
+
+Sway has quality, not only quantity. In DDL the weight — the material — decides
+that quality implicitly:
+
+| weight | quality of sway | character |
+|---|---|---|
+| silverpoint | almost_none | almost no sway (exact). The thinnest line a hand can draw (0.5px) and the one that wavers least. Pruned from the vocabulary in v1.92 under the name `hair`, and returned in v2.7.9 renamed silverpoint. Saved Scores that still say `hair` are rewritten as they load |
+| pencil | perlin_fine | Perlin-leaning (the continuity of a hand), faint secondary lines, fine grain |
+| pen | perlin_minimal | slight Perlin. The standard reference line |
+| rotring | almost_none | uniform width, square ends, a hard drafting line |
+| crayon | rubbed_noise | rubbing, short breaks, granular gaps |
+| chalk | perlin_plus_noise | Perlin plus powdery scratchiness, blur |
+| brush_thin | perlin_strong | thin brush track, secondary lines, density variation |
+| brush_thick | pressure_blur | thick pressure, rubbed secondary lines, light blur |
+| burin | almost_none | a hard, certain engraved line. Round ends, no texture filter |
+| drypoint | burr_noise | bleeding and scratchiness from the burr. Its own burr treatment |
+| computer | periodic_quantized | it sways, but **it repeats without error**. Integer-period sine and rounding to a lattice. The material is what sampling leaves behind (see "engine 13" in the [version history](docs/spec/render-engine-history.md)) |
+
+Reference §6 is the source of truth for the numeric characteristics (stroke
+width, opacity, dasharray, presence of a filter).
+
+**Kinds of sway noise:**
+
+- **White noise**: each point independent, uncorrelated, jagged
+- **Perlin noise**: continuous, neighboring points similar, a smooth wave
+- **1/f sway (pink noise)**: common in nature, and what people read as "natural"
+
+A drawn line carries continuity from the inertia of the hand, so Perlin-leaning
+noise is the natural choice.
+
+### 13.6 The Categories of Motion Vocabulary
+
+The Saijiki carries a category called ゆらぎ (movements).
+
+**Japanese, ゆらぎ:**
+
+| Dimension | Vocabulary |
+|---|---|
+| amplitude | 細かく, 大きく |
+| frequency | 速く, ゆっくり |
+| quality | 揺れる, 波打つ, 震える, 滲む |
+
+**English, movements:**
+
+| Dimension | Vocabulary |
+|---|---|
+| amplitude | fine, large |
+| frequency | quickly, slowly |
+| quality | swaying, undulating, trembling, blurring |
+
+Scatter in placement is not ゆらぎ. It is carried by うごき (motions, "scatter")
+and by `arrangement` (layout / path / jitter).
+
+### 13.7 Sway from Phenomena: the Nature Plugin
+
+Sway that comes from a natural phenomenon is provided as a Nature plugin. The
+writer does not write sway parameters; the writer **calls the phenomenon**.
+
+**Basic form:**
+
+```
+ペンで直線を 中心に 置く
+Nature.風を 通す
+```
+
+or:
+
+```
+筆で円を 並べる
+Nature.うねりを かける
+```
+
+"Let the wind through", "run a swell through it" — a natural phenomenon can be
+woven into the description as a verb. It reads close to the way a tanka reads.
+
+**Representative Nature plugins (candidates for reference implementation):**
+
+- `Nature.風` (wind): a slow horizontal wave
+- `Nature.うねり` (swell): fine waveforms superimposed
+- `Nature.揺れ` (sway): small rotation about a center axis
+- `Nature.震え` (tremble): small high-frequency oscillation
+- `Nature.無風` (no wind): sway suppressed, including the material's own
+
+**An example of macro expansion:**
+
+```
+Nature.風, conceptually, expands to:
+  for every line and form
+  a gentle horizontal wave
+  amplitude: 2-5% of the drawn object's size
+  frequency: 1-2 cycles across the canvas width
+  shape: Perlin noise
+```
+
+Expansion is only a writing-down into core vocabulary. Following the plugin
+principles, it does not change any core mechanism.
+
+**State of the implementation (a v1.92 note):** the proper place for plugin
+expansion is the declarative plugin layer immediately after Stage 1 (§4.6). Only
+the three words `Nature.風` / `Nature.うねり` / `Nature.無風` remain as a v1.70
+reference implementation, **expanded by hard-coded logic inside Stage 1.5** (they
+expand mechanically only when the `Nature.` namespace is explicit, and add no new
+primitive and no new Score field). Moving these three into declarative plugin
+documents is outstanding work — until it happens, their static display in the web
+Saijiki stays frozen — and when it happens this section folds into §4.6. The
+plugin principles in §4.3 are not relaxed for them.
+
+### 13.8 Sway Is Generated in the Renderer
+
+The random generation for sway happens in the **renderer**, not in the JSON Score.
+
+**Why the design puts it there:**
+
+| Layer | Role | Determinism |
+|---|---|---|
+| DDL text | description (native language) | deterministic |
+| normalized DDL | instructions (core vocabulary) | deterministic |
+| JSON Score | score (structured instructions) | deterministic |
+| **Renderer** | **performance (sway realized)** | **non-deterministic** |
+| SVG | output (happens once) | generated each time |
+
+The JSON Score is a score; it does not contain the performance. The score holds
+the *instruction* for sway — amplitude, frequency, quality — but not the concrete
+random values. This gives:
+
+- replaying the same JSON Score produces a different SVG every time (a capability the Android app already had)
+- the JSON Score becomes meaningful as an archive
+- changing the sway seed produces several performances from one score
+
+**The performance has freedom at two scales (v1.51):**
+
+| Scale | What it is | Written in |
+|---|---|---|
+| micro | line tremble, blur, grain, rubbing | §13.9 `variation` |
+| macro | performance-time resolution of placement written as relation and region | §14.4 sequential resolution |
+
+The score records a relation — "not touching the previous line, at a narrow
+interval" — and the performance decides the actual position each time. This is
+what makes "a different performance every time from the same score" work at the
+level of composition rather than at the level of a few pixels of tremble. The
+earlier implementation realized only the micro scale, and macro sway was assigned
+to no layer at all. That was the primary cause of the uniformity observed in
+Build 436.
+
+**The three layers of a tiling performance (v1.75):** `layout="grid"`, which the
+writer states explicitly, is performed in three layers: (1) a small within-cell
+displacement from a deterministic hash derived from the performance seed, (2) the
+existing `variation`, whose phase differs per element, and (3) the existing
+material sway of pencil, brush, chalk and the rest. The same Score with the same
+render seed is bit-identical, and when the seed changes the hand differs while the
+order holds. Because a full repetition is itself the writer's intent for a grid,
+the bias, fade, cluster, preserve-space and count-representation treatments meant
+for scatter are not applied to it.
+
+### 13.9 The `variation` Schema in the JSON Score
+
+The JSON Score's `variation` field is structured by dimension.
+
+```json
+{
+  "variation": {
+    "amplitude": "fine",
+    "frequency": "high",
+    "quality": "perlin",
+    "dimensions": ["position_y"]
+  }
+}
+```
+
+| Field | Values | Meaning |
+|---|---|---|
+| `amplitude` | `fine` / `medium` / `broad` | amplitude (from motion words) |
+| `frequency` | `slow` / `medium` / `high` | frequency (from motion words) |
+| `quality` | `none` / `white` / `perlin` / `pink` / `wave` | kind of noise (from weight) |
+| `dimensions` | `[position_x, position_y, angle, length, rotation, radius]` | which dimensions sway. `thickness` was retired in v2.7.2 (declared but never read by the renderer) |
+
+**The writer never writes this structure directly.** Stage 2, the structuring
+layer, generates it from the combination of motion words, weight, and plugins.
+
+In the current implementation the sway of a line is expressed by turning it into a
+polyline in the renderer. Amplitude is a ratio against the shape's representative
+dimension — `fine=0.025` / `medium=0.08` / `broad=0.18` (v2.1.0; before that,
+absolute pixels of 7 / 12 / 30 against a 1000px canvas) — so that the perception
+of a sway word stays constant regardless of how large the shape is.
+
+`quality` is chosen roughly as follows:
+
+- `perlin`: fine, irregular sway of a line — "trembling", "swaying finely"
+- `wave`: low-period, legible undulation — "swaying slowly", "undulating"
+- `pink`: blurring of the boundary — "blurring"
+- `white`: coarse, noise-like scatter
+
+When a short line is given sway, prefer `dimensions=["position_x","position_y"]`
+so the sway is not crushed against the line's length. For long horizontal or
+vertical lines, the base axis is `position_y` for a horizontal line and
+`position_x` for a vertical one.
+
+The schema keeps `variation`, but it is invisible from the DDL text interface.
+Only those implementing plugins or materials handle these dimensions.
+
+### 13.10 The `arrangement` Path in the JSON Score
+
+`arrangement` holds not only how many, but how they run and along what trace.
+
+```json
+{
+  "arrangement": {
+    "count": 21,
+    "layout": "scatter",
+    "path": "wave",
+    "margin": 0.12
+  }
+}
+```
+
+| Field | Values | Meaning |
+|---|---|---|
+| `layout` | `horizontal` / `vertical` / `radial` / `scatter` / `grid` | base placement. `grid` is tiling that was stated |
+| `path` | `none` / `diagonal` / `wave` / `top_to_bottom` / `left_to_right` / `right_half` | trace of the placement |
+| `rows` / `cols` | 1-64, or omitted | rows and columns for a grid. When both are given, `rows×cols` wins |
+| `jitter` | 0.0-1.0 (default 0.12) | deterministic displacement within a grid cell |
+
+Correspondences:
+
+- "along an undulating trace" → `layout="scatter"`, `path="wave"`
+- "a diagonal band" → `path="diagonal"`
+- "scattered from top to bottom" → `layout="vertical"`, `path="top_to_bottom"`
+- "from left to right", "across" → `layout="horizontal"`, `path="left_to_right"`
+- "the right half" → `path="right_half"`
+- "radial", "concentric" → `layout="radial"`
+- "tile it", "lay it out in a lattice" → `layout="grid"` (only when those words are explicit. The ceiling on count is a flat 2000 regardless of layout)
+
+#### How a stated count is treated (v2.7.6)
+
+A count written in plain words in the description is stronger than anything
+inferred downstream.
+
+| Request | Treatment |
+|---|---|
+| **under 240** | **literal. The requested value goes straight into `arrangement.count`** |
+| **240 and over** | represented. `count` becomes 80-120, and `density` / `cluster_count` / `fade` / `preserve_space` keep the appearance of the group |
+
+The threshold of 240 matches `MAX_EXPANDED_PER_INSTRUCTION`. Putting it at 300
+would create a band from 241 to 299 that is structurally impossible to honor —
+declared literal while coerce cuts at 240. **"Two hundred thirty-three lines"
+draws 233 lines.**
+
+**The treatments that reduce density in quiet, membrane, or memory contexts are
+not applied to a group whose count was stated.** Quietness is a reading of the
+scene; a written number is not a reading. Those treatments act only on groups
+with no stated count. Treatments that adjust size (symbolic forms, lone forms,
+unintended fills) touch no counts and act as before.
+
+**When the literal totals of several groups exceed 400
+(`MAX_EXPANDED_PRIMITIVES`), the groups are tipped into representation starting
+with the largest request, stopping as soon as the total is 400 or under. Small
+groups are not cut first.** A number that can be counted and a number that
+cannot are different things, and proportional shrinking breaks the countable
+side first. Only when representing every group still exceeds the ceiling do the
+large groups share one limit between them.
+
+When `path` is `none`, placement uses `layout` alone as before. When a `path` is
+given, the renderer uses a deterministic hash and a sequence number, so the same
+JSON Score reproduces the same traced placement.
+
+### 13.11 A Worked Example
+
+The description:
+
+```
+細かく揺れるペンシルの破線が3本、画面を横切る
+(three finely swaying dashed pencil lines cross the screen)
+```
+
+**Stage 1 (interpretation) produces normalized DDL, in the form the corpus uses:**
+
+```
+鉛筆の破線の横線を縦に三本並べる。線は細かく揺れる。
+(line up three horizontal dashed pencil lines vertically. the lines sway finely.)
+```
+
+**Stage 2 (structuring) produces the JSON Score, in part:**
+
+```json
+{
+  "instructions": [
+    {
+      "primitive": "line",
+      "style": "dashed",
+      "from": [0.0, 0.33],
+      "to": [1.0, 0.33],
+      "weight": "pencil",
+      "variation": {
+        "amplitude": "fine",
+        "frequency": "high",
+        "quality": "perlin",
+        "dimensions": ["position_y"]
+      }
+    }
+  ]
+}
+```
+
+**The renderer:**
+
+It takes the JSON Score and, from the `variation` information, selects the actual
+sway function — Perlin noise, fine amplitude, high frequency, along the y axis —
+and generates the SVG. Each replay is performed with different random values.
+
+The engine bumps that changed this performance are recorded in the [render engine
+version history](docs/spec/render-engine-history.md); the prose below states the
+reason for each one inline, for the range before the corpus was frozen.
+
+v1.99 extended the objects of sway from lines to arcs and closed forms (circle,
+ellipse, triangle, square, polygon). It fires when quality ∈ {perlin, wave, white}
+and `dimensions` contains one of position_x / position_y / radius (symmetric with
+line; radius is a form's natural axis). Closed forms are performed with periodic
+noise whose seam is continuous, polygons are performed edge by edge with the
+corners pinned, and arcs pin both endpoints completely so the touching contract
+holds. The pink (blurring) path and the quality=none path are unchanged. Because
+the performance of the same Score with the same seed changed, the render engine
+version went to 5 (past works may look different when replayed, but saved SVGs
+are unchanged).
+
+v2.0.5 gave wave-quality sway a phase derived from the performance seed (until
+then the sine had a fixed phase, so the waveform was identical even when the seed
+changed). The phase is derived deterministically from the seed, and the automatic
+closure of closed contours by integer frequency, the pinning of arc endpoints, and
+the pinning of polygon corners all hold. Material contours (the contours and
+specks of pencil / crayon / chalk and the rest) were made to follow the
+performance seed as well. With no performance seed given, output is byte-identical
+to before. The render engine version went to 6.
+
+v2.1.0 converted absolute pixels in rendering to a proportional system throughout.
+The sway amplitude vocabulary (fine / medium / broad) changed from absolute pixels
+against a 1000px canvas (7 / 12 / 30px) to **a ratio against the shape's
+representative dimension** (0.025 / 0.08 / 0.18). The representative dimension is
+the radius for circle / polygon / arc, the geometric mean of the radii for
+ellipse, half the shorter side for square / triangle / cloudform, and the length
+for line. Small shapes now sway finely and large shapes broadly. The
+`stdDeviation` of blurring (pink) was made proportional the same way (0.009 / 0.03
+/ 0.07). Contour subdivision and stroke sampling changed from fixed counts (80 /
+49) to length-proportional counts with clamps. The material layer (line width,
+dasharray, texture filter, material contour, speck) and the display filter were
+made relative to `canvas.unit`, and at `unit=1000` they match the old behavior
+(except that speck count follows perimeter and stroke sampling follows length).
+Alongside this, the author's calibration raised material contour and speck
+strength by a floor method (at strength step s1, floors on contour offset /
+opacity and on speck opacity / count; the texture filter was left alone).
+Material contours were given `class="material-outline"` so they can be told from
+the main line mechanically. The render engine version went to 7.
+
+v2.2.0 made closed forms (circle / ellipse / square / triangle / polygon) draw
+their contours with a drawn stroke — the stroke engine. `synthesize_along` was
+added to `stroke_engine` to compose a stroke along an arbitrary centerline (the
+tool grammar is the same as for line; only the following target is swapped, and
+an integrator feeds the intended stride forward so the spring carries only the
+residual, removing radial distortion from curvature). The contour is drawn as a
+filled band of two subpaths, outer and inner (`class="contour-stroke-v1"`,
+fill-rule evenodd). Corners are pinned at their ideal positions and become the
+seams of the brush; a closed contour with no corners closes its seam with a linear
+ramp. The target weights are every drawn tool except rotring, which keeps a
+geometric contour. The band's centerline is the contour after sway is performed,
+and material contours and specks coexist with the band. Dashed and dotted styles
+keep a thinned geometric contour, because the line style is itself part of the
+description. The body element stays geometric (with `stroke="none"` for solid
+styles, leaving only the fill), and the bbox and touching contracts are unchanged.
+Line and arc output is byte-identical to v2.1. The render engine version went to 8.
+
+v2.3.0 changed the fill of closed forms from a region fill to **a stroke fill that
+fills the interior with the material's own touch**, restoring the meaning of
+`filled` (`True` = fill the interior with the material's touch, `False` = contour
+only; previously closed forms were always filled regardless of `filled`, making it
+a dead field). The fill takes intersections of scan lines with the closed contour
+in pairs and passes each interior interval through `synthesize_along` as one
+stroke (no clipPath is needed; a concave cloudform is handled as intersection
+pairs too, and the endpoints move inward by half the line width so the edge aligns
+with the contour). The group is `class="fill-stroke-v1"`. The scan angle comes
+from the performance seed (uniform over 0-180°) and differs per shape; the
+interval is `max(line width × 1.5, canvas.unit × 0.012)` with ±12% jitter.
+Complete coverage is not attempted — the grain of the paper is left showing.
+rotring keeps a region fill, and shapes too small for three scan lines degrade to
+a region fill. When `surface` is given, no material fill is produced (a fill is
+the material's default way of filling; `surface` is an explicit printmaking
+expression). Alongside this, the hatch and crosshatch surfaces were replaced with
+bands of touch (`class="surface-stroke-v1"`) instead of geometric straight lines
+(centerline, angle, interval, and count unchanged; rotring stays geometric), and
+sways that are not performed were excluded from the seed key so that the presence
+of an inactive sway no longer changes the rendered bytes. The render engine
+version went to 9.
+
+v2.3.1 made arcs perform as a drawn band too (`class="arc-stroke-v1"`), closing
+the last exception left by v2.2.0. The target weights are every drawn tool except
+rotring. The band's centerline is the arc after sway is performed, and both ends
+are pinned to their intended values. **The geometric arc remains as an invisible
+intent element** (`stroke="none"`), and the touching check reads that intent arc
+back out of the drawn SVG and guarantees the contract by coordinates (the arc
+extractor is unchanged; the band is a filled polygon of `M..L..Z` with no arc
+command, so it is not counted twice). **The touching end stays tapered**: the
+envelope of stroke synthesis converges to zero at both ends, and since the intent
+arc guarantees the contract by coordinates, the band may fade softly at the end
+like a free end — the tip and base of a leaf come to look softly extinguished.
+Dashed and dotted styles make the intent arc itself visible as a thin dashed or
+dotted line. drypoint puts its burr along the performed centerline, and material
+contours and specks coexist with the band. The render engine version went to 10.
 
 ---
 

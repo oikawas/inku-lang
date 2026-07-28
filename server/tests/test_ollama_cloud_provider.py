@@ -202,6 +202,61 @@ def test_ollama_cloud_still_asks_by_tool(monkeypatch) -> None:
     assert seen["tools"][0]["function"]["name"] == "submit_score"
 
 
+def _capture_stage1_request(monkeypatch, provider: str, **kwargs) -> dict:
+    """Same, for Stage 1, which asks in prose and has its own thinking switch."""
+    import openai
+
+    from inku_server import interpreter
+
+    seen: dict = {}
+
+    class _FakeCompletions:
+        def create(self, **kw):
+            seen.update(kw)
+            return _FakeResponse("地: 白い紙。中心に円を置く。")
+
+    class _FakeClient:
+        def __init__(self, **_kwargs) -> None:
+            self.chat = type("Chat", (), {"completions": _FakeCompletions()})()
+
+    monkeypatch.setattr(openai, "OpenAI", _FakeClient)
+    monkeypatch.setattr(interpreter, "_current_model_settings", default_model_settings)
+    interpreter._interpret_openai_detail(
+        "中心に円を置く。", model="stub-model", provider=provider,
+        system_prompt="SYS", **kwargs
+    )
+    return seen
+
+
+# Ollama thinks by default, and the thinking comes out of the same token budget as
+# the answer -- that is how a request returns nothing at all. The two stages carry
+# the setting separately, so they are asserted separately: a loop over both would
+# report the same failure whichever one lapsed.
+
+
+def test_stage2_tells_local_ollama_not_to_think(monkeypatch) -> None:
+    assert _capture_stage2_request(monkeypatch, "ollama")["reasoning_effort"] == "none"
+
+
+def test_stage1_tells_local_ollama_not_to_think(monkeypatch) -> None:
+    assert _capture_stage1_request(monkeypatch, "ollama")["reasoning_effort"] == "none"
+
+
+def test_asking_for_the_thinking_leaves_it_on(monkeypatch) -> None:
+    # Stage 1 can be asked for the thinking itself (the trace path). Suppressing it
+    # there would empty the very field the caller wanted.
+    seen = _capture_stage1_request(monkeypatch, "ollama", include_thinking=True)
+    assert "reasoning_effort" not in seen
+
+
+def test_other_providers_are_not_told_anything(monkeypatch) -> None:
+    # The cloud's models emitted no thinking either way, so the argument buys
+    # nothing; and it asks by tool call, where the setting has cost the call itself.
+    for provider in ("ollama-cloud", "ovms"):
+        assert "reasoning_effort" not in _capture_stage2_request(monkeypatch, provider)
+        assert "reasoning_effort" not in _capture_stage1_request(monkeypatch, provider)
+
+
 def test_the_system_prompt_is_sent_whole(monkeypatch) -> None:
     # The truncation happened inside Ollama, not here; this pins that we are not
     # the ones shortening it, so a future "fix" cannot be applied in the wrong place.

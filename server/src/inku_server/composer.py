@@ -1487,8 +1487,17 @@ def _compose_openai(
     # Ollama Cloud ignores every form of structured output but honours tool calling
     # (measured 2026-07-27), so that provider stays on tools. The remaining
     # OpenAI-compatible providers are unmeasured here and keep the tool path.
+    #
+    # `reasoning_effort` is the other half: Ollama turns thinking on by itself when
+    # the argument is absent, and thinking shares MAX_TOKENS with the answer, so a
+    # model that thinks past the budget returns nothing. Suppressing it ran the same
+    # eight cases 8x faster, recovered the one that had been coming back empty, and
+    # left coverage identical (measured 2026-07-28). The cloud is left alone: its
+    # models emitted no thinking either way, and there the setting has been seen to
+    # cost the tool call itself.
     if provider == "ollama":
         structured: dict = {
+            "reasoning_effort": "none",
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
@@ -1496,7 +1505,7 @@ def _compose_openai(
                     "schema": _score_tool_schema(),
                     "strict": True,
                 },
-            }
+            },
         }
     else:
         structured = {

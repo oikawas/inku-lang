@@ -39,11 +39,13 @@ def test_render_reference_case_counts() -> None:
     # 本番既定の `display` 固有の分岐を一度も実行していなかったので `display` を
     # 通す 4 件 (`C-display-surface-*`) を足し、微小な塗りの機構が切り替わる
     # 境界の両側を留める 4 件 (`C-tinyfill-*`) を足した。
-    assert len(cases) == 358
+    # 段 3 で C 群が 51 -> 58。太さの軸 (`thinness`) は道具 3 種 × 2 段の 6 件と、
+    # 既定を明示した 1 件 (`C-thinness-default-pen`) で留める。
+    assert len(cases) == 365
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E")
-    } == {"A": 88, "B": 72, "C": 51, "D": 28, "E": 119}
+    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:

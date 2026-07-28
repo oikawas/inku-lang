@@ -63,6 +63,17 @@ WEIGHT_TO_STROKE_WIDTH: dict[str, float] = {
     "computer": 2.0,
 }
 
+# 太さの軸 (engine 16 段 3)。道具の既定幅に掛ける係数で、細い側にしか無い。
+# 記述者は px を書かず、「細い」「極細」とだけ書く。
+THINNESS_TO_WIDTH_SCALE: dict[str | None, float] = {
+    None: 1.0,
+    "fine": 0.6,
+    "extra_fine": 0.35,
+}
+
+# どの道具をどれだけ細く引いても、最も細い道具 (銀筆) より細くはならない。
+MIN_STROKE_WIDTH: float = WEIGHT_TO_STROKE_WIDTH["silverpoint"]
+
 COLOR_MAP: dict[str, str] = {
     "white": "#ffffff",
     "black": "#111111",
@@ -397,9 +408,17 @@ def _unit_scale(canvas: CanvasSize) -> float:
     return canvas.unit / CANVAS_PX
 
 
-def _stroke_width_px(weight: str, canvas: CanvasSize) -> float:
-    """weight の線幅 (px)。canvas.unit 相対 (unit=1000 で表の値そのもの)。"""
-    return WEIGHT_TO_STROKE_WIDTH[weight] * _unit_scale(canvas)
+def _stroke_width_px(
+    weight: str, canvas: CanvasSize, thinness: str | None = None
+) -> float:
+    """weight と thinness の線幅 (px)。canvas.unit 相対 (unit=1000 で表の値そのもの)。
+
+    太さは道具が内包する寸法で、thinness はそれを細い側へ寄せるだけの係数である
+    (太い側は無い)。銀筆は最も細い道具なので、どの道具をどれだけ細く引いても
+    銀筆の既定より細くはならない — 道具の順序は太さの指定では壊れない。
+    """
+    width = WEIGHT_TO_STROKE_WIDTH[weight] * THINNESS_TO_WIDTH_SCALE[thinness]
+    return max(width, MIN_STROKE_WIDTH) * _unit_scale(canvas)
 
 
 def _grid_step_px(weight: str, canvas: CanvasSize) -> float:
@@ -515,6 +534,7 @@ _SEED_INSTRUCTION_FIELDS = (
     "filled",
     "style",
     "weight",
+    "thinness",
     "mode",
     "carve_depth",
     "variation",
@@ -2374,7 +2394,7 @@ def _surface_dab(
     ]
     stroke = synthesize_along(
         centerline,
-        max(_stroke_width_px(ins.weight, canvas), radius * 1.3),
+        max(_stroke_width_px(ins.weight, canvas, ins.thinness), radius * 1.3),
         ins.weight,
         _surface_stroke_seed(seed, index),
         closed=False,
@@ -2512,7 +2532,7 @@ def _render_surface_vectors(
             segments = _scanline_segments(contour, angle, spacing, layer_seed)
             for _, start, end in segments:
                 width = max(
-                    _stroke_width_px(ins.weight, canvas),
+                    _stroke_width_px(ins.weight, canvas, ins.thinness),
                     spacing * (0.44 + _hash01(index, seed, "wash-width") * 0.30),
                 )
                 _surface_sweep(
@@ -3312,7 +3332,7 @@ def _stroke_attrs(
     hint = _norm_label(ins.color_hint or "")
     attrs = {
         "stroke": color,
-        "stroke_width": _stroke_width_px(ins.weight, canvas),
+        "stroke_width": _stroke_width_px(ins.weight, canvas, ins.thinness),
         "fill": color if do_fill else "none",
         "stroke_linecap": weight_style.get("stroke_linecap", "round"),
     }
@@ -3670,14 +3690,18 @@ _SPECK_SPECS: dict[str, tuple[int, float, float, float]] = {
 
 
 def _material_outline_profile(
-    weight: str, canvas: CanvasSize
+    weight: str, canvas: CanvasSize, thinness: str | None = None
 ) -> list[tuple[float, float, float, str | None]]:
-    """材質輪郭の (offset, 線幅, opacity, dasharray)。すべて canvas.unit 相対。"""
+    """材質輪郭の (offset, 線幅, opacity, dasharray)。すべて canvas.unit 相対。
+
+    細く引いた線の材質層は墨と同じだけ細くなる。基準を公称幅に据え置くと、
+    墨だけが細って材質が取り残される。
+    """
     spec = _MATERIAL_OUTLINE_SPECS.get(weight)
     if not spec:
         return []
     scale = _unit_scale(canvas)
-    base_width = _stroke_width_px(weight, canvas)
+    base_width = _stroke_width_px(weight, canvas, thinness)
     offset_gain = _material_gain("outline_offset")
     opacity_gain = _material_gain("outline_opacity")
     return [
@@ -3724,7 +3748,7 @@ def _add_material_circle_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.circle(
                 center=(cx, cy),
@@ -3761,7 +3785,7 @@ def _add_material_ellipse_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.ellipse(
                 center=(cx, cy),
@@ -3798,7 +3822,7 @@ def _add_material_rect_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.rect(
                 insert=(x - offset, y - offset),
@@ -3836,7 +3860,7 @@ def _add_material_arc_outline(
     render_seed: int | None = None,
 ) -> None:
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         group.add(
             dwg.path(
                 d=_arc_path_d(cx, cy, max(0.0, r + offset), start_deg, end_deg),
@@ -3931,7 +3955,7 @@ def _add_material_performed_outline(
     OFF の出力は幾何版のまま 1 バイトも動かさない。
     """
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas):
+    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
         points = _offset_performed_path(path, offset, closed, center)
         element = dwg.polygon if closed else dwg.polyline
         group.add(
@@ -4121,7 +4145,7 @@ def _material_line_group(
             layer_attrs = _copy_attrs(attrs)
             layer_attrs["stroke_width"] = max(
                 0.8 * scale,
-                _stroke_width_px(ins.weight, canvas)
+                _stroke_width_px(ins.weight, canvas, ins.thinness)
                 * (0.25 if ins.weight == "crayon" else 0.30),
             )
             layer_attrs["stroke_opacity"] = _layer_opacity(
@@ -4192,7 +4216,7 @@ def _render_hand_stroke(
     wild: bool = False,
 ):
     length = math.hypot(end[0] - start[0], end[1] - start[1])
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     grid_step = _grid_step_px(ins.weight, canvas)
     stroke = synthesize_stroke(
         start,
@@ -4340,7 +4364,7 @@ def _fill_scan_angle(seed: int) -> float:
 def _fill_scan_spacing(ins: Instruction, canvas: CanvasSize) -> float:
     """走査線の間隔。完全被覆は狙わない (実際の塗りも紙目を残す)。"""
     return max(
-        _stroke_width_px(ins.weight, canvas) * FILL_SPACING_WIDTH_GAIN,
+        _stroke_width_px(ins.weight, canvas, ins.thinness) * FILL_SPACING_WIDTH_GAIN,
         canvas.unit * FILL_SPACING_UNIT_RATIO,
     )
 
@@ -4416,7 +4440,7 @@ def _render_fill_strokes(
     """
     if len(contour) < 3:
         return None
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     grid_step = _grid_step_px(ins.weight, canvas)
     seed = _seed_for_instruction(ins, render_seed)
     segments = _scanline_segments(
@@ -4541,7 +4565,7 @@ def _render_fill_dab(
     seed = _seed_for_instruction(ins, render_seed)
     stroke = synthesize_along(
         centerline,
-        max(_stroke_width_px(ins.weight, canvas), short_axis),
+        max(_stroke_width_px(ins.weight, canvas, ins.thinness), short_axis),
         ins.weight,
         _fill_stroke_seed(seed, 0),
         closed=False,
@@ -4613,7 +4637,7 @@ def _render_contour_hand_stroke(
     戻り値の 2 つめは演奏後の中心線。材質層がこれに追随できるように返す
     (幾何から引くと墨だけが動いて材質が取り残される)。
     """
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     stroke = synthesize_along(
         contour,
         base_width,
@@ -4707,7 +4731,7 @@ def _render_arc_hand_stroke(
         centerline = _arc_points(
             cx, cy, r, ins.angle_start, ins.angle_end, _stroke_sample_count(arc_len, canvas)
         )
-    base_width = _stroke_width_px(ins.weight, canvas)
+    base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     stroke = synthesize_along(
         centerline,
         base_width,

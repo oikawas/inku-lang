@@ -13,6 +13,7 @@ engine 16 はそこを打点にする。短辺 2% の円を「内部を走査し
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import pathlib
@@ -20,6 +21,7 @@ import re
 
 import pytest
 
+import inku_server.renderer as renderer
 from inku_server.renderer import render
 from inku_server.schema import Score
 
@@ -70,6 +72,26 @@ def _normalized_digest(svg: str) -> str:
         r"\d+\.\d+", lambda match: f"{round(float(match.group(0)), 6):.6f}", svg
     )
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
+
+
+@contextlib.contextmanager
+def _engine_15_seed_material():
+    """演奏 seed の材料を engine 15 の 19 フィールドへ戻す。
+
+    段 3 が `thinness` を allowlist へ入れた (C-7) ので、値が既定の None でも
+    seed 鍵の JSON が変わり、コーパス 358 件のうち 325 件が動いた (不変 33 件は
+    rotring と computer = 機械の極)。ここで留めたいのは「この段がこの経路を
+    触っていない」ことなので、比較は太さの軸を足す前の材料で行う。段 3 の側は
+    `test_thinness_axis.py` が別に留めている。
+    """
+    original = renderer._SEED_INSTRUCTION_FIELDS
+    reverted = tuple(name for name in original if name != "thinness")
+    assert len(reverted) == len(original) - 1, "allowlist から thinness が消えている"
+    renderer._SEED_INSTRUCTION_FIELDS = reverted
+    try:
+        yield
+    finally:
+        renderer._SEED_INSTRUCTION_FIELDS = original
 
 
 def _replay(case: dict) -> str:
@@ -166,10 +188,11 @@ def test_f2_the_filled_cases_above_the_boundary_are_byte_identical_to_engine_15(
         or case_id == "D-size-large-filled-polygon"
     )
     assert len(above) == 31, above
-    for case_id in above:
-        assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
-            case_id
-        )
+    with _engine_15_seed_material():
+        for case_id in above:
+            assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
+                case_id
+            )
 
 
 def test_f2_the_one_tiny_case_in_the_corpus_did_move() -> None:

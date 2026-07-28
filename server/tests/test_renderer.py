@@ -1637,7 +1637,10 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
     # engine 15 (演奏 seed の allowlist 化 + 材質輪郭の距離是正) で再採取。
     # ここは既定 weight の pen を使うので、pen が材質輪郭を持った分も入っている。
-    assert digest == "a822b5cf5eb09d9b8176d3b79f7d9f94890a9421c2956dad069b2983ac49cc67"
+    # engine 16 段 3 (太さの軸) で再採取。`thinness` が演奏 seed の allowlist に
+    # 入った (C-7) ので、値が既定の None でも seed 鍵が変わる。幅そのものは
+    # 動いていない (thinness=None の倍率は 1.0)。
+    assert digest == "3caad55448f0a0a3f4c97b3f084b55dad143783a37e934f6283b58597d7ecc8c"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

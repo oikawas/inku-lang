@@ -52,7 +52,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 7379,
+    "bytes": 7399,
     "counts": {
       "path": 1,
       "polyline": 3,
@@ -65,7 +65,7 @@
     },
     "classes": [
       "material-outline",
-      "stroke-engine-v1 controls-39 events-1"
+      "stroke-engine-v1 controls-39 events-0"
     ]
   },
   "03_square_filled": {
@@ -89,9 +89,9 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 46718,
+    "bytes": 49415,
     "counts": {
-      "path": 36,
+      "path": 39,
       "polyline": 0,
       "polygon": 0,
       "circle": 60,
@@ -102,7 +102,7 @@
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
-      "fill-stroke-v1 strokes-35",
+      "fill-stroke-v1 strokes-38",
       "material-outline"
     ]
   },
@@ -196,7 +196,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 99129,
+    "bytes": 99131,
     "counts": {
       "path": 42,
       "polyline": 0,
@@ -382,7 +382,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 112373,
+    "bytes": 112381,
     "counts": {
       "path": 42,
       "polyline": 0,
@@ -437,7 +437,7 @@
       "g": 7
     },
     "classes": [
-      "contour-stroke-v1 controls-157 events-1",
+      "contour-stroke-v1 controls-157 events-0",
       "material-outline"
     ]
   },
@@ -510,7 +510,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": false,
-    "bytes": 12721,
+    "bytes": 12717,
     "counts": {
       "path": 1,
       "polyline": 2,
@@ -602,7 +602,7 @@
     },
     "classes": [
       "cloudform contour-v1 stroke-engine-touch",
-      "contour-stroke-v1 controls-245 events-1",
+      "contour-stroke-v1 controls-245 events-0",
       "material-outline"
     ]
   },
@@ -688,6 +688,7 @@
     },
     "classes": [
       "arc-stroke-v1 controls-31 events-0",
+      "arc-stroke-v1 controls-31 events-1",
       "material-outline"
     ]
   },
@@ -770,7 +771,7 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": true,
-    "bytes": 7387,
+    "bytes": 7399,
     "counts": {
       "path": 1,
       "polyline": 3,
@@ -783,7 +784,7 @@
     },
     "classes": [
       "material-outline",
-      "stroke-engine-v1 controls-39 events-1"
+      "stroke-engine-v1 controls-39 events-0"
     ],
     "wild_off_twin": "02_line_brush"
   },
@@ -878,9 +879,9 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": true,
-    "bytes": 50124,
+    "bytes": 52821,
     "counts": {
-      "path": 36,
+      "path": 39,
       "polyline": 0,
       "polygon": 2,
       "circle": 60,
@@ -891,7 +892,7 @@
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
-      "fill-stroke-v1 strokes-35",
+      "fill-stroke-v1 strokes-38",
       "material-outline"
     ],
     "wild_off_twin": "03_square_filled"
@@ -916,12 +917,12 @@
     "render_seed": 12345,
     "svg_profile": "editable",
     "wild": true,
-    "bytes": 31842,
+    "bytes": 31945,
     "counts": {
       "path": 2,
       "polyline": 0,
       "polygon": 2,
-      "circle": 45,
+      "circle": 46,
       "ellipse": 0,
       "line": 0,
       "rect": 1,
@@ -929,7 +930,7 @@
     },
     "classes": [
       "cloudform contour-v1 stroke-engine-touch",
-      "contour-stroke-v1 controls-245 events-1",
+      "contour-stroke-v1 controls-245 events-0",
       "material-outline"
     ],
     "wild_off_twin": "11_cloudform_pencil"

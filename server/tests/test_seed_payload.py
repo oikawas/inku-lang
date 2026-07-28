@@ -14,6 +14,7 @@ from inku_server.schema import Arrangement, Instruction, Score
 EXPECTED_SEED_INSTRUCTION_FIELDS = {
     "primitive",
     "weight",
+    "thinness",
     "style",
     "filled",
     "mode",
@@ -230,6 +231,7 @@ def test_seed_payload_keeps_the_four_existing_default_normalizations():
         "filled": False,
         "style": "solid",
         "weight": "pen",
+        "thinness": None,
         "variation": None,
         "arrangement": None,
         "surface": {

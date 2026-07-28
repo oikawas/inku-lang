@@ -112,12 +112,14 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # 全 dump でなく allowlist から作られるようになったこと (色・配置・注記が手つきを
 # 変えなくなった) と、材質輪郭の距離が強度レベルの倍率と下限から解放され、表が
 # もともと書いていた距離 — 帯の半幅の 0.7〜2.3 倍 — へ戻ったことである。
+# engine 16 段 3 (太さの軸) で再採取。`thinness` が演奏 seed の allowlist に
+# 入った (C-7) ので、既定 None のままでも seed 鍵が動く。
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "0085dba1234a0e336befdfbe81e7dcb9",
-    "chalk_square": "a69fee8dc7b6afe965159c3bb52c0ea2",
-    "crayon_arc": "f6f7b97a55a8688e72fd68baeecfb0bb",
-    "pencil_circle": "28ee36f58e5b264a7eea180428055c6a",
-    "pencil_ellipse": "95a23cc820b503178f0db51a104ab240",
+    "brush_thin_line": "532e64970f0dbe20f303e40696f56b6a",
+    "chalk_square": "8821b5468bbdd99133a5bff39ea60612",
+    "crayon_arc": "bf3b2adeddbd488400d6032155cf3537",
+    "pencil_circle": "e950ff63e16c5859100c9ffa4f85d978",
+    "pencil_ellipse": "87de69f3c6602833a71acc5d735a013e",
 }
 
 

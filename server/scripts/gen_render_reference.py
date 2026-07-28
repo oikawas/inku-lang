@@ -70,7 +70,8 @@ BASE_INSTRUCTION: dict[str, Any] = {
     "primitive": "line", "from": [0.18, 0.50], "to": [0.82, 0.50],
     "center": None, "radius": None, "sides": None, "position": None,
     "size": None, "angle_start": None, "angle_end": None, "rotation": None,
-    "filled": False, "style": "solid", "weight": "pen", "mode": "additive",
+    "filled": False, "style": "solid", "weight": "pen", "thinness": None,
+    "mode": "additive",
     "carve_depth": None, "color": "black", "color_hint": None,
     "variation": None, "arrangement": None, "at": None, "relation": None,
     "surface": None,
@@ -184,6 +185,16 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _case(cases, "C-tinyfill-boundary-pen",
           _instruction("circle", weight="pen", radius=0.017, filled=True))
 
+    # The thinness axis. Three tools spanning the width table (0.5 / 2.0 / 8.0)
+    # times the two thinness values, plus one case that states the default
+    # explicitly: naming the default must draw exactly what omitting it draws.
+    for tool in ("silverpoint", "pen", "brush_thick"):
+        for thinness in ("fine", "extra_fine"):
+            _case(cases, f"C-thinness-{thinness}-{tool}",
+                  _instruction("line", weight=tool, thinness=thinness))
+    _case(cases, "C-thinness-default-pen",
+          _instruction("line", weight="pen", thinness=None))
+
     # The corpus is 100% `editable`, but production renders `display`. Every
     # display-only branch of the surface layer was therefore never executed once
     # in 350 cases. These four run the profile the author actually looks at.
@@ -266,9 +277,9 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                   _instruction("square", weight=tool, filled=False, surface=surface),
                   wild=True)
 
-    expected = {"A": 88, "B": 72, "C": 51, "D": 28, "E": 119}
+    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 358:
+    if actual != expected or len(cases) != 365:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

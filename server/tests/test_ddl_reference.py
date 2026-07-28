@@ -12,7 +12,9 @@ from inku_server.schema import Arrangement, CanvasSpec, Instruction, Presence, R
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_ddl_reference.py"
-MANIFEST_PATH = SERVER_ROOT / "reference" / "ddl-engine-1" / "manifest.json"
+MANIFEST_PATH = (
+    SERVER_ROOT / "reference" / f"ddl-engine-{DDL_ENGINE_VERSION}" / "manifest.json"
+)
 
 def _generator():
     spec = importlib.util.spec_from_file_location("gen_ddl_reference", GENERATOR_PATH)
@@ -30,7 +32,10 @@ def _aliases(model) -> set[str]:
 def test_ddl_reference_versions_and_parts() -> None:
     manifest = _manifest()
     assert DDL_VERSION == "1"
-    assert DDL_ENGINE_VERSION == "1"
+    # engine 2 (2026-07-28): `Instruction` が `thinness` を得たので、この層の
+    # 凍結出力は振る舞いが変わらないまま dump の形だけが変わった。凍結済みの
+    # ディレクトリは書き換えないという規約に従い、次の版へ焼いた。
+    assert DDL_ENGINE_VERSION == "2"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"

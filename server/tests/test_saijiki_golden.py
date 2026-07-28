@@ -71,6 +71,24 @@ _REORDERED_JA = (
     ),
     ("「背景を灰で塗りつぶす」を出力してはいけない。", "「背景を灰で埋める」を出力してはいけない。", 1),
     ("・線・弧・多角形で近似する。", "・線・弧で近似する。", 1),
+    # --- 2026-07-28: engine 16 段 3 = 太さの軸 ---
+    # 太さを道具から独立した寸法として書く節。てざわりの節を変えずに足す
+    # (太さを理由にてざわりを変えさせないため)。
+    (
+        "# 数量表現\n",
+        "# 太さ — てざわりとは別に書く\n"
+        "\n"
+        "線の太さは、てざわりとは別に書く。既定より細いときだけ書く（太い指定は無い）。\n"
+        "\n"
+        "- 細い、細線、糸のような、髪のような → 「細い」と明記する\n"
+        "- 極細、きわめて細い、引っかき傷のような → 「極細」と明記する\n"
+        "\n"
+        "太さは DDL に明示する: 「極細の黒い線」「細いペンの横線」。\n"
+        "太さを理由にてざわりを変えない。細さの語があってもてざわりは質感から選ぶ。\n"
+        "\n"
+        "# 数量表現\n",
+        1,
+    ),
 )
 _REORDERED_EN = (
     ("hair, ", "silverpoint, ", 2),
@@ -112,6 +130,26 @@ _REORDERED_EN = (
         1,
     ),
     ("square, line, arc, or polygon.", "square, line, or arc.", 1),
+    # --- 2026-07-28: engine 16 段 3 = 太さの軸 ---
+    (
+        "# Quantity\n",
+        "# Thinness — written separately from the touch\n"
+        "\n"
+        "Line thinness is written separately from the touch. "
+        "Write it only when the line is thinner than the tool's default; "
+        "there is no thicker side.\n"
+        "\n"
+        "- thin, fine line, threadlike, hairlike \u2192 write \"thin\"\n"
+        "- extra fine, extremely thin, scratchlike \u2192 write \"extra fine\"\n"
+        "\n"
+        "Write the thinness explicitly in normalized DDL: "
+        '"extra fine black line", "thin pen horizontal line".\n'
+        "Never change the touch because of thinness. "
+        "Choose the touch from texture even when a thinness word is present.\n"
+        "\n"
+        "# Quantity\n",
+        1,
+    ),
 )
 
 

@@ -12,6 +12,7 @@ engine 15 まで `synthesize_along` を通っていた surface は hatch / cross
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import math
@@ -20,6 +21,7 @@ import re
 
 import pytest
 
+import inku_server.renderer as renderer
 from inku_server.renderer import (
     _point_in_polygon,
     _surface_contour,
@@ -107,6 +109,26 @@ def _distance_outside(
     return best
 
 
+@contextlib.contextmanager
+def _engine_15_seed_material():
+    """演奏 seed の材料を engine 15 の 19 フィールドへ戻す。
+
+    段 3 が `thinness` を allowlist へ入れた (C-7) ので、値が既定の None でも
+    seed 鍵の JSON が変わり、コーパス 358 件のうち 325 件が動いた (不変 33 件は
+    rotring と computer = 機械の極)。ここで留めたいのは「この段がこの経路を
+    触っていない」ことなので、比較は太さの軸を足す前の材料で行う。段 3 の側は
+    `test_thinness_axis.py` が別に留めている。
+    """
+    original = renderer._SEED_INSTRUCTION_FIELDS
+    reverted = tuple(name for name in original if name != "thinness")
+    assert len(reverted) == len(original) - 1, "allowlist から thinness が消えている"
+    renderer._SEED_INSTRUCTION_FIELDS = reverted
+    try:
+        yield
+    finally:
+        renderer._SEED_INSTRUCTION_FIELDS = original
+
+
 def _replay(case: dict) -> str:
     render_input = case["input"]
     return render(
@@ -148,10 +170,11 @@ def test_s2_hatch_and_crosshatch_cases_are_byte_identical_to_engine_15() -> None
         if "surface-" in case_id and ("-hatch-" in case_id or "-crosshatch-" in case_id)
     )
     assert len(pinned) == 8, pinned
-    for case_id in pinned:
-        assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
-            case_id
-        )
+    with _engine_15_seed_material():
+        for case_id in pinned:
+            assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
+                case_id
+            )
 
 
 def test_s2_the_other_surface_cases_did_move() -> None:
@@ -263,7 +286,8 @@ def test_s6_filled_cases_are_untouched_by_stage_one() -> None:
     cases = _engine_15_cases()
     fill_cases = sorted(case_id for case_id in cases if "-fill-" in case_id)
     assert len(fill_cases) == 30, len(fill_cases)
-    for case_id in fill_cases:
-        assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
-            case_id
-        )
+    with _engine_15_seed_material():
+        for case_id in fill_cases:
+            assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
+                case_id
+            )

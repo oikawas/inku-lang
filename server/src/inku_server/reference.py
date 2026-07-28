@@ -63,11 +63,13 @@ from .renderer import (
     FREQUENCY_CYCLES,
     REPRESENTATIVE_MIN_RATIO,
     SEGMENT_COUNT_MAX,
+    MIN_STROKE_WIDTH,
     SEGMENT_COUNT_MIN,
     SEGMENT_TARGET_RATIO,
     STYLE_TO_DASH,
     SVG_PROFILES,
     TEXTURE_FILTER_WEIGHTS,
+    THINNESS_TO_WIDTH_SCALE,
     WEIGHT_STYLE,
     WEIGHT_TO_STROKE_WIDTH,
 )
@@ -378,6 +380,10 @@ def _weight_properties() -> dict[str, Any]:
         "weights": weights,
         "line_style_dash": {style: STYLE_TO_DASH[style] for style in get_args(schema.LineStyle)},
         "texture_filter_weights": sorted(TEXTURE_FILTER_WEIGHTS),
+        "thinness_width_scale": {
+            str(key): value for key, value in THINNESS_TO_WIDTH_SCALE.items()
+        },
+        "min_stroke_width": MIN_STROKE_WIDTH,
         "canvas_px": CANVAS_PX,
     }
 

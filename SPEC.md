@@ -132,13 +132,9 @@ abstract colors and `palette:<name>` entries are expanded to the exact
 `render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
-`render_hash` is the work-edition identifier. SVG text, input text, normalized DDL, and raw LLM responses are never part of the hash payload.
-
-**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`composition_seed`) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
-
-**`render_wild` joined the material in engine 12; the format name stays `rh3`.** Extending the material does make a separate hash space, but **`render_engine_version` sits inside the same payload**, so a value computed under the old material always contains `"11"` or lower and one under the new always contains `"12"` or higher. The two can never coincide, so no `rh4` is needed. **This argument holds only because the engine version moved at the same time; the material must never be extended on its own.**
-
-**`rh2` (v1.60 through v2.4.4) is retained as legacy and never recalculated.** Stored `rh2:` rows keep their values and no destructive migration runs, matching how the earlier 64-character hex hashes were left in place. **`rh2` and `rh3` are separate hash spaces and must not be compared to decide whether two works are the same edition.** The startup backfill writes `rh3` only for rows whose `render_hash` is empty. `render_hash_short` — the four-character uppercase suffix used in the UI and CLI — is unchanged across both forms.
+`render_hash` is the work-edition identifier; what it is derived from, and why
+the build number and the Score-side seed stay out of it, is in "Separation From
+the Render Engine Pack" below.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
 artifact.  In normal server-generated output they match, but both are retained
@@ -154,6 +150,95 @@ and ratio from it.
 
 ## 4. Plugin Model
 
+### 4.1 Why the Plugin Model Is Designed From the Start
+
+DDL designs the plugin mechanism **from the beginning rather than adding it
+later**.  Three reasons:
+
+**To keep the core pure.**  Concrete vocabularies such as the Nature plugin
+(rain, leaf, water, wind) are already ruled out of the core.  That ruling holds
+only if a plugin mechanism exists from the start; otherwise it invites the
+compromise of "put it in the core for now and separate it later."
+
+**To settle the manner of extension first.**  Leaving other-language editions to
+the community works only once the manner of writing a plugin is defined.
+"Extend it freely" produces implementations that do not resemble one another.
+
+**To make the boundary with the core explicit.**  What is core and what is
+extension.  If that line is drawn late, the line itself becomes vague.
+
+### 4.2 The Emacs Lisp Lesson and the Go Stance
+
+Freedom in a plugin system cuts both ways.
+
+**What Emacs pays for its extensibility**
+- the boundary between core and package is vague
+- packages collide with each other
+- the core itself swells as extensions pull on it
+- the learning curve differs per person, which weakens it as common ground
+
+**Go's opposite stance**
+- language features are kept deliberately few
+- no macros, no metaprogramming
+- forcing "one way" means other people's code can be read
+
+If DDL aims at tanka, the **Go stance** is the fitting one.  Tanka has no
+"grammar of my own."  The common form is what lets individual expression exist.
+
+### 4.3 Five Principles
+
+**Principle 1: a plugin is limited to a macro over vocabulary.**
+It cannot add a new primitive.  It cannot add new syntax.  It only names a
+combination of existing core words.
+
+**Principle 2: a plugin cannot change the core.**
+No plugin can rewrite what "place" means.  Core vocabulary is immutable.
+
+**Principle 3: a plugin is referenced explicitly.**
+It carries a namespace, as in `Nature.雨`.  The bare vocabulary space stays
+unpolluted, and whether a plugin is in use is evident from the description.
+
+**Principle 4: a plugin stands alone.**
+Plugin A may not depend on plugin B.  With no chain of dependencies, installing
+and removing are independent acts.
+
+**Principle 5: the core alone can write it.**
+Every plugin expands into a description written in core vocabulary.  A plugin is
+shorthand, not a new capability.
+
+### 4.4 Implementation Hooks
+
+The reference implementation adds the `canvas-aspect` plugin (v1.29).  Its only
+hook is the **canvas-size hook**, and per-user plugin settings are stored as JSON
+in plugin extension storage.  System plugins and user plugins live in separate
+directories, one directory per plugin: `server/src/inku_server/plugins/system/canvas_aspect/`
+on the server and `web/src/lib/plugins/system/canvas-aspect/` on the web side.
+The web UI's plugin button (Canvas) sits in the writing tab's action row,
+currently ordered color catalog, model selection, canvas, new (Build 563, §8.4).
+The aspects it offers, the coordinate rules, and what changing an aspect does to
+the displayed work are in "Canvas Model" below.  How to write a plugin is
+recorded in `PLUGIN.md`.
+
+### 4.5 The Expansion Model
+
+A plugin is defined as a name given to a combination of core words.
+
+```text
+Nature.雨  ->  many short lines scattered from top to bottom
+           =  "thin, vertical, short lines, in the upper half, scattered"
+              (core words: thin line, vertical, short, upper half, scatter)
+```
+
+A plugin is expandable: any description that uses one converts mechanically into
+a description written with the core alone.  Because of that,
+
+- the renderer only has to know the core
+- a bug in a plugin cannot break rendering
+- porting to another language only requires porting the core
+- plugins cannot collide with each other
+
+### 4.6 Declarative Plugin Documents (v1.90.0 / Build 589)
+
 Vocabulary plugins are UTF-8 declarative documents, not executable code. One `.inku-plugin.md` file contains a front-matter manifest and word entries. The manifest requires `namespace`, `name`, semantic `version`, `authors`, `languages`, `license`, and Japanese/English descriptions. Each entry provides namespaced identity, Japanese/English surfaces and `fires_on` nouns, optional bilingual Saijiki notes, and equivalent bilingual expansion templates. Arbitrary code, URLs, and file references are forbidden.
 
 The pipeline order is **Stage 1 output -> plugin expansion -> core-only DDL -> Stage 1.5 -> Stage 2**. Templates may use core normalized DDL plus bounded expansion forms: deterministic `N to M` repetition (with unit-preserving singulars, and Build 591 multi-word English units such as `leaf forms`, `blades`, `cloudforms`, `spots`, `arcs`); a `member name: definition` local composite inlined at each member (Build 591; undefined references are rejected at load); `note:` comment lines that carry no expansion (Build 591); an `anchor` whose region determines separate member bands, including a Build 591 `anchor ... at N to M spots` nested repetition (spots x per-anchor members, depth two, each spot its own band); and symbolic `{region: ...}` translation, whose canonical key list is published by reference §3 and includes a `bottom band`, with an `upper-left to lower-right diagonal band` resolved as a computation (member sub-regions along a descending diagonal) rather than a rectangle. The same input chooses the same count, member regions, and rotations.
@@ -168,8 +253,113 @@ An explicit qualified term always fires. Stage 1 may resolve a `fires_on` noun o
 
 The built-in `canvas-aspect` system plugin remains separate and uses its existing hook and per-user plugin storage. Vocabulary plugin documents do not gain that code-level hook.
 
-### Short-Form Guide
-The writing surface carries only a non-blocking length hint. Japanese input uses roughly 31 characters as a tanka-like guide; English input uses roughly 12 words. The UI must not block longer text or display evaluative copy about length. It may show only a numeric counter and a subtle density change when the guide is exceeded, so the form is present without scolding the writer.
+### 4.7 Separation From the Render Engine Pack
+
+A vocabulary plugin is a macro over core vocabulary; it is not a way to replace
+the drawing core.  Replacing the drawing core carries a heavier responsibility
+and is treated separately, as a **Render Engine Pack**.
+
+A render engine is the boundary that takes `JSON Score + render options +
+server-owned color metadata` and returns `SVG + render metadata`.  The current
+`renderer.py` is the `default` engine.
+
+The boundary exists so that drawing strategy can later branch by model or by
+expressive goal:
+
+- an engine that favors stable SVG for display
+- an engine that favors editability in Illustrator or Affinity
+- an engine that strengthens one particular expression — geometric
+  construction, planes of color, material feel
+- an engine tuned to a particular Stage 2 model or prompt pack
+
+A render engine must not break the compatibility of the canonical DB record.
+The canonical metadata format read by history, the JSON tab, the CLI, and the
+benchmarks stays stable.  `render_hash` is the work-edition identifier; SVG
+text, input text, normalized DDL, and raw LLM responses are never part of the
+hash payload.
+
+**The current form is `rh3:<sha256>` (v2.4.5).** Identity is derived from the saved canonical JSON Score, `render_seed`, `render_wild`, the render engine's ID and version, and `render_color_catalog_id`. **`render_build_number` and the Score-side seed (`composition_seed`, called `vary_seed` until v2.8.0) are excluded.** The build number is whatever sits in `web/BUILD_NUMBER` and moves for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte — a false difference. It stays as provenance metadata and leaves the definition of identity. The Score-side seed is redundant: a different Score already yields a different ID.
+
+> **The key name `vary_seed` in the legacy `rh2` material stays frozen** (v2.8.0). **The material of an identity ID is not its name** — changing the characters of the key would rebuild the `rh2` of every saved work. The value is taken from the renamed `composition_seed`.
+
+**`render_wild` joined the material in engine 12; the format name stays `rh3`.** Extending the material does make a separate hash space, but **`render_engine_version` sits inside the same payload**, so a value computed under the old material always contains `"11"` or lower and one under the new always contains `"12"` or higher. The two can never coincide, so no `rh4` is needed. **This argument holds only because the engine version moved at the same time; the material must never be extended on its own.**
+
+**`rh2` (v1.60 through v2.4.4) is retained as legacy and never recalculated.** Stored `rh2:` rows keep their values and no destructive migration runs, matching how the earlier 64-character hex hashes were left in place. **`rh2` and `rh3` are separate hash spaces and must not be compared to decide whether two works are the same edition.** The startup backfill writes `rh3` only for rows whose `render_hash` is empty. `render_hash_short` — the four-character uppercase suffix used in the UI and CLI — is unchanged across both forms.
+
+Loading arbitrary external code is not implemented at this point.  The internal
+boundary and the metadata record come first; distribution format, safety, and
+dependencies get designed once a second real engine is actually needed.
+
+### 4.8 Correspondence With Bonsai
+
+The design agrees with the bonsai figure.  Bonsai does not invent a new plant;
+it makes a world out of the arrangement and combination of plants that already
+exist.  A plugin should have the same property.
+
+It does not add a feature.  It gives a name to a combination that is already
+there.  That is what a plugin is for.
+
+### 4.9 Official Reference Plugins
+
+DDL's stance on the split between "official" and "unofficial" plugins:
+
+**The approach: provide only a few official reference plugins.**  A handful —
+Nature, Bamboo — are offered as worked examples of how a plugin is written.
+Anything else users write freely, and there is no official registry.
+
+**What that buys:**
+- the manner of writing a plugin is shown by example
+- the burden of official review is avoided
+- users can read a reference implementation and write their own
+- the core team stays on the core
+
+### 4.10 Namespace Convention
+
+Every plugin carries a namespace:
+
+```text
+Nature.雨
+Nature.風
+Bamboo.竹
+Seasons.桜
+```
+
+So that:
+- where a plugin is used is evident from the description
+- words of the same name do not collide (`Nature.雨` and `Weather.雨` stay
+  distinct)
+- Saijiki can display plugin words in categories of their own
+
+### 4.11 The Final Judgment on Freedom Is Reserved
+
+The principles above push hard toward "a plugin is limited to a macro over
+vocabulary."  **The final extent of that freedom, however, is decided by
+implementation and testing.**
+
+#### Accounting for the form "touching" (v1.90.0)
+
+- **Gained:** a closed organic contour — a leaf shape (vesica) made of two arcs
+  that touch at both ends — can be written without freezing coordinates into the
+  score, keeping the performance's sway of position and tilt.  The dilemma the
+  sketches showed, "it closes but becomes a stamp / it varies but it splits," is
+  resolved by one observable relation word.
+- **Lost:** for the first time a relation puts an exact constraint, endpoint
+  coincidence, into the space between.  The family of relations was until now
+  uniformly loose — distance ranges that the performance resolves — and that
+  uniformity is gone.  The cost is judged smaller than the expressive absence of
+  being unable to write a closed form.
+
+Questions still to be answered:
+
+- how far meaningful expression reaches with core primitives alone
+- whether limiting plugins to vocabulary macros still expresses concrete worlds
+  such as Nature or Bamboo
+- how far to relax the principle if extension needs show that macros are not
+  enough
+
+**Even when a principle is relaxed, keep an explicit line that avoids becoming
+Emacs.**  When freedom is increased, decide only after stating what that freedom
+takes away.
 
 ---
 
@@ -334,6 +524,98 @@ export tab.  Each template has a name, description, and y-axis height in pixels.
 The default templates are `PNG 1024px` and `PNG 2048px`.  The status bar PNG
 menu is generated from these templates, and export width is computed from the
 current canvas aspect ratio.
+
+---
+
+## 8. The Cost of Choosing and the Balance of Making
+
+### 8.1 The Problem
+
+"For most people, choosing is a cost" — and yet "making is a succession of
+choices."  How does DDL hold that balance?
+
+### 8.2 The Approach
+
+**Axis 1: the grain of a choice**
+- what is left to the author is the **coarse choice, at the level of intent**
+- fine choices (parameters) are left to the LLM and to sway
+
+**Axis 2: the timing of a choice**
+- minimize the choices made in advance (writing the description)
+- put the weight on the choices made afterwards (picking among several outputs)
+- a choice that has something to compare against is cheap
+
+### 8.3 What That Implies for the Design
+
+Once the description is written, several options are generated at once, and the
+author picks one, rewrites the description, or regenerates.  The cost drops from
+"make something out of a blank page" to "look at what is laid out."
+
+### 8.4 Making the Afterwards Choice Concrete: Two Stages of Regeneration (v1.52)
+
+Regeneration splits into two stages.  Neither breaks the default determinism,
+and both change only on an explicit action.
+
+| Stage | Name | What changes | Cost |
+|---|---|---|---|
+| Performance | Another performance | region, relation, and placement phase as resolved by the performance seed (§13.8 / §14.4) | no LLM call (re-render only) |
+| Composition | Another composition | composition family, focus, and technique candidates as chosen by Stage 1.5's selection seed, `vary` (§12.11) | one Stage 2 call (Stage 1 is cached; the instructions do not change) |
+
+`vary` does not break the identity of the description — what changes is the
+selection, not the interpretation (Stage 1's instructions).  The same
+description with the same `vary` value and the same performance seed reproduces
+the same output, which is what makes a work replayable from history.
+
+These two stages are the substance of §8.2's "put the weight on the choices made
+afterwards."  A generator with wide dispersion also produces more misses, but a
+miss is handled by the human act of choosing among what is laid out, not by a
+governor that averages it away beforehand.  Choosing is part of making, standing
+beside the refining of the description.  The final judgment of quality belongs
+to this afterwards choice as well: the judge metric is a reference value for
+regression detection, never an acceptance gate.
+
+**Labels in the UI.**  This specification and the internal design keep the
+musical figure — description, score, performance.  The main action buttons
+replace those figures with plain operational words, so that someone touching the
+app for the first time can predict what a button does: performance is shown as
+touch, composition as layout, and interpretation as reading.  How the Refine tab
+realizes this — the five refinement kinds, model comparison, language
+comparison, and the Lineage card menu — is in "Web Application" above.
+
+---
+
+## 9. The Design of the First Stroke
+
+### 9.1 Requirements
+
+- an inspiration can become the first stroke
+- that stroke produces feedback satisfying enough to continue
+- chance is not too high, completion does not go too far, and yet it is not mere
+  tracing
+
+### 9.2 Where the Needle Sits
+
+```text
+chance too high      ->  the author's intent is invisible  ->  motivation goes
+completing too much  ->  it does not feel self-made        ->  no meaning in it
+mere tracing         ->  DDL was not needed for this       ->  no meaning in it
+```
+
+The needle sits right when **the words the author wrote are realized a little
+more intelligently than expected**.  That "a little" is what makes the next line
+worth writing.
+
+To support a tanka-like brevity, the writing surface carries only a non-blocking
+length hint.  Japanese input uses roughly 31 characters as a guide; English input
+uses roughly 12 words.  Input is never blocked.  The UI shows no copy that
+denies a long description and no evaluative display — only a numeric counter and
+a faint change in density, so the form is quietly present without scolding the
+writer.
+
+### 9.3 The First Line
+
+Not "what to draw" but "what is on your mind."  The LLM draws the work out of
+that.
 
 ---
 

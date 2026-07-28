@@ -488,10 +488,20 @@
 		cursor: not-allowed;
 		opacity: 0.5;
 	}
+	/* Same shell as the main paint button (no ▶ mark: footer buttons carry none). */
 	.ddled-draw {
-		background: var(--accent);
-		color: var(--accent-fg);
-		border-color: var(--accent);
+		background: var(--action-bg);
+		color: var(--action-fg);
+		border-color: var(--action-bg);
+	}
+	.ddled-draw:hover:not(:disabled) {
+		background: var(--action-hover);
+		border-color: var(--action-hover);
+	}
+	.ddled-draw:disabled {
+		background: var(--action-disabled-bg);
+		color: var(--action-disabled-fg);
+		border-color: var(--action-disabled-bg);
 	}
 	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }
 	.ddled-cancel:hover:not(:disabled) {

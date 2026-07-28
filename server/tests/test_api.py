@@ -412,13 +412,21 @@ def test_current_user_theme_can_be_updated(auth_context):
     assert me.status_code == 200
     assert me.json()["ui_theme"] == "dark"
 
-    updated = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "dark"})
+    # The patch has to ask for the theme the default is *not*, or the assertion
+    # holds whether or not the write happened. Build 744 made dark the default
+    # and left this test patching dark onto dark, which passed with the store
+    # commented out.
+    updated = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "light"})
     assert updated.status_code == 200
-    assert updated.json()["ui_theme"] == "dark"
+    assert updated.json()["ui_theme"] == "light"
 
     me_again = client.get("/api/auth/me", headers=headers)
     assert me_again.status_code == 200
-    assert me_again.json()["ui_theme"] == "dark"
+    assert me_again.json()["ui_theme"] == "light"
+
+    back = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "dark"})
+    assert back.status_code == 200
+    assert back.json()["ui_theme"] == "dark"
 
     invalid = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "sepia"})
     assert invalid.status_code == 400

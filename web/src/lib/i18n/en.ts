@@ -195,7 +195,7 @@ export const en: LangPack = {
 	tooltipAppRailLogo: 'About inku-lang',
 	tooltipAppRailUser: 'User profile / Logout',
 	tooltipAppRailSettings: 'Open settings',
-	tooltipAppRailTheme: 'Toggle light / dark theme',
+	tooltipAppRailTheme: 'Toggle dark / light theme',
 	tooltipAppRailLang: 'Switch display language',
 	tooltipInputCatalog: 'Select color catalog',
 	tooltipInputLang: 'Text input language detection',

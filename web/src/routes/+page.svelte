@@ -473,7 +473,7 @@
 	let settingsTab  = $state<SettingsTab>('connection');
 	let pngMenuOpen  = $state(false);
 	let userMenuOpen = $state(false);
-	let darkMode     = $state(false);
+	let darkMode     = $state(true);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
 	let canvasAspectEnabled = $state(true);
@@ -848,7 +848,9 @@
 	}
 
 	function applyUserTheme(user: UserItem | null) {
-		darkMode = user?.ui_theme === 'dark';
+		// No stored preference (signed out, or a row without one) follows the
+		// release default rather than falling back to light.
+		darkMode = (user?.ui_theme ?? 'dark') === 'dark';
 	}
 
 	function modelsFor(provider: Provider) {

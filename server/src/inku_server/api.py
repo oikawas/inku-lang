@@ -1342,7 +1342,7 @@ class UserAccountItem(BaseModel):
     role_label: str
     group_id: str | None = None
     group_name: str | None = None
-    ui_theme: str = "light"
+    ui_theme: str = "dark"
     settings_tab: str = "db"
     model_settings: dict = Field(default_factory=dict)
     image_generation_count: int = 0

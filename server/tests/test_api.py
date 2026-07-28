@@ -410,7 +410,7 @@ def test_current_user_theme_can_be_updated(auth_context):
 
     me = client.get("/api/auth/me", headers=headers)
     assert me.status_code == 200
-    assert me.json()["ui_theme"] == "light"
+    assert me.json()["ui_theme"] == "dark"
 
     updated = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "dark"})
     assert updated.status_code == 200

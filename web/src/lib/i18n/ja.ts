@@ -195,7 +195,7 @@ export const ja: LangPack = {
 	tooltipAppRailLogo: 'inku-lang について',
 	tooltipAppRailUser: 'ユーザープロフィール / ログアウト',
 	tooltipAppRailSettings: '設定を開く',
-	tooltipAppRailTheme: 'ライトモード / ダークモードの切り替え',
+	tooltipAppRailTheme: 'ダークモード / ライトモードの切り替え',
 	tooltipAppRailLang: '表示言語の切り替え',
 	tooltipInputCatalog: '色カタログの選択',
 	tooltipInputLang: '入力テキストの判定言語 (自動/日/英)',

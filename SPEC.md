@@ -740,6 +740,13 @@ operational rather than conceptual and has no Japanese counterpart: under the
 2026-07-28 ruling, Japanese is canonical for the concepts and English carries the
 operations.
 
+Short English tabs, buttons, and labels follow the casing and vocabulary rules
+in `web/src/lib/i18n/GLOSSARY.md`, which is canonical for the English interface
+and is enforced by `npm run lint:i18n` (v2.7.1).  At iPad-class widths the
+Canvas tabs and the displayed Models / Color / Canvas / creation metadata wrap
+into two rows, and the left panel scales with the viewport rather than clipping
+the work metadata.
+
 The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (§12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
@@ -2864,76 +2871,6 @@ Build 558 implements this boundary and the UI-language fallback. Adopted compari
 Build 559 adds the effective Stage 1 and Stage 2 languages to Provenance / Details. Normal works show their shared resolved language, while adopted language comparisons show the per-stage values recorded in lineage metadata.
 
 Build 560 aligns Provenance / JSON with Details by adding per-stage instruction languages, render/layout/interpretation seeds, description hash, elapsed time, input/output token counts, and derivation kind/metadata at the top level. The JSON Score, API and database schemas, and canonical render-hash payload remain unchanged.
-
-### v1.85 Operational safety, complete CLI access, and containers
-
-The existing non-container development setup remains supported. A root Compose configuration additionally runs a non-root FastAPI container, a production SvelteKit Node container, and a persistent data volume. The Web service proxies only same-origin API requests to the internal API service.
-
-The server enforces a configurable request-body limit, per-user/IP login rate limiting, renderer concurrency, explicit additional CORS origins, and sanitized unexpected errors. SQLite foreign keys are enabled on every connection. Work, lineage node, and lineage edge writes remain atomic; permanent deletion is limited to trash and preserves content-free lineage tombstones.
-
-Save endpoints accept a per-user Idempotency-Key. A retry with the same key returns the existing work without duplicating history, lineage nodes or edges, or generation counts. User-management scope is also enforced inside update and delete transactions. Group leads can manage only regular users in their own group, and no history, lineage root, or count crosses user scope. External identity providers remain future work and must preserve the current session, role, and scope boundary.
-
-History lineage groups, item positions, and focused ancestor/descendant graphs use paginated or recursive database queries. Similarity ranking loads score candidates without hydrating every SVG and restores only the selected works. The UI aborts stale group requests.
-
-inku-cli always provides help. Its api command supports GET, POST, PUT, PATCH, DELETE, query parameters, JSON body/file input, headers, and binary output, restricted to /api/... and /health on the configured server. It therefore exposes every public API under the same authentication and role permissions as the GUI.
-Dedicated commands (`lineage`, `refine`, `inspect`, `review`) are added to inku-cli to fully support autonomous testing and quality improvement workflows driven by an AI agent (generating touch/layout/reading/color variations, evaluating visual aesthetics via Vision NIM, traversing the lineage tree, and submitting unread words). A dedicated guide (`cli-reference-for-ai.md`) is provided to outline standard testing procedures for AI agents.
-
-Short English tabs, buttons, and labels follow the casing and vocabulary rules in `web/src/lib/i18n/GLOSSARY.md`, which is canonical for the English interface and is enforced by `npm run lint:i18n` (v2.7.1). At iPad-class widths the Canvas tabs and displayed Models/Color/Canvas/creation metadata wrap into two rows, and the left panel scales with the viewport rather than clipping the work metadata.
-
-JSON Score remains a strict, versioned schema so unknown fields are never silently discarded. Additive database migrations remain idempotent and do not destructively rewrite existing render hashes, description hashes, or lineage identities. Build 564 (New CLI commands and AI testing guidelines are implemented in Build 565).
-
-### v1.86 Lineage UI menu integration and autonomous refinement (2026-07-16)
-
-- Added a contextual menu trigger (`...` button) to each card in the Lineage tab, letting users execute individual actions (AI Refine, Manual Refine, and Delete) directly from the card.
-- Implemented the AI Refine modal, enabling users to enter a direction prompt, choose a generation depth (1 to 10), and select which elements (Reading, Colors, Composition, and Texture) to vary. Svelte drives an asynchronous, sequential generation loop (`paintOne` calls) in the frontend, providing real-time feedback including step progress, stage-resolved statuses, and previews of intermediate generated graphics. The lineage tree auto-refreshes to show the newly grown branch once completed.
-- Implemented the Manual Refine modal, carrying over the displayed parent DDL structure and color catalog as defaults, and allowing fast, single-generation variations by specifying a derivation kind, color catalog, or additional Saijiki/prompt.
-- Integrated individual deletion to instantly trash selected works directly from their card menu.
-- Build 565.
-
-### v1.86.1 — agy review reflection, security and performance optimization (2026-07-16)
-
-- **Authentication Toggles and Guards**: Made the Google/local authentication settings dynamic and persistent in the database (`app_settings` table) and created a configuration API endpoint. Implemented a security guard to block login attempts with `403 Forbidden` if local authentication is disabled.
-- **Robust Schema Validation**: Applied `ConfigDict(extra="forbid")` to all Pydantic schemas (e.g. `SurfaceSpec`, `CanvasSpec` models) to prevent silent discarding of unknown fields with unexpected parameters.
-- **Svelte 5 Warnings & Recursion Fixes**: Introduced a 200ms debounce to ResizeObserver state updates in `HistoryManager.svelte` to prevent layout thrashing (infinite reflow loops). Also fixed reactive state bindings in `ManualRefineModal` to avoid compile warnings about copying prop values into local state.
-- **Lineage Rendering Performance**: Replaced the expensive `getBoundingClientRect()` calls with recursive layout-pixel based offset calculations (`offsetLeft`/`offsetTop`), significantly reducing rendering overhead.
-- **WebKit Layout Coordinates Fix**: Removed the non-standard CSS `zoom` property from the lineage layout (which causes arrow offset mismatches in iPad Safari/WebKit) in favor of standard `transform: scale` and `transform-origin`.
-- **Management CLI Enhancements**: Added `user` (create, list, update, cascade delete), `group` (management), and `config` (settings status and change) admin subcommands to `inku-cli`. Built an automated script to parse parser definitions, format them, and write them directly into `cli/README.md`.
-- **i18n and Responsive Upgrades**: Migrated all hardcoded strings in AI and manual refinement modals to the shared i18n dictionary `t()`. Applied `flex-wrap: wrap` and `text-overflow: ellipsis` to the canvas metadata section, preventing layout clipping at intermediate viewport widths.
-- **Build 566**.
-
-
-
-Build 561 removes the former “Use today's word as a seed” control from the writing tab and first generation, and moves it to Refine / Adjust as “Another performance.” The entered words affect only the Renderer's deterministic performance seed, never the interpretation, DDL, JSON Score, or layout. Because the same words reproduce the same touch, this operation generates one candidate at a time. History, Provenance / JSON, and replay retain both the words and resolved seed. The first work remains the source work and never applies this word-based touch variation.
-
-Build 562 removes the duplicated instruction preview below the writing field and places the normalized-DDL heading on the same row as Saijiki, DDL edit, and automatic repair. “Another performance” moves to the end of the refinement choices; selecting it alone reveals an unlabeled input and copy explaining deterministic Seed behavior and the one-option limit. Writing-tab selectors now use action-target labels, “Canvas” and “Color catalog,” in both languages instead of showing the current values, and the canvas button no longer has a leading square icon.
-
-Build 563 orders writing-tab actions as Color catalog, Model selection, Canvas, and New, and gives the Canvas selector the same outlined styling as the other ordinary buttons. The Prompt and Interpretation (normalized DDL) headings use a clearer 12px semibold treatment without increasing their row height.
-
-Build 545 reorganizes the Canvas work facts and next-generation settings into separate groups and consolidates generation metadata into the Details / Prompts / JSON inspector. It changes only the visible height, not the content, of the Stage 1 user input and Stage 2 system prompt fields.
-
-Build 546 moves the former top-level Compare tab into Refine and presents Adjust and Model comparison as sibling subviews. Switching subviews preserves their candidates and comparison results; changing the target work clears stale comparison results.
-
-Build 547 adds a `First` button to the right of `Next` in History Manager. It jumps directly to the oldest page containing the earliest saved work and is disabled while loading or already on that page.
-
-Build 548 fixes a History Manager page-size boundary where wrapper padding was counted as usable thumbnail space, making the calculated column count one larger than the actual CSS Grid. Columns now use the Grid's rendered width and rows use the wrapper height minus vertical padding, so only fully visible rows are fetched.
-
-Build 549 aligns History Manager's bulk delete action with the lineage view: both use the same trash icon followed by the selected count. The action is disabled with no selection, while its name remains available through the tooltip and aria-label.
-
-Build 550 stops using the fixed model catalog for Demo prompt generation. Its provider and model dropdowns now follow the configured, enabled list returned by `/api/models`; empty providers are omitted, a disabled saved choice is replaced and persisted with the first enabled model, and Demo start is disabled when no enabled model exists.
-
-Build 551 fixes Demo random color catalogs updating only the paint request while leaving the visible catalog selection unchanged. Each draw now updates the UI selection, avoids the immediately previous catalog when at least two choices exist, and reconciles the selection with the catalog ID actually reported by the response.
-
-Build 552 moves the authoritative Demo catalog draw into `/api/paint` after an observed run still rendered with `Ink & Season`. The backward-compatible `random_color_catalog` flag makes the server exclude the submitted current catalog ID, choose another catalog, and carry that one ID through render metadata, the color map, Renderer, history, and response. Demo updates its UI from the returned effective ID; ordinary paint requests keep their explicit catalog behavior.
-
-Build 553 makes refinement a radio-style single intervention so every lineage edge corresponds to one kind of change, and adds color catalog as the fourth kind. Color candidates use a metadata-bearing rerender that fixes the parent's DDL, Score, seeds, and canvas, while `catalog_change` records before/after IDs. Touch, layout, and reading candidates now also inherit the displayed parent's effective catalog and canvas.
-
-Build 554 fixes stale candidates from the previous source work remaining after a saved candidate or another work becomes the explicit refinement target. History, lineage, nearby-work and previous/next selection, new generation, and DDL rendering now reset candidate and progress state, while switching Refine subviews preserves it.
-
-Build 555 unifies reset of target-owned transient UI state, including model-comparison results, reading diffs, replay errors, intermediate-lineage notices, and lineage fetch state. Model comparison uses request abortion plus a run ID, lineage fetching uses a latest-request ID, and comparison/refinement saves and replay rendering verify the target generation so delayed responses from an old work cannot populate the current one.
-
-Build 556 fixes the stacking order that placed the lineage overview above its delete confirmation, making the trash action appear unresponsive. Confirmation dialogs now occupy the top interaction layer above full-screen overlays, so deletion can be confirmed or cancelled without closing the overview.
-
----
 
 ## Autonomous Refinement Methods
 

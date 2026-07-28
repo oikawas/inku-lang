@@ -123,13 +123,7 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     # more: every new version must land in both. The backlog did not vanish --
     # it moved into the two archives below, where it is now countable.
     ("CHANGELOG.ja.md", "CHANGELOG.md", "entries", None),
-    (
-        "docs/history/changelog-v1.72-v2.4.ja.md",
-        "docs/history/changelog-v1.72-v2.4.md",
-        "entries",
-        "47 Japanese entries against 44 English: v1.85, v1.86 and v1.86.1 have "
-        "no English text (ledger I-032)",
-    ),
+    ("docs/history/changelog-v1.72-v2.4.ja.md", "docs/history/changelog-v1.72-v2.4.md", "entries", None),
     (
         "docs/history/changelog-v0.1-v1.71.ja.md",
         "docs/history/changelog-v0.1-v1.71.md",

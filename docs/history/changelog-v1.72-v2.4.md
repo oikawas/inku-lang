@@ -4,8 +4,7 @@
 The canonical Japanese archive for the same range is
 [changelog-v1.72-v2.4.ja.md](changelog-v1.72-v2.4.ja.md).
 
-This archive holds **44 entries**. The Japanese original holds 47: **v1.85, v1.86
-and v1.86.1 have no English text yet** (ledger I-032 tracks the translation).
+This archive holds **47 entries**, the same as the Japanese original.
 Everything before v1.72 exists only in Japanese, in
 [changelog-v0.1-v1.71.ja.md](changelog-v0.1-v1.71.ja.md).
 
@@ -73,6 +72,39 @@ Everything before v1.72 exists only in Japanese, in
 - Build 525.
 
 **v1.76 closure (2026-07-15):** Build 525 is the accepted v1.76 release. Successive real-browser reviews confirmed that any lineage work can become the next derivation source, parent-child paths remain traceable through generation arrows, the displayed work stays synchronized with bottom history, and History Manager selection, bulk deletion, and page sizing remain stable. Feedback was incorporated across Builds 518–525. Subsequent work, beginning with v1.80, uses this lineage contract and the separation of the four identities as its foundation.
+
+### v1.85 — Operational safety, complete CLI access, and containers (2026-07-15)
+
+- The existing non-container development setup remains supported. A root Compose configuration additionally runs a non-root FastAPI container, a production SvelteKit Node container, and a persistent data volume. The Web service proxies only same-origin API requests to the internal API service.
+- Every HTTP request body has a configurable limit; login has per-user and per-IP rate limiting; the renderer has a concurrency limit. Additional CORS origins are named explicitly through environment variables, and the body of an unexpected internal exception is logged on the server rather than returned to the client.
+- SQLite foreign keys are enabled on every connection. A work, its lineage node, and its lineage edge are written in one transaction, so a failed parent or a failed save never leaves a partial lineage. Permanent deletion is limited to works in the trash, and the lineage node becomes a content-free tombstone.
+- Save endpoints accept a per-user Idempotency-Key. A retry with the same key returns the existing work without duplicating history, lineage nodes, edges, or generation counts.
+- User- and group-management scope is enforced inside update and delete transactions as well. A group lead can manage only regular users in the same group and cannot retrieve another user's history, lineage, or counts. External identity providers remain future work; the current session, role, and scope boundary stays canonical after any such integration.
+- History lineage-group aggregation, the current position, and a focused lineage's ancestors and descendants are computed by paginated or recursive queries in the database. Similarity ranking reads only the score candidates instead of hydrating every SVG and its unused metadata, and restores only the selected works. The UI aborts group requests it no longer needs.
+- inku-cli always provides help. Beyond its dedicated commands, its `api` command handles GET, POST, PUT, PATCH, DELETE, query parameters, JSON file or body input, headers, and binary output. Paths are restricted to `/api/...` and `/health` on the configured server, so it operates every public API under the same authentication and role permissions as the GUI.
+- Dedicated commands (`lineage`, `refine`, `inspect`, `review`) let an AI drive the whole quality-improvement process from the command line: creating a starting work, comparing several models, generating refinement variants, evaluating with Vision NIM, and traversing and saving connections in the lineage tree. A dedicated reference (`cli-reference-for-ai.md`) ships with them and states the testing procedure.
+- Short English tabs, buttons, and labels are unified to Title Case. At iPad-class widths the Models, Color, Canvas, and creation metadata above the Canvas wrap into two rows and the left panel scales with the viewport, so no information is clipped.
+- JSON Score remains a strict, versioned schema and never silently discards an unknown field. Database migrations add columns and indexes idempotently and do not destructively rewrite existing render hashes, description hashes, or lineage identities.
+- Build 564 (the new commands and the AI verification procedure were completed as Build 565).
+
+### v1.86 — Lineage UI menu integration and autonomous refinement (2026-07-16)
+
+- Added a contextual menu trigger (`...` button) to each work card in the Lineage tab, letting users run individual actions — AI refine, manual refine, and delete — directly from the card.
+- Implemented the AI refine modal. The user writes a direction, chooses how many generations to evolve (1 to 10), and selects which elements to vary (reading, colors, composition, touch). The frontend drives an asynchronous sequential generation loop (successive `paintOne` calls) and feeds back progress, per-step status, and image previews of the intermediate works in real time. The tree reloads automatically when it finishes and draws the variant lineage.
+- Implemented the manual refine modal, which carries the parent work's DDL structure and color catalog over as defaults and generates a single lineage variant quickly by naming a derivation kind, a color catalog, and an additional Saijiki entry or direction.
+- Integrated individual deletion, moving a work to the trash directly from its card menu.
+- Build 565.
+
+### v1.86.1 — agy review reflection, security and performance strengthening (2026-07-16)
+
+- **Authentication toggle and guard**: the Google and local authentication settings, previously environment variables, became dynamically and persistently switchable in the database (the `app_settings` table), with a new authentication-settings API. A guard rejects a login attempt with `403 Forbidden` whenever local authentication is disabled.
+- **Schema hardening**: `ConfigDict(extra="forbid")` was applied to every Pydantic schema (`SurfaceSpec`, `CanvasSpec` and the rest), so an unknown field carrying an unexpected parameter is no longer silently ignored.
+- **Svelte 5 warnings and recursion**: a 200 ms debounce was added to the ResizeObserver state update in `HistoryManager.svelte` to prevent layout thrashing (an endless reflow). The prop-initial-value copy warning in `ManualRefineModal` was fixed with a state binding.
+- **Lineage rendering performance**: the synchronous reflow that ran `getBoundingClientRect()` on every card to draw the arrows was removed in favor of layout-pixel coordinates walked up from `offsetLeft` / `offsetTop`, substantially reducing the cost of drawing a lineage.
+- **WebKit coordinate fix**: the non-standard `zoom` property, which causes display offsets and computation bugs on iPad Safari and other WebKit browsers, was dropped in favor of standard `transform: scale`.
+- **Management CLI**: `user` (create, list, update, delete), `group` (management), and `config` (system settings) administrator subcommands were added to `inku-cli`, along with a documentation-sync script that extracts and formats help from the command definitions and updates `cli/README.md`.
+- **Localization and responsive layout**: every display string in the AI and manual refinement modals moved to the shared i18n dictionary `t()`. `flex-wrap: wrap` and `text-overflow: ellipsis` on the canvas metadata prevent the layout from breaking at intermediate and mobile widths.
+- **Build 566**.
 
 ### v1.87 — Printmaking Grammar and Vocabulary Refinement (2026-07-16)
 

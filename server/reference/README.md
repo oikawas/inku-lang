@@ -4,6 +4,11 @@ This directory freezes outputs from versioned deterministic layers so a future
 change can show exactly which cases changed. It is a development asset and is
 excluded from `git archive` source packages.
 
+> **For the render engine versions themselves, start at
+> [docs/spec/render-engine-history.md](../../docs/spec/render-engine-history.md)**, which lists
+> every version newest-first with the measured moved/unchanged counts. The sections below stay
+> here because they describe what the corpora hold, not what the versions changed.
+
 ## Layout
 
 ```text

@@ -66,9 +66,16 @@ server/out/
 # Local-only operational files
 no-git-sync/
 # docs/* rather than docs/: git cannot re-include a path under an excluded
-# directory, and docs/assets/ holds the images the READMEs publish
+# directory, and docs/assets/ holds the images the READMEs publish.
+# Re-include one directory at a time. Never widen this to !docs/*.md: docs/
+# used to hold the private operating conventions, and a broad rule would
+# publish whatever a later session drops here. Private documents now live in
+# no-git-sync/docs/ (moved 2026-07-28).
 docs/*
 !docs/assets/
+!docs/spec/
+!docs/history/
+!docs/guide/
 
 #Codex
 AGENTS.md

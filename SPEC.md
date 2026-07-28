@@ -372,19 +372,46 @@ it as JSON, and renders it as SVG.
 ```text
 description -> normalized DDL -> expanded DDL -> JSON Score -> SVG
 human          Stage 1          Stage 1.5      Stage 2       Renderer
+writes         interprets       expands        structures    draws
 ```
 
-The description remains readable by humans.  The JSON Score remains structured
-enough for machines.  The SVG is a performance.
+### 5.1 What Each Layer Does
 
-In LeWitt's terms, the normalized DDL is the instruction sheet; Stage 1 stands
-where LeWitt stood when he wrote the instructions.  inku adds one layer above
-it: the author writes a poem-like description, and the machine transcribes it
-into LeWitt-style instructions.
+- **Description**: the human layer.  Written as natural sentences in the
+  author's own language; tanka-like brevity is encouraged.  It is a poetic
+  layer standing one step above the executable specification.
+- **Normalized DDL**: the executable specification, in core vocabulary only.
+  Stage 1 transcribes it from the description (there is also an entrance for
+  writing DDL directly).
+- **JSON Score**: the score in between.  Language-independent and
+  machine-readable.
+- **SVG**: the result of the performance.  It happens once.  The description
+  stays; the output is born and lost each time.
 
-The vocabulary maps to the layers as follows.  This table matches the UI's
-vocabulary dialog (App Info, "Vocabulary & Layers") and is the single source
-of truth.
+### 5.2 What inku Adds to LeWitt
+
+LeWitt's instruction sheet was itself the concrete, executable instruction.
+What corresponds to it in inku is the **normalized DDL**, and Stage 1 stands
+where LeWitt stood when he wrote the instructions.
+
+inku adds two things to LeWitt.
+
+1. **The writer and the executor become one person.**  LeWitt kept the writer
+   (LeWitt) and the executor (the draftsman) apart.  In DDL it happens inside
+   a single person — between the author and the LLM.
+2. **An input layer one step above.**  What the author writes is not the
+   instructions (the normalized DDL) but the poem-like description a step
+   above it.  The instructions are transcribed on the author's behalf by
+   Stage 1: the author writes a poem, and the machine fair-copies it into
+   LeWitt-style instructions.
+
+What came from within returns from outside — and somewhere in that round trip
+is the moment the fog lifts.
+
+### 5.3 Vocabulary and Layers
+
+This table is the same content as the UI's vocabulary dialog (App Info,
+"Vocabulary & Layers"), and this table is the single source of truth for both.
 
 | Term (ja) | Term (en) | Layer / act |
 |---|---|---|
@@ -399,6 +426,49 @@ of truth.
 ---
 
 ## 6. The Base Language Question
+
+### 6.1 The Question
+
+What to do about DDL in Japanese, in English, and in other languages.
+
+### 6.2 The Approach (provisional)
+
+**Split the language by layer:**
+
+| Layer | Language |
+|---|---|
+| DDL text (the layer humans write) | the author's own language (Japanese, English, others) |
+| JSON Score (the layer machines read) | English keys throughout |
+| LLM (the converting layer) | multilingual understanding |
+
+### 6.3 Why the Design Is That Way
+
+The JSON is a score, not a performance.  A score may be written in an
+international notation and the performer still performs it out of their own
+cultural background.  In the same way, the description can be in the author's
+own language while the score is written in a common one.
+
+To hold the principle that a description must be in one's own words, the DDL
+text layer has to admit the author's native language.  Tanka can be written in
+English too, but for most people the fog lifts more readily in their own
+language.
+
+### 6.4 Where the Responsibility Ends (the stance as OSS)
+
+**What the author (Shinichiro Oikawa) is responsible for:**
+- the Japanese DDL (the reference implementation, as Base Language)
+- the English DDL
+
+**What is left to the community:**
+- implementations in other languages (Chinese, Korean, French, and the rest)
+- vocabulary extensions specific to a language
+
+**What is treated as fixed specification:**
+- the JSON Score uses English keys throughout (a language-independent
+  intermediate layer)
+- primitive names and field names are English
+
+### 6.5 UI Display Language and Instruction Language
 
 The UI display language and the instruction language are separate metadata.
 The writing tab does not ask users to choose a language: normal generation
@@ -428,6 +498,30 @@ third-party language such as Spanish should be added first as a new registry
 entry with prompts, expander behavior, and coerce markers, keeping JSON Score
 schema, renderer behavior, and color catalogs separate unless the new language
 demonstrably needs a core extension.
+
+### 6.6 Why Developing in Two Languages Matters
+
+Developing in Japanese and English side by side works as a device for raising
+the quality of the design.
+
+When the same concept is written in both and one of them comes out unnatural,
+that is the sign that the core's choice of words is leaning.  Only what can be
+written naturally in both stays in the core.
+
+**Examples of the judgment:**
+- 「置く」 ⇔ *place* — natural in both, so it goes into the core
+- 「佇む」 ⇔ *stand still, but with presence* — English cannot make it one
+  word, so it is treated as an extension on the Japanese side rather than as
+  core
+
+Developing in one language only lets a language-specific bias into the core
+without anyone noticing.  Having two makes the language-independent core and
+the language-specific extension separate on their own.
+
+### 6.7 The English Instruction Path
+
+This subsection is on the operational side and has no Japanese counterpart.
+It records what the English path actually does and how it was measured.
 
 Builds 403-427 extend the English instruction path beyond structural routing.
 Japanese and English now live in separate language files for Stage 1 prompts,
@@ -808,6 +902,68 @@ that.
 
 ---
 
+## 10. Quality and Error Handling
+
+### 10.1 The Errors That Actually Happen
+
+1. the tokens run too long (a problem of the input)
+2. the generated JSON has errors (a problem of the conversion)
+3. no drawing behavior can be generated for the instruction (a problem of
+   expression)
+
+All three come from **the distance between the description and the schema**.
+The further the description sits from the schema, the more interpretation the
+LLM has to supply, and the higher the chance of failure.
+
+### 10.2 The Layers of Constraint
+
+| Layer | What it does |
+|---|---|
+| Layer 1: input constraint | limit the vocabulary, grammar and length of the description |
+| Layer 2: conversion constraint | require schema adherence in the system prompt; few-shot examples |
+| Layer 3: output constraint | repair JSON errors automatically in the sanitizer |
+
+### 10.3 What Constraint Design Really Is
+
+Tighten the constraints and errors go down, but so does the freedom of
+expression.  Loosen them and expression grows richer while errors multiply.
+Designing DDL's constraints is **drawing the line between what the system
+guarantees and what is left to the LLM's sway**.
+
+### 10.4 Repair Parts Must Not Become a Fingerprint (v1.52)
+
+The stock parts that Layer 3 repair (coerce) inserts — accent shapes, arcs of
+adjacent reaction, vanishing traces — become **the system's fingerprint** if
+they repeat with fixed coordinates, fixed shapes and a high firing rate.  A
+viewer notices by the second or third work and starts looking for the same
+part in every one after that.  It reads as an insertion by the machine rather
+than as the artist's motif, and it ruins the viewing of a series.  (Confirmed
+in the three-persona review of Build 441: the arc of adjacent reaction
+appeared in the same form in 56 of 60 samples.)
+
+Repair parts carry these requirements:
+
+1. **Measure the firing rate per part in the bench and watch the ceiling.**
+   There is no floor — a floor would enforce a style (the same root as
+   §14.6-4).
+2. **Do not hard-code fixed values for shape, position or direction.**  The
+   real parameters of an inserted part are resolved from the position relative
+   to the element it refers to, from the input hash, or from the performance
+   seed.
+3. **The firing condition is limited to "the subject breaks without it."**
+   Nothing is inserted to average out a style or to lift a metric.
+
+The only ways to lower a firing rate are to narrow the firing condition and to
+resolve the fixed values.  Swapping in a different new inserted part (trading
+one fingerprint for another) and adding a new governor are both ruled out.
+
+Repair parts such as focal reactions, angular pulses, vanishing traces and
+rhythm offsets are measured by marker phrase in CLI analysis, which is how the
+firing rate is watched.  Focal adjacent reactions are limited to isolated
+visual events where omitting the reaction would weaken the subject.
+
+---
+
 ## 11. Testing and Evaluation
 
 The project evaluates quality through several layers:
@@ -1118,13 +1274,11 @@ the repair may add a small `polygon`; when repeated lines dominate, it shapes
 the existing line group with syncopated spacing, preserved negative space,
 directional fading, and slight endpoint gaps instead of increasing density.
 
-Repair parts such as focal reactions, angular pulses, vanishing traces, and
-rhythm offsets are measured by marker phrase in CLI analysis. Their firing rate
-is monitored, but no new governor or floor may force them into every sample.
-When such a part is necessary, fixed coordinates and fixed shape parameters are
-resolved from the event anchor and input hash so repeated works do not reveal a
-constant inserted component. Focal adjacent reactions are limited to isolated
-visual events where omitting the reaction would weaken the subject.
+What these repairs may and may not insert is governed by §10.4, "Repair Parts
+Must Not Become a Fingerprint": the firing rate is watched from above and never
+from below, fixed coordinates and shapes are resolved from the event anchor,
+the input hash or the performance seed, and a part fires only where leaving it
+out would break the subject.
 
 The rendering core is exposed internally through a RenderEngine contract.  A
 render engine receives JSON Score, render options, and server-owned color

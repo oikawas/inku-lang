@@ -740,7 +740,7 @@ operational rather than conceptual and has no Japanese counterpart: under the
 2026-07-28 ruling, Japanese is canonical for the concepts and English carries the
 operations.
 
-The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (`SPEC.ja.md` §12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
+The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (§12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause. Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser. Reading is one upstream intervention whose downstream layout and touch are regenerated. One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover. Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. Display rendering makes touch-seed changes visible without changing canonical composition coordinates. A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs. The caption visibility choice is persisted per user. Previous/next navigation preserves the active Adjust or Model comparison subview inside Refine and changes only its target work. Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, nearby works, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
 
@@ -1001,7 +1001,143 @@ but they do not exclude a successful work from aesthetic or structural review.
 
 ## 12. The Two-Stage Architecture
 
-### Stage 1: Interpretation
+### 12.1 Two Stages, Not One
+
+The DDL conversion pipeline uses **two stages**.  One stage is not used.
+
+```text
+the user's description
+    | stage one: interpretation
+normalized DDL (an intermediate form written only in core vocabulary)
+    | stage two: structuring
+JSON Score
+    |
+SVG
+```
+
+### 12.2 Why One Stage Is Not Used
+
+With one stage the LLM would be doing two different jobs at once.
+
+**Job 1: interpretation (semantic).**  Map the loose expressions of free
+natural language onto DDL's vocabulary space.
+
+**Job 2: structuring (syntactic).**  Emit JSON that matches the schema, with
+fields such as primitive, region, weight and variation.
+
+What the two ask for is fundamentally different:
+
+- interpretation is a **creative, associative** ability
+- structuring is a **mechanical, rule-abiding** ability
+
+Demand both at a high level in a single prompt and both come out
+half-finished.  In corner cases especially, the difficulty of the
+interpretation induces structuring errors — an LLM unsure how to interpret
+also breaks the JSON form.
+
+The existing tests likewise show that one stage cannot carry the corner cases
+through to an implementation.
+
+### 12.3 How It Fits the DDL Concept
+
+The two stages match the philosophy of DDL structurally.
+
+Fitted into the three-layer pipeline of §5:
+
+```text
+description (the author's own language, free words)
+  | stage one: interpretation
+normalized DDL (core vocabulary only)   <- where "the fog lifts"
+  | stage two: structuring
+score (JSON Score)
+  |
+performance (SVG)
+```
+
+The step from description to normalized DDL is the scene where authors are
+made to see their own intent.  A vague word — 「佇ませる」, *let it stand
+there* — is broken down into core vocabulary: *place it near the center, with
+a thin line, given a slight sway*.  Feeding that breakdown back to authors is
+what lets them see, for the first time, what they wrote.
+
+In tanka terms it is close to the feeling of having someone else read the poem
+you wrote.  The gap between their reading and your own intent is what produces
+the next description.
+
+### 12.4 The Form of Normalized DDL
+
+The form of the normalized DDL that stage one emits is decided by this policy.
+
+**Policy: keep the rhythm of natural sentences, and limit the vocabulary to
+the core.**
+
+```text
+normalized DDL (example, in the form the corpus uses):
+
+  中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。
+  (Place one thin pencil line at the center.  The line sways finely.)
+```
+
+**Options that were rejected:**
+
+| Form | Why it was rejected |
+|---|---|
+| fully natural sentences ("place a thin line, with a slight sway, near the center") | leaves room for a second *interpretation* in stage two |
+| a structured list (YAML-like) | looks like code; it takes the pleasure out of describing |
+| function-call style (`place(subject=line, position=center)`) | too close to code |
+| a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways finely" (the fixture corpus is canonical). The exception is surface and ground texture, where only the fixed phrases 「面: ...」 and 「地: ...」 are separated onto their own line |
+
+**What the adopted form does:**
+
+- keeps the rhythm of natural sentences (the readability of tanka)
+- limits the vocabulary to the core (place, thin, center, and the like)
+- writes motion words inline, separating only surface and ground texture with
+  the fixed 「面: / 地:」 phrases
+- keeps the structure of the format common between the Japanese and the
+  English version
+- **is designed on the assumption that the author will see it** (it is shown
+  in the interpretation-feedback UI)
+- names exactly one Saijiki touch on every visible line, arc or outline.  An
+  explicitly stated material is preserved; where none is stated, the touch is
+  chosen from texture and context.  A shape that is only a filled area is not
+  assigned a touch mechanically
+- selects burin and drypoint only where the input names that technique.  DDL
+  must not be left carrying touchless phrases such as "thin black line" or
+  "white horizontal line."  Dynamic few-shot selection always includes at
+  least one non-pen material example
+
+### 12.5 Splitting the Model by Stage
+
+A different model can be used for each stage.  **The current implementation
+selects a model per stage**: users and administrators set a model for Stage 1,
+Stage 2 and Vision separately (the model settings and model comparison of
+§8.4, and the llm / vision catalogs of `/api/models`).
+
+The assumption made at design time — Stage 1 a high-capability model, Stage 2
+a light one — is kept as policy:
+
+- interpretation (Stage 1) is associative and creative and needs nuance, while
+  structuring (Stage 2) has a restricted input and stays stable on a light
+  model
+- it satisfies both the principle that *the choice of model is itself a
+  creative variable* and a practical cost structure
+
+### 12.6 The Design of Stage 1 (Interpretation)
+
+**What Opus 4.7 carries:**
+
+1. read the meaning of a free description (「佇ませる」 -> *place it quietly at
+   the center*)
+2. normalize with an understanding of the bonsai sensibility and the rhythm of
+   tanka
+3. choose the most beautiful interpretation where there is ambiguity
+4. decide the degree of sway from the atmosphere of the description
+   (「ひっそりと」, *hushed*, -> a small sway)
+
+This design draws the most out of Opus's **artistic power of interpretation**.
+Reading nuance is hard for a light model, so it is left to Opus.
+
+In the implementation the stage holds to the same boundary.
 
 Stage 1 reads the user's natural-language description and produces normalized
 DDL.  Its job is semantic.  It may choose a more visually effective
@@ -1013,57 +1149,352 @@ It should not simply extract nouns.  A quiet sentence, a ceremonial sentence,
 and a turbulent sentence should lead to different density, focus, motion, and
 material choices.
 
-Every visible line, arc, or outline in normalized DDL names exactly one core
-touch. Explicit material is preserved; otherwise Stage 1 chooses from texture
-and context. A filled shape with no visible outline is not assigned a touch
-mechanically. Burin and drypoint remain literal-input-only techniques. DDL must
-not leave touchless phrases such as “thin black line” or “white horizontal
-line.” Dynamic few-shot selection always includes at least one non-pen material
-example.
+**The policy for the prompt:**
 
-Since v1.98 an empty Stage 1 output is treated as a failure rather than drawn
-from nothing. A work drawn through a Stage 1 fallback path records an
+- state the list of core vocabulary explicitly
+- share the category structure of the Saijiki
+- ask explicitly for a beautiful interpretation
+- show examples of "vague description -> normalized DDL" as few-shot examples
+
+### 12.7 The Design of Stage 2 (Structuring)
+
+**What the light model carries:**
+
+- convert normalized DDL into JSON Score mechanically
+- put schema adherence first
+- no creative judgment is needed (stage one has done it)
+
+**The policy for the prompt (the initial sketch):**
+
+```text
+You are a function that converts normalized DDL into JSON Score.
+The input contains only the following core vocabulary:
+(vocabulary block)
+Each word corresponds to the following field of the JSON Score:
+... (mapping table)
+Parse the input and emit JSON according to the schema.
+```
+
+Because the input is restricted, this prompt works as a nearly deterministic
+conversion function.  The sketch above is from design time; the vocabulary and
+the fixed-phrase relation table of the prompt in use today are derived from
+the saijiki table (v1.92).  For the values in use, see reference §1-§2.
+
+In the implementation the stage holds to the same boundary.
+
+Stage 2 converts normalized and expanded DDL into JSON Score.  Its job is
+structural, not poetic.  It must preserve DDL elements such as color, material,
+movement, arrangement path, rotation, and canvas.  If an element exists in DDL,
+Stage 2 should either encode it or fail clearly.
+
+Adjectives, motion words, and texture words modify the primitive that the DDL
+already names.  Stage 2 must not add unrequested support lines, support shapes,
+or differently colored instructions merely because the DDL says "trembling",
+"swaying", "blurring", "thick", "thin", or a similar modifier.  The server also
+applies a narrow deterministic contract guard for single-primitive DDL with
+motion or texture modifiers: it keeps only instructions matching the requested
+primitive and explicit color, drops unrequested auxiliary marks, and applies
+the missing motion as sway on the requested primitive when possible.  The
+guard is intentionally not applied to multi-motif DDL.
+
+### 12.8 Error Recovery
+
+Splitting into two stages lets error recovery be designed per stage.
+
+**Errors in stage one:**
+
+- there is a word Opus could not normalize -> the UI reports that the word
+  could not be understood
+- it is visualized as a pale color or as transparency in the interpretation
+  feedback (§7.6)
+- **it is fed back to the author and does not stop the processing**
+
+**Errors in stage two:**
+
+1. try to repair the JSON in the sanitizer (the existing Kotlin / Python
+   implementation)
+2. if it cannot be repaired, retry with a prompt that carries the error (at
+   most three times)
+3. if that still fails, fall back to Opus 4.7 (it costs more but nearly always
+   succeeds)
+
+**Added in v1.98:** an empty Stage 1 output is treated as a failure rather than
+drawn from nothing. A work drawn through a Stage 1 fallback path records an
 `interpret_fallback` reason in history and is marked in the UI. Provider-side
 failures are classified by HTTP status into model-gone, authentication,
 rate-limit, and other kinds, reported with the failing stage and the provider's
 original message (the legacy string-form error path is kept for compatibility).
 
-### Stage 1.5: Deterministic Expansion Filter
+When Stage 2 cannot return usable instructions because of timeout, empty output,
+or transient model failure, the server may produce a deterministic fallback
+Score.  This fallback is still expected to preserve the DDL's visible essentials:
+quantity, placement path, material words, scene tone, and enough shape variety
+to remain reviewable.
 
-Stage 1.5 sits between natural interpretation and strict JSON generation.  It
-is deterministic and rule-guided.  It expands sparse DDL into richer visual
-possibilities by selectively applying:
+### 12.9 Implementation Order (Back to Front)
 
-- mathematical and geometric laws
-- spatial paths and non-central focus
-- scene-tone color choices
-- music-derived structures such as counterpoint, canon, and harmonic ratios
-- painting and material techniques such as perspective, chiaroscuro, drawing,
-  pointillism, watercolor, oil-paint layering, patchwork, fresco, and sumi ink
-- abstracted natural or material forms using the current primitive vocabulary
+The policy is to **implement from the back of the pipeline forward**.
 
-The filter must be selective.  It should not pack every technique into every
-image.  It now favors composition-family selection and relation attachment over
-fixed finished recipes.  The maintained composition families include diagonal
-bands, vertical rhythm, horizontal strata, radial or concentric structures,
-one-sided focus, central stillness, retreat to the edge, and dispersal.  Focus
-points are represented as regions, not hard-coded coordinates.  Techniques such
-as counterpoint, pointillist backgrounds, perspective lines, and canon-like
-repetition should primarily become relations on existing instructions; separate
-fixed auxiliary layers are used only when relation encoding cannot carry the
-intent.
+**Step 1: build stage two first**
 
-Any line or arc introduced by Stage 1.5 must also name one context-selected
-touch. Composition-family rewrites must preserve expansion markers so the same
-DDL is not expanded twice.
+- implement the conversion from normalized DDL (input) to JSON Score (output)
+- write the input by hand at first (ten to twenty normalized-DDL examples)
+- once stage two is stable, the back half of the pipeline is settled
 
-Since v1.98 history stores the input-side DDL (the user's text or the Stage 1
-output, `ddl`) separately from the expanded DDL that Stage 2 consumes
-(`expanded_ddl`); works saved before the split keep only the expanded form.
-The explicit `focus` input added in v1.98 was retired in v2.0: the focus
-defaults to a deterministic hash choice from the DDL text and moves only as a
-variation axis (see below). The focus the expansion layer resolves is recorded
-in the response and in `history.focus`.
+**Step 2: build stage one**
+
+- the user's description to normalized DDL
+- design the prompt with Opus 4.7
+- connect it to stage two
+
+**Step 3: UI, interpretation feedback, finishing**
+
+- show the output of both stages in the web UI
+- implement the interpretation feedback
+- prepare a collection of sample descriptions
+
+**Why back to front.**  Debugging stage one is hard while stage two is
+unstable.  Building from the input side leaves you at the mercy of instability
+on the output side.  Settling the downstream first lets each stage be debugged
+independently.
+
+### 12.10 Handling Latency
+
+Two stages double the latency.  Against that:
+
+**Measure A: show the UI in stages.**  Show the result of stage one — the
+normalized DDL — in the UI first.  The user reads the normalized DDL while
+waiting for stage two, the drawing, to finish.  The felt latency drops.
+
+**Measure B: cache.**  On the assumption that the same description produces
+the same normalized DDL, cache the result of stage one.  Sway enters from
+stage two onward.
+
+The cache must not kill the one-time nature of the output (§13.2, role 2).
+Macro sway — composition and placement — is realized by the renderer
+resolving, at performance time, the relations and regions written in the JSON
+Score (§13.8 / §14.4).  A Stage 1 cache and "a different performance every
+time from the same description" therefore hold together.  The cache is not a
+reason to give up macro diversity.
+
+Measure A was implemented in v1.98 as `POST /api/paint/stream` (NDJSON).  When
+the interpretation completes it emits a `stage1` event (normalized DDL, the
+model used, token count, elapsed time, and whether a fallback occurred), and
+the final `done` event returns the usual `PaintResponse`.  The existing
+`/api/paint` is a wrapper consuming the same logic and its response shape is
+unchanged, so the CLI and Android needed no modification.
+
+**Measure C: parallelism (later).**  When generating several options, run
+stage two in parallel.
+
+### 12.11 The Intermediate Filter (Stage 1.5)
+
+v1.19 introduces a deterministic intermediate filter between stage one
+(interpretation) and stage two (structuring).
+
+```text
+the user's description
+    | Stage 1: interpretation
+normalized DDL
+    | Stage 1.5: the intermediate filter
+expanded normalized DDL
+    | Stage 2: structuring
+JSON Score
+    | Renderer
+SVG
+```
+
+The intermediate filter is not an LLM but a deterministic DDL converter.  Its
+purpose is to expand what Stage 1 extracted, without breaking that intent,
+into an input from which Stage 2 can more easily produce several supports,
+layers and structures.
+
+It does not, however, pack every technique in every time.  It builds a
+deterministic seed from the input DDL and selects only a few layers out of the
+mathematical, musical and painterly candidates.  The same input gets the same
+expansion, while a different input changes which path, which part and which
+focus are chosen.
+
+What the filter draws from is: mathematical and geometric laws; spatial paths
+and a non-central focus; color choices in the tone of the scene;
+music-derived structures such as counterpoint, canon and harmonic ratios;
+painting and material techniques such as perspective, chiaroscuro, drawing,
+pointillism, watercolor, oil-paint layering, patchwork, fresco and sumi ink;
+and natural or material forms abstracted through the current primitive
+vocabulary.  The mathematical, musical and painterly groups are set out below.
+
+**The selection seed and vary (v1.52).**  The selection seed is built from the
+input alone by default, so "the same input gets the same expansion" holds as
+the default.  Only when the user explicitly asks to vary — the "another
+composition" regeneration button — is a vary counter mixed into the seed and
+the choice of composition family, focus and technique made again (§8.4).
+Varying does not change Stage 1's interpretation, the normalized DDL.  Implicit
+non-determinism through auto-increment or a clock seed is prohibited: the
+default is always deterministic, and non-determinism belongs only to the user's
+explicit operation and to the renderer's performance (§13.8).
+
+**The design policy**
+
+- treat Stage 1's normalized result as canonical and never overwrite its
+  meaning
+- treat "random" as a forbidden word, always replaced by an explicit placement
+- land anything added on the lines, circles, ellipses, squares, arcs,
+  arrangements and sways the existing JSON Score schema can express
+- treat mathematical, musical and painterly techniques as drawable structures,
+  materials and procedures — not as the name of a school or as an atmosphere
+- apply techniques selectively; never put every candidate into one drawing
+- name one context-selected touch on any line or arc Stage 1.5 newly adds; an
+  added phrase must never be returned to a state with no material
+- preserve the expansion markers after a composition-family rewrite of focus
+  and path, so the same DDL is not expanded twice
+- let what changes per work be "which path, which part, which detail is
+  brought into focus" rather than "which law it approaches"
+- 「中心」 and 「中央」 are not necessarily the center of the canvas
+  coordinates.  Stage 1.5 replaces them with a dynamic focus per input (upper
+  right, lower left, toward the top edge, and so on), deciding the pictorial
+  center per work
+- keep several composition families and choose one from the input: diagonal
+  bands, vertical rhythm, horizontal strata, radial or concentric, one-sided
+  focus, central stillness, retreat to the edge, dispersal.  Do not
+  permanently favor particular families such as diagonal or one-sided focus
+- when one composition family takes the majority within a bench set, treat it
+  as a bias in the selection weights and make it an object of inspection (for
+  the acceptance criteria see codex-task.md / tune_bench)
+- keep the focus candidates — golden ratio, rule of thirds, silver ratio — as
+  regions rather than fixed coordinates (for example an upper-right focus is
+  x in [0.56, 0.68], y in [0.32, 0.44]) and resolve within the region at
+  performance time.  Do not hard-code focus coordinates
+- treat the expanded DDL after the intermediate filter as the response of
+  `/api/paint`, as history, and as the input to Stage 2
+- store the input-side DDL (the user's text or the Stage 1 output, `ddl`)
+  separately in history from the expanded DDL that Stage 2 consumes
+  (`expanded_ddl`).  Works saved before the v1.98 split keep only the expanded
+  form and the input side cannot be recovered
+- the explicit `focus` input added in v1.98 was retired in v2.0.  The focus
+  defaults to a deterministic hash choice from the DDL text and moves only as
+  the focus axis of variation (§12.13).  The focus the expansion layer
+  resolves is recorded in the response and in `history.focus`, and is used to
+  recompute and reproduce `moved_axes`
+
+**Mathematical and geometric expansion**
+
+The intermediate filter weaves mathematical and geometric laws, from any place
+and period, into the normalized DDL as added layers.
+
+- the golden-ratio position: upper right is `[0.618, 0.382]`
+- the intersections of thirds: upper left is `[0.333, 0.333]`
+- the silver-ratio position: lower left is `[0.414, 0.586]`
+- the vertices of a regular pentagon: `count=5`, `layout=radial`
+- Fibonacci-like quantities: `13`, `21`, `34` kept as explicit counts
+- radial placement, concentric circles, diagonals, undulating paths
+
+These express beauty as a count, a coordinate, a repetition and an angle
+rather than instructing it with a subjective word.
+
+**Expansion from musical technique**
+
+Techniques used in music are treated visually as repetition, displacement,
+ratio and opposition.
+
+- contrary motion in counterpoint: a layer of diagonals running against the
+  main direction
+- the harmonic series: layers of radial arcs and circles that suggest integer
+  ratios
+- canon: a repetition of the same form displaced sideways a little at a time
+
+Musical terms themselves do not become core vocabulary; the intermediate
+filter expands them into the existing DDL vocabulary.
+
+**Expansion from painterly technique**
+
+Painting is treated not as a school but as material and technical evolution.
+
+- one-point perspective: guide lines converging on the center
+- perspective: repeated horizontals that show depth
+- light and shade: layers of black, gray and white values
+- drawing: thin-brush or pencil-like underlines and guide lines
+- pointillism: many small circles scattered as points
+- oil paint: short, thickly laid strokes of a broad brush
+- watercolor: overlapping ellipses and circles that bleed
+- patchwork: repetition of colored squares
+- fresco: chalk and gray ground lines
+- sumi ink: black and gray brush lines, bleeding, gradation
+
+All of these are expressed so that they can be converted into existing JSON
+Score fields (`primitive`, `weight`, `variation`, `arrangement`,
+`color_cycle`, and the rest).  Paths such as an undulating trajectory, a
+diagonal band, top-to-bottom, or the right half are kept as
+`arrangement.path`, which the renderer expands into a stable placement.
+
+**The shift in role at v1.51.**  The mathematical, musical and painterly
+techniques above used to be implemented as the injection of finished recipes —
+layers with fixed coordinates and fixed primitives — and that invited the
+repetition of the same auxiliary layer, such as the diagonals of contrapuntal
+contrary motion.  Since then Stage 1.5 expresses a technique first as **the
+attachment of a relation predicate to an existing instruction**, and adds an
+independent fixed layer only where a relation cannot carry the intent (§14.5).
+
+**An example**
+
+The normalized DDL that comes in:
+
+```text
+背景を白で埋める。赤い小さな円を画面全体に点々と十二個散らす。白い細筆の細い線を水平に三本引く。
+```
+
+An expansion after the intermediate filter:
+
+```text
+背景を白で埋める。
+赤い小さな円を画面全体に点々と十二個散らす。
+白い細筆の細い線を水平に三本引く。
+赤い小さな円を正五角形の頂点に五個並べる。
+赤い小さな円を放射状に十三個並べる。細かく震える。
+赤い小さな円を波打つ軌跡に沿って二十一個散らす。ゆっくり揺れる。
+白い細い線を対位法の反行として右下がりに三本並べる。
+白い細い線を一点透視法として中央へ向けて八本引く。
+赤い小さな円を点描として画面全体に点々と三十四個散らす。
+白い小さな円を右上の黄金比の位置に一点置く。
+```
+
+### 12.12 Staffage Level (tenkei, v1.97)
+
+Staffage — the minor accompanying elements each layer adds around the subject
+on its own — has a level the user chooses at generation time.  Like vary
+(§12.11) it is **an explicit operation by the user**, not a governor that
+thins a work out afterwards.
+
+- **Three levels**: `none`, `sparse`, and `auto` (leave it to the system, the
+  behavior as it always was).  It is not a continuous value (principle 6)
+- **A deterministic mapping onto the three layers**, switched before
+  generation: Stage 1 gets a norm sentence per level (under `none`, an input
+  made only of plugin words takes a **pure-explicit bypass** that does not
+  pass through Stage 1 at all); Stage 1.5 contracts its candidate pool
+  (`none` = nothing added, only the focus rewrite; `sparse` = one candidate);
+  and coerce gets an insertion budget for the branches that add staffage on
+  their own (`none` = 0, `sparse` = 1).  Repair, mutation, and the rescue of
+  explicitly stated content run regardless of level
+- **Saved per work and inherited along a lineage**: the level is saved to the
+  work (history), and a derived generation resolves it in the order **explicit
+  request value > inheritance from the parent work > auto**.  Because the
+  inheritance resolves on the server, a lineage keeps its level unstated
+  through refinement, autonomous refinement and the CLI, and a
+  renderer-only derivation (a touch change) does not break the chain, since
+  the resolution happens at save time.  A child work whose level was changed
+  explicitly in the refinement UI becomes the branch point for the lineage
+  that follows
+- For the measurements that ground the suppression of staffage — that any one
+  of the three layers can dominate the picture on its own — and for how each
+  branch corresponds, see CHANGELOG v1.96-v1.97.  The level is not an
+  ingredient of `rh2`, so a replay from a saved Score and seed is invariant
+  with respect to it
+
+For an input whose plugin expansion returned deterministic transcription
+instructions, the addition of finished recipes by Stage 1.5 is suppressed
+regardless of level (extending the boundary of §4.6 to what follows the
+transcription; Build 605).
+
+### 12.13 Variation (Stage 1.5, v2.0)
 
 Stage 1.5 is the application's own layer: it is deterministic, uses no LLM,
 and the author does not intervene in its individual parameters — by design
@@ -1094,30 +1525,11 @@ nondeterministic performance. The replay contract (same Score + same seed =
 same work) is untouched, since variation happens before the Score exists and
 is not an rh2 ingredient.
 
-### Stage 2: Structuring
+### 12.14 What the Renderer Owns
 
-Stage 2 converts normalized and expanded DDL into JSON Score.  Its job is
-structural, not poetic.  It must preserve DDL elements such as color, material,
-movement, arrangement path, rotation, and canvas.  If an element exists in DDL,
-Stage 2 should either encode it or fail clearly.
-
-Adjectives, motion words, and texture words modify the primitive that the DDL
-already names.  Stage 2 must not add unrequested support lines, support shapes,
-or differently colored instructions merely because the DDL says "trembling",
-"swaying", "blurring", "thick", "thin", or a similar modifier.  The server also
-applies a narrow deterministic contract guard for single-primitive DDL with
-motion or texture modifiers: it keeps only instructions matching the requested
-primitive and explicit color, drops unrequested auxiliary marks, and applies
-the missing motion as sway on the requested primitive when possible.  The
-guard is intentionally not applied to multi-motif DDL.
-
-When Stage 2 cannot return usable instructions because of timeout, empty output,
-or transient model failure, the server may produce a deterministic fallback
-Score.  This fallback is still expected to preserve the DDL's visible essentials:
-quantity, placement path, material words, scene tone, and enough shape variety
-to remain reviewable.
-
-### Renderer: Performance
+This subsection is on the operational side and has no Japanese counterpart.
+The concept of the renderer as the layer where sway is performed belongs to
+§13.8; what follows is what the implementation of that layer actually holds.
 
 The renderer converts JSON Score into SVG.  It owns visual realization:
 
@@ -1129,123 +1541,10 @@ The renderer converts JSON Score into SVG.  It owns visual realization:
 - canvas aspect handling
 
 The renderer is allowed to produce controlled sway, but it must preserve
-the JSON Score's intent.  Renderer performance has two scales: micro sway
-(line wobble, blur, grain, material texture) and macro sway (seeded
-resolution of regions and relations).  Each render may carry a `render_seed`;
-providing the same seed makes replay reproducible while leaving the canonical
-Score stable.
-
-> **The render engine versions have their own index:
-> [docs/spec/render-engine-history.md](docs/spec/render-engine-history.md).** It lists every
-> version newest-first with the measured moved/unchanged counts. The paragraphs below record the
-> bumps to 5, 6, 7, 8 and 10 as they happened, in the middle of describing the renderer; the index
-> is where to look when the question is "which version changed what".
-
-Since v1.99 sway is performed not only on lines but also on arcs and
-closed shapes (circle, ellipse, triangle, square, polygon). The gate mirrors
-the line gate: quality in {perlin, wave, white} and dimensions intersecting
-{position_x, position_y, radius} (radius being a shape's natural axis). Closed
-contours use seam-continuous periodic noise, polygonal shapes perform each edge
-with fixed corners, and arcs keep both endpoints exactly fixed so the touching
-contact contract holds. The pink (blur) and quality=none paths are unchanged.
-Because the same Score and seed now render differently for affected works, the
-render engine version was bumped to 5; saved SVGs are untouched.
-
-v2.0.5 gave wave-quality sway a performance-seed-derived phase (it was a
-fixed-phase sine before, so the waveform never changed across seeds). The phase
-is derived deterministically from the seed; closure of closed contours at
-integer frequencies, exact arc endpoints, and fixed polygon corners are all
-preserved. Material outlines (pencil / crayon / chalk contours and specks) now
-also follow the performance seed. With no performance seed the output stays
-byte-identical to the previous behavior. Because the same Score and seed render
-differently, the render engine version was bumped to 6.
-
-v2.1.0 replaced absolute pixel values throughout rendering with proportional
-systems. The amplitude vocabulary (fine / medium / broad) changed meaning from
-absolute pixels on a 1000px canvas (7 / 12 / 30px) to **ratios of a shape's
-representative size** (0.025 / 0.08 / 0.18): radius for circle / polygon / arc,
-geometric mean of the radii for ellipse, half the short side for square /
-triangle / cloudform, and line length for line. Small shapes now wobble finely
-and large shapes broadly. Bleed (pink) stdDeviation was ratioed the same way
-(0.009 / 0.03 / 0.07). Contour segment counts and stroke sample counts changed
-from fixed values (80 / 49) to length-proportional with clamps. The material
-layer (stroke widths, dasharrays, texture filters, material outlines, specks)
-and the display filter became `canvas.unit`-relative, matching previous output
-at `unit=1000` except for perimeter-proportional speck counts and
-length-proportional stroke samples. Author calibration also raised material
-outline and speck strength via floors (intensity level s1: floors on outline
-offset / opacity and speck opacity / count; texture filters unchanged).
-Material outlines now carry `class="material-outline"` so they can be
-mechanically distinguished from primary lines. Because the same Score and seed
-render differently, the render engine version was bumped to 7.
-
-v2.2.0 draws closed-shape contours (circle / ellipse / square / triangle /
-polygon) with hand strokes from the stroke engine. `synthesize_along` extends
-stroke synthesis to arbitrary centerlines (same tool grammar as lines, only the
-target path changes; the integrator feed-forwards the intended step and leaves
-only the residual to the spring, eliminating radial distortion on curved
-paths). The contour is drawn as a filled band of outer and inner banks
-(`class="contour-stroke-v1"`, fill-rule evenodd). Corners are pinned to their
-ideal positions as brush seams; cornerless closed contours close their seam
-with a linear ramp. All hand-drawn weights participate; rotring keeps its
-geometric contour. The band's centerline is the contour after sway is
-performed, and material outlines and specks coexist with the band. Dashed and
-dotted styles keep a thinned geometric contour since the line style itself is
-the description. Body elements stay geometric (with `stroke="none"` for solid
-style), so bbox and touching contracts are unchanged. Line and arc output is
-byte-identical to v2.1 (arc stroke-ization awaits a redesign of the touching
-test's arc extractor in a follow-up contract). Because the same Score and seed
-render differently, the render engine version was bumped to 8.
-
-v2.3.0 replaces the area fill of closed shapes with **stroke fill — the
-material's brushwork filling the interior** — and restores the semantics of
-`filled` (`True` = fill the interior with material strokes / `False` = contour
-only; previously closed shapes were always filled regardless of `filled`, a
-dead field). Fill strokes are built by intersecting scanlines with the closed
-contour and passing each interior span — one span = one brush stroke — through
-`synthesize_along` (no clipPath needed; concave cloudforms are handled as
-intersection pairs, and endpoints are pulled half a stroke-width inside the
-intersections so edges align with the contour). The group carries
-`class="fill-stroke-v1"`. The scan angle derives from the render seed (uniform
-over 0–180°) so it differs per shape; spacing is `max(stroke width × 1.5,
-canvas.unit × 0.012)` with ±12% jitter per scanline. Full coverage is not the
-goal — paper grain (gaps) remains. Rotring keeps area fill (`True` = solid
-fill / `False` = contour only), and tiny shapes with fewer than three
-scanlines degrade to area fill. When `surface` is specified the material fill
-is suppressed (fill = the material's default way of covering; `surface` = an
-explicit printmaking expression). Surface hatch / crosshatch lines also moved
-from geometric lines to brushwork bands (`class="surface-stroke-v1"`;
-centerline, angle, spacing, and count unchanged; rotring keeps geometric
-lines). Sways that are not performed are now excluded from the seed key,
-so the presence of an inactive sway no longer changes the rendered bytes
-(per-primitive inactivity rules; for cloudform only `dimensions` is inactive
-since its contour generator always consumes quality / amplitude / frequency).
-Because the same Score and seed render differently, the render engine version
-was bumped to 9.
-
-v2.3.1 performs arcs as hand-drawn stroke bands too (`class="arc-stroke-v1"`),
-closing the last exclusion left by v2.2.0. All hand-drawn weights participate;
-rotring and non-hand-drawn weights keep the geometric arc. The band's
-centerline is the arc after sway is performed, with both endpoints pinned
-to their intended values. **The geometric arc remains as an invisible intent
-element (`stroke="none"`)**: the touching (contact) contract is verified by
-reading this intent arc back from the rendered SVG, so the arc extractor needs
-no change (the band is a filled `M..L..Z` polygon with no arc command, so
-nothing is double-counted). **Contact ends stay tapered**: the stroke
-synthesis envelope converges to zero at both ends, and since the intent arc
-guarantees the contact contract by coordinates, the band may fade out at
-contact points just like free ends (leaf tips and bases fade softly). Dashed
-and dotted styles make the intent arc itself visible as a thin dashed / dotted
-line (the line style is the description, symmetric with lines and closed
-shapes). Drypoint emits burr along the performed centerline, and material
-outlines and specks coexist with the band. Because the same Score and seed
-render differently, the render engine version was bumped to 10.
-
-For literal `layout="grid"` tiling, performance composes three controlled layers: a deterministic seed-derived within-cell position jitter, the existing per-element `variation` with a distinct phase for every mark, and the existing material behavior of weights such as pencil, brush, and chalk. The same Score and render seed remain bit-identical. Because full-field repetition is explicit author intent, grid bypasses scatter-oriented bias, fade, clustering, preserved-space injection, and representative count reduction.
-
-inku exposes this as the first half of two-step regeneration: **another
-performance** rerenders the same JSON Score with a new explicit performance
-seed. It does not call an LLM and does not change the interpretation or Score.
+the JSON Score's intent.  Each render may carry a `render_seed`; providing the
+same seed makes replay reproducible while leaving the canonical Score stable.
+The two scales of the performance, and the version history of the render
+engine, are in §13.8 and §13.11.
 
 Human, face, animal, and group motifs are not drawn as literal objects.  Stage 2
 and the coercion layer convert them into `Score.presence`: presence kind,
@@ -1279,14 +1578,6 @@ Must Not Become a Fingerprint": the firing rate is watched from above and never
 from below, fixed coordinates and shapes are resolved from the event anchor,
 the input hash or the performance seed, and a part fires only where leaving it
 out would break the subject.
-
-The rendering core is exposed internally through a RenderEngine contract.  A
-render engine receives JSON Score, render options, and server-owned color
-metadata, then returns SVG plus render metadata.  The current `renderer.py`
-implementation is wrapped as the static `default` engine.  inku does not load
-arbitrary external engine code yet; this boundary exists so future engine packs
-can be introduced without changing the API, history, JSON tab, CLI, or
-benchmark metadata contracts.
 
 SVG export has three profiles:
 
@@ -2651,7 +2942,7 @@ Lineage's autonomous refinement is a bounded run of 1–10 generations whose fin
 - `Random automatic refinement` randomly chooses each generation's variation kind from the enabled reading, color-catalog, layout, touch, and variation elements. It does not use Vision. Because the direction text only reaches the drawing text of reading generations, the random-method UI states that condition explicitly.
 - `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed variation kind; that advice becomes input to the next generation.
 
-Either method may include variation (`SPEC.ja.md` §12.13) among the enabled refinement elements (up to five). Only while variation is enabled, an amplitude choice (small/medium/large, default medium) is shown; the chosen amplitude applies to every variation generation in the run, and seeds are server-issued.
+Either method may include variation (§12.13) among the enabled refinement elements (up to five). Only while variation is enabled, an amplitude choice (small/medium/large, default medium) is shown; the chosen amplitude applies to every variation generation in the run, and seeds are server-issued.
 
 The Vision method is a finite advisory loop, not quality optimization or automatic acceptance. Vision must not score, rank, accept, reject, praise, condemn, or discard a generated work. Intermediate generations remain `lineage_only`, the final generation enters regular history, and all generations remain in lineage. Derivation metadata records the method, Vision model, observation, and next direction, while the modal shows the latest advice. The model may be changed between runs but remains fixed during one run. Only the human may save, promote, star, or finally choose a work.
 

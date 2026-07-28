@@ -590,3 +590,69 @@ Every deterministic check is green: server **1424 passed / 31 skipped**, ruff, c
 - **Before believing a statement that no English version exists, grep the other documents.** The English text of v1.85, v1.86 and v1.86.1 **was in `SPEC.md` under Accounting for Refinement, where the Japanese SPEC had no such subsections** — the two languages were filing the same records in different places. **The GLOSSARY and `lint:i18n` policy buried inside v1.85 was the only statement of it in either SPEC**, so it moved to 7.8 rather than down into an archive entry
 
 **Japanese barely moved outside the READMEs** (`SPEC.ja.md` did not change by a single line through stage 4c). **Two declared differences remain**: English sections 15 and 17 are deliberately not written, and the operational sections from 18 onward stand in English alone. **`check_docs.py` green, server 1487 passed / 31 skipped, cli 76 passed, ruff green.**
+
+### v2.9.3 — a surface becomes a mark, and thinness becomes an axis (render engine 16) (Build 754, 2026-07-29)
+
+**The drawing version goes from 15 to 16.** Three changes are gathered into one version — they belong to the same layer, and raising it three times would make Android follow three times. All stages of ledger I-001.
+
+**333 of the corpus's 365 cases moved; 32 are unchanged. All 32 are `rotring` and `computer`**, which after engine 12's twelve and engine 15's thirty-two means **the same side has stood still for three versions running**. Their grammar is zero throughout and consumes no seed, so **an axis that changes the hand cannot reach a tool that has no hand**.
+
+#### A surface is performed, not filled in
+
+**Six of the eight touch words scattered circles by a uniform random over the shape's bounding box. They never once saw the shape they belonged to.**
+
+| Shape | Grains falling outside the shape (engine 15) | engine 16 |
+|---|---|---|
+| triangle | **46 / 90 (51%)** | **0** |
+| cloudform | **43 / 90 (48%)** | **0** |
+| polygon | 20 / 90 (22%) | **0** |
+| circle | 12 / 90 (13%) | **0** |
+
+- **Positions are placed inside the contour, and each grain is performed as one stroke.** The scan uses the same `_scanline_segments` as `_render_fill_strokes`, so a concave shape (cloudform) needs no special case
+- **`bleed` had been one ellipse at the centre of the bounding box** — the same picture whatever the shape was. It becomes three bands pushed outward from the contour, and **the innermost ring sits on the contour itself (offset zero)**: a bleed happens on both sides of an edge, so the bands do not float away from the shape as rings
+- **`hatch` and `crosshatch` are not changed by a single byte.** In engine 15 those two already sent their centre line through `synthesize_along`; they were not scattering a surface. **That those eight cases are unchanged is what shows the change stayed closed around the six words that scattered**
+- **The same word had become two unrelated pictures, one per profile** — display emitted a rectangle carrying `feTurbulence`, `feDisplacementMap` and `feGaussianBlur`, while editable scattered circles. **Both profiles now draw by the same mechanism, and the display clipPath is gone** (`bleed` seeps outward, so the clip would erase what was drawn)
+- **Speed is 1.44× slower** (119 production works carrying a surface, in display: 56.2 s → 80.9 s), which is ninety circles replaced by ninety synthesized strokes
+
+#### A tiny fill is placed
+
+A fill too small for scan lines had **degraded into a region fill**. **The degradation was preventing a failure, not being right** — a small shape filled with a hand tool became a machine's fill in that one spot.
+
+- **It is placed as a single dab**, carried along the shape's longer axis, its width decided by the shorter one
+- **The mechanism switches where the short side is about 3% of the canvas** (measured at 2.9–3.2% across five tools and six seeds; **the switch happens once and does not go back and forth**)
+- **The carry floor of 0.90 was chosen by measurement.** At 0.30, `_edge_window` takes the width to zero over 16% at each end, so **a 10px filled circle becomes an outline with a hollow inside**. At 1.10 the dab is darker than the shape it fills (ink coverage 115%)
+- **`rotring` stays a region fill at every size** (it branches before `_uses_hand_stroke`)
+- **75.3% of production `filled` closed shapes drawn with a hand tool now take the dab** (measured over 150 works)
+
+#### Thinness becomes an axis independent of the tool's name
+
+**Thinness had been a property of the tool's name.** Asking for a thin line was asking for a different tool, and "a thin pen" could not be written. `Instruction` gains `thinness` (`fine` / `extra_fine`).
+
+| Tool | Default | `fine` | `extra_fine` |
+|---|---|---|---|
+| silverpoint | 0.5 | 0.5 | 0.5 |
+| rotring | 1.0 | 0.6 | 0.5 |
+| pencil | 1.5 | 0.9 | 0.525 |
+| pen / computer | 2.0 | 1.2 | 0.7 |
+| drypoint | 2.6 | 1.56 | 0.91 |
+| chalk / brush_thin | 3.0 | 1.8 | 1.05 |
+| burin | 3.2 | 1.92 | 1.12 |
+| crayon | 4.0 | 2.4 | 1.4 |
+| brush_thick | 8.0 | 4.8 | 2.8 |
+
+- **The floor is not a new number; it is the thinnest tool itself** (`MIN_STROKE_WIDTH = WEIGHT_TO_STROKE_WIDTH["silverpoint"]`). It reads as "no line is drawn thinner than silverpoint". **Silverpoint accepts no thinness. That is the specification, not an omission**
+- **Three candidates were drawn and measured by ink coverage.** **Rejected, 0.7 / 0.45: the thick brush's `fine` came to 99% of its default** and drawing it changed nothing. **Rejected, 0.5 / 0.25: the tools stop being distinguishable** (at `extra_fine` the eleven tools' distinct widths fall from 9 to 6 — **the thinness axis eats the tool axis**). **Taken, 0.6 / 0.35: 9 to 8**, with only silverpoint and rotring merging
+- **Thinness was carried into the material contour too.** Leaving `base_width` at the nominal value would **thin the ink alone and leave the material behind**. Only the thick brush and the crayon carry a proportional term; the rest are absolute and do not move (**a thinned pen line keeps a material band that does not thin**). **The offset was not touched**
+- **It was added to the performance seed's allowlist** (19 → 20). The consequence is that **changing thinness also changes the path the line takes, and silverpoint's width does not change while its hand does**
+- **coerce does not put it on the lines it adds.** Staffage is coerce's own voice rather than the writer's request, so **a written thinness lands only on the shapes the writer wrote**
+- **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). Stage 1 reads thinness words and writes them into the normalized DDL, but they appear neither in the vocabulary table nor in the Saijiki display
+
+#### Versions
+
+- **`render_engine_version` 15 → 16**, with the reference corpus `render-engine-16/` frozen (365 cases, 333 SVGs held)
+- **`ddl_engine_version` 1 → 2** — **the DDL layer behaves exactly as before while every instruction dump carries one more line, `"thinness": null`.** Following the rule that a frozen directory is not rewritten, `ddl-engine-2/` (29 cases) was frozen anew and `ddl-engine-1/` was not touched by a byte
+- **`ddl_version` 1 → 2** (author's ruling, 2026-07-29) — **the DDL vocabulary grew.** "An extra fine black line" is a sentence DDL could not write before. **Saved works keep `"1"`**
+
+**Verification:** server **1596 passed / 31 skipped**, cli **76 passed**, ruff green (`src tests scripts`), `check_frozen_corpora.py` **byte-identical twice in a row**, `npm run check` 0 errors / 2 warnings / 217 files, `check_docs.py` green. **At acceptance the core of each of the three stages was perturbed: returning the contour to the bounding box turns four S-3 cases red, making the thinness scale the identity turns thirteen T-1 cases red, and removing the branch into the dab turns fifteen F cases red.**
+
+**Recorded but not fixed**: **Stage 2 fills `thinness` in a measured 10%** of works, and the 96% observed at design time did not reproduce. The deterministic layers — schema, prompt, coerce, renderer — are all green, so **whether it is carried remains a question about the LLM layer** (ledger I-036). **Android is still on engine 15** (I-029; the four prompt constants' fingerprints have been re-baked, so the Kotlin side is red by design).

@@ -1697,6 +1697,10 @@ The three layers match the way bonsai is thought about:
 - the **gardener's hand** enters (motion words)
 - **the environment** (wind, season) is laid over it (plugins)
 
+**Thinness is a dimension, not a sway** (engine 16, v2.9.3). It does not belong to the layer where `weight` carries the sway inherent to a material. A tool has a thinness as its default, but thinness itself is a dimension the writer states independently, and it falls **outside the three layers** (material, motion word, Nature plugin). It has steps on the thin side only; there is no vocabulary for the thick side. `Instruction.thinness` (`fine` / `extra_fine`) carries it. **The principle gains no exception; thinness is placed outside the three layers instead.**
+
+Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). Stage 1 reads thinness words and writes them into the normalized DDL, but they appear neither in the §3.1 vocabulary table nor in the Saijiki display.
+
 #### Wild (engine 12; its reach in engine 14)
 
 **Separate from the three layers, one switch lifts the ceiling on the performance itself.** The UI calls it 暴れる — wild.

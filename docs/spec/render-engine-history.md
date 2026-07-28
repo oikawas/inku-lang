@@ -34,6 +34,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **16** | v2.9.3 | 749 / 754 | 2026-07-28 | 365 | **333** | **32** |
 | **15** | v2.7.8 (v2.7.12 folded in) | 717 / 721 | 2026-07-27 | 350 | **318** | **32** |
 | **14** | v2.7.0 | 709 | 2026-07-25 | 347 | **126** | **221** |
 | **13** | v2.6.0 | 707 | 2026-07-25 | 228 | **8** | **220** |
@@ -89,12 +90,15 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `14` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `1` | the same input and seed produce different output |
-| `ddl_version` | the DDL language itself (grammar, keywords) | `1` | grammar is added, changed, or retired |
+| `render_engine_version` | the drawing engine | `16` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `2` | the same input and seed produce different output |
+| `ddl_version` | the DDL language itself (grammar, keywords) | `2` | grammar is added, changed, or retired |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.5.0 | per release |
-| `web/BUILD_NUMBER` | build serial | 706 | **moves for UI-only changes too** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.3 | per release |
+| `web/BUILD_NUMBER` | build serial | 754 | **moves for UI-only changes too** |
+
+**The "current" column holds the values as of writing.** When a version goes up, this column is
+corrected in the same commit.
 
 **A version also rises when the performable vocabulary grows** (author's ruling,
 2026-07-25). Adding a tool or a surface moves no existing corpus case, because
@@ -355,6 +359,164 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 16 — a surface becomes a mark, and thinness becomes an axis (v2.9.3)
+
+**Three changes gathered into one version**, for the reason engine 15 gathered five: they belong to
+the same layer, and raising the version three times would make Android follow three times.
+
+- **A surface is performed, not filled in** — six of the eight touch words were circles scattered by
+  a uniform random over the bounding box
+- **A tiny fill is placed** — a fill too small to scan had degraded into a region fill
+- **Thinness becomes an axis independent of the tool's name** — `thinness` (`fine` / `extra_fine`)
+
+**333 moved, 32 unchanged. All 32 are `rotring` and `computer`.** After engine 12's twelve and
+engine 15's thirty-two, **the same side has stood still for three versions running**. Their grammar
+is zero throughout and consumes no seed, so **an axis that changes the hand cannot reach a tool that
+has no hand**. `C-tinyfill-circle-rotring` is unchanged twice over, and it is the one case in the
+manifest that carries no class at all.
+
+Detail: "What engine 16 changed" in `server/reference/README.md` /
+[CHANGELOG v2.9.3](../../CHANGELOG.md)
+
+### A surface is performed inside its own contour
+
+`stipple`, `grain`, `paper_grain`, `aquatint`, `wash` and `bleed` — six words —
+**scattered circles by a uniform random over the shape's bounding box. They never once saw the shape
+they belonged to.**
+
+| Shape | Grains falling outside the shape (engine 15) | engine 16 |
+|---|---|---|
+| triangle | **46 / 90 (51%)** | **0** |
+| cloudform | **43 / 90 (48%)** | **0** |
+| polygon | 20 / 90 (22%) | **0** |
+| circle | 12 / 90 (13%) | **0** |
+
+**Ask for grains scattered over a triangle, and half of them landed outside the triangle.**
+engine 16 places them inside the contour and performs each grain as one stroke. The scan uses the
+same `_scanline_segments` as `_render_fill_strokes`, so a concave shape (cloudform) needs no special
+case.
+
+`bleed` alone works differently. engine 15 drew **one ellipse at the centre of the bounding box** —
+the same picture whatever the shape was. engine 16 draws three bands pushed outward from the
+contour, the push varying vertex by vertex. **The innermost ring sits on the contour itself (offset
+zero)**: a bleed happens on both sides of an edge, so the bands rise from the edge instead of
+floating as rings away from the shape.
+
+`hatch` and `crosshatch` are **not changed by a single byte**. Those two already sent their centre
+line through `synthesize_along` in engine 15; they were not scattering a surface. **That those eight
+cases are unchanged is what shows this change stayed closed around the six words that scattered.**
+
+#### The same word had become two unrelated pictures, one per profile
+
+engine 15's display emitted a **rectangle** carrying `feTurbulence`, `feDisplacementMap` and
+`feGaussianBlur`, while editable scattered circles. **The one word `wash` was a different picture
+depending on where you looked at it.**
+
+engine 16 draws both profiles by the same mechanism. The profile difference that remains is the one
+every other layer has: **whether the material filter is applied**. **The display clipPath is gone
+too** — grains are drawn from inside the contour so it is unnecessary, and **`bleed` seeps outward,
+so the clip would erase what was drawn**.
+
+**Speed became 1.44× slower** (119 production works carrying a surface, redrawn in display:
+56.2 s → 80.9 s). That is ninety circles replaced by ninety synthesized strokes — the increase the
+mechanism implies.
+
+### A tiny fill is placed, not scanned
+
+When a fill was too small for scan lines, engine 15 **degraded into a region fill**. **The
+degradation was preventing a failure, not being right** — a small shape filled with a hand tool
+became a machine's fill in that one spot.
+
+engine 16 places it as a single dab: carried along the shape's longer axis, its width decided by the
+shorter one.
+
+- **The mechanism switches where the short side is about 3% of the canvas** (measured at 2.9–3.2%,
+  confirmed across five tools and six seeds; **the switch happens once and does not go back and
+  forth**)
+- **The carry floor of 0.90 was chosen by measurement.** At 0.30, `_edge_window` takes the width to
+  zero over 16% at each end, so **a 10px filled circle becomes an outline with a hollow inside**. At
+  1.10 the dab is darker than the shape it fills (ink coverage 115%)
+- **`rotring` branches before `_uses_hand_stroke`**, so it stays a region fill at every size
+
+**75.3% of production `filled` closed shapes drawn with a hand tool now take the dab** (measured over
+150 works).
+
+### Thinness is a dimension, not a sway
+
+**Thinness had been a property of the tool's name.** Asking for a thin line was asking for a
+different tool, and "a thin pen" could not be written. engine 16 puts `thinness` on `Instruction`.
+
+| Tool | Default | `fine` | `extra_fine` |
+|---|---|---|---|
+| silverpoint | 0.5 | 0.5 | 0.5 |
+| rotring | 1.0 | 0.6 | 0.5 |
+| pencil | 1.5 | 0.9 | 0.525 |
+| pen / computer | 2.0 | 1.2 | 0.7 |
+| drypoint | 2.6 | 1.56 | 0.91 |
+| chalk / brush_thin | 3.0 | 1.8 | 1.05 |
+| burin | 3.2 | 1.92 | 1.12 |
+| crayon | 4.0 | 2.4 | 1.4 |
+| brush_thick | 8.0 | 4.8 | 2.8 |
+
+**The floor is not a new number; it is the thinnest tool itself**
+(`MIN_STROKE_WIDTH = WEIGHT_TO_STROKE_WIDTH["silverpoint"]`). It reads as "no line is drawn thinner
+than silverpoint". **Silverpoint accepts no thinness. That is the specification, not an omission.**
+
+**Three candidates were drawn and measured by ink coverage.**
+
+- **Rejected, 0.7 / 0.45** — **the thick brush's `fine` came to 99% of its default**; drawing it
+  changed nothing. The thick brush's material layer is mostly an absolute width, so thinning the ink
+  alone by 30% does not move the picture
+- **Rejected, 0.5 / 0.25** — **the tools stop being distinguishable.** At `extra_fine` five tools
+  pin to the floor and **the eleven tools' distinct widths fall from 9 to 6. The thinness axis eats
+  the tool axis**
+- **Taken, 0.6 / 0.35** — at `extra_fine` the distinct widths go 9 to 8 (only silverpoint and rotring
+  merge). The thick brush's `extra_fine` is 2.8px, still wider than a pen — still a brush
+
+**Thinness was carried into the material contour too.** That width is
+`abs_width + base_width * width_ratio`, and leaving `base_width` at the nominal value would
+**thin the ink alone and leave the material behind**. Only the thick brush and the crayon carry a
+proportional term; the rest are absolute and do not move with thinness (**a thinned pen line keeps a
+material band that does not thin**). **The offset was not touched** — engine 15's "strength stops
+being distance" stands.
+
+**`thinness` was added to the performance seed's allowlist** (19 → 20), following engine 15's
+principle that a seed is built from what makes a mark another mark. **The consequence is that
+changing thinness also changes the path the line takes.** **Silverpoint's width does not change but
+its hand does** — write "a thin silverpoint line" and the picture changes without getting thinner.
+
+**coerce does not put `thinness` on the lines it adds.** Staffage is coerce's own voice rather than
+the writer's request, so **a written thinness lands only on the shapes the writer wrote**.
+
+#### Thinness is not a Saijiki word
+
+**`thinness` is a field on `Instruction`, not a word in the Saijiki table** (author's ruling,
+2026-07-29). Stage 1 reads thinness words and writes them into the normalized DDL, but they do not
+appear in the Saijiki UI or in the §3.1 vocabulary table. **There is one word here that works when
+written and cannot be found by looking.**
+
+### Version and corpus
+
+- **`render_engine_version` 15 → 16**
+- **`ddl_engine_version` 1 → 2** — `Instruction` gained `thinness`, so **the DDL layer behaves
+  exactly as before while every instruction dump carries one more line, `"thinness": null`.**
+  Following the rule that a frozen directory is not rewritten, `ddl-engine-2/` (29 cases) was frozen
+  anew and `ddl-engine-1/` was not touched by a byte. **A layer's version goes up for a change in the
+  shape of the output rather than in the behaviour.**
+- **`ddl_version` 1 → 2** (author's ruling, 2026-07-29) — **the DDL vocabulary grew.** "An extra fine
+  black line" is a sentence DDL could not write before. **Saved works keep `ddl_version` `"1"`.**
+- **Reference corpus `render-engine-16/`** — 365 cases (A 88 / B 72 / C 58 / D 28 / E 119), holding
+  the SVGs of the 333 that moved
+
+**The discriminator tests were checked by perturbing the core of each of the three stages** (at
+acceptance). Returning the contour to the bounding box turns four S-3 cases red; making the thinness
+scale the identity turns thirteen T-1 cases red; removing the branch into the dab turns fifteen F
+cases red.
+
+**Stage 2 fills `thinness` in a measured 10%** of works, and the 96% observed at design time did not
+reproduce. The deterministic layers — schema, prompt, coerce, renderer — are all green, so **whether
+it is carried remains a question about the LLM layer** (ledger I-036).
 
 ## engine 15 — remaking the seed and the mark (v2.7.8)
 

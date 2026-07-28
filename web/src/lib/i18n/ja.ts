@@ -211,7 +211,7 @@ export const ja: LangPack = {
 	tooltipStatsToggle: '解釈・描画それぞれの所要時間とトークン数を表示します',
 	tooltipInputClear: '入力をクリアする',
 	tooltipSubmit: '入力文を読み取り、配置とタッチを決めて1枚生成します。',
-	tooltipDdlPaint: '編集したDDLコードを反映し、同じ読み取りから描き直します。',
+	tooltipDdlPaint: '表示中の指示書（正規化DDL）をそのままStage 2へ渡して描き直します。Stage 1は走らないので解釈は変わりません。',
 	tooltipInputTabSingle: '自由な自然言語で記述を入力して1枚ずつ描画します',
 	tooltipInputTabBatch: '改行区切りで複数の記述を入力し、順次連続して描画します',
 	tooltipInputTabDemo: '一定時間ごとに自動でサンプルを生成し続ける自動デモモードです',

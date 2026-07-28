@@ -10,9 +10,13 @@
 		expandedDdl?: string | null;
 		label: string;
 		expandedLabel: string;
+		/** Perform the shown DDL again through Stage 2. Omitted = no button. */
+		onPaint?: (() => void) | null;
+		/** Set by the caller while a run is in flight; empty DDL disables on its own. */
+		paintDisabled?: boolean;
 	};
 
-	let { ddl, expandedDdl = null, label, expandedLabel }: Props = $props();
+	let { ddl, expandedDdl = null, label, expandedLabel, onPaint = null, paintDisabled = false }: Props = $props();
 
 	// Artworks saved before v1.98 have no input-side DDL: their single stored text
 	// is the expanded one. Show it in the main slot and rename the label so the
@@ -25,6 +29,9 @@
 	const showExpanded = $derived(!legacyExpandedOnly && !!expandedDdl && expandedDdl !== ddl);
 	const highlighted = $derived(highlightDDL(primary));
 	const expandedHighlighted = $derived(highlightDDL(expandedDdl ?? ''));
+	// The legacy branch shows an expanded DDL the caller cannot re-perform, so the
+	// button follows the input-side text the caller actually holds.
+	const paintBlocked = $derived(paintDisabled || !ddl.trim());
 	let expandedOpen = $state(false);
 </script>
 
@@ -33,6 +40,13 @@
 		<span class="ddl-viewer-label">{primaryLabel}</span>
 	</div>
 	<div class="ddl-viewer-body ddl-highlight">{@html highlighted}</div>
+	{#if onPaint}
+		<div class="ddl-viewer-actions">
+			<Tooltip placement="left" text={t().tooltipDdlPaint}>
+				<button class="ghost-btn" type="button" disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</button>
+			</Tooltip>
+		</div>
+	{/if}
 	{#if showExpanded}
 		<div class="ddl-expanded">
 			<Tooltip placement="right" text={t().tooltipDdlExpandedToggle}>
@@ -80,6 +94,24 @@
 		tab-size: 4;
 		overflow-x: auto;
 	}
+	.ddl-viewer-actions {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: -2px;
+	}
+	.ghost-btn {
+		padding: var(--btn-sm-padding);
+		border: 1px solid var(--border2);
+		border-radius: var(--btn-sm-radius);
+		background: var(--panel);
+		color: var(--fg2);
+		font-size: var(--btn-sm-font-size);
+		cursor: pointer;
+		font-family: inherit;
+		white-space: nowrap;
+	}
+	.ghost-btn:hover:not(:disabled) { background: var(--bg2); }
+	.ghost-btn:disabled { opacity: 0.38; cursor: not-allowed; }
 	.ddl-expanded {
 		display: flex;
 		flex-direction: column;

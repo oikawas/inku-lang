@@ -6167,7 +6167,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
 						<section class="panel-section">
-							<DdlViewer {ddl} {expandedDdl} label={t().ddlLabel} expandedLabel={t().ddlExpandedLabel} />
+							<DdlViewer
+								{ddl}
+								{expandedDdl}
+								label={t().ddlLabel}
+								expandedLabel={t().ddlExpandedLabel}
+								onPaint={() => { void replay(); }}
+								paintDisabled={loading || reloading || variationGridBusy}
+							/>
 						</section>
 					{/if}
 

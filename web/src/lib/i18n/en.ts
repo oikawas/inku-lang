@@ -211,7 +211,7 @@ export const en: LangPack = {
 	tooltipStatsToggle: 'Show the elapsed time and token counts for interpretation and performance.',
 	tooltipInputClear: 'Clear text input',
 	tooltipSubmit: 'Reads your description, chooses composition and touch, and paints one work.',
-	tooltipDdlPaint: 'Applies the edited DDL and performs it again from the same reading.',
+	tooltipDdlPaint: 'Sends the shown instructions (normalized DDL) straight to Stage 2 and performs them again. Stage 1 does not run, so the reading is unchanged.',
 	tooltipInputTabSingle: 'Write a description in natural language and paint a single work',
 	tooltipInputTabBatch: 'Enter several descriptions separated by newlines and paint them one after another',
 	tooltipInputTabDemo: 'Demo mode that paints new works at a set interval',

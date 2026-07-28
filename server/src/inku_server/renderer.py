@@ -4483,7 +4483,12 @@ def _render_fill_strokes(
 
 
 FILL_DAB_SAMPLES = 5
-FILL_DAB_MIN_TRAVEL = 0.30
+# 円のように長短の軸が等しい図形での運びの下限 (長い方の軸に対する比)。
+# 端の taper (`_edge_window`) が両端の 16% ずつを削るので、運びが短すぎると全幅の
+# 平坦部が残らず、図形の内側が空いて輪郭だけの絵になる — 縮退が防いでいた当の失敗
+# である。0.30 では engine 15 の領域 fill の 56〜92% の墨しか置かなかった。
+# 0.90 で 85〜105%、1.10 では 115% まで行き過ぎる (実測は結果レポート §段2)。
+FILL_DAB_MIN_TRAVEL = 0.90
 
 
 def _render_fill_dab(

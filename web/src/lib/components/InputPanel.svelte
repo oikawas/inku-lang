@@ -30,6 +30,8 @@
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		singleRunning: boolean;
+		/** The run shows its status elsewhere (the instruction sheet draws its own). */
+		hideRunStatus?: boolean;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		singleDdlReady: boolean;
@@ -106,6 +108,7 @@
 		batchNonEmpty,
 		batchRunning,
 		singleRunning,
+		hideRunStatus = false,
 		runTokensIn,
 		runTokensOut,
 		singleDdlReady,
@@ -331,7 +334,7 @@
 
 		{@render inputSettings()}
 
-		{#if singleRunning}
+		{#if singleRunning && !hideRunStatus}
 			<div class="gen-status-wrap">
 			<RunStatus
 				label={stageLabel || t().stageDdlGenerating}

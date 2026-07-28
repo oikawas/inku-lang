@@ -615,11 +615,11 @@ $effect(() => {
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-					{isJapanese ? '指示を編集' : 'Edit the instructions'}
+					{isJapanese ? '記述を編集' : 'Edit the description'}
 				</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
-				{isJapanese ? 'DDLを編集' : 'Edit DDL'}
+				{isJapanese ? '指示書を編集' : 'Edit instructions'}
 			</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
@@ -691,7 +691,7 @@ $effect(() => {
 	<div class="lineage-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="lineage-edit-title" tabindex="-1">
 			<header>
 				<div>
-					<h2 id="lineage-edit-title">{editMode === 'description' ? (isJapanese ? '記述を編集' : 'Edit description') : (isJapanese ? 'DDLを編集' : 'Edit DDL')}</h2>
+					<h2 id="lineage-edit-title">{editMode === 'description' ? (isJapanese ? '記述を編集' : 'Edit description') : (isJapanese ? '指示書を編集' : 'Edit instructions')}</h2>
 					<p>{isJapanese ? '描画すると、選択した作品の子として系譜へ保存します。' : 'Drawing saves a new child of the chosen work.'}</p>
 				</div>
 				<button type="button" disabled={editDrawing} aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeEditDialog}>×</button>

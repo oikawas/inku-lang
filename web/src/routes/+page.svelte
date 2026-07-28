@@ -22,6 +22,7 @@
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
+	import RunStatus from '$lib/components/RunStatus.svelte';
 	import ProfileModal from '$lib/components/ProfileModal.svelte';
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
@@ -6074,6 +6075,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{batchNonEmpty}
 						{batchRunning}
 						{singleRunning}
+						hideRunStatus={reloading}
 						singleDdlReady={ddl !== null}
 						{batchActiveLine}
 						{batchActiveDdlHighlighted}
@@ -6108,7 +6110,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{demoError}
 						lockNonDemo={demoRunning}
 						{canSubmit}
-						generationDisabled={variationGridBusy}
+						generationDisabled={variationGridBusy || reloading}
 						{error}
 						{stageLabel}
 						{tenkeiLevel}
@@ -6164,6 +6166,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
+					<!-- 指示書から描画したときの状況表示。入力欄ではなくボタンの下に出す -->
+					{#snippet ddlRunStatus()}
+						<RunStatus
+							label={stageLabel || t().stageDdlGenerating}
+							stage2Model={stage2ModelLabel}
+							elapsedMs={liveMs}
+							tokensIn={activeRunTokensIn}
+							tokensOut={activeRunTokensOut}
+							onStop={stopDdlRender}
+						/>
+					{/snippet}
+
 					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
 						<section class="panel-section">
@@ -6174,6 +6188,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								expandedLabel={t().ddlExpandedLabel}
 								onPaint={() => { void replay(); }}
 								paintDisabled={loading || reloading || variationGridBusy}
+								runStatus={reloading ? ddlRunStatus : null}
 							/>
 						</section>
 					{/if}

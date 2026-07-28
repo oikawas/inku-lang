@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { highlightDDL } from '$lib/highlight';
 	import Tooltip from './Tooltip.svelte';
+	import PaintButton from './PaintButton.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	type Props = {
@@ -14,9 +15,11 @@
 		onPaint?: (() => void) | null;
 		/** Set by the caller while a run is in flight; empty DDL disables on its own. */
 		paintDisabled?: boolean;
+		/** Status + stop panel for the run this button started. Sits under the button. */
+		runStatus?: import('svelte').Snippet | null;
 	};
 
-	let { ddl, expandedDdl = null, label, expandedLabel, onPaint = null, paintDisabled = false }: Props = $props();
+	let { ddl, expandedDdl = null, label, expandedLabel, onPaint = null, paintDisabled = false, runStatus = null }: Props = $props();
 
 	// Artworks saved before v1.98 have no input-side DDL: their single stored text
 	// is the expanded one. Show it in the main slot and rename the label so the
@@ -43,10 +46,11 @@
 	{#if onPaint}
 		<div class="ddl-viewer-actions">
 			<Tooltip placement="left" text={t().tooltipDdlPaint}>
-				<button class="ddl-new-btn" type="button" disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</button>
+				<PaintButton icon={false} block={false} disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</PaintButton>
 			</Tooltip>
 		</div>
 	{/if}
+	{#if runStatus}{@render runStatus()}{/if}
 	{#if showExpanded}
 		<div class="ddl-expanded">
 			<Tooltip placement="right" text={t().tooltipDdlExpandedToggle}>
@@ -99,22 +103,6 @@
 		justify-content: flex-end;
 		margin-top: -2px;
 	}
-	/* Same amber shell as the 指示書 edit / new buttons above the viewer. */
-	.ddl-new-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--ddl-btn-border);
-		border-radius: var(--btn-sm-radius);
-		background: var(--ddl-btn-bg);
-		color: var(--ddl-btn-fg);
-		font-family: inherit;
-		font-size: var(--btn-sm-font-size);
-		font-weight: 600;
-		box-shadow: var(--ddl-btn-shadow);
-		white-space: nowrap;
-		cursor: pointer;
-	}
-	.ddl-new-btn:hover:not(:disabled) { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
-	.ddl-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 	.ddl-expanded {
 		display: flex;
 		flex-direction: column;

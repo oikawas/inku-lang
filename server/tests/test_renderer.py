@@ -1341,7 +1341,12 @@ def test_canvas_ground_non_display_profiles_remain_filter_free():
         )
 
 
-def test_render_display_surface_stipple_is_clipped_to_shape():
+def test_render_display_surface_stipple_follows_the_shape_without_a_clip():
+    """engine 16: 粒は輪郭の内側から引くので display の clipPath が要らない。
+
+    engine 15 までは bbox に一様乱数で撒いてはみ出した分を display だけが
+    clipPath で隠しており、editable では図形の外に粒が出ていた。
+    """
     score = Score.model_validate(
         {
             "instructions": [
@@ -1359,9 +1364,8 @@ def test_render_display_surface_stipple_is_clipped_to_shape():
     svg = render(score, render_seed=123)
 
     assert 'id="surface_000_000_stipple"' in svg
-    assert "<clipPath" in svg
-    assert 'clip-path="url(#clip_surface_000_000_stipple_' in svg
-    assert svg.count("<circle") > 10
+    assert "clip_surface_000_000_stipple" not in svg
+    assert svg.count("surface-stroke-v1") > 10
 
 
 def test_render_editable_surface_has_stable_group_id_without_filters():

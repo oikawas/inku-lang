@@ -126,6 +126,7 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
           aspect: str = "square", ground: dict[str, Any] | None = None,
           render_seed: int = DEFAULT_RENDER_SEED,
           color_map: dict[str, str] = DEFAULT_COLOR_MAP,
+          svg_profile: str = SVG_PROFILE,
           wild: bool = False) -> None:
     if case_id in cases:
         raise ValueError(f"duplicate case ID: {case_id}")
@@ -133,7 +134,7 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
         "score": _score(instruction, aspect=aspect, ground=ground),
         "render_seed": render_seed,
         "color_map": copy.deepcopy(color_map),
-        "svg_profile": SVG_PROFILE,
+        "svg_profile": svg_profile,
         "wild": wild,
     }
 
@@ -168,6 +169,16 @@ def build_inputs() -> dict[str, dict[str, Any]]:
             surface["texture"] = texture
             _case(cases, f"C-surface-{texture}-{tool}",
                   _instruction("square", weight=tool, filled=False, surface=surface))
+
+    # The corpus is 100% `editable`, but production renders `display`. Every
+    # display-only branch of the surface layer was therefore never executed once
+    # in 350 cases. These four run the profile the author actually looks at.
+    for texture in ("wash", "bleed", "grain", "hatch"):
+        surface = copy.deepcopy(BASE_SURFACE)
+        surface["texture"] = texture
+        _case(cases, f"C-display-surface-{texture}-pen",
+              _instruction("square", weight="pen", filled=False, surface=surface),
+              svg_profile="display")
 
     for material in ("plain", "paper", "washi", "ink_wash", "charcoal_ground", "mezzotint"):
         ground = copy.deepcopy(BASE_GROUND)
@@ -241,9 +252,9 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                   _instruction("square", weight=tool, filled=False, surface=surface),
                   wild=True)
 
-    expected = {"A": 88, "B": 72, "C": 43, "D": 28, "E": 119}
+    expected = {"A": 88, "B": 72, "C": 47, "D": 28, "E": 119}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 350:
+    if actual != expected or len(cases) != 354:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

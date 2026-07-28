@@ -2927,7 +2927,15 @@ if (unreadWords.length > 0) {
 	// stay on the artwork on screen instead of chasing every new line. It clears
 	// when that artwork is not in the newest window, rather than pointing at a
 	// neighbour.
+	// While the reader has paged back through the strip, a finished batch line or
+	// demo render must not drag them to the newest page. Only the count moves;
+	// the window itself is refetched when the run ends (refreshHistoryAfterRun).
+	// The same guard already protects the strip from externally saved works.
 	async function refreshHistoryAfterServerSave() {
+		if (historyOffset !== 0) {
+			if (!historyStarredOnly) historyTotal += 1;
+			return;
+		}
 		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
 		await fetchHistoryOffset(0);
 		if (!activeHistoryId) {
@@ -2935,6 +2943,13 @@ if (unreadWords.length > 0) {
 			return;
 		}
 		historyCursor = historyItems.findIndex((item) => item.id === activeHistoryId);
+	}
+
+	// Catch the paged-away strip up once the run is over, staying on the page the
+	// reader chose. Page 0 needs nothing: it was refreshed after every save.
+	async function refreshHistoryAfterRun() {
+		if (!authToken || historyOffset === 0) return;
+		await fetchHistoryOffset(historyOffset, { preserveSelection: true });
 	}
 
 	function sleep(ms: number): Promise<void> {
@@ -3034,6 +3049,7 @@ if (unreadWords.length > 0) {
 			}
 		}
 		if (demoRunId === runId) {
+			await refreshHistoryAfterRun();
 			demoTimedOut = Date.now() >= timeoutAt;
 			demoCurrentStartedAt = null;
 			stopTimer();
@@ -3073,6 +3089,7 @@ if (unreadWords.length > 0) {
 
 	function stopDemo() {
 		demoRunId += 1;
+		void refreshHistoryAfterRun();
 		demoTimedOut = false;
 		demoCurrentStartedAt = null;
 		loading = false;
@@ -3246,6 +3263,7 @@ if (unreadWords.length > 0) {
 					}
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
+				await refreshHistoryAfterRun();
 				if (batchFailures.length > 0) {
 					setBatchFailureReport({
 						success: batchSuccess,

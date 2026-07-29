@@ -48,7 +48,7 @@ export const ja: LangPack = {
 	providerLabel: '接続先：',
 	modelLabel: 'モデル：',
 	showThinkingLabel: '思考を表示',
-	modelSelectionSharedHint: '選んだモデルを Stage 1 と Stage 2 の両方に設定します。オススメ度は、段ごとに測ってあるモデルでは低いほうの段の値を出します。',
+	modelSelectionSharedHint: '選んだモデルを Stage 1 と Stage 2 の両方に設定します。段ごとに測ってあるモデルは、低いほうの段の順に並べます。',
 	modelSelectionSeparateHint: 'このStageだけに使用するモデルを選びます。Stage 1とStage 2には別々のモデルを設定できます。',
 	modelSelectionVisionHint: '画像を読むVision処理に使うモデルを選択します。',
 

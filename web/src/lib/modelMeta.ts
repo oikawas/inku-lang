@@ -59,6 +59,31 @@ export function modelRecommendation(
 	return level > 0 ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
 }
 
+/**
+ * The two stage rows for the hover card, or null when one row is the honest shape.
+ *
+ * A model measured end to end has one number and both stages read it, so splitting
+ * it would print the same stars twice and imply a measurement nobody took. Only a
+ * model carrying at least one stage key is split. Vision is never split — the stage
+ * keys narrow the LLM level and say nothing about reading an image.
+ *
+ * Returning strings rather than levels keeps the card free of formatting decisions,
+ * and keeps this decidable without rendering a component.
+ */
+export function modelStageRecommendations(
+	model: ModelOption,
+	purpose?: ModelPurpose
+): { stage1: string; stage2: string } | null {
+	if (purpose === 'vision') return null;
+	const staged =
+		typeof model.recommendation_stage1 === 'number' || typeof model.recommendation_stage2 === 'number';
+	if (!staged) return null;
+	return {
+		stage1: modelRecommendation(model, 'llm', 'stage1'),
+		stage2: modelRecommendation(model, 'llm', 'stage2')
+	};
+}
+
 // 一覧の並び。提供終了を末尾へ送り、その中で推奨度の高い順に見せる。取得ボタンは提供元の
 // 順序で配列を作り直すため、カタログの配列順では順序を維持できない (v1.98)。
 export function sortModels(models: ModelOption[], purpose?: ModelPurpose, stage?: ModelStage): ModelOption[] {

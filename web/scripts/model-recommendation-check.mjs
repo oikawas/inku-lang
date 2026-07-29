@@ -20,9 +20,8 @@ const EXPECTATIONS = JSON.parse(
 	readFileSync(join(HERE, 'model-recommendation-expectations.json'), 'utf8')
 );
 
-const { modelRecommendationLevel, modelRecommendation, sortModels } = await import(
-	join(HERE, '..', 'src/lib/modelMeta.ts')
-);
+const { modelRecommendationLevel, modelRecommendation, modelStageRecommendations, sortModels } =
+	await import(join(HERE, '..', 'src/lib/modelMeta.ts'));
 
 const failures = [];
 let checks = 0;
@@ -79,6 +78,16 @@ for (const c of EXPECTATIONS.display.cases) {
 	check('Stage 1 tab leads with the Stage 1 model', ids('stage1'), ['stage1-strong', 'stage2-strong']);
 	check('Stage 2 tab leads with the Stage 2 model', ids('stage2'), ['stage2-strong', 'stage1-strong']);
 	check('the shared tab leads with the higher floor', ids('both'), ['stage2-strong', 'stage1-strong']);
+}
+
+// ── the hover card splits only where the measurement was split ────────────
+for (const c of EXPECTATIONS.hover_card.cases) {
+	const model = { id: 'x', label: 'x', ...c.model };
+	check(
+		`hover card for ${JSON.stringify(c.model)}`,
+		modelStageRecommendations(model, c.purpose ?? 'llm'),
+		c.split
+	);
 }
 
 if (failures.length > 0) {

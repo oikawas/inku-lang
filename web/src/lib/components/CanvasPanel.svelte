@@ -9,7 +9,6 @@
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
-	import type { ModelStage } from '$lib/modelMeta';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel, type DerivationKind } from '$lib/derivation';
@@ -338,13 +337,6 @@
 		onPaintOne,
 		onVisionAdvice
 	}: Props = $props();
-
-	// The comparison grid picks the models that *vary*, so the stage it is choosing
-	// for is the opposite of the one being held fixed: "fixed Stage 1" compares
-	// Stage 2 candidates. Showing the Stage 1 level there would name the wrong stage.
-	const comparedStage = $derived<ModelStage>(
-		modelCompareMode === 'stage1_fixed' ? 'stage2' : modelCompareMode === 'stage2_fixed' ? 'stage1' : 'both'
-	);
 
 	let canvasContentEl: HTMLDivElement | null = null;
 	let svgMenuOpen = $state(false);
@@ -948,7 +940,7 @@
 									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || blocked || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
 									<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
 								</label>
-								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} purpose="llm" stage={comparedStage} />
+								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} purpose="llm" />
 							</div>
 						{/each}
 					</div>

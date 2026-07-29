@@ -782,7 +782,7 @@
 									<strong>{model.label}</strong>
 									{#if isModelUnselectable(model)}<span class="eol-mark">{modelStatusLabel(model, isJapanese)}</span>{/if}
 									{#if model.notes}<span>{model.notes}</span>{/if}
-									<ModelMetaCard {model} {isJapanese} purpose={recommendationPurpose} stage={recommendationStage} />
+									<ModelMetaCard {model} {isJapanese} purpose={recommendationPurpose} />
 								</button>
 							{/each}
 							</div>

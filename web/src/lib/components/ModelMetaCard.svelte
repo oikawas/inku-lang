@@ -7,26 +7,33 @@
 -->
 <script lang="ts">
 	import type { ModelOption } from '$lib/models';
-	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelStatusLabel, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
+	import { modelPurposes, modelRecommendation, modelStageRecommendations, modelSpeed, modelComment, modelStatusLabel, type ModelPurpose } from '$lib/modelMeta';
 
 	type Props = {
 		model: ModelOption;
 		isJapanese: boolean;
 		extra?: string;
-		// Which stage the surrounding surface is choosing for. Omitted where there is
-		// no stage in question (the admin metadata editor), and then the card shows
-		// the model's highest level as it always did.
 		purpose?: ModelPurpose;
-		stage?: ModelStage;
 	};
 
-	let { model, isJapanese, extra = '', purpose = undefined, stage = undefined }: Props = $props();
+	let { model, isJapanese, extra = '', purpose = undefined }: Props = $props();
+
+	// A model measured per stage shows both stages, whichever surface the card is on:
+	// the two numbers are the measurement, and reading one of them means switching
+	// tabs to find the other. The stage a surface is choosing for still decides the
+	// order of the cards (sortModels) and what a click sets.
+	const stages = $derived(modelStageRecommendations(model, purpose));
 </script>
 
 <span class="model-hover-card" role="tooltip">
 	{#if modelStatusLabel(model, isJapanese)}<span><strong>状態 / Status</strong>{modelStatusLabel(model, isJapanese)}</span>{/if}
 	<span><strong>用途 / Use</strong>{modelPurposes(model)}</span>
-	<span><strong>オススメ度 / Recommendation</strong>{modelRecommendation(model, purpose, stage)}</span>
+	{#if stages}
+		<span><strong>オススメ度 / Stage 1</strong>{stages.stage1}</span>
+		<span><strong>オススメ度 / Stage 2</strong>{stages.stage2}</span>
+	{:else}
+		<span><strong>オススメ度 / Recommendation</strong>{modelRecommendation(model, purpose)}</span>
+	{/if}
 	<span><strong>速度 / Speed</strong>{modelSpeed(model)}</span>
 	<span><strong>評価 / Comment</strong>{modelComment(model, isJapanese)}</span>
 	{#if extra}<span><strong>{isJapanese ? '状態 / Status' : 'Status'}</strong>{extra}</span>{/if}

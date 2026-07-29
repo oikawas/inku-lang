@@ -62,5 +62,36 @@
       { "model": {}, "stage1": 0, "stage2": 0, "both": 0, "why": "nothing measured at all" },
       { "model": { "recommendation_llm": 4, "recommendation_stage2": 2 }, "stage1": 4, "stage2": 2, "both": 2, "why": "a stage value narrows the end-to-end number; the unnarrowed stage keeps it" }
     ]
+  },
+  "hover_card": {
+    "note": [
+      "The hover card splits the recommendation into two rows for a model measured per stage,",
+      "so reading one stage does not mean switching tabs to find the other. A model measured",
+      "end to end keeps one row: two rows would print the same stars twice and imply a",
+      "measurement nobody took. Vision is never split -- the stage keys narrow the LLM level",
+      "and say nothing about reading an image.",
+      "split: null means one row. Otherwise the two strings the card prints."
+    ],
+    "cases": [
+      {
+        "model": { "recommendation_stage1": 5, "recommendation_stage2": 2 },
+        "split": { "stage1": "★★★★★ (5/5)", "stage2": "★★☆☆☆ (2/5)" },
+        "why": "qwen3.5:4b -- both numbers visible without changing tab"
+      },
+      {
+        "model": { "recommendation_stage1": 1 },
+        "split": { "stage1": "★☆☆☆☆ (1/5)", "stage2": "—" },
+        "why": "an unmeasured stage stays an em dash inside the split"
+      },
+      { "model": { "recommendation_llm": 4 }, "split": null, "why": "measured end to end: one row" },
+      { "model": { "recommendation_level": 3 }, "split": null, "why": "the pre-v1.98 shape: one row" },
+      { "model": {}, "split": null, "why": "nothing measured: one row, an em dash" },
+      {
+        "model": { "purposes": ["vision"], "recommendation_vision": 3, "recommendation_stage1": 5 },
+        "purpose": "vision",
+        "split": null,
+        "why": "vision is never split even when stage keys are present"
+      }
+    ]
   }
 }

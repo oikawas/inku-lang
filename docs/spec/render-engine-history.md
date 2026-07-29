@@ -135,14 +135,14 @@ of works that differ by a name and nothing else**.
 namespaces from being read as linked. They step in whole integers.
 
 **The work-edition ID is `rh3`** (details in `SPEC.md`). Identity
-comes from `score`, `render_seed`, `render_wild`, the render engine's ID and version, and
+comes from `score`, `render_seed`, the render engine's ID and version, and
 `render_color_catalog_id`.
 
 - **`render_build_number` is not part of identity.** It is stamped for UI-only
   changes, so it gave a new edition ID to a drawing that had not changed by a single
   byte. It stays as provenance: worth keeping as history, not worth putting in the
   definition of sameness.
-- **The Score-side seed (`composition_seed`) is excluded too** — a different Score already
+- **The Score-side seed (`vary_seed`) is excluded too** — a different Score already
   yields a different ID.
 - **`rh2` is retained as legacy and never recalculated.** `rh2` and `rh3` are
   separate hash spaces and must not be compared to decide sameness.
@@ -761,6 +761,7 @@ pictorial meaning and was discarded.**
 - **The correction event repeated with period 5**
 - A closed contour carried a thin seam
 - A gesture entered the centre line, and the wild toggle arrived
+- **`render_wild` joined the `rh3` material; the format name stays `rh3`**
 
 **199 moved, 21 unchanged. The unchanged are 12 `rotring` cases and 9 `cloudform` cases.**
 `rotring` is the mechanical extreme, so that follows; **the 9 `cloudform` cases were still because

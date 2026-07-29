@@ -713,3 +713,17 @@ Version and build date moved to the top of the info modal (**the date is the mti
 **Verification:** `npm run check` **0 errors / 2 warnings / 218 files**, `npm run lint:i18n` **877 / 44 / 0 / 0**, `npm run lint:models` 56, server **1596 passed / 31 skipped**, cli **76**, ruff green. **Drawing is untouched**, so the frozen corpora do not apply.
 
 **Fixed at acceptance, absent from the implementation report**: **`test_current_user_theme_can_be_updated` had lost its discriminating power.** When Build 744 made dark the default, the test's `"light"` strings were replaced mechanically with `"dark"`, leaving it **patching dark onto a default of dark** — so **commenting out `row.ui_theme = ui_theme` in `update_user_settings` leaves it green** (measured). **It now asks for the non-default side, reads it back, and was confirmed to fail under that perturbation.**
+
+### 2026-07-29 — the version history is written in the names of its own time (**no version**; documentation only)
+
+**A section stamped with a version is written in the names and materials of that version** (author's ruling, 2026-07-29). The split is that **SPEC holds the present and the version history holds the origin**.
+
+The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/render-engine-history`, where **only the English had been updated to the present, twice**. The Japanese was internally consistent as the record of v2.4.5, so **not one line of that Japanese section moved**.
+
+- **`composition_seed` went back to `vary_seed`** in the English (the rename is v2.8.0; at v2.4.5 the field was `vary_seed`)
+- **`render_wild` was dropped from the English identity list.** It entered the material at **engine 12 (v2.5.0)**, so naming it in the v2.4.5 section placed it in the wrong decade of the document
+- Nothing true was deleted: **both languages gained one line in the engine 12 section** — `render_wild` joined the `rh3` material, and the format name stays `rh3` — which moves the fact to where it belongs chronologically
+- **`vary_seed` is not a dead name.** It is **frozen and live as the material key of the older `rh2` format** (`SPEC.ja.md` §4.7); a blanket replacement would reach into the saved works' `rh2` and rewrite that too
+- **No sentinel can catch this.** This pair is checked by `check_docs.py` at **`shape`** — the heading skeleton — so a single word inside a body line never turns red, and `npm run lint:i18n` reads only the web's display strings. **That is why it survived from the v2.8.0 rename until today.**
+
+**Verification:** `check_docs.py` green (the same two declared differences; 56 internal references). **No running code changed**, so no version is stamped.

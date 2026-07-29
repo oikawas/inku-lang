@@ -2,7 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { getMascot, setMascot } from '$lib/mascot.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
-	import { modelStatusLabel, isModelUnselectable, sortModels } from '$lib/modelMeta';
+	import { modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -440,6 +440,13 @@
 	const isAdmin = $derived(currentUser?.role === 'admin');
 	type ModelSelectionTab = 'shared' | 'stage1' | 'stage2' | 'vision';
 	let modelSelectionTab = $state<ModelSelectionTab>('shared');
+	// The tab already knows which stage is being chosen for; before this it was
+	// collapsed to 'llm' and the stage was thrown away, so Stage 1 and Stage 2
+	// showed the same number for models whose two stages disagree.
+	const recommendationPurpose = $derived<ModelPurpose>(modelSelectionTab === 'vision' ? 'vision' : 'llm');
+	const recommendationStage = $derived<ModelStage | undefined>(
+		modelSelectionTab === 'vision' ? undefined : modelSelectionTab === 'shared' ? 'both' : modelSelectionTab
+	);
 	let newProviderId = $state('');
 	let newProviderLabel = $state('');
 	let newProviderKind = $state('openai_compatible');
@@ -761,7 +768,7 @@
 						<section class="generation-model-provider">
 							<h3>{provider.label}</h3>
 							<div class="generation-model-grid">
-								{#each sortModels(provider.models, modelSelectionTab === 'vision' ? 'vision' : 'llm') as model (model.id)}
+								{#each sortModels(provider.models, recommendationPurpose, recommendationStage) as model (model.id)}
 								<button
 									type="button"
 									class="model-metadata-hover"
@@ -775,7 +782,7 @@
 									<strong>{model.label}</strong>
 									{#if isModelUnselectable(model)}<span class="eol-mark">{modelStatusLabel(model, isJapanese)}</span>{/if}
 									{#if model.notes}<span>{model.notes}</span>{/if}
-									<ModelMetaCard {model} {isJapanese} />
+									<ModelMetaCard {model} {isJapanese} purpose={recommendationPurpose} />
 								</button>
 							{/each}
 							</div>

@@ -61,7 +61,13 @@ def test_tags_name_the_quantization() -> None:
 def test_every_entry_carries_what_was_measured() -> None:
     for model in VERIFIED_OLLAMA_LOCAL_MODELS:
         assert model["purposes"] == ["llm"]
-        assert str(model["speed_label"]).strip()
+        # speed_label is optional as of 2026-07-30: four entries had no per-case
+        # timing and were carrying the string "第二段階は未計測" in the field instead,
+        # which put a measurement status in a speed slot -- and one that disappears in
+        # the release view, since the field is developer-only. When the key is present
+        # it must be a timing; test_model_recommendation.py holds that end.
+        if "speed_label" in model:
+            assert str(model["speed_label"]).strip()
         for key in ("comment_ja", "comment_en"):
             comment = str(model[key])
             assert comment.strip()
@@ -70,14 +76,23 @@ def test_every_entry_carries_what_was_measured() -> None:
             assert ("機体" in comment) or ("machine" in comment)
 
 
-def test_recommendation_levels_stay_absent() -> None:
+def test_the_end_to_end_level_stays_absent_and_the_stage_levels_stand_in() -> None:
+    # This test used to say "recommendation levels stay absent", because
     # SCORING-DESIGN.md defines the 1-5 scale on success rate, schema violations and
-    # correction count over nine attempts against NIM. This track measured neither of
-    # those axes, so a level here would be a number with no method behind it -- the
-    # same reason the Ollama Cloud entries carry none. Measure those axes before
-    # deleting this test.
+    # correction count over nine attempts against NIM, and this track measured none
+    # of those axes. That still holds for recommendation_llm and is why it is absent
+    # here.
+    #
+    # What changed on 2026-07-30 is that a rule for the axes this track *did* measure
+    # was written and adjudicated: Stage 1 from the Japanese and English n/6 that came
+    # back as usable DDL, Stage 2 from coverage over 28 sentences. It lives in
+    # web/scripts/model-recommendation-expectations.json under "rules", and the levels
+    # are asserted against it in test_model_recommendation.py. So the levels here are
+    # per stage, and the single end-to-end number is still the one nobody measured.
     for model in VERIFIED_OLLAMA_LOCAL_MODELS:
         assert "recommendation_llm" not in model
+        assert "recommendation_level" not in model
+        assert "recommendation_stage1" in model
         assert "recommendation_vision" not in model
         assert "recommendation_level" not in model
 

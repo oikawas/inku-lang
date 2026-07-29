@@ -5,10 +5,9 @@
   - EXAMPLE_POOL: 変換例のプール。増やしても推論コストは増えない
   - _build_system_prompt(text): 推論時に入力と関連性の高い例を k 件だけ選択して注入
 
-モデル ID によるバックエンド自動選択:
-- `anthropic:<model>` → Anthropic API
-- `org/model` (スラッシュ含む) → NVIDIA NIM API
-- それ以外 → OVMS (ローカル OpenAI 互換)
+Which backend a model id reaches is decided by model_settings.provider_for_model
+and its three rules (explicit qualification, sole ownership, the stage default).
+Nothing here guesses it from the shape of the string.
 """
 
 from __future__ import annotations
@@ -1338,28 +1337,6 @@ def _build_system_prompt(
     return prompt
 
 
-def _get_provider(model: str) -> str:
-    if ":" in model:
-        prefix, _ = model.split(":", 1)
-        if prefix in {"openai", "anthropic", "gemini", "nvidia", "ollama", "ovms"}:
-            return prefix
-    if model.startswith("anthropic:"):
-        return "anthropic"
-    if model.startswith("gemini-"):
-        return "gemini"
-    if "/" in model:
-        return "nvidia"
-    return "ovms"
-
-
-def _strip_prefix(model: str) -> str:
-    if ":" in model:
-        prefix, value = model.split(":", 1)
-        if prefix in {"openai", "anthropic", "gemini", "nvidia", "ollama", "ovms"}:
-            return value
-    return model
-
-
 def _current_model_settings() -> dict:
     from . import db as _db
 
@@ -1541,11 +1518,7 @@ def _interpret_openai_detail(
     timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
     client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)
 
-    is_qwen3 = "qwen3" in model.lower() and provider == "ovms"
-    if is_qwen3 and not include_thinking:
-        user_content = f"/no_think {text}"
-    else:
-        user_content = text
+    user_content = text
 
     # Ollama turns thinking on by itself whenever `reasoning_effort` is absent, and
     # the thinking shares MAX_TOKENS with the answer: a model that thinks past the
@@ -1553,7 +1526,10 @@ def _interpret_openai_detail(
     # thinking suppressed the same work ran 8x faster, one case stopped coming back
     # empty, and how much of the description survived did not change.
     #
-    # `/no_think` above is the same intent said in OVMS's dialect.
+    # Qwen3 used to be told the same thing a second way, by prefixing the prompt
+    # with `/no_think`, because the provider that served it read no parameter for
+    # it. That provider is gone and `reasoning_effort` covers the same models, so
+    # the intent is now said once.
     #
     # Ollama Cloud used to be left out, on the grounds that its models emitted no
     # thinking either way. That was gemma4:31b's behaviour -- the only cloud model

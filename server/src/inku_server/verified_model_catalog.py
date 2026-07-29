@@ -18,8 +18,8 @@ they scored badly or could not be measured, for the same reason.
 Method and rubric: no-git-sync/fable5/mode-api-claude/SCORING-DESIGN.md
 """
 
-MODEL_CONFIG_VERSION = "2.4.0"
-MODEL_CONFIG_LAST_UPDATED = "2026-07-29T11:00:00Z"
+MODEL_CONFIG_VERSION = "2.5.0"
+MODEL_CONFIG_LAST_UPDATED = "2026-07-30T01:00:00Z"
 
 VERIFIED_NVIDIA_MODELS: list[dict[str, object]] = [
     {"id": "mistralai/mistral-nemotron", "label": "mistralai/mistral-nemotron", "purposes": ["llm"], "recommendation_llm": 4, "speed_class": "ultra-fast", "speed_label": "昼 121s / 夕 10s / 深夜 8s", "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.0。応答中央値 昼 121s / 夕 10s / 深夜 8s。", "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.0 corrections on average; median response midday 121s / evening 10s / late night 8s."},
@@ -133,10 +133,10 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
         "speed_label": "中央値 43s / 17〜51s (2026-07-29)",
         "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
         + "4 実行すべて完走し、スキーマ違反は無かった。補正の発火は平均 10.0 で、"
-        + "計測した 8 本の中では多い側。所要は中央値 43 秒 (17〜51 秒)。",
+        + "計測した 8 本の中では多い側。",
         "comment_en": _OLLAMA_CLOUD_NOTICE_EN
         + " Completed all four runs with no schema violations. Its correction load averaged 10.0,"
-        + " among the heavier of the eight measured. Took a median of 43 seconds (17-51).",
+        + " among the heavier of the eight measured.",
     },
     {
         "id": "minimax-m2.5",
@@ -146,11 +146,9 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
         "speed_class": "unknown",
         "speed_label": "中央値 26s / 16〜26s (2026-07-29)",
         "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
-        + "4 実行のうち 3 回完走し、1 回は空の応答が返った。補正の発火は平均 8.0。"
-        + "所要は中央値 26 秒 (16〜26 秒)。",
+        + "4 実行のうち 3 回完走し、1 回は空の応答が返った。補正の発火は平均 8.0。",
         "comment_en": _OLLAMA_CLOUD_NOTICE_EN
-        + " Completed three of four runs; the fourth came back empty. Correction load averaged 8.0."
-        + " Took a median of 26 seconds (16-26).",
+        + " Completed three of four runs; the fourth came back empty. Correction load averaged 8.0.",
     },
     {
         "id": "nemotron-3-super",
@@ -161,10 +159,10 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
         "speed_label": "中央値 11s / 5〜14s (2026-07-29)",
         "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
         + "4 実行のうち 3 回完走し、1 回は変奏の指定がスキーマに合わなかった。補正の発火は平均 8.7。"
-        + "所要は中央値 11 秒 (5〜14 秒) で、計測した中では速い側。",
+        + "計測した 8 本の中では所要が速い側。",
         "comment_en": _OLLAMA_CLOUD_NOTICE_EN
         + " Completed three of four runs; the fourth wrote a variation the schema does not accept."
-        + " Correction load averaged 8.7. Took a median of 11 seconds (5-14), among the faster measured.",
+        + " Correction load averaged 8.7. Among the faster of the eight measured.",
     },
     {
         "id": "gemma4:31b",
@@ -175,12 +173,11 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
         "speed_label": "中央値 35s / 7〜64s (2026-07-29)",
         "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
         + "4 実行のうち 2 回完走。1 回は空の応答、1 回は色語彙に無い色 (黄) を書いた"
-        + "(Score の色は 6 語しかない)。補正の発火は平均 11.5 で最も多い。"
-        + "所要は中央値 35 秒 (7〜64 秒)。",
+        + "(Score の色は 6 語しかない)。補正の発火は平均 11.5 で最も多い。",
         "comment_en": _OLLAMA_CLOUD_NOTICE_EN
         + " Completed two of four runs: one came back empty, and one named a colour the Score has no"
         + " word for (yellow; the vocabulary holds six). Correction load averaged 11.5, the heaviest"
-        + " measured. Took a median of 35 seconds (7-64).",
+        + " measured.",
     },
     {
         "id": "nemotron-3-nano:30b",
@@ -191,10 +188,10 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
         "speed_label": "中央値 13s (2026-07-29)",
         "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
         + "4 実行のうち完走は 1 回。3 回は命令の並びがスキーマに合わなかった。"
-        + "補正の発火は平均 11.0。完走した 1 回の所要は 13 秒。",
+        + "補正の発火は平均 11.0。",
         "comment_en": _OLLAMA_CLOUD_NOTICE_EN
         + " One of four runs completed; the other three wrote instruction lists the schema rejects."
-        + " Correction load averaged 11.0. The one clean run took 13 seconds.",
+        + " Correction load averaged 11.0.",
     },
     {
         "id": "gpt-oss:120b",
@@ -292,6 +289,8 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "qwen3.5:4b-q4_K_M",
         "label": "qwen3.5:4b-q4_K_M (3.4GB)",
         "purposes": ["llm"],
+        "recommendation_stage1": 5,
+        "recommendation_stage2": 2,
         "speed_class": "fast",
         "speed_label": "1 件 39〜73s",
         "comment_ja": "第一段階の推奨。日本語・英語とも 6/6 が正規化 DDL として成立した唯一の小型モデルで、"
@@ -306,6 +305,8 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "ministral-3:8b-instruct-2512-q4_K_M",
         "label": "ministral-3:8b-instruct-2512-q4_K_M (6.0GB)",
         "purposes": ["llm"],
+        "recommendation_stage1": 3,
+        "recommendation_stage2": 5,
         "speed_class": "slow",
         "speed_label": "1 件 50〜576s",
         "comment_ja": "第二段階の推奨。被覆 20/28 は計測した中で最も高く、8 件とも Score になった。"
@@ -320,6 +321,8 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "gemma4:e4b-it-q4_K_M",
         "label": "gemma4:e4b-it-q4_K_M (9.6GB)",
         "purposes": ["llm"],
+        "recommendation_stage1": 3,
+        "recommendation_stage2": 4,
         "speed_class": "fast",
         "speed_label": "1 件 9〜141s",
         "comment_ja": "第二段階の被覆 18/28。8 件とも Score になり、所要は計測した中で最も短い。"
@@ -333,8 +336,8 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "gemma4:31b-it-q4_K_M",
         "label": "gemma4:31b-it-q4_K_M (19GB)",
         "purposes": ["llm"],
-        "speed_class": "unknown",
-        "speed_label": "第二段階は未計測",
+        "recommendation_stage1": 5,
+        "recommendation_stage2": 4,
         "comment_ja": "第一段階は日本語・英語とも計測した中で最良。説明の文も灰背景の指示も 0 件で、"
         "「地: 生成りの紙。」の固定形を正しく使う唯一のモデル。"
         "第二段階の被覆 18/28 は Build 748/749 より前の経路で採った数字で、他の行とは条件が違う。"
@@ -348,6 +351,8 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "gemma4:12b-it-q4_K_M",
         "label": "gemma4:12b-it-q4_K_M (7.6GB)",
         "purposes": ["llm"],
+        "recommendation_stage1": 3,
+        "recommendation_stage2": 3,
         "speed_class": "medium",
         "speed_label": "1 件 18〜110s",
         "comment_ja": "第二段階の被覆 14/28。8 件とも Score になった。"
@@ -361,6 +366,8 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "qwen3.5:27b-q4_K_M",
         "label": "qwen3.5:27b-q4_K_M (17GB)",
         "purposes": ["llm"],
+        "recommendation_stage1": 4,
+        "recommendation_stage2": 2,
         "speed_class": "slow",
         "speed_label": "1 件 224〜410s",
         "comment_ja": "第一段階は日本語 6/6・英語 6/6 が成立する。"
@@ -374,6 +381,8 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "qwen3.5:9b-q4_K_M",
         "label": "qwen3.5:9b-q4_K_M (6.6GB)",
         "purposes": ["llm"],
+        "recommendation_stage1": 3,
+        "recommendation_stage2": 2,
         "speed_class": "medium",
         "speed_label": "1 件 67〜114s",
         "comment_ja": "第二段階の被覆 8/28 は、半分の大きさの qwen3.5:4b（9/28）を下回る。"
@@ -387,8 +396,7 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "granite4.1:8b-q4_K_M",
         "label": "granite4.1:8b-q4_K_M (5.3GB)",
         "purposes": ["llm"],
-        "speed_class": "unknown",
-        "speed_label": "第二段階は未計測",
+        "recommendation_stage1": 1,
         "comment_ja": "第一段階が日本語 6 件中 4 件で成立しない。感情語「静かに」が残り、"
         "禁止された動詞を 3 回使い、1 件は「面:」の誤用で図形の指示が 1 つも出ない。"
         "第二段階は測っていない。" + _OLLAMA_LOCAL_NOTICE_JA,
@@ -400,8 +408,7 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "qwen3.5:2b-q4_K_M",
         "label": "qwen3.5:2b-q4_K_M (1.9GB)",
         "purposes": ["llm"],
-        "speed_class": "unknown",
-        "speed_label": "第二段階は未計測",
+        "recommendation_stage1": 1,
         "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。同じ段落を 3 回繰り返す 1 件と、"
         "図形を表す語が抜けて配置の句だけが並ぶ 2 件。第二段階は測っていない。" + _OLLAMA_LOCAL_NOTICE_JA,
         "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: one repeats the same paragraph three times,"
@@ -412,8 +419,7 @@ VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
         "id": "qwen3.5:0.8b-q8_0",
         "label": "qwen3.5:0.8b-q8_0 (1.0GB)",
         "purposes": ["llm"],
-        "speed_class": "unknown",
-        "speed_label": "第二段階は未計測",
+        "recommendation_stage1": 1,
         "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。述語のない断片（「中央付近に。」）と、"
         "入力の情景語をそのまま写した 2 件。第二段階は測っていない。" + _OLLAMA_LOCAL_NOTICE_JA,
         "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: a fragment with no predicate, and two that"

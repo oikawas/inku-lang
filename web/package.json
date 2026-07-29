@@ -11,7 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint:i18n": "node scripts/i18n-lint.mjs",
-		"lint:models": "node scripts/model-ref-check.mjs"
+		"lint:models": "node scripts/model-ref-check.mjs",
+		"lint:recommendations": "node scripts/model-recommendation-check.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^5.5.7",

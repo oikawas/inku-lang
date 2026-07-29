@@ -4,10 +4,9 @@
   SYSTEM_PROMPT は「手順」のみ。フィールド仕様は schema.py の description が正典。
   新しい primitive や属性を追加する場合は schema.py を更新する。ここは変えない。
 
-モデル ID によるバックエンド自動選択:
-- `anthropic:<model>` → Anthropic tool_use API
-- `org/model` (スラッシュ含む) → NVIDIA NIM API
-- それ以外 → OVMS (ローカル OpenAI 互換)
+Which backend a model id reaches is decided by model_settings.provider_for_model
+and its three rules (explicit qualification, sole ownership, the stage default).
+Nothing here guesses it from the shape of the string.
 """
 
 from __future__ import annotations
@@ -847,28 +846,6 @@ def _stage2_prompt_digest(system_prompt: str) -> str:
     # `history.stage2_prompt_digest` に残らなかった。
     tool_json = json.dumps(_submit_tool(), ensure_ascii=False)
     return _prompt_digest(system_prompt + "\n" + tool_json)
-
-
-def _get_provider(model: str) -> str:
-    if ":" in model:
-        prefix, _ = model.split(":", 1)
-        if prefix in {"openai", "anthropic", "gemini", "nvidia", "ollama", "ovms"}:
-            return prefix
-    if model.startswith("anthropic:"):
-        return "anthropic"
-    if model.startswith("gemini-"):
-        return "gemini"
-    if "/" in model:
-        return "nvidia"
-    return "ovms"
-
-
-def _strip_prefix(model: str) -> str:
-    if ":" in model:
-        prefix, value = model.split(":", 1)
-        if prefix in {"openai", "anthropic", "gemini", "nvidia", "ollama", "ovms"}:
-            return value
-    return model
 
 
 def _current_model_settings() -> dict:

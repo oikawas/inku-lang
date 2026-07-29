@@ -85,7 +85,7 @@ The distributed environment template explicitly sets operational example values.
 | Gemini | `GEMINI_API_KEY` | `GEMINI_BASE_URL` |
 | NVIDIA NIM | `NVIDIA_API_KEY` | `NVIDIA_BASE_URL` |
 | Ollama | `OLLAMA_API_KEY` | `OLLAMA_BASE_URL` |
-| Intel OVMS | `OVMS_API_KEY` | `OVMS_BASE_URL` |
+| Ollama Cloud | `OLLAMA_CLOUD_API_KEY` | `OLLAMA_CLOUD_BASE_URL` |
 
 Base URLs, keys, and published models can also be managed from the admin UI. Keys stored in the DB use the encrypted `enc:v1:` format.
 

@@ -101,12 +101,6 @@
       "minimax-m2.7",
       "mistral-large-3:675b",
       "qwen3.5:397b"
-    ],
-    "ovms": [
-      "qwen3-api",
-      "qwen-api",
-      "gemma3-12b-api",
-      "gemma3-4b-api"
     ]
   },
   "stage_defaults": {
@@ -152,9 +146,17 @@
     },
     {
       "ref": "qwen-api",
-      "provider": "ovms",
+      "provider": "nvidia",
       "model": "qwen-api",
-      "rule": "sole"
+      "rule": "stage",
+      "why": "ovms owned it until 2026-07-30; a withdrawn provider stops deciding rule 2"
+    },
+    {
+      "ref": "ovms:gemma3-4b-api",
+      "provider": "ovms",
+      "model": "gemma3-4b-api",
+      "rule": "explicit",
+      "why": "five artworks carry this exact string. Splitting it is what keeps the model id from being read as 'ovms:gemma3-4b-api' whole -- the label, not the routing, is what the retired entry serves"
     },
     {
       "ref": "llama3.2",
@@ -290,12 +292,46 @@
     }
   ],
   "never_ovms": {
-    "note": "The old rules sent everything unrecognised to ovms, whose endpoint answers /health long after it stops serving models.",
+    "note": [
+      "The old rules sent everything unrecognised to ovms, whose endpoint answered /health long after it stopped serving models.",
+      "ovms was withdrawn on 2026-07-30 and is now a retired entry: its ids are recognised for naming an old artwork and never for routing.",
+      "gemma3-4b-api is the load-bearing ref here -- a retired provider owns it and no live one does, so this is what pins naming apart from routing.",
+      "The routing rules must not name it. Only the display resolver may."
+    ],
     "refs": [
       "my-model",
       "qwen3.5:4b-q4_K_M",
       "gpt-oss:20b",
-      "totally-unknown-model"
+      "totally-unknown-model",
+      "gemma3-4b-api",
+      "qwen-api"
+    ]
+  },
+  "retired_display": {
+    "note": [
+      "The other half of never_ovms, asserted against the display resolver only.",
+      "Read by web/scripts/model-ref-check.mjs. The server has no path that turns a model id into a label, so this group is web-only.",
+      "The last case is the control: a live model must keep its own provider, or 'the retired entry names everything' would pass unnoticed."
+    ],
+    "cases": [
+      {
+        "ref": "ovms:gemma3-4b-api",
+        "provider": "ovms",
+        "model": "gemma3-4b-api",
+        "display": "Intel OVMS / Google Gemma 3 4B Instruct"
+      },
+      {
+        "ref": "gemma3-4b-api",
+        "provider": "ovms",
+        "model": "gemma3-4b-api",
+        "display": "Intel OVMS / Google Gemma 3 4B Instruct"
+      },
+      {
+        "ref": "qwen3.5:4b-q4_K_M",
+        "provider": "ollama",
+        "model": "qwen3.5:4b-q4_K_M",
+        "display": "Ollama / qwen3.5:4b-q4_K_M (3.4GB)"
+      }
     ]
   }
 }

@@ -48,7 +48,7 @@ export const en: LangPack = {
 	providerLabel: 'Provider:',
 	modelLabel: 'Model:',
 	showThinkingLabel: 'Show thinking',
-	modelSelectionSharedHint: 'Use the selected model for both Stage 1 and Stage 2.',
+	modelSelectionSharedHint: 'Use the selected model for both Stage 1 and Stage 2. Models measured per stage are ordered by their lower stage.',
 	modelSelectionSeparateHint: 'Choose the model for this stage only. Stage 1 and Stage 2 can use different models.',
 	modelSelectionVisionHint: 'Choose the model used for Vision processing of images.',
 
@@ -511,7 +511,7 @@ export const en: LangPack = {
 	settingsModelAddServiceButton: 'Add service',
 	settingsModelEditServiceTitle: 'Edit AI service name',
 	settingsModelServiceId: 'Service ID',
-	settingsModelServiceIdHelp: 'The service ID is a unique internal key for identifying this AI service.\nUsed as the DB connection-settings key, the Stage 1 / Stage 2 provider reference, the provider selector for API calls, and duplicate-service protection.\nThe user-facing display name is the service name. Because the service ID is an internal ID that is hard to change later, use a short stable name with letters, numbers, and hyphens.\nAvoid an ID that matches the head of a model name: in "service-id:model", everything before the first colon is read as the service ID.\nExamples: openai, anthropic, gemini, ollama, ovms, my-openai, local-qwen',
+	settingsModelServiceIdHelp: 'The service ID is a unique internal key for identifying this AI service.\nUsed as the DB connection-settings key, the Stage 1 / Stage 2 provider reference, the provider selector for API calls, and duplicate-service protection.\nThe user-facing display name is the service name. Because the service ID is an internal ID that is hard to change later, use a short stable name with letters, numbers, and hyphens.\nAvoid an ID that matches the head of a model name: in "service-id:model", everything before the first colon is read as the service ID.\nExamples: openai, anthropic, gemini, ollama, ollama-cloud, my-openai, local-qwen',
 	settingsModelServiceName: 'Service name',
 	settingsModelServiceKind: 'Connection type',
 	settingsModelRequiresApiKey: 'Requires API key',

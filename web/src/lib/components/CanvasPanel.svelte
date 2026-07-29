@@ -940,7 +940,7 @@
 									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || blocked || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
 									<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
 								</label>
-								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} />
+								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} purpose="llm" />
 							</div>
 						{/each}
 					</div>

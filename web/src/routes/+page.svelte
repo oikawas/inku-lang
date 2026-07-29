@@ -38,7 +38,7 @@
 		providerOfModel,
 		qualifiedModelId,
 		registerModelCatalog,
-		resolveModelRef,
+		resolveModelRefForDisplay,
 		splitModelRef,
 		type Provider,
 		type ProviderGroup,
@@ -76,7 +76,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const APP_VERSION = 'v2.9.9';
+	const APP_VERSION = 'v2.9.10';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
 	const buildDateLabel = $derived.by(() => {
@@ -5722,7 +5722,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// say which provider ran it: the same id can be served by two of them.
 	function shortModel(m: string | null | undefined): string {
 		if (!m) return '';
-		const { provider, model } = resolveModelRef(m);
+		const { provider, model } = resolveModelRefForDisplay(m);
 		const owner = providerLabel(provider);
 		const short = shortModelName(model);
 		return owner ? `${owner}/${short}` : short;

@@ -28,8 +28,6 @@ services:
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
-      OPENAI_MODEL_STAGE1: ${OPENAI_MODEL_STAGE1:-}
       # Local Ollama, which needs no key. Its default endpoint is localhost, and
       # inside this container localhost is the container -- so reaching an Ollama
       # on the host means naming the host. See `extra_hosts` below.

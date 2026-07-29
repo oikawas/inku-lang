@@ -107,14 +107,18 @@ def clear_learned_examples() -> None:
             LEARNED_FILE.unlink(missing_ok=True)
 
 
-# ── LLM バックエンド (interpreter.py と同じルーティング規則) ──────────────────
+# ── LLM backend ─────────────────────────────────────────────────────────────
+# A copy of the old rules that guessed the backend from the shape of the id. It is
+# called only from within this module, and nothing imports this module. The result
+# is only ever compared against "anthropic", so the OpenAI-compatible landings are
+# folded into one.
 
 def _get_provider(model: str) -> str:
     if model.startswith("anthropic:"):
         return "anthropic"
     if "/" in model:
         return "nvidia"
-    return "ovms"
+    return "openai"
 
 
 def _strip_prefix(model: str) -> str:
@@ -132,12 +136,7 @@ def _generate_openai(style: str, model: str) -> str:
         api_key = os.getenv("OPENAI_API_KEY") or "none"
 
     client = OpenAI(base_url=base_url, api_key=api_key)
-    is_qwen3 = "qwen3" in model.lower() and "/" not in model
-    user_content = (
-        f"/no_think 以下のスタイルで記述サンプルを 1 つ生成してください。\nスタイル: {style}"
-        if is_qwen3
-        else f"以下のスタイルで記述サンプルを 1 つ生成してください。\nスタイル: {style}"
-    )
+    user_content = f"以下のスタイルで記述サンプルを 1 つ生成してください。\nスタイル: {style}"
     resp = client.chat.completions.create(
         model=model,
         max_tokens=256,
@@ -186,8 +185,7 @@ def generate_sample(style_idx: int, model: str | None) -> str:
         return _generate_openai(style, model)
     backend = os.getenv("INKU_LLM_BACKEND", "anthropic").lower()
     if backend == "openai":
-        m = os.getenv("OPENAI_MODEL_STAGE1", "qwen3-api")
-        return _generate_openai(style, m)
+        return _generate_openai(style, "google/gemma-4-31b-it")
     return _generate_anthropic(style, "claude-opus-4-7")
 
 

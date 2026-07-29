@@ -56,9 +56,10 @@ def test_the_expectation_table(case, stage):
 
 
 def test_qualified_references_are_taken_at_their_word():
-    """Rule 1. These four answered correctly before the change and still do."""
+    """Rule 1. Four answered correctly before the rules changed; the fifth names a
+    provider that has since been withdrawn, and rule 1 still reads it."""
     explicit = [case for case in EXPECTATIONS["cases"] if case["rule"] == "explicit"]
-    assert len(explicit) == 4
+    assert len(explicit) == 5
     for case in explicit:
         assert provider_for_model(case["ref"], stage="stage1", settings=_settings()) == (
             case["provider"],
@@ -105,8 +106,13 @@ def test_rule_three_reads_the_stage(case):
 
 @pytest.mark.parametrize("ref", EXPECTATIONS["never_ovms"]["refs"])
 @pytest.mark.parametrize("stage", ["stage1", "stage2"])
-def test_nothing_unrecognised_lands_on_ovms(ref, stage):
-    """ovms was the old default landing provider and its endpoint is stopped."""
+def test_nothing_unqualified_lands_on_ovms(ref, stage):
+    """ovms was the old default landing provider; since 2026-07-30 it is withdrawn.
+
+    Two of these refs are models only ovms ever listed. They are the load-bearing
+    ones: a retired provider keeps its ids for naming an old artwork, and this is
+    what holds that apart from routing.
+    """
     settings = _settings({"stage1_provider": "ollama", "stage2_provider": "anthropic"})
     assert provider_for_model(ref, stage=stage, settings=settings)[0] != "ovms"
 

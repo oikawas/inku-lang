@@ -18,6 +18,34 @@ from .verified_model_catalog import (
     VERIFIED_OLLAMA_LOCAL_MODELS,
 )
 
+# Every recommendation key, named once. Three places have to agree about them --
+# the normalizer's receiving end, the metadata refresh a catalog version bump
+# triggers, and the set carried across a live model-list fetch (api.py) -- and a
+# key added to only some of them is lost in whichever path was missed, without
+# anything failing.
+#
+# The stage keys refine recommendation_llm rather than replacing it. A model
+# measured end to end -- every NVIDIA and Ollama Cloud entry -- has one number and
+# both stages read it, so adding these migrated nothing. They exist because the
+# local Ollama models were measured per stage and the two stages disagree: the
+# pair inku recommends is a Stage 1 model that covers 32% of Stage 2 and a Stage 2
+# model that breaks Stage 1 in English. One number cannot say that.
+MODEL_RECOMMENDATION_KEYS = (
+    "recommendation_llm",
+    "recommendation_vision",
+    "recommendation_stage1",
+    "recommendation_stage2",
+    "recommendation_level",
+)
+MODEL_METADATA_KEYS = (
+    "purposes",
+    *MODEL_RECOMMENDATION_KEYS,
+    "speed_class",
+    "speed_label",
+    "comment_ja",
+    "comment_en",
+)
+
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
     {
         "id": "openai",
@@ -112,25 +140,22 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         # promise to anyone else, so a release does not show them.
         "speed_developer_only": True,
     },
-    {
-        "id": "ovms",
-        "label": "Intel OVMS",
-        "kind": "openai_compatible",
-        "api_key_env": "OVMS_API_KEY",
-        "base_url_env": "OVMS_BASE_URL",
-        "default_base_url": "http://127.0.0.1:18000/v3",
-        "requires_api_key": False,
-        "models": [
-            {"id": "qwen3-api", "label": "Qwen3 8B Instruct", "notes": "thinking"},
-            {"id": "qwen-api", "label": "Qwen2.5 7B Instruct"},
-            {"id": "gemma3-12b-api", "label": "Google Gemma 3 12B Instruct"},
-            {"id": "gemma3-4b-api", "label": "Google Gemma 3 4B Instruct"},
-        ],
-    },
 ]
 
 BUILTIN_PROVIDER_IDS = {str(provider["id"]) for provider in PROVIDER_DEFINITIONS}
 _BUILTIN_PROVIDER_BY_ID = {str(provider["id"]): provider for provider in PROVIDER_DEFINITIONS}
+
+# Providers withdrawn from the catalog. Dropping the definition is not enough to
+# remove one from an installation: a provider id the builtin list does not know
+# is kept as though the operator had added it by hand (see the fallback branch in
+# normalize_model_settings), and the metadata refresh that MODEL_CONFIG_VERSION
+# triggers sits inside `if builtin`, so it never reaches it either. So a withdrawn
+# id has to be named here and dropped on the way in.
+#
+# ovms (Intel OpenVINO Model Server) was the local OpenAI-compatible backend
+# until 2026-07-30. Its endpoint had stopped serving models while still answering
+# /health, and the models it offered are reachable through Ollama instead.
+RETIRED_PROVIDER_IDS = {"ovms"}
 _OPENAI_LEGACY_LOCAL_BASE_URLS = {
     "http://127.0.0.1:18000/v3",
     "http://localhost:18000/v3",
@@ -186,6 +211,15 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
                 value = model.get(key)
                 if not isinstance(value, int) or isinstance(value, bool):
                     value = legacy if purpose in clean_purposes else None
+                if isinstance(value, int) and not isinstance(value, bool):
+                    item[key] = max(1, min(5, value))
+            # Stage levels have no purpose of their own -- they narrow the LLM
+            # level -- so they are read straight through with no legacy fallback.
+            # Absent means "not measured for that stage", which the picker shows
+            # as an em dash; it must not be filled in with a 0 or with the other
+            # stage's number.
+            for key in ("recommendation_stage1", "recommendation_stage2"):
+                value = model.get(key)
                 if isinstance(value, int) and not isinstance(value, bool):
                     item[key] = max(1, min(5, value))
             for key in ("speed_class", "speed_label", "comment_ja", "comment_en", "eol_date"):
@@ -262,6 +296,8 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
             provider_id = _normalize_provider_id(raw_provider_id)
             if not provider_id or not isinstance(incoming, dict):
                 continue
+            if provider_id in RETIRED_PROVIDER_IDS:
+                continue
             builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
             provider = clean["providers"].get(provider_id) or {
                 "id": provider_id,
@@ -319,11 +355,7 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 catalog_moved = incoming_catalog_version != MODEL_CONFIG_VERSION
                 builtin_by_id = {str(model["id"]): model for model in provider["models"]}
                 if builtin and (provider_id == "nvidia" or catalog_moved):
-                    metadata_keys = (
-                        "purposes", "recommendation_llm", "recommendation_vision",
-                        "recommendation_level", "speed_class", "speed_label",
-                        "comment_ja", "comment_en",
-                    )
+                    metadata_keys = MODEL_METADATA_KEYS
                     # NVIDIA additionally keeps builtin-only models the stored list has
                     # dropped, because artworks name them and a dropped id would leave
                     # those artworks labelless.
@@ -570,10 +602,16 @@ def _known_provider_ids(settings: dict[str, Any] | None) -> set[str]:
     A dict carrying "providers" is taken as a catalog and read directly rather
     than normalized: normalize_model_settings() deep-copies the whole catalog,
     and splitting a reference only needs the keys.
+
+    Retired ids are recognised too, so "ovms:gemma3-4b-api" -- five artworks carry
+    that exact string -- splits into a provider and a model rather than being read
+    as one long model id. Recognising the prefix is not offering the provider:
+    connection_for() then raises for it, which says what is actually wrong instead
+    of asking NVIDIA for a model named "ovms:gemma3-4b-api".
     """
     if isinstance(settings, dict) and isinstance(settings.get("providers"), dict):
-        return {str(provider_id) for provider_id in settings["providers"]}
-    return set(BUILTIN_PROVIDER_IDS)
+        return {str(provider_id) for provider_id in settings["providers"]} | RETIRED_PROVIDER_IDS
+    return set(BUILTIN_PROVIDER_IDS) | RETIRED_PROVIDER_IDS
 
 
 def split_model_ref(ref: str, settings: dict[str, Any] | None) -> tuple[str | None, str]:
@@ -628,9 +666,11 @@ def provider_for_model(model: str | None, *, stage: str, settings: dict[str, Any
 
     Rule 2 must be *exactly* one: "gpt-oss:20b" is offered by both ollama and
     ollama-cloud, so nothing in the string can decide between them and the
-    reference falls to rule 3 rather than being guessed. There is deliberately
-    no default landing provider; the old rules sent everything unrecognised to
-    ovms, whose endpoint answers /health long after it stops serving models.
+    reference falls to rule 3 rather than being guessed. There is deliberately no
+    default landing provider: the rules that preceded these sent everything
+    unrecognised to one, and it went on answering /health long after it had
+    stopped serving models, so an unresolvable reference looked like a working
+    one.
     """
     stage_key = "stage1_provider" if stage == "stage1" else "stage2_provider"
     if not model:
@@ -664,15 +704,21 @@ def provider_concurrency_limit(provider_id: str) -> int:
 
 
 def connection_for(provider_id: str, settings: dict[str, Any]) -> dict[str, Any]:
+    """Where to reach a provider. An unknown id is an error, not a redirection.
+
+    A name nobody configured used to fall through to ovms, which meant a typo or a
+    retired reference reached a real endpoint and got a real-looking answer from
+    the wrong machine. Raising here is what makes the withdrawal of a provider
+    visible at the point of use.
+    """
     clean = normalize_model_settings(settings)
-    provider = clean["providers"].get(provider_id) or clean["providers"].get("ovms")
+    provider = clean["providers"].get(provider_id)
     if not provider:
         raise ValueError(f"unknown model provider: {provider_id}")
-    stored = clean["providers"].get(provider_id, {})
     return {
         "id": provider_id,
         "kind": provider["kind"],
-        "base_url": stored.get("base_url") or provider["default_base_url"],
-        "api_key": decrypt_secret(str(stored.get("api_key") or "")) or os.getenv(str(provider["api_key_env"]), ""),
+        "base_url": provider.get("base_url") or provider["default_base_url"],
+        "api_key": decrypt_secret(str(provider.get("api_key") or "")) or os.getenv(str(provider["api_key_env"]), ""),
         "requires_api_key": provider["requires_api_key"],
     }

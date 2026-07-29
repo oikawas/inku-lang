@@ -66,7 +66,7 @@ def test_catalog_reaches_the_settings_the_ui_reads() -> None:
 
 def test_concurrency_is_capped_for_the_cloud_and_free_elsewhere() -> None:
     assert provider_concurrency_limit("ollama-cloud") == 2
-    for provider_id in ("ollama", "nvidia", "openai", "anthropic", "gemini", "ovms"):
+    for provider_id in ("ollama", "nvidia", "openai", "anthropic", "gemini"):
         assert provider_concurrency_limit(provider_id) == 0
     assert provider_concurrency_limit("no-such-provider") == 0
 
@@ -273,7 +273,7 @@ def test_the_cloud_keeps_asking_by_tool_call(monkeypatch) -> None:
 def test_unmeasured_providers_are_not_told_anything(monkeypatch) -> None:
     # Suppression can cost the tool call (gpt-oss:20b loses it). It is only sent
     # where it was measured.
-    for provider in ("ovms", "nvidia"):
+    for provider in ("openai", "nvidia"):
         assert "reasoning_effort" not in _capture_stage2_request(monkeypatch, provider)
         assert "reasoning_effort" not in _capture_stage1_request(monkeypatch, provider)
 

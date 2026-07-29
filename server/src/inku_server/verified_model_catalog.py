@@ -90,24 +90,33 @@ _OLLAMA_CLOUD_NOTICE_EN = (
     "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model."
 )
 
-_OLLAMA_CLOUD_UNMEASURED = [
+# Ten of the eighteen answer HTTP 403 "this model requires a subscription" on the
+# free tier (every one of the eighteen was asked a fourteen-token question on
+# 2026-07-29, so this is the account's own answer, not an inference from size).
+# They stay listed and are marked unselectable: removing them would hide that they
+# exist and would have to be undone the day the account changes, while leaving them
+# selectable means the reader only learns of the wall by drawing into an error.
+_OLLAMA_CLOUD_SUBSCRIPTION_ONLY = [
     "deepseek-v4-flash",
     "deepseek-v4-pro",
     "glm-5.1",
     "glm-5.2",
-    "gpt-oss:20b",
-    "gpt-oss:120b",
     "kimi-k2.5",
     "kimi-k2.6",
     "kimi-k2.7-code",
-    "minimax-m2.5",
     "minimax-m2.7",
-    "minimax-m3",
     "mistral-large-3:675b",
+    "qwen3.5:397b",
+]
+
+_OLLAMA_CLOUD_UNMEASURED = [
+    "gpt-oss:20b",
+    "gpt-oss:120b",
+    "minimax-m2.5",
+    "minimax-m3",
     "nemotron-3-nano:30b",
     "nemotron-3-super",
     "nemotron-3-ultra",
-    "qwen3.5:397b",
 ]
 
 VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
@@ -135,6 +144,22 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
             "comment_en": _OLLAMA_CLOUD_NOTICE_EN + " Its quality has not been measured.",
         }
         for model_id in _OLLAMA_CLOUD_UNMEASURED
+    ],
+    *[
+        {
+            "id": model_id,
+            "label": model_id,
+            "purposes": ["llm"],
+            "requires_subscription": True,
+            "speed_class": "unknown",
+            "speed_label": "未計測",
+            "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+            + "無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+            + " Not available on the free tier (403; the provider's paid plan is required),"
+            + " so its quality has not been measured.",
+        }
+        for model_id in _OLLAMA_CLOUD_SUBSCRIPTION_ONLY
     ],
 ]
 

@@ -1553,13 +1553,19 @@ def _interpret_openai_detail(
     # thinking suppressed the same work ran 8x faster, one case stopped coming back
     # empty, and how much of the description survived did not change.
     #
-    # `/no_think` above is the same intent said in OVMS's dialect. Ollama Cloud is
-    # left alone: its models emitted no thinking in either setting (measured), so
-    # the argument would buy nothing there and it asks by tool call, where the
-    # setting has been seen to cost the call itself.
+    # `/no_think` above is the same intent said in OVMS's dialect.
+    #
+    # Ollama Cloud used to be left out, on the grounds that its models emitted no
+    # thinking either way. That was gemma4:31b's behaviour -- the only cloud model
+    # measured on 2026-07-27 -- read as the whole provider's. Asked the same trivial
+    # question at three budgets on 2026-07-29, the eight cloud models the free tier
+    # can reach answered 2/8 at sixteen tokens, 7/8 at 1024, and 8/8 only once
+    # thinking was suppressed. Stage 1 shares MAX_TOKENS the same way Stage 2 does,
+    # so it is suppressed here for the same reason (see composer.py for the full
+    # measurement and for what the suppression costs).
     thinking_off: dict = (
         {"reasoning_effort": "none"}
-        if provider == "ollama" and not include_thinking
+        if provider in ("ollama", "ollama-cloud") and not include_thinking
         else {}
     )
 

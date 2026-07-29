@@ -7,7 +7,7 @@
 -->
 <script lang="ts">
 	import type { ModelOption } from '$lib/models';
-	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelEolLabel } from '$lib/modelMeta';
+	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelStatusLabel } from '$lib/modelMeta';
 
 	type Props = {
 		model: ModelOption;
@@ -19,7 +19,7 @@
 </script>
 
 <span class="model-hover-card" role="tooltip">
-	{#if model.eol}<span><strong>状態 / Status</strong>{modelEolLabel(model, isJapanese)}</span>{/if}
+	{#if modelStatusLabel(model, isJapanese)}<span><strong>状態 / Status</strong>{modelStatusLabel(model, isJapanese)}</span>{/if}
 	<span><strong>用途 / Use</strong>{modelPurposes(model)}</span>
 	<span><strong>オススメ度 / Recommendation</strong>{modelRecommendation(model)}</span>
 	<span><strong>速度 / Speed</strong>{modelSpeed(model)}</span>

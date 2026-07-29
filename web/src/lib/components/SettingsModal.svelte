@@ -2,7 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { getMascot, setMascot } from '$lib/mascot.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
-	import { modelEolLabel, sortModels } from '$lib/modelMeta';
+	import { modelStatusLabel, isModelUnselectable, sortModels } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -747,12 +747,13 @@
 									class="model-metadata-hover"
 									class:selected={modelSelected(provider.id, model.id)}
 									class:eol={model.eol}
-									disabled={model.eol}
+									class:unselectable={isModelUnselectable(model)}
+									disabled={isModelUnselectable(model)}
 									aria-pressed={modelSelected(provider.id, model.id)}
 									onclick={() => selectGenerationModel(provider.id, model.id)}
 								>
 									<strong>{model.label}</strong>
-									{#if model.eol}<span class="eol-mark">{modelEolLabel(model, isJapanese)}</span>{/if}
+									{#if isModelUnselectable(model)}<span class="eol-mark">{modelStatusLabel(model, isJapanese)}</span>{/if}
 									{#if model.notes}<span>{model.notes}</span>{/if}
 									<ModelMetaCard {model} {isJapanese} />
 								</button>
@@ -1773,7 +1774,8 @@
 		background: var(--panel); color: var(--fg2); cursor: pointer; text-align: left; font-family: inherit;
 	}
 	.generation-model-grid button:hover { border-color: var(--accent); background: var(--bg2); }
-	.generation-model-grid button.eol { opacity: 0.55; cursor: not-allowed; }
+	.generation-model-grid button.unselectable { opacity: 0.55; cursor: not-allowed; }
+	/* 取り消し線は退役にだけ引く。有料プラン限定は「消えた」のではない */
 	.generation-model-grid button.eol strong { text-decoration: line-through; }
 	.eol-mark { color: var(--danger); font-weight: 600; }
 	.generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }

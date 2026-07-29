@@ -20,16 +20,18 @@ import re
 import unicodedata
 import urllib.request
 from copy import deepcopy
-from typing import Any
+from typing import Any, get_args
 
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from .saijiki import relation_literal_markers
-from .schema import Score, Variation
+from .schema import Score, ScoreVersion, Variation
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 2048
+# Read off the Literal rather than written again, so the two cannot drift apart.
+SCORE_VERSION = get_args(ScoreVersion)[0]
 _logger = logging.getLogger(__name__)
 
 # 手順のみ。フィールド仕様は submit_score スキーマの description を参照。
@@ -1406,6 +1408,30 @@ def _record_stage2_raw(trace_sink: list[dict] | None, raw_text: str, parse_ok: b
         trace_sink.append({"raw_text": raw_text, "parse_ok": bool(parse_ok)})
 
 
+def _score_from_model_output(data: object) -> Score:
+    """Validate a Score a model wrote, without letting one constant throw it away.
+
+    `version` is `Literal["0.1.0"]` with that same value as its default, and the
+    tool schema does not require it: the model has nothing to say through this
+    field, and the one legal value is already ours. A provider whose decoder is
+    constrained cannot get it wrong, but Ollama Cloud ignores structured output
+    in all three of its forms (measured 2026-07-27), so the model writes the
+    field from the prompt and guesses -- `"1.0"`, every time it guessed.
+
+    That guess cost the whole Score. Of the thirty-two Stage 2 runs measured on
+    2026-07-29 across the eight cloud models the free tier can reach, **nine
+    failed on this field and nothing else**, taking four models from "returns
+    nothing usable" to a working Score once the key is dropped.
+
+    Dropped rather than rewritten: rewriting would mean deciding the model meant
+    0.1.0, and there is nothing to decide -- the field simply carries no
+    information from a model. The default then supplies it.
+    """
+    if isinstance(data, dict) and "version" in data and data.get("version") != SCORE_VERSION:
+        data = {key: value for key, value in data.items() if key != "version"}
+    return Score.model_validate(data)
+
+
 def _compose_anthropic(
     user_msg: str,
     *,
@@ -1435,7 +1461,7 @@ def _compose_anthropic(
         if block.type == "tool_use" and block.name == "submit_score":
             raw_text = json.dumps(block.input, ensure_ascii=False, default=str)
             try:
-                score = Score.model_validate(block.input)
+                score = _score_from_model_output(block.input)
             except Exception:
                 _record_stage2_raw(trace_sink, raw_text, False)
                 raise
@@ -1484,7 +1510,7 @@ def _compose_gemini(
     text_out = "\n".join(str(part.get("text", "")) for part in parts).strip()
     usage = payload.get("usageMetadata", {})
     try:
-        score = Score.model_validate(_extract_json(text_out))
+        score = _score_from_model_output(_extract_json(text_out))
     except Exception:
         _record_stage2_raw(trace_sink, text_out, False)
         raise
@@ -1531,9 +1557,21 @@ def _compose_openai(
     # the argument is absent, and thinking shares MAX_TOKENS with the answer, so a
     # model that thinks past the budget returns nothing. Suppressing it ran the same
     # eight cases 8x faster, recovered the one that had been coming back empty, and
-    # left coverage identical (measured 2026-07-28). The cloud is left alone: its
-    # models emitted no thinking either way, and there the setting has been seen to
-    # cost the tool call itself.
+    # left coverage identical (measured 2026-07-28).
+    #
+    # The cloud used to be left out of this, on the grounds that its models emitted
+    # no thinking either way. That was one model's behaviour read as the provider's:
+    # gemma4:31b was the only cloud model measured on 2026-07-27. Asked the same
+    # trivial question at three budgets on 2026-07-29, the eight cloud models the
+    # free tier can reach answered 2/8 at sixteen tokens, 7/8 at 1024, and 8/8 only
+    # once thinking was suppressed -- minimax-m3 needs the suppression to reach an
+    # answer at all. Over four Stage 2 runs each, suppression took the clean total
+    # from 6 to 9 and cut empty responses from 15 to 6.
+    #
+    # The other half of that old note holds: suppression can cost the tool call
+    # (gpt-oss:20b loses it and returns nothing). It was kept anyway, because the
+    # models it rescues outnumber the one it breaks, and gpt-oss:20b's Score was
+    # already invalid without it.
     if provider == "ollama":
         structured: dict = {
             "reasoning_effort": "none",
@@ -1560,6 +1598,11 @@ def _compose_openai(
             ],
             "tool_choice": {"type": "function", "function": {"name": "submit_score"}},
         }
+        # The cloud keeps tools and gains only the suppression. The two settings are
+        # separable: one chooses how the answer is shaped, the other whether the
+        # model spends the budget before writing it.
+        if provider == "ollama-cloud":
+            structured["reasoning_effort"] = "none"
 
     with provider_slot(provider):
         resp = call_with_llm_retry(
@@ -1583,7 +1626,7 @@ def _compose_openai(
     if msg.tool_calls:
         args = msg.tool_calls[0].function.arguments
         try:
-            score = Score.model_validate(json.loads(args))
+            score = _score_from_model_output(json.loads(args))
         except Exception:
             _record_stage2_raw(trace_sink, args, False)
             raise
@@ -1594,7 +1637,7 @@ def _compose_openai(
     args = _extract_tool_call_args(text)
     if args is not None:
         try:
-            score = Score.model_validate(args)
+            score = _score_from_model_output(args)
         except Exception:
             _record_stage2_raw(trace_sink, text, False)
             raise
@@ -1602,7 +1645,7 @@ def _compose_openai(
         return score, tin, tout
 
     try:
-        score = Score.model_validate(_extract_json(text))
+        score = _score_from_model_output(_extract_json(text))
     except Exception:
         _record_stage2_raw(trace_sink, text, False)
         raise

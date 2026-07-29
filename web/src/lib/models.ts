@@ -17,6 +17,9 @@ export type ModelOption = {
 	// v1.98: 提供元が提供終了したモデル。一覧には残すが新規描画では選べない。
 	eol?: boolean;
 	eol_date?: string;
+	// 提供元の有料プランでしか叩けないモデル。EOL と同じく選べないが、理由が違う
+	// (退役したのではなく、こちらの契約が届いていない)。
+	requires_subscription?: boolean;
 };
 
 export type ProviderGroup = {

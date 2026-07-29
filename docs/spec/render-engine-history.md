@@ -20,6 +20,15 @@ four places (gathered into this document on 2026-07-28) — prose in `SPEC.md` (
 the version actually moved go into `server/reference/render-engine-<version>/`, while the manifest
 carries the digest of every case.
 
+**The DDL transform layer (`DDL_ENGINE_VERSION`) has a third reason of its own** — **the declaration
+order of `Instruction`'s fields changed**. The Stage 2 tool schema reaches the model with its
+property order intact, and an optional field's fill rate depends monotonically on where it is
+declared (0% at the head, 89% at the tail; measured in `SPEC.ja.md` §5.1). **Not one line of
+behaviour need change for the distribution of Scores, and therefore the drawing, to change.**
+Reordering looks like tidying for readability, and **this is the one reason a frozen corpus cannot
+catch** — the corpus fixes the Score and watches the performance, so a change in which Scores are
+produced moves nothing in it.
+
 **The block cannot be restored, but the prints can be kept.** Freezing is the proof print that makes
 that possible: the **actual output** from a fixed set of inputs (the SVG, its element counts,
 classes, and a coordinate digest) is stored, and CI fails if regenerating an existing case is not

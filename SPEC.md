@@ -388,6 +388,17 @@ writes         interprets       expands        structures    draws
 - **SVG**: the result of the performance.  It happens once.  The description
   stays; the output is born and lost each time.
 
+**The Stage 2 tool schema reaches the model with its property order intact.** An optional field's
+fill rate therefore **depends monotonically on where it is declared**: moving `Instruction.thinness`
+alone through five positions gave **0%** at the head, **18%** at position 14 (where render engine 16
+declares it), **48%** at 19, **83%** at 22 and **89%** at the tail (25 distinct inputs, the same
+Stage 1 output, the same Stage 2 prompt, `nvidia:google/gemma-4-31b-it`, counted over the 21 that
+completed all five groups). **The head scoring 0% rules out "sitting next to a related word is what
+hurts": the further back a field sits, the more often it is filled.** Field declaration order is
+therefore part of the specification, not a matter of readability. The rule for raising the version
+when that order changes lives under "When the version goes up" in the
+[render engine version history](docs/spec/render-engine-history.md).
+
 ### 5.2 What inku Adds to LeWitt
 
 LeWitt's instruction sheet was itself the concrete, executable instruction.

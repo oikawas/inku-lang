@@ -749,3 +749,18 @@ The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/
 - **Only `android/VERSION` is stamped.** `APP_VERSION` (`v2.9.4`), `web/BUILD_NUMBER` (755) and `android/BUILD_NUMBER` (148090) all stand still, and **pentala needs no deployment**
 - **Verification:** Android **99 tests, 0 failures, 0 errors, 0 skipped** (23 XML files). After the merge, in the main checkout: server **1596 passed / 31 skipped**, cli **76**, ruff green over `src tests scripts`, `npm run check` **0 errors / 2 warnings / 218 files**, and `check_frozen_corpora.py` byte-identical
 - **Still outstanding:** `ANDROID_SPEC.ja.md` and `.md` **have not followed engine 15 either** ([I-013]), which this contract left out of scope
+
+---
+
+### 2026-07-29 — declaration order is part of the specification (**no version**; documentation only)
+
+**Two author's rulings from 2026-07-29 ([I-037] and [I-040]) were written into the documents.** They were made in the engine-design session, which cannot write to the ledger, so **only their delivery was outstanding** — the record lived in §2.2 of the design handoff and had never reached `DECIDED.ja.md`.
+
+- **The fact goes in SPEC** (`SPEC.ja.md` §5.1 and its counterpart in `SPEC.md`): **the Stage 2 tool schema reaches the model with its property order intact, and an optional field's fill rate depends monotonically on where it is declared.** Moving `Instruction.thinness` alone through five positions measured **0% at the head, 18% at position 14 (where render engine 16 declares it), 48% at 19, 83% at 22 and 89% at the tail** (25 distinct inputs, the same Stage 1 output, the same Stage 2 prompt, `nvidia:google/gemma-4-31b-it`, counted over the 21 that completed all five groups). **The head scoring 0% rules out "sitting next to a related word is what hurts": the further back a field sits, the more often it is filled**
+- **The rule goes in the version history** (under "When the version goes up" in `docs/spec/render-engine-history`, both languages): **the DDL transform layer (`DDL_ENGINE_VERSION`) has a reason of its own — the declaration order of `Instruction`'s fields changed.** **Not one line of behaviour need change for the distribution of Scores, and therefore the drawing, to change**
+- **The split across two documents follows the 2026-07-28 restructuring**, which moved the canonical home of the version rules out of SPEC and into the version history (`SPEC.ja.md` says so explicitly). The ruling said "write it in SPEC", so **the fact and the rule were separated to satisfy both**
+- **This is the one reason a frozen corpus cannot catch.** The corpus fixes the Score and watches the performance, so a change in which Scores are produced moves nothing in it
+- Two clauses were added to the development conventions (a private document): **do not reorder keys when comparing schemas**, and **assert the position before sending if you reorder**. **Two sessions fell into that trap independently** — comparing with `json.dumps(..., sort_keys=True)` reported "byte-identical" for what was in fact identical content in a different order, and that order was the cause
+- **Actually moving `thinness` to the tail is a separate contract** (`thinness-declaration-position.md`, phase 1; **not started**). This entry is documentation only, and **no running code changed**
+
+**Verification:** `check_docs.py` green (the same two declared differences; 56 internal references).

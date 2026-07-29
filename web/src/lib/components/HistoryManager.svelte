@@ -495,12 +495,20 @@
 		<div class="history-head-left">
 			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
 			<div class="settings-tabs history-mode-tabs">
-				<button class:active={historyManagerTab === 'thumbs'} title={t().tooltipHistoryThumbsTab} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
-				<button class:active={historyManagerTab === 'list'} title={t().tooltipHistoryListTab} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryThumbsTab}>
+					<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
+				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryListTab}>
+					<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
+				</Tooltip>
 			</div>
 			<div class="settings-tabs history-group-tabs">
-				<button class:active={historyDisplayMode === 'chronological'} title={t().tooltipHistoryChronological} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
-				<button class:active={historyDisplayMode === 'lineage'} title={t().tooltipHistoryLineageGrouped} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryChronological}>
+					<button class:active={historyDisplayMode === 'chronological'} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
+				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryLineageGrouped}>
+					<button class:active={historyDisplayMode === 'lineage'} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
+				</Tooltip>
 			</div>
 			<span class="history-manager-count">
 				{#if historyDisplayMode === 'lineage'}
@@ -869,24 +877,33 @@
 		cursor: pointer;
 		line-height: 1;
 	}
+	/* No overflow clipping here: the tabs carry Tooltip bubbles that must escape the box.
+	   The rounded corners live on the end buttons instead. */
 	.settings-tabs {
 		display: flex;
 		gap: 0;
 		background: var(--bg);
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		overflow: hidden;
 	}
+	.settings-tabs :global(.tooltip-wrap) { align-items: stretch; }
 	.settings-tabs button {
-		padding: 4px 9px;
+		padding: var(--btn-sm-padding);
 		border: none;
 		background: none;
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 		font-family: inherit;
 	}
-	.settings-tabs button + button { border-left: 1px solid var(--border); }
+	/* -1px keeps the fill inside the container's 1px border. */
+	.settings-tabs :global(.tooltip-wrap:first-child button) {
+		border-radius: calc(var(--btn-sm-radius) - 1px) 0 0 calc(var(--btn-sm-radius) - 1px);
+	}
+	.settings-tabs :global(.tooltip-wrap:last-child button) {
+		border-radius: 0 calc(var(--btn-sm-radius) - 1px) calc(var(--btn-sm-radius) - 1px) 0;
+	}
+	.settings-tabs :global(.tooltip-wrap + .tooltip-wrap button) { border-left: 1px solid var(--border); }
 	.settings-tabs button.active { color: var(--fg); background: var(--panel); font-weight: 500; }
 	.history-tools {
 		display: flex;

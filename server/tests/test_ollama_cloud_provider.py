@@ -249,10 +249,31 @@ def test_asking_for_the_thinking_leaves_it_on(monkeypatch) -> None:
     assert "reasoning_effort" not in seen
 
 
-def test_other_providers_are_not_told_anything(monkeypatch) -> None:
-    # The cloud's models emitted no thinking either way, so the argument buys
-    # nothing; and it asks by tool call, where the setting has cost the call itself.
-    for provider in ("ollama-cloud", "ovms"):
+def test_the_cloud_is_told_not_to_think_too(monkeypatch) -> None:
+    # This used to assert the opposite. The claim behind it -- "the cloud's models
+    # emitted no thinking either way" -- was gemma4:31b's behaviour, the only cloud
+    # model measured on 2026-07-27, read as the provider's. Asked the same trivial
+    # question at three budgets on 2026-07-29, the eight cloud models the free tier
+    # can reach answered 2/8 at sixteen tokens, 7/8 at 1024, and 8/8 only once
+    # thinking was suppressed. Over four Stage 2 runs each it took the clean total
+    # from 6 to 9 and cut empty responses from 15 to 6.
+    assert _capture_stage2_request(monkeypatch, "ollama-cloud")["reasoning_effort"] == "none"
+    assert _capture_stage1_request(monkeypatch, "ollama-cloud")["reasoning_effort"] == "none"
+
+
+def test_the_cloud_keeps_asking_by_tool_call(monkeypatch) -> None:
+    # The rest of that old note holds: the cloud ignores structured output in all
+    # three forms, so it stays on tools. The suppression rides alongside, and the
+    # two settings must not be merged into one branch.
+    seen = _capture_stage2_request(monkeypatch, "ollama-cloud")
+    assert "tools" in seen
+    assert "response_format" not in seen
+
+
+def test_unmeasured_providers_are_not_told_anything(monkeypatch) -> None:
+    # Suppression can cost the tool call (gpt-oss:20b loses it). It is only sent
+    # where it was measured.
+    for provider in ("ovms", "nvidia"):
         assert "reasoning_effort" not in _capture_stage2_request(monkeypatch, provider)
         assert "reasoning_effort" not in _capture_stage1_request(monkeypatch, provider)
 

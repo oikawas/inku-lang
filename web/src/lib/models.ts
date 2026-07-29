@@ -17,6 +17,9 @@ export type ModelOption = {
 	// v1.98: 提供元が提供終了したモデル。一覧には残すが新規描画では選べない。
 	eol?: boolean;
 	eol_date?: string;
+	// 提供元の有料プランでしか叩けないモデル。EOL と同じく選べないが、理由が違う
+	// (退役したのではなく、こちらの契約が届いていない)。
+	requires_subscription?: boolean;
 };
 
 export type ProviderGroup = {
@@ -96,10 +99,14 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 	{
 		id: 'ollama-cloud',
 		label: 'Ollama Cloud (ollama.com)',
+		// サーバのカタログが届くまでの控え。**無料枠で叩ける 3 本を推奨度の高い順に置く。**
+		// 以前はここに qwen3.5:397b と glm-5.2 を並べていたが、どちらも提供元の有料プランが
+		// 要る (2026-07-29 実測・403)。控えには印が付かないので、起動直後だけ選べてしまい、
+		// 描こうとして初めて壁に気づくことになる。
 		models: [
-			{ id: 'gemma4:31b', label: 'gemma4:31b' },
-			{ id: 'qwen3.5:397b', label: 'qwen3.5:397b' },
-			{ id: 'glm-5.2', label: 'glm-5.2' }
+			{ id: 'nemotron-3-ultra', label: 'nemotron-3-ultra' },
+			{ id: 'minimax-m2.5', label: 'minimax-m2.5' },
+			{ id: 'nemotron-3-super', label: 'nemotron-3-super' }
 		]
 	},
 	{

@@ -104,6 +104,13 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         # a taste, so it is fixed here instead of being offered as a setting.
         "max_concurrency": 2,
         "models": VERIFIED_OLLAMA_CLOUD_MODELS,
+        # Same reason as local Ollama, for a different cause: there the machine is
+        # nobody else's, here the queue is everybody's. The same request to the same
+        # model ran 1.2 and 110 seconds on one day (2026-07-27), and gemma4:31b's
+        # median moved 11s -> 105s -> 35s across three runs of the same four cases
+        # on 2026-07-29. The numbers are worth having while measuring and are not a
+        # promise to anyone else, so a release does not show them.
+        "speed_developer_only": True,
     },
     {
         "id": "ovms",
@@ -188,6 +195,11 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             # v1.98: 提供終了 (EOL) の印。新規描画では選べないが一覧には残す。
             if model.get("eol") is True:
                 item["eol"] = True
+            # 提供元の有料プランでしか叩けないモデルの印。EOL とは別の理由で選べない
+            # (退役したのではなく、こちらの契約が届いていない)。一覧には残す — 消すと
+            # 契約を変えたときに戻す作業が要るうえ、存在自体が見えなくなる。
+            if model.get("requires_subscription") is True:
+                item["requires_subscription"] = True
             normalized.append(item)
     return normalized
 

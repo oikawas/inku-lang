@@ -33,8 +33,8 @@ export function modelRecommendation(model: ModelOption, purpose?: ModelPurpose):
 // 順序で配列を作り直すため、カタログの配列順では順序を維持できない (v1.98)。
 export function sortModels(models: ModelOption[], purpose?: ModelPurpose): ModelOption[] {
 	return [...models].sort((a, b) => {
-		const retired = Number(!!a.eol) - Number(!!b.eol);
-		if (retired !== 0) return retired;
+		const unselectable = Number(isModelUnselectable(a)) - Number(isModelUnselectable(b));
+		if (unselectable !== 0) return unselectable;
 		const level = modelRecommendationLevel(b, purpose) - modelRecommendationLevel(a, purpose);
 		if (level !== 0) return level;
 		return (a.label || a.id).localeCompare(b.label || b.id);
@@ -53,4 +53,17 @@ export function modelEolLabel(model: ModelOption, isJapanese: boolean): string |
 	if (!model.eol) return null;
 	const date = model.eol_date ? ` (${model.eol_date})` : '';
 	return isJapanese ? `提供終了${date}` : `End of life${date}`;
+}
+
+// 選べない理由は 2 つある。退役 (EOL) と、有料プラン限定。どちらも一覧には残す
+// ので、無効化と並べ替えは 1 つの述語を通す。
+export function isModelUnselectable(model: ModelOption): boolean {
+	return !!model.eol || !!model.requires_subscription;
+}
+
+export function modelStatusLabel(model: ModelOption, isJapanese: boolean): string | null {
+	const eol = modelEolLabel(model, isJapanese);
+	if (eol) return eol;
+	if (model.requires_subscription) return isJapanese ? '有料プラン限定' : 'Paid plan only';
+	return null;
 }

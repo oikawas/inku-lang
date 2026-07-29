@@ -676,12 +676,6 @@
 		return new Date(ms).toLocaleString();
 	}
 
-	const dbBackupTimeValue = $derived(
-		settingsStatus
-			? `${String(settingsStatus.db_backup.backup_hour).padStart(2, '0')}:${String(settingsStatus.db_backup.backup_minute).padStart(2, '0')}`
-			: '03:00'
-	);
-
 	// What the current settings will ask of the disk: the automatic copies are
 	// pruned to max_generations, so that is the ceiling. Manual copies are never
 	// pruned and are therefore not something the settings can predict.
@@ -699,11 +693,6 @@
 		);
 	}
 
-	function saveDbBackupTime(value: string) {
-		const [hour, minute] = value.split(':').map(Number);
-		if (!Number.isFinite(hour) || !Number.isFinite(minute)) return;
-		saveDbBackupSettings({ hour, minute });
-	}
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -928,15 +917,31 @@
 								onchange={(e) => saveDbBackupSettings({ maxGenerations: Number((e.currentTarget as HTMLInputElement).value) })}
 							/>
 						</label>
-						<label>
+						<div class="db-backup-field db-backup-time">
 							<span>{t().settingsDbBackupTime}</span>
-							<input
-								type="time"
-								value={dbBackupTimeValue}
-								disabled={!settingsStatus.db_backup.supported}
-								onchange={(e) => saveDbBackupTime((e.currentTarget as HTMLInputElement).value)}
-							/>
-						</label>
+							<div class="db-backup-time-fields">
+								<input
+									type="number"
+									min="0"
+									max="23"
+									aria-label={t().settingsDbBackupTimeHourLabel}
+									value={settingsStatus.db_backup.backup_hour}
+									disabled={!settingsStatus.db_backup.supported}
+									onchange={(e) => saveDbBackupSettings({ hour: Number((e.currentTarget as HTMLInputElement).value) })}
+								/>
+								<span class="db-backup-time-unit">{t().settingsDbBackupTimeHourUnit}</span>
+								<input
+									type="number"
+									min="0"
+									max="59"
+									aria-label={t().settingsDbBackupTimeMinuteLabel}
+									value={settingsStatus.db_backup.backup_minute}
+									disabled={!settingsStatus.db_backup.supported}
+									onchange={(e) => saveDbBackupSettings({ minute: Number((e.currentTarget as HTMLInputElement).value) })}
+								/>
+								<span class="db-backup-time-unit">{t().settingsDbBackupTimeMinuteUnit}</span>
+							</div>
+						</div>
 					</div>
 					<div class="db-backup-hint">{t().settingsDbBackupTimeHint}</div>
 					<div class="settings-readonly-grid compact">
@@ -1857,13 +1862,13 @@
 	}
 	.db-backup-grid {
 		display: grid;
-		/* Three controls now; auto-fit keeps them on one row when the popover is
-		   wide enough and wraps instead of squeezing when it is not. */
-		grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+		/* The time takes two number fields, so it claims two of these tracks. */
+		grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 		gap: 10px;
 		margin-top: 10px;
 	}
-	.db-backup-grid label {
+	.db-backup-grid label,
+	.db-backup-field {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
@@ -1871,6 +1876,21 @@
 		font-size: 10px;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
+	}
+	.db-backup-time { grid-column: span 2; }
+	.db-backup-time-fields {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+	}
+	.db-backup-time-fields input { flex: 1 1 0; }
+	.db-backup-time-unit {
+		flex: 0 0 auto;
+		color: var(--fg2);
+		font-size: 11px;
+		letter-spacing: 0;
+		text-transform: none;
 	}
 	.db-backup-grid input,
 	.db-backup-grid select {
@@ -1884,8 +1904,8 @@
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
 	}
-	/* WebKit reveals the stepper only on hover or focus; these two fields are
-	   meant to be nudged, so the arrows stay out. */
+	/* WebKit reveals the stepper only on hover or focus; these fields are meant
+	   to be nudged, so the arrows stay out. */
 	.db-backup-grid input[type='number']::-webkit-inner-spin-button,
 	.db-backup-grid input[type='number']::-webkit-outer-spin-button {
 		opacity: 1;

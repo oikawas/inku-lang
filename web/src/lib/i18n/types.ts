@@ -431,6 +431,10 @@ export interface LangPack {
 	settingsDbBackupStoredCounts: (autoCount: number, manualCount: number) => string;
 	settingsDbBackupTime: string;
 	settingsDbBackupTimeHint: string;
+	settingsDbBackupTimeHourUnit: string;
+	settingsDbBackupTimeMinuteUnit: string;
+	settingsDbBackupTimeHourLabel: string;
+	settingsDbBackupTimeMinuteLabel: string;
 	settingsDbBackupNextAuto: string;
 	settingsDbBackupEstimatedDisk: string;
 	settingsDbBackupEstimatedDiskHint: string;

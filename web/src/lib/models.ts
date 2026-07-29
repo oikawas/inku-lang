@@ -70,10 +70,24 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 	{
 		id: 'ollama',
 		label: 'Ollama',
+		// API のカタログが届くまでの控え。verified_model_catalog.py の
+		// VERIFIED_OLLAMA_LOCAL_MODELS と同じ並び・同じ id を保つこと。
+		// 実測のコメントと速度は API 側から来るのでここには持たない。
+		// 量子化までタグに書くのは、素タグが上流で差し替わり計測と結びつかなくなるため。
 		models: [
-			{ id: 'ollama:llama3.2', label: 'Llama 3.2' },
-			{ id: 'ollama:gpt-oss:20b', label: 'gpt-oss 20B' },
-			{ id: 'ollama:qwen3:8b', label: 'Qwen3 8B' }
+			{ id: 'ollama:qwen3.5:4b-q4_K_M', label: 'qwen3.5:4b-q4_K_M (3.4GB)' },
+			{
+				id: 'ollama:ministral-3:8b-instruct-2512-q4_K_M',
+				label: 'ministral-3:8b-instruct-2512-q4_K_M (6.0GB)'
+			},
+			{ id: 'ollama:gemma4:e4b-it-q4_K_M', label: 'gemma4:e4b-it-q4_K_M (9.6GB)' },
+			{ id: 'ollama:gemma4:31b-it-q4_K_M', label: 'gemma4:31b-it-q4_K_M (19GB)' },
+			{ id: 'ollama:gemma4:12b-it-q4_K_M', label: 'gemma4:12b-it-q4_K_M (7.6GB)' },
+			{ id: 'ollama:qwen3.5:27b-q4_K_M', label: 'qwen3.5:27b-q4_K_M (17GB)' },
+			{ id: 'ollama:qwen3.5:9b-q4_K_M', label: 'qwen3.5:9b-q4_K_M (6.6GB)' },
+			{ id: 'ollama:granite4.1:8b-q4_K_M', label: 'granite4.1:8b-q4_K_M (5.3GB)' },
+			{ id: 'ollama:qwen3.5:2b-q4_K_M', label: 'qwen3.5:2b-q4_K_M (1.9GB)' },
+			{ id: 'ollama:qwen3.5:0.8b-q8_0', label: 'qwen3.5:0.8b-q8_0 (1.0GB)' }
 		]
 	},
 	{

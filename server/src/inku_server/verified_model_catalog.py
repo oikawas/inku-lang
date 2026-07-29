@@ -18,8 +18,8 @@ they scored badly or could not be measured, for the same reason.
 Method and rubric: no-git-sync/fable5/mode-api-claude/SCORING-DESIGN.md
 """
 
-MODEL_CONFIG_VERSION = "2.2.0"
-MODEL_CONFIG_LAST_UPDATED = "2026-07-27T12:27:00Z"
+MODEL_CONFIG_VERSION = "2.3.0"
+MODEL_CONFIG_LAST_UPDATED = "2026-07-29T11:00:00Z"
 
 VERIFIED_NVIDIA_MODELS: list[dict[str, object]] = [
     {"id": "mistralai/mistral-nemotron", "label": "mistralai/mistral-nemotron", "purposes": ["llm"], "recommendation_llm": 4, "speed_class": "ultra-fast", "speed_label": "昼 121s / 夕 10s / 深夜 8s", "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.0。応答中央値 昼 121s / 夕 10s / 深夜 8s。", "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.0 corrections on average; median response midday 121s / evening 10s / late night 8s."},
@@ -136,4 +136,168 @@ VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
         }
         for model_id in _OLLAMA_CLOUD_UNMEASURED
     ],
+]
+
+
+# Local Ollama, measured 2026-07-27 and 2026-07-29 on a GPU-less machine with eight
+# threads and 62GB of RAM. Every model here was run against the same frozen prompts:
+# Stage 1 in Japanese and English (6 cases each, read and judged), Stage 2 through the
+# production path (8 cases; `response_format` plus `reasoning_effort="none"`, the shape
+# Build 748 and 749 gave local Ollama).
+#
+# Recommendation levels are deliberately absent, for the same reason they are absent
+# from the cloud list: SCORING-DESIGN.md defines the 1-5 scale on success rate, schema
+# violations and correction count measured over nine attempts against NIM, and none of
+# those axes were measured here. What was measured is written out instead.
+#
+# The two stages want different models, so each entry says which stage it is for.
+# Stage 1 asks for prose that stays inside the vocabulary; Stage 2 asks for a Score
+# that covers every sentence. The models that win are not the same, and neither is the
+# largest: qwen3.5:4b is the only small model whose Stage 1 passed in both languages,
+# while ministral-3:8b carried the most sentences into Stage 2 of anything measured.
+#
+# `coverage` in the comments is the number of instructions produced for the five
+# complex cases (28 sentences) over 28. It counts instructions, not sentences matched.
+#
+# Timings are for that one machine and say nothing about anyone else's. They exclude
+# the first request against a freshly loaded model, which pays for the load and the
+# 12-14k token prompt evaluation and ran 344s to 2116s.
+_OLLAMA_LOCAL_NOTICE_JA = "計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。"
+_OLLAMA_LOCAL_NOTICE_EN = (
+    "Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+)
+
+VERIFIED_OLLAMA_LOCAL_MODELS: list[dict[str, object]] = [
+    {
+        "id": "qwen3.5:4b-q4_K_M",
+        "label": "qwen3.5:4b-q4_K_M (3.4GB)",
+        "purposes": ["llm"],
+        "speed_class": "fast",
+        "speed_label": "1 件 39〜73s",
+        "comment_ja": "第一段階の推奨。日本語・英語とも 6/6 が正規化 DDL として成立した唯一の小型モデルで、"
+        "しかも候補中の最小。明文規則の違反は英語 6 件中 0 件。"
+        "第二段階では被覆 9/28 と低いので、そちらは別のモデルに任せる。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Recommended for Stage 1. The only small model whose 6 Japanese and 6 English"
+        " attempts all came back as usable normalized DDL, and the smallest candidate at that;"
+        " zero explicit-rule violations in English. Its Stage 2 coverage is 9 of 28, so leave that"
+        " stage to another model. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "ministral-3:8b-instruct-2512-q4_K_M",
+        "label": "ministral-3:8b-instruct-2512-q4_K_M (6.0GB)",
+        "purposes": ["llm"],
+        "speed_class": "slow",
+        "speed_label": "1 件 50〜576s",
+        "comment_ja": "第二段階の推奨。被覆 20/28 は計測した中で最も高く、8 件とも Score になった。"
+        "思考する機能を持たないので、思考が予算を食い切って何も返らない失敗を構造的に踏まない。"
+        "第一段階は日本語 6/6 が成立するが、英語で座標を直書きして崩れる。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Recommended for Stage 2. Its coverage of 20 of 28 is the highest measured, and all"
+        " eight cases produced a Score. It has no thinking capability, so it cannot fail the way models"
+        " do when thinking eats the whole token budget. Stage 1 holds up in Japanese but breaks down in"
+        " English, where it writes raw coordinates. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "gemma4:e4b-it-q4_K_M",
+        "label": "gemma4:e4b-it-q4_K_M (9.6GB)",
+        "purposes": ["llm"],
+        "speed_class": "fast",
+        "speed_label": "1 件 9〜141s",
+        "comment_ja": "第二段階の被覆 18/28。8 件とも Score になり、所要は計測した中で最も短い。"
+        "第一段階は日本語 6/6 が成立するが、英語で説明の文を 5 件付け、数量が落ちる"
+        "（「七つ」が several になる）。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Stage 2 coverage 18 of 28, all eight cases producing a Score, and the shortest"
+        " times measured. Stage 1 holds up in Japanese but in English it adds explanatory sentences"
+        " in 5 of 6 cases and drops counts (\"seven\" becomes \"several\"). " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "gemma4:31b-it-q4_K_M",
+        "label": "gemma4:31b-it-q4_K_M (19GB)",
+        "purposes": ["llm"],
+        "speed_class": "unknown",
+        "speed_label": "第二段階は未計測",
+        "comment_ja": "第一段階は日本語・英語とも計測した中で最良。説明の文も灰背景の指示も 0 件で、"
+        "「地: 生成りの紙。」の固定形を正しく使う唯一のモデル。"
+        "第二段階の被覆 18/28 は Build 748/749 より前の経路で採った数字で、他の行とは条件が違う。"
+        + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "The best Stage 1 measured in either language: no explanatory sentences, no gray"
+        " background, and the only model that uses the fixed ground form correctly. Its Stage 2 coverage"
+        " of 18 of 28 was taken on the path that preceded Build 748 and 749, so it is not comparable with"
+        " the other entries here. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "gemma4:12b-it-q4_K_M",
+        "label": "gemma4:12b-it-q4_K_M (7.6GB)",
+        "purposes": ["llm"],
+        "speed_class": "medium",
+        "speed_label": "1 件 18〜110s",
+        "comment_ja": "第二段階の被覆 14/28。8 件とも Score になった。"
+        "第一段階は英語が 6/6 成立して説明の文も 0 件だが、日本語で助詞が壊れる"
+        "（「水たまりを楕円を七つ並べる」・「三ひゃく七十本」）。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Stage 2 coverage 14 of 28, all eight cases producing a Score. Its English Stage 1"
+        " is clean across all 6 cases with no explanatory sentences, but its Japanese breaks grammatically"
+        " and mangles a numeral. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "qwen3.5:27b-q4_K_M",
+        "label": "qwen3.5:27b-q4_K_M (17GB)",
+        "purposes": ["llm"],
+        "speed_class": "slow",
+        "speed_label": "1 件 224〜410s",
+        "comment_ja": "第一段階は日本語 6/6・英語 6/6 が成立する。"
+        "第二段階の被覆は 10/28 で、5 分の 1 の大きさの qwen3.5:4b（9/28）とほとんど変わらない。"
+        "同じ系統では規模を上げても被覆が伸びず、所要だけが伸びる。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Stage 1 holds up across all 6 Japanese and all 6 English cases. Its Stage 2"
+        " coverage of 10 of 28 is barely above qwen3.5:4b at 9 of 28, a model a fifth its size: within"
+        " this family, size buys time rather than coverage. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "qwen3.5:9b-q4_K_M",
+        "label": "qwen3.5:9b-q4_K_M (6.6GB)",
+        "purposes": ["llm"],
+        "speed_class": "medium",
+        "speed_label": "1 件 67〜114s",
+        "comment_ja": "第二段階の被覆 8/28 は、半分の大きさの qwen3.5:4b（9/28）を下回る。"
+        "複雑な 5 件のうち 4 件で指示を 1 本しか出さない。"
+        "第一段階は日本語 6/6 が成立するが、英語で説明の文を 4 件付ける。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Stage 2 coverage of 8 of 28 falls below qwen3.5:4b at 9 of 28, half its size; on"
+        " four of the five complex cases it emits a single instruction. Stage 1 holds up in Japanese but"
+        " adds explanatory sentences in 4 English cases. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "granite4.1:8b-q4_K_M",
+        "label": "granite4.1:8b-q4_K_M (5.3GB)",
+        "purposes": ["llm"],
+        "speed_class": "unknown",
+        "speed_label": "第二段階は未計測",
+        "comment_ja": "第一段階が日本語 6 件中 4 件で成立しない。感情語「静かに」が残り、"
+        "禁止された動詞を 3 回使い、1 件は「面:」の誤用で図形の指示が 1 つも出ない。"
+        "第二段階は測っていない。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Stage 1 fails on 4 of 6 Japanese cases: an emotional adverb survives, three"
+        " forbidden verbs appear, and one case produces no shape instruction at all through misuse of the"
+        " surface form. Stage 2 was not measured. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "qwen3.5:2b-q4_K_M",
+        "label": "qwen3.5:2b-q4_K_M (1.9GB)",
+        "purposes": ["llm"],
+        "speed_class": "unknown",
+        "speed_label": "第二段階は未計測",
+        "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。同じ段落を 3 回繰り返す 1 件と、"
+        "図形を表す語が抜けて配置の句だけが並ぶ 2 件。第二段階は測っていない。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: one repeats the same paragraph three times,"
+        " two list placements with the shape word missing. Stage 2 was not measured. "
+        + _OLLAMA_LOCAL_NOTICE_EN,
+    },
+    {
+        "id": "qwen3.5:0.8b-q8_0",
+        "label": "qwen3.5:0.8b-q8_0 (1.0GB)",
+        "purposes": ["llm"],
+        "speed_class": "unknown",
+        "speed_label": "第二段階は未計測",
+        "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。述語のない断片（「中央付近に。」）と、"
+        "入力の情景語をそのまま写した 2 件。第二段階は測っていない。" + _OLLAMA_LOCAL_NOTICE_JA,
+        "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: a fragment with no predicate, and two that"
+        " copy the scenic nouns of the input straight through without normalizing them. Stage 2 was not"
+        " measured. " + _OLLAMA_LOCAL_NOTICE_EN,
+    },
 ]

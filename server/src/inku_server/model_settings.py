@@ -15,6 +15,7 @@ from .verified_model_catalog import (
     MODEL_CONFIG_VERSION,
     VERIFIED_NVIDIA_MODELS,
     VERIFIED_OLLAMA_CLOUD_MODELS,
+    VERIFIED_OLLAMA_LOCAL_MODELS,
 )
 
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
@@ -80,11 +81,9 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "base_url_env": "OLLAMA_BASE_URL",
         "default_base_url": "http://localhost:11434/v1",
         "requires_api_key": False,
-        "models": [
-            {"id": "llama3.2", "label": "Llama 3.2"},
-            {"id": "gpt-oss:20b", "label": "gpt-oss 20B"},
-            {"id": "qwen3:8b", "label": "Qwen3 8B"},
-        ],
+        # Tags name the quantization. A bare tag is a moving target upstream, and the
+        # measurements behind these entries were taken against one build of one file.
+        "models": VERIFIED_OLLAMA_LOCAL_MODELS,
     },
     {
         "id": "ollama-cloud",
@@ -288,18 +287,34 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 provider["memo"] = incoming["memo"].strip()
             models = _normalize_models(incoming.get("models"))
             if models:
-                if provider_id == "nvidia" and builtin:
-                    merged = {str(model["id"]): model for model in provider["models"]}
+                # A stored list is the installation's own -- it may name models pulled
+                # locally that no catalog knows -- so it decides which models exist.
+                # What it must not do is outlive a catalog whose measurements changed:
+                # the stored copy carries whatever metadata was current when it was
+                # written, and a list refreshed from a live endpoint carries none at
+                # all (pentala's Ollama entries held id, label and purposes only). So
+                # on a catalog version bump the builtin metadata is laid back over the
+                # matching ids, which is the whole reason MODEL_CONFIG_VERSION exists.
+                catalog_moved = incoming_catalog_version != MODEL_CONFIG_VERSION
+                builtin_by_id = {str(model["id"]): model for model in provider["models"]}
+                if builtin and (provider_id == "nvidia" or catalog_moved):
                     metadata_keys = (
                         "purposes", "recommendation_llm", "recommendation_vision",
                         "recommendation_level", "speed_class", "speed_label",
                         "comment_ja", "comment_en",
                     )
+                    # NVIDIA additionally keeps builtin-only models the stored list has
+                    # dropped, because artworks name them and a dropped id would leave
+                    # those artworks labelless.
+                    merged = dict(builtin_by_id) if provider_id == "nvidia" else {}
                     for model in models:
                         model_id = str(model["id"])
-                        combined = {**merged.get(model_id, {}), **model}
-                        if incoming_catalog_version != MODEL_CONFIG_VERSION and model_id in merged:
-                            combined.update({key: merged[model_id][key] for key in metadata_keys if key in merged[model_id]})
+                        combined = {**builtin_by_id.get(model_id, {}), **model}
+                        if catalog_moved and model_id in builtin_by_id:
+                            combined.update({
+                                key: builtin_by_id[model_id][key]
+                                for key in metadata_keys if key in builtin_by_id[model_id]
+                            })
                         merged[model_id] = combined
                     provider["models"] = list(merged.values())
                 else:

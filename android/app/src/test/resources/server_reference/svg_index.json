@@ -574,6 +574,76 @@
       "material-outline"
     ]
   },
+  "31_triangle_pencil": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "triangle",
+          "position": [
+            0.3,
+            0.3
+          ],
+          "size": [
+            0.4,
+            0.4
+          ],
+          "weight": "pencil"
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "bytes": 12163,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 3,
+      "circle": 48,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 7
+    },
+    "classes": [
+      "contour-stroke-v1 controls-64 events-2",
+      "material-outline"
+    ]
+  },
+  "32_polygon_brush_thin": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "polygon",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.25,
+          "sides": 6,
+          "weight": "brush_thin"
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "bytes": 10786,
+    "counts": {
+      "path": 1,
+      "polyline": 0,
+      "polygon": 3,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 7
+    },
+    "classes": [
+      "contour-stroke-v1 controls-102 events-1",
+      "material-outline"
+    ]
+  },
   "07_circle_wave": {
     "score": {
       "instructions": [

@@ -402,6 +402,12 @@ SCORES: dict[str, dict] = {
     "28_circle_brush_thick_fine": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "brush_thick", "thinness": "fine"}]},
     "29_circle_silverpoint_extra_fine": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "silverpoint", "thinness": "extra_fine"}]},
     "30_square_filled_pencil_fine": {"instructions": [{"primitive": "square", "position": [0.3, 0.3], "size": [0.4, 0.4], "weight": "pencil", "filled": True, "thinness": "fine"}]},
+    # engine 15 gave the corner shapes the material layer, and not one of the
+    # cases above is a triangle or a polygon, so the port had to hold its own
+    # hand-copied digests for them (CornerShapeMaterialLayerTest). These two put
+    # the same shapes in the corpus, where the walk over the index reaches them.
+    "31_triangle_pencil": {"instructions": [{"primitive": "triangle", "position": [0.3, 0.3], "size": [0.4, 0.4], "weight": "pencil"}]},
+    "32_polygon_brush_thin": {"instructions": [{"primitive": "polygon", "center": [0.5, 0.5], "radius": 0.25, "sides": 6, "weight": "brush_thin"}]},
 }
 
 # Each of these repeats the Score of a tracked OFF render, so the pair is the

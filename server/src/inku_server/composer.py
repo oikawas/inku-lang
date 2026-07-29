@@ -838,7 +838,10 @@ def _prompt_digest(value: str) -> str:
 
 
 def _stage2_prompt_digest(system_prompt: str) -> str:
-    tool_json = json.dumps(_submit_tool(), ensure_ascii=False, sort_keys=True)
+    # 鍵を並べ替えない。宣言順は tool schema に並びごと LLM へ渡り、任意フィールドの
+    # 搬送率を動かす (I-038)。`sort_keys=True` はその並びを潰すので、絵を動かす変更が
+    # `history.stage2_prompt_digest` に残らなかった。
+    tool_json = json.dumps(_submit_tool(), ensure_ascii=False)
     return _prompt_digest(system_prompt + "\n" + tool_json)
 
 

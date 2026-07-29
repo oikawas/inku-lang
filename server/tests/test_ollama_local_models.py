@@ -11,7 +11,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from inku_server.model_settings import PROVIDER_DEFINITIONS, normalize_model_settings
+from inku_server.model_settings import (
+    PROVIDER_DEFINITIONS,
+    model_provider_catalog,
+    normalize_model_settings,
+)
 from inku_server.verified_model_catalog import (
     MODEL_CONFIG_VERSION,
     VERIFIED_OLLAMA_LOCAL_MODELS,
@@ -212,3 +216,66 @@ def test_nvidia_still_keeps_builtin_models_the_stored_list_dropped() -> None:
     ids = {str(model["id"]) for model in settings["providers"]["nvidia"]["models"]}
     assert "meta/llama-3.3-70b-instruct" in ids
     assert len(ids) > 1
+
+
+# --------------------------------------------------------------------------
+# Speed is shown while experimenting and withheld from a release.
+#
+# Decided 2026-07-27: with no GPU here there is no speed to promise, so a release
+# does not present one. Decided 2026-07-29: the numbers still help locally, so they
+# survive in developer mode. The provider itself is never hidden -- running without
+# an API key is the whole point of listing it.
+# --------------------------------------------------------------------------
+
+def _catalog_provider(*, include_developer: bool) -> dict:
+    catalog = model_provider_catalog(None, include_developer=include_developer)
+    return {str(provider["id"]): provider for provider in catalog}["ollama"]
+
+
+def test_the_provider_is_listed_without_developer_mode() -> None:
+    provider = _catalog_provider(include_developer=False)
+    ids = [str(model["id"]) for model in provider["models"]]
+    assert STAGE1_RECOMMENDED in ids
+    assert STAGE2_RECOMMENDED in ids
+    assert len(ids) == 10
+
+
+def test_a_release_shows_no_speed_for_local_ollama() -> None:
+    for model in _catalog_provider(include_developer=False)["models"]:
+        assert "speed_label" not in model, model["id"]
+        assert "speed_class" not in model, model["id"]
+        # What was measured about quality still shows; only the timing is withheld.
+        assert str(model["comment_ja"]).strip()
+
+
+def test_developer_mode_shows_the_measured_timings() -> None:
+    by_id = {str(m["id"]): m for m in _catalog_provider(include_developer=True)["models"]}
+    assert by_id[STAGE2_RECOMMENDED]["speed_label"] == "1 件 50〜576s"
+
+
+def test_other_providers_keep_their_speed() -> None:
+    # The 2026-07-27 decision was about this track. Labels measured against providers
+    # that fix their own ids are out of its scope and stay where they are.
+    release = {
+        str(provider["id"]): provider
+        for provider in model_provider_catalog(None, include_developer=False)
+    }
+    cloud = {str(m["id"]): m for m in release["ollama-cloud"]["models"]}
+    assert cloud["gemma4:31b"]["speed_label"] == "1〜110s"
+    # NVIDIA is `developer_only`, so a release hides the provider outright -- there is
+    # no release view of its labels to check.
+    assert "nvidia" not in release
+    developer = {
+        str(provider["id"]): provider
+        for provider in model_provider_catalog(None, include_developer=True)
+    }
+    nvidia = {str(m["id"]): m for m in developer["nvidia"]["models"]}
+    assert nvidia["google/gemma-4-31b-it"]["speed_label"] == "昼 221s / 夕 114s / 深夜 199s"
+
+
+def test_hiding_speed_does_not_touch_what_is_stored() -> None:
+    # Developer mode changes what is shown, never what is saved. A release that
+    # stripped the stored copy would lose the numbers for good on the next save.
+    stored = normalize_model_settings(None)
+    by_id = {str(m["id"]): m for m in stored["providers"]["ollama"]["models"]}
+    assert by_id[STAGE2_RECOMMENDED]["speed_label"] == "1 件 50〜576s"

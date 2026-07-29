@@ -30,6 +30,15 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       OPENAI_MODEL_STAGE1: ${OPENAI_MODEL_STAGE1:-}
+      # Local Ollama, which needs no key. Its default endpoint is localhost, and
+      # inside this container localhost is the container -- so reaching an Ollama
+      # on the host means naming the host. See `extra_hosts` below.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+    # `host.docker.internal` resolves on its own under Docker Desktop but not on
+    # Linux, where it has to be mapped to the gateway. Mapping it here rather than
+    # in the setup instructions keeps the same OLLAMA_BASE_URL working everywhere.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${INKU_API_PORT:-8100}:8100"
     volumes:

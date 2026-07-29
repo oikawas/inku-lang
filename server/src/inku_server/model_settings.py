@@ -84,6 +84,11 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         # Tags name the quantization. A bare tag is a moving target upstream, and the
         # measurements behind these entries were taken against one build of one file.
         "models": VERIFIED_OLLAMA_LOCAL_MODELS,
+        # Speed was taken out of what a release presents (decided 2026-07-27: there is
+        # no GPU here, so there is no speed to promise). The numbers are still worth
+        # having while experimenting locally, and they were measured on one machine
+        # that no one else is running, so they are shown in developer mode only.
+        "speed_developer_only": True,
     },
     {
         "id": "ollama-cloud",
@@ -404,13 +409,22 @@ def model_provider_catalog(
         if not include_developer and builtin and builtin.get("developer_only"):
             continue
         enabled_models = provider["enabled_models"]
+        # Hiding here rather than at the source keeps to what developer mode means:
+        # it changes what is shown, never what is stored or which model gets called.
+        hide_speed = bool(
+            not include_developer and builtin and builtin.get("speed_developer_only")
+        )
         models = []
         for model in provider["models"]:
             enabled = bool(enabled_models.get(str(model["id"]), True))
             if purpose and purpose not in model.get("purposes", ["llm"]):
                 continue
             if include_disabled or enabled:
-                models.append({**model, "enabled": enabled})
+                shown = {**model, "enabled": enabled}
+                if hide_speed:
+                    shown.pop("speed_class", None)
+                    shown.pop("speed_label", None)
+                models.append(shown)
         catalog.append({
             "id": provider["id"],
             "label": provider["label"],

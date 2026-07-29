@@ -271,8 +271,8 @@
       "part": "a_expand"
     },
     "B-baseline-no-ddl": {
-      "bytes": 2196,
-      "digest": "1b4fc8213ca0de884fb7f67ebe33c180",
+      "bytes": 2218,
+      "digest": "ec02532f42be6bd17a6fa349958aece0",
       "fired_branches": {},
       "input": {
         "ddl": null,
@@ -327,8 +327,8 @@
       "part": "b_coerce"
     },
     "B-cloudform": {
-      "bytes": 2199,
-      "digest": "7eb8c5e51310f75fc9230e7c20414c2e",
+      "bytes": 2221,
+      "digest": "0c7030e4fd3a4780e7842adc4568237b",
       "fired_branches": {},
       "input": {
         "ddl": null,
@@ -383,8 +383,8 @@
       "part": "b_coerce"
     },
     "B-dedupe-three": {
-      "bytes": 2196,
-      "digest": "d86ef4d490f80c267f66fc3481813b2c",
+      "bytes": 2218,
+      "digest": "a484163cb1494a20e599f37148431dd2",
       "fired_branches": {
         "dedupe_instructions": 2
       },
@@ -505,8 +505,8 @@
       "part": "b_coerce"
     },
     "B-dense-forty": {
-      "bytes": 29858,
-      "digest": "b43468df4c07dcdbd2d7e80a704e0244",
+      "bytes": 30738,
+      "digest": "88e760fda7184fe6298db657492030cb",
       "fired_branches": {},
       "input": {
         "ddl": null,
@@ -1809,8 +1809,8 @@
       "part": "b_coerce"
     },
     "B-grid": {
-      "bytes": 3379,
-      "digest": "c732c85c34b4c017a599958c0d334c68",
+      "bytes": 3423,
+      "digest": "472524585373830776ca4ac090a540b2",
       "fired_branches": {
         "with_composition_diversity_repair": 1,
         "with_literal_grid_fidelity": 1
@@ -1884,8 +1884,8 @@
       "part": "b_coerce"
     },
     "B-invalid-touching": {
-      "bytes": 2196,
-      "digest": "102686a6ba66ba74eae06b3928dcb7a7",
+      "bytes": 2218,
+      "digest": "e7dd14ae9925f736081a702b29b33ace",
       "fired_branches": {
         "drop_invalid_relations": 1
       },
@@ -1945,8 +1945,8 @@
       "part": "b_coerce"
     },
     "B-presence-from-ddl": {
-      "bytes": 3716,
-      "digest": "e277aa489710f8c79cf50657aede50f8",
+      "bytes": 3760,
+      "digest": "53752ed3d62fe843abe2037dce8d8f93",
       "fired_branches": {
         "presence_from_ddl": 1,
         "with_color_delivery_repair": 1,
@@ -2005,8 +2005,8 @@
       "part": "b_coerce"
     },
     "B-presence-no-ddl": {
-      "bytes": 2401,
-      "digest": "3e7d79934cf742df5cd89ede63c75ded",
+      "bytes": 2423,
+      "digest": "cbe925cd5ab5d606248e83c361b0cc37",
       "fired_branches": {},
       "input": {
         "ddl": null,
@@ -2071,8 +2071,8 @@
       "part": "b_coerce"
     },
     "B-quiet-water": {
-      "bytes": 2720,
-      "digest": "d9d64636e17d61653f1dc09f50122295",
+      "bytes": 2742,
+      "digest": "85a3cd05ad51064c484954b9203f4bd7",
       "fired_branches": {
         "with_color_delivery_repair": 1
       },
@@ -2129,8 +2129,8 @@
       "part": "b_coerce"
     },
     "B-trigger-auto": {
-      "bytes": 5292,
-      "digest": "ea6dabcbc968e39942341ba31f860400",
+      "bytes": 5358,
+      "digest": "b435599beef46664869c26af4926b2de",
       "fired_branches": {
         "coerce_and_repair_instruction": 1,
         "with_color_delivery_repair": 1,
@@ -2192,8 +2192,8 @@
       "part": "b_coerce"
     },
     "B-trigger-none": {
-      "bytes": 2763,
-      "digest": "bbb7899e3e2e63fae9ff453308edfe88",
+      "bytes": 2785,
+      "digest": "dc429d9a5be80c72d2425514a299e707",
       "fired_branches": {
         "coerce_and_repair_instruction": 1,
         "with_color_delivery_repair": 1,
@@ -2252,8 +2252,8 @@
       "part": "b_coerce"
     },
     "B-trigger-sparse": {
-      "bytes": 3818,
-      "digest": "0ae04952ee4e84fb0fac77d7ef251f9c",
+      "bytes": 3862,
+      "digest": "5490818cefb66b878b526a280fe0fe2b",
       "fired_branches": {
         "coerce_and_repair_instruction": 1,
         "with_color_delivery_repair": 1,
@@ -2313,8 +2313,8 @@
       "part": "b_coerce"
     },
     "B-white-filled-circle": {
-      "bytes": 2185,
-      "digest": "c6dccdc694f4a404c6b2055ba47d8541",
+      "bytes": 2207,
+      "digest": "9fe5787ddf4c16548bea3385fc2a3009",
       "fired_branches": {
         "coerce_and_repair_instruction": 1
       },
@@ -2368,8 +2368,8 @@
       "part": "b_coerce"
     },
     "B-white-line": {
-      "bytes": 2223,
-      "digest": "937f17649e7a7989b75ddd367d530b16",
+      "bytes": 2245,
+      "digest": "08796bb4c1a0c11a904c2c8f0be2086d",
       "fired_branches": {
         "coerce_and_repair_instruction": 1
       },

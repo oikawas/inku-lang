@@ -53,10 +53,11 @@
           0.5
         ],
         "color": "black",
-        "color_hint": "white foreground made visible",
+        "color_hint": null,
         "filled": true,
         "from": null,
         "mode": "additive",
+        "note": "white foreground made visible",
         "position": null,
         "primitive": "circle",
         "radius": 0.2,

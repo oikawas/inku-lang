@@ -2506,7 +2506,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "size": [0.34, 0.22],
             "color": color,
             "weight": weight,
-            "color_hint": "fallback from explicit DDL cloudform",
+            "note": "fallback from explicit DDL cloudform",
         }
     elif ("三角" in ddl) or ("triangle" in lower) or ("山" in ddl) or ("mountain" in lower):
         instruction = {
@@ -2517,7 +2517,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
-            "color_hint": "fallback from DDL",
+            "note": "fallback from DDL",
         }
     elif ("弧" in ddl) or ("arc" in lower) or ("crescent" in lower):
         instruction = {
@@ -2528,7 +2528,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "angle_end": 330,
             "color": color,
             "weight": weight,
-            "color_hint": "fallback from DDL",
+            "note": "fallback from DDL",
         }
     elif ("四角" in ddl) or ("square" in lower) or ("rectangle" in lower) or ("紙片" in ddl) or ("patch" in lower):
         instruction = {
@@ -2539,7 +2539,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
-            "color_hint": "fallback from DDL",
+            "note": "fallback from DDL",
         }
     elif ("多角形" in ddl) or ("五角" in ddl) or ("六角" in ddl) or ("polygon" in lower):
         instruction = {
@@ -2551,7 +2551,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
-            "color_hint": "fallback from DDL",
+            "note": "fallback from DDL",
         }
     elif ("楕円" in ddl) or ("oval" in lower) or ("ellipse" in lower) or ("蕾" in ddl) or ("花びら" in ddl) or ("petal" in lower) or ("bud" in lower):
         instruction = {
@@ -2562,7 +2562,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
-            "color_hint": "fallback from DDL",
+            "note": "fallback from DDL",
         }
     elif ("円" in ddl) or ("circle" in lower) or ("moon" in lower) or ("月" in ddl):
         instruction = {
@@ -2572,7 +2572,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "color": color,
             "weight": weight,
             "filled": "塗" in ddl or "fill" in lower,
-            "color_hint": "fallback from DDL",
+            "note": "fallback from DDL",
         }
     else:
         instruction = {
@@ -2582,7 +2582,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "rotation": -8,
             "color": color,
             "weight": weight,
-            "color_hint": "fallback from DDL",
+            "note": "fallback from DDL",
         }
 
     arrangement: dict[str, object] | None = None
@@ -2633,7 +2633,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
             "preserve_space": True,
         }
     elif color_cycle:
-        instruction["color_hint"] = f"{instruction['color_hint']}; palette {'/'.join(color_cycle)}"
+        instruction["note"] = f"{instruction['note']}; palette {'/'.join(color_cycle)}"
 
     instructions = [instruction]
     if ma_fallback:
@@ -2648,7 +2648,7 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
                 "rotation": -18,
                 "color": support_color,
                 "weight": "silverpoint",
-                "color_hint": "fallback negative space support",
+                "note": "fallback negative space support",
                 "arrangement": {
                     "count": 3,
                     "layout": "radial",

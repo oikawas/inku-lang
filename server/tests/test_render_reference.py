@@ -54,7 +54,7 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
     score_fields = set(generator.BASE_SCORE)
     assert instruction_fields == {
         field.alias or name for name, field in Instruction.model_fields.items()
-    }
+    } - {"note"}
     assert score_fields == set(Score.model_fields)
     assert set(generator.BASE_SURFACE) == set(SurfaceSpec.model_fields)
     assert set(generator.BASE_GROUND) == set(CanvasGroundSpec.model_fields)

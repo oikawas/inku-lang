@@ -134,9 +134,8 @@ def _with_material_hint(ins: Instruction, ddl: str | None) -> Instruction:
         if any(marker.lower() in lower for marker in markers):
             data = ins.model_dump(by_alias=True)
             data["weight"] = weight
-            hint = data.get("color_hint")
             note = f"material inferred from DDL: {weight}"
-            data["color_hint"] = f"{hint}; {note}" if hint else note
+            _append_note(data, note)
             return Instruction.model_validate(data)
     return ins
 
@@ -299,9 +298,8 @@ def _with_arrangement_density_governor(ins: Instruction, *, count: int, density:
     if arr_data.get("cluster_count") is None and arr_data["count"] >= 32:
         arr_data["cluster_count"] = min(5, _cluster_count(original_count))
     data["arrangement"] = arr_data
-    hint = data.get("color_hint")
     full_note = f"{note}; original count {original_count}"
-    data["color_hint"] = f"{hint}; {full_note}" if hint else full_note
+    _append_note(data, full_note)
     return Instruction.model_validate(data)
 
 
@@ -319,7 +317,7 @@ def _with_quiet_symbolic_shape_tempering(ins: Instruction, *, ddl: str | None) -
         return ins
     if ins.primitive == "polygon" and ins.radius is None:
         return ins
-    hint = ins.color_hint or ""
+    hint = ins.note or ""
     if not any(marker in hint for marker in ("coverage from DDL clause", "motif restored", "shape intent", "fallback from DDL")):
         return ins
 
@@ -352,7 +350,7 @@ def _with_quiet_symbolic_shape_tempering(ins: Instruction, *, ddl: str | None) -
             arr_data["density"] = "low"
         data["arrangement"] = arr_data
     note = "quiet symbolic shape tempered to avoid fallback dominance"
-    data["color_hint"] = f"{hint}; {note}" if hint else note
+    _append_note(data, note)
     return Instruction.model_validate(data)
 
 
@@ -428,9 +426,8 @@ def _with_quiet_single_shape_tempering(ins: Instruction, *, ddl: str | None) -> 
         data["radius"] = min(float(ins.radius or MAX_QUIET_SINGLE_SHAPE_RADIUS), MAX_QUIET_SINGLE_SHAPE_RADIUS)
     elif ins.size is not None:
         data["size"] = _cap_size(ins.size, MAX_QUIET_SINGLE_SHAPE_WIDTH, MAX_QUIET_SINGLE_SHAPE_HEIGHT)
-    hint = data.get("color_hint")
     note = "quiet single large shape tempered to keep trace/space legible"
-    data["color_hint"] = f"{hint}; {note}" if hint else note
+    _append_note(data, note)
     return Instruction.model_validate(data)
 
 
@@ -455,9 +452,8 @@ def _with_unintentional_filled_shape_tempering(ins: Instruction, *, ddl: str | N
             MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH,
             MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT,
         )
-    hint = data.get("color_hint")
     note = "large filled shape tempered to avoid unintended surface dominance"
-    data["color_hint"] = f"{hint}; {note}" if hint else note
+    _append_note(data, note)
     return Instruction.model_validate(data)
 
 
@@ -499,9 +495,8 @@ def _with_motion_energy(instructions: list[Instruction], *, ddl: str | None) -> 
             changed = True
 
         if changed:
-            hint = data.get("color_hint")
             note = "motion energy restored through trajectory and rotation"
-            data["color_hint"] = f"{hint}; {note}" if hint else note
+            _append_note(data, note)
         adjusted.append(Instruction.model_validate(data))
     return adjusted
 
@@ -556,7 +551,7 @@ def _motion_floor_instruction(*, ddl: str | None, background: str) -> Instructio
             "rotation": -16,
             "color": color,
             "weight": "silverpoint",
-            "color_hint": "motion floor restored as a small directional trace",
+            "note": "motion floor restored as a small directional trace",
             "arrangement": {
                 "count": 3,
                 "layout": "scatter",
@@ -584,7 +579,7 @@ def _with_motion_floor(
         return instructions
     if len(instructions) >= 10 or _has_motion_path(instructions):
         return instructions
-    if any("motion floor restored" in (ins.color_hint or "") for ins in instructions):
+    if any("motion floor restored" in (ins.note or "") for ins in instructions):
         return instructions
     return [*instructions, _motion_floor_instruction(ddl=ddl, background=background)]
 
@@ -628,9 +623,8 @@ def _with_rhythm_variation(instructions: list[Instruction], *, ddl: str | None) 
             }
             changed = True
         if changed:
-            hint = data.get("color_hint")
             note = "rhythm variation restored without increasing count"
-            data["color_hint"] = f"{hint}; {note}" if hint else note
+            _append_note(data, note)
         adjusted.append(Instruction.model_validate(data))
     return adjusted
 
@@ -718,7 +712,7 @@ def _with_repetition_event_variation(instructions: list[Instruction], *, ddl: st
             changed = True
         if changed:
             data["arrangement"] = arr_data
-            _append_hint(data, "visual event shaped with syncopated gaps")
+            _append_note(data, "visual event shaped with syncopated gaps")
             adjusted.append(Instruction.model_validate(data))
         else:
             adjusted.append(ins)
@@ -861,7 +855,7 @@ def _visual_event_recipe(
                 "rotation": -8,
                 "color": visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event type shared_object restored as a shared surface hinge",
+                "note": "visual event type shared_object restored as a shared surface hinge",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -887,7 +881,7 @@ def _visual_event_recipe(
                 "rotation": -20,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event type sound_in_space restored as a spatial echo",
+                "note": "visual event type sound_in_space restored as a spatial echo",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -910,7 +904,7 @@ def _visual_event_recipe(
                 "to": [0.70, 0.38],
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event type vanishing_outline restored as a fading contour",
+                "note": "visual event type vanishing_outline restored as a fading contour",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -934,7 +928,7 @@ def _visual_event_recipe(
                 "rotation": 15,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event type inherited_memory restored as a three-part memory sequence",
+                "note": "visual event type inherited_memory restored as a three-part memory sequence",
                 "arrangement": {
                     "count": 3,
                     "layout": "scatter",
@@ -957,7 +951,7 @@ def _visual_event_recipe(
                 "to": [0.72, 0.39],
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event type temporal_chain restored as an ordered reaction path",
+                "note": "visual event type temporal_chain restored as an ordered reaction path",
                 "arrangement": {
                     "count": 3,
                     "layout": "scatter",
@@ -983,7 +977,7 @@ def _visual_event_recipe(
                 "rotation": -22,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event type anticipatory_shift restored as an early hinge",
+                "note": "visual event type anticipatory_shift restored as an early hinge",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1009,7 +1003,7 @@ def _visual_event_recipe(
                 "rotation": -26,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event type brief_arrival_departure restored as an arrival-leaving trace",
+                "note": "visual event type brief_arrival_departure restored as an arrival-leaving trace",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1051,7 +1045,7 @@ def _visual_event_instruction(
                 "rotation": -8,
                 "color": visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event restored as a shared newspaper hinge",
+                "note": "visual event restored as a shared newspaper hinge",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1072,7 +1066,7 @@ def _visual_event_instruction(
                 "to": [0.68, 0.63],
                 "color": "white" if background != "white" else visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as diagonal afternoon light",
+                "note": "visual event restored as diagonal afternoon light",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1096,7 +1090,7 @@ def _visual_event_instruction(
                 "rotation": 10,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as hidden foot rhythm",
+                "note": "visual event restored as hidden foot rhythm",
                 "arrangement": {
                     "count": 3,
                     "layout": "scatter",
@@ -1118,7 +1112,7 @@ def _visual_event_instruction(
                 "to": [0.45, 0.38],
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as doubled river road",
+                "note": "visual event restored as doubled river road",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1143,7 +1137,7 @@ def _visual_event_instruction(
                 "rotation": -6,
                 "color": "blue" if background != "blue" else visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event restored as a pre-bell light hinge",
+                "note": "visual event restored as a pre-bell light hinge",
                 "arrangement": {
                     "count": 1,
                     "layout": "scatter",
@@ -1168,7 +1162,7 @@ def _visual_event_instruction(
                 "rotation": 15,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as an inherited bow sequence",
+                "note": "visual event restored as an inherited bow sequence",
                 "arrangement": {
                     "count": 3,
                     "layout": "scatter",
@@ -1189,7 +1183,7 @@ def _visual_event_instruction(
                 "to": [0.72, 0.36],
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as a chain reaction",
+                "note": "visual event restored as a chain reaction",
                 "arrangement": {
                     "count": 3,
                     "layout": "scatter",
@@ -1212,7 +1206,7 @@ def _visual_event_instruction(
                 "rotation": -16,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as a tilted-room drop",
+                "note": "visual event restored as a tilted-room drop",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1238,7 +1232,7 @@ def _visual_event_instruction(
                 "rotation": -26,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as a small sensory drift",
+                "note": "visual event restored as a small sensory drift",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1258,7 +1252,7 @@ def _visual_event_instruction(
                 "to": [0.75, 0.38],
                 "color": "blue" if background != "blue" else "white",
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as a thin reflected cut",
+                "note": "visual event restored as a thin reflected cut",
                 "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
@@ -1274,7 +1268,7 @@ def _visual_event_instruction(
                 "to": [0.71, 0.58],
                 "color": visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event restored as a small broken line",
+                "note": "visual event restored as a small broken line",
                 "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
@@ -1287,7 +1281,7 @@ def _visual_event_instruction(
                 "rotation": -18,
                 "color": visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event restored as a small light plane",
+                "note": "visual event restored as a small light plane",
                 "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
@@ -1302,7 +1296,7 @@ def _visual_event_instruction(
                 "rotation": 24,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "visual event restored as a small offbeat arc",
+                "note": "visual event restored as a small offbeat arc",
                 "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
             }
         )
@@ -1316,7 +1310,7 @@ def _visual_event_instruction(
                 "rotation": _seed_choice(ddl, "rhythm-offset-rotation", (-28, -14, 12, 22, 34)),
                 "color": visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event restored as a small handmade rhythm offset",
+                "note": "visual event restored as a small handmade rhythm offset",
                 "arrangement": {
                     "count": 2,
                     "layout": "scatter",
@@ -1342,7 +1336,7 @@ def _visual_event_instruction(
                 "rotation": _seed_choice(ddl, "compact-event-rotation", (-24, -10, 12, 26)),
                 "color": visible,
                 "weight": "brush_thin",
-                "color_hint": "visual event restored as a compact off-center mark",
+                "note": "visual event restored as a compact off-center mark",
                 "arrangement": {
                     "count": 1,
                     "layout": "scatter",
@@ -1369,7 +1363,7 @@ def _visual_event_instruction(
             "rotation": _seed_choice(ddl, "focal-pulse-rotation", (-28, -12, 8, 22)),
             "color": color,
             "weight": "silverpoint",
-            "color_hint": "visual event restored as a small focal pulse",
+            "note": "visual event restored as a small focal pulse",
             "arrangement": {"count": 1, "layout": "scatter", "density": "low", "fade": "outward", "preserve_space": True},
         }
     )
@@ -1382,7 +1376,7 @@ def _with_visual_event(instructions: list[Instruction], *, ddl: str | None, back
         return instructions
     if _strict_count_hint_from_ddl(ddl) is not None or _primitive_only_constraint_from_ddl(ddl):
         return instructions
-    if any("visual event restored" in (ins.color_hint or "") for ins in instructions):
+    if any("visual event restored" in (ins.note or "") for ins in instructions):
         return instructions
     if len(instructions) >= 10:
         return instructions
@@ -1397,7 +1391,7 @@ def _with_visual_event_type_hints(instructions: list[Instruction], *, ddl: str |
     event_type = _detect_visual_event_type(ddl)
     if event_type is None:
         return instructions
-    if any(event_type in (ins.color_hint or "") for ins in instructions):
+    if any(event_type in (ins.note or "") for ins in instructions):
         return instructions
 
     adjusted: list[Instruction] = []
@@ -1405,9 +1399,8 @@ def _with_visual_event_type_hints(instructions: list[Instruction], *, ddl: str |
     note = f"visual event type {event_type} detected through abstract event evidence"
     for ins in instructions:
         data = ins.model_dump(by_alias=True)
-        hint = data.get("color_hint") or ""
         if not applied and _has_focal_event_hint(ins):
-            data["color_hint"] = f"{hint}; {note}" if hint else note
+            _append_note(data, note)
             applied = True
         adjusted.append(Instruction.model_validate(data))
     if applied:
@@ -1421,15 +1414,15 @@ def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: 
 
     adjusted: list[Instruction] = []
     for ins in instructions:
-        hint = (ins.color_hint or "").lower()
-        if "five-sense" in hint or "scent layer" in hint:
+        descriptive_hint = (ins.color_hint or "").lower()
+        if "five-sense" in descriptive_hint or "scent layer" in descriptive_hint:
             continue
-        if "crescent" in hint and "sensory layer" in hint and ins.color == "green":
+        if "crescent" in descriptive_hint and "sensory layer" in descriptive_hint and ins.color == "green":
             data = ins.model_dump(by_alias=True)
             data["color"] = "blue" if background != "blue" else "white"
-            if isinstance(data.get("color_hint"), str):
-                data["color_hint"] = (
-                    data["color_hint"]
+            if isinstance(data.get("note"), str):
+                data["note"] = (
+                    data["note"]
                     .replace("white sensory layer made visible as pale green", "crescent white layer kept abstract")
                     .replace("pale green", "pale blue")
                 )
@@ -1438,7 +1431,7 @@ def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: 
                 arrangement["color_cycle"] = [
                     item for item in (arrangement.get("color_cycle") or []) if item != "green"
                 ]
-            _append_hint(data, "crescent sensory color suppressed")
+            _append_note(data, "crescent sensory color suppressed")
             adjusted.append(Instruction.model_validate(data))
             continue
         adjusted.append(ins)
@@ -1472,9 +1465,8 @@ def _with_ma_pressure(instructions: list[Instruction], *, ddl: str | None) -> li
             changed = True
         if changed:
             data["arrangement"] = arr_data
-            hint = data.get("color_hint")
             note = "ma pressure restored through spacing and preserved negative space"
-            data["color_hint"] = f"{hint}; {note}" if hint else note
+            _append_note(data, note)
             adjusted.append(Instruction.model_validate(data))
         else:
             adjusted.append(ins)
@@ -1490,7 +1482,7 @@ def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: s
     lower_source = source.lower()
     adjusted = instructions
     for markers, note in SEMANTIC_VISUAL_EVENT_HINTS:
-        if note in " ".join(ins.color_hint or "" for ins in adjusted):
+        if note in " ".join(ins.note or "" for ins in adjusted):
             continue
         if not _any_marker_in_text(markers, source, lower_source):
             continue
@@ -1499,11 +1491,11 @@ def _with_semantic_visual_event_hints(instructions: list[Instruction], *, ddl: s
         applied = False
         for ins in adjusted:
             data = ins.model_dump(by_alias=True)
-            hint = data.get("color_hint") or ""
-            hint_lower = hint.lower()
-            marker_in_hint = _any_marker_in_text(markers, hint, hint_lower)
-            if not applied and marker_in_hint and "visual event" not in hint_lower:
-                data["color_hint"] = f"{hint}; {note}" if hint else note
+            description_hint = data.get("color_hint") or ""
+            marker_in_hint = _any_marker_in_text(markers, description_hint, description_hint.lower())
+            machine_note = data.get("note") or ""
+            if not applied and marker_in_hint and "visual event" not in machine_note.lower():
+                _append_note(data, note)
                 applied = True
             next_instructions.append(Instruction.model_validate(data))
         adjusted = next_instructions
@@ -1517,7 +1509,7 @@ FOCAL_EVENT_MIN_LINE_EXTENT = 0.14
 
 
 def _has_focal_event_hint(ins: Instruction) -> bool:
-    hint = (ins.color_hint or "").lower()
+    hint = (ins.note or "").lower()
     return any(
         marker in hint
         for marker in (
@@ -1597,8 +1589,8 @@ def _with_existing_event_counterweight(
     has_context = _context_has_marker(ddl, VISUAL_EVENT_CONTEXT_MARKERS) or event_type is not None
     has_existing_event = any(_has_focal_event_hint(ins) for ins in instructions)
     has_compact_mark = any(
-        "small focal mark kept compact" in (ins.color_hint or "").lower()
-        or "circle focal mark kept compact" in (ins.color_hint or "").lower()
+        "small focal mark kept compact" in (ins.note or "").lower()
+        or "circle focal mark kept compact" in (ins.note or "").lower()
         for ins in instructions
     )
     if not has_existing_event and not (has_context and has_compact_mark):
@@ -1607,7 +1599,7 @@ def _with_existing_event_counterweight(
     support_index: int | None = None
     if event_type == "inherited_memory" and has_existing_event:
         for candidate_index, candidate in enumerate(instructions):
-            candidate_hint = (candidate.color_hint or "").lower()
+            candidate_hint = (candidate.note or "").lower()
             if _has_focal_event_hint(candidate):
                 continue
             if "small focal mark kept compact" in candidate_hint or "circle focal mark kept compact" in candidate_hint:
@@ -1621,7 +1613,7 @@ def _with_existing_event_counterweight(
         if ins.arrangement is not None and ins.arrangement.layout == "grid":
             adjusted.append(ins)
             continue
-        hint = (ins.color_hint or "").lower()
+        hint = (ins.note or "").lower()
         compact_mark = "small focal mark kept compact" in hint or "circle focal mark kept compact" in hint
         focal_event = _has_focal_event_hint(ins)
         supporting_event = index == support_index
@@ -1653,16 +1645,16 @@ def _with_existing_event_counterweight(
         arr_data["preserve_space"] = True
         data["arrangement"] = arr_data
         if compact_mark and not focal_event:
-            _append_hint(data, "visual event preserved as compact focal accent")
+            _append_note(data, "visual event preserved as compact focal accent")
         if supporting_event:
-            _append_hint(data, "visual event inherited memory trace preserved on existing support")
-        _append_hint(data, "visual event counterweight preserved through opposing placement")
+            _append_note(data, "visual event inherited memory trace preserved on existing support")
+        _append_note(data, "visual event counterweight preserved through opposing placement")
         adjusted.append(Instruction.model_validate(data))
     return adjusted
 
 
 def _with_minimum_focal_extent(ins: Instruction) -> Instruction:
-    hint = (ins.color_hint or "").lower()
+    hint = (ins.note or "").lower()
     if "small focal mark kept compact" in hint or "circle focal mark kept compact" in hint:
         return ins
     if not _has_focal_event_hint(ins):
@@ -1700,12 +1692,12 @@ def _with_minimum_focal_extent(ins: Instruction) -> Instruction:
 
     if not changed:
         return ins
-    _append_hint(data, "focal event visibility floor applied")
+    _append_note(data, "focal event visibility floor applied")
     return Instruction.model_validate(data)
 
 
 def _has_adjacent_reaction(instructions: list[Instruction]) -> bool:
-    return any("adjacent reaction" in (ins.color_hint or "").lower() for ins in instructions)
+    return any("adjacent reaction" in (ins.note or "").lower() for ins in instructions)
 
 
 def _adjacent_reaction_instruction(
@@ -1723,7 +1715,7 @@ def _adjacent_reaction_instruction(
             "primitive": primitive,
             "color": color,
             "weight": "silverpoint",
-            "color_hint": "visual event adjacent reaction added to hold focal event",
+            "note": "visual event adjacent reaction added to hold focal event",
             "arrangement": {
                 "count": _seed_choice(ddl, "adjacent-reaction-count", (1, 2)),
                 "layout": "scatter",
@@ -1796,7 +1788,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "rotation": -28,
                 "color": "red" if background != "red" else visible,
                 "filled": True,
-                "color_hint": "leaf/grain energy restored without density growth",
+                "note": "leaf/grain energy restored without density growth",
                 "arrangement": {
                     "count": 6,
                     "layout": "scatter",
@@ -1818,7 +1810,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "rotation": -7,
                 "color": visible,
                 "weight": "silverpoint",
-                "color_hint": "silence/layer energy restored as a long optical trace",
+                "note": "silence/layer energy restored as a long optical trace",
                 "arrangement": {
                     "count": 4,
                     "layout": "horizontal",
@@ -1840,7 +1832,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "rotation": 18,
                 "color": "gray" if background != "gray" else visible,
                 "weight": "brush_thin",
-                "color_hint": "hard edge visual event restored with polygonal rust/steel fragments",
+                "note": "hard edge visual event restored with polygonal rust/steel fragments",
                 "arrangement": {
                     "count": 5,
                     "layout": "scatter",
@@ -1866,7 +1858,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "rotation": -8,
                 "color": light_color,
                 "weight": "silverpoint",
-                "color_hint": "edge light event restored as a small cutting point",
+                "note": "edge light event restored as a small cutting point",
                 "arrangement": {
                     "count": 2,
                     "layout": "horizontal",
@@ -1891,7 +1883,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
                 "rotation": _seed_choice(ddl, "vanishing-trace-rotation", (-32, -18, -4, 16)),
                 "color": trace_color,
                 "weight": "silverpoint",
-                "color_hint": "vanishing trace restored with a fading endpoint",
+                "note": "vanishing trace restored with a fading endpoint",
                 "arrangement": {
                     "count": 3,
                     "layout": "scatter",
@@ -1914,7 +1906,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
             "color": playful_color,
             "filled": True,
             "weight": "brush_thick",
-            "color_hint": "playful motion energy restored as a small moving color cluster",
+            "note": "playful motion energy restored as a small moving color cluster",
             "arrangement": {
                 "count": 5,
                 "layout": "scatter",
@@ -1935,7 +1927,7 @@ def _context_energy_instruction(kind: str, *, background: str, ddl: str | None =
 
 def _has_context_energy(instructions: list[Instruction], kind: str) -> bool:
     marker = kind.replace("_", " ")
-    return any(kind in (ins.color_hint or "") or marker in (ins.color_hint or "") for ins in instructions)
+    return any(kind in (ins.note or "") or marker in (ins.note or "") for ins in instructions)
 
 
 def _with_context_energy_repair(
@@ -1977,7 +1969,7 @@ def _with_context_energy_repair(
 
 
 def _has_surface_tension(instructions: list[Instruction]) -> bool:
-    return any("surface tension restored" in (ins.color_hint or "") for ins in instructions)
+    return any("surface tension restored" in (ins.note or "") for ins in instructions)
 
 
 def _with_surface_tension(
@@ -2007,7 +1999,7 @@ def _with_surface_tension(
             "rotation": -4,
             "color": color,
             "weight": "silverpoint",
-            "color_hint": "surface tension restored as a quiet shadow trace",
+            "note": "surface tension restored as a quiet shadow trace",
         }
     )
     return [*instructions, tension]
@@ -2015,7 +2007,7 @@ def _with_surface_tension(
 
 def _has_compensating_accent(instructions: list[Instruction]) -> bool:
     for ins in instructions:
-        if "quiet expression accent restored" in (ins.color_hint or ""):
+        if "quiet expression accent restored" in (ins.note or ""):
             return True
     return any(
         (ins.color in {"red", "green", "blue"} and _expanded_count(ins) <= 12 and _closed_shape_area(ins) <= 0.03)
@@ -2036,7 +2028,7 @@ def _quiet_expression_accent(*, ddl: str | None, background: str) -> Instruction
                 "angle_end": 325,
                 "color": color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black"),
                 "weight": "silverpoint",
-                "color_hint": "quiet expression accent restored after density governance",
+                "note": "quiet expression accent restored after density governance",
                 "arrangement": {
                     "count": 3,
                     "layout": "radial",
@@ -2056,7 +2048,7 @@ def _quiet_expression_accent(*, ddl: str | None, background: str) -> Instruction
             "color": color if color != background else VISIBLE_ON_BACKGROUND.get(background, "black"),
             "weight": "pencil",
             "filled": True,
-            "color_hint": "quiet expression accent restored after density governance",
+            "note": "quiet expression accent restored after density governance",
         }
     )
 
@@ -2253,17 +2245,16 @@ def _with_color_cycle_delivery(ins: Instruction, colors: list[str], *, ddl: str 
         arr_data["count"] = max(2, len(cycle))
         arr_data["layout"] = arr_data.get("layout") or "scatter"
         arr_data["margin"] = max(float(arr_data.get("margin") or 0.1), 0.16)
-    if "small focal mark kept compact" in (data.get("color_hint") or ""):
+    if "small focal mark kept compact" in (data.get("note") or ""):
         arr_data["density"] = arr_data.get("density") or "low"
         arr_data["fade"] = arr_data.get("fade") or "outward"
         arr_data["preserve_space"] = True
     arr_data["color_cycle"] = cycle
     data["arrangement"] = arr_data
-    hint = data.get("color_hint")
     note = f"{'/'.join(colors)} restored in color_cycle from DDL color intent"
     if green_context:
         note = f"{note}; {green_context}"
-    data["color_hint"] = f"{hint}; {note}" if hint else note
+    _append_note(data, note)
     return Instruction.model_validate(data)
 
 
@@ -2320,7 +2311,7 @@ def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | 
             continue
         data = repaired[candidate_index].model_dump(by_alias=True)
         data["color"] = color
-        _append_hint(data, f"{color} promoted to primary stroke from DDL color intent")
+        _append_note(data, f"{color} promoted to primary stroke from DDL color intent")
         repaired[candidate_index] = Instruction.model_validate(data)
     return repaired
 
@@ -2347,7 +2338,7 @@ def _shape_repair_instruction(primitive: str, *, index: int, background: str) ->
         "primitive": primitive,
         "color": color,
         "weight": "brush_thin",
-        "color_hint": f"{primitive} restored from DDL shape intent",
+        "note": f"{primitive} restored from DDL shape intent",
     }
     if primitive == "triangle":
         common.update({
@@ -2427,7 +2418,7 @@ def _requested_motifs_from_ddl(ddl: str | None) -> list[str]:
 
 
 def _score_contains_motif(instructions: list[Instruction], motif: str) -> bool:
-    return any(motif in (ins.color_hint or "") for ins in instructions)
+    return any(motif in (ins.note or "") for ins in instructions)
 
 
 def _composition_repair_suppressed(ddl: str | None) -> bool:
@@ -2498,7 +2489,7 @@ def _composition_anchor_instruction(*, color: str, background: str) -> Instructi
         "rotation": -18,
         "color": visible,
         "weight": "brush_thick",
-        "color_hint": "composition anchor restored for shape/color diversity",
+        "note": "composition anchor restored for shape/color diversity",
     })
 
 
@@ -2513,7 +2504,7 @@ def _composition_accent_instruction(*, color: str, background: str) -> Instructi
         "rotation": 8,
         "color": visible,
         "weight": "brush_thin",
-        "color_hint": "composition accent restored for shape/color diversity",
+        "note": "composition accent restored for shape/color diversity",
     })
 
 
@@ -2557,7 +2548,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
                 "size": [0.13, 0.035],
                 "rotation": -28,
                 "color": "green" if background != "green" else "white",
-                "color_hint": "leaf_cluster motif restored from DDL intent",
+                "note": "leaf_cluster motif restored from DDL intent",
             }),
             Instruction.model_validate({
                 "primitive": "arc",
@@ -2568,7 +2559,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
                 "rotation": -24,
                 "color": color,
                 "weight": "brush_thin",
-                "color_hint": "leaf_cluster motif restored from DDL intent",
+                "note": "leaf_cluster motif restored from DDL intent",
             }),
         ]
     if motif == "paper_shard":
@@ -2579,7 +2570,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
                 "size": [0.13, 0.09],
                 "rotation": -24,
                 "color": color,
-                "color_hint": "paper_shard motif restored from DDL intent",
+                "note": "paper_shard motif restored from DDL intent",
             }),
             Instruction.model_validate({
                 "primitive": "line",
@@ -2587,7 +2578,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
                 "to": [0.70 - offset, 0.37 + offset],
                 "color": color,
                 "weight": "silverpoint",
-                "color_hint": "paper_shard motif restored from DDL intent",
+                "note": "paper_shard motif restored from DDL intent",
             }),
         ]
     if motif == "ripple_knot":
@@ -2599,7 +2590,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
                 "angle_start": 25,
                 "angle_end": 210,
                 "color": "blue" if background != "blue" else "white",
-                "color_hint": "ripple_knot motif restored from DDL intent",
+                "note": "ripple_knot motif restored from DDL intent",
             }),
             Instruction.model_validate({
                 "primitive": "ellipse",
@@ -2607,7 +2598,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
                 "size": [0.055, 0.025],
                 "rotation": 18,
                 "color": color,
-                "color_hint": "ripple_knot motif restored from DDL intent",
+                "note": "ripple_knot motif restored from DDL intent",
             }),
         ]
     return [
@@ -2617,7 +2608,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
             "size": [0.18, 0.15],
             "rotation": -12,
             "color": color,
-            "color_hint": "mountain_sign motif restored from DDL intent",
+            "note": "mountain_sign motif restored from DDL intent",
         }),
         Instruction.model_validate({
             "primitive": "line",
@@ -2625,7 +2616,7 @@ def _motif_repair_instructions(motif: str, *, index: int, background: str) -> li
             "to": [0.59 - offset, 0.45 + offset],
             "color": color,
             "weight": "silverpoint",
-            "color_hint": "mountain_sign motif restored from DDL intent",
+            "note": "mountain_sign motif restored from DDL intent",
         }),
     ]
 
@@ -2884,7 +2875,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
         "primitive": primitive,
         "color": color,
         "weight": weight,
-        "color_hint": f"coverage from DDL clause: {clause[:48]}",
+        "note": f"coverage from DDL clause: {clause[:48]}",
     }
     offset = min(index, 4) * 0.09
     if primitive == "line":
@@ -2924,7 +2915,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
             "preserve_space": True,
             "rhythm_spacing": "none",
         }
-        common["color_hint"] = f"{common['color_hint']}; small focal mark kept compact with preserved negative space"
+        common["note"] = f"{common['note']}; small focal mark kept compact with preserved negative space"
     elif primitive == "circle":
         common["arrangement"] = {
             "count": 1,
@@ -2936,7 +2927,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
             "preserve_space": True,
             "rhythm_spacing": "none",
         }
-        common["color_hint"] = f"{common['color_hint']}; circle focal mark kept compact with preserved negative space"
+        common["note"] = f"{common['note']}; circle focal mark kept compact with preserved negative space"
 
     if any(marker in clause or marker in lower for marker in ("右半分", "right half")):
         if "center" in common:
@@ -2988,7 +2979,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
                     "fade": "outward",
                     "preserve_space": True,
                 },
-                "color_hint": f"{common['color_hint']}; soft light",
+                "color_hint": "soft light",
             }
         )
     elif sensory_kind == "scent":
@@ -3007,7 +2998,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
                     "fade": "directional",
                     "preserve_space": True,
                 },
-                "color_hint": f"{common['color_hint']}; scent layer",
+                "color_hint": "scent layer",
             }
         )
     elif sensory_kind == "bud":
@@ -3023,7 +3014,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
                     "path": "diagonal",
                     "margin": 0.18,
                 },
-                "color_hint": f"{common['color_hint']}; waiting buds",
+                "color_hint": "waiting buds",
             }
         )
     elif sensory_kind == "sense":
@@ -3042,7 +3033,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
                     "fade": "outward",
                     "preserve_space": True,
                 },
-                "color_hint": f"{common['color_hint']}; five-sense presence",
+                "color_hint": "five-sense presence",
             }
         )
     elif _is_atmospheric_clause(clause):
@@ -3056,7 +3047,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
             "preserve_space": True,
         }
         common["filled"] = True
-        common["color_hint"] = f"{common['color_hint']}; membrane haze"
+        common["color_hint"] = "membrane haze"
     elif _is_reflection_clause(clause):
         common["arrangement"] = {
             "count": 9,
@@ -3067,7 +3058,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
             "fade": "directional",
             "preserve_space": True,
         }
-        common["color_hint"] = f"{common['color_hint']}; reflection"
+        common["color_hint"] = "reflection"
     elif _is_fading_clause(clause):
         common["arrangement"] = {
             "count": 7,
@@ -3078,7 +3069,7 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
             "fade": "directional",
             "preserve_space": True,
         }
-        common["color_hint"] = f"{common['color_hint']}; fading"
+        common["color_hint"] = "fading"
     if cycle:
         arrangement = dict(common.get("arrangement") or {"count": max(len(cycle), 3), "layout": "scatter", "margin": 0.18})
         arrangement["color_cycle"] = cycle
@@ -3429,9 +3420,11 @@ def _color_only_constraint_from_ddl(ddl: str | None) -> list[str]:
     return requested
 
 
-def _append_hint(data: dict[str, Any], note: str) -> None:
-    hint = data.get("color_hint")
-    data["color_hint"] = f"{hint}; {note}" if hint else note
+def _append_note(data: dict[str, Any], note: str) -> None:
+    hint = data.get("note")
+    if isinstance(hint, str) and note in (part.strip() for part in hint.split(";")):
+        return
+    data["note"] = f"{hint}; {note}" if hint else note
 
 
 def _as_circle_instruction(ins: Instruction, note: str) -> Instruction:
@@ -3458,8 +3451,9 @@ def _as_circle_instruction(ins: Instruction, note: str) -> Instruction:
         "arrangement": data.get("arrangement"),
         "variation": data.get("variation"),
         "color_hint": data.get("color_hint"),
+        "note": data.get("note"),
     }
-    _append_hint(converted, note)
+    _append_note(converted, note)
     return Instruction.model_validate(converted)
 
 
@@ -3570,7 +3564,7 @@ def _with_explicit_constraint_enforcement(
                     data["arrangement"] = arr_data
                     changed = True
             if changed:
-                _append_hint(data, "explicit color-only constraint enforced")
+                _append_note(data, "explicit color-only constraint enforced")
             adjusted.append(Instruction.model_validate(data))
         repaired = adjusted
 
@@ -3583,7 +3577,7 @@ def _with_explicit_constraint_enforcement(
             arr_data["count"] = strict_count
             arr_data["layout"] = arr_data.get("layout") or "scatter"
             first["arrangement"] = arr_data
-        _append_hint(first, "explicit count constraint enforced")
+        _append_note(first, "explicit count constraint enforced")
         repaired = [Instruction.model_validate(first)]
 
     return repaired

@@ -1097,7 +1097,7 @@ def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch,
     data = r.json()
     assert data["score"]["instructions"]
     assert data["score"]["instructions"][0]["primitive"] == "line"
-    assert data["score"]["instructions"][0]["color_hint"].startswith("fallback from DDL")
+    assert data["score"]["instructions"][0]["note"].startswith("fallback from DDL")
 
 
 def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
@@ -1119,7 +1119,7 @@ def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
     assert r.status_code == 200
     instructions = r.json()["score"]["instructions"]
     assert [ins["primitive"] for ins in instructions] == ["line"]
-    assert not any("composition anchor restored" in (ins.get("color_hint") or "") for ins in instructions)
+    assert not any("composition anchor restored" in (ins.get("note") or "") for ins in instructions)
 
 
 def test_compose_fallback_preserves_arrangement_path(monkeypatch, auth_context):
@@ -1222,7 +1222,7 @@ def test_compose_fallback_adds_negative_space_support_for_paper_trace(monkeypatc
     assert len(instructions) >= 2
     assert instructions[0]["arrangement"]["preserve_space"] is True
     assert instructions[0]["arrangement"]["fade"] == "outward"
-    assert any("fallback negative space support" in (ins.get("color_hint") or "") for ins in instructions)
+    assert any("fallback negative space support" in (ins.get("note") or "") for ins in instructions)
 
 
 def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
@@ -1243,7 +1243,7 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
     data = r.json()
     assert data["fallback_used"] is True
     assert data["retry_reasons"] == ["stage2_hard_timeout"]
-    assert data["score"]["instructions"][0]["color_hint"].startswith("fallback from DDL")
+    assert data["score"]["instructions"][0]["note"].startswith("fallback from DDL")
 
 
 def test_compose_retry_reason_only_retries_empty_instructions():

@@ -69,13 +69,14 @@
         "carve_depth": null,
         "center": null,
         "color": "black",
-        "color_hint": "blue restored in color_cycle from DDL color intent",
+        "color_hint": null,
         "filled": false,
         "from": [
           0.18,
           0.5
         ],
         "mode": "additive",
+        "note": "blue restored in color_cycle from DDL color intent",
         "position": null,
         "primitive": "line",
         "radius": null,

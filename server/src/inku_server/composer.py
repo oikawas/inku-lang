@@ -45,6 +45,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 ## 図形と圧縮
 
+- **note は機械専用の処理注記。Stage 2 からは絶対に出力しない**
 - 座標: 0.0-1.0 比率 (左上=(0,0) 右下=(1,1))
 - circle/ellipse/arc/polygon/cloudform → center フィールド。square/triangle → position フィールド (bbox 左上)
 - **正規化DDLの「雲形」だけを primitive="cloudform", center+size へ転記する。輪郭座標・制御点は生成しない。雲形を補完・推測で追加しない**
@@ -435,6 +436,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 ## Shapes and compression
 
+- **note is reserved for machine processing annotations. Never emit it from Stage 2**
 - Coordinates: 0.0-1.0 ratio (top-left=(0,0) bottom-right=(1,1))
 - circle/ellipse/arc/polygon/cloudform → center field. square/triangle → position field (bbox top-left)
 - **Transcribe only normalized DDL cloudform as primitive="cloudform" with center+size. Never generate contour coordinates or control points, and never infer or repair cloudform into the score**

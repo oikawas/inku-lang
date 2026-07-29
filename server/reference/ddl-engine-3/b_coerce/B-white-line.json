@@ -50,13 +50,14 @@
         "carve_depth": null,
         "center": null,
         "color": "black",
-        "color_hint": "white foreground made visible",
+        "color_hint": null,
         "filled": false,
         "from": [
           0.18,
           0.5
         ],
         "mode": "additive",
+        "note": "white foreground made visible",
         "position": null,
         "primitive": "line",
         "radius": null,

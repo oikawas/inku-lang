@@ -117,6 +117,7 @@ def test_compose_fixture(case_dir: Path):
             f"{case_dir.name}: instruction count "
             f"{len(actual.instructions)} vs {len(expected.instructions)}"
         )
+    assert all(instruction.note is None for instruction in actual.instructions)
 
     all_errors: list[str] = []
     for i, (a, e) in enumerate(zip(actual.instructions, expected.instructions)):

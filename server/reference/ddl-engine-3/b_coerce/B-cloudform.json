@@ -57,6 +57,7 @@
         "filled": false,
         "from": null,
         "mode": "additive",
+        "note": null,
         "position": null,
         "primitive": "cloudform",
         "radius": null,

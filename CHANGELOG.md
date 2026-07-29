@@ -857,3 +857,15 @@ The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/
 - **`<p align="center">` was measured against GitHub's sanitizer before the push.** Sent through `POST /markdown`, both `align` and `width` survived; the only change was that the `<img>` came back wrapped in an `<a>`. It is treated exactly like the existing `<table align="center">`.
 - **Nothing about the application changed.** `web/BUILD_NUMBER` and `APP_VERSION` were not moved, nothing was synced to the development host, and the web favicons (`web/static/favicon*.png`, `web/src/lib/assets/favicon.svg`) were not replaced.
 - **The GitHub social preview — the card image shown when the repository link is shared — was not set.** It can only be uploaded through the repository settings page; the REST API exposes no endpoint for it. It is a separate thing from the README image.
+
+---
+
+### 2026-07-29 — The top page now introduces itself in Japanese as well (**no version**, documentation only)
+
+**GitHub has no mechanism for serving a README in the reader's language.** `README.ja.md` is not recognised as a README at all; the top page shows `README.md` and nothing else. The two files had linked to each other for a long time, but the link sat on **line 322 of `README.md` — the last line**, so a Japanese reader had to scroll the whole page to find it.
+
+- **A language bar was placed at the top**, directly under the icon and above `# inku`. Both files carry it, centred, with the language being read in `<strong>` and the other one as a link.
+- **A Japanese introduction was placed in `README.md` as a blockquote**, immediately after the English one-liner. The wording is taken verbatim from the opening of `README.ja.md`: **Japanese is canonical, so Japanese embedded in the English file is not newly authored either.**
+- **Not one heading was added.** `check_docs.py` compares this pair in `shape` mode — the sequence of heading levels and nothing else — so a paragraph and a `<p>` without a heading leave the two skeletons identical. **The same introduction under a `##` would fail the check.**
+- **`<p align="center">` and the blockquote were measured against GitHub's sanitizer before the push** (`POST /markdown`). The `align` attribute, the link, the `｜` separator and `<strong>` all survived.
+- **The About field in the sidebar was left alone.** It can only be changed through the settings page or an authenticated API call, so a bilingual draft (223 characters against a 350 limit) was handed to the author instead.

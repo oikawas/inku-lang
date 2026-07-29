@@ -2,9 +2,17 @@
   <img src="docs/assets/incu-icon-512.png" width="120" alt="The inku icon: small gray, black, blue, red and green squares set in a cross on a dark rounded square">
 </p>
 
+<p align="center">
+  <a href="README.ja.md">日本語</a> ｜ <strong>English</strong>
+</p>
+
 # inku
 
 **One sentence becomes a picture.**
+
+> **一文が、絵になる。**
+> `inku`（インク）は、短い記述から抽象的なベクターグラフィックを生み出す描画言語 DDL（Drawing Description Language）のリファレンスとなるアプリケーションです。絵画の経験や道具が無くても、自分のイメージを形に出来ます。心に残った光景をひとつ、短く書くことが始まりで、そこから作品を作っていくことが出来ます。
+> **日本語の全文は [日本語版 README](README.ja.md) にあります。**
 
 <table align="center">
 <tr>

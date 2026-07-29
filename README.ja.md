@@ -2,6 +2,10 @@
   <img src="docs/assets/incu-icon-512.png" width="120" alt="inku のアイコン。濃い灰色の角丸正方形の上に、灰・黒・青・赤・緑の小さな正方形が十字に並ぶ">
 </p>
 
+<p align="center">
+  <strong>日本語</strong> ｜ <a href="README.md">English</a>
+</p>
+
 # inku
 
 **一文が、絵になる。**

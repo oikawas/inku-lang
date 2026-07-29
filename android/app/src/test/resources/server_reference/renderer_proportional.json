@@ -48,7 +48,13 @@
       "burin": 3.2,
       "drypoint": 2.6,
       "computer": 2.0
-    }
+    },
+    "THINNESS_TO_WIDTH_SCALE": {
+      "null": 1.0,
+      "fine": 0.6,
+      "extra_fine": 0.35
+    },
+    "MIN_STROKE_WIDTH": 0.5
   },
   "canvases": {
     "square": {
@@ -1682,6 +1688,2242 @@
       "aspect": "vertical",
       "weight": "silverpoint",
       "value": 0.281
+    }
+  ],
+  "stroke_width_thinness_px": [
+    {
+      "aspect": "square",
+      "weight": "brush_thick",
+      "thinness": null,
+      "value": 8.0
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "value": 4.8
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "value": 2.8
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thin",
+      "thinness": null,
+      "value": 3.0
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "value": 1.7999999999999998
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "value": 1.0499999999999998
+    },
+    {
+      "aspect": "square",
+      "weight": "burin",
+      "thinness": null,
+      "value": 3.2
+    },
+    {
+      "aspect": "square",
+      "weight": "burin",
+      "thinness": "fine",
+      "value": 1.92
+    },
+    {
+      "aspect": "square",
+      "weight": "burin",
+      "thinness": "extra_fine",
+      "value": 1.1199999999999999
+    },
+    {
+      "aspect": "square",
+      "weight": "chalk",
+      "thinness": null,
+      "value": 3.0
+    },
+    {
+      "aspect": "square",
+      "weight": "chalk",
+      "thinness": "fine",
+      "value": 1.7999999999999998
+    },
+    {
+      "aspect": "square",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "value": 1.0499999999999998
+    },
+    {
+      "aspect": "square",
+      "weight": "computer",
+      "thinness": null,
+      "value": 2.0
+    },
+    {
+      "aspect": "square",
+      "weight": "computer",
+      "thinness": "fine",
+      "value": 1.2
+    },
+    {
+      "aspect": "square",
+      "weight": "computer",
+      "thinness": "extra_fine",
+      "value": 0.7
+    },
+    {
+      "aspect": "square",
+      "weight": "crayon",
+      "thinness": null,
+      "value": 4.0
+    },
+    {
+      "aspect": "square",
+      "weight": "crayon",
+      "thinness": "fine",
+      "value": 2.4
+    },
+    {
+      "aspect": "square",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "value": 1.4
+    },
+    {
+      "aspect": "square",
+      "weight": "drypoint",
+      "thinness": null,
+      "value": 2.6
+    },
+    {
+      "aspect": "square",
+      "weight": "drypoint",
+      "thinness": "fine",
+      "value": 1.56
+    },
+    {
+      "aspect": "square",
+      "weight": "drypoint",
+      "thinness": "extra_fine",
+      "value": 0.9099999999999999
+    },
+    {
+      "aspect": "square",
+      "weight": "pen",
+      "thinness": null,
+      "value": 2.0
+    },
+    {
+      "aspect": "square",
+      "weight": "pen",
+      "thinness": "fine",
+      "value": 1.2
+    },
+    {
+      "aspect": "square",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "value": 0.7
+    },
+    {
+      "aspect": "square",
+      "weight": "pencil",
+      "thinness": null,
+      "value": 1.5
+    },
+    {
+      "aspect": "square",
+      "weight": "pencil",
+      "thinness": "fine",
+      "value": 0.8999999999999999
+    },
+    {
+      "aspect": "square",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "value": 0.5249999999999999
+    },
+    {
+      "aspect": "square",
+      "weight": "rotring",
+      "thinness": null,
+      "value": 1.0
+    },
+    {
+      "aspect": "square",
+      "weight": "rotring",
+      "thinness": "fine",
+      "value": 0.6
+    },
+    {
+      "aspect": "square",
+      "weight": "rotring",
+      "thinness": "extra_fine",
+      "value": 0.5
+    },
+    {
+      "aspect": "square",
+      "weight": "silverpoint",
+      "thinness": null,
+      "value": 0.5
+    },
+    {
+      "aspect": "square",
+      "weight": "silverpoint",
+      "thinness": "fine",
+      "value": 0.5
+    },
+    {
+      "aspect": "square",
+      "weight": "silverpoint",
+      "thinness": "extra_fine",
+      "value": 0.5
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thick",
+      "thinness": null,
+      "value": 8.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "value": 4.8
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "value": 2.8
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thin",
+      "thinness": null,
+      "value": 3.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "value": 1.7999999999999998
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "value": 1.0499999999999998
+    },
+    {
+      "aspect": "wide",
+      "weight": "burin",
+      "thinness": null,
+      "value": 3.2
+    },
+    {
+      "aspect": "wide",
+      "weight": "burin",
+      "thinness": "fine",
+      "value": 1.92
+    },
+    {
+      "aspect": "wide",
+      "weight": "burin",
+      "thinness": "extra_fine",
+      "value": 1.1199999999999999
+    },
+    {
+      "aspect": "wide",
+      "weight": "chalk",
+      "thinness": null,
+      "value": 3.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "chalk",
+      "thinness": "fine",
+      "value": 1.7999999999999998
+    },
+    {
+      "aspect": "wide",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "value": 1.0499999999999998
+    },
+    {
+      "aspect": "wide",
+      "weight": "computer",
+      "thinness": null,
+      "value": 2.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "computer",
+      "thinness": "fine",
+      "value": 1.2
+    },
+    {
+      "aspect": "wide",
+      "weight": "computer",
+      "thinness": "extra_fine",
+      "value": 0.7
+    },
+    {
+      "aspect": "wide",
+      "weight": "crayon",
+      "thinness": null,
+      "value": 4.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "crayon",
+      "thinness": "fine",
+      "value": 2.4
+    },
+    {
+      "aspect": "wide",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "value": 1.4
+    },
+    {
+      "aspect": "wide",
+      "weight": "drypoint",
+      "thinness": null,
+      "value": 2.6
+    },
+    {
+      "aspect": "wide",
+      "weight": "drypoint",
+      "thinness": "fine",
+      "value": 1.56
+    },
+    {
+      "aspect": "wide",
+      "weight": "drypoint",
+      "thinness": "extra_fine",
+      "value": 0.9099999999999999
+    },
+    {
+      "aspect": "wide",
+      "weight": "pen",
+      "thinness": null,
+      "value": 2.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "pen",
+      "thinness": "fine",
+      "value": 1.2
+    },
+    {
+      "aspect": "wide",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "value": 0.7
+    },
+    {
+      "aspect": "wide",
+      "weight": "pencil",
+      "thinness": null,
+      "value": 1.5
+    },
+    {
+      "aspect": "wide",
+      "weight": "pencil",
+      "thinness": "fine",
+      "value": 0.8999999999999999
+    },
+    {
+      "aspect": "wide",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "value": 0.5249999999999999
+    },
+    {
+      "aspect": "wide",
+      "weight": "rotring",
+      "thinness": null,
+      "value": 1.0
+    },
+    {
+      "aspect": "wide",
+      "weight": "rotring",
+      "thinness": "fine",
+      "value": 0.6
+    },
+    {
+      "aspect": "wide",
+      "weight": "rotring",
+      "thinness": "extra_fine",
+      "value": 0.5
+    },
+    {
+      "aspect": "wide",
+      "weight": "silverpoint",
+      "thinness": null,
+      "value": 0.5
+    },
+    {
+      "aspect": "wide",
+      "weight": "silverpoint",
+      "thinness": "fine",
+      "value": 0.5
+    },
+    {
+      "aspect": "wide",
+      "weight": "silverpoint",
+      "thinness": "extra_fine",
+      "value": 0.5
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thick",
+      "thinness": null,
+      "value": 1.6
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "value": 0.96
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "value": 0.5599999999999999
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thin",
+      "thinness": null,
+      "value": 0.6000000000000001
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "value": 0.36
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "value": 0.20999999999999996
+    },
+    {
+      "aspect": "pillar",
+      "weight": "burin",
+      "thinness": null,
+      "value": 0.6400000000000001
+    },
+    {
+      "aspect": "pillar",
+      "weight": "burin",
+      "thinness": "fine",
+      "value": 0.384
+    },
+    {
+      "aspect": "pillar",
+      "weight": "burin",
+      "thinness": "extra_fine",
+      "value": 0.22399999999999998
+    },
+    {
+      "aspect": "pillar",
+      "weight": "chalk",
+      "thinness": null,
+      "value": 0.6000000000000001
+    },
+    {
+      "aspect": "pillar",
+      "weight": "chalk",
+      "thinness": "fine",
+      "value": 0.36
+    },
+    {
+      "aspect": "pillar",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "value": 0.20999999999999996
+    },
+    {
+      "aspect": "pillar",
+      "weight": "computer",
+      "thinness": null,
+      "value": 0.4
+    },
+    {
+      "aspect": "pillar",
+      "weight": "computer",
+      "thinness": "fine",
+      "value": 0.24
+    },
+    {
+      "aspect": "pillar",
+      "weight": "computer",
+      "thinness": "extra_fine",
+      "value": 0.13999999999999999
+    },
+    {
+      "aspect": "pillar",
+      "weight": "crayon",
+      "thinness": null,
+      "value": 0.8
+    },
+    {
+      "aspect": "pillar",
+      "weight": "crayon",
+      "thinness": "fine",
+      "value": 0.48
+    },
+    {
+      "aspect": "pillar",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "value": 0.27999999999999997
+    },
+    {
+      "aspect": "pillar",
+      "weight": "drypoint",
+      "thinness": null,
+      "value": 0.52
+    },
+    {
+      "aspect": "pillar",
+      "weight": "drypoint",
+      "thinness": "fine",
+      "value": 0.31200000000000006
+    },
+    {
+      "aspect": "pillar",
+      "weight": "drypoint",
+      "thinness": "extra_fine",
+      "value": 0.182
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pen",
+      "thinness": null,
+      "value": 0.4
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pen",
+      "thinness": "fine",
+      "value": 0.24
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "value": 0.13999999999999999
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pencil",
+      "thinness": null,
+      "value": 0.30000000000000004
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pencil",
+      "thinness": "fine",
+      "value": 0.18
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "value": 0.10499999999999998
+    },
+    {
+      "aspect": "pillar",
+      "weight": "rotring",
+      "thinness": null,
+      "value": 0.2
+    },
+    {
+      "aspect": "pillar",
+      "weight": "rotring",
+      "thinness": "fine",
+      "value": 0.12
+    },
+    {
+      "aspect": "pillar",
+      "weight": "rotring",
+      "thinness": "extra_fine",
+      "value": 0.1
+    },
+    {
+      "aspect": "pillar",
+      "weight": "silverpoint",
+      "thinness": null,
+      "value": 0.1
+    },
+    {
+      "aspect": "pillar",
+      "weight": "silverpoint",
+      "thinness": "fine",
+      "value": 0.1
+    },
+    {
+      "aspect": "pillar",
+      "weight": "silverpoint",
+      "thinness": "extra_fine",
+      "value": 0.1
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thick",
+      "thinness": null,
+      "value": 4.496
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "value": 2.6976
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "value": 1.5736
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thin",
+      "thinness": null,
+      "value": 1.6860000000000002
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "value": 1.0116
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "value": 0.5901
+    },
+    {
+      "aspect": "vertical",
+      "weight": "burin",
+      "thinness": null,
+      "value": 1.7984000000000002
+    },
+    {
+      "aspect": "vertical",
+      "weight": "burin",
+      "thinness": "fine",
+      "value": 1.07904
+    },
+    {
+      "aspect": "vertical",
+      "weight": "burin",
+      "thinness": "extra_fine",
+      "value": 0.62944
+    },
+    {
+      "aspect": "vertical",
+      "weight": "chalk",
+      "thinness": null,
+      "value": 1.6860000000000002
+    },
+    {
+      "aspect": "vertical",
+      "weight": "chalk",
+      "thinness": "fine",
+      "value": 1.0116
+    },
+    {
+      "aspect": "vertical",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "value": 0.5901
+    },
+    {
+      "aspect": "vertical",
+      "weight": "computer",
+      "thinness": null,
+      "value": 1.124
+    },
+    {
+      "aspect": "vertical",
+      "weight": "computer",
+      "thinness": "fine",
+      "value": 0.6744
+    },
+    {
+      "aspect": "vertical",
+      "weight": "computer",
+      "thinness": "extra_fine",
+      "value": 0.3934
+    },
+    {
+      "aspect": "vertical",
+      "weight": "crayon",
+      "thinness": null,
+      "value": 2.248
+    },
+    {
+      "aspect": "vertical",
+      "weight": "crayon",
+      "thinness": "fine",
+      "value": 1.3488
+    },
+    {
+      "aspect": "vertical",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "value": 0.7868
+    },
+    {
+      "aspect": "vertical",
+      "weight": "drypoint",
+      "thinness": null,
+      "value": 1.4612000000000003
+    },
+    {
+      "aspect": "vertical",
+      "weight": "drypoint",
+      "thinness": "fine",
+      "value": 0.8767200000000002
+    },
+    {
+      "aspect": "vertical",
+      "weight": "drypoint",
+      "thinness": "extra_fine",
+      "value": 0.51142
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pen",
+      "thinness": null,
+      "value": 1.124
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pen",
+      "thinness": "fine",
+      "value": 0.6744
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "value": 0.3934
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pencil",
+      "thinness": null,
+      "value": 0.8430000000000001
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pencil",
+      "thinness": "fine",
+      "value": 0.5058
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "value": 0.29505
+    },
+    {
+      "aspect": "vertical",
+      "weight": "rotring",
+      "thinness": null,
+      "value": 0.562
+    },
+    {
+      "aspect": "vertical",
+      "weight": "rotring",
+      "thinness": "fine",
+      "value": 0.3372
+    },
+    {
+      "aspect": "vertical",
+      "weight": "rotring",
+      "thinness": "extra_fine",
+      "value": 0.281
+    },
+    {
+      "aspect": "vertical",
+      "weight": "silverpoint",
+      "thinness": null,
+      "value": 0.281
+    },
+    {
+      "aspect": "vertical",
+      "weight": "silverpoint",
+      "thinness": "fine",
+      "value": 0.281
+    },
+    {
+      "aspect": "vertical",
+      "weight": "silverpoint",
+      "thinness": "extra_fine",
+      "value": 0.281
+    }
+  ],
+  "material_outline_thinness": [
+    {
+      "aspect": "square",
+      "weight": "brush_thick",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -4.0,
+          "width": 2.24,
+          "opacity": 0.648,
+          "dash": "18.000000,7.000000,3.000000,11.000000"
+        },
+        {
+          "offset": 3.2,
+          "width": 1.76,
+          "opacity": 0.504,
+          "dash": "11.000000,9.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -4.0,
+          "width": 1.344,
+          "opacity": 0.648,
+          "dash": "18.000000,7.000000,3.000000,11.000000"
+        },
+        {
+          "offset": 3.2,
+          "width": 1.056,
+          "opacity": 0.504,
+          "dash": "11.000000,9.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -4.0,
+          "width": 0.784,
+          "opacity": 0.648,
+          "dash": "18.000000,7.000000,3.000000,11.000000"
+        },
+        {
+          "offset": 3.2,
+          "width": 0.616,
+          "opacity": 0.504,
+          "dash": "11.000000,9.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thin",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.6,
+          "width": 1.0,
+          "opacity": 0.576,
+          "dash": "22.000000,9.000000"
+        },
+        {
+          "offset": 1.8,
+          "width": 1.4,
+          "opacity": 0.504,
+          "dash": "14.000000,8.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.6,
+          "width": 1.0,
+          "opacity": 0.576,
+          "dash": "22.000000,9.000000"
+        },
+        {
+          "offset": 1.8,
+          "width": 1.4,
+          "opacity": 0.504,
+          "dash": "14.000000,8.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.6,
+          "width": 1.0,
+          "opacity": 0.576,
+          "dash": "22.000000,9.000000"
+        },
+        {
+          "offset": 1.8,
+          "width": 1.4,
+          "opacity": 0.504,
+          "dash": "14.000000,8.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "chalk",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -3.2,
+          "width": 1.2,
+          "opacity": 0.54,
+          "dash": "8.000000,12.000000,1.000000,8.000000"
+        },
+        {
+          "offset": 3.6,
+          "width": 1.0,
+          "opacity": 0.5,
+          "dash": "5.000000,10.000000,1.000000,6.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "chalk",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -3.2,
+          "width": 1.2,
+          "opacity": 0.54,
+          "dash": "8.000000,12.000000,1.000000,8.000000"
+        },
+        {
+          "offset": 3.6,
+          "width": 1.0,
+          "opacity": 0.5,
+          "dash": "5.000000,10.000000,1.000000,6.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -3.2,
+          "width": 1.2,
+          "opacity": 0.54,
+          "dash": "8.000000,12.000000,1.000000,8.000000"
+        },
+        {
+          "offset": 3.6,
+          "width": 1.0,
+          "opacity": 0.5,
+          "dash": "5.000000,10.000000,1.000000,6.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "crayon",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -3.4,
+          "width": 0.96,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        },
+        {
+          "offset": -1.5,
+          "width": 0.8,
+          "opacity": 0.5,
+          "dash": "4.000000,8.000000"
+        },
+        {
+          "offset": 2.4,
+          "width": 0.88,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "crayon",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -3.4,
+          "width": 0.576,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        },
+        {
+          "offset": -1.5,
+          "width": 0.48,
+          "opacity": 0.5,
+          "dash": "4.000000,8.000000"
+        },
+        {
+          "offset": 2.4,
+          "width": 0.528,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -3.4,
+          "width": 0.336,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        },
+        {
+          "offset": -1.5,
+          "width": 0.28,
+          "opacity": 0.5,
+          "dash": "4.000000,8.000000"
+        },
+        {
+          "offset": 2.4,
+          "width": 0.308,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "pen",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.4,
+          "width": 0.38,
+          "opacity": 0.5,
+          "dash": "14.000000,3.000000"
+        },
+        {
+          "offset": 1.4,
+          "width": 0.34,
+          "opacity": 0.5,
+          "dash": "12.000000,4.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "pen",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.4,
+          "width": 0.38,
+          "opacity": 0.5,
+          "dash": "14.000000,3.000000"
+        },
+        {
+          "offset": 1.4,
+          "width": 0.34,
+          "opacity": 0.5,
+          "dash": "12.000000,4.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.4,
+          "width": 0.38,
+          "opacity": 0.5,
+          "dash": "14.000000,3.000000"
+        },
+        {
+          "offset": 1.4,
+          "width": 0.34,
+          "opacity": 0.5,
+          "dash": "12.000000,4.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "pencil",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.0,
+          "width": 0.45,
+          "opacity": 0.5,
+          "dash": "1.000000,7.000000"
+        },
+        {
+          "offset": 1.2,
+          "width": 0.5,
+          "opacity": 0.5,
+          "dash": "1.000000,5.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "pencil",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.0,
+          "width": 0.45,
+          "opacity": 0.5,
+          "dash": "1.000000,7.000000"
+        },
+        {
+          "offset": 1.2,
+          "width": 0.5,
+          "opacity": 0.5,
+          "dash": "1.000000,5.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "square",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.0,
+          "width": 0.45,
+          "opacity": 0.5,
+          "dash": "1.000000,7.000000"
+        },
+        {
+          "offset": 1.2,
+          "width": 0.5,
+          "opacity": 0.5,
+          "dash": "1.000000,5.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thick",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -4.0,
+          "width": 2.24,
+          "opacity": 0.648,
+          "dash": "18.000000,7.000000,3.000000,11.000000"
+        },
+        {
+          "offset": 3.2,
+          "width": 1.76,
+          "opacity": 0.504,
+          "dash": "11.000000,9.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -4.0,
+          "width": 1.344,
+          "opacity": 0.648,
+          "dash": "18.000000,7.000000,3.000000,11.000000"
+        },
+        {
+          "offset": 3.2,
+          "width": 1.056,
+          "opacity": 0.504,
+          "dash": "11.000000,9.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -4.0,
+          "width": 0.784,
+          "opacity": 0.648,
+          "dash": "18.000000,7.000000,3.000000,11.000000"
+        },
+        {
+          "offset": 3.2,
+          "width": 0.616,
+          "opacity": 0.504,
+          "dash": "11.000000,9.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thin",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.6,
+          "width": 1.0,
+          "opacity": 0.576,
+          "dash": "22.000000,9.000000"
+        },
+        {
+          "offset": 1.8,
+          "width": 1.4,
+          "opacity": 0.504,
+          "dash": "14.000000,8.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.6,
+          "width": 1.0,
+          "opacity": 0.576,
+          "dash": "22.000000,9.000000"
+        },
+        {
+          "offset": 1.8,
+          "width": 1.4,
+          "opacity": 0.504,
+          "dash": "14.000000,8.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.6,
+          "width": 1.0,
+          "opacity": 0.576,
+          "dash": "22.000000,9.000000"
+        },
+        {
+          "offset": 1.8,
+          "width": 1.4,
+          "opacity": 0.504,
+          "dash": "14.000000,8.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "chalk",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -3.2,
+          "width": 1.2,
+          "opacity": 0.54,
+          "dash": "8.000000,12.000000,1.000000,8.000000"
+        },
+        {
+          "offset": 3.6,
+          "width": 1.0,
+          "opacity": 0.5,
+          "dash": "5.000000,10.000000,1.000000,6.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "chalk",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -3.2,
+          "width": 1.2,
+          "opacity": 0.54,
+          "dash": "8.000000,12.000000,1.000000,8.000000"
+        },
+        {
+          "offset": 3.6,
+          "width": 1.0,
+          "opacity": 0.5,
+          "dash": "5.000000,10.000000,1.000000,6.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -3.2,
+          "width": 1.2,
+          "opacity": 0.54,
+          "dash": "8.000000,12.000000,1.000000,8.000000"
+        },
+        {
+          "offset": 3.6,
+          "width": 1.0,
+          "opacity": 0.5,
+          "dash": "5.000000,10.000000,1.000000,6.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "crayon",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -3.4,
+          "width": 0.96,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        },
+        {
+          "offset": -1.5,
+          "width": 0.8,
+          "opacity": 0.5,
+          "dash": "4.000000,8.000000"
+        },
+        {
+          "offset": 2.4,
+          "width": 0.88,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "crayon",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -3.4,
+          "width": 0.576,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        },
+        {
+          "offset": -1.5,
+          "width": 0.48,
+          "opacity": 0.5,
+          "dash": "4.000000,8.000000"
+        },
+        {
+          "offset": 2.4,
+          "width": 0.528,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -3.4,
+          "width": 0.336,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        },
+        {
+          "offset": -1.5,
+          "width": 0.28,
+          "opacity": 0.5,
+          "dash": "4.000000,8.000000"
+        },
+        {
+          "offset": 2.4,
+          "width": 0.308,
+          "opacity": 0.5,
+          "dash": "2.000000,5.000000,9.000000,7.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "pen",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.4,
+          "width": 0.38,
+          "opacity": 0.5,
+          "dash": "14.000000,3.000000"
+        },
+        {
+          "offset": 1.4,
+          "width": 0.34,
+          "opacity": 0.5,
+          "dash": "12.000000,4.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "pen",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.4,
+          "width": 0.38,
+          "opacity": 0.5,
+          "dash": "14.000000,3.000000"
+        },
+        {
+          "offset": 1.4,
+          "width": 0.34,
+          "opacity": 0.5,
+          "dash": "12.000000,4.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.4,
+          "width": 0.38,
+          "opacity": 0.5,
+          "dash": "14.000000,3.000000"
+        },
+        {
+          "offset": 1.4,
+          "width": 0.34,
+          "opacity": 0.5,
+          "dash": "12.000000,4.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "pencil",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.0,
+          "width": 0.45,
+          "opacity": 0.5,
+          "dash": "1.000000,7.000000"
+        },
+        {
+          "offset": 1.2,
+          "width": 0.5,
+          "opacity": 0.5,
+          "dash": "1.000000,5.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "pencil",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.0,
+          "width": 0.45,
+          "opacity": 0.5,
+          "dash": "1.000000,7.000000"
+        },
+        {
+          "offset": 1.2,
+          "width": 0.5,
+          "opacity": 0.5,
+          "dash": "1.000000,5.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "wide",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.0,
+          "width": 0.45,
+          "opacity": 0.5,
+          "dash": "1.000000,7.000000"
+        },
+        {
+          "offset": 1.2,
+          "width": 0.5,
+          "opacity": 0.5,
+          "dash": "1.000000,5.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thick",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.8,
+          "width": 0.448,
+          "opacity": 0.648,
+          "dash": "3.600000,1.400000,0.600000,2.200000"
+        },
+        {
+          "offset": 0.64,
+          "width": 0.352,
+          "opacity": 0.504,
+          "dash": "2.200000,1.800000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.8,
+          "width": 0.2688,
+          "opacity": 0.648,
+          "dash": "3.600000,1.400000,0.600000,2.200000"
+        },
+        {
+          "offset": 0.64,
+          "width": 0.2112,
+          "opacity": 0.504,
+          "dash": "2.200000,1.800000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.8,
+          "width": 0.1568,
+          "opacity": 0.648,
+          "dash": "3.600000,1.400000,0.600000,2.200000"
+        },
+        {
+          "offset": 0.64,
+          "width": 0.1232,
+          "opacity": 0.504,
+          "dash": "2.200000,1.800000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thin",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.32,
+          "width": 0.2,
+          "opacity": 0.576,
+          "dash": "4.400000,1.800000"
+        },
+        {
+          "offset": 0.36,
+          "width": 0.28,
+          "opacity": 0.504,
+          "dash": "2.800000,1.600000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.32,
+          "width": 0.2,
+          "opacity": 0.576,
+          "dash": "4.400000,1.800000"
+        },
+        {
+          "offset": 0.36,
+          "width": 0.28,
+          "opacity": 0.504,
+          "dash": "2.800000,1.600000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.32,
+          "width": 0.2,
+          "opacity": 0.576,
+          "dash": "4.400000,1.800000"
+        },
+        {
+          "offset": 0.36,
+          "width": 0.28,
+          "opacity": 0.504,
+          "dash": "2.800000,1.600000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "chalk",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.64,
+          "width": 0.24,
+          "opacity": 0.54,
+          "dash": "1.600000,2.400000,0.200000,1.600000"
+        },
+        {
+          "offset": 0.72,
+          "width": 0.2,
+          "opacity": 0.5,
+          "dash": "1.000000,2.000000,0.200000,1.200000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "chalk",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.64,
+          "width": 0.24,
+          "opacity": 0.54,
+          "dash": "1.600000,2.400000,0.200000,1.600000"
+        },
+        {
+          "offset": 0.72,
+          "width": 0.2,
+          "opacity": 0.5,
+          "dash": "1.000000,2.000000,0.200000,1.200000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.64,
+          "width": 0.24,
+          "opacity": 0.54,
+          "dash": "1.600000,2.400000,0.200000,1.600000"
+        },
+        {
+          "offset": 0.72,
+          "width": 0.2,
+          "opacity": 0.5,
+          "dash": "1.000000,2.000000,0.200000,1.200000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "crayon",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.68,
+          "width": 0.192,
+          "opacity": 0.5,
+          "dash": "0.400000,1.000000,1.800000,1.400000"
+        },
+        {
+          "offset": -0.3,
+          "width": 0.16,
+          "opacity": 0.5,
+          "dash": "0.800000,1.600000"
+        },
+        {
+          "offset": 0.48,
+          "width": 0.176,
+          "opacity": 0.5,
+          "dash": "0.400000,1.000000,1.800000,1.400000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "crayon",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.68,
+          "width": 0.1152,
+          "opacity": 0.5,
+          "dash": "0.400000,1.000000,1.800000,1.400000"
+        },
+        {
+          "offset": -0.3,
+          "width": 0.096,
+          "opacity": 0.5,
+          "dash": "0.800000,1.600000"
+        },
+        {
+          "offset": 0.48,
+          "width": 0.1056,
+          "opacity": 0.5,
+          "dash": "0.400000,1.000000,1.800000,1.400000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.68,
+          "width": 0.0672,
+          "opacity": 0.5,
+          "dash": "0.400000,1.000000,1.800000,1.400000"
+        },
+        {
+          "offset": -0.3,
+          "width": 0.056,
+          "opacity": 0.5,
+          "dash": "0.800000,1.600000"
+        },
+        {
+          "offset": 0.48,
+          "width": 0.0616,
+          "opacity": 0.5,
+          "dash": "0.400000,1.000000,1.800000,1.400000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pen",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.28,
+          "width": 0.076,
+          "opacity": 0.5,
+          "dash": "2.800000,0.600000"
+        },
+        {
+          "offset": 0.28,
+          "width": 0.068,
+          "opacity": 0.5,
+          "dash": "2.400000,0.800000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pen",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.28,
+          "width": 0.076,
+          "opacity": 0.5,
+          "dash": "2.800000,0.600000"
+        },
+        {
+          "offset": 0.28,
+          "width": 0.068,
+          "opacity": 0.5,
+          "dash": "2.400000,0.800000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.28,
+          "width": 0.076,
+          "opacity": 0.5,
+          "dash": "2.800000,0.600000"
+        },
+        {
+          "offset": 0.28,
+          "width": 0.068,
+          "opacity": 0.5,
+          "dash": "2.400000,0.800000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pencil",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.2,
+          "width": 0.09,
+          "opacity": 0.5,
+          "dash": "0.200000,1.400000"
+        },
+        {
+          "offset": 0.24,
+          "width": 0.1,
+          "opacity": 0.5,
+          "dash": "0.200000,1.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pencil",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.2,
+          "width": 0.09,
+          "opacity": 0.5,
+          "dash": "0.200000,1.400000"
+        },
+        {
+          "offset": 0.24,
+          "width": 0.1,
+          "opacity": 0.5,
+          "dash": "0.200000,1.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "pillar",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.2,
+          "width": 0.09,
+          "opacity": 0.5,
+          "dash": "0.200000,1.400000"
+        },
+        {
+          "offset": 0.24,
+          "width": 0.1,
+          "opacity": 0.5,
+          "dash": "0.200000,1.000000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thick",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -2.248,
+          "width": 1.25888,
+          "opacity": 0.648,
+          "dash": "10.116000,3.934000,1.686000,6.182000"
+        },
+        {
+          "offset": 1.7984,
+          "width": 0.98912,
+          "opacity": 0.504,
+          "dash": "6.182000,5.058000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thick",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -2.248,
+          "width": 0.755328,
+          "opacity": 0.648,
+          "dash": "10.116000,3.934000,1.686000,6.182000"
+        },
+        {
+          "offset": 1.7984,
+          "width": 0.593472,
+          "opacity": 0.504,
+          "dash": "6.182000,5.058000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thick",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -2.248,
+          "width": 0.440608,
+          "opacity": 0.648,
+          "dash": "10.116000,3.934000,1.686000,6.182000"
+        },
+        {
+          "offset": 1.7984,
+          "width": 0.346192,
+          "opacity": 0.504,
+          "dash": "6.182000,5.058000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thin",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.8992,
+          "width": 0.562,
+          "opacity": 0.576,
+          "dash": "12.364000,5.058000"
+        },
+        {
+          "offset": 1.0116,
+          "width": 0.7868,
+          "opacity": 0.504,
+          "dash": "7.868000,4.496000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thin",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.8992,
+          "width": 0.562,
+          "opacity": 0.576,
+          "dash": "12.364000,5.058000"
+        },
+        {
+          "offset": 1.0116,
+          "width": 0.7868,
+          "opacity": 0.504,
+          "dash": "7.868000,4.496000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "brush_thin",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.8992,
+          "width": 0.562,
+          "opacity": 0.576,
+          "dash": "12.364000,5.058000"
+        },
+        {
+          "offset": 1.0116,
+          "width": 0.7868,
+          "opacity": 0.504,
+          "dash": "7.868000,4.496000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "chalk",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.7984,
+          "width": 0.6744,
+          "opacity": 0.54,
+          "dash": "4.496000,6.744000,0.562000,4.496000"
+        },
+        {
+          "offset": 2.0232,
+          "width": 0.562,
+          "opacity": 0.5,
+          "dash": "2.810000,5.620000,0.562000,3.372000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "chalk",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.7984,
+          "width": 0.6744,
+          "opacity": 0.54,
+          "dash": "4.496000,6.744000,0.562000,4.496000"
+        },
+        {
+          "offset": 2.0232,
+          "width": 0.562,
+          "opacity": 0.5,
+          "dash": "2.810000,5.620000,0.562000,3.372000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "chalk",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.7984,
+          "width": 0.6744,
+          "opacity": 0.54,
+          "dash": "4.496000,6.744000,0.562000,4.496000"
+        },
+        {
+          "offset": 2.0232,
+          "width": 0.562,
+          "opacity": 0.5,
+          "dash": "2.810000,5.620000,0.562000,3.372000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "crayon",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -1.9108,
+          "width": 0.53952,
+          "opacity": 0.5,
+          "dash": "1.124000,2.810000,5.058000,3.934000"
+        },
+        {
+          "offset": -0.843,
+          "width": 0.4496,
+          "opacity": 0.5,
+          "dash": "2.248000,4.496000"
+        },
+        {
+          "offset": 1.3488,
+          "width": 0.49456,
+          "opacity": 0.5,
+          "dash": "1.124000,2.810000,5.058000,3.934000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "crayon",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -1.9108,
+          "width": 0.323712,
+          "opacity": 0.5,
+          "dash": "1.124000,2.810000,5.058000,3.934000"
+        },
+        {
+          "offset": -0.843,
+          "width": 0.26976,
+          "opacity": 0.5,
+          "dash": "2.248000,4.496000"
+        },
+        {
+          "offset": 1.3488,
+          "width": 0.296736,
+          "opacity": 0.5,
+          "dash": "1.124000,2.810000,5.058000,3.934000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "crayon",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -1.9108,
+          "width": 0.188832,
+          "opacity": 0.5,
+          "dash": "1.124000,2.810000,5.058000,3.934000"
+        },
+        {
+          "offset": -0.843,
+          "width": 0.15736,
+          "opacity": 0.5,
+          "dash": "2.248000,4.496000"
+        },
+        {
+          "offset": 1.3488,
+          "width": 0.173096,
+          "opacity": 0.5,
+          "dash": "1.124000,2.810000,5.058000,3.934000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pen",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.7868,
+          "width": 0.21356,
+          "opacity": 0.5,
+          "dash": "7.868000,1.686000"
+        },
+        {
+          "offset": 0.7868,
+          "width": 0.19108,
+          "opacity": 0.5,
+          "dash": "6.744000,2.248000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pen",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.7868,
+          "width": 0.21356,
+          "opacity": 0.5,
+          "dash": "7.868000,1.686000"
+        },
+        {
+          "offset": 0.7868,
+          "width": 0.19108,
+          "opacity": 0.5,
+          "dash": "6.744000,2.248000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pen",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.7868,
+          "width": 0.21356,
+          "opacity": 0.5,
+          "dash": "7.868000,1.686000"
+        },
+        {
+          "offset": 0.7868,
+          "width": 0.19108,
+          "opacity": 0.5,
+          "dash": "6.744000,2.248000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pencil",
+      "thinness": null,
+      "layers": [
+        {
+          "offset": -0.562,
+          "width": 0.2529,
+          "opacity": 0.5,
+          "dash": "0.562000,3.934000"
+        },
+        {
+          "offset": 0.6744,
+          "width": 0.281,
+          "opacity": 0.5,
+          "dash": "0.562000,2.810000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pencil",
+      "thinness": "fine",
+      "layers": [
+        {
+          "offset": -0.562,
+          "width": 0.2529,
+          "opacity": 0.5,
+          "dash": "0.562000,3.934000"
+        },
+        {
+          "offset": 0.6744,
+          "width": 0.281,
+          "opacity": 0.5,
+          "dash": "0.562000,2.810000"
+        }
+      ]
+    },
+    {
+      "aspect": "vertical",
+      "weight": "pencil",
+      "thinness": "extra_fine",
+      "layers": [
+        {
+          "offset": -0.562,
+          "width": 0.2529,
+          "opacity": 0.5,
+          "dash": "0.562000,3.934000"
+        },
+        {
+          "offset": 0.6744,
+          "width": 0.281,
+          "opacity": 0.5,
+          "dash": "0.562000,2.810000"
+        }
+      ]
     }
   ],
   "speck_count": [

@@ -10,6 +10,9 @@ HTTP 403 "this model requires a subscription" を返した。一覧から消す�
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from inku_server.model_settings import (
     PROVIDER_DEFINITIONS,
     default_model_settings,
@@ -102,6 +105,21 @@ def test_the_speed_numbers_are_dated() -> None:
     """速度は時間帯とセットでしか意味を持たない。日付の無いラベルを置かない。"""
     for model_id in FREE_TIER_REACHABLE:
         assert "2026-07-29" in str(_by_id()[model_id]["speed_label"]), model_id
+
+
+def test_the_web_fallback_offers_only_models_that_can_be_used() -> None:
+    """控えの一覧には印が付かない。選べないものを置くと、起動直後だけ選べてしまう。
+
+    サーバのカタログが届けば `requires_subscription` で無効化されるが、届くまでの
+    数百ミリ秒は `models.ts` の控えがそのまま出る。**印の無い場所に、印で守る前提の
+    ものを置かない。**
+    """
+    source = (Path(__file__).resolve().parents[2] / "web/src/lib/models.ts").read_text(encoding="utf-8")
+    block = source.split("id: 'ollama-cloud'", 1)[1].split("]", 1)[0]
+    listed = set(re.findall(r"id: '([^']+)'", block))
+    assert listed, "控えの一覧が読めていない"
+    assert not (listed & SUBSCRIPTION_ONLY), sorted(listed & SUBSCRIPTION_ONLY)
+    assert listed <= FREE_TIER_REACHABLE, sorted(listed - FREE_TIER_REACHABLE)
 
 
 def test_the_provider_hides_speed_outside_developer_mode() -> None:

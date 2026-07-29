@@ -962,3 +962,42 @@ server **1695 passed / 31 skipped** (+27), cli 76, ruff clean, `npm run check` 2
 **The implementing session's perturbations were 112/112** (92 writes, 20 read-backs). **The accepting session applied five of its own and all five went red** (adding `note` to the seed allowlist, regressing the write channel, regressing a read-back guard, moving the declaration to the tail, and the corpus blind spot). **The fifth did not go red, so the corpus was refrozen on the spot.**
 
 **The version is a patch.** The schema gains an optional field defaulting to `None`, and stored Scores validate with or without it (`extra="forbid"` does not trip on an addition). The render engine stays at **16** and `ddl_version` / `ddl_engine_version` at **2 / 3**.
+
+### v2.9.10 — The stopped machine is let go, and a model is recommended for the stage it was measured at (Build 781, 2026-07-30)
+
+Ledger [I-056], plus per-stage recommendations for the local LLM models. **OVMS (Intel OpenVINO Model Server) was retired as a provider on 2026-07-30** — its endpoint had stopped serving models while still answering `/health`, and the models it offered are reachable through Ollama instead.
+
+#### A retired provider takes part in naming, not in routing
+
+- **Removing it from the built-in list does not remove it from an installation.** An unknown provider id is preserved as though an operator had added it by hand, and the metadata refresh that `MODEL_CONFIG_VERSION` triggers sits inside `if builtin`, so it never reaches it. A withdrawn id is now named in **`RETIRED_PROVIDER_IDS` and dropped at the entry of `normalize_model_settings`.**
+- **It stays in reference splitting and label lookup, though.** Six works record an OVMS model, and **five of them carry the qualified string `ovms:gemma3-4b-api`** (one carries the bare `gemma3-4b-api`). Drop the retired id from splitting and those five display as "NVIDIA NIM / ovms:gemma3-4b-api", which is **worse than showing the id alone**. It is not listed in the ownership table (rule 2 of model reference resolution), and `connection_for` raises `ValueError` for it.
+- **Two live landing places the ledger did not know about were removed** — a literal `"qwen-api"` in the demo instruction generator in `api.py`, and `/no_think` in `interpreter.py`. Both named OVMS models, so an unconfigured demo was asking a withdrawn provider for its instruction. Three copies of the dead old routing (composer, interpreter, trainer) went with them.
+- **`OPENAI_MODEL` and `OPENAI_MODEL_STAGE1` lost their last reader**, so they were removed from both compose passthroughs and from the development host's `.env`. **`INKU_LLM_BACKEND` stays** — removing it makes the default anthropic, which falls onto a path with no key.
+
+#### One number cannot say that the two stages disagree
+
+- **The local Ollama models were measured per stage, and the two stages disagree.** The pair inku recommends is a Stage 1 model that covers 32% of Stage 2 and a Stage 2 model that breaks Stage 1 in English. `recommendation_stage1` and `recommendation_stage2` were added.
+- **The stage values do not replace `recommendation_llm`; they narrow it.** A model with no stage value reads the existing value for both stages, so the **8 cloud and 32 NVIDIA models measured end to end are unchanged and no migration is needed**.
+- **The settings UI already had Stage 1, Stage 2 and shared tabs, yet folded both stages into the same `'llm'`** (`SettingsModal.svelte`). Ordering reads the stage too, and the shared tab takes the lower of the two.
+- **Three places listed the metadata keys** (normalization, the version-bump refresh, and the carry-over on re-fetch). A key added to one and forgotten in another disappeared silently, so they were collapsed into **one `MODEL_METADATA_KEYS`**.
+- The hover card shows `Recommended / Stage 1` and `Recommended / Stage 2` only for models measured per stage. **A model measured end to end keeps one line** — two would print the same stars twice and imply a measurement nobody made. Vision is not split. The decision moved into `modelStageRecommendations()`, **which can be checked without drawing anything**.
+
+#### A tautological test, and a sample with no discriminating power
+
+- **One of the implementing session's perturbations missed.** Removing the two stage keys from `MODEL_RECOMMENDATION_KEYS` left 22/22 green. There were two causes, and both are the shape where **the check supplies its own answer**.
+  - **It was tautological** — `for key in MODEL_RECOMMENDATION_KEYS: assert key in MODEL_METADATA_KEYS` **compared a list against itself**. Delete from the constant and the loop stops running. The expected keys are now written out in the test.
+  - **The sample had no discriminating power** — the refresh check had **not given the stored settings the keys at all**. The `{**builtin, **stored}` base merge was supplying the answer, and `metadata_keys` was never traversed. The sample was replaced with one where **the stored value is a stale 1 and the catalog says 5**.
+- **This also found one error in the contract.** "A key not added to `metadata_keys` is not refreshed even when the version rises" is false: it only bites **when the stored settings hold an older value**.
+- **A guard left by a predecessor was rewritten, not deleted.** `test_recommendation_levels_stay_absent` said "do not add recommendations until the method is measured; if you do, delete this test." **It was replaced by one that points at where the method now lives** instead.
+
+#### Version and verification
+
+**The version is a patch.** Retiring a provider is not a format change to stored data (the retired id is dropped on read), and the stage keys are additions that need no migration. **`MODEL_CONFIG_VERSION` goes 2.4.0 → 2.5.0** — two metadata keys were added, so this is not a change of values alone. The render engine stays at **16** and `ddl_version` / `ddl_engine_version` at **2 / 3**. No deterministic layer was touched, so both frozen corpora are byte-identical.
+
+server **1732 passed / 31 skipped** (+37), cli 76, ruff clean, `npm run check` 219 files / 0 errors / 2 warnings, `npm run lint:i18n` 918 / 47 / 0 / 0, `npm run lint:models` 68 checks, **`npm run lint:recommendations` 37 checks (new)**, `check_docs.py` green. **`lint:recommendations` joins the local checklist** — CI runs corpus regeneration only, so CI is unchanged.
+
+**The implementing session applied five perturbations** (removing the retired id from the shared key list, 2 red; the shared tab as `Math.max`, 3 red; ignoring the stage and returning `recommendation_llm`, 6 red; dropping the split condition, 3 red; dropping the vision exclusion, 1 red). **The accepting session applied one per stage, independently, and all three went red** (`RETIRED_PROVIDER_IDS` emptied → 9 red; the two stage keys removed from `MODEL_RECOMMENDATION_KEYS` → 2 red; `modelStageRecommendations()` forced to `null` → `lint:recommendations` 2 red). **The second of those is the perturbation that had missed; once fixed, it goes red.**
+
+#### The build number did not skip
+
+**This branch used 777, 778 and 779, and main reached 780 while it was open.** This version takes 781, and the three branch numbers survive only inside its commits. **The counter is shared, not per branch.**

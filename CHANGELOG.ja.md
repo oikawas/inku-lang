@@ -1157,3 +1157,42 @@ server **1695 passed / 31 skipped**（+27）、cli 76、ruff clean、`npm run ch
 **摂動は実装側が 112/112**（書き込み 92・読み戻し 20）。**受け入れ側は 5 件を独立に当てて 5/5 が赤**（seed allowlist への追加・書き込み channel の退行・読み戻しガードの退行・宣言位置を末尾へ・コーパスの盲点）。**5 件目は赤にならなかったので、その場でコーパスを焼き直した。**
 
 **版数は patch。** スキーマへの追加は既定値 `None` を持つ任意フィールドで、保存済み Score は `note` の有無どちらでも検証を通る（`extra="forbid"` は追加では当たらない）。render engine は **16**、`ddl_version` / `ddl_engine_version` は **2 / 3** のまま。
+
+### v2.9.10 — 止まった機械を手放し、モデルは測った段で薦められる（Build 781、2026-07-30）
+
+台帳 [I-056] の実施と、ローカル LLM の推奨度を段ごとに分けたもの。**OVMS（Intel OpenVINO Model Server）は 2026-07-30 に provider から退役した** — `/health` は答えるのにモデルを出さなくなっており、同じモデルは Ollama から届く。
+
+#### 退役は「名づけ」に参加し、「経路」には参加しない
+
+- **組み込みの一覧から消すだけでは、設置済みからは消えない。** 未知の provider id はカスタム provider として温存され、`MODEL_CONFIG_VERSION` による貼り直しは `if builtin` の内側にあるので届かない。**`RETIRED_PROVIDER_IDS` を `normalize_model_settings` の入口に置いて落とす**形にした。
+- **ただし参照の分割とラベル引きには残す。** 作品 6 件が OVMS のモデルを記録しており、**うち 5 件は `ovms:gemma3-4b-api` と修飾済み**（裸の `gemma3-4b-api` が 1 件）。退役 id を分割の側から外すと、その 5 件が「NVIDIA NIM / ovms:gemma3-4b-api」と表示され、**id だけを出すより悪くなる**。所有表（モデル参照の規則 2）には載せず、`connection_for` は退役 id に対して `ValueError` を上げる。
+- **台帳に無かった生きた落とし先を 2 つ消した** — `api.py` のデモ指示文生成が持っていた直書きの `"qwen-api"` と、`interpreter.py` の `/no_think`。どちらも OVMS のモデルを名指ししていたので、設定していない環境のデモが退役済みの provider を叩いていた。死んだ古い routing の写し 3 本（composer / interpreter / trainer）も落とした。
+- **`OPENAI_MODEL` / `OPENAI_MODEL_STAGE1` は読み手が 0 になった**ので compose 2 本の passthrough と開発サーバーの `.env` から削除した。**`INKU_LLM_BACKEND` は残した** — 消すと既定が anthropic になり、鍵の無い経路へ落ちる。
+
+#### 一つの数字では、二つの段の食い違いを言えない
+
+- **ローカル Ollama のモデルは段ごとに測ってあり、二つの段の答えが食い違っていた。** inku が薦める組み合わせは「Stage 2 を 32% しかこなせない Stage 1 モデル」と「英語の Stage 1 を壊す Stage 2 モデル」である。`recommendation_stage1` / `recommendation_stage2` を足した。
+- **段の値は `recommendation_llm` を置き換えるのではなく狭める。** 段の値を持たないモデルは両段ともこれまでの値を読む。したがって**通しで測った cloud 8 本・NVIDIA 32 本は不変で、migration は要らない**。
+- **設定 UI は既に Stage 1 / Stage 2 / 共有のタブを持っていながら、両段を同じ `'llm'` へ畳んでいた**（`SettingsModal.svelte`）。並び順も段を読むようにし、共有タブは二つの低い方を使う。
+- **メタキーの一覧が 3 箇所にあった**（正規化・版上げの貼り直し・取り直し時の持ち越し）。足し忘れた経路で黙って消える構造だったので、**`MODEL_METADATA_KEYS` 1 本にまとめた**。
+- ホバーカードは、段ごとに測ったモデルだけ `オススメ度 / Stage 1` と `オススメ度 / Stage 2` の 2 行を出す。**通しで測ったモデルは 1 行のまま** — 2 行にすると同じ星を 2 度書いて、誰も測っていない計測があるように見える。Vision は分割しない。判定は `modelStageRecommendations()` に出して、**描かずに検査できる形**にした。
+
+#### 恒真テストと、判別力を持たない標本
+
+- **実装セッションの摂動が 1 回空振りした。** 「`MODEL_RECOMMENDATION_KEYS` から段の 2 鍵を削る」を当てて 22/22 が緑のままだった。原因は 2 つあり、どちらも**検査が自分の言い分を自分で供給していた**型である。
+  - **恒真だった** — `for key in MODEL_RECOMMENDATION_KEYS: assert key in MODEL_METADATA_KEYS` は**一覧を一覧自身と比べていた**。定数から消せばループが回らない。期待鍵をテスト側にべた書きして直した。
+  - **標本が判別力を持たなかった** — 貼り直しの検査で、保存済みに鍵を**持たせていなかった**。`{**builtin, **stored}` の土台合成が答えを供給しており、`metadata_keys` を一度も通っていない。**保存済みが古い値 1 を持ち、カタログが 5 を言う**標本へ差し替えた。
+- **これで契約の記述が 1 つ誤りだったことも分かった。** 「`metadata_keys` に足さないと版を上げても貼り直されない」は誤りで、**効くのは保存済みが古い値を持っているときだけ**である。
+- **前任が置いた番人を書き換えた。** `test_recommendation_levels_stay_absent` は「方法を測るまで推奨度を入れるな。入れるならこのテストを消せ」と書いてあった。**消すのではなく、方法がどこにあるかを指す形に置き換えた**。
+
+#### 版数と検証
+
+**版数は patch。** provider の撤去は保存データの形式変更ではなく（退役 id は読み取り時に落とす）、段の鍵は追加のみで migration を要さない。**`MODEL_CONFIG_VERSION` は 2.4.0 → 2.5.0**（メタの鍵が 2 つ増えたので、値だけの変更ではない）。render engine は **16**、`ddl_version` / `ddl_engine_version` は **2 / 3** のまま。決定的な層には触れていないので、凍結コーパスは両方ともバイト不変。
+
+server **1732 passed / 31 skipped**（+37）、cli 76、ruff clean、`npm run check` 219 files / 0 errors / 2 warnings、`npm run lint:i18n` 918 / 47 / 0 / 0、`npm run lint:models` 68 checks、**`npm run lint:recommendations` 37 checks（新設）**、`check_docs.py` 緑。**`lint:recommendations` は手元の確認手順に加わる** — CI が回すのは凍結コーパスの再生成だけなので、CI の側は変わらない。
+
+**摂動は実装側が 5 件**（退役 id を共有キー一覧から抜く 2 本赤・共有タブを `Math.max` に 3 件赤・段を無視して `recommendation_llm` を返す 6 件赤・分割条件を外す 3 件赤・vision の除外を外す 1 件赤）。**受け入れ側は 3 段に 1 件ずつ独立に当てて 3/3 が赤**（`RETIRED_PROVIDER_IDS` を空集合に → 9 本赤・段の 2 鍵を `MODEL_RECOMMENDATION_KEYS` から削る → 2 本赤・`modelStageRecommendations()` を常に `null` に → `lint:recommendations` が 2 件赤）。**2 番目は実装セッションが空振りさせた摂動そのもので、直した後は赤くなる。**
+
+#### 番号は飛んでいない
+
+**このブランチは 777 / 778 / 779 を使ったが、その間に main が 780 に達した。** 本版は 781 を採り、ブランチ内の 3 つは commit の中にだけ残る。**採番器は共有の連番であって、ブランチごとの値ではない。**

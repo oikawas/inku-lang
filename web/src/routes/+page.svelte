@@ -6713,7 +6713,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onAskPermanentDelete={askPermanentDelete}
 		onToggleSelection={toggleHistorySelection}
 		onLoadItem={loadIterationItem}
-		onReplayItem={(item) => replayHistoryItem(item, 'history-manager')}
 		onToggleStar={toggleHistoryStar}
 		{historyModelSummary}
 		{formatHistoryDate}
@@ -6816,6 +6815,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--thumb-plate-bg:     rgba(255,255,255,0.86);
 		--thumb-plate-fg:     rgba(40,36,30,0.42);
 		--thumb-plate-border: rgba(0,0,0,0.12);
+		/* 同じ台座でも数字は読ませる必要があるので、星より濃い字の色を持つ。 */
+		--thumb-plate-fg-read: rgba(40,36,30,0.72);
 	}
 
 	:global(html[data-theme='dark']) {

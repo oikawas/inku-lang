@@ -661,6 +661,7 @@ export const en: LangPack = {
 	historyLineageExpandTitle: 'Open this lineage and list its works',
 	historySelectLineageTitle: 'Select every work in this lineage',
 	historyHashCopyTitle: 'Copy hash',
+	historyGenerationTitle: 'Generation number',
 	historyReplay: 'Replay',
 	historyReplayTitle: 'perform again from the saved Score and seed',
 	historyReplayMissingSeed: 'This history item has no render_seed for replay.',

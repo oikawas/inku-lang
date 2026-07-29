@@ -60,7 +60,7 @@ const RESTRICTED = [
 			'aiRefineVisionModeHint', 'aiRefineDirectionRandomHint', 'aiRefineGensLabel',
 			'settingsDbBackupMaxGenerations', 'okugakiDescription', 'okugakiBranchConfirm',
 			'okugakiProgress', 'svgExportDisplayUse', 'svgExportEditableFeature', 'svgExportCompatFeature',
-			'provenanceLabelGeneration', 'provenanceHintGeneration',
+			'provenanceLabelGeneration', 'provenanceHintGeneration', 'historyGenerationTitle',
 		],
 		texts: [],
 	},

@@ -661,6 +661,7 @@ export const ja: LangPack = {
 	historyLineageExpandTitle: 'この系譜の作品を開いて一覧します',
 	historySelectLineageTitle: 'この系譜の作品をすべて選択します',
 	historyHashCopyTitle: 'ハッシュをコピー',
+	historyGenerationTitle: '世代番号',
 	historyReplay: '再現',
 	historyReplayTitle: '保存済みScoreとseedで再レンダリング',
 	historyReplayMissingSeed: 'この履歴には再現用のrender_seedがありません。',

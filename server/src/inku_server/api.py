@@ -1387,6 +1387,8 @@ class UserAccountItem(BaseModel):
     group_id: str | None = None
     group_name: str | None = None
     ui_theme: str = "dark"
+    ui_mode: str = "simple"
+    ui_custom: dict[str, bool] = Field(default_factory=dict)
     settings_tab: str = "db"
     model_settings: dict = Field(default_factory=dict)
     image_generation_count: int = 0
@@ -1426,6 +1428,8 @@ class LoginResponse(BaseModel):
 
 class UserSettingsBody(BaseModel):
     ui_theme: str | None = None
+    ui_mode: str | None = None
+    ui_custom: dict[str, bool] | None = None
     settings_tab: str | None = None
     model_settings: dict | None = None
 
@@ -1796,6 +1800,8 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
         user = _db.update_user_settings(
             actor["id"],
             ui_theme=body.ui_theme,
+            ui_mode=body.ui_mode,
+            ui_custom=body.ui_custom,
             settings_tab=body.settings_tab,
             model_settings=body.model_settings,
         )

@@ -1199,7 +1199,7 @@
 		<Tooltip placement="top" text={t().historyReplayTitle}>
 			<button
 				type="button"
-				class="generation-info-button"
+				class="generation-info-button replay-button"
 				disabled={replayDisabled}
 				onclick={onReplayCurrent}
 			>{t().historyReplay}</button>
@@ -1208,7 +1208,7 @@
 			<button
 				bind:this={generationInfoToggleEl}
 				type="button"
-				class="generation-info-button"
+				class="generation-info-button provenance-button"
 				class:active={generationInfoOpen}
 				disabled={!result && !allowEmptyOutputTabs}
 				aria-expanded={generationInfoOpen}

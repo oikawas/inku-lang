@@ -6,6 +6,7 @@
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
+	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 
 	type PluginItem = {
 		name: string;
@@ -157,6 +158,12 @@
 		outputSaveStatus: string | null;
 		logRetentionStatus: string | null;
 		currentUser: UserItem | null;
+		uiMode: UiMode;
+		uiCustom: UiCustomVisibility;
+		uiModeSaving: boolean;
+		uiModeSaveError: boolean;
+		onSetUiMode: (mode: UiMode) => void | Promise<void>;
+		onSetUiCustomItem: (key: UiVisibilityKey, visible: boolean) => void;
 		userSettingsStatus: string | null;
 		userSettingsLoading: boolean;
 		loginUserName: string;
@@ -262,6 +269,12 @@
 		outputSaveStatus,
 		logRetentionStatus,
 		currentUser,
+		uiMode,
+		uiCustom,
+		uiModeSaving,
+		uiModeSaveError,
+		onSetUiMode,
+		onSetUiCustomItem,
 		userSettingsStatus,
 		userSettingsLoading,
 		loginUserName = $bindable(),
@@ -1467,6 +1480,39 @@
 				</label>
 			</div>
 		{:else}
+			<div class="popover-group ui-mode-settings">
+				<div class="popover-group-label">{t().uiModeLabel}</div>
+				<div class="db-test-result">{t().uiModeDescription}</div>
+				<div class="settings-radio-set ui-mode-options">
+					<label class="setting-toggle">
+						<input type="radio" name="ui-mode" value="simple" checked={uiMode === 'simple'} disabled={uiModeSaving} onchange={() => onSetUiMode('simple')} />
+						<span><strong>{t().uiModeSimple}</strong><small>{t().uiModeSimpleDescription}</small></span>
+					</label>
+					<label class="setting-toggle">
+						<input type="radio" name="ui-mode" value="full" checked={uiMode === 'full'} disabled={uiModeSaving} onchange={() => onSetUiMode('full')} />
+						<span><strong>{t().uiModeFull}</strong><small>{t().uiModeFullDescription}</small></span>
+					</label>
+					<label class="setting-toggle">
+						<input type="radio" name="ui-mode" value="custom" checked={uiMode === 'custom'} disabled={uiModeSaving} onchange={() => onSetUiMode('custom')} />
+						<span><strong>{t().uiModeCustom}</strong><small>{t().uiModeCustomDescription}</small></span>
+					</label>
+				</div>
+				{#if uiMode === 'custom'}
+					<div class="settings-radio-title">{t().uiModeCustomItems}</div>
+					<div class="ui-custom-grid">
+						{#each UI_VISIBILITY_KEYS as key (key)}
+							<label class="setting-toggle">
+								<input type="checkbox" checked={uiCustom[key] === true} disabled={uiModeSaving} onchange={(event) => onSetUiCustomItem(key, event.currentTarget.checked)} />
+								<span>{key === 'input_modes' ? t().uiModeInputModes : key === 'drawing_settings' ? t().uiModeDrawingSettings : key === 'ddl_tools' ? t().uiModeDdlTools : key === 'detail_status' ? t().uiModeDetailStatus : key === 'work_tools' ? t().uiModeWorkTools : key === 'history' ? t().uiModeHistory : t().uiModeAuxiliary}</span>
+							</label>
+						{/each}
+					</div>
+					<div class="settings-inline-actions"><button class="ghost-btn" disabled={uiModeSaving} onclick={() => onSetUiMode('simple')}>{t().uiModeResetSimple}</button></div>
+				{/if}
+				<div class="db-test-result">{t().uiModeAlwaysVisible}</div>
+				{#if uiModeSaving}<div class="inline-message">{t().uiModeSaving}</div>{/if}
+				{#if uiModeSaveError}<div class="inline-message error-text">{t().uiModeSaveFailed}</div>{/if}
+			</div>
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsMascotLabel}</div>
 				<div class="settings-radio-set">
@@ -2810,6 +2856,13 @@
 		color: var(--fg2);
 		cursor: pointer;
 	}
+	.ui-mode-options { display: grid; gap: 8px; }
+	.ui-mode-options .setting-toggle { align-items: flex-start; }
+	.ui-mode-options .setting-toggle span { display: grid; gap: 2px; }
+	.ui-mode-options small { color: var(--fg3); font-size: 11px; font-weight: 400; }
+	.ui-custom-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin-top: 8px; }
+	@media (max-width: 720px) { .ui-custom-grid { grid-template-columns: 1fr; } }
+
 	.settings-radio-set {
 		display: flex;
 		flex-direction: column;

@@ -77,6 +77,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | ごみ箱 | **trash** | 名詞 | — |
 | 起点（新規作成） | **origin**（動作は **New**） | 名詞 | — |
 | 記録なし | **not recorded** | 状態表示。値を推測しない契約の表示 | ~~unknown~~（別状態。`historyVersionUnknown` は「不明」の訳として別に存在する） |
+| UIモード | **UI mode**（**Simple UI / Full UI / Custom UI**） | 表示構成の固定プリセットとユーザー別設定 | ~~Beginner / Expert~~（習熟度の評価にしない） |
 
 ### 2-1. 道具（てざわり）の名
 

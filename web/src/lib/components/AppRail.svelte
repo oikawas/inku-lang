@@ -15,6 +15,7 @@
 		darkMode: boolean;
 		buildNumber: string;
 		developerMode: boolean;
+		showAuxiliary: boolean;
 		onToggleUserMenu: () => void;
 		onOpenProfile: () => void;
 		onLogout: () => void | Promise<void>;
@@ -31,6 +32,7 @@
 		darkMode,
 		buildNumber,
 		developerMode,
+		showAuxiliary,
 		onToggleUserMenu,
 		onOpenProfile,
 		onLogout,
@@ -62,14 +64,14 @@
 				</button>
 			</Tooltip>
 		</div>
-		<div class="rail-logo-row">
+		{#if showAuxiliary}<div class="rail-logo-row">
 			<Tooltip placement="right" text={t().tooltipAppRailLogo}>
 				<button class="rail-logo" type="button" onclick={onOpenAppInfo} aria-label={t().appInfoOpenLabel}>
 					<span class="rail-logo-core">inku</span>{#if expanded}<span class="rail-logo-suffix">-lang</span>{/if}
 				</button>
 			</Tooltip>
-		</div>
-		{#if expanded}<div class="rail-sub">{t().subtitle}</div>{/if}
+		</div>{/if}
+		{#if showAuxiliary && expanded}<div class="rail-sub">{t().subtitle}</div>{/if}
 	</div>
 
 	<div class="rail-actions">
@@ -102,6 +104,7 @@
 			</button>
 		</Tooltip>
 
+		{#if showAuxiliary}
 		<Tooltip placement="right" text={t().tooltipAppRailTheme}>
 			<button class="rail-action" onclick={onToggleTheme}>
 				<span class="rail-icon theme-icon" class:dark={darkMode} aria-hidden="true"></span>
@@ -118,10 +121,11 @@
 				</Tooltip>
 			{/each}
 		</div>
+		{/if}
 	</div>
 
 	<div class="rail-spacer"></div>
-	{#if developerMode}
+	{#if developerMode && showAuxiliary}
 		<Tooltip placement="right" text={`Build ${buildNumber}`}>
 			<div class="rail-build">
 				{#if expanded}<span>Build </span>{/if}{buildNumber}

@@ -27,6 +27,7 @@
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { normalizeUiCustom, normalizeUiMode, resolveUiVisibility, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import {
 		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
@@ -303,6 +304,8 @@
 		group_id: string | null;
 		group_name: string | null;
 		ui_theme?: 'light' | 'dark';
+		ui_mode?: UiMode;
+		ui_custom?: UiCustomVisibility;
 		settings_tab?: SettingsTab;
 		model_settings?: UserModelSettings;
 		image_generation_count: number;
@@ -757,6 +760,11 @@
 	let userSettingsRequestId = 0;
 	let authToken = $state<string | null>(null);
 	let currentUser = $state<UserItem | null>(null);
+	let uiModeSaving = $state(false);
+	let uiModeSaveError = $state(false);
+	const uiMode = $derived(normalizeUiMode(currentUser?.ui_mode));
+	const uiCustom = $derived(normalizeUiCustom(currentUser?.ui_custom));
+	const uiVisibility = $derived(resolveUiVisibility(uiMode, uiCustom));
 	let loginUserName = $state('admin');
 	let loginPassword = $state('');
 	let loginPasswordVisible = $state(false);
@@ -1246,6 +1254,40 @@
 			darkMode = previousDarkMode;
 			console.warn('failed to update UI theme', e);
 		}
+	}
+
+	async function updateUiMode(nextMode: UiMode, nextCustom: UiCustomVisibility = uiCustom) {
+		if (!currentUser || uiModeSaving) return;
+		const previousUser = currentUser;
+		const normalizedCustom = nextMode === 'simple' ? {} : normalizeUiCustom(nextCustom);
+		uiModeSaving = true;
+		uiModeSaveError = false;
+		currentUser = { ...currentUser, ui_mode: nextMode, ui_custom: normalizedCustom };
+		const nextVisibility = resolveUiVisibility(nextMode, normalizedCustom);
+		if (!nextVisibility.input_modes) inputMode = 'single';
+		if (!nextVisibility.work_tools) outputTab = 'canvas';
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ui_mode: nextMode, ui_custom: normalizedCustom })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
+			}
+			currentUser = await r.json() as UserItem;
+		} catch (e) {
+			currentUser = previousUser;
+			uiModeSaveError = true;
+			console.warn('failed to update UI mode', e);
+		} finally {
+			uiModeSaving = false;
+		}
+	}
+
+	function updateUiCustomItem(key: UiVisibilityKey, visible: boolean) {
+		void updateUiMode('custom', { ...uiCustom, [key]: visible });
 	}
 
 	async function updateUserSettingsTab(tab: typeof settingsTab) {
@@ -2152,6 +2194,7 @@
 		profileOpen = false;
 		authToken = null;
 		currentUser = null;
+		uiModeSaveError = false;
 		applyUserTheme(null);
 		batchPromptHistory = [];
 		demoSettings = { ...DEFAULT_DEMO_SETTINGS };
@@ -6077,7 +6120,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{developerMode}
 	/>
 {:else}
-<div class="root">
+<div
+	class="root"
+	class:ui-hide-input-modes={!uiVisibility.input_modes}
+	class:ui-hide-drawing-settings={!uiVisibility.drawing_settings}
+	class:ui-hide-ddl-tools={!uiVisibility.ddl_tools}
+	class:ui-hide-detail-status={!uiVisibility.detail_status}
+	class:ui-hide-work-tools={!uiVisibility.work_tools}
+	class:ui-hide-history={!uiVisibility.history}
+>
 	<AppRail
 		{currentUser}
 		bind:userMenuOpen
@@ -6086,6 +6137,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
+		showAuxiliary={uiVisibility.auxiliary}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onOpenProfile={openProfile}
 		onLogout={logout}
@@ -6450,6 +6502,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			/>
 		</div><!-- /body -->
 
+			{#if uiVisibility.history}
 			<HistoryStrip
 			{historyItems}
 			{historyTotal}
@@ -6474,6 +6527,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{catalogName}
 			isJapanese={getLang() === 'ja'}
 		/>
+			{/if}
 	</div><!-- /main-shell -->
 
 </div><!-- /root -->
@@ -6537,6 +6591,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{outputSaveStatus}
 		{logRetentionStatus}
 		{currentUser}
+		{uiMode}
+		{uiCustom}
+		{uiModeSaving}
+		{uiModeSaveError}
+		onSetUiMode={(mode) => void updateUiMode(mode)}
+		onSetUiCustomItem={updateUiCustomItem}
 		{userSettingsStatus}
 		{userSettingsLoading}
 		bind:loginUserName
@@ -6875,6 +6935,33 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--star-fg:      #ffd166;
 		--star-bg:      rgba(213,155,33,0.18);
 		--star-border:  rgba(255,209,102,0.55);
+	}
+
+	/* UI modes change visibility only. The underlying features and saved work stay intact. */
+	.ui-hide-input-modes :global(.panel-tabs),
+	.ui-hide-drawing-settings :global(.section-head),
+	.ui-hide-drawing-settings :global(.current-selection),
+	.ui-hide-drawing-settings :global(.input-label .tooltip-wrap),
+	.ui-hide-ddl-tools .ddl-tools-section,
+	.ui-hide-ddl-tools :global(.ddl-viewer),
+	.ui-hide-ddl-tools .interpretation-diff,
+	.ui-hide-detail-status .thinking-details,
+	.ui-hide-detail-status .stats-section,
+	.ui-hide-detail-status :global(.render-meta-strip),
+	.ui-hide-detail-status :global(.status-hash-btn),
+	.ui-hide-detail-status :global(.provenance-button),
+	.ui-hide-work-tools :global(.right-tabs),
+	.ui-hide-work-tools :global(.canvas-corner-controls),
+	.ui-hide-work-tools :global(.zoom-controls),
+	.ui-hide-work-tools :global(.status-star),
+	.ui-hide-work-tools :global(.replay-button),
+	.ui-hide-work-tools :global(.saijiki-open-btn),
+	.ui-hide-work-tools :global(.png-wrap),
+	.ui-hide-history :global(.nav-left),
+	.ui-hide-history :global(.nav-right),
+	.ui-hide-history :global(.nearby-mirror),
+	.ui-hide-detail-status.ui-hide-work-tools :global(.status-bar) {
+		display: none;
 	}
 
 	/* DDL token palette (v1.98): one definition for every surface that renders

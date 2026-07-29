@@ -466,13 +466,6 @@ class Instruction(BaseModel):
             " / computer=格子に乗り、段に落ち、誤差なく反復するコンピュータ"
         ),
     )
-    thinness: Optional[Thinness] = Field(
-        default=None,
-        description=(
-            "線の細さ。道具の既定より細く引く指定。fine=細い / extra_fine=極細。"
-            "省略時は道具の既定。太くする指定は無い"
-        ),
-    )
     mode: InstructionMode = Field(
         default="additive", description="additive=地へ加える / carve=暗い地から光を彫る"
     )
@@ -509,6 +502,18 @@ class Instruction(BaseModel):
     surface: Optional[SurfaceSpec] = Field(
         default=None,
         description="閉じた図形の面の質感。line/arc では安全に無視または近似される。SVG固有の pattern/filter は入れない",
+    )
+
+    # 宣言順は Stage 2 の tool schema に並びごと渡り、任意フィールドは後ろにあるほど
+    # 埋まる。`weight` の直後 (位置 14) では 4〜18% しか搬送されず、末尾で 84〜91%。
+    # 語としては weight の隣だが、**位置は仕様であって整理の対象ではない**。
+    # 隣へ戻さないこと (I-036 / SPEC.ja.md §5.1)。
+    thinness: Optional[Thinness] = Field(
+        default=None,
+        description=(
+            "線の細さ。道具の既定より細く引く指定。fine=細い / extra_fine=極細。"
+            "省略時は道具の既定。太くする指定は無い"
+        ),
     )
 
     @field_validator("weight", mode="before")

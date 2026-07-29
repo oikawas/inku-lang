@@ -127,8 +127,13 @@ def test_stage2_prompt_and_tool_expected_values():
     # `thinness` の enum + description が tool schema に出た。17_764 -> 18_064。
     assert len(tool_json.encode("utf-8")) == 18_064
     assert _digest(tool_json) == "0e4021f1b0a3a1f9"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "32e65db9dcb68e99"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "31d357f591d4cf9b"
+    # `thinness` を `weight` の直後から末尾へ移し (搬送 18% -> 89%)、
+    # `_stage2_prompt_digest` の `sort_keys=True` を外して指紋を並び順に開いた
+    # (I-036 / I-038)。**上の 2 行はここで動かない** — この tool_json は
+    # テスト側で `sort_keys=True` を掛けており、並びを潰しているため。
+    # 動くのは並びを見るようになった下の 2 行だけ (2026-07-29)。
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "e11b7daa7c65a5fe"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "e1eacdb0176f7f98"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -230,7 +235,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     changed_tool = replace_description(changed_tool)
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "9d17d02965345445"
+    # `_stage2_prompt_digest` が鍵を並べ替えなくなったので採り直した (I-038・2026-07-29)。
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "8dc6afdcc122265d"
     assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "1169084a389f8a08"
 
 

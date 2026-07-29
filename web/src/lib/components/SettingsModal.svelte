@@ -652,6 +652,13 @@
 		);
 	}
 
+	const settingsProviderGroups = $derived.by(() => {
+		const priority: Record<string, number> = { "ollama-cloud": 0, ollama: 1 };
+		return providerGroups
+			.map((provider, index) => ({ provider, index }))
+			.sort((a, b) => (priority[a.provider.id] ?? 2) - (priority[b.provider.id] ?? 2) || a.index - b.index)
+			.map(({ provider }) => provider);
+	});
 	const modelPickerProvider = $derived(providerGroups.find((provider) => provider.id === modelPickerProviderId) ?? null);
 	const modelPickerSetting = $derived(
 		modelPickerProviderId && modelSettings
@@ -795,7 +802,7 @@
 						<div class="model-security-note">{t().settingsModelSecurityNote}</div>
 					</div>
 					<div class="model-provider-list">
-						{#each providerGroups as provider (provider.id)}
+						{#each settingsProviderGroups as provider (provider.id)}
 							{@const setting = modelSettings.providers[provider.id] ?? { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} }}
 							<div class="model-provider-row">
 								<div class="model-provider-head">

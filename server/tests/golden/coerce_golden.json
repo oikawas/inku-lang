@@ -2,7 +2,7 @@
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches.",
  "frozen_at": "2026-07-26",
- "commit": "d32177cde06436f070e33a47cdc87004230ffbd9",
+ "commit": "c260e99db48f4f48a1cb7f203c9412bd172d997b",
  "branches_reached": [
   "coerce_and_repair_instruction",
   "dedupe_instructions",
@@ -110,7 +110,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "黄色い蝋燭の灯; material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -152,7 +151,9 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": null
-       }
+       },
+       "color_hint": "黄色い蝋燭の灯",
+       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "square",
@@ -178,7 +179,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "coverage from DDL clause: 黄色いクレヨンの小さな四角を画面全体に点々と四十八個散らす; small focal mark kept compact with preserved negative space; quiet symbolic shape tempered to avoid fallback dominance; motion energy restored through trajectory and rotation; visual event preserved as compact focal accent; visual event counterweight preserved through opposing placement",
        "variation": null,
        "arrangement": {
         "count": 8,
@@ -205,7 +205,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "coverage from DDL clause: 黄色いクレヨンの小さな四角を画面全体に点々と四十八個散らす; small focal mark kept compact with preserved negative space; quiet symbolic shape tempered to avoid fallback dominance; motion energy restored through trajectory and rotation; visual event preserved as compact focal accent; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "line",
@@ -231,7 +232,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "coverage from DDL clause: 面: 滲む; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -244,7 +244,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "coverage from DDL clause: 面: 滲む; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "line",
@@ -270,7 +271,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "blue",
-       "color_hint": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement",
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -297,7 +297,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement"
       }
      ]
     },
@@ -314,6 +315,7 @@
      "instructions": [
       {
        "primitive": "square",
+       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": null,
@@ -333,11 +335,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "黄色い蝋燭の灯; material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
+       "color_hint": "黄色い蝋燭の灯",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -379,10 +380,12 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "square",
+       "note": "coverage from DDL clause: 黄色いクレヨンの小さな四角を画面全体に点々と四十八個散らす; small focal mark kept compact with preserved negative space; quiet symbolic shape tempered to avoid fallback dominance; motion energy restored through trajectory and rotation; visual event preserved as compact focal accent; visual event counterweight preserved through opposing placement; white foreground made visible",
        "from": null,
        "to": null,
        "center": null,
@@ -402,11 +405,10 @@
        "filled": true,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 黄色いクレヨンの小さな四角を画面全体に点々と四十八個散らす; small focal mark kept compact with preserved negative space; quiet symbolic shape tempered to avoid fallback dominance; motion energy restored through trajectory and rotation; visual event preserved as compact focal accent; visual event counterweight preserved through opposing placement; white foreground made visible; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -441,10 +443,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "coverage from DDL clause: 面: 滲む; motion energy restored through trajectory and rotation; material inferred from DDL: crayon; white foreground made visible",
        "from": [
         0.33999999999999997,
         0.5800000000000001
@@ -464,11 +468,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 面: 滲む; motion energy restored through trajectory and rotation; material inferred from DDL: crayon; white foreground made visible",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -481,10 +484,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement",
        "from": [
         0.54,
         0.42
@@ -504,11 +509,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "blue",
-       "color_hint": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -543,7 +547,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -561,7 +566,7 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 2,
+     "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 0,
      "with_literal_grid_fidelity": 0,
@@ -617,7 +622,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "young leaves; material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -646,7 +650,9 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "color_hint": "young leaves",
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "arc",
@@ -669,7 +675,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "young leaves; material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -702,7 +707,9 @@
         "gap": "medium",
         "contact": "both_ends"
        },
-       "surface": null
+       "surface": null,
+       "color_hint": "young leaves",
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "ellipse",
@@ -728,7 +735,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -741,7 +747,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "arc",
@@ -764,7 +771,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -777,7 +783,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "ellipse",
@@ -803,7 +810,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -836,7 +842,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "line",
@@ -862,7 +869,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement",
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -889,7 +895,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement"
       }
      ]
     },
@@ -906,6 +913,7 @@
      "instructions": [
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -922,11 +930,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "young leaves; material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
+       "color_hint": "young leaves",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -955,10 +962,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -975,11 +984,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "young leaves; material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
+       "color_hint": "young leaves",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -1011,10 +1019,12 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation; material inferred from DDL: pencil",
        "from": null,
        "to": null,
        "center": [
@@ -1034,11 +1044,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation; material inferred from DDL: pencil",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -1051,10 +1060,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -1071,11 +1082,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -1088,10 +1098,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation; material inferred from DDL: pencil",
        "from": null,
        "to": null,
        "center": [
@@ -1111,11 +1123,10 @@
        "filled": true,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation; material inferred from DDL: pencil",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -1148,10 +1159,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement",
        "from": [
         0.11149999999999999,
         0.385
@@ -1171,11 +1184,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -1209,7 +1221,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -1227,7 +1240,7 @@
      "with_context_energy_repair": 1,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 1,
+     "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 0,
      "with_literal_grid_fidelity": 0,
@@ -1292,7 +1305,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "material inferred from DDL: rotring; gray promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1336,7 +1348,8 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "note": "material inferred from DDL: rotring; gray promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; rhythm variation restored without increasing count"
       },
       {
        "primitive": "line",
@@ -1362,7 +1375,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "material inferred from DDL: rotring; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -1375,7 +1387,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: rotring; rhythm variation restored without increasing count"
       },
       {
        "primitive": "arc",
@@ -1398,7 +1411,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "material inferred from DDL: rotring; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1431,7 +1443,8 @@
         "gap": "medium",
         "contact": "both_ends"
        },
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: rotring; rhythm variation restored without increasing count"
       },
       {
        "primitive": "ellipse",
@@ -1457,7 +1470,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1471,7 +1483,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count"
       },
       {
        "primitive": "arc",
@@ -1494,7 +1507,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1508,7 +1520,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count"
       },
       {
        "primitive": "ellipse",
@@ -1534,7 +1547,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1568,7 +1580,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count"
       }
      ]
     },
@@ -1585,6 +1598,7 @@
      "instructions": [
       {
        "primitive": "ellipse",
+       "note": "material inferred from DDL: rotring; gray promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; rhythm variation restored without increasing count",
        "from": [
         0.5,
         0.5
@@ -1610,11 +1624,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "material inferred from DDL: rotring; gray promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; rhythm variation restored without increasing count",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1658,10 +1671,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "material inferred from DDL: rotring; rhythm variation restored without increasing count",
        "from": [
         0.5,
         0.5
@@ -1681,11 +1696,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "material inferred from DDL: rotring; rhythm variation restored without increasing count",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -1698,10 +1712,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: rotring; rhythm variation restored without increasing count",
        "from": null,
        "to": null,
        "center": [
@@ -1718,11 +1734,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "material inferred from DDL: rotring; rhythm variation restored without increasing count",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1754,10 +1769,12 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count; material inferred from DDL: rotring",
        "from": null,
        "to": null,
        "center": [
@@ -1777,11 +1794,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count; material inferred from DDL: rotring",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1795,10 +1811,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
        "from": null,
        "to": null,
        "center": [
@@ -1815,11 +1833,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1833,10 +1850,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count; material inferred from DDL: rotring",
        "from": null,
        "to": null,
        "center": [
@@ -1856,11 +1875,10 @@
        "filled": true,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count; material inferred from DDL: rotring",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1894,10 +1912,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count",
        "from": null,
        "to": null,
        "center": [
@@ -1917,11 +1937,10 @@
        "filled": true,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -1955,7 +1974,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -2032,7 +2052,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; explicit count constraint enforced",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -2055,7 +2074,8 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "note": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; explicit count constraint enforced"
       }
      ]
     },
@@ -2072,6 +2092,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; explicit count constraint enforced",
        "from": [
         0.5,
         0.2
@@ -2091,11 +2112,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; explicit count constraint enforced; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -2118,10 +2138,12 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -2141,11 +2163,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -2158,7 +2179,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -2237,7 +2259,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "赤いクレヨン; material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; explicit count constraint enforced",
        "variation": null,
        "arrangement": null,
        "at": {
@@ -2249,7 +2270,9 @@
         ]
        },
        "relation": null,
-       "surface": null
+       "surface": null,
+       "color_hint": "赤いクレヨン",
+       "note": "material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; explicit count constraint enforced"
       }
      ]
     },
@@ -2273,6 +2296,7 @@
      "instructions": [
       {
        "primitive": "square",
+       "note": "material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; explicit count constraint enforced",
        "from": null,
        "to": null,
        "center": null,
@@ -2292,11 +2316,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "赤いクレヨン; material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; explicit count constraint enforced; white restored in color_cycle from DDL color intent",
+       "color_hint": "赤いクレヨン",
        "variation": null,
        "arrangement": {
         "count": 2,
@@ -2327,10 +2350,12 @@
         ]
        },
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "square",
+       "note": "coverage from DDL clause: 赤いクレヨンの縦長の四角を右端に一つ置く; quiet symbolic shape tempered to avoid fallback dominance",
        "from": null,
        "to": null,
        "center": null,
@@ -2350,11 +2375,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "coverage from DDL clause: 赤いクレヨンの縦長の四角を右端に一つ置く; quiet symbolic shape tempered to avoid fallback dominance",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 3,
@@ -2377,10 +2401,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "square",
+       "note": "coverage from DDL clause: 灰色の鉛筆の細い線を四角の横に一本引く; quiet symbolic shape tempered to avoid fallback dominance",
        "from": null,
        "to": null,
        "center": null,
@@ -2400,11 +2426,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "coverage from DDL clause: 灰色の鉛筆の細い線を四角の横に一本引く; quiet symbolic shape tempered to avoid fallback dominance",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 3,
@@ -2427,7 +2452,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -2501,7 +2527,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2550,7 +2575,8 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "note": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "arc",
@@ -2573,7 +2599,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2597,7 +2622,8 @@
         "gap": "medium",
         "contact": "both_ends"
        },
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "arc",
@@ -2620,7 +2646,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2644,7 +2669,8 @@
         "gap": "medium",
         "contact": "both_ends"
        },
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "arc",
@@ -2667,7 +2693,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2691,7 +2716,8 @@
         "gap": "medium",
         "contact": "both_ends"
        },
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation"
       }
      ]
     },
@@ -2708,6 +2734,7 @@
      "instructions": [
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; green promoted to primary stroke from DDL color intent",
        "from": null,
        "to": null,
        "center": [
@@ -2724,11 +2751,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; green promoted to primary stroke from DDL color intent",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2777,10 +2803,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -2797,11 +2825,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2824,10 +2851,12 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -2844,11 +2873,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2871,10 +2899,12 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -2891,11 +2921,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -2918,7 +2947,8 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -2995,7 +3025,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "black foreground made visible; red promoted to primary stroke from DDL color intent; blue promoted to primary stroke from DDL color intent; green promoted to primary stroke from DDL color intent; gray promoted to primary stroke from DDL color intent; quiet density governed to preserve lightness; original count 110; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -3030,7 +3059,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "black foreground made visible; red promoted to primary stroke from DDL color intent; blue promoted to primary stroke from DDL color intent; green promoted to primary stroke from DDL color intent; gray promoted to primary stroke from DDL color intent; quiet density governed to preserve lightness; original count 110; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "line",
@@ -3056,7 +3086,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -3100,7 +3129,8 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "note": "black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "polygon",
@@ -3123,7 +3153,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "polygon restored from DDL shape intent; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -3136,7 +3165,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "polygon restored from DDL shape intent; motion energy restored through trajectory and rotation"
       }
      ]
     },
@@ -3153,6 +3183,7 @@
      "instructions": [
       {
        "primitive": "square",
+       "note": "black foreground made visible; red promoted to primary stroke from DDL color intent; blue promoted to primary stroke from DDL color intent; green promoted to primary stroke from DDL color intent; gray promoted to primary stroke from DDL color intent; quiet density governed to preserve lightness; original count 110; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": null,
@@ -3172,11 +3203,10 @@
        "filled": true,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "black foreground made visible; red promoted to primary stroke from DDL color intent; blue promoted to primary stroke from DDL color intent; green promoted to primary stroke from DDL color intent; gray promoted to primary stroke from DDL color intent; quiet density governed to preserve lightness; original count 110; motion energy restored through trajectory and rotation; red promoted to primary stroke from DDL color intent; blue promoted to primary stroke from DDL color intent; green promoted to primary stroke from DDL color intent; gray promoted to primary stroke from DDL color intent",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -3211,10 +3241,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; white foreground made visible",
        "from": [
         0.5,
         0.5
@@ -3234,11 +3266,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; white foreground made visible; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -3282,10 +3313,12 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "polygon",
+       "note": "polygon restored from DDL shape intent; motion energy restored through trajectory and rotation; white foreground made visible",
        "from": null,
        "to": null,
        "center": [
@@ -3302,11 +3335,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "polygon restored from DDL shape intent; motion energy restored through trajectory and rotation; white foreground made visible",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -3319,7 +3351,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -3335,14 +3368,14 @@
      "with_context_density_governor": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 1,
+     "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
      "with_per_instruction_density_budget": 0,
      "with_presence_auxiliary_shape_repair": 0,
-     "with_primary_color_delivery": 1,
+     "with_primary_color_delivery": 0,
      "with_repetition_event_variation": 0,
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
@@ -3397,7 +3430,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "赤い公衆電話; material inferred from DDL: crayon; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; explicit count constraint enforced",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -3410,7 +3442,9 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "color_hint": "赤い公衆電話",
+       "note": "material inferred from DDL: crayon; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; explicit count constraint enforced"
       }
      ]
     },
@@ -3434,6 +3468,7 @@
      "instructions": [
       {
        "primitive": "square",
+       "note": "material inferred from DDL: crayon; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; explicit count constraint enforced",
        "from": null,
        "to": null,
        "center": null,
@@ -3453,11 +3488,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "赤い公衆電話; material inferred from DDL: crayon; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; explicit count constraint enforced; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
+       "color_hint": "赤い公衆電話",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -3489,10 +3523,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "coverage from DDL clause: 上から下へ三十七本の白い短い線を波打つ軌跡に沿って散らす; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "from": [
         0.29,
         0.635
@@ -3512,11 +3548,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 上から下へ三十七本の白い短い線を波打つ軌跡に沿って散らす; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -3551,10 +3586,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "visual event restored as a small focal pulse; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": [
@@ -3571,11 +3608,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "visual event restored as a small focal pulse; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -3602,7 +3638,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -3679,7 +3716,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "material inferred from DDL: rotring; rhythm variation restored without increasing count; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -3714,7 +3750,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: rotring; rhythm variation restored without increasing count; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "line",
@@ -3740,7 +3777,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: autumn leaves scatter; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -3754,7 +3790,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "coverage from DDL clause: autumn leaves scatter; rhythm variation restored without increasing count"
       },
       {
        "primitive": "arc",
@@ -3777,7 +3814,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: place an arc, then an arc touching the previous ; green/gray restored in color_cycle from DDL color intent; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -3811,7 +3847,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "coverage from DDL clause: place an arc, then an arc touching the previous ; green/gray restored in color_cycle from DDL color intent; rhythm variation restored without increasing count"
       },
       {
        "primitive": "ellipse",
@@ -3837,7 +3874,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -3851,7 +3887,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count"
       },
       {
        "primitive": "arc",
@@ -3874,7 +3911,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -3888,7 +3924,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count"
       },
       {
        "primitive": "ellipse",
@@ -3914,7 +3951,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -3948,7 +3984,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count"
       }
      ]
     },
@@ -3965,6 +4002,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from DDL: rotring; rhythm variation restored without increasing count; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "from": [
         0.5,
         0.5
@@ -3984,11 +4022,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "material inferred from DDL: rotring; rhythm variation restored without increasing count; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -4023,10 +4060,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "coverage from DDL clause: autumn leaves scatter; rhythm variation restored without increasing count; material inferred from DDL: rotring",
        "from": [
         0.25,
         0.67
@@ -4046,11 +4085,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: autumn leaves scatter; rhythm variation restored without increasing count; material inferred from DDL: rotring",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -4064,10 +4102,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "coverage from DDL clause: place an arc, then an arc touching the previous ; green/gray restored in color_cycle from DDL color intent; rhythm variation restored without increasing count; material inferred from DDL: rotring; gray promoted to primary stroke from DDL color intent",
        "from": null,
        "to": null,
        "center": [
@@ -4084,11 +4124,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "coverage from DDL clause: place an arc, then an arc touching the previous ; green/gray restored in color_cycle from DDL color intent; rhythm variation restored without increasing count; material inferred from DDL: rotring; gray promoted to primary stroke from DDL color intent",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -4122,10 +4161,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count; material inferred from DDL: rotring",
        "from": null,
        "to": null,
        "center": [
@@ -4145,11 +4186,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count; material inferred from DDL: rotring",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -4163,10 +4203,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
        "from": null,
        "to": null,
        "center": [
@@ -4183,11 +4225,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent; rhythm variation restored without increasing count",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -4201,10 +4242,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count; material inferred from DDL: rotring",
        "from": null,
        "to": null,
        "center": [
@@ -4224,11 +4267,10 @@
        "filled": true,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count; material inferred from DDL: rotring",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -4262,10 +4304,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count",
        "from": null,
        "to": null,
        "center": [
@@ -4285,11 +4329,10 @@
        "filled": true,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth; rhythm variation restored without increasing count",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -4323,7 +4366,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -4341,7 +4385,7 @@
      "with_context_energy_repair": 1,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 1,
+     "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 0,
      "with_literal_grid_fidelity": 0,
@@ -4404,7 +4448,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "material inferred from DDL: brush_thin; blue/black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4437,7 +4480,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: brush_thin; blue/black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space"
       },
       {
        "primitive": "line",
@@ -4463,7 +4507,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4507,7 +4550,8 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "note": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "line",
@@ -4533,7 +4577,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "material inferred from DDL: brush_thin; black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4577,7 +4620,8 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "note": "material inferred from DDL: brush_thin; black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "line",
@@ -4603,7 +4647,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4648,7 +4691,8 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "note": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space"
       },
       {
        "primitive": "arc",
@@ -4671,7 +4715,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "surface tension restored as a quiet shadow trace; motion energy restored through trajectory and rotation; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -4706,7 +4749,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "surface tension restored as a quiet shadow trace; motion energy restored through trajectory and rotation; visual event counterweight preserved through opposing placement"
       }
      ]
     },
@@ -4730,6 +4774,7 @@
      "instructions": [
       {
        "primitive": "circle",
+       "note": "material inferred from DDL: brush_thin; blue/black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; white foreground made visible",
        "from": null,
        "to": null,
        "center": [
@@ -4746,11 +4791,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: brush_thin; blue/black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; white foreground made visible",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4783,10 +4827,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; white foreground made visible",
        "from": [
         0.32999999999999996,
         0.5299999999999999
@@ -4806,11 +4852,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
-       "color": "blue",
-       "color_hint": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; white sensory layer made visible as pale blue; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
+       "color": "black",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4854,10 +4899,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "material inferred from DDL: brush_thin; black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; white foreground made visible",
        "from": [
         0.5,
         0.6
@@ -4877,11 +4924,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: brush_thin; black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; white foreground made visible; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4925,10 +4971,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; white foreground made visible",
        "from": [
         0.4,
         0.3
@@ -4948,11 +4996,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; white foreground made visible",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -4997,10 +5044,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "surface tension restored as a quiet shadow trace; motion energy restored through trajectory and rotation; visual event counterweight preserved through opposing placement; white foreground made visible",
        "from": null,
        "to": null,
        "center": [
@@ -5017,11 +5066,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "surface tension restored as a quiet shadow trace; motion energy restored through trajectory and rotation; visual event counterweight preserved through opposing placement; white foreground made visible; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -5056,10 +5104,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event restored as a small broken line; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
        "from": [
         0.6,
         0.61
@@ -5079,11 +5129,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "visual event restored as a small broken line; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -5110,7 +5159,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -5128,7 +5178,7 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 4,
+     "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 1,
@@ -5186,7 +5236,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent",
        "variation": null,
        "arrangement": {
         "count": 37,
@@ -5210,7 +5259,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent"
       }
      ]
     },
@@ -5227,6 +5277,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent",
        "from": [
         0.48,
         0.5
@@ -5246,11 +5297,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 37,
@@ -5274,10 +5324,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -5297,16 +5349,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "white",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -5380,7 +5432,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -5413,7 +5464,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation"
       }
      ]
     },
@@ -5430,6 +5482,7 @@
      "instructions": [
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -5446,11 +5499,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -5483,10 +5535,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "coverage from DDL clause: 白い鉛筆の細い線を上から下へ二百三十三本散らす; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "from": [
         0.29,
         0.635
@@ -5506,11 +5560,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 白い鉛筆の細い線を上から下へ二百三十三本散らす; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -5545,10 +5598,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "coverage from DDL clause: 白いペンの弧を左右に二本、重なるように置く; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -5565,11 +5620,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 白いペンの弧を左右に二本、重なるように置く; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -5582,7 +5636,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -5653,7 +5708,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "bell ringer pull; material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -5705,7 +5759,9 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": 1234567890
-       }
+       },
+       "color_hint": "bell ringer pull",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "ellipse",
@@ -5731,7 +5787,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -5777,7 +5832,8 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": 1234567890
-       }
+       },
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "square",
@@ -5803,7 +5859,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "blue",
-       "color_hint": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement",
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -5830,7 +5885,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "line",
@@ -5856,7 +5912,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "visual event adjacent reaction added to hold focal event",
        "variation": null,
        "arrangement": {
         "count": 2,
@@ -5877,7 +5932,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event adjacent reaction added to hold focal event"
       }
      ]
     },
@@ -5894,6 +5950,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement",
        "from": [
         0.1,
         0.1
@@ -5913,11 +5970,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "bell ringer pull; material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement; visual event counterweight preserved through opposing placement",
+       "color_hint": "bell ringer pull",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -5969,10 +6025,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": 1234567890
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -5992,11 +6050,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6042,10 +6099,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": 1234567890
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "square",
+       "note": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": null,
@@ -6065,11 +6124,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "blue",
-       "color_hint": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6104,10 +6162,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement; focal event visibility floor applied",
        "from": [
         0.02813788116918911,
         0.1502896372209081
@@ -6127,11 +6187,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement; focal event visibility floor applied",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6166,7 +6225,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -6184,7 +6244,7 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 3,
+     "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 1,
      "with_literal_grid_fidelity": 0,
@@ -6240,7 +6300,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "枯草; material inferred from DDL: crayon; red promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; withered grass kept as muted green-gray; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6284,7 +6343,9 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "color_hint": "枯草",
+       "note": "material inferred from DDL: crayon; red promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; withered grass kept as muted green-gray; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count"
       },
       {
        "primitive": "arc",
@@ -6307,7 +6368,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "落葉; material inferred from DDL: crayon; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6350,7 +6410,9 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "color_hint": "落葉",
+       "note": "material inferred from DDL: crayon; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count"
       },
       {
        "primitive": "line",
@@ -6376,7 +6438,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "blue",
-       "color_hint": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement",
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -6403,7 +6464,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "ellipse",
@@ -6429,7 +6491,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "visual event adjacent reaction added to hold focal event",
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -6450,7 +6511,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event adjacent reaction added to hold focal event"
       }
      ]
     },
@@ -6467,6 +6529,7 @@
      "instructions": [
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: crayon; red promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; withered grass kept as muted green-gray; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count",
        "from": null,
        "to": null,
        "center": [
@@ -6483,11 +6546,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "枯草; material inferred from DDL: crayon; red promoted to primary stroke from DDL color intent; green restored in color_cycle from DDL color intent; withered grass kept as muted green-gray; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count",
+       "color_hint": "枯草",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6531,10 +6593,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "material inferred from DDL: crayon; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count",
        "from": null,
        "to": null,
        "center": [
@@ -6551,11 +6615,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "落葉; material inferred from DDL: crayon; motion energy restored through trajectory and rotation; rhythm variation restored without increasing count",
+       "color_hint": "落葉",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6597,10 +6660,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement; rhythm variation restored without increasing count",
        "from": [
         0.54,
         0.42
@@ -6620,11 +6685,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "blue",
-       "color_hint": "visual event restored as a thin reflected cut; visual event counterweight preserved through opposing placement; rhythm variation restored without increasing count; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6659,10 +6723,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement; focal event visibility floor applied",
        "from": null,
        "to": null,
        "center": [
@@ -6682,11 +6748,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement; focal event visibility floor applied",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -6721,7 +6786,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -6739,7 +6805,7 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 2,
+     "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 1,
      "with_literal_grid_fidelity": 0,
@@ -6798,7 +6864,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "緑; material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; explicit count constraint enforced",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -6818,7 +6883,9 @@
         ]
        },
        "relation": null,
-       "surface": null
+       "surface": null,
+       "color_hint": "緑",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; explicit count constraint enforced"
       }
      ]
     },
@@ -6835,6 +6902,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; explicit count constraint enforced",
        "from": [
         0.1,
         0.5
@@ -6854,11 +6922,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "緑; material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; explicit count constraint enforced",
+       "color_hint": "緑",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -6878,10 +6945,12 @@
         ]
        },
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -6901,11 +6970,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -6918,10 +6986,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": [
@@ -6938,11 +7008,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 3,
@@ -6969,7 +7038,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -7053,7 +7123,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "赤い公衆電話; material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; ma pressure restored through spacing and preserved negative space; explicit count constraint enforced",
        "variation": {
         "amplitude": "fine",
         "frequency": "slow",
@@ -7076,7 +7145,9 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "color_hint": "赤い公衆電話",
+       "note": "material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; ma pressure restored through spacing and preserved negative space; explicit count constraint enforced"
       }
      ]
     },
@@ -7100,6 +7171,7 @@
      "instructions": [
       {
        "primitive": "square",
+       "note": "material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; ma pressure restored through spacing and preserved negative space; explicit count constraint enforced",
        "from": null,
        "to": null,
        "center": null,
@@ -7119,11 +7191,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "赤い公衆電話; material inferred from DDL: pencil; white restored in color_cycle from DDL color intent; ma pressure restored through spacing and preserved negative space; explicit count constraint enforced; white restored in color_cycle from DDL color intent; ma pressure restored through spacing and preserved negative space",
+       "color_hint": "赤い公衆電話",
        "variation": {
         "amplitude": "fine",
         "frequency": "slow",
@@ -7165,10 +7236,12 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "square",
+       "note": "coverage from DDL clause: 赤いクレヨンの縦長の四角を右端寄りに一つ置く; quiet symbolic shape tempered to avoid fallback dominance",
        "from": null,
        "to": null,
        "center": null,
@@ -7188,11 +7261,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "coverage from DDL clause: 赤いクレヨンの縦長の四角を右端寄りに一つ置く; quiet symbolic shape tempered to avoid fallback dominance",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 3,
@@ -7215,10 +7287,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "square",
+       "note": "coverage from DDL clause: 黒い細筆の短い縦線を四角の下に一本引く; quiet symbolic shape tempered to avoid fallback dominance",
        "from": null,
        "to": null,
        "center": null,
@@ -7238,11 +7312,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 黒い細筆の短い縦線を四角の下に一本引く; quiet symbolic shape tempered to avoid fallback dominance",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 3,
@@ -7265,10 +7338,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "coverage from DDL clause: 白い鉛筆の小さな楕円を画面全体に点々と二百三十三個散らす; small focal mark kept compact with preserved negative space; quiet density governed to preserve lightness; original count 120",
        "from": null,
        "to": null,
        "center": [
@@ -7288,11 +7363,10 @@
        "filled": true,
        "style": "solid",
        "weight": "pencil",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 白い鉛筆の小さな楕円を画面全体に点々と二百三十三個散らす; small focal mark kept compact with preserved negative space; quiet density governed to preserve lightness; original count 120",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 64,
@@ -7313,7 +7387,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -7390,7 +7465,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 黒い細い斜めの線を三本並べる; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -7421,7 +7495,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "coverage from DDL clause: 黒い細い斜めの線を三本並べる; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "line",
@@ -7447,7 +7522,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -7482,7 +7556,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "cloudform",
@@ -7546,6 +7621,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "coverage from DDL clause: 黒い細い斜めの線を三本並べる; motion energy restored through trajectory and rotation; material inferred from DDL: chalk; white restored in color_cycle from DDL color intent",
        "from": [
         0.25,
         0.67
@@ -7565,11 +7641,10 @@
        "filled": false,
        "style": "solid",
        "weight": "chalk",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 黒い細い斜めの線を三本並べる; motion energy restored through trajectory and rotation; material inferred from DDL: chalk; white restored in color_cycle from DDL color intent",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -7602,10 +7677,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement; gray promoted to primary stroke from DDL color intent",
        "from": [
         0.36,
         0.54
@@ -7625,11 +7702,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement; gray promoted to primary stroke from DDL color intent; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -7664,10 +7740,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "cloudform",
+       "note": "material inferred from DDL: chalk; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -7687,11 +7765,10 @@
        "filled": false,
        "style": "solid",
        "weight": "chalk",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from DDL: chalk; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -7720,10 +7797,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement",
        "from": [
         0.36,
         0.54
@@ -7743,11 +7822,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 2,
@@ -7774,7 +7852,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -7792,7 +7871,7 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 2,
+     "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 0,
      "with_literal_grid_fidelity": 0,
@@ -7851,7 +7930,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -7885,7 +7963,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190"
       },
       {
        "primitive": "ellipse",
@@ -7911,7 +7990,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "桜色; blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -7943,7 +8021,9 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "color_hint": "桜色",
+       "note": "blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space"
       }
      ]
     },
@@ -7960,6 +8040,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190",
        "from": [
         0.5,
         0.5
@@ -7979,11 +8060,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -8017,10 +8097,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space; single arrangement density clustered to preserve negative space; original count 321",
        "from": null,
        "to": null,
        "center": [
@@ -8040,11 +8122,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "桜色; blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space; single arrangement density clustered to preserve negative space; original count 321",
+       "color_hint": "桜色",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -8076,7 +8157,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -8094,7 +8176,7 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 1,
+     "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 0,
      "with_literal_grid_fidelity": 0,
@@ -8164,7 +8246,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "種が目を覚まし春を探す線; material inferred from DDL: crayon; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -8193,7 +8274,9 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "color_hint": "種が目を覚まし春を探す線",
+       "note": "material inferred from DDL: crayon; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "ellipse",
@@ -8219,7 +8302,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "目覚めた種; material inferred from DDL: crayon; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -8242,7 +8324,9 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "color_hint": "目覚めた種",
+       "note": "material inferred from DDL: crayon; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "arc",
@@ -8265,7 +8349,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement",
        "variation": null,
        "arrangement": {
         "count": 3,
@@ -8292,7 +8375,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement"
       }
      ]
     },
@@ -8319,6 +8403,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from DDL: crayon; motion energy restored through trajectory and rotation",
        "from": [
         0.25,
         0.7
@@ -8338,11 +8423,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "種が目を覚まし春を探す線; material inferred from DDL: crayon; motion energy restored through trajectory and rotation",
+       "color_hint": "種が目を覚まし春を探す線",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -8371,10 +8455,12 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "material inferred from DDL: crayon; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -8394,11 +8480,10 @@
        "filled": false,
        "style": "solid",
        "weight": "crayon",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "目覚めた種; material inferred from DDL: crayon; motion energy restored through trajectory and rotation",
+       "color_hint": "目覚めた種",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -8421,10 +8506,12 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       }
+       },
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": [
@@ -8441,11 +8528,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -8480,10 +8566,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
        "from": [
         0.1135,
         0.7668400000000001
@@ -8503,11 +8591,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -8534,7 +8621,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -8552,7 +8640,7 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 2,
+     "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 1,
@@ -8610,7 +8698,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 白いロットリングの全幅の横線を下端寄りに一本引く; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -8623,7 +8710,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "coverage from DDL clause: 白いロットリングの全幅の横線を下端寄りに一本引く; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "cloudform",
@@ -8649,7 +8737,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "fallback from explicit DDL cloudform; white foreground made visible; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -8678,7 +8765,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "fallback from explicit DDL cloudform; white foreground made visible; motion energy restored through trajectory and rotation"
       },
       {
        "primitive": "line",
@@ -8704,7 +8792,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 白いチョークの雲形を右端に三つ散らす; motion energy restored through trajectory and rotation",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -8733,7 +8820,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "coverage from DDL clause: 白いチョークの雲形を右端に三つ散らす; motion energy restored through trajectory and rotation"
       }
      ]
     },
@@ -8750,6 +8838,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "coverage from DDL clause: 白いロットリングの全幅の横線を下端寄りに一本引く; motion energy restored through trajectory and rotation; green/white restored in color_cycle from DDL color intent",
        "from": [
         0.16,
         0.46
@@ -8769,11 +8858,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 白いロットリングの全幅の横線を下端寄りに一本引く; motion energy restored through trajectory and rotation; green/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -8806,10 +8894,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "cloudform",
+       "note": "fallback from explicit DDL cloudform; white foreground made visible; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -8829,11 +8919,10 @@
        "filled": false,
        "style": "solid",
        "weight": "rotring",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "fallback from explicit DDL cloudform; white foreground made visible; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "medium",
@@ -8862,10 +8951,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "line",
+       "note": "coverage from DDL clause: 白いチョークの雲形を右端に三つ散らす; motion energy restored through trajectory and rotation",
        "from": [
         0.88,
         0.27
@@ -8885,11 +8976,10 @@
        "filled": false,
        "style": "solid",
        "weight": "chalk",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "coverage from DDL clause: 白いチョークの雲形を右端に三つ散らす; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -8918,7 +9008,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -8995,7 +9086,6 @@
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -9030,7 +9120,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "note": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement"
       },
       {
        "primitive": "cloudform",
@@ -9078,6 +9169,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
        "from": [
         0.4455,
         0.4372
@@ -9097,11 +9189,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -9136,10 +9227,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "cloudform",
+       "note": "material inferred from DDL: chalk",
        "from": null,
        "to": null,
        "center": [
@@ -9159,11 +9252,10 @@
        "filled": false,
        "style": "solid",
        "weight": "chalk",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "material inferred from DDL: chalk; visual event preserved as chalk dust tension; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "fine",
         "frequency": "medium",
@@ -9173,35 +9265,15 @@
          "position_y"
         ]
        },
-       "arrangement": {
-        "count": 1,
-        "layout": "scatter",
-        "rows": null,
-        "cols": null,
-        "jitter": 0.12,
-        "path": "diagonal",
-        "color_cycle": [
-         "gray",
-         "black"
-        ],
-        "margin": 0.22,
-        "center": [
-         0.18,
-         0.193
-        ],
-        "radius": null,
-        "density": "low",
-        "cluster_count": null,
-        "fade": "outward",
-        "preserve_space": true,
-        "rhythm_spacing": "loose"
-       },
+       "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": [
@@ -9218,11 +9290,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 3,
@@ -9249,59 +9320,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
-      },
-      {
-       "primitive": "ellipse",
-       "from": null,
-       "to": null,
-       "center": [
-        0.43900000000000006,
-        0.5469999999999999
-       ],
-       "radius": null,
-       "sides": null,
-       "position": null,
-       "size": [
-        0.072,
-        0.031
-       ],
-       "angle_start": null,
-       "angle_end": null,
-       "rotation": -30.0,
-       "filled": false,
-       "style": "solid",
-       "weight": "silverpoint",
-       "thinness": null,
-       "mode": "additive",
-       "carve_depth": null,
-       "color": "gray",
-       "color_hint": "visual event adjacent reaction added to hold focal event",
-       "variation": null,
-       "arrangement": {
-        "count": 1,
-        "layout": "scatter",
-        "rows": null,
-        "cols": null,
-        "jitter": 0.12,
-        "path": "left_to_right",
-        "color_cycle": [],
-        "margin": 0.22,
-        "center": null,
-        "radius": null,
-        "density": "low",
-        "cluster_count": null,
-        "fade": "outward",
-        "preserve_space": true,
-        "rhythm_spacing": "loose"
-       },
-       "at": null,
-       "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
-    "instruction_count": 4,
+    "instruction_count": 3,
     "branch_report": {
      "coerce_and_repair_instruction": 1,
      "dedupe_instructions": 0,
@@ -9315,9 +9339,9 @@
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 0,
-     "with_existing_event_counterweight": 3,
+     "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
-     "with_focal_event_floor": 1,
+     "with_focal_event_floor": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -9327,7 +9351,7 @@
      "with_primary_color_delivery": 0,
      "with_repetition_event_variation": 0,
      "with_rhythm_variation": 0,
-     "with_semantic_visual_event_hints": 1,
+     "with_semantic_visual_event_hints": 0,
      "with_shape_delivery_repair": 0,
      "with_structural_duplicate_repair": 0,
      "with_surface_tension": 0,
@@ -9387,6 +9411,7 @@
      "instructions": [
       {
        "primitive": "circle",
+       "note": "blue restored in color_cycle from DDL color intent",
        "from": [
         0.2,
         0.5
@@ -9409,11 +9434,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "blue restored in color_cycle from DDL color intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 9,
@@ -9437,7 +9461,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -9500,7 +9525,7 @@
        ],
        "color": "black",
        "weight": "pen",
-       "color_hint": "material inferred from ddl: pen"
+       "note": "material inferred from ddl: pen"
       },
       {
        "primitive": "line",
@@ -9514,7 +9539,7 @@
        ],
        "color": "black",
        "weight": "pen",
-       "color_hint": "material inferred from ddl: brush"
+       "note": "material inferred from ddl: brush"
       }
      ]
     },
@@ -9531,6 +9556,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from ddl: pen",
        "from": [
         0.2,
         0.5
@@ -9550,19 +9576,20 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "material inferred from ddl: pen",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -9582,16 +9609,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -9680,7 +9707,7 @@
        ],
        "radius": 0.3,
        "filled": true,
-       "color_hint": "material inferred from ddl: brush"
+       "note": "material inferred from ddl: brush"
       }
      ],
      "presence": {
@@ -9708,6 +9735,7 @@
      "instructions": [
       {
        "primitive": "circle",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -9730,7 +9758,6 @@
        "filled": true,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -9739,10 +9766,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -9762,16 +9791,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -9901,6 +9930,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "largest group represented to fit the total density budget; original count 200",
        "from": [
         0.2,
         0.5
@@ -9920,11 +9950,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "largest group represented to fit the total density budget; original count 200",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 84,
@@ -9945,10 +9974,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "circle",
+       "note": "largest group represented to fit the total density budget; original count 200",
        "from": [
         0.2,
         0.5
@@ -9971,11 +10002,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "largest group represented to fit the total density budget; original count 200",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 84,
@@ -9996,10 +10026,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "triangle",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -10028,7 +10060,6 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -10053,7 +10084,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -10141,6 +10173,7 @@
      "instructions": [
       {
        "primitive": "square",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -10169,7 +10202,6 @@
        "filled": true,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -10178,10 +10210,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -10201,19 +10235,20 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "surface tension restored as a quiet shadow trace; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": [
@@ -10230,11 +10265,10 @@
        "filled": false,
        "style": "solid",
        "weight": "silverpoint",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "surface tension restored as a quiet shadow trace; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -10261,7 +10295,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -10340,6 +10375,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "green restored in color_cycle from DDL color intent",
        "from": [
         0.2,
         0.5
@@ -10359,11 +10395,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "green restored in color_cycle from DDL color intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 2,
@@ -10387,10 +10422,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf_cluster motif restored from DDL intent",
        "from": null,
        "to": null,
        "center": [
@@ -10410,19 +10447,20 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "leaf_cluster motif restored from DDL intent",
        "from": null,
        "to": null,
        "center": [
@@ -10439,19 +10477,20 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf/grain energy restored without density growth",
        "from": null,
        "to": null,
        "center": [
@@ -10471,11 +10510,10 @@
        "filled": true,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 6,
@@ -10500,7 +10538,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -10585,6 +10624,7 @@
      "instructions": [
       {
        "primitive": "circle",
+       "note": "large filled shape tempered to avoid unintended surface dominance",
        "from": [
         0.2,
         0.5
@@ -10607,16 +10647,16 @@
        "filled": true,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "large filled shape tempered to avoid unintended surface dominance",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -10686,7 +10726,8 @@
        "radius": 0.2,
        "angle_start": 20,
        "angle_end": 200,
-       "color_hint": "crescent white sensory layer made visible as pale green"
+       "color_hint": "crescent sensory layer",
+       "note": "white sensory layer made visible as pale green"
       }
      ]
     },
@@ -10703,6 +10744,7 @@
      "instructions": [
       {
        "primitive": "arc",
+       "note": "crescent white layer kept abstract; crescent sensory color suppressed",
        "from": [
         0.2,
         0.5
@@ -10725,16 +10767,16 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "blue",
-       "color_hint": "crescent crescent white layer kept abstract; crescent sensory color suppressed",
+       "color_hint": "crescent sensory layer",
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -10803,7 +10845,7 @@
        ],
        "radius": 0.05,
        "filled": true,
-       "color_hint": "focal visual event"
+       "note": "focal visual event"
       }
      ]
     },
@@ -10820,6 +10862,7 @@
      "instructions": [
       {
        "primitive": "circle",
+       "note": "focal visual event; visual event type brief_arrival_departure detected through abstract event evidence; visual event counterweight preserved through opposing placement",
        "from": [
         0.2,
         0.5
@@ -10842,11 +10885,10 @@
        "filled": true,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "focal visual event; visual event type brief_arrival_departure detected through abstract event evidence; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 1,
@@ -10873,7 +10915,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -10975,6 +11018,7 @@
      "instructions": [
       {
        "primitive": "circle",
+       "note": "explicit circle-only constraint enforced",
        "from": null,
        "to": null,
        "center": [
@@ -10991,16 +11035,16 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "explicit circle-only constraint enforced",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -11105,6 +11149,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -11124,7 +11169,6 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -11133,10 +11177,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -11156,16 +11202,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -11361,6 +11407,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "green restored in color_cycle from DDL color intent",
        "from": [
         0.2,
         0.5
@@ -11380,11 +11427,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "green restored in color_cycle from DDL color intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 2,
@@ -11408,10 +11454,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf_cluster motif restored from DDL intent",
        "from": null,
        "to": null,
        "center": [
@@ -11431,19 +11479,20 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "green",
-       "color_hint": "leaf_cluster motif restored from DDL intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "arc",
+       "note": "leaf_cluster motif restored from DDL intent",
        "from": null,
        "to": null,
        "center": [
@@ -11460,19 +11509,20 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "leaf_cluster motif restored from DDL intent",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "leaf/grain energy restored without density growth",
        "from": null,
        "to": null,
        "center": [
@@ -11492,11 +11542,10 @@
        "filled": true,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "red",
-       "color_hint": "leaf/grain energy restored without density growth",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 6,
@@ -11521,7 +11570,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -11604,6 +11654,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -11623,7 +11674,6 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -11632,10 +11682,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -11655,16 +11707,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -11750,6 +11802,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -11769,7 +11822,6 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -11778,10 +11830,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -11801,16 +11855,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -11895,6 +11949,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -11914,7 +11969,6 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -11939,10 +11993,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -11962,16 +12018,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -12054,6 +12110,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "single arrangement density clustered to preserve negative space; original count 320",
        "from": [
         0.2,
         0.5
@@ -12073,11 +12130,10 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "single arrangement density clustered to preserve negative space; original count 320",
+       "color_hint": null,
        "variation": null,
        "arrangement": {
         "count": 120,
@@ -12098,10 +12154,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity",
        "from": null,
        "to": null,
        "center": [
@@ -12121,16 +12179,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -12209,6 +12267,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": null,
        "from": [
         0.2,
         0.5
@@ -12228,7 +12287,6 @@
        "filled": false,
        "style": "solid",
        "weight": "pen",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
@@ -12237,10 +12295,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "triangle",
+       "note": "triangle restored from DDL shape intent; quiet symbolic shape tempered to avoid fallback dominance",
        "from": null,
        "to": null,
        "center": null,
@@ -12260,16 +12320,16 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "triangle restored from DDL shape intent; quiet symbolic shape tempered to avoid fallback dominance",
+       "color_hint": null,
        "variation": null,
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },
@@ -12349,6 +12409,7 @@
      "instructions": [
       {
        "primitive": "line",
+       "note": "material inferred from DDL: chalk; motion energy restored through trajectory and rotation; visual event preserved as chalk dust tension; visual event counterweight preserved through opposing placement",
        "from": [
         0.2,
         0.5
@@ -12368,11 +12429,10 @@
        "filled": false,
        "style": "solid",
        "weight": "chalk",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "chalk dust drifting from the brick wall dust; material inferred from DDL: chalk; motion energy restored through trajectory and rotation; visual event preserved as chalk dust tension; visual event counterweight preserved through opposing placement",
+       "color_hint": "chalk dust drifting from the brick wall dust",
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -12407,10 +12467,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "ellipse",
+       "note": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -12430,11 +12492,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thick",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "black",
-       "color_hint": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -12447,10 +12508,12 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       },
       {
        "primitive": "polygon",
+       "note": "hard edge visual event restored with polygonal rust/steel fragments; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": [
@@ -12467,11 +12530,10 @@
        "filled": false,
        "style": "solid",
        "weight": "brush_thin",
-       "thinness": null,
        "mode": "additive",
        "carve_depth": null,
        "color": "gray",
-       "color_hint": "hard edge visual event restored with polygonal rust/steel fragments; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
+       "color_hint": null,
        "variation": {
         "amplitude": "medium",
         "frequency": "slow",
@@ -12506,7 +12568,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null
+       "surface": null,
+       "thinness": null
       }
      ]
     },

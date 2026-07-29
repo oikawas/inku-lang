@@ -206,7 +206,8 @@ def _with_visible_color(ins: Instruction, background: str) -> Instruction:
     else:
         data["color"] = VISIBLE_ON_BACKGROUND.get(background, "black")
         note = f"{background} foreground made visible"
-    data["color_hint"] = f"{hint}; {note}" if hint else note
+    machine_note = data.get("note")
+    data["note"] = f"{machine_note}; {note}" if machine_note else note
     return Instruction.model_validate(data)
 
 
@@ -252,11 +253,12 @@ def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
 def _dedupe_instruction_key(ins: Instruction) -> str:
     data = ins.model_dump(by_alias=True, exclude_none=True)
     data.pop("color_hint", None)
+    data.pop("note", None)
     return json.dumps(data, sort_keys=True, ensure_ascii=False)
 
 
 def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[Instruction]:
-    """color_hint だけが違う同一補助層を統合する。"""
+    """Merge structurally identical helper layers that differ only in machine notes."""
     repaired: list[Instruction] = []
     seen: set[str] = set()
     for ins in instructions:
@@ -356,7 +358,8 @@ def _with_presence_auxiliary_shape_repair(instructions: list[Instruction], prese
         if (
             key in atmospheric_keys
             and _closed_shape_area(ins) >= 0.025
-            and _is_plain_material_hint(ins.color_hint)
+            and not _is_atmospheric_effect_hint(ins.color_hint)
+            and _is_plain_material_hint(ins.note)
         ):
             continue
         repaired.append(ins)
@@ -376,8 +379,8 @@ def _with_arrangement_count(ins: Instruction, count: int, note: str) -> Instruct
     arrangement = dict(data["arrangement"])
     arrangement["count"] = max(1, int(count))
     data["arrangement"] = arrangement
-    hint = data.get("color_hint")
-    data["color_hint"] = f"{hint}; {note}" if hint else note
+    machine_note = data.get("note")
+    data["note"] = f"{machine_note}; {note}" if machine_note else note
     return Instruction.model_validate(data)
 
 
@@ -421,9 +424,9 @@ def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
     if arr_data.get("fade", "none") == "none":
         arr_data["fade"] = "directional" if arr.path != "none" or arr.layout in ("horizontal", "vertical") else "outward"
     data["arrangement"] = arr_data
-    hint = data.get("color_hint")
+    machine_note = data.get("note")
     full_note = f"{note}; original count {original_count}"
-    data["color_hint"] = f"{hint}; {full_note}" if hint else full_note
+    data["note"] = f"{machine_note}; {full_note}" if machine_note else full_note
     return Instruction.model_validate(data)
 
 

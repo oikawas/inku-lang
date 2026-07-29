@@ -113,10 +113,10 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 43_822
-    assert _digest(composer.SYSTEM_PROMPT) == "1169084a389f8a08"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 41_887
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "e02fe62bc805b9b3"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 43_908
+    assert _digest(composer.SYSTEM_PROMPT) == "09d51781b10e2d15"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 41_973
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "690f2e1fc759eb2e"
     # `hair` -> `silverpoint` の改名で、Stage 2 の素材語対応表 2 行と作例 8 件、
     # そして weight の enum と description が動いた。tool schema は 17_696 -> 17_713。
     # 色選択の一行が `palette` を捨てて `抽象色` / `the abstract colors` になった
@@ -124,16 +124,16 @@ def test_stage2_prompt_and_tool_expected_values():
     # プロンプト内部矛盾の解消で、Stage 2 の背景規則 2 行・作例 5 件と
     # background の description が動いた。tool schema は 17_713 -> 17_764 (2026-07-27)。
     # engine 16 段 3 (太さの軸) で、Stage 2 の変換表 2 つ (日英) と作例 4 件が入り、
-    # `thinness` の enum + description が tool schema に出た。17_764 -> 18_064。
-    assert len(tool_json.encode("utf-8")) == 18_064
-    assert _digest(tool_json) == "0e4021f1b0a3a1f9"
+    # `thinness` の enum + description が tool schema に出た。17_764 -> 18_257。
+    assert len(tool_json.encode("utf-8")) == 18_257
+    assert _digest(tool_json) == "deab1e9a9cfc8170"
     # `thinness` を `weight` の直後から末尾へ移し (搬送 18% -> 89%)、
     # `_stage2_prompt_digest` の `sort_keys=True` を外して指紋を並び順に開いた
     # (I-036 / I-038)。**上の 2 行はここで動かない** — この tool_json は
     # テスト側で `sort_keys=True` を掛けており、並びを潰しているため。
     # 動くのは並びを見るようになった下の 2 行だけ (2026-07-29)。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "e11b7daa7c65a5fe"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "e1eacdb0176f7f98"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "ad7d89fbf2d0e5dd"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "4eaad90c80ef3353"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -236,8 +236,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
     # `_stage2_prompt_digest` が鍵を並べ替えなくなったので採り直した (I-038・2026-07-29)。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "8dc6afdcc122265d"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "1169084a389f8a08"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a2188513d092f6c7"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "09d51781b10e2d15"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

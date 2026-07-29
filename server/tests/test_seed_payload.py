@@ -36,6 +36,7 @@ EXPECTED_SEED_INSTRUCTION_FIELDS = {
 EXPECTED_NON_SEED_INSTRUCTION_FIELDS = {
     "color",
     "color_hint",
+    "note",
     "at",
     "relation",
 }
@@ -78,6 +79,7 @@ def _all_field_instruction_payload() -> dict:
         "carve_depth": None,
         "color": "black",
         "color_hint": "annotation one",
+        "note": "machine annotation one",
         "variation": {
             "amplitude": "fine",
             "frequency": "slow",

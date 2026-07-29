@@ -71,7 +71,7 @@ def thinness_at(index: int) -> Iterator[None]:
 def test_thinness_is_declared_last() -> None:
     """P-1 位置: 任意フィールドは後ろにあるほど埋まる。末尾から動かさない。"""
     properties = _instruction_properties()
-    assert len(properties) == 24
+    assert len(properties) == 25
     assert list(properties)[-1] == "thinness"
     assert list(Instruction.model_fields)[-1] == "thinness"
 

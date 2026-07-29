@@ -401,6 +401,10 @@ class Instruction(BaseModel):
             " / polygon=多角形 / arc=弧 / cloudform=雲形"
         ),
     )
+    note: Optional[str] = Field(
+        default=None,
+        description="機械が付ける処理注記。描画に影響しない。出力しないこと",
+    )
 
     from_: Optional[Coord] = Field(
         default=None,

@@ -18,8 +18,8 @@ they scored badly or could not be measured, for the same reason.
 Method and rubric: no-git-sync/fable5/mode-api-claude/SCORING-DESIGN.md
 """
 
-MODEL_CONFIG_VERSION = "2.4.0"
-MODEL_CONFIG_LAST_UPDATED = "2026-07-29T11:00:00Z"
+MODEL_CONFIG_VERSION = "2.4.1"
+MODEL_CONFIG_LAST_UPDATED = "2026-07-30T00:00:00Z"
 
 VERIFIED_NVIDIA_MODELS: list[dict[str, object]] = [
     {"id": "mistralai/mistral-nemotron", "label": "mistralai/mistral-nemotron", "purposes": ["llm"], "recommendation_llm": 4, "speed_class": "ultra-fast", "speed_label": "昼 121s / 夕 10s / 深夜 8s", "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.0。応答中央値 昼 121s / 夕 10s / 深夜 8s。", "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.0 corrections on average; median response midday 121s / evening 10s / late night 8s."},

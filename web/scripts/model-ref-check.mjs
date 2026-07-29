@@ -18,9 +18,8 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EXPECTATIONS = JSON.parse(readFileSync(join(HERE, 'model-ref-expectations.json'), 'utf8'));
 
-const { splitModelRef, qualifiedModelId, resolveModelRef } = await import(
-	join(HERE, '..', 'src/lib/models.ts')
-);
+const { splitModelRef, qualifiedModelId, resolveModelRef, resolveModelRefForDisplay, modelDisplayName } =
+	await import(join(HERE, '..', 'src/lib/models.ts'));
 
 const failures = [];
 let checks = 0;
@@ -88,10 +87,23 @@ for (const c of EXPECTATIONS.cases) {
 	);
 }
 
-// ── nothing unrecognised lands on ovms ────────────────────────────────────
+// ── the retired provider names, and never routes ──────────────────────────
+// resolveModelRef is the routing resolver, so nothing unqualified may reach a
+// retired provider through it -- not even a model only that provider ever owned.
 for (const ref of EXPECTATIONS.never_ovms.refs) {
 	const provider = resolveModelRef(ref, GROUPS, 'ollama').provider;
 	check(`${ref} does not land on ovms`, provider === 'ovms', false);
+}
+
+// The display resolver is the one place that may, and it must, or the six
+// artworks made on ovms would be attributed to whatever the stage default is.
+for (const c of EXPECTATIONS.retired_display.cases) {
+	check(
+		`display ${c.ref}`,
+		resolveModelRefForDisplay(c.ref, GROUPS, 'ollama'),
+		{ provider: c.provider, model: c.model }
+	);
+	check(`display name ${c.ref}`, modelDisplayName(c.ref, undefined, 'ollama'), c.display);
 }
 
 // ── qualification never happens twice ─────────────────────────────────────

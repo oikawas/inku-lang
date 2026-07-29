@@ -108,18 +108,36 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 			{ id: 'minimax-m2.5', label: 'minimax-m2.5' },
 			{ id: 'nemotron-3-super', label: 'nemotron-3-super' }
 		]
-	},
+	}
+];
+
+// Providers withdrawn from the catalog. They are offered nowhere -- every picker
+// reads PROVIDER_GROUPS -- but artworks made before the withdrawal still name
+// their models, and the name is the only thing left to honour: without an entry
+// here the six ovms artworks would read "NVIDIA NIM / ovms:gemma3-4b-api", which
+// is worse than the id alone because it also names the wrong machine.
+//
+// A retired provider takes part in *naming* and never in *routing*: its ids are
+// recognised when a reference is split (so "ovms:x" is not read as a bare model)
+// and its labels are looked up for display, but it is kept out of the ownership
+// table, so rule 2 can never send new work to an endpoint that stopped serving.
+const RETIRED_PROVIDER_GROUPS: ProviderGroup[] = [
 	{
+		// Intel OVMS, the local OpenAI-compatible backend until 2026-07-30.
+		// Six artworks name gemma3-4b-api: five as 'ovms:gemma3-4b-api', one bare
+		// (measured 2026-07-30). No artwork names the other three models.
 		id: 'ovms',
 		label: 'Intel OVMS',
 		models: [
-			{ id: 'qwen3-api', label: 'Qwen3 8B Instruct', notes: 'thinking有効' },
+			{ id: 'qwen3-api', label: 'Qwen3 8B Instruct' },
 			{ id: 'qwen-api', label: 'Qwen2.5 7B Instruct' },
-			{ id: 'gemma3-12b-api', label: 'Google Gemma 3 12B Instruct', notes: '低速' },
+			{ id: 'gemma3-12b-api', label: 'Google Gemma 3 12B Instruct' },
 			{ id: 'gemma3-4b-api', label: 'Google Gemma 3 4B Instruct' }
 		]
 	}
 ];
+
+const retiredProviderIds = new Set<Provider>(RETIRED_PROVIDER_GROUPS.map((group) => group.id));
 
 export const DEFAULT_PROVIDER: Provider = 'nvidia';
 export const DEFAULT_MODEL = 'google/gemma-4-31b-it';
@@ -132,10 +150,15 @@ export function modelsForProvider(provider: Provider): ModelOption[] {
 // starts as the built-in list and grows as the server catalogs arrive, so the
 // ~40 call sites of qualifiedModelId() stay correct for providers the operator
 // added without threading a catalog through every one of them.
-let registeredProviderIds = new Set<Provider>(PROVIDER_GROUPS.map((group) => group.id));
+// Retired ids join the id set and both label maps, and stay out of the owner
+// map: naming, never routing.
+let registeredProviderIds = new Set<Provider>(
+	[...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS].map((group) => group.id)
+);
 let registeredModelOwners = ownersOf(PROVIDER_GROUPS);
-let registeredProviderLabels = providerLabelsOf(PROVIDER_GROUPS);
-let registeredModelLabels = modelLabelsOf(PROVIDER_GROUPS);
+let registeredProviderLabels = providerLabelsOf([...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS]);
+let registeredModelLabels = modelLabelsOf([...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS]);
+const retiredModelOwners = ownersOf(RETIRED_PROVIDER_GROUPS);
 
 function providerLabelsOf(groups: ProviderGroup[]): Map<Provider, string> {
 	const labels = new Map<Provider, string>();
@@ -204,7 +227,7 @@ export function modelDisplayName(
 ): string {
 	const ref = String(modelId ?? '').trim();
 	if (!ref) return '';
-	const { provider, model } = resolveModelRef(ref, groups, stageProvider);
+	const { provider, model } = resolveModelRefForDisplay(ref, groups, stageProvider);
 	const fromArgument = groups?.find((group) => group.id === provider)?.models.find((item) => item.id === model)?.label;
 	const name = fromArgument || registeredModelLabels.get(`${provider}:${model}`) || model;
 	const owner = providerLabel(provider, groups);
@@ -228,7 +251,11 @@ export function splitModelRef(
 	if (index <= 0) return { provider: null, model: text };
 	const head = text.slice(0, index);
 	const rest = text.slice(index + 1);
-	const known = groups ? new Set(groups.map((group) => group.id)) : registeredProviderIds;
+	// Retired ids are recognised whichever catalog is handed in: "ovms:gemma3-4b-api"
+	// must never be read as a bare model id whose name happens to contain a colon.
+	const known = groups
+		? new Set<Provider>([...groups.map((group) => group.id), ...retiredProviderIds])
+		: registeredProviderIds;
 	if (rest && known.has(head)) return { provider: head, model: rest };
 	return { provider: null, model: text };
 }
@@ -267,4 +294,26 @@ export function providerOfModel(
 	stageProvider: Provider = DEFAULT_PROVIDER
 ): Provider {
 	return resolveModelRef(modelId, groups, stageProvider).provider;
+}
+
+/**
+ * Resolve a reference the way a *label* should read it: the same three rules,
+ * with retired ownership consulted between rule 2 and rule 3.
+ *
+ * Kept separate from resolveModelRef() so the retired entries can name an old
+ * artwork without ever becoming a place new work is sent. Only the two functions
+ * that produce text for a person go through here.
+ */
+export function resolveModelRefForDisplay(
+	modelId: string,
+	groups?: ProviderGroup[],
+	stageProvider: Provider = DEFAULT_PROVIDER
+): { provider: Provider; model: string } {
+	const split = splitModelRef(modelId, groups);
+	if (split.provider) return { provider: split.provider, model: split.model };
+	const owners = groups ? ownersOf(groups).get(split.model) : registeredModelOwners.get(split.model);
+	if (owners && owners.size === 1) return { provider: [...owners][0], model: split.model };
+	const retired = retiredModelOwners.get(split.model);
+	if (retired && retired.size === 1) return { provider: [...retired][0], model: split.model };
+	return { provider: stageProvider, model: split.model };
 }

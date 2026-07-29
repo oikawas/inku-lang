@@ -91,7 +91,11 @@ def test_resolved_stage_models_qualify_current_user_provider():
     assert api_module._resolved_stage2_model("claude-sonnet-4-6", actor) == "anthropic:claude-sonnet-4-6"
     assert api_module._resolved_vision_model(None, actor) == "nvidia:meta/llama-3.2-90b-vision-instruct"
     assert api_module._resolved_vision_model("openai:gpt-4.1", actor) == "openai:gpt-4.1"
-    assert api_module._resolved_stage1_model("ovms:qwen-api", actor) == "ovms:qwen-api"
+    # A reference qualified by a provider other than this actor's stage is left
+    # alone. It used to say "ovms:qwen-api", which passed for the wrong reason once
+    # ovms was withdrawn: an unqualified reference that is not the stage's own model
+    # is also returned unchanged, so the assertion held without rule 1 running.
+    assert api_module._resolved_stage1_model("gemini:gemini-2.5-pro", actor) == "gemini:gemini-2.5-pro"
     assert api_module._resolved_stage1_model("qwen-api", actor) == "qwen-api"
 
 

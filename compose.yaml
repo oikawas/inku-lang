@@ -16,13 +16,10 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # LLM backend wiring for bench parity with bare metal. Values come from the
-      # pentala-local --env-file (never committed). OVMS is reached via the LAN IP
-      # set in OPENAI_BASE_URL (container reaches the host's LAN address).
+      # pentala-local --env-file (never committed).
       INKU_LLM_BACKEND: ${INKU_LLM_BACKEND:-}
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
-      OPENAI_MODEL_STAGE1: ${OPENAI_MODEL_STAGE1:-}
       INKU_SKETCH_RELATIONS: ${INKU_SKETCH_RELATIONS:-}
     ports:
       - "${INKU_API_PORT:-8101}:8100"

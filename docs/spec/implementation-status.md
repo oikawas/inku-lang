@@ -150,7 +150,7 @@ The settings dialog includes an admin-only Model Settings tab.  It stores the
 default Stage 1 / Stage 2 provider and model plus per-provider base URL and API
 key settings in server app settings.  The supported connection targets are
 OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama's
-OpenAI-compatible API, and Intel OVMS's OpenAI-compatible API. Admin users can
+OpenAI-compatible API, and Ollama Cloud. Admin users can
 add and remove connection services from the model settings tab. Added services
 carry a service ID, display name, connection kind (`openai_compatible`,
 `anthropic`, or `gemini`), base URL, and optional initial API key. The add
@@ -183,15 +183,19 @@ again, and keys configured through environment
 variables are treated as initial values. A model reference is resolved in three
 steps and never by guesswork: an explicit provider prefix wins
 (`openai:...`, `anthropic:...`, `gemini:...`, `nvidia:...`, `ollama:...`,
-`ollama-cloud:...`, `ovms:...`); otherwise, if *exactly one* configured provider
+`ollama-cloud:...`); otherwise, if *exactly one* configured provider
 lists that model ID, that provider is used; otherwise the stage's configured
 provider is used. Because a provider ID cannot contain a colon, the first colon
 is the only possible split point, so a model ID may carry any number of them
 (`qwen3.5:4b-q4_K_M`). A model ID offered by two providers — `gpt-oss:20b` is
 offered by both Ollama and Ollama Cloud — is deliberately *not* decided by the
 second step. The earlier fallbacks (a slash meaning NVIDIA, a `gemini-` prefix,
-and OVMS as the catch-all) are gone: a bare string that no catalog lists now
-goes to the stage's provider instead of silently to OVMS.
+and a catch-all provider) are gone: a bare string that no catalog lists now goes
+to the stage's provider instead of silently to one that answered `/health` long
+after it had stopped serving models. That provider, Intel OVMS, was withdrawn
+altogether on 2026-07-30; a withdrawn provider is dropped from stored settings on
+read, is offered nowhere, and raises rather than accepting a connection, while its
+model ids stay readable so artworks made on it are still named.
 Wherever a model is named on screen — the running indicator, the work's Stage 1
 and Stage 2 lines, the history table, the lineage node details — it is named as
 `<provider> / <model>`, because a model id alone does not say where it runs and,
@@ -202,8 +206,8 @@ The web UI normalizes model IDs sent to `/api/paint`, `/api/interpret`, and
 example `openai:gpt-5.2`. Stored per-user model choices are provider/model
 pairs; the older single qualified string is still accepted on read and split
 into a pair. Demo prompt generation uses the same provider resolution path for
-OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, Ollama Cloud,
-and Intel OVMS. Ollama Cloud declares its own concurrency ceiling, which the
+OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Ollama
+Cloud. Ollama Cloud declares its own concurrency ceiling, which the
 server enforces per provider rather than exposing as a setting.
 LLM server connection settings are global admin-managed settings.  Each user's
 Stage 1 / Stage 2 provider and model selection is stored separately in

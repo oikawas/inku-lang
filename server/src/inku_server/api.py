@@ -904,7 +904,7 @@ app.add_middleware(ConcurrencyLimitMiddleware, max_requests=_MAX_CONCURRENT_REQU
 class ComposeRequest(BaseModel):
     ddl: str = Field(..., min_length=1, max_length=100_000, description="正規化DDL テキスト")
     model: str | None = Field(
-        default=None, description="Stage 2 モデル名 (未指定時は OPENAI_MODEL 既定)"
+        default=None, description="Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)"
     )
     description: str | None = Field(default=None, max_length=100_000, description="作者が書いた記述 (省略可)")
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
@@ -983,7 +983,7 @@ class InterpretRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
     stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
     model: str | None = Field(
-        default=None, description="Stage 1 モデル名 (未指定時は OPENAI_MODEL_STAGE1 既定)"
+        default=None, description="Stage 1 モデル名 (未指定時は利用者の Stage 1 既定)"
     )
     include_thinking: bool = Field(
         default=False, description="qwen3 の <think> 内容を別フィールドで返すか"
@@ -3365,9 +3365,12 @@ def _demo_instruction_system(lang: str) -> str:
 
 
 def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str) -> str:
-    model_name = model or os.getenv("OPENAI_MODEL_STAGE1") or os.getenv("OPENAI_MODEL") or "qwen-api"
+    # No env fallback and no literal: both named ovms models, so an unconfigured
+    # demo asked a withdrawn provider for its instruction. provider_for_model
+    # reads the Stage 1 default when the model is None, which is the same answer
+    # every other caller gets.
     settings = _db.get_model_settings()
-    provider, model_id = provider_for_model(model_name, stage="stage1", settings=settings)
+    provider, model_id = provider_for_model(model or None, stage="stage1", settings=settings)
     if provider == "anthropic":
         import anthropic
 

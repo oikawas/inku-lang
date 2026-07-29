@@ -38,7 +38,7 @@
 		providerOfModel,
 		qualifiedModelId,
 		registerModelCatalog,
-		resolveModelRef,
+		resolveModelRefForDisplay,
 		splitModelRef,
 		type Provider,
 		type ProviderGroup,
@@ -5722,7 +5722,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// say which provider ran it: the same id can be served by two of them.
 	function shortModel(m: string | null | undefined): string {
 		if (!m) return '';
-		const { provider, model } = resolveModelRef(m);
+		const { provider, model } = resolveModelRefForDisplay(m);
 		const owner = providerLabel(provider);
 		const short = shortModelName(model);
 		return owner ? `${owner}/${short}` : short;

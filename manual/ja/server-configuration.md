@@ -85,7 +85,7 @@ queue上限時も履歴DB保存を優先し、artifact保存だけをskipしま�
 | Gemini | `GEMINI_API_KEY` | `GEMINI_BASE_URL` |
 | NVIDIA NIM | `NVIDIA_API_KEY` | `NVIDIA_BASE_URL` |
 | Ollama | `OLLAMA_API_KEY` | `OLLAMA_BASE_URL` |
-| Intel OVMS | `OVMS_API_KEY` | `OVMS_BASE_URL` |
+| Ollama Cloud | `OLLAMA_CLOUD_API_KEY` | `OLLAMA_CLOUD_BASE_URL` |
 
 providerのBase URL、key、公開モデルは管理UIからも設定できます。keyをDBへ保存する場合は`enc:v1:`形式で暗号化します。
 

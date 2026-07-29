@@ -12,6 +12,7 @@
 		input: string;
 		source_text?: string | null;
 		display_label?: string | null;
+		lineage_generation?: number | null;
 		ddl: string | null;
 		thinking?: string | null;
 		score: { instructions: unknown[] };
@@ -78,7 +79,6 @@
 		onAskPermanentDelete: (ids: string[]) => void;
 		onToggleSelection: (id: string) => void;
 		onLoadItem: (item: HistoryItem) => void;
-		onReplayItem: (item: HistoryItem) => void | Promise<void>;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		historyModelSummary: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
@@ -119,7 +119,6 @@
 		onAskPermanentDelete,
 		onToggleSelection,
 		onLoadItem,
-		onReplayItem,
 		onToggleStar,
 		historyModelSummary,
 		formatHistoryDate,
@@ -379,13 +378,6 @@
 		onClose();
 	}
 
-	async function replayItemAndClose(item: HistoryItem, event?: Event) {
-		event?.stopPropagation();
-		if (historyManagerView !== 'active') return;
-		await onReplayItem(item);
-		onClose();
-	}
-
 	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
@@ -495,12 +487,20 @@
 		<div class="history-head-left">
 			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
 			<div class="settings-tabs history-mode-tabs">
-				<button class:active={historyManagerTab === 'thumbs'} title={t().tooltipHistoryThumbsTab} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
-				<button class:active={historyManagerTab === 'list'} title={t().tooltipHistoryListTab} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryThumbsTab}>
+					<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
+				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryListTab}>
+					<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
+				</Tooltip>
 			</div>
 			<div class="settings-tabs history-group-tabs">
-				<button class:active={historyDisplayMode === 'chronological'} title={t().tooltipHistoryChronological} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
-				<button class:active={historyDisplayMode === 'lineage'} title={t().tooltipHistoryLineageGrouped} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryChronological}>
+					<button class:active={historyDisplayMode === 'chronological'} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
+				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryLineageGrouped}>
+					<button class:active={historyDisplayMode === 'lineage'} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
+				</Tooltip>
 			</div>
 			<span class="history-manager-count">
 				{#if historyDisplayMode === 'lineage'}
@@ -652,7 +652,6 @@
 											<div class="lineage-member-actions">
 												<button class="hash-row-star" class:starred={!!it.starred} title={it.starred ? t().starOn : t().starOff} aria-label={it.starred ? t().starOn : t().starOff} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
 												{#if historyManagerView === 'active'}
-													<button class="ghost-btn" title={t().historyReplayTitle} onclick={(event) => replayItemAndClose(it, event)}>{t().historyReplay}</button>
 													<button class="ghost-btn icon-trash-btn" title={t().historyTrashItemTitle} onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
 												{:else}
 													<button class="ghost-btn" title={t().historyRestoreTitle} onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
@@ -683,6 +682,9 @@
 	aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
 	onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}
 ><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
+						{#if it.lineage_generation}
+							<span class="manager-generation" title={t().historyGenerationTitle}>{it.lineage_generation}</span>
+						{/if}
 						<div
 							class="thumb manager-thumb"
 							title={t().historyOpenItemTitle}
@@ -705,21 +707,7 @@
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
 								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
-								{#if historyManagerView === 'active'}
-									<button class="ghost-btn history-replay-btn" onclick={(event) => replayItemAndClose(it, event)} title={t().historyReplayTitle}>{t().historyReplay}</button>
-									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().historyTrashItemTitle} aria-label={t().deleteButton}>
-										<svg viewBox="2 2 20 20" aria-hidden="true">
-											<path d="M3 6h18" />
-											<path d="M8 6V4h8v2" />
-											<path d="M6 6l1 15h10l1-15" />
-											<path d="M10 10v7" />
-											<path d="M14 10v7" />
-										</svg>
-									</button>
-								{:else}
-									<button class="ghost-btn" title={t().historyRestoreTitle} onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
-									<button class="danger-btn" title={t().historyPermanentDeleteTitle} onclick={() => it.id && onAskPermanentDelete([it.id])}>{t().historyPermanentDelete}</button>
-								{/if}
+								<span class="thumb-model" title={historyModelSummary(it)}>{historyModelSummary(it)}</span>
 							</div>
 						</div>
 					</div>
@@ -761,7 +749,6 @@
 							<td>{catalogName(it.catalog_id)}</td>
 							<td>
 								{#if historyManagerView === 'active'}
-									<button class="ghost-btn history-replay-btn" onclick={(event) => replayItemAndClose(it, event)} title={t().historyReplayTitle}>{t().historyReplay}</button>
 									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().historyTrashItemTitle} aria-label={t().deleteButton}>
 										<svg viewBox="2 2 20 20" aria-hidden="true">
 											<path d="M3 6h18" />
@@ -869,24 +856,33 @@
 		cursor: pointer;
 		line-height: 1;
 	}
+	/* No overflow clipping here: the tabs carry Tooltip bubbles that must escape the box.
+	   The rounded corners live on the end buttons instead. */
 	.settings-tabs {
 		display: flex;
 		gap: 0;
 		background: var(--bg);
 		border: 1px solid var(--border);
 		border-radius: var(--r);
-		overflow: hidden;
 	}
+	.settings-tabs :global(.tooltip-wrap) { align-items: stretch; }
 	.settings-tabs button {
-		padding: 4px 9px;
+		padding: var(--btn-sm-padding);
 		border: none;
 		background: none;
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--btn-sm-font-size);
 		cursor: pointer;
 		font-family: inherit;
 	}
-	.settings-tabs button + button { border-left: 1px solid var(--border); }
+	/* -1px keeps the fill inside the container's 1px border. */
+	.settings-tabs :global(.tooltip-wrap:first-child button) {
+		border-radius: calc(var(--btn-sm-radius) - 1px) 0 0 calc(var(--btn-sm-radius) - 1px);
+	}
+	.settings-tabs :global(.tooltip-wrap:last-child button) {
+		border-radius: 0 calc(var(--btn-sm-radius) - 1px) calc(var(--btn-sm-radius) - 1px) 0;
+	}
+	.settings-tabs :global(.tooltip-wrap + .tooltip-wrap button) { border-left: 1px solid var(--border); }
 	.settings-tabs button.active { color: var(--fg); background: var(--panel); font-weight: 500; }
 	.history-tools {
 		display: flex;
@@ -967,6 +963,25 @@
 	top: 6px;
 	left: 6px;
 	z-index: 30;
+}
+/* Sits directly under the 16px checkbox, over the thumbnail, so it needs the
+   same plate treatment the star badge uses to stay readable on any image. */
+.manager-generation {
+	position: absolute;
+	top: 26px;
+	left: 6px;
+	z-index: 30;
+	box-sizing: border-box;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 3px;
+	display: inline-grid;
+	place-items: center;
+	border: 1px solid var(--thumb-plate-border);
+	border-radius: 3px;
+	background: var(--thumb-plate-bg);
+	color: var(--thumb-plate-fg-read);
+	font: 600 10px/1 system-ui, sans-serif;
 }
 .selection-checkbox {
 	box-sizing: border-box;
@@ -1111,6 +1126,19 @@
 		font-size: 11px;
 		white-space: nowrap;
 	}
+	/* Takes whatever the star and the hash chip leave; the native title carries
+	   the whole string once the card is too narrow for it. */
+	.thumb-model {
+		flex: 1 1 auto;
+		align-self: flex-end;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--fg3);
+		font-size: 10px;
+		line-height: 1.6;
+	}
 	.manager-thumb {
 		width: 100%;
 	}
@@ -1125,13 +1153,6 @@
 		min-width: 0;
 		position: relative;
 		z-index: 40;
-	}
-	.manager-thumb-actions .ghost-btn,
-	.manager-thumb-actions .danger-btn {
-		flex: 0 0 auto;
-		margin-left: auto;
-		font-size: var(--btn-sm-font-size);
-		padding: var(--btn-sm-padding);
 	}
 	.history-table {
 		width: 100%;

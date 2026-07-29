@@ -18,6 +18,14 @@
 		id?: string;
 		enabled?: boolean;
 	};
+	type DbBackupEntry = {
+		kind: 'auto' | 'manual';
+		name: string;
+		at: number;
+		size_bytes: number;
+		generation: number | null;
+	};
+
 	type SettingsStatus = {
 		database: {
 			backend: string;
@@ -34,10 +42,16 @@
 			supported: boolean;
 			interval_days: number;
 			max_generations: number;
+			backup_hour: number;
+			backup_minute: number;
 			last_auto_backup_at: number;
+			next_auto_backup_at: number;
 			backup_dir: string;
 			auto_count: number;
 			manual_count: number;
+			backups: DbBackupEntry[];
+			backups_total_count: number;
+			backups_total_size_bytes: number;
 		};
 		plugins: {
 			enabled: boolean;
@@ -197,7 +211,7 @@
 		onCreatePlugin: (content: string, filename: string) => Promise<string[] | null>;
 		onDeletePlugin: (id: string) => Promise<boolean>;
 		onSetPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
-		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number) => void | Promise<void>;
+		onUpdateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => void | Promise<void>;
 		onRunDbBackupNow: () => void | Promise<void>;
 		onUpdateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => void | Promise<void>;
 		renderConcurrencyStatus: string | null;
@@ -661,6 +675,24 @@
 		if (!ms) return '-';
 		return new Date(ms).toLocaleString();
 	}
+
+	// What the current settings will ask of the disk: the automatic copies are
+	// pruned to max_generations, so that is the ceiling. Manual copies are never
+	// pruned and are therefore not something the settings can predict.
+	const dbBackupEstimatedBytes = $derived(
+		settingsStatus ? (settingsStatus.database.file_size_bytes ?? 0) * settingsStatus.db_backup.max_generations : 0
+	);
+
+	function saveDbBackupSettings(patch: { intervalDays?: number; maxGenerations?: number; hour?: number; minute?: number }) {
+		const current = settingsStatus?.db_backup;
+		void onUpdateDbBackupSettings(
+			patch.intervalDays ?? current?.interval_days ?? 7,
+			patch.maxGenerations ?? current?.max_generations ?? 4,
+			patch.hour ?? current?.backup_hour ?? 3,
+			patch.minute ?? current?.backup_minute ?? 0
+		);
+	}
+
 </script>
 
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
@@ -871,7 +903,7 @@
 								max="365"
 								value={settingsStatus.db_backup.interval_days}
 								disabled={!settingsStatus.db_backup.supported}
-								onchange={(e) => onUpdateDbBackupSettings(Number((e.currentTarget as HTMLInputElement).value), settingsStatus?.db_backup.max_generations ?? 4)}
+								onchange={(e) => saveDbBackupSettings({ intervalDays: Number((e.currentTarget as HTMLInputElement).value) })}
 							/>
 						</label>
 						<label>
@@ -882,15 +914,76 @@
 								max="100"
 								value={settingsStatus.db_backup.max_generations}
 								disabled={!settingsStatus.db_backup.supported}
-								onchange={(e) => onUpdateDbBackupSettings(settingsStatus?.db_backup.interval_days ?? 7, Number((e.currentTarget as HTMLInputElement).value))}
+								onchange={(e) => saveDbBackupSettings({ maxGenerations: Number((e.currentTarget as HTMLInputElement).value) })}
 							/>
 						</label>
+						<div class="db-backup-field db-backup-time">
+							<span>{t().settingsDbBackupTime}</span>
+							<div class="db-backup-time-fields">
+								<input
+									type="number"
+									min="0"
+									max="23"
+									aria-label={t().settingsDbBackupTimeHourLabel}
+									value={settingsStatus.db_backup.backup_hour}
+									disabled={!settingsStatus.db_backup.supported}
+									onchange={(e) => saveDbBackupSettings({ hour: Number((e.currentTarget as HTMLInputElement).value) })}
+								/>
+								<span class="db-backup-time-unit">{t().settingsDbBackupTimeHourUnit}</span>
+								<input
+									type="number"
+									min="0"
+									max="59"
+									aria-label={t().settingsDbBackupTimeMinuteLabel}
+									value={settingsStatus.db_backup.backup_minute}
+									disabled={!settingsStatus.db_backup.supported}
+									onchange={(e) => saveDbBackupSettings({ minute: Number((e.currentTarget as HTMLInputElement).value) })}
+								/>
+								<span class="db-backup-time-unit">{t().settingsDbBackupTimeMinuteUnit}</span>
+							</div>
+						</div>
 					</div>
+					<div class="db-backup-hint">{t().settingsDbBackupTimeHint}</div>
 					<div class="settings-readonly-grid compact">
 						<span>{t().settingsDbBackupLastAuto}</span><strong>{formatTimestamp(settingsStatus.db_backup.last_auto_backup_at)}</strong>
+						<span>{t().settingsDbBackupNextAuto}</span><strong>{formatTimestamp(settingsStatus.db_backup.next_auto_backup_at)}</strong>
+						<span>{t().settingsDbBackupEstimatedDisk}</span><strong title={t().settingsDbBackupEstimatedDiskHint}>{formatBytes(dbBackupEstimatedBytes)}</strong>
 						<span>Directory</span><code>{settingsStatus.db_backup.backup_dir}</code>
 						<span>Saved</span><strong>{t().settingsDbBackupStoredCounts(settingsStatus.db_backup.auto_count, settingsStatus.db_backup.manual_count)}</strong>
 					</div>
+					<div class="popover-group-label db-backup-list-label">{t().settingsDbBackupListTitle}</div>
+					{#if settingsStatus.db_backup.backups.length === 0}
+						<div class="inline-message">{t().settingsDbBackupListEmpty}</div>
+					{:else}
+						<div class="db-backup-list-wrap">
+							<table class="db-backup-list">
+								<thead>
+									<tr>
+										<th>{t().settingsDbBackupListGeneration}</th>
+										<th>{t().settingsDbBackupListKind}</th>
+										<th>{t().settingsDbBackupListAt}</th>
+										<th>{t().settingsDbBackupListSize}</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each settingsStatus.db_backup.backups as entry (entry.name)}
+										<tr>
+											<td class="db-backup-generation">{entry.generation ?? '—'}</td>
+											<td>{entry.kind === 'auto' ? t().settingsDbBackupKindAuto : t().settingsDbBackupKindManual}</td>
+											<td>{formatTimestamp(entry.at)}</td>
+											<td class="db-backup-size">{formatBytes(entry.size_bytes)}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						<div class="db-backup-hint">
+							{t().settingsDbBackupListTotal(settingsStatus.db_backup.backups_total_count, formatBytes(settingsStatus.db_backup.backups_total_size_bytes))}
+							{#if settingsStatus.db_backup.backups_total_count > settingsStatus.db_backup.backups.length}
+								{t().settingsDbBackupListTruncated(settingsStatus.db_backup.backups.length)}
+							{/if}
+						</div>
+					{/if}
 					{#if dbBackupStatus}
 						<div class="inline-message">{dbBackupStatus}</div>
 					{/if}
@@ -1769,11 +1862,13 @@
 	}
 	.db-backup-grid {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		/* The time takes two number fields, so it claims two of these tracks. */
+		grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 		gap: 10px;
 		margin-top: 10px;
 	}
-	.db-backup-grid label {
+	.db-backup-grid label,
+	.db-backup-field {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
@@ -1781,6 +1876,21 @@
 		font-size: 10px;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
+	}
+	.db-backup-time { grid-column: span 2; }
+	.db-backup-time-fields {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+	}
+	.db-backup-time-fields input { flex: 1 1 0; }
+	.db-backup-time-unit {
+		flex: 0 0 auto;
+		color: var(--fg2);
+		font-size: 11px;
+		letter-spacing: 0;
+		text-transform: none;
 	}
 	.db-backup-grid input,
 	.db-backup-grid select {
@@ -1794,6 +1904,55 @@
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
 	}
+	/* WebKit reveals the stepper only on hover or focus; these fields are meant
+	   to be nudged, so the arrows stay out. */
+	.db-backup-grid input[type='number']::-webkit-inner-spin-button,
+	.db-backup-grid input[type='number']::-webkit-outer-spin-button {
+		opacity: 1;
+	}
+	.db-backup-hint {
+		margin-top: 6px;
+		color: var(--fg3);
+		font-size: 10px;
+		line-height: 1.5;
+	}
+	.db-backup-list-label {
+		margin-top: 14px;
+	}
+	.db-backup-list-wrap {
+		margin-top: 6px;
+		max-height: 190px;
+		overflow: auto;
+		border: 1px solid var(--border);
+		border-radius: var(--r);
+	}
+	.db-backup-list {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+	}
+	.db-backup-list th {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		padding: 5px 8px;
+		background: var(--panel2);
+		border-bottom: 1px solid var(--border);
+		color: var(--fg3);
+		font-weight: 500;
+		text-align: left;
+		white-space: nowrap;
+	}
+	.db-backup-list td {
+		padding: 4px 8px;
+		border-bottom: 1px solid var(--border);
+		color: var(--fg2);
+		white-space: nowrap;
+	}
+	.db-backup-list tr:last-child td { border-bottom: none; }
+	.db-backup-generation,
+	.db-backup-size { text-align: right; }
 	.settings-config-preview {
 		margin-top: 10px;
 		display: flex;

@@ -185,6 +185,14 @@
 		entries?: PluginEntry[];
 		reasons?: string[];
 	};
+	type DbBackupEntry = {
+		kind: 'auto' | 'manual';
+		name: string;
+		at: number;
+		size_bytes: number;
+		generation: number | null;
+	};
+
 	type SettingsStatus = {
 		database: {
 			backend: string;
@@ -201,10 +209,16 @@
 			supported: boolean;
 			interval_days: number;
 			max_generations: number;
+			backup_hour: number;
+			backup_minute: number;
 			last_auto_backup_at: number;
+			next_auto_backup_at: number;
 			backup_dir: string;
 			auto_count: number;
 			manual_count: number;
+			backups: DbBackupEntry[];
+			backups_total_count: number;
+			backups_total_size_bytes: number;
 		};
 		plugins: {
 			enabled: boolean;
@@ -1923,13 +1937,23 @@
 		}
 	}
 
-	async function updateDbBackupSettings(intervalDays: number, maxGenerations: number) {
+	async function updateDbBackupSettings(
+		intervalDays: number,
+		maxGenerations: number,
+		backupHour: number,
+		backupMinute: number
+	) {
 		dbBackupStatus = null;
 		try {
 			const r = await apiFetch('/api/settings/db-backup', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations })
+				body: JSON.stringify({
+					interval_days: intervalDays,
+					max_generations: maxGenerations,
+					backup_hour: backupHour,
+					backup_minute: backupMinute
+				})
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: unknown };
@@ -6713,7 +6737,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onAskPermanentDelete={askPermanentDelete}
 		onToggleSelection={toggleHistorySelection}
 		onLoadItem={loadIterationItem}
-		onReplayItem={(item) => replayHistoryItem(item, 'history-manager')}
 		onToggleStar={toggleHistoryStar}
 		{historyModelSummary}
 		{formatHistoryDate}
@@ -6816,6 +6839,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--thumb-plate-bg:     rgba(255,255,255,0.86);
 		--thumb-plate-fg:     rgba(40,36,30,0.42);
 		--thumb-plate-border: rgba(0,0,0,0.12);
+		/* 同じ台座でも数字は読ませる必要があるので、星より濃い字の色を持つ。 */
+		--thumb-plate-fg-read: rgba(40,36,30,0.72);
 	}
 
 	:global(html[data-theme='dark']) {

@@ -6,11 +6,13 @@ Stage 2 composer を monkeypatch でバイパスし、FastAPI のスキーマ/�
 
 from __future__ import annotations
 
+import asyncio
 import builtins
 import importlib.metadata
 import json
 from datetime import datetime, timezone
 import logging
+import os
 import sys
 import time
 import types
@@ -2569,6 +2571,209 @@ def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch)
         db.delete_user(admin["id"])
         db.delete_user(user["id"])
         db.delete_user_group(group["id"])
+
+
+def test_reading_the_settings_panel_does_not_write_a_backup(tmp_path, monkeypatch):
+    """The reload button reads; the scheduler writes.
+
+    last_auto_backup_at = 0 makes a copy due right now, so a status read that
+    still carried the old ensure_scheduled_db_backup() call would leave a file
+    behind and fail here.
+    """
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    settings = db.get_db_backup_settings()
+    settings["last_auto_backup_at"] = 0
+    db._write_app_setting(db._DB_BACKUP_SETTINGS_KEY, settings)
+    assert db.next_scheduled_db_backup_at() == 0  # i.e. due
+
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"db-readonly-{suffix}")
+    admin = db.add_user(
+        username=f"db-readonly-admin-{suffix}",
+        email=f"db-readonly-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    admin_headers, admin_token = _auth_headers(admin)
+    try:
+        assert client.get("/api/settings/status", headers=admin_headers).status_code == 200
+        auto_dir = tmp_path / "db-backups" / "auto"
+        assert not auto_dir.exists() or list(auto_dir.glob("*.db")) == []
+    finally:
+        db.delete_session(admin_token)
+        db.delete_user(admin["id"])
+        db.delete_user_group(group["id"])
+
+
+def test_lifespan_starts_and_cancels_the_backup_scheduler(monkeypatch):
+    """Without this the hour and minute would be settings nothing ever reads.
+
+    The old code only checked whether a backup was due inside GET
+    /api/settings/status, so the schedule fired when an admin opened the panel.
+    """
+    ran: list[str] = []
+
+    async def fake_loop() -> None:
+        ran.append("start")
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            ran.append("cancelled")
+            raise
+
+    monkeypatch.setattr(api_module, "_db_backup_scheduler_loop", fake_loop)
+
+    async def drive() -> None:
+        async with api_module._lifespan(app):
+            await asyncio.sleep(0)
+
+    asyncio.run(drive())
+    assert ran == ["start", "cancelled"]
+
+    ran.clear()
+    monkeypatch.setenv("INKU_DB_BACKUP_SCHEDULER", "0")
+    asyncio.run(drive())
+    assert ran == []
+
+
+def test_db_backup_scheduler_loop_asks_the_due_check_each_tick(monkeypatch):
+    calls: list[int] = []
+
+    def fake_due_check() -> None:
+        calls.append(len(calls))
+        return None
+
+    monkeypatch.setattr(api_module._db, "ensure_scheduled_db_backup", fake_due_check)
+
+    async def stop_on_second_tick(_seconds: float) -> None:
+        if len(calls) >= 2:
+            raise asyncio.CancelledError
+    monkeypatch.setattr(api_module.asyncio, "sleep", stop_on_second_tick)
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(api_module._db_backup_scheduler_loop())
+    assert calls == [0, 1]
+
+
+def test_db_backup_scheduler_loop_survives_a_failing_backup(monkeypatch, caplog):
+    calls: list[int] = []
+
+    def boom() -> None:
+        calls.append(len(calls))
+        raise OSError("disk went away")
+
+    monkeypatch.setattr(api_module._db, "ensure_scheduled_db_backup", boom)
+
+    async def stop_on_second_tick(_seconds: float) -> None:
+        if len(calls) >= 2:
+            raise asyncio.CancelledError
+    monkeypatch.setattr(api_module.asyncio, "sleep", stop_on_second_tick)
+
+    with caplog.at_level(logging.ERROR), pytest.raises(asyncio.CancelledError):
+        asyncio.run(api_module._db_backup_scheduler_loop())
+    assert calls == [0, 1]
+    assert "scheduled DB backup failed" in caplog.text
+
+
+def test_db_backup_schedule_time_round_trips_and_moves_the_due_moment(tmp_path, monkeypatch):
+    """The stored hour and minute must be the ones that decide when a copy is due.
+
+    Both values are deliberately away from the 3:00 default, so a regression that
+    drops the write and falls back to the default fails instead of passing.
+    """
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"db-schedule-{suffix}")
+    admin = db.add_user(
+        username=f"db-schedule-admin-{suffix}",
+        email=f"db-schedule-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    admin_headers, admin_token = _auth_headers(admin)
+    try:
+        saved = client.put(
+            "/api/settings/db-backup",
+            headers=admin_headers,
+            json={"interval_days": 3, "max_generations": 2, "backup_hour": 22, "backup_minute": 45},
+        )
+        assert saved.status_code == 200
+        assert saved.json()["backup_hour"] == 22
+        assert saved.json()["backup_minute"] == 45
+
+        last = datetime(2026, 7, 20, 9, 15)
+        db.update_db_backup_settings(3, 2, 22, 45)
+        settings = db.get_db_backup_settings()
+        settings["last_auto_backup_at"] = int(last.timestamp() * 1000)
+
+        due = db.next_scheduled_db_backup_at(settings)
+        assert datetime.fromtimestamp(due / 1000) == datetime(2026, 7, 23, 22, 45)
+
+        # The same interval with a different time of day must land elsewhere.
+        settings["backup_hour"] = 4
+        settings["backup_minute"] = 5
+        assert datetime.fromtimestamp(db.next_scheduled_db_backup_at(settings) / 1000) == datetime(2026, 7, 23, 4, 5)
+
+        for bad in ({"backup_hour": 24}, {"backup_minute": 60}, {"backup_hour": -1}):
+            body = {"interval_days": 3, "max_generations": 2, **bad}
+            assert client.put("/api/settings/db-backup", headers=admin_headers, json=body).status_code == 422
+    finally:
+        db.delete_session(admin_token)
+        db.delete_user(admin["id"])
+        db.delete_user_group(group["id"])
+
+
+def test_scheduled_db_backup_waits_for_the_configured_time(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    db.update_db_backup_settings(1, 4, 22, 45)
+    settings = db.get_db_backup_settings()
+    settings["last_auto_backup_at"] = int(datetime(2026, 7, 20, 22, 45).timestamp() * 1000)
+    db._write_app_setting(db._DB_BACKUP_SETTINGS_KEY, settings)
+    auto_dir = tmp_path / "db-backups" / "auto"
+
+    # One minute before the configured time on the due day: nothing is written.
+    monkeypatch.setattr(db, "_now_ms", lambda: int(datetime(2026, 7, 21, 22, 44).timestamp() * 1000))
+    assert db.ensure_scheduled_db_backup() is None
+    assert not auto_dir.exists() or list(auto_dir.glob("*.db")) == []
+
+    # One minute after it, the copy is taken.
+    monkeypatch.setattr(db, "_now_ms", lambda: int(datetime(2026, 7, 21, 22, 46).timestamp() * 1000))
+    assert db.ensure_scheduled_db_backup() is not None
+    assert len(list(auto_dir.glob("inku-auto-*.db"))) == 1
+
+
+def test_db_backup_listing_numbers_generations_newest_first(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    auto_dir = tmp_path / "db-backups" / "auto"
+    manual_dir = tmp_path / "db-backups" / "manual"
+    auto_dir.mkdir(parents=True)
+    manual_dir.mkdir(parents=True)
+    written = {}
+    for name, mtime, payload in (
+        ("inku-auto-20260720-030000.db", 1_000, b"a"),
+        ("inku-auto-20260721-030000.db", 2_000, b"bb"),
+        ("inku-auto-20260722-030000.db", 3_000, b"ccc"),
+    ):
+        path = auto_dir / name
+        path.write_bytes(payload)
+        os.utime(path, (mtime, mtime))
+        written[name] = len(payload)
+    manual = manual_dir / "inku-manual-20260719-120000.db"
+    manual.write_bytes(b"dddd")
+    os.utime(manual, (2_500, 2_500))
+
+    listing = db.list_db_backups()
+    assert listing["total_count"] == 4
+    assert listing["total_size_bytes"] == sum(written.values()) + 4
+
+    names = [entry["name"] for entry in listing["entries"]]
+    assert names[0] == "inku-auto-20260722-030000.db"
+    # The manual copy sits between the automatic ones by time, but it is outside
+    # the numbering, and it must not shift the generations either.
+    assert [entry["generation"] for entry in listing["entries"]] == [1, None, 2, 3]
+    assert [entry["kind"] for entry in listing["entries"]] == ["auto", "manual", "auto", "auto"]
 
 
 def test_user_management_crud():

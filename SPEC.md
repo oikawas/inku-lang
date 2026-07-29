@@ -399,6 +399,10 @@ therefore part of the specification, not a matter of readability. The rule for r
 when that order changes lives under "When the version goes up" in the
 [render engine version history](docs/spec/render-engine-history.md).
 
+**`thinness` moved to the tail in `ddl_engine_version` 3 (v2.9.5)**, where carry measures 89%.
+**It must not be moved back beside `weight`**: as a word it belongs next to thickness, but
+**the position is the more binding specification**.
+
 ### 5.2 What inku Adds to LeWitt
 
 LeWitt's instruction sheet was itself the concrete, executable instruction.

@@ -29,6 +29,11 @@ Reordering looks like tidying for readability, and **this is the one reason a fr
 catch** — the corpus fixes the Score and watches the performance, so a change in which Scores are
 produced moves nothing in it.
 
+**The first application of this reason was `ddl_engine_version` 2 → 3 (v2.9.5, 2026-07-29)** —
+`Instruction.thinness` moved from position 14 to the end, and carry went from 18% to 89%.
+**The corpus frozen as `ddl-engine-3/` is byte-identical to `ddl-engine-2/` in all 29 cases, and
+`changed_from_previous` is empty.** **That emptiness is what this reason looks like.**
+
 **The block cannot be restored, but the prints can be kept.** Freezing is the proof print that makes
 that possible: the **actual output** from a fixed set of inputs (the SVG, its element counts,
 classes, and a coordinate digest) is stored, and CI fails if regenerating an existing case is not
@@ -100,11 +105,11 @@ but never asserts "the output will change"**.
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
 | `render_engine_version` | the drawing engine | `16` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `2` | the same input and seed produce different output |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `3` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `2` | grammar is added, changed, or retired |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.3 | per release |
-| `web/BUILD_NUMBER` | build serial | 754 | **moves for UI-only changes too** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.5 | per release |
+| `web/BUILD_NUMBER` | build serial | 763 | **moves for UI-only changes too** |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.

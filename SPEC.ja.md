@@ -322,6 +322,9 @@ Seasons.桜
 順序を変えたときに版を上げる規則は
 [render engine の版史](docs/spec/render-engine-history.ja.md) の「版を上げる条件」が持つ。
 
+**`thinness` は `ddl_engine_version` 3（v2.9.5）で末尾へ移した。** 実測の搬送は 89%。
+**`weight` の隣へ戻してはならない** — 語としては太さの隣だが、**位置のほうが仕様である**。
+
 ### 5.2 LeWittとの違い
 
 LeWittの指示書は、実行可能な具体的指示そのものだった。inku でそれに相当するのは

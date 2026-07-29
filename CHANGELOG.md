@@ -778,3 +778,21 @@ The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/
 - **The two pieces of information the rewrite dropped** — the per-stage model examples and the sentence explaining the gallery's seeds — **were not restored, by the author's ruling, and the English was trimmed to match**
 
 **Verification:** `check_docs.py` green. **No running code changed.**
+
+---
+
+### v2.9.5 — thinness is only written once it stands last (DDL engine 3) (Build 763, 2026-07-29)
+
+**`Instruction.thinness` moves from just after `weight` (position 14) to the end of the declaration (position 23).** The thinness axis added in engine 16 had barely been reaching the picture, because of where it was declared.
+
+- **Carry goes from 18% to 89%** (25 distinct inputs, `nvidia:google/gemma-4-31b-it`; 25 of 28 instructions across the 19 inputs that contain a thinness word). **Not one character of the field changed. Only its position moved.**
+- **`sort_keys=True` is gone from `_stage2_prompt_digest`** ([I-038]). **The fingerprint was blind to order, so a change that moves the picture had never once been recorded in `history.stage2_prompt_digest`.** Japanese `32e65db9dcb68e99` → `e11b7daa7c65a5fe`, English `31d357f591d4cf9b` → `e1eacdb0176f7f98`. **Stored values are left alone** — a past value points at a past schema order, and that is simply true.
+- **Four discriminating tests were added** (`test_thinness_declaration_position.py`). **No other gate catches this property**: the frozen corpora start from a Score and never pass through Stage 2, so reordering the declaration turns nothing red. Measured: **stage 1 alone left all 1596 tests green.**
+- **`DDL_ENGINE_VERSION` 2 → 3.** `DDL_VERSION` stays at `2` (no word was added), and **render engine stays at `16`** (no performance moved by a byte).
+- **The reference corpus `ddl-engine-3/` was frozen. All 29 cases are byte-identical to `ddl-engine-2/`, and `changed_from_previous` is empty.** **That emptiness is the description of the version**: the corpus fixes the Score and watches the transform, so a change in *which Scores arrive* moves nothing in it.
+- **`gen_ddl_reference.py` had recorded every case as changed whenever a new version directory was cut.** That was invisible for engine 2, where every dump really did change; here it would have made the manifest claim the opposite of what the version means. **The previous manifest now decides** — which `gen_render_reference.py` already did, and which step 4 of `server/reference/README.md` already required.
+- **Five tests pinned `ddl_engine_version == "2"` and went red; they were re-pinned** (four in `test_api.py`, one in `test_ddl_reference.py`).
+
+**Verification:** server 1600 passed / 31 skipped (+4 new tests), cli 76 passed, ruff clean, `npm run check` 0 errors / 2 warnings / 218 files, `npm run lint:i18n` 877 / 44 / 0 / 0, `npm run lint:models` 56, `check_frozen_corpora.py` byte-identical, `check_docs.py` green. Both perturbations (revert stage 1, revert stage 2) were re-applied on the accepting side and measured to turn P-1+P-3 and P-3 red respectively.
+
+**The build number skipped.** 762 had already been taken by `feat/ollama-cloud-provider`, so 763 was taken.

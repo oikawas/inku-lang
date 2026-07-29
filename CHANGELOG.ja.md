@@ -976,3 +976,21 @@ info モーダルのバージョン・ビルド日時を先頭へ（**日時は 
 - **消えた 2 情報（Stage ごとのモデルの具体例・ギャラリーの seed の説明）は作者裁定で戻さず、英語側も同じく削除して揃えた**
 
 **検証:** `check_docs.py` 緑。**動くコードは 0 行。**
+
+---
+
+### v2.9.5 — 太さは末尾に立って初めて書かれる（DDL engine 3）（Build 763、2026-07-29）
+
+**`Instruction.thinness` の宣言を `weight` の直後（14 番目）から末尾（23 番目）へ移した。** engine 16 で入れた太さの軸は、宣言位置のせいでほとんど絵に出ていなかった。
+
+- **搬送は 18% → 89%**（異なり入力 25 件・`nvidia:google/gemma-4-31b-it`。太さ語を含む 19 件で 25/28 instruction）。**フィールドの中身は 1 文字も変えていない。移したのは位置だけである**
+- **`_stage2_prompt_digest` の `sort_keys=True` を外した**（[I-038]）。**指紋が並び順に対して盲目だったので、絵を動かす変更が `history.stage2_prompt_digest` に 1 度も残っていなかった**。日 `32e65db9dcb68e99` → `e11b7daa7c65a5fe`、英 `31d357f591d4cf9b` → `e1eacdb0176f7f98`。**保存済みの値は書き換えない** — 過去の値は過去のスキーマ順を指す値としてそのまま残る
+- **判別テストを 4 件足した**（`test_thinness_declaration_position.py`）。**この性質を捕まえるゲートは他に無い** — 凍結コーパスは Score から始まるので Stage 2 を通らず、宣言順を変えても既存の検査は 1 つも赤くならない。実測でも**段 1 だけなら 1596 件が緑のままだった**
+- **`DDL_ENGINE_VERSION` 2 → 3。** `DDL_VERSION` は `2` 据え置き（語彙は増えていない）、**render engine も `16` 据え置き**（演奏は 1 バイトも動かない）
+- **参照コーパス `ddl-engine-3/` を焼いた。29 ケースは `ddl-engine-2/` とバイト一致で、`changed_from_previous` は空である。** **その空白がこの版の説明である** — コーパスは Score を固定して変換を見る検査なので、**書かれる Score そのものが変わる変化を 1 件も動かさない**
+- **`gen_ddl_reference.py` は新しい版を切るたびに全ケースを「動いた」と記録していた。** engine 2 では全 dump が実際に変わったので見えなかったが、この版では manifest が版の意味と逆のことを主張するところだった。**前の版の manifest と突き合わせて決めるようにした**（`gen_render_reference.py` と `server/reference/README.md` の手順 4 が既に定めていたもの）
+- **`ddl_engine_version == "2"` を固定していたテストが 5 件赤くなり、採り直した**（`test_api.py` 4 箇所・`test_ddl_reference.py` 1 箇所）
+
+**検証:** server 1600 passed / 31 skipped（+4 = 新規テスト）、cli 76 passed、ruff clean、`npm run check` 0 errors / 2 warnings / 218 files、`npm run lint:i18n` 877 / 44 / 0 / 0、`npm run lint:models` 56、`check_frozen_corpora.py` バイト一致、`check_docs.py` 緑。摂動 2 件（段 1 を戻す・段 2 を戻す）を受け入れ側でも当て直し、それぞれ P-1+P-3・P-3 が赤くなることを実測した。
+
+**Build 番号が飛んだ。** 762 は `feat/ollama-cloud-provider` が先に採っていたため 763 を採った。

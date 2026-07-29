@@ -1110,3 +1110,13 @@ server **1668 passed / 31 skipped**（+33）、cli 76 passed、ruff clean、`npm
 摂動は実装セッションが当てた — `requires_subscription` の検査 5/5、配線と `version` の検査 6/6、UI モードの永続化 1 件。**受け入れ側は再測定していない**（作者裁定「二重のテストは不要」）が、**マージした木で初めて回る検査はすべて自分で回した**。
 
 **版数は patch。** DB の列 2 本は既定値つきの migration を伴う追加のみで、保存データ・API・エディション ID のどの形式も動いていない。render engine は **16**、`ddl_version` / `ddl_engine_version` は **2 / 3** のまま。
+
+### 2026-07-30 — クライアントアプリの実装は、開発サーバーへ送らない（**採番なし**・運用と build context のみ）
+
+開発サーバーに `android/` が 174M、`macos_swift/` が 587M 残っていた。どちらも 5〜6 月に一度 rsync され、そのまま古くなっていた。消したものは `1.48.0-android.1` を宣言しており、Mac は `2.1.3-android.1` である。
+
+- **その機械は、そもそも両方をビルドできない。** JDK も gradle も Android SDK も Swift toolchain も入っていない。ビルドとテストは Mac で行う。systemd ユニットも drop-in も `compose.yaml` も `deploy/` も、どちらのディレクトリも参照していなかった。
+- **中身の大半はビルド生成物だった。** `android/` の 174M のうち 168M が `app/build/` の中間物と古い `app-debug.apk`、`macos_swift/` の 587M のうち 577M が macOS 用の索引ストア。ソースは Mac と突き合わせ、**固有のファイルは 1 つも無かった**（`macos_swift/` の 12 ファイルは全ハッシュ一致）。
+- **ベンチコンテナの src に 3 つ目の複製（1.9M）があった。** 3 つとも削除した。
+- **恒久の除外を書いた。** `.dockerignore` に `android` と `macos_swift` を足し、運用文書 3 箇所へ常設ルールとして置いた。ただし `server/Dockerfile` と `web/Dockerfile` は `shared/` `server/` `web/` を名指しで `COPY` するので、**イメージの中身は前も後も変わらない**。効くのは docker daemon へ送る context の大きさだけである。
+- **`macos_swift/` は git 管理外（`.git/info/exclude`）である。** 正本は Mac の作業ツリーだけで、**開発サーバーの複製はバックアップではなかった**。

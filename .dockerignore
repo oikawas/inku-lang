@@ -4,6 +4,8 @@ no-git-sync
 AGENTS.md
 CLAUDE.md
 Review.md
+android
+macos_swift
 **/.DS_Store
 **/.env
 **/.venv

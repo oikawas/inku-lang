@@ -915,3 +915,13 @@ server **1668 passed / 31 skipped** (+33), cli 76 passed, ruff clean, `npm run c
 The perturbations were applied by the implementing sessions — 5/5 on the `requires_subscription` checks, 6/6 on the wiring and `version` checks, and one on UI mode persistence. **The accepting session did not measure them again** (the author ruled a second pass unnecessary) **but ran every check that meets the merged tree for the first time.**
 
 **The version is a patch.** The two new columns are additions with defaulted migrations; no stored-data, API or edition-ID shape moved. The render engine stays at **16** and `ddl_version` / `ddl_engine_version` at **2 / 3**.
+
+### 2026-07-30 — The client app implementations are not sent to the development server (**no version**; operations and build context only)
+
+The development server still held `android/` at 174M and `macos_swift/` at 587M. Both had been rsynced once in May or June and had gone stale there. What was removed declared `1.48.0-android.1`; the Mac is at `2.1.3-android.1`.
+
+- **That machine cannot build either of them.** It has no JDK, no gradle, no Android SDK and no Swift toolchain; both are built and tested on the Mac. Neither directory was referenced by the systemd units, their drop-ins, `compose.yaml` or `deploy/`.
+- **Most of the bulk was build output.** Of the 174M in `android/`, 168M was `app/build/` intermediates plus a stale `app-debug.apk`; of the 587M in `macos_swift/`, 577M was a macOS index store. The sources were compared against the Mac and **not one file existed only on the server** (the 12 files under `macos_swift/` were hash-identical).
+- **A third copy (1.9M) sat in the bench container source tree.** All three were removed.
+- **The exclusion was written down permanently.** `android` and `macos_swift` were added to `.dockerignore`, and the standing rule was placed in three operational documents. `server/Dockerfile` and `web/Dockerfile` `COPY` `shared/`, `server/` and `web/` by name, so **the image contents are unchanged**; what shrinks is only the context sent to the Docker daemon.
+- **`macos_swift/` is not in Git at all** (`.git/info/exclude`). Its only copy is the Mac working tree, so **the server copy was never a backup**.

@@ -143,16 +143,6 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
 def _canonical_output(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
 
-def _corpus_score(score: Score) -> dict[str, Any]:
-    """Keep machine-only diagnostics outside the DDL engine identity."""
-    data = score.model_dump(by_alias=True, mode="json")
-    for instruction in data["instructions"]:
-        note = instruction.pop("note", None)
-        if note:
-            color_hint = instruction.get("color_hint")
-            instruction["color_hint"] = f"{note}; {color_hint}" if color_hint else note
-    return data
-
 def _digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
 
@@ -177,7 +167,7 @@ def _render_cases() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
         score = coerce_score(Score.model_validate(input_data["score"]), ddl=input_data["ddl"],
                              branch_report=report, tenkei=input_data["tenkei"],
                              plugin_instructions_present=input_data["plugin_instructions_present"])
-        text = _canonical_output({"score": _corpus_score(score), "branch_report": report})
+        text = _canonical_output({"score": score.model_dump(by_alias=True, mode="json"), "branch_report": report})
         path = f"b_coerce/{case_id}.json"
         outputs[path] = text
         manifest_cases[case_id] = {

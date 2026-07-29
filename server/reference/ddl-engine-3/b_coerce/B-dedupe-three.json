@@ -57,6 +57,7 @@
           0.5
         ],
         "mode": "additive",
+        "note": null,
         "position": null,
         "primitive": "line",
         "radius": null,

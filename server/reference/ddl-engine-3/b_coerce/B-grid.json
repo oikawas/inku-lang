@@ -73,6 +73,7 @@
           0.5
         ],
         "mode": "additive",
+        "note": null,
         "position": null,
         "primitive": "line",
         "radius": null,
@@ -101,10 +102,11 @@
           0.4
         ],
         "color": "black",
-        "color_hint": "composition anchor restored for shape/color diversity",
+        "color_hint": null,
         "filled": false,
         "from": null,
         "mode": "additive",
+        "note": "composition anchor restored for shape/color diversity",
         "position": null,
         "primitive": "ellipse",
         "radius": null,

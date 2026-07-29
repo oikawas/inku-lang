@@ -70,13 +70,14 @@
         "carve_depth": null,
         "center": null,
         "color": "black",
-        "color_hint": "blue/green restored in color_cycle from DDL color intent",
+        "color_hint": null,
         "filled": false,
         "from": [
           0.18,
           0.5
         ],
         "mode": "additive",
+        "note": "blue/green restored in color_cycle from DDL color intent",
         "position": null,
         "primitive": "line",
         "radius": null,
@@ -105,10 +106,11 @@
           0.4
         ],
         "color": "black",
-        "color_hint": "composition anchor restored for shape/color diversity",
+        "color_hint": null,
         "filled": false,
         "from": null,
         "mode": "additive",
+        "note": "composition anchor restored for shape/color diversity",
         "position": null,
         "primitive": "ellipse",
         "radius": null,

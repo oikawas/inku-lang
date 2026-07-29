@@ -64,13 +64,14 @@
         "carve_depth": null,
         "center": null,
         "color": "black",
-        "color_hint": "red restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
+        "color_hint": null,
         "filled": false,
         "from": [
           0.18,
           0.5
         ],
         "mode": "additive",
+        "note": "red restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
         "position": null,
         "primitive": "line",
         "radius": null,
@@ -107,10 +108,11 @@
           0.4
         ],
         "color": "black",
-        "color_hint": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
+        "color_hint": null,
         "filled": false,
         "from": null,
         "mode": "additive",
+        "note": "composition anchor restored for shape/color diversity; motion energy restored through trajectory and rotation",
         "position": null,
         "primitive": "ellipse",
         "radius": null,

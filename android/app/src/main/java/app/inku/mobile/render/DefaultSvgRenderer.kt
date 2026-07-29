@@ -1291,6 +1291,7 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"filled\":"); append(ins.optBoolean("filled", false))
             append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
             append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
+            append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
             // server pops the two defaults so a plain instruction keeps the shorter key.
             val mode = ins.optString("mode", "additive")
             if (mode != "additive") { append(",\"mode\":"); append(jsonString(mode)) }
@@ -1449,6 +1450,7 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"filled\":"); append(ins.optBoolean("filled", false))
             append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
             append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
+            append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
             append(",\"mode\":"); append(jsonString(ins.optString("mode", "additive")))
             append(",\"carve_depth\":"); append(stringOrNull(ins, "carve_depth"))
             append(",\"color\":"); append(jsonString(ins.optString("color", "black")))

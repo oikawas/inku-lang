@@ -796,3 +796,28 @@ The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/
 **Verification:** server 1600 passed / 31 skipped (+4 new tests), cli 76 passed, ruff clean, `npm run check` 0 errors / 2 warnings / 218 files, `npm run lint:i18n` 877 / 44 / 0 / 0, `npm run lint:models` 56, `check_frozen_corpora.py` byte-identical, `check_docs.py` green. Both perturbations (revert stage 1, revert stage 2) were re-applied on the accepting side and measured to turn P-1+P-3 and P-3 red respectively.
 
 **The build number skipped.** 762 had already been taken by `feat/ollama-cloud-provider`, so 763 was taken.
+
+---
+
+### v2.9.6 — you can now start without an API key (Build 765, 2026-07-29)
+
+**Choosing a local Ollama as the provider is enough to run inku without a single API key.** The measured recommendation is **Stage 1 `qwen3.5:4b-q4_K_M` plus Stage 2 `ministral-3:8b-instruct-2512-q4_K_M`** (9.4GB together, 71% coverage), replacing the previously approved `qwen3.5:4b` plus `gemma4:e4b` (13.0GB, 64%).
+
+- **`SETUP.ja.md` and `SETUP.md` gain "running without an API key (local Ollama)"** (between the web UI and the CLI), and `OLLAMA_BASE_URL` / `OLLAMA_CONTEXT_LENGTH` join the environment table. `deploy/compose.yaml` passes `OLLAMA_BASE_URL` to `api` and maps `host.docker.internal` to the gateway through `extra_hosts` — **"local" seen from inside a container is not the host**.
+- **The Ollama model list is replaced by the ten that were actually measured** (`MODEL_CONFIG_VERSION` 2.2.0 → 2.3.0). **The tags name the quantization**: a bare tag is a moving target upstream, and it would stop matching the measurement behind it.
+- **Stage 2 asks a local Ollama by schema rather than by tool** (`response_format`). **A tool definition rides in the prompt, and the Score schema was large enough that Ollama was discarding 75% of it.**
+- **Thinking is turned off** (`reasoning_effort="none"`). **Ollama starts thinking by itself when nothing says otherwise, and that thinking shares the answer's budget**, so whatever ran past the budget came back as nothing at all. With it off the same work ran 8× faster and coverage did not move.
+- **Speed left the release display and is shown in developer mode only** (`speed_developer_only`, the implemented form of the 2026-07-27 ruling). **Numbers measured on one machine with no GPU are not a promise to anyone else's.**
+- **Re-importing a stored catalog widened from nvidia to every builtin provider.** A stored list belongs to the installation and decides which models exist; what it must not do is outlive a catalog whose measurements changed, so on a version bump the builtin metadata is laid back over the matching ids.
+- **One sentence was added to both READMEs**, right after "at least one LLM provider is needed", pointing at the key-free path in SETUP. **That line still read as though a key were mandatory.**
+
+**Fixed at acceptance, absent from the implementation report.** The branch was cut at Build 730, before `e653f52` (Build 731) made every id in `PROVIDER_GROUPS` bare, so **three disagreements existed that neither branch could turn red on its own**.
+
+- **The ten new entries in `web/src/lib/models.ts` were written qualified**; they are merged bare, matching the server's `VERIFIED_OLLAMA_LOCAL_MODELS`.
+- **`test_web_fallback_list_matches_the_catalog` read the ids with `ollama:` baked into its pattern.** Loosening it meant starting the scan at the group's `models: [`, since the looser pattern would otherwise have read the group's own `id: 'ollama'` as a model.
+- **`web/scripts/model-ref-expectations.json` described the Ollama catalog that was replaced.** `gpt-oss:20b` is now owned by ollama-cloud alone and is decided by rule 2; `qwen3.5:4b-q4_K_M` is now owned by ollama and likewise; `llama3.2` is gone from every catalog and so carries the opposite lesson — **a retired id stops being decided by rule 2**. The case both of them used to make, that a colon-bearing id no catalog holds falls through to the stage default, is carried by a new entry.
+- **Replacing the Ollama list removed the last model two providers both listed.** `test_sole_ownership_decides_and_ambiguity_does_not` depends on exactly that, and **failed by name: "the ambiguity this rule exists for is gone"**. The second owner is now injected from the expectation table, by the Python reader and the node reader alike, before either builds its groups; the three assertions are unchanged.
+
+**Verification:** server 1628 passed / 31 skipped, cli 76 passed, ruff clean, `npm run check` 0 errors / 2 warnings / 218 files, **`npm run lint:models` 58** (+2 for the added case), `npm run lint:i18n` 877 / 44 / 0 / 0, `check_frozen_corpora.py` byte-identical, `check_docs.py` green. **Four perturbations, one per mechanism**: dropping `reasoning_effort` reddens the Stage 1 thinking test; narrowing the re-import back to nvidia reddens the two version-bump tests; turning off `speed_developer_only` reddens the release-display test; killing the `response_format` branch reddens the schema test and the Stage 2 thinking test.
+
+**The version is a patch.** The report argued for a minor, but **the rule reserves minor for a milestone the author declares or a break in compatibility**, and the shapes of the stored settings, the API and the edition ID all stayed where they were.

@@ -994,3 +994,28 @@ info モーダルのバージョン・ビルド日時を先頭へ（**日時は 
 **検証:** server 1600 passed / 31 skipped（+4 = 新規テスト）、cli 76 passed、ruff clean、`npm run check` 0 errors / 2 warnings / 218 files、`npm run lint:i18n` 877 / 44 / 0 / 0、`npm run lint:models` 56、`check_frozen_corpora.py` バイト一致、`check_docs.py` 緑。摂動 2 件（段 1 を戻す・段 2 を戻す）を受け入れ側でも当て直し、それぞれ P-1+P-3・P-3 が赤くなることを実測した。
 
 **Build 番号が飛んだ。** 762 は `feat/ollama-cloud-provider` が先に採っていたため 763 を採った。
+
+---
+
+### v2.9.6 — API キーを持たずに始められるようになった（Build 765、2026-07-29）
+
+**手元の Ollama を provider に選ぶだけで、API キーを 1 つも用意せずに inku を動かせる。** 実測に基づく推奨は **Stage 1 `qwen3.5:4b-q4_K_M` + Stage 2 `ministral-3:8b-instruct-2512-q4_K_M`**（合計 9.4GB・被覆 71%）で、旧・承認済みの `qwen3.5:4b` + `gemma4:e4b`（13.0GB・64%）から乗り換えた。
+
+- **`SETUP.ja.md` / `SETUP.md` に「API キーなしで動かす（ローカル Ollama）」を新設した**（Web UI と CLI の間）。環境変数表へ `OLLAMA_BASE_URL` / `OLLAMA_CONTEXT_LENGTH` を追加。`deploy/compose.yaml` は `api` へ `OLLAMA_BASE_URL` を渡し、`extra_hosts` で `host.docker.internal` を gateway へ写す（**コンテナから見た「手元」はホストではないため**）
+- **Ollama のモデル一覧を、実際に計測した 10 本へ差し替えた**（`MODEL_CONFIG_VERSION` 2.2.0 → 2.3.0）。**タグに量子化まで書く** — 素タグは上流で中身が差し替わるので、計測と結びつかなくなる
+- **Stage 2 はローカル Ollama へ tool ではなくスキーマで訊く**（`response_format`）。**tool 定義はプロンプトに乗り、Score スキーマが大きすぎて Ollama がプロンプトの 75% を捨てていた**
+- **思考を止める**（`reasoning_effort="none"`）。**Ollama は指定が無いと自分で思考を始め、その思考は答えと同じ予算を食う**ので、予算を超えた分だけ何も返らなくなっていた。止めると同じ作業が 8 倍速く、被覆は変わらない
+- **速度はリリース表示から外し、デベロッパーモード限定にした**（2026-07-27 裁定の実装形。`speed_developer_only`）。**GPU の無い 1 台で測った数字は、他人の環境への約束にならない**
+- **保存済みカタログの再取り込みを nvidia 限定から全 builtin provider へ広げた** — 保存された一覧は設置環境自身のもので、どのモデルが在るかはそちらが決める。ただし**計測が変わったカタログより長生きしてはならない**ので、版が上がったときは builtin のメタデータを同じ id へ貼り直す
+- **README 日英に 1 文足した** — 「少なくとも 1 つの LLM provider が要る」の直後に、API キー無しの道が SETUP にあることを書いた。**この行は API キーが必須だと読める書き方のままだった**
+
+**受け入れで直したもの（実装セッションの報告に無い）。** 分岐点が Build 730 で、その後 main の `e653f52`（Build 731）が `PROVIDER_GROUPS` の id を修飾なしへ揃えていたため、**片方のブランチだけでは 1 つも赤くならない食い違いが 3 つ出た**。
+
+- **`web/src/lib/models.ts` の追加 10 本が `ollama:` 付きで書かれていた**ので、修飾なしへ直した（サーバの `VERIFIED_OLLAMA_LOCAL_MODELS` と同じ表記）
+- **`test_web_fallback_list_matches_the_catalog` は `ollama:` を前提にした正規表現で id を読んでいた**。緩めると群自身の `id: 'ollama'` まで拾うので、走査の開始をその群の `models: [` へ移した
+- **`web/scripts/model-ref-expectations.json` が差し替え前の Ollama カタログを記述していた**。`gpt-oss:20b` は ollama-cloud の単独所有になり規則 2 で決まる／`qwen3.5:4b-q4_K_M` は ollama の単独所有になり同じく規則 2 で決まる／`llama3.2` はどのカタログからも消えたので、**退役した id は規則 2 で決まらなくなる**という逆の教訓を担う。両者が担っていた「どのカタログにも無い、コロンを含む id は段の既定へ落ちる」は新しい 1 件で持ち直した
+- **Ollama 一覧の差し替えで、2 つの provider が共に載せるモデルが出荷カタログから消えた**。`test_sole_ownership_decides_and_ambiguity_does_not` はその材料に依存しており、**テスト自身が「the ambiguity this rule exists for is gone」と名指しで失敗した**。第 2 の所有者は期待値表で明示的に注入し、Python と node の両方が組み立て前に足すようにした（3 つの assertion は不変）
+
+**検証:** server 1628 passed / 31 skipped、cli 76 passed、ruff clean、`npm run check` 0 errors / 2 warnings / 218 files、**`npm run lint:models` 58**（+2 = 足した case）、`npm run lint:i18n` 877 / 44 / 0 / 0、`check_frozen_corpora.py` バイト一致、`check_docs.py` 緑。**摂動 4 件を機構ごとに当て直した** — `reasoning_effort` を外すと Stage 1 の思考テスト／再取り込みを nvidia 限定へ戻すと版上げ 2 件／`speed_developer_only` を切るとリリース表示 1 件／`response_format` の分岐を殺すとスキーマ 1 件と Stage 2 の思考 1 件が、それぞれ赤になる。
+
+**版数は patch。** レポートは minor を推していたが、**規則の minor は「作者が節目と明示」か「互換が切れるとき」に限られ**、保存データ・API・エディション ID の形式はどれも動いていない。

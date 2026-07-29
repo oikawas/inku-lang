@@ -764,3 +764,17 @@ The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/
 - **Actually moving `thinness` to the tail is a separate contract** (`thinness-declaration-position.md`, phase 1; **not started**). This entry is documentation only, and **no running code changed**
 
 **Verification:** `check_docs.py` green (the same two declared differences; 56 internal references).
+
+---
+
+### 2026-07-29 — the README opening was rewritten, and the English followed (**no version**; documentation only)
+
+**The author rewrote the three opening paragraphs of `README.ja.md` and part of the "how it works" section** — the beginning in a museum, what to do with that first sentence, that DDL implements neither meaning nor feeling, and that once the specification moves on, the old picture does not come back. This entry records the catch-up and the corrections.
+
+- **The English README was re-translated from the updated Japanese** (nothing was written into English as English). **Four paragraphs** had diverged
+- **The English README called sway `variation`.** The dictionary reserves **`sway` for 揺らぎ** and **`variation` for the variation alone** (the Stage 1.5 shake). **Five occurrences became `sway`; the four that really mean variation stayed** — each was decided against its Japanese counterpart (ゆらぎ / 揺らぎ against バリエーション / 変奏)
+- **`npm run lint:i18n` reads only the web's display strings, so a README violation survives any number of cycles.** This is the same class as the 49 found in SPEC on 2026-07-28, and again it took a person reading the dictionary to find it
+- On the Japanese side: the typo `Rendrer` → `Renderer`, two sentences joined by a comma, six places missing the space around Latin words, the numeral `3つ` → `三つ` (the existing README counts in kanji), and the redundant `LLMモデル` → `LLM`
+- **The two pieces of information the rewrite dropped** — the per-stage model examples and the sentence explaining the gallery's seeds — **were not restored, by the author's ruling, and the English was trimmed to match**
+
+**Verification:** `check_docs.py` green. **No running code changed.**

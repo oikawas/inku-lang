@@ -10,15 +10,15 @@
 </tr>
 </table>
 
-`inku` is the reference application for DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No experience with drawing and no tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the start — and from there you build the image up.
+`inku` is the reference application for DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic. No experience with drawing and no tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the beginning — and from there you build the work up.
 
 ```
 A blue line slowly loosens across the night water.
 ```
 
-That sentence is interpreted, becomes a score, and is performed by the renderer into a picture. Draw again from the same sentence and variation brings back a slightly different picture. Works are kept as lineage and saved generation by generation. You build variations on your own work, refine it, choose from the candidates lined up before you, and a new generation is born — **the back-and-forth of writing and choosing** is how creation works in inku.
+That sentence is interpreted, becomes a score, and is performed into the form of a vector graphic until a picture appears. Draw again from the same sentence and the sway brings back a slightly different picture. Works are kept as lineage and saved generation by generation. You build variations on that first work, refine it, choose, and a new generation is born — **the back-and-forth of writing and choosing** is how creation works in inku. You may hold on to that first sentence and carry it all the way to a finished work, or forget it along the way. DDL implements no meaning and no feeling; what you make it carry is yours to decide.
 
-inku was born at the crossing of ideas learned from three cultural traditions, and it is an application that thinks about how generative-AI technology should be applied there. Generative AI is used, but this is not a prompt lottery.
+inku began in a museum, standing in front of a Sol LeWitt exhibition and wondering whether such a mechanism was something one could build oneself. It starts mainly from the three ideas below.
 
 | Culture / tradition | What it gives inku |
 |---|---|
@@ -159,18 +159,18 @@ Instructions (Normalized DDL — a human-readable executable specification)
      │  structuring — written down as a score (Stage 2, LLM)
      ▼
 JSON Score (the score — saved deterministically)
-     │  performance — drawn, with variation (Renderer, seed-driven)
+     │  performance — drawn, with sway (Renderer, seed-driven)
      ▼
 SVG (the performance — one-time; for a wall, a page, a screen)
 ```
 
-**The description is permanent; the performance is one-time.** The score remains fixed, while each picture is born with its own variation. Just as LeWitt's instructions became a slightly different wall drawing under each craftsman's hand, the same score becomes a slightly different performance each time. Variation is not a bug here — it is the specification of the language.
+**The description is permanent; the performance — the rendering — is one-time.** The score remains fixed, while each picture is born with its own sway (technically speaking, the score is kept as JSON). Just as LeWitt's instructions became a slightly different wall drawing under each craftsman's hand, the same score becomes a slightly different performance each time. Sway is not a bug here — it is the specification of the language.
 
 The words land in fields of the score. In the second work above, "shoal" landed in `count` and `cluster_count: 7`; "along an undulating path" landed in `path: wave`; "silver" landed in `color_cycle` and `surface.texture: wash`; and the "opposite bank" became the single vertical line at the right edge. **Neither the sniper nor the fisherman nor the war survives — only shape, material, and motion.**
 
-Interpretation and structuring are separated because they demand different abilities: interpretation is associative and creative; structuring is mechanical and rule-abiding. Each stage can be tuned independently, and API models, local LLMs, and NVIDIA NIM-style endpoints can be selected per stage. **The choice of model is itself a creative variable.**
+Interpretation and structuring are separated because they demand different abilities: interpretation is associative and creative; structuring is mechanical and rule-abiding. Each stage can be tuned independently, and the LLM used can be selected per stage. In practice the model makes a large difference to the work that comes out. **The choice of model is itself a creative variable.**
 
-Non-determinism lives in exactly two places: the renderer's performance (performance seed) and your explicit operations (another composition, another interpretation). The default path is always deterministic, and history's `render_seed` / `composition_seed` / `render_hash` (work edition ID) let any saved work be reproduced exactly. That is why each gallery work above carries its seed.
+Non-determinism lives in exactly two places: the renderer's performance (performance seed) and your explicit operations (another composition, another interpretation). The default path is always deterministic, and history's `render_seed` / `composition_seed` / `render_hash` (work edition ID) let any saved work be reproduced. The specification, though, keeps moving: what a newer inku draws is never quite what an older one drew. As the block is discarded, past Renderers live only in the git history.
 
 **The score itself, the vocabulary of each layer, and how surface and ground texture are handled are in [how it works](docs/guide/how-it-works.md).**
 
@@ -238,7 +238,7 @@ Only physical, observable words belong to the core. Emotional evaluation — "be
 ## Design principles
 
 1. Descriptions are human-readable, between natural language and code
-2. Variation is a feature, not a bug
+2. Sway is a feature, not a bug
 3. Emotional vocabulary is excluded; physical and motion vocabulary is embraced
 4. No fixed canvas — coordinates are ratios from 0.0 to 1.0, scalable to any medium
 5. Output is still — the viewer moves, not the image

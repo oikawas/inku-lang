@@ -13,6 +13,9 @@ import kotlin.math.sin
 import org.json.JSONArray
 import org.json.JSONObject
 
+internal const val FILL_DAB_SAMPLES = 5
+internal const val FILL_DAB_MIN_TRAVEL = 0.90
+
 class DefaultSvgRenderer : SvgRenderer {
     override fun render(request: RenderRequest): RenderResult {
         // Saved works carry retired tool names. Migrate before anything reads `weight`,
@@ -1554,19 +1557,20 @@ class DefaultSvgRenderer : SvgRenderer {
         return ""
     }
 
-    private fun renderFillStrokes(
+    internal fun renderFillStrokes(
         ins: JSONObject,
         attrs: SvgAttrs,
         contour: List<Pair<Double, Double>>,
         unit: Double,
         renderSeed: Long? = null,
-        wild: Boolean = false
+        wild: Boolean = false,
+        instructionSeed: Any? = null
     ): String? {
         if (contour.size < 3) return null
         val weight = ins.optString("weight", "pen")
         val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
         val gridStep = gridStepPx(weight, unit)
-        val seedStr = seedForInstruction(ins, renderSeed)
+        val seedStr = instructionSeed ?: seedForInstruction(ins, renderSeed)
         val angle = ServerRendererGeometry.fillScanAngle(seedStr)
         val spacing = ServerRendererGeometry.fillScanSpacing(ins, unit)
         val segments = ServerRendererGeometry.scanlineSegments(contour, angle, spacing, seedStr)
@@ -1624,20 +1628,76 @@ class DefaultSvgRenderer : SvgRenderer {
         return """<g class="fill-stroke-v1 strokes-${paths.size}">${paths.joinToString("")}</g>"""
     }
 
-    private fun interiorFill(
+    internal fun renderFillDab(
         ins: JSONObject,
         attrs: SvgAttrs,
         contour: List<Pair<Double, Double>>,
         unit: Double,
         renderSeed: Long? = null,
-        wild: Boolean = false
+        wild: Boolean = false,
+        instructionSeed: Any? = null
+    ): String? {
+        if (contour.size < 3) return null
+        val minX = contour.minOf { it.first }
+        val maxX = contour.maxOf { it.first }
+        val minY = contour.minOf { it.second }
+        val maxY = contour.maxOf { it.second }
+        val width = maxX - minX
+        val height = maxY - minY
+        if (width <= 0.0 || height <= 0.0) return null
+
+        val centerX = (minX + maxX) * 0.5
+        val centerY = (minY + maxY) * 0.5
+        val alongX = width >= height
+        val longAxis = max(width, height)
+        val shortAxis = min(width, height)
+        val travel = max(longAxis - shortAxis, longAxis * FILL_DAB_MIN_TRAVEL)
+        val centerline = (0 until FILL_DAB_SAMPLES).map { index ->
+            val t = index.toDouble() / (FILL_DAB_SAMPLES - 1).toDouble() - 0.5
+            if (alongX) {
+                (centerX + travel * t) to centerY
+            } else {
+                centerX to (centerY + travel * t)
+            }
+        }
+
+        val weight = ins.optString("weight", "pen")
+        val thinness = ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+        val baseWidth = max(ServerRendererStyle.strokeWidth(weight, unit, thinness), shortAxis)
+        val seed = instructionSeed ?: seedForInstruction(ins, renderSeed)
+        val stroke = ServerStrokeEngine.synthesizeAlong(
+            centerline = centerline,
+            baseWidth = baseWidth,
+            weight = weight,
+            seed = ServerRendererGeometry.fillStrokeSeed(seed, 0),
+            closed = false,
+            gridStep = gridStepPx(weight, unit),
+            wild = wild
+        )
+        val d = ServerStrokeEngine.contourStrokePath(stroke)
+        val opacity = attrs.fillOpacity ?: attrs.strokeOpacity
+        val filterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")
+        val filterAttr = if (weight in filterWeights) """ filter="url(#texture-$weight)"""" else ""
+        return """<g class="fill-dab-v1"><path d="$d" fill="${attrs.stroke}" fill-opacity="${fmt(opacity)}" stroke="none"$filterAttr/></g>"""
+    }
+
+    internal fun interiorFill(
+        ins: JSONObject,
+        attrs: SvgAttrs,
+        contour: List<Pair<Double, Double>>,
+        unit: Double,
+        renderSeed: Long? = null,
+        wild: Boolean = false,
+        instructionSeed: Any? = null
     ): Pair<String?, Boolean> {
         val regionFill = if (ins.has("surface") && !ins.isNull("surface")) false else ins.optBoolean("filled", false)
         if (!regionFill) return null to false
         val weight = ins.optString("weight", "pen")
         if (!usesHandStroke(weight)) return null to true
-        val fillGroup = renderFillStrokes(ins, attrs, contour, unit, renderSeed, wild)
-        return if (fillGroup == null) null to true else fillGroup to false
+        val fillGroup = renderFillStrokes(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
+        if (fillGroup != null) return fillGroup to false
+        val dabGroup = renderFillDab(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
+        return if (dabGroup == null) null to true else dabGroup to false
     }
 
     private fun renderArcHandStroke(

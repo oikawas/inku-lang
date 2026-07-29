@@ -99,8 +99,8 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `3` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `2` | 文法の追加・変更・廃止 |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
-| `APP_VERSION` / `server/pyproject.toml` | 製品リリース | v2.9.6 | リリースごと |
-| `web/BUILD_NUMBER` | ビルド通し番号 | 765 | **UI の変更でも動く** |
+| `APP_VERSION` / `server/pyproject.toml` | 製品リリース | v2.9.7 | リリースごと |
+| `web/BUILD_NUMBER` | ビルド通し番号 | 766 | **UI の変更でも動く** |
 
 **「現在」の列は書いた時点の値である。** 版を上げたら、この列も同じ commit で直す。
 

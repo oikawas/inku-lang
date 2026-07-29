@@ -2745,12 +2745,33 @@ but plugin setting changes and plugin-storage update APIs are restricted to
 
 The DB settings tab also shows the current DB file size when the backend is a
 SQLite file database.  Admin users can configure DB replica backups with an
-interval in days and a maximum number of automatic generations.  The defaults
-are seven days and four generations.  Scheduled backups are created when the
-settings status endpoint is loaded after the interval has elapsed.  Manual
-backups can be created immediately and are stored separately from the automatic
-generation limit.  File-replica backups are reported as unavailable for
-non-SQLite DB backends.
+interval in days, a time of day, and a maximum number of automatic generations.
+The defaults are seven days, 03:00, and four generations.  Manual backups can be
+created immediately and are stored separately from the automatic generation
+limit.  File-replica backups are reported as unavailable for non-SQLite DB
+backends.
+
+**The interval decides which day and the time of day decides when on that day.**
+The next due moment is derived from the last backup taken, not from the moment
+the scheduler happens to wake, so a backup taken late at night does not drag its
+successors along behind it.
+
+Scheduled backups are taken by a resident scheduler owned by the application
+lifespan, which asks once a minute whether a backup is due.  `INKU_DB_BACKUP_SCHEDULER=0`
+removes it.  **The one-minute tick is deliberately coarse**: because the due
+moment comes from the last backup rather than from the loop's own period, a late
+wake-up delays a copy instead of skipping one.  **Reading the settings status
+endpoint does not create a backup.**  Until v2.9.7 that endpoint was the only
+trigger, which meant an interval of N days was really "whenever an admin next
+opened the panel after N days had passed", and it also meant that merely
+refreshing the panel could write a replica.  Both properties are gone.
+
+The settings status response also reports what the backups currently occupy:
+each retained file with its generation, kind, timestamp and size.  **Generation 1
+is the newest automatic backup** and the highest number is the next to be pruned.
+**Manual backups are never pruned and therefore carry no generation number.**  The
+listing stops at 50 rows, but the reported total count and total size cover every
+file, so the cutoff cannot understate usage.
 
 Concurrent drawing requests are bounded at the application layer. Stage 1 and
 Stage 2 LLM calls share a bounded executor controlled by `INKU_STAGE_WORKERS`

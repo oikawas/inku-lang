@@ -108,8 +108,8 @@ but never asserts "the output will change"**.
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `3` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `2` | grammar is added, changed, or retired |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.6 | per release |
-| `web/BUILD_NUMBER` | build serial | 765 | **moves for UI-only changes too** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.7 | per release |
+| `web/BUILD_NUMBER` | build serial | 766 | **moves for UI-only changes too** |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.

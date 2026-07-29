@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t, setLang, getLang, PACK_LIST } from '$lib/i18n/index.svelte';
 	import Tooltip from './Tooltip.svelte';
+	import type { UiMode } from '$lib/uiMode';
 
 	type UserItem = {
 		username: string;
@@ -15,6 +16,9 @@
 		darkMode: boolean;
 		buildNumber: string;
 		developerMode: boolean;
+		showAuxiliary: boolean;
+		uiMode: UiMode;
+		onSetUiMode: (mode: UiMode) => void | Promise<void>;
 		onToggleUserMenu: () => void;
 		onOpenProfile: () => void;
 		onLogout: () => void | Promise<void>;
@@ -31,6 +35,9 @@
 		darkMode,
 		buildNumber,
 		developerMode,
+		showAuxiliary,
+		uiMode,
+		onSetUiMode,
 		onToggleUserMenu,
 		onOpenProfile,
 		onLogout,
@@ -40,12 +47,27 @@
 	}: Props = $props();
 
 	let expanded = $state(false);
+	let uiModeOpen = $state(false);
+	let uiModeWrapEl: HTMLDivElement | null = null;
+	const uiModeLabel = $derived(uiMode === 'full' ? t().uiModeFull : uiMode === 'custom' ? t().uiModeCustom : t().uiModeSimple);
+
+	function selectUiMode(mode: UiMode) {
+		uiModeOpen = false;
+		void onSetUiMode(mode);
+	}
 
 	function toggleExpanded() {
 		expanded = !expanded;
-		if (!expanded) userMenuOpen = false;
+		if (!expanded) {
+			userMenuOpen = false;
+			uiModeOpen = false;
+		}
 	}
 </script>
+
+<svelte:window onclick={(event) => {
+	if (uiModeOpen && !uiModeWrapEl?.contains(event.target as Node)) uiModeOpen = false;
+}} />
 
 <aside class="app-rail" class:expanded>
 	<div class="rail-brand">
@@ -62,14 +84,14 @@
 				</button>
 			</Tooltip>
 		</div>
-		<div class="rail-logo-row">
+		{#if showAuxiliary}<div class="rail-logo-row">
 			<Tooltip placement="right" text={t().tooltipAppRailLogo}>
 				<button class="rail-logo" type="button" onclick={onOpenAppInfo} aria-label={t().appInfoOpenLabel}>
 					<span class="rail-logo-core">inku</span>{#if expanded}<span class="rail-logo-suffix">-lang</span>{/if}
 				</button>
 			</Tooltip>
-		</div>
-		{#if expanded}<div class="rail-sub">{t().subtitle}</div>{/if}
+		</div>{/if}
+		{#if showAuxiliary && expanded}<div class="rail-sub">{t().subtitle}</div>{/if}
 	</div>
 
 	<div class="rail-actions">
@@ -95,6 +117,22 @@
 			{/if}
 		</div>
 
+		<div class="rail-menu-wrap" bind:this={uiModeWrapEl}>
+			<Tooltip placement="right" text={t().uiModeLabel}>
+				<button class="rail-action" class:active={uiModeOpen} type="button" aria-haspopup="menu" aria-expanded={uiModeOpen} onclick={() => (uiModeOpen = !uiModeOpen)}>
+					<span class="rail-icon ui-mode-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+					{#if expanded}<span class="rail-label">{uiModeLabel}</span>{/if}
+				</button>
+			</Tooltip>
+			{#if uiModeOpen}
+				<div class="rail-user-menu ui-mode-menu" role="menu" aria-label={t().uiModeLabel}>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'simple'} class:selected={uiMode === 'simple'} onclick={() => selectUiMode('simple')}>{t().uiModeSimple}</button>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'full'} class:selected={uiMode === 'full'} onclick={() => selectUiMode('full')}>{t().uiModeFull}</button>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'custom'} class:selected={uiMode === 'custom'} onclick={() => selectUiMode('custom')}>{t().uiModeCustom}</button>
+				</div>
+			{/if}
+		</div>
+
 		<Tooltip placement="right" text={t().tooltipAppRailSettings}>
 			<button class="rail-action" class:active={settingsOpen} onclick={onOpenSettings}>
 				<span class="rail-icon gear-icon" aria-hidden="true"></span>
@@ -102,6 +140,7 @@
 			</button>
 		</Tooltip>
 
+		{#if showAuxiliary}
 		<Tooltip placement="right" text={t().tooltipAppRailTheme}>
 			<button class="rail-action" onclick={onToggleTheme}>
 				<span class="rail-icon theme-icon" class:dark={darkMode} aria-hidden="true"></span>
@@ -118,10 +157,11 @@
 				</Tooltip>
 			{/each}
 		</div>
+		{/if}
 	</div>
 
 	<div class="rail-spacer"></div>
-	{#if developerMode}
+	{#if developerMode && showAuxiliary}
 		<Tooltip placement="right" text={`Build ${buildNumber}`}>
 			<div class="rail-build">
 				{#if expanded}<span>Build </span>{/if}{buildNumber}
@@ -269,6 +309,11 @@
 		border-color: var(--border2);
 		color: var(--fg);
 	}
+	.ui-mode-icon { flex-direction: column; gap: 2px; }
+	.ui-mode-icon i { display: block; width: 11px; height: 1px; background: currentColor; }
+	.ui-mode-menu button.selected { color: var(--fg); font-weight: 600; }
+	.ui-mode-menu button.selected::before { content: '✓'; margin-right: 6px; }
+
 	.rail-icon {
 		width: 22px;
 		height: 22px;

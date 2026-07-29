@@ -385,7 +385,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "starred",
     } <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert {"ui_theme", "model_settings", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
+    assert {"ui_theme", "ui_mode", "ui_custom", "model_settings", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
     with legacy_engine.connect() as conn:
@@ -432,6 +432,53 @@ def test_current_user_theme_can_be_updated(auth_context):
 
     invalid = client.patch("/api/auth/me/settings", headers=headers, json={"ui_theme": "sepia"})
     assert invalid.status_code == 400
+
+
+def test_current_user_ui_mode_and_custom_visibility_are_persisted(auth_context):
+    headers, _, _ = auth_context
+
+    initial = client.get("/api/auth/me", headers=headers)
+    assert initial.status_code == 200
+    assert initial.json()["ui_mode"] == "simple"
+    assert initial.json()["ui_custom"] == {}
+
+    custom = {
+        "input_modes": True,
+        "drawing_settings": False,
+        "ddl_tools": True,
+        "detail_status": False,
+        "work_tools": True,
+        "history": False,
+        "auxiliary": True,
+    }
+    updated = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"ui_mode": "custom", "ui_custom": custom},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["ui_mode"] == "custom"
+    assert updated.json()["ui_custom"] == custom
+
+    persisted = client.get("/api/auth/me", headers=headers)
+    assert persisted.json()["ui_mode"] == "custom"
+    assert persisted.json()["ui_custom"] == custom
+
+    reset = client.patch(
+        "/api/auth/me/settings",
+        headers=headers,
+        json={"ui_mode": "simple", "ui_custom": {}},
+    )
+    assert reset.status_code == 200
+    assert reset.json()["ui_mode"] == "simple"
+    assert reset.json()["ui_custom"] == {}
+
+    assert client.patch(
+        "/api/auth/me/settings", headers=headers, json={"ui_mode": "expert"}
+    ).status_code == 400
+    assert client.patch(
+        "/api/auth/me/settings", headers=headers, json={"ui_custom": {"unknown": True}}
+    ).status_code == 400
 
 
 def test_current_user_model_selection_is_persisted(auth_context):

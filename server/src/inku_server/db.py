@@ -228,6 +228,8 @@ class UserAccountRow(Base):
     role          = Column(String, nullable=False, index=True)
     group_id      = Column(String, ForeignKey("user_groups.id"), nullable=True, index=True)
     ui_theme      = Column(String, nullable=False, default="dark")
+    ui_mode       = Column(String, nullable=False, default="simple")
+    ui_custom     = Column(Text, nullable=False, default="{}")
     settings_tab  = Column(String, nullable=False, default="db")
     model_settings = Column(Text, nullable=False, default="{}")
     image_generation_count = Column(Integer, nullable=False, default=0)
@@ -330,6 +332,8 @@ _LINEAGE_NODE_COLUMN_MIGRATIONS = {
 }
 _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
+    "ui_mode": "ALTER TABLE user_accounts ADD COLUMN ui_mode VARCHAR NOT NULL DEFAULT 'simple'",
+    "ui_custom": "ALTER TABLE user_accounts ADD COLUMN ui_custom TEXT NOT NULL DEFAULT '{}'",
     "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
     "model_settings": "ALTER TABLE user_accounts ADD COLUMN model_settings TEXT NOT NULL DEFAULT '{}'",
     "image_generation_count": (
@@ -343,6 +347,11 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
 _BATCH_PROMPT_HISTORY_LIMIT = 20
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
 _SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc", "server_misc", "logs"}
+_UI_MODES = {"simple", "full", "custom"}
+_UI_CUSTOM_KEYS = {
+    "input_modes", "drawing_settings", "ddl_tools", "detail_status",
+    "work_tools", "history", "auxiliary",
+}
 _PLUGIN_STORAGE_MAX_BYTES = 20_000
 _OUTPUT_SAVE_SETTINGS_KEY = "output_save_settings"
 _OUTPUT_SAVE_DEFAULT_SETTINGS = {
@@ -1931,6 +1940,15 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         model_settings = json.loads(row.model_settings or "{}")
     except json.JSONDecodeError:
         model_settings = {}
+    try:
+        ui_custom_raw = json.loads(row.ui_custom or "{}")
+    except json.JSONDecodeError:
+        ui_custom_raw = {}
+    ui_custom = {
+        key: value
+        for key, value in ui_custom_raw.items()
+        if key in _UI_CUSTOM_KEYS and isinstance(value, bool)
+    } if isinstance(ui_custom_raw, dict) else {}
     return {
         "id": row.id,
         "username": row.username,
@@ -1940,6 +1958,8 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "group_id": row.group_id,
         "group_name": group_name,
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
+        "ui_mode": row.ui_mode if row.ui_mode in _UI_MODES else "simple",
+        "ui_custom": ui_custom,
         "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
         "model_settings": normalize_user_model_settings(model_settings),
         "image_generation_count": row.image_generation_count or 0,
@@ -2470,6 +2490,8 @@ def update_user_theme(user_id: str, ui_theme: str) -> dict | None:
 def update_user_settings(
     user_id: str,
     ui_theme: str | None = None,
+    ui_mode: str | None = None,
+    ui_custom: dict | None = None,
     settings_tab: str | None = None,
     model_settings: dict | None = None,
 ) -> dict | None:
@@ -2477,6 +2499,13 @@ def update_user_settings(
 
     if ui_theme is not None and ui_theme not in {"light", "dark"}:
         raise ValueError("invalid ui theme")
+    if ui_mode is not None and ui_mode not in _UI_MODES:
+        raise ValueError("invalid ui mode")
+    if ui_custom is not None and (
+        not isinstance(ui_custom, dict)
+        or any(key not in _UI_CUSTOM_KEYS or not isinstance(value, bool) for key, value in ui_custom.items())
+    ):
+        raise ValueError("invalid custom ui settings")
     if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
         raise ValueError("invalid settings tab")
     with SessionLocal() as session:
@@ -2485,6 +2514,10 @@ def update_user_settings(
             return None
         if ui_theme is not None:
             row.ui_theme = ui_theme
+        if ui_mode is not None:
+            row.ui_mode = ui_mode
+        if ui_custom is not None:
+            row.ui_custom = json.dumps(ui_custom, ensure_ascii=False, sort_keys=True)
         if settings_tab is not None:
             row.settings_tab = settings_tab
         if model_settings is not None:

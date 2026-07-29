@@ -2067,7 +2067,9 @@ def api_reference(
 
 @app.get("/api/settings/status", response_model=SettingsStatusResponse)
 def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
-    _db.ensure_scheduled_db_backup()
+    # Reading the panel must not write a backup. This used to call
+    # ensure_scheduled_db_backup() because it was the only trigger there was;
+    # the resident scheduler asks the same question every minute now.
     db_info = _db.database_info()
     output_settings = _output_save_settings()
     log_settings = _log_retention_settings()

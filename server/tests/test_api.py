@@ -2573,6 +2573,39 @@ def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch)
         db.delete_user_group(group["id"])
 
 
+def test_reading_the_settings_panel_does_not_write_a_backup(tmp_path, monkeypatch):
+    """The reload button reads; the scheduler writes.
+
+    last_auto_backup_at = 0 makes a copy due right now, so a status read that
+    still carried the old ensure_scheduled_db_backup() call would leave a file
+    behind and fail here.
+    """
+    monkeypatch.setattr(db, "_DB_BACKUP_DIR", tmp_path / "db-backups")
+    settings = db.get_db_backup_settings()
+    settings["last_auto_backup_at"] = 0
+    db._write_app_setting(db._DB_BACKUP_SETTINGS_KEY, settings)
+    assert db.next_scheduled_db_backup_at() == 0  # i.e. due
+
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"db-readonly-{suffix}")
+    admin = db.add_user(
+        username=f"db-readonly-admin-{suffix}",
+        email=f"db-readonly-admin-{suffix}@example.test",
+        password="password-123",
+        role="admin",
+        group_id=group["id"],
+    )
+    admin_headers, admin_token = _auth_headers(admin)
+    try:
+        assert client.get("/api/settings/status", headers=admin_headers).status_code == 200
+        auto_dir = tmp_path / "db-backups" / "auto"
+        assert not auto_dir.exists() or list(auto_dir.glob("*.db")) == []
+    finally:
+        db.delete_session(admin_token)
+        db.delete_user(admin["id"])
+        db.delete_user_group(group["id"])
+
+
 def test_lifespan_starts_and_cancels_the_backup_scheduler(monkeypatch):
     """Without this the hour and minute would be settings nothing ever reads.
 

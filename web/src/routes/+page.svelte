@@ -6138,6 +6138,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
 		showAuxiliary={uiVisibility.auxiliary}
+		{uiMode}
+		onSetUiMode={(mode) => void updateUiMode(mode)}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onOpenProfile={openProfile}
 		onLogout={logout}

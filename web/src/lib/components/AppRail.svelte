@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t, setLang, getLang, PACK_LIST } from '$lib/i18n/index.svelte';
 	import Tooltip from './Tooltip.svelte';
+	import type { UiMode } from '$lib/uiMode';
 
 	type UserItem = {
 		username: string;
@@ -16,6 +17,8 @@
 		buildNumber: string;
 		developerMode: boolean;
 		showAuxiliary: boolean;
+		uiMode: UiMode;
+		onSetUiMode: (mode: UiMode) => void | Promise<void>;
 		onToggleUserMenu: () => void;
 		onOpenProfile: () => void;
 		onLogout: () => void | Promise<void>;
@@ -33,6 +36,8 @@
 		buildNumber,
 		developerMode,
 		showAuxiliary,
+		uiMode,
+		onSetUiMode,
 		onToggleUserMenu,
 		onOpenProfile,
 		onLogout,
@@ -42,12 +47,27 @@
 	}: Props = $props();
 
 	let expanded = $state(false);
+	let uiModeOpen = $state(false);
+	let uiModeWrapEl: HTMLDivElement | null = null;
+	const uiModeLabel = $derived(uiMode === 'full' ? t().uiModeFull : uiMode === 'custom' ? t().uiModeCustom : t().uiModeSimple);
+
+	function selectUiMode(mode: UiMode) {
+		uiModeOpen = false;
+		void onSetUiMode(mode);
+	}
 
 	function toggleExpanded() {
 		expanded = !expanded;
-		if (!expanded) userMenuOpen = false;
+		if (!expanded) {
+			userMenuOpen = false;
+			uiModeOpen = false;
+		}
 	}
 </script>
+
+<svelte:window onclick={(event) => {
+	if (uiModeOpen && !uiModeWrapEl?.contains(event.target as Node)) uiModeOpen = false;
+}} />
 
 <aside class="app-rail" class:expanded>
 	<div class="rail-brand">
@@ -93,6 +113,22 @@
 				<div class="rail-user-menu" role="menu">
 					<button type="button" role="menuitem" onclick={onOpenProfile}>{t().profileButton}</button>
 					<button type="button" role="menuitem" onclick={onLogout}>{t().logoutButton}</button>
+				</div>
+			{/if}
+		</div>
+
+		<div class="rail-menu-wrap" bind:this={uiModeWrapEl}>
+			<Tooltip placement="right" text={t().uiModeLabel}>
+				<button class="rail-action" class:active={uiModeOpen} type="button" aria-haspopup="menu" aria-expanded={uiModeOpen} onclick={() => (uiModeOpen = !uiModeOpen)}>
+					<span class="rail-icon ui-mode-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+					{#if expanded}<span class="rail-label">{uiModeLabel}</span>{/if}
+				</button>
+			</Tooltip>
+			{#if uiModeOpen}
+				<div class="rail-user-menu ui-mode-menu" role="menu" aria-label={t().uiModeLabel}>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'simple'} class:selected={uiMode === 'simple'} onclick={() => selectUiMode('simple')}>{t().uiModeSimple}</button>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'full'} class:selected={uiMode === 'full'} onclick={() => selectUiMode('full')}>{t().uiModeFull}</button>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'custom'} class:selected={uiMode === 'custom'} onclick={() => selectUiMode('custom')}>{t().uiModeCustom}</button>
 				</div>
 			{/if}
 		</div>
@@ -273,6 +309,11 @@
 		border-color: var(--border2);
 		color: var(--fg);
 	}
+	.ui-mode-icon { flex-direction: column; gap: 2px; }
+	.ui-mode-icon i { display: block; width: 11px; height: 1px; background: currentColor; }
+	.ui-mode-menu button.selected { color: var(--fg); font-weight: 600; }
+	.ui-mode-menu button.selected::before { content: '✓'; margin-right: 6px; }
+
 	.rail-icon {
 		width: 22px;
 		height: 22px;

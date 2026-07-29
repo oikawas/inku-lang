@@ -2230,6 +2230,9 @@ def api_settings_fetch_provider_models(
         "purposes", "recommendation_llm", "recommendation_vision",
         "recommendation_level", "speed_class", "speed_label",
         "comment_ja", "comment_en", "eol", "eol_date",
+        # 有料プラン限定の印は提供元の一覧に現れない (一覧には載るが叩くと 403 が
+        # 返る)。取得のたびに消えては困るので、EOL と違って再提供で外さない。
+        "requires_subscription",
     )
     for model in models:
         previous = previous_models.get(str(model["id"]))
@@ -2270,6 +2273,7 @@ def api_settings_fetch_provider_models(
     enabled_models = {
         model["id"]: (
             not model.get("eol")
+            and not model.get("requires_subscription")
             and str(model["id"]) in previous_models
             and bool(previous_enabled_models.get(model["id"], False))
         )

@@ -27,7 +27,7 @@
 	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import { normalizeUiCustom, normalizeUiMode, resolveUiVisibility, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
+	import { normalizeUiCustom, normalizeUiMode, resolveUiVisibility, UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import {
 		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
@@ -1276,7 +1276,13 @@
 				const d = await r.json().catch(() => ({})) as { detail?: unknown };
 				throw new Error(describeApiError(d.detail, r.status));
 			}
-			currentUser = await r.json() as UserItem;
+			const updatedUser = await r.json() as UserItem;
+			const savedCustom = normalizeUiCustom(updatedUser.ui_custom);
+			const customMatches = UI_VISIBILITY_KEYS.every((key) => savedCustom[key] === normalizedCustom[key]);
+			if (updatedUser.ui_mode !== nextMode || !customMatches) {
+				throw new Error('UI mode settings were not persisted by the server');
+			}
+			currentUser = updatedUser;
 		} catch (e) {
 			currentUser = previousUser;
 			uiModeSaveError = true;

@@ -743,7 +743,7 @@ class DefaultSvgRenderer : SvgRenderer {
         wild: Boolean = false
     ): Pair<String, List<Pair<Double, Double>>> {
         val weight = ins.optString("weight", "pen")
-        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
         val gridStep = gridStepPx(weight, unit)
         val seedStr = seedForInstruction(ins, renderSeed)
         val seedLong = ServerRendererGeometry.seedToLong(seedStr)
@@ -886,7 +886,7 @@ class DefaultSvgRenderer : SvgRenderer {
         wild: Boolean = false
     ): String {
         val length = kotlin.math.hypot(x2 - x1, y2 - y1)
-        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
         val gridStep = gridStepPx(weight, unit)
         val samples = ServerRendererGeometry.strokeSampleCount(length, unit)
         val seedStr = seedForInstruction(ins, renderSeed)
@@ -1564,7 +1564,7 @@ class DefaultSvgRenderer : SvgRenderer {
     ): String? {
         if (contour.size < 3) return null
         val weight = ins.optString("weight", "pen")
-        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
         val gridStep = gridStepPx(weight, unit)
         val seedStr = seedForInstruction(ins, renderSeed)
         val angle = ServerRendererGeometry.fillScanAngle(seedStr)
@@ -1669,7 +1669,7 @@ class DefaultSvgRenderer : SvgRenderer {
             ServerRendererGeometry.arcPoints(cx, cy, r, startDeg, endDeg, count)
         }
 
-        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
         val stroke = ServerStrokeEngine.synthesizeAlong(
             centerline = centerline,
             baseWidth = baseWidth,

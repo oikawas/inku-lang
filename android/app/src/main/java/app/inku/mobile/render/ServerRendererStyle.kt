@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import kotlin.math.max
 import kotlin.math.min
 import org.json.JSONArray
 import org.json.JSONObject
@@ -37,6 +38,25 @@ internal data class SvgAttrs(
 }
 
 internal object ServerRendererStyle {
+    internal val weightToStrokeWidth = mapOf(
+        "silverpoint" to 0.5,
+        "pencil" to 1.5,
+        "pen" to 2.0,
+        "rotring" to 1.0,
+        "crayon" to 4.0,
+        "chalk" to 3.0,
+        "brush_thin" to 3.0,
+        "brush_thick" to 8.0,
+        "burin" to 3.2,
+        "drypoint" to 2.6,
+        "computer" to 2.0,
+    )
+    internal val thinnessToWidthScale = mapOf(
+        null to 1.0,
+        "fine" to 0.6,
+        "extra_fine" to 0.35,
+    )
+
     fun strokeAttrs(primitive: String, weight: String, colorKey: String, colorMap: Map<String, String>, ins: JSONObject, unit: Double): SvgAttrs {
         val colorHint = if (ins.has("color_hint") && !ins.isNull("color_hint")) ins.optString("color_hint") else null
         val color = resolveColor(colorKey, colorHint, colorMap)
@@ -90,7 +110,7 @@ internal object ServerRendererStyle {
         }
         return SvgAttrs(
             stroke = color,
-            strokeWidth = strokeWidth(weight, unit),
+            strokeWidth = strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in thinnessToWidthScale }),
             strokeLinecap = lineCap(weight),
             strokeOpacity = strokeOpacity,
             fill = fill,
@@ -104,20 +124,11 @@ internal object ServerRendererStyle {
         return attrs.copy(strokeWidth = strokeWidth, strokeOpacity = opacity, fill = "none", fillOpacity = null, dash = dash ?: attrs.dash)
     }
 
-    fun strokeWidth(weight: String, unit: Double): Double {
-        val base = when (weight) {
-            "silverpoint" -> 0.5
-            "pencil" -> 1.5
-            "rotring" -> 1.0
-            "crayon" -> 4.0
-            "chalk" -> 3.0
-            "brush_thin" -> 3.0
-            "brush_thick" -> 8.0
-            "burin" -> 3.2
-            "drypoint" -> 2.6
-            else -> 2.0
-        }
-        return base * (unit / 1000.0)
+    fun strokeWidth(weight: String, unit: Double, thinness: String? = null): Double {
+        val base = weightToStrokeWidth[weight] ?: weightToStrokeWidth.getValue("pen")
+        val widthScale = thinnessToWidthScale[thinness] ?: thinnessToWidthScale.getValue(null)
+        val minimum = weightToStrokeWidth.values.minOrNull() ?: error("stroke width table is empty")
+        return max(base * widthScale, minimum) * (unit / 1000.0)
     }
 
     fun strokeOpacity(weight: String): Double = when (weight) {

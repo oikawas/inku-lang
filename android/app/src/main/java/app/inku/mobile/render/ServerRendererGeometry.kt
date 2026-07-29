@@ -466,7 +466,8 @@ internal object ServerRendererGeometry {
 
     fun fillScanSpacing(ins: JSONObject, unit: Double): Double {
         val weight = ins.optString("weight", "pen")
-        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val thinness = ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, thinness)
         return max(baseWidth * 1.5, unit * 0.012)
     }
 

@@ -869,3 +869,49 @@ The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/
 - **Not one heading was added.** `check_docs.py` compares this pair in `shape` mode — the sequence of heading levels and nothing else — so a paragraph and a `<p>` without a heading leave the two skeletons identical. **The same introduction under a `##` would fail the check.**
 - **`<p align="center">` and the blockquote were measured against GitHub's sanitizer before the push** (`POST /markdown`). The `align` attribute, the link, the `｜` separator and `<strong>` all survived.
 - **The About field in the sidebar was left alone.** It can only be changed through the settings page or an authenticated API call, so a bilingual draft (223 characters against a 350 limit) was handed to the author instead.
+
+---
+
+### v2.9.8 — The screen can be made smaller, and what cannot be chosen is no longer offered (Build 776, 2026-07-29)
+
+**Two branches entered together.** The sixth round of UI adjustments
+(`feat/ui-adjustments-6`) and the Ollama Cloud model evaluation
+(`feat/ollama-cloud-provider`) are independent of each other; the only conflict
+was `web/BUILD_NUMBER`.
+
+#### How much is shown is the writer's choice
+
+- **Three UI modes, stored per logged-in user.** `user_accounts` gained `ui_mode` (default `simple`) and `ui_custom` (JSON). **Simple UI** shows only what is required — the user menu, the way into settings, the single description input, the drawing controls and the canvas. **Full UI** shows everything, as before. **Custom UI** adds any of seven groups to the required set. **A new account starts in Simple UI.**
+- **A mode changes the display layer and nothing else.** Feature paths, history and stored data are untouched; a hidden tool works again the moment the mode is changed back. **If the mode is changed while an input method or a work tab it cannot show is selected, the view returns to the single description input or to the canvas.**
+- **The modes are not named after proficiency** — `GLOSSARY.md` rejects `Beginner` / `Expert`. The ruled terms are `UI mode`, `Simple UI`, `Full UI`, `Custom UI`.
+- A switcher sits permanently on the left rail. Settings → Misc carries the mode choice, the custom items, a note on what is always shown, and "back to Simple".
+- **The favicon is now the project icon** (64px, 192px, and the compatibility file).
+
+#### Marking what cannot be chosen
+
+- **Ten of the eighteen Ollama Cloud models answer 403 on the free tier.** They appear in the provider's listing, so without a mark they look ordinary and **the wall is met only by drawing into it**. They now carry `requires_subscription` and cannot be selected.
+- **A re-fetch does not clear that mark.** An EOL mark is cleared because the listing carries it; a paid-plan mark is not, because the listing does not. **The difference is where the mark comes from: the listing, or a measurement.** Written into SPEC.
+- **The eight that can be reached were measured four runs each** and given recommendation levels and tooltip text. **No level 5 was awarded**: the one model that succeeded on every run needed correction on the heavy side, and **four runs cannot separate a shared host's luck from a model's ability** (the median for `gemma4:31b` moved 11s → 105s → 35s on one day). Speed stays developer-mode only.
+- **The two paid models were also removed from the fallback list in `models.ts`.** The fallback carries no marks, so for the few hundred milliseconds before the server catalog arrives they looked ordinary. **The rule is not "keep this list fresh" but "do not put something guarded by a mark where marks are not shown"**, and a test now holds it.
+- **A model that writes its own `version` no longer costs the Score** — the guess is dropped instead. **That path runs through all five validation sites for every provider** (tool, text, JSON), making it the widest-reaching change in this version.
+- **`MODEL_CONFIG_VERSION` moved 2.3.0 → 2.4.0 (ruled in this session).** The bump lays the builtin metadata back over stored catalogs so the mark reaches the ten. **Stored model lists and enable/disable choices survive**, so nothing is lost. **The reason the implementing session gave was wrong when measured**: the development host's stored catalog was at `2.2.0`, where the re-layer already runs. What the bump actually reaches is **an installation already stored at 2.3.0**.
+
+#### An accident on the shared host, and what was done about it
+
+- **A parallel branch ran `rsync -a server/src/inku_server/` and took the other branch's `ui_mode` and `ui_custom` off the development host.** A branch does not carry what the other added after they diverged, so **sending the directory deletes it**. `AGENTS.md` said "do not rsync the whole `server/`" but never said **the same thing happens one level down**.
+- Three repairs. **The front end now checks the PATCH response against what it asked for** and does not accept a 200 from an API that ignored the unknown fields — without it the optimistic update silently fell back to simple. **The deploy helper refuses, before rsync, a sync that would remove a feature the remote already has.** A deployment-only integration branch carried both until now.
+- **Filed in the ledger as [I-053].** The permanent fix is undecided.
+
+#### The build number skipped
+
+**766 is followed by 776.** The sixth UI round used 767–771, Ollama Cloud used 772 and 774, and the deployment integration branch used 773 and 775. **The counter is shared, not per branch: your own +1 is not necessarily free.**
+
+#### Verification
+
+**The merged tree was compared against the integration branch that had been measured green on the development host: the only differences were five documentation files and `BUILD_NUMBER`, with not one byte of source differing.** The checks that ran there therefore apply to this merge.
+
+server **1668 passed / 31 skipped** (+33), cli 76 passed, ruff clean, `npm run check` 219 files / 0 errors / 2 warnings, **`lint:i18n` 918 / 47 / 0 / 0**, `lint:models` 58, `check_docs.py` green. `check_frozen_corpora.py` was not run: `coerce/`, `ddl_expander.py`, `renderer.py`, `stroke_engine.py`, `schema.py` and `saijiki.py` are untouched.
+
+The perturbations were applied by the implementing sessions — 5/5 on the `requires_subscription` checks, 6/6 on the wiring and `version` checks, and one on UI mode persistence. **The accepting session did not measure them again** (the author ruled a second pass unnecessary) **but ran every check that meets the merged tree for the first time.**
+
+**The version is a patch.** The two new columns are additions with defaulted migrations; no stored-data, API or edition-ID shape moved. The render engine stays at **16** and `ddl_version` / `ddl_engine_version` at **2 / 3**.

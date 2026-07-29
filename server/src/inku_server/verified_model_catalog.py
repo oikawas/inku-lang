@@ -18,7 +18,7 @@ they scored badly or could not be measured, for the same reason.
 Method and rubric: no-git-sync/fable5/mode-api-claude/SCORING-DESIGN.md
 """
 
-MODEL_CONFIG_VERSION = "2.3.0"
+MODEL_CONFIG_VERSION = "2.4.0"
 MODEL_CONFIG_LAST_UPDATED = "2026-07-29T11:00:00Z"
 
 VERIFIED_NVIDIA_MODELS: list[dict[str, object]] = [

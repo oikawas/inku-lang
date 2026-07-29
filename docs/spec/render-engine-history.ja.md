@@ -99,8 +99,9 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `3` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `2` | 文法の追加・変更・廃止 |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
-| `APP_VERSION` / `server/pyproject.toml` | 製品リリース | v2.9.7 | リリースごと |
-| `web/BUILD_NUMBER` | ビルド通し番号 | 766 | **UI の変更でも動く** |
+| `MODEL_CONFIG_VERSION` | モデルカタログの中身 | `2.4.0` | **計測値・推奨度・選択可否が変わったとき**。上げると保存済みカタログの同じ id へ組み込みのメタを貼り直す（保存済みのモデル一覧と有効/無効の選択は残る） |
+| `APP_VERSION` / `server/pyproject.toml` | 製品リリース | v2.9.8 | リリースごと |
+| `web/BUILD_NUMBER` | ビルド通し番号 | 776 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる** |
 
 **「現在」の列は書いた時点の値である。** 版を上げたら、この列も同じ commit で直す。
 

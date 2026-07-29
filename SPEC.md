@@ -600,6 +600,21 @@ changed and what was added can be seen.  It is designed as **the trace of
 refinement**: not a programmer's diff, but the visualization of a process of
 paring a text down.
 
+**How much is shown is the writer's choice (v2.9.8).** The number of tools on
+screen is too many for someone opening inku for the first time and too few for
+someone building a work up, so the visible surface is one of three **UI modes**,
+stored per logged-in user in the server database. **Simple UI** shows only what
+is required — the user menu, the way into settings, the single description
+input, the drawing controls and the canvas. **Full UI** shows everything, as
+before. **Custom UI** adds any of seven groups (batch drawing, drawing settings,
+instruction tools, detailed status, work tools, history, auxiliary controls) to
+that required set. **A newly created account starts in Simple UI.** A mode
+changes the display layer and nothing else: the feature paths, the history and
+the stored data are untouched, so a hidden tool works again the moment the mode
+is changed back. The modes are not named after proficiency. **If the mode is
+changed while an input method or a work tab that it cannot show is selected,
+the view returns to the single description input or to the canvas.**
+
 ### 7.3 LLM Model Inspection
 
 A view that puts several LLM models side by side — Gemma 4 and Opus 4.7, for
@@ -2902,7 +2917,7 @@ Normal Stage 1 and Stage 2 generation is LLM processing, while image-reading ope
 
 Each model may carry LLM/Vision purposes, per-purpose five-level recommendations (split into LLM and Vision values in v1.98; the old single value is read for compatibility only), Japanese and English evaluation comments, and a measured speed class and label. Administrators can edit this metadata, and both admin and user model selection expose it on hover. Speed values are observations from a particular measurement run, not a permanent performance guarantee or an acceptance gate for generation quality. Beyond normal generation, Batch has no image input, so it shows the current Stage 1/2 models and opens a model dialog without Vision. Demo separately selects its instruction-generation LLM and rendering Stage 1/2 models, while the colophon selects from Vision cards grouped by provider. These cards expose the same evaluation metadata on hover using a theme-independent high-contrast tooltip.
 
-Since v1.98 every model list is ordered with end-of-life (EOL) models last, then by the recommendation for the purpose at hand in descending order, with ties broken by label. EOL models stay in the catalog marked as retired and unselectable rather than being removed, so model references in saved works remain resolvable. The server does not reject requests naming an EOL model; the provider's failure is classified and explained by kind (model gone, authentication, rate limit, other).
+Since v1.98 every model list is ordered with end-of-life (EOL) models last, then by the recommendation for the purpose at hand in descending order, with ties broken by label. EOL models stay in the catalog marked as retired and unselectable rather than being removed, so model references in saved works remain resolvable. **There are two reasons a model can be unselectable: it has reached end of life, or it requires a paid plan from the provider (v2.9.8).** The second mark does not appear in the provider's own listing — such a model is listed and then refuses when called — so **a re-fetch does not clear it**, whereas an EOL mark is cleared because the listing carries it. The difference is where the mark comes from: the listing, or a measurement. The server does not reject requests naming an EOL model; the provider's failure is classified and explained by kind (model gone, authentication, rate limit, other).
 
 Refine adds Language comparison beside Adjust and Model comparison. It uses the same three comparison modes: shared Stage 1/2 language, fixed Stage 1 with Stage 2 comparison, and Stage 1 comparison with fixed Stage 2. Japanese and English can be assigned per stage only for an explicit comparison run, without changing automatic detection for normal generation. The target's identical language combination is excluded, results show the Stage 1/2 language pair and normalized DDL, and an adopted result records the pair in lineage metadata. Changing the target clears results and aborts an in-flight language comparison.
 

@@ -156,6 +156,66 @@ npm run check
 npm run build
 ```
 
+## APIキーなしで動かす（ローカル Ollama）
+
+inku は [Ollama](https://ollama.com) をプロバイダーとして選べる。**APIキーは要らず、記述は機体の外へ出ない。**
+
+### 1. コンテキスト長を広げる
+
+Ollama を導入したうえで、コンテキスト長を指定する。**Stage 2 のプロンプトは 12,000〜14,600 トークンあり、短いコンテキストでは入りきらない。あふれた分は黙って捨てられ、応答は返るのに指示の大半が読まれていない状態になる。**
+
+```sh
+export OLLAMA_CONTEXT_LENGTH=16384
+```
+
+### 2. モデルを 2 つ取得する
+
+**段によって適したモデルが違うため、Stage 1 と Stage 2 に別々のモデルを割り当てる。**
+
+```sh
+ollama pull qwen3.5:4b-q4_K_M                      # Stage 1（3.4GB）
+ollama pull ministral-3:8b-instruct-2512-q4_K_M    # Stage 2（6.0GB）
+```
+
+合計 9.4GB。**両方が同時に常駐する**ので、メモリはその分を見込む。
+
+**タグは量子化まで書く。** `qwen3.5:4b` のような素タグは上流で中身が差し替わり、モデル一覧の説明と結びつかなくなる。
+
+### 3. 接続先を指す
+
+既定の接続先は `http://localhost:11434/v1` で、同じ機体で動かすなら設定は要らない。変える場合は次を使う。
+
+```sh
+export OLLAMA_BASE_URL='http://localhost:11434/v1'
+```
+
+**コンテナで動かす場合、コンテナ内の `localhost` はコンテナ自身を指す**ので、ホストで動く Ollama へは届かない。`.env` でホストを名指しする。
+
+```sh
+OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+```
+
+`host.docker.internal` の解決は `deploy/compose.yaml` が引き受けているので、この 1 行だけでよい。
+
+### 4. 段ごとに割り当てる
+
+管理者でログインし、モデル設定で次のように選ぶ。
+
+| 段 | プロバイダー | モデル |
+| --- | --- | --- |
+| Stage 1 | Ollama | `qwen3.5:4b-q4_K_M` |
+| Stage 2 | Ollama | `ministral-3:8b-instruct-2512-q4_K_M` |
+
+### この組み合わせの理由
+
+**Stage 1**（記述を指示書へ読み解く段）は、語彙の外へ出ない文を書けるかで決まる。日本語と英語の両方で成立したのは `qwen3.5:4b-q4_K_M` だけで、しかも候補中で最も小さい。**大きいほど良いという順にはならない。**
+
+**Stage 2**（指示書を JSON Score へ組む段）は、記述した文がいくつ図形の指示まで届くかで決まる。`ministral-3:8b-instruct-2512-q4_K_M` が最も多くを運ぶ。
+
+モデル設定の一覧には、計測した 10 本それぞれについて、この 2 つの観点で分かったことが説明として付いている。手元にある別のモデルを選ぶ場合はそちらを見る。
+
+**GPU は要らないが、あった方がよい。** CPU だけでも動く。1 枚あたりの待ち時間は機体で大きく変わる。
+
 ## CLI のセットアップ
 
 別のターミナルで実行する。
@@ -202,6 +262,8 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い円を右上に置
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `GEMINI_API_KEY` | Gemini API key |
 | `NVIDIA_API_KEY` | NVIDIA API key |
+| `OLLAMA_BASE_URL` | ローカル Ollama の接続先。未指定時は `http://localhost:11434/v1` |
+| `OLLAMA_CONTEXT_LENGTH` | Ollama 側で指定するコンテキスト長。inku は読まない。**Stage 2 のプロンプトが入る長さが要る** |
 
 コンテナで動かす場合のみ使うもの:
 

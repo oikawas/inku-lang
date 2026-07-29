@@ -156,6 +156,66 @@ npm run check
 npm run build
 ```
 
+## Running Without an API Key (local Ollama)
+
+inku can use [Ollama](https://ollama.com) as a provider. **No API key is needed, and the description never leaves the machine.**
+
+### 1. Widen the context length
+
+Install Ollama, then set its context length. **A Stage 2 prompt runs 12,000 to 14,600 tokens, which does not fit in a short context. What overflows is dropped silently, so a reply comes back having read only a fraction of the instructions.**
+
+```sh
+export OLLAMA_CONTEXT_LENGTH=16384
+```
+
+### 2. Pull two models
+
+**The two stages want different models, so give each its own.**
+
+```sh
+ollama pull qwen3.5:4b-q4_K_M                      # Stage 1 (3.4GB)
+ollama pull ministral-3:8b-instruct-2512-q4_K_M    # Stage 2 (6.0GB)
+```
+
+9.4GB together. **Both stay resident at once**, so budget memory for the pair.
+
+**Name the quantization in the tag.** A bare tag such as `qwen3.5:4b` is replaced upstream over time and comes loose from the notes in the model list.
+
+### 3. Point inku at it
+
+The default endpoint is `http://localhost:11434/v1`, so nothing needs setting when Ollama runs on the same machine. To change it:
+
+```sh
+export OLLAMA_BASE_URL='http://localhost:11434/v1'
+```
+
+**Inside a container, `localhost` is the container itself** and will not reach an Ollama running on the host. Name the host in `.env`:
+
+```sh
+OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+```
+
+That one line is all it takes: `deploy/compose.yaml` already resolves `host.docker.internal`.
+
+### 4. Assign one model per stage
+
+Sign in as an administrator and set these in the model settings:
+
+| Stage | Provider | Model |
+| --- | --- | --- |
+| Stage 1 | Ollama | `qwen3.5:4b-q4_K_M` |
+| Stage 2 | Ollama | `ministral-3:8b-instruct-2512-q4_K_M` |
+
+### Why this pair
+
+**Stage 1** reads a description into instructions, so what matters is whether it writes sentences that stay inside the vocabulary. `qwen3.5:4b-q4_K_M` was the only model that held up in both Japanese and English, and it is also the smallest of the candidates. **Larger does not order better here.**
+
+**Stage 2** builds those instructions into a JSON Score, so what matters is how many of the written sentences reach a shape instruction. `ministral-3:8b-instruct-2512-q4_K_M` carries the most.
+
+The model list carries a note on each of the ten models measured, describing what these two readings found. Consult it when choosing something else you already have.
+
+**A GPU is not required, though it helps.** CPU alone works. How long a single drawing takes varies widely by machine.
+
 ## CLI Setup
 
 Run this in another terminal:
@@ -202,6 +262,8 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `GEMINI_API_KEY` | Gemini API key |
 | `NVIDIA_API_KEY` | NVIDIA API key |
+| `OLLAMA_BASE_URL` | Local Ollama endpoint. Defaults to `http://localhost:11434/v1` |
+| `OLLAMA_CONTEXT_LENGTH` | Context length, set on the Ollama side; inku does not read it. **It must be long enough to hold a Stage 2 prompt** |
 
 Used only when running in containers:
 

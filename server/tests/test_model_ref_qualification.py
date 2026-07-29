@@ -69,6 +69,12 @@ def test_qualified_references_are_taken_at_their_word():
 def test_sole_ownership_decides_and_ambiguity_does_not():
     ambiguity = EXPECTATIONS["ambiguity"]
     settings = _settings()
+    # The shipped catalog no longer contains a model two providers both list --
+    # replacing the Ollama list on 2026-07-29 removed the last one -- so the
+    # second owner is added here. Without it this rule would go untested.
+    settings["providers"][ambiguity["added_owner"]]["models"].append(
+        {"id": ambiguity["ref"], "label": ambiguity["ref"]}
+    )
     owners = [
         provider_id
         for provider_id, provider in settings["providers"].items()

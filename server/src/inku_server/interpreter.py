@@ -1547,6 +1547,22 @@ def _interpret_openai_detail(
     else:
         user_content = text
 
+    # Ollama turns thinking on by itself whenever `reasoning_effort` is absent, and
+    # the thinking shares MAX_TOKENS with the answer: a model that thinks past the
+    # budget returns nothing at all. Measured 2026-07-28 on Ollama 0.32.4 -- with
+    # thinking suppressed the same work ran 8x faster, one case stopped coming back
+    # empty, and how much of the description survived did not change.
+    #
+    # `/no_think` above is the same intent said in OVMS's dialect. Ollama Cloud is
+    # left alone: its models emitted no thinking in either setting (measured), so
+    # the argument would buy nothing there and it asks by tool call, where the
+    # setting has been seen to cost the call itself.
+    thinking_off: dict = (
+        {"reasoning_effort": "none"}
+        if provider == "ollama" and not include_thinking
+        else {}
+    )
+
     with provider_slot(provider):
         resp = call_with_llm_retry(
             lambda: client.chat.completions.create(
@@ -1558,6 +1574,7 @@ def _interpret_openai_detail(
                     {"role": "user", "content": user_content},
                 ],
                 stream=False,
+                **thinking_off,
             )
         )
     usage = resp.usage

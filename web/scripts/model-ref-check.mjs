@@ -66,14 +66,24 @@ for (const c of EXPECTATIONS.cases) {
 // ── rule 2 demands exactly one owner ──────────────────────────────────────
 {
 	const a = EXPECTATIONS.ambiguity;
-	const owners = Object.entries(EXPECTATIONS.catalog)
+	// The shipped catalog no longer contains a model two providers both list --
+	// replacing the Ollama list on 2026-07-29 removed the last one -- so the
+	// second owner is added here. Without it this rule would go untested.
+	const catalog = Object.fromEntries(
+		Object.entries(EXPECTATIONS.catalog).map(([id, models]) => [
+			id,
+			id === a.added_owner ? [...models, a.ref] : models
+		])
+	);
+	const owners = Object.entries(catalog)
 		.filter(([, models]) => models.includes(a.ref))
 		.map(([id]) => id);
+	const groups = groupsFrom(catalog);
 	check(`${a.ref} is offered by both providers`, owners.sort(), [...a.owners].sort());
-	check(`${a.ref} is not decided by rule 2`, resolveModelRef(a.ref, GROUPS, STAGE1).provider, STAGE1);
+	check(`${a.ref} is not decided by rule 2`, resolveModelRef(a.ref, groups, STAGE1).provider, STAGE1);
 	check(
 		`${a.ref} is decided once ${a.deactivate} is gone`,
-		resolveModelRef(a.ref, groupsFrom(EXPECTATIONS.catalog, a.deactivate), STAGE1).provider,
+		resolveModelRef(a.ref, groupsFrom(catalog, a.deactivate), STAGE1).provider,
 		a.provider_when_deactivated
 	);
 }

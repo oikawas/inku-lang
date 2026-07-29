@@ -71,9 +71,16 @@
       "qwen/qwen3-coder-480b-a35b-instruct"
     ],
     "ollama": [
-      "llama3.2",
-      "gpt-oss:20b",
-      "qwen3:8b"
+      "qwen3.5:4b-q4_K_M",
+      "ministral-3:8b-instruct-2512-q4_K_M",
+      "gemma4:e4b-it-q4_K_M",
+      "gemma4:31b-it-q4_K_M",
+      "gemma4:12b-it-q4_K_M",
+      "qwen3.5:27b-q4_K_M",
+      "qwen3.5:9b-q4_K_M",
+      "granite4.1:8b-q4_K_M",
+      "qwen3.5:2b-q4_K_M",
+      "qwen3.5:0.8b-q8_0"
     ],
     "ollama-cloud": [
       "gemma4:31b",
@@ -151,9 +158,10 @@
     },
     {
       "ref": "llama3.2",
-      "provider": "ollama",
+      "provider": "nvidia",
       "model": "llama3.2",
-      "rule": "sole"
+      "rule": "stage",
+      "why": "ollama listed it until 2026-07-29; a retired id stops being decided by rule 2"
     },
     {
       "ref": "gemma4:31b",
@@ -169,17 +177,24 @@
     },
     {
       "ref": "gpt-oss:20b",
-      "provider": "nvidia",
+      "provider": "ollama-cloud",
       "model": "gpt-oss:20b",
-      "rule": "stage",
-      "why": "ollama and ollama-cloud both offer it; nothing in the string decides"
+      "rule": "sole",
+      "why": "ollama listed it until 2026-07-29; now ollama-cloud is the only owner"
     },
     {
       "ref": "qwen3.5:4b-q4_K_M",
-      "provider": "nvidia",
+      "provider": "ollama",
       "model": "qwen3.5:4b-q4_K_M",
+      "rule": "sole",
+      "why": "no catalog listed it until the measured Ollama models arrived on 2026-07-29"
+    },
+    {
+      "ref": "unknown-model:7b",
+      "provider": "nvidia",
+      "model": "unknown-model:7b",
       "rule": "stage",
-      "why": "no catalog lists it; the ollama catalog holds only llama3.2, gpt-oss:20b, qwen3:8b"
+      "why": "no catalog lists it, and the colon must not be read as a provider prefix"
     },
     {
       "ref": "meta/llama-x",
@@ -209,12 +224,12 @@
         "stage2": "anthropic"
       },
       {
-        "ref": "gpt-oss:20b",
+        "ref": "unknown-model:7b",
         "stage1": "ollama",
         "stage2": "anthropic"
       },
       {
-        "ref": "llama3.2",
+        "ref": "qwen3.5:4b-q4_K_M",
         "stage1": "ollama",
         "stage2": "ollama",
         "why": "rule 2 wins before the stage is consulted"
@@ -222,12 +237,13 @@
     ]
   },
   "ambiguity": {
-    "note": "Rule 2 demands exactly one owner. Removing one owner makes it decide again.",
-    "ref": "gpt-oss:20b",
+    "note": "Rule 2 demands exactly one owner. The shipped catalog no longer holds a model that two providers both list: replacing the Ollama list on 2026-07-29 removed the last one. The second owner is therefore added here on purpose, so the rule stays tested rather than merely unexercised. Both readers must inject it before building their groups.",
+    "ref": "gemma4:31b",
     "owners": [
       "ollama",
       "ollama-cloud"
     ],
+    "added_owner": "ollama",
     "deactivate": "ollama",
     "provider_when_deactivated": "ollama-cloud"
   },

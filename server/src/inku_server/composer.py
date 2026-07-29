@@ -1515,17 +1515,52 @@ def _compose_openai(
     timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
     client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)
 
-    tool = {
-        "type": "function",
-        "function": {
-            "name": "submit_score",
-            "description": "正規化DDLから導出した JSON Score を提出する。",
-            "parameters": _score_tool_schema(),
-        },
-    }
-
+    # A tool definition travels inside the prompt, and the Score schema is large
+    # enough to push the request past the context window: with the 28k-character
+    # system prompt, local Ollama reported 8,194 prompt tokens against 12,195 for
+    # the same messages without tools -- a longer prompt counting fewer tokens,
+    # because three quarters of it had been dropped to make room (measured
+    # 2026-07-28, Ollama 0.32.4, 16384 context). `response_format` constrains the
+    # decoder instead of the prompt, costs no tokens, and leaves the prompt whole.
+    #
     # Ollama Cloud ignores every form of structured output but honours tool calling
-    # (measured 2026-07-27), so this path stays on tools for that provider.
+    # (measured 2026-07-27), so that provider stays on tools. The remaining
+    # OpenAI-compatible providers are unmeasured here and keep the tool path.
+    #
+    # `reasoning_effort` is the other half: Ollama turns thinking on by itself when
+    # the argument is absent, and thinking shares MAX_TOKENS with the answer, so a
+    # model that thinks past the budget returns nothing. Suppressing it ran the same
+    # eight cases 8x faster, recovered the one that had been coming back empty, and
+    # left coverage identical (measured 2026-07-28). The cloud is left alone: its
+    # models emitted no thinking either way, and there the setting has been seen to
+    # cost the tool call itself.
+    if provider == "ollama":
+        structured: dict = {
+            "reasoning_effort": "none",
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "submit_score",
+                    "schema": _score_tool_schema(),
+                    "strict": True,
+                },
+            },
+        }
+    else:
+        structured = {
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "submit_score",
+                        "description": "正規化DDLから導出した JSON Score を提出する。",
+                        "parameters": _score_tool_schema(),
+                    },
+                }
+            ],
+            "tool_choice": {"type": "function", "function": {"name": "submit_score"}},
+        }
+
     with provider_slot(provider):
         resp = call_with_llm_retry(
             lambda: client.chat.completions.create(
@@ -1536,9 +1571,8 @@ def _compose_openai(
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_msg},
                 ],
-                tools=[tool],
-                tool_choice={"type": "function", "function": {"name": "submit_score"}},
                 stream=False,
+                **structured,
             )
         )
     usage = resp.usage

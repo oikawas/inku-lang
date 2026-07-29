@@ -1044,3 +1044,14 @@ info モーダルのバージョン・ビルド日時を先頭へ（**日時は 
 **分岐点が古かったが、食い違いは出なかった。** 起点 `217580f` 以降に main が同じファイルを触ったのは 2 commit で、`test_api.py` の `ddl_engine_version` ピン 4 箇所（`"2"`→`"3"`）と `APP_VERSION` の 1 行だけである。**本ブランチの新テストは層の版を 1 つも焼いていない**ので、どちらも自動マージで解けた。衝突は `web/BUILD_NUMBER` の 1 件のみ。
 
 **版数は patch。** UI 5 件とサーバー 2 件の改修だが、**保存データ・API・エディション ID のどの形式も動いていない**（設定への鍵 2 つは追加のみ）。render engine は **16**、`ddl_version` / `ddl_engine_version` は **2 / 3** のまま。
+
+---
+
+### 2026-07-29 — README の冒頭にプロジェクトのアイコンを置いた（**採番なし**・ドキュメントのみ）
+
+`no-git-sync/mascot/incu/incu-icon-512.png` を `docs/assets/incu-icon-512.png` として公開し、README 日英の冒頭（`# inku` の直上）へ中央寄せ 120px で置いた。素材のファイル名 `incu` は作者の指示でそのままにしている。
+
+- **置き場は `docs/assets/` でなければならない。** `.gitignore` は `docs/*` を無視し `!docs/assets/` `!docs/spec/` `!docs/history/` `!docs/guide/` の 4 つだけを再包含するので、それ以外に置いた画像は作者のディスクでは解決し GitHub では 404 になる。ギャラリーの 3 枚が通っているのと同じ経路である。
+- **`<p align="center">` が GitHub のサニタイザを通ることを push 前に実測した。** `POST /markdown` へ掛けたところ `align` と `width` はどちらも残り、`<img>` が `<a>` でラップされるだけだった。既存の `<table align="center">` と同じ扱いである。
+- **アプリケーションは何も変わっていない。** `web/BUILD_NUMBER` も `APP_VERSION` も動かしていない。pentala への反映も行っていない。web の favicon（`web/static/favicon*.png`、`web/src/lib/assets/favicon.svg`）は差し替えていない。
+- **GitHub のソーシャルプレビュー（リンクを共有したときのカード画像）は設定していない。** これはリポジトリ設定画面からのアップロードでしか登録できず、REST API に口が無い。README の画像とは別のものである。

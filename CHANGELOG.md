@@ -846,3 +846,14 @@ The divergence sat in **§Versions and the Identity ID (v2.4.5)** of `docs/spec/
 **The branch was cut early, and nothing disagreed.** Since `217580f`, main touched the same files in two commits: four `ddl_engine_version` pins in `test_api.py` (`"2"` → `"3"`) and one `APP_VERSION` line. **None of the new tests pin a layer version**, so both merged automatically. The only conflict was `web/BUILD_NUMBER`.
 
 **The version is a patch.** Five UI changes and two server changes, but **none of the stored-data, API or edition-ID shapes moved** (the settings gained two keys and lost none). The render engine stays at **16** and `ddl_version` / `ddl_engine_version` stay at **2 / 3**.
+
+---
+
+### 2026-07-29 — The project icon now opens the README (**no version**, documentation only)
+
+`no-git-sync/mascot/incu/incu-icon-512.png` was published as `docs/assets/incu-icon-512.png` and placed at the top of both READMEs, centred at 120px directly above `# inku`. The source file name `incu` was kept as it is, on the author's instruction.
+
+- **It has to live under `docs/assets/`.** `.gitignore` excludes `docs/*` and re-includes only `!docs/assets/`, `!docs/spec/`, `!docs/history/` and `!docs/guide/`, so an image placed anywhere else resolves on the author's disk and 404s on GitHub. This is the same path the three gallery images already travel.
+- **`<p align="center">` was measured against GitHub's sanitizer before the push.** Sent through `POST /markdown`, both `align` and `width` survived; the only change was that the `<img>` came back wrapped in an `<a>`. It is treated exactly like the existing `<table align="center">`.
+- **Nothing about the application changed.** `web/BUILD_NUMBER` and `APP_VERSION` were not moved, nothing was synced to the development host, and the web favicons (`web/static/favicon*.png`, `web/src/lib/assets/favicon.svg`) were not replaced.
+- **The GitHub social preview — the card image shown when the repository link is shared — was not set.** It can only be uploaded through the repository settings page; the REST API exposes no endpoint for it. It is a separate thing from the README image.

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/incu-icon-512.png" width="120" alt="The inku icon: small gray, black, blue, red and green squares set in a cross on a dark rounded square">
+</p>
+
 # inku
 
 **One sentence becomes a picture.**

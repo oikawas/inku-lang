@@ -20,12 +20,14 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-28"
+FROZEN_AT = "2026-07-29"
 REASON = (
-    "The Score gains a thinness axis. Thinness had been a property of the tool "
-    "name, so asking for a thin line asked for a different tool; it is a dimension, "
-    "not a touch, and it now has its own field. The DDL layer's behaviour is "
-    "unchanged - every instruction dump simply carries one more key."
+    "`Instruction.thinness` moves to the end of the declaration. The Stage 2 tool "
+    "schema reaches the model with its property order intact and an optional "
+    "field's fill rate follows its position, so a reordering that changes no "
+    "behaviour still changes which Scores are written. Nothing in this corpus "
+    "moves: it fixes the Score and watches the transform, and this version "
+    "changes which Scores arrive."
 )
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
 
@@ -176,6 +178,18 @@ def _render_cases() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
         }
     return manifest_cases, outputs
 
+def _previous_manifest() -> dict[str, Any] | None:
+    """The frozen manifest of the highest engine version below the current one."""
+    current = int(DDL_ENGINE_VERSION)
+    candidates: list[tuple[int, pathlib.Path]] = []
+    for path in REFERENCE_ROOT.glob("ddl-engine-*/manifest.json"):
+        suffix = path.parent.name.rsplit("-", 1)[-1]
+        if suffix.isdigit() and int(suffix) < current:
+            candidates.append((int(suffix), path))
+    if not candidates:
+        return None
+    return json.loads(max(candidates)[1].read_text(encoding="utf-8"))
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")) if MANIFEST_PATH.exists() else None
     cases, outputs = _render_cases()
@@ -183,8 +197,24 @@ def generate() -> None:
                 "engine_version": DDL_ENGINE_VERSION, "ddl_version": DDL_VERSION,
                 "schema_version": SCHEMA_VERSION}
     if existing is None:
+        # A version can go up without the transform moving - the declaration order
+        # of `Instruction` is such a reason. Listing every case as changed would
+        # make the manifest claim the opposite of what the version means, so the
+        # previous manifest decides, exactly as gen_render_reference.py does.
+        # Unlike the render corpus, every version keeps a body for every case:
+        # `test_ddl_reference_output_files_match_manifest` reads them all from the
+        # current directory.
+        previous = _previous_manifest()
+        if previous is None:
+            changed = sorted(cases)
+        else:
+            before = previous["cases"]
+            changed = sorted(
+                case_id for case_id, case in cases.items()
+                if case_id not in before or before[case_id]["digest"] != case["digest"]
+            )
         frozen = {"frozen_at": FROZEN_AT, "commit": _source_commit(), "reason": REASON,
-                  "changed_from_previous": sorted(cases)}
+                  "changed_from_previous": changed}
     else:
         frozen = {key: existing[key] for key in ("frozen_at", "commit", "reason", "changed_from_previous")}
     manifest = {**identity, **frozen, "cases": cases}

@@ -35,7 +35,11 @@ def test_ddl_reference_versions_and_parts() -> None:
     # engine 2 (2026-07-28): `Instruction` が `thinness` を得たので、この層の
     # 凍結出力は振る舞いが変わらないまま dump の形だけが変わった。凍結済みの
     # ディレクトリは書き換えないという規約に従い、次の版へ焼いた。
-    assert DDL_ENGINE_VERSION == "2"
+    # engine 3 (2026-07-29): `thinness` の宣言を末尾へ移した。Stage 2 の tool schema は
+    # 並び順ごと LLM へ渡るので、この層の出力は 1 バイトも動かないまま、書かれる Score が
+    # 変わる。**このコーパスが 1 件も動かないことが、この版が何をした版かの説明である**
+    # （manifest の `changed_from_previous` は空）。
+    assert DDL_ENGINE_VERSION == "3"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"

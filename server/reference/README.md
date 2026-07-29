@@ -41,7 +41,13 @@ server/reference/
 │   │   └── <permanent-case-id>.ddl
 │   └── b_coerce/
 │       └── <permanent-case-id>.json
-└── ddl-engine-2/
+├── ddl-engine-2/
+│   ├── manifest.json
+│   ├── a_expand/
+│   │   └── <permanent-case-id>.ddl
+│   └── b_coerce/
+│       └── <permanent-case-id>.json
+└── ddl-engine-3/
     ├── manifest.json
     ├── a_expand/
     │   └── <permanent-case-id>.ddl

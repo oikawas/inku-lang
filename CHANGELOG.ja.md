@@ -925,3 +925,25 @@ info モーダルのバージョン・ビルド日時を先頭へ（**日時は 
 - **どの番人もこれを捕まえられない**。`check_docs.py` のこの対は **`shape`（見出しの骨格）**なので本文中の 1 語は永久に赤くならず、`npm run lint:i18n` は web の表示文字列しか見ない。**v2.8.0 の改名から今日まで残ったのはそのためである**
 
 **検証:** `check_docs.py` 緑（宣言済みの差分 2 件のまま・内部参照 56）。**動くコードは 0 行**なので採番しない。
+
+---
+
+### Android `2.1.3-android.1` — 描画層が render engine 16 へ追随（太さの軸・微小な塗り・版の宣言）（android Build 148090 据え置き、2026-07-29）
+
+**engine 16 のうち server と共有している部分を移植し、Android も render engine 16 を名乗る。** テストは **89 件 / 失敗 15 → 99 件 / 失敗 0**。
+
+- **段 1 seed:** `serverInstructionJson` と `surfaceSeed` の**両方**の dump へ、`weight` の直後に `thinness` を足した。**seed の材料は Kotlin に 2 箇所ある**ので、1 箇所だけでは面の検査が赤で残る。`CornerShapeMaterialLayerTest` の期待値は engine 16 へ採り直した
+- **段 2 プロンプト:** server の 4 定数を丸ごと同期した（`STAGE1_*` が 18,945 / 17,932 バイト、`STAGE2_*` が 43,822 / 41,887 バイト）。`*_LITERT` は対象外
+- **段 3 太さ:** schema・coercer・線幅・材質輪郭へ `thinness` を通した。倍率は `null=1.0` / `fine=0.6` / `extra_fine=0.35`、**下限は新しい定数ではなく道具表の最小値（銀筆の 0.5）から導く**。材質輪郭は細めた幅を使い、**offset は動かさない**。**coercer は与えられた値を保存するだけで、DDL 文からは作らない**
+- **段 4 微小な塗り:** 走査線が 3 本未満で `renderFillStrokes` が `null` を返したときに限り、`fill-dab-v1` を **1 本の path** で置く。`rotring` は領域 fill のまま
+- **段 5 版:** renderer metadata と render-hash fallback の 2 箇所を `"16"` にした。engine version としての `"15"` は **0 件**
+- **面の質感 6 つ（`stipple` / `grain` / `paper_grain` / `wash` / `aquatint` / `bleed`）は実装していない。** 作者裁定 `D-20260729-android-declares-the-shared-part` により範囲外で、**部分実装のまま版を宣言する**。レポートにその 1 行がある
+- **受け入れではレポートの数値を引き写さず、再現と摂動を行った。** 全 99 件を回して 0 failures を確認し、**段の数だけ 5 つの摂動**を当てて、契約が名指しした assertion がそれぞれ赤くなることを見た。`surfaceSeed` の 1 行削除 → `test06SurfaceHatchExactParity`、日本語 Stage 1 プロンプトへ 1 文字 → `PromptFingerprintTest`、線幅の下限除去 → `ServerRendererThinnessTest`、走査線の境界 3 → 4 → `DefaultSvgRendererFillDabTest`、版を `"15"` へ戻す → `Engine16VersionTest`
+- **レポートより判別力が 1 段強かった箇所が 2 つある** — 摂動 1 と 3 は端から端までの参照 SVG 照合（`testEveryReferenceSvgMatchesOnPathsPointsAndDashes`）も赤にした。レポートはどちらも「1 件赤」と書いている
+- **`CornerShapeMaterialLayerTest` の期待値が焼いた参照 SVG 由来であることを、受け入れ側で SVG から digest を再計算して確かめた** — `31_triangle_pencil` は `contour-stroke-v1 controls-64 events-2` / 材質輪郭 2 / 粒 48 / digest `6fcd7fdf…` と `ecaf7129…`、`32_polygon_brush_thin` は `controls-102 events-1` / 材質輪郭 2 / 粒 0 / digest `1d646f6c…`。**4 つとも実装の出力ではなく凍結 SVG から再現し、テストの期待値と一致した**
+- **判別点は `01_circle_pen` 可動 × `05_circle_rotring` 不変**（engine 15 の凍結と比べて `0202eec…` → `b79faee…`、`60e774d…` は不変）。**機械の極が動かないのは 3 版連続**である
+- **`fill_dab_group` の 10 ケースだけは座標を `1e-5` 以内で比べている** — fixture が contour を小数 6 桁へ丸めて保存しており、保存済み contour を再演奏すると最終桁が 1e-6 だけずれるため（例: `495.275170` 対 `495.275171`）。**端から端までの凍結 SVG 照合は文字列 exact のまま**で、`26_tinyfill_circle_pen` に `fill-dab-v1` が出ることを含め全件緑
+- **`server/` と `server_reference/` は 1 バイトも変更していない**（`git diff 0350cc0..HEAD` が両方とも空）
+- **採番は `android/VERSION` だけ。** `APP_VERSION`（`v2.9.4`）・`web/BUILD_NUMBER`（755）・`android/BUILD_NUMBER`（148090）はいずれも不動で、**pentala 反映も不要**
+- **検証:** Android **99 件 / failures 0 / errors 0 / skipped 0**（23 XML）。マージ後の主 checkout で server **1596 passed / 31 skipped**、cli **76**、ruff（`src tests scripts`）緑、`npm run check` **0 errors / 2 warnings / 218 files**、`check_frozen_corpora.py` はバイト一致
+- **残り:** `ANDROID_SPEC.ja.md` / `.md` は **engine 15 にも未追随**（[I-013]）。本契約の範囲外

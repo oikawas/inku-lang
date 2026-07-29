@@ -257,15 +257,32 @@ def test_developer_mode_shows_the_measured_timings() -> None:
     assert by_id[STAGE2_RECOMMENDED]["speed_label"] == "1 件 50〜576s"
 
 
-def test_other_providers_keep_their_speed() -> None:
-    # The 2026-07-27 decision was about this track. Labels measured against providers
-    # that fix their own ids are out of its scope and stay where they are.
+def test_the_cloud_hides_its_timings_too() -> None:
+    # This used to assert the opposite for ollama-cloud, on the grounds that the
+    # 2026-07-27 decision was about the local track only. The cause differs -- there
+    # the machine is nobody else's, here the queue is everybody's -- but the reason
+    # for withholding is the same: gemma4:31b's median over the same four cases moved
+    # 11s -> 105s -> 35s across three runs on 2026-07-29. A number that swings that
+    # far is not a promise to anyone.
     release = {
         str(provider["id"]): provider
         for provider in model_provider_catalog(None, include_developer=False)
     }
     cloud = {str(m["id"]): m for m in release["ollama-cloud"]["models"]}
-    assert cloud["gemma4:31b"]["speed_label"] == "1〜110s"
+    for model in cloud.values():
+        assert "speed_label" not in model, model["id"]
+        assert "speed_class" not in model, model["id"]
+        # Quality still shows; only the timing is withheld.
+        assert str(model["comment_ja"]).strip()
+
+    developer_cloud = {
+        str(m["id"]): m
+        for provider in model_provider_catalog(None, include_developer=True)
+        if str(provider["id"]) == "ollama-cloud"
+        for m in provider["models"]
+    }
+    assert developer_cloud["nemotron-3-ultra"]["speed_label"] == "中央値 43s / 17〜51s (2026-07-29)"
+
     # NVIDIA is `developer_only`, so a release hides the provider outright -- there is
     # no release view of its labels to check.
     assert "nvidia" not in release

@@ -83,6 +83,32 @@ def test_paid_models_carry_no_recommendation() -> None:
         assert model.get("recommendation_level") is None, model_id
 
 
+def test_every_reachable_model_carries_a_measured_level() -> None:
+    """叩ける 8 本は全部 2026-07-29 に測ってある。1 本でも欠ければ一覧に穴が空く。"""
+    for model_id in FREE_TIER_REACHABLE:
+        level = _by_id()[model_id].get("recommendation_llm")
+        assert isinstance(level, int) and 1 <= level <= 5, (model_id, level)
+
+
+def test_nothing_reaches_five() -> None:
+    """SCORING-DESIGN の 5 は全成功かつ補正が下位 1/3。完走した 1 本は補正が重い側だった。
+
+    4 試行では共有基盤の当たり外れと実力を分けられない。5 は名乗らせない。
+    """
+    assert max(m.get("recommendation_llm") or 0 for m in VERIFIED_OLLAMA_CLOUD_MODELS) == 4
+
+
+def test_the_speed_numbers_are_dated() -> None:
+    """速度は時間帯とセットでしか意味を持たない。日付の無いラベルを置かない。"""
+    for model_id in FREE_TIER_REACHABLE:
+        assert "2026-07-29" in str(_by_id()[model_id]["speed_label"]), model_id
+
+
+def test_the_provider_hides_speed_outside_developer_mode() -> None:
+    """1 台・1 時間帯で測った数字を全利用者への約束として出さない (2026-07-27 裁定)。"""
+    assert _BY_ID["ollama-cloud"].get("speed_developer_only") is True
+
+
 def test_the_provider_definition_carries_the_flag_through() -> None:
     """カタログに書いても provider 定義を通らなければ UI へ届かない。"""
     models = {str(model["id"]): model for model in _BY_ID["ollama-cloud"]["models"]}

@@ -109,42 +109,137 @@ _OLLAMA_CLOUD_SUBSCRIPTION_ONLY = [
     "qwen3.5:397b",
 ]
 
-_OLLAMA_CLOUD_UNMEASURED = [
-    "gpt-oss:20b",
-    "gpt-oss:120b",
-    "minimax-m2.5",
-    "minimax-m3",
-    "nemotron-3-nano:30b",
-    "nemotron-3-super",
-    "nemotron-3-ultra",
-]
+# The eight the free tier can reach, measured 2026-07-29 against Build 767: four
+# Stage 2 runs each (Japanese short, English, Japanese long, and the short one
+# again), through the production path, retries off, one request at a time.
+# Raw logs: cli/out2/766-v2.9.7-ollama-cloud-bench/bench-results-ship.jsonl.
+#
+# The levels follow SCORING-DESIGN.md section 3-1. Nothing reaches 5: that asks for
+# a clean sweep with a correction load in the lowest third, and the model that swept
+# cleanly carries one of the heavier loads. The thresholds come from five models --
+# only those produced a clean run at all -- so they are thin, and four attempts
+# cannot separate a bad model from a bad afternoon on a shared service.
+#
+# Speed is stated but shown in developer mode only (see the provider definition).
+# The same request to the same model has run 1.2 and 110 seconds on the same day.
 
 VERIFIED_OLLAMA_CLOUD_MODELS: list[dict[str, object]] = [
+    {
+        "id": "nemotron-3-ultra",
+        "label": "nemotron-3-ultra",
+        "purposes": ["llm"],
+        "recommendation_llm": 4,
+        "speed_class": "unknown",
+        "speed_label": "中央値 43s / 17〜51s (2026-07-29)",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "4 実行すべて完走し、スキーマ違反は無かった。補正の発火は平均 10.0 で、"
+        + "計測した 8 本の中では多い側。所要は中央値 43 秒 (17〜51 秒)。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " Completed all four runs with no schema violations. Its correction load averaged 10.0,"
+        + " among the heavier of the eight measured. Took a median of 43 seconds (17-51).",
+    },
+    {
+        "id": "minimax-m2.5",
+        "label": "minimax-m2.5",
+        "purposes": ["llm"],
+        "recommendation_llm": 2,
+        "speed_class": "unknown",
+        "speed_label": "中央値 26s / 16〜26s (2026-07-29)",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "4 実行のうち 3 回完走し、1 回は空の応答が返った。補正の発火は平均 8.0。"
+        + "所要は中央値 26 秒 (16〜26 秒)。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " Completed three of four runs; the fourth came back empty. Correction load averaged 8.0."
+        + " Took a median of 26 seconds (16-26).",
+    },
+    {
+        "id": "nemotron-3-super",
+        "label": "nemotron-3-super",
+        "purposes": ["llm"],
+        "recommendation_llm": 2,
+        "speed_class": "unknown",
+        "speed_label": "中央値 11s / 5〜14s (2026-07-29)",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "4 実行のうち 3 回完走し、1 回は変奏の指定がスキーマに合わなかった。補正の発火は平均 8.7。"
+        + "所要は中央値 11 秒 (5〜14 秒) で、計測した中では速い側。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " Completed three of four runs; the fourth wrote a variation the schema does not accept."
+        + " Correction load averaged 8.7. Took a median of 11 seconds (5-14), among the faster measured.",
+    },
     {
         "id": "gemma4:31b",
         "label": "gemma4:31b",
         "purposes": ["llm"],
+        "recommendation_llm": 2,
         "speed_class": "unknown",
-        "speed_label": "1〜110s",
+        "speed_label": "中央値 35s / 7〜64s (2026-07-29)",
         "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
-        + "第一段階は実測 6/6 応答。第二段階は tool calling で通る (構造化出力の指定は無視される)。"
-        + "同じ要求の所要が 1 秒から 110 秒まで振れるため、待ち時間は約束できない。",
+        + "4 実行のうち 2 回完走。1 回は空の応答、1 回は色語彙に無い色 (黄) を書いた"
+        + "(Score の色は 6 語しかない)。補正の発火は平均 11.5 で最も多い。"
+        + "所要は中央値 35 秒 (7〜64 秒)。",
         "comment_en": _OLLAMA_CLOUD_NOTICE_EN
-        + " Stage 1 answered 6 of 6 attempts; Stage 2 works through tool calling, since structured output"
-        + " requests are ignored. The same request took anywhere from 1 to 110 seconds, so no wait can be promised.",
+        + " Completed two of four runs: one came back empty, and one named a colour the Score has no"
+        + " word for (yellow; the vocabulary holds six). Correction load averaged 11.5, the heaviest"
+        + " measured. Took a median of 35 seconds (7-64).",
     },
-    *[
-        {
-            "id": model_id,
-            "label": model_id,
-            "purposes": ["llm"],
-            "speed_class": "unknown",
-            "speed_label": "未計測",
-            "comment_ja": _OLLAMA_CLOUD_NOTICE_JA + "品質は未計測。",
-            "comment_en": _OLLAMA_CLOUD_NOTICE_EN + " Its quality has not been measured.",
-        }
-        for model_id in _OLLAMA_CLOUD_UNMEASURED
-    ],
+    {
+        "id": "nemotron-3-nano:30b",
+        "label": "nemotron-3-nano:30b",
+        "purposes": ["llm"],
+        "recommendation_llm": 2,
+        "speed_class": "unknown",
+        "speed_label": "中央値 13s (2026-07-29)",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "4 実行のうち完走は 1 回。3 回は命令の並びがスキーマに合わなかった。"
+        + "補正の発火は平均 11.0。完走した 1 回の所要は 13 秒。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " One of four runs completed; the other three wrote instruction lists the schema rejects."
+        + " Correction load averaged 11.0. The one clean run took 13 seconds.",
+    },
+    {
+        "id": "gpt-oss:120b",
+        "label": "gpt-oss:120b",
+        "purposes": ["llm"],
+        "recommendation_llm": 1,
+        "speed_class": "unknown",
+        "speed_label": "完走なし (2026-07-29)",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "判定できた 3 実行で完走は 0。2 回は背景の指定がスキーマに合わなかった。"
+        + "残り 1 実行は第一段階が 120 秒応答せず、判定から外した。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " None of the three judged runs completed; two wrote a background the schema rejects."
+        + " A fourth run is not counted: Stage 1 did not answer within 120 seconds.",
+    },
+    {
+        "id": "gpt-oss:20b",
+        "label": "gpt-oss:20b",
+        "purposes": ["llm"],
+        "recommendation_llm": 1,
+        "speed_class": "unknown",
+        "speed_label": "完走なし (2026-07-29)",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "判定できた 3 実行すべてで応答が空だった。このモデルは思考を止めると道具呼び出し自体を"
+        + "返さなくなる (2026-07-29 実測) が、止めない場合も Score は妥当にならなかった。"
+        + "残り 1 実行は第一段階が 120 秒応答せず、判定から外した。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " All three judged runs came back empty. Suppressing this model's thinking costs it the tool"
+        + " call outright (measured 2026-07-29), and leaving the thinking on did not produce a valid"
+        + " Score either. A fourth run is not counted: Stage 1 did not answer within 120 seconds.",
+    },
+    {
+        "id": "minimax-m3",
+        "label": "minimax-m3",
+        "purposes": ["llm"],
+        "recommendation_llm": 1,
+        "speed_class": "unknown",
+        "speed_label": "完走なし (2026-07-29)",
+        "comment_ja": _OLLAMA_CLOUD_NOTICE_JA
+        + "4 実行すべてで応答が空だった。思考を止めないと答えに辿り着かないモデルで、"
+        + "止めた状態でも Score は返らなかった。",
+        "comment_en": _OLLAMA_CLOUD_NOTICE_EN
+        + " All four runs came back empty. This model cannot reach an answer at all unless its thinking"
+        + " is suppressed, and with it suppressed no Score came back either.",
+    },
     *[
         {
             "id": model_id,

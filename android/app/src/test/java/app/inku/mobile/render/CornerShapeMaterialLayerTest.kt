@@ -9,13 +9,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * engine 15 gave the corner shapes the material layer square already had.
+ * engine 16 gives the corner shapes the material layer square already had.
  *
- * The frozen reference corpus cannot see this: not one of its 25 cases is a triangle or a
- * polygon. Deleting the call outright leaves the whole suite green, which is the failure
- * this file exists to close - a correct function that nothing ever calls.
+ * The frozen engine 16 reference corpus includes both corner cases, and these focused assertions
+ * also make the material-layer contract explicit at the element and digest levels.
  *
- * The expected values were measured from the server (v2.9.0, render engine 15) at
+ * The expected values were measured from the server (v2.9.4, render engine 16) at
  * render_seed 12345, not from this port. With them in place the port's output is
  * element-for-element identical to the server's for all three cases, down to the 48
  * powder specks; the only remaining difference in the document is the background rect's
@@ -91,21 +90,21 @@ class CornerShapeMaterialLayerTest {
     fun testATrianglePencilCarriesTheServersMaterialLayer() {
         val svg = render(triangle("pencil"))
         assertEquals(
-            listOf("contour-stroke-v1 controls-64 events-0", "material-outline", "material-outline"),
+            listOf("contour-stroke-v1 controls-64 events-2", "material-outline", "material-outline"),
             classes(svg),
         )
         val points = outlinePoints(svg)
         assertEquals("two strata, as the pencil table says", 2, points.size)
         assertEquals(
             "the strata must ride the performed centreline exactly as the server draws them",
-            "c9e24c029a9bb1128b4677dff5a8efd740a0fd53c915d4a4a0ba0eb486e9e47a",
+            "6fcd7fdf298bde33b9cb89e895389b817876883b28cbbcf7660514d37ffd98bc",
             sha256(points.joinToString("|")),
         )
         val specks = speckPositions(svg)
         assertEquals("pencil powder, counted by perimeter", 48, specks.size)
         assertEquals(
             "every grain must land where the server puts it, spread by the ladder's 1.8",
-            "a2efb96e3828d342423105103ae5d79cb86b7834fba7c059b33ba60d3e646dc3",
+            "ecaf7129c3934d62cd307bb93d489be37957c5ddf8087d8ec4601ab169920a4d",
             sha256(specks.joinToString("|")),
         )
     }
@@ -114,13 +113,13 @@ class CornerShapeMaterialLayerTest {
     fun testAPolygonBrushThinCarriesTheServersMaterialLayer() {
         val svg = render(hexagon("brush_thin"))
         assertEquals(
-            listOf("contour-stroke-v1 controls-102 events-0", "material-outline", "material-outline"),
+            listOf("contour-stroke-v1 controls-102 events-1", "material-outline", "material-outline"),
             classes(svg),
         )
         val points = outlinePoints(svg)
         assertEquals(2, points.size)
         assertEquals(
-            "02fca4c7c951d6b72dbcceeb9332ed6722475b648aa32d9a133f4630ef811144",
+            "1d646f6c54bd7956eff6d3195ffe13aadc3876767c992953ca96a0e9a7788f50",
             sha256(points.joinToString("|")),
         )
         assertEquals("brush_thin is given no powder", emptyList<String>(), speckPositions(svg))

@@ -391,6 +391,23 @@ SCORES: dict[str, dict] = {
     "19_circle_computer": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "computer"}]},
     "20_line_computer_wide": {"canvas": {"aspect": "wide"}, "instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "weight": "computer"}]},
     "21_hatch_computer": {"instructions": [{"primitive": "square", "position": [0.25, 0.25], "size": [0.5, 0.5], "weight": "computer", "surface": {"texture": "hatch", "density": 0.5, "direction": "diagonal_rising"}}]},
+    # engine 16. 26 is a fill too small to scan: engine 15 flattened it into a
+    # region fill, engine 16 places it as one stroke. 27-30 are the thickness
+    # axis: 27 thins the ink itself, 28 is one of the two tools whose material
+    # layer width is proportional to the ink (so the layer has to follow it),
+    # 29 is the thinnest tool, which accepts no thinning at all, and 30 sends
+    # the axis through the fill spacing, where it decides how many strokes fit.
+    "26_tinyfill_circle_pen": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.005, "weight": "pen", "filled": True}]},
+    "27_circle_pen_extra_fine": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "pen", "thinness": "extra_fine"}]},
+    "28_circle_brush_thick_fine": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "brush_thick", "thinness": "fine"}]},
+    "29_circle_silverpoint_extra_fine": {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "silverpoint", "thinness": "extra_fine"}]},
+    "30_square_filled_pencil_fine": {"instructions": [{"primitive": "square", "position": [0.3, 0.3], "size": [0.4, 0.4], "weight": "pencil", "filled": True, "thinness": "fine"}]},
+    # engine 15 gave the corner shapes the material layer, and not one of the
+    # cases above is a triangle or a polygon, so the port had to hold its own
+    # hand-copied digests for them (CornerShapeMaterialLayerTest). These two put
+    # the same shapes in the corpus, where the walk over the index reaches them.
+    "31_triangle_pencil": {"instructions": [{"primitive": "triangle", "position": [0.3, 0.3], "size": [0.4, 0.4], "weight": "pencil"}]},
+    "32_polygon_brush_thin": {"instructions": [{"primitive": "polygon", "center": [0.5, 0.5], "radius": 0.25, "sides": 6, "weight": "brush_thin"}]},
 }
 
 # Each of these repeats the Score of a tracked OFF render, so the pair is the
@@ -614,6 +631,14 @@ def proportional_fixtures() -> None:
             "MATERIAL_INTENSITY_LEVEL": renderer.MATERIAL_INTENSITY_LEVEL,
             "MATERIAL_INTENSITY_SELECTED": renderer.MATERIAL_INTENSITY[renderer.MATERIAL_INTENSITY_LEVEL],
             "WEIGHT_TO_STROKE_WIDTH": renderer.WEIGHT_TO_STROKE_WIDTH,
+            # engine 16 stage 3: the thickness axis. A multiplier on the tool's own
+            # width, with a floor at the thinnest tool, so no amount of thinning
+            # reorders the tools.
+            "THINNESS_TO_WIDTH_SCALE": {
+                ("null" if k is None else k): v
+                for k, v in renderer.THINNESS_TO_WIDTH_SCALE.items()
+            },
+            "MIN_STROKE_WIDTH": renderer.MIN_STROKE_WIDTH,
         },
         "canvases": {a: {"width": c.width, "height": c.height, "unit": c.unit, "unit_scale": renderer._unit_scale(c)} for a, c in canvases.items()},
         "representative_size_px": [],
@@ -622,6 +647,8 @@ def proportional_fixtures() -> None:
         "segment_count": [],
         "stroke_sample_count": [],
         "stroke_width_px": [],
+        "stroke_width_thinness_px": [],
+        "material_outline_thinness": [],
         "speck_count": [],
     }
 
@@ -651,6 +678,29 @@ def proportional_fixtures() -> None:
         for weight in sorted(renderer.WEIGHT_TO_STROKE_WIDTH):
             out["stroke_width_px"].append({"aspect": aspect, "weight": weight,
                                            "value": renderer._stroke_width_px(weight, canvas)})
+            # Every tool at every thinness, so a port that drops the floor shows up
+            # as silverpoint going below 0.5 and as the tool order collapsing.
+            for thinness in (None, "fine", "extra_fine"):
+                out["stroke_width_thinness_px"].append({
+                    "aspect": aspect, "weight": weight, "thinness": thinness,
+                    "value": renderer._stroke_width_px(weight, canvas, thinness),
+                })
+
+        # The material layer follows the thinned ink where its width is proportional
+        # to it, and keeps its own distance: strength is not distance (engine 15).
+        # The tool list comes from the specs themselves so a new tool cannot slip
+        # past this fixture.
+        for weight in sorted(renderer._MATERIAL_OUTLINE_SPECS):
+            for thinness in (None, "fine", "extra_fine"):
+                layers = renderer._material_outline_profile(weight, canvas, thinness)
+                out["material_outline_thinness"].append({
+                    "aspect": aspect, "weight": weight, "thinness": thinness,
+                    "layers": [
+                        {"offset": round(offset, 9), "width": round(width, 9),
+                         "opacity": round(opacity, 9), "dash": dash}
+                        for offset, width, opacity, dash in layers
+                    ],
+                })
 
     (OUT / "renderer_proportional.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
@@ -720,6 +770,8 @@ def fill_and_arc_fixtures() -> None:
             "FILL_SPACING_JITTER": renderer.FILL_SPACING_JITTER,
             "FILL_MIN_SCANLINES": renderer.FILL_MIN_SCANLINES,
             "FILL_MIN_STROKE_WIDTHS": renderer.FILL_MIN_STROKE_WIDTHS,
+            "FILL_DAB_SAMPLES": renderer.FILL_DAB_SAMPLES,
+            "FILL_DAB_MIN_TRAVEL": renderer.FILL_DAB_MIN_TRAVEL,
         },
         "fill_scan_angle": [
             {"seed": seed, "value": round(renderer._fill_scan_angle(seed), 12)}
@@ -746,6 +798,7 @@ def fill_and_arc_fixtures() -> None:
         ],
         "scanline_segments": [],
         "fill_stroke_group": [],
+        "fill_dab_group": [],
         "surface_hatch": [],
         "arc_centerline": [],
     }
@@ -764,30 +817,43 @@ def fill_and_arc_fixtures() -> None:
         "circle_filled_pen": (fill_shapes["circle_pen"], "square"),
         "tiny_dot_pencil": (fill_shapes["tiny_dot_pencil"], "square"),
     }
-    for name, (ins, aspect) in fill_group_cases.items():
-        canvas = canvases[aspect]
-        seed = renderer._seed_for_instruction(ins, RENDER_SEED)
+    # `svgwrite` keeps a path's `d` in the element's command list, not in
+    # `attribs`, so reading `attribs["d"]` yields an empty string and any test
+    # comparing it is vacuously true. Serialise the element and read `d` back.
+    def path_d_list(group):
+        if group is None:
+            return []
+        return [
+            re.search(r' d="([^"]*)"', element.tostring()).group(1)
+            for element in group.elements
+        ]
+
+    def contour_for(ins, canvas):
         if ins.primitive == "square":
             assert ins.position is not None and ins.size is not None
             px, py = renderer._px(ins.position, canvas)
             w = ins.size[0] * canvas.width
             h = ins.size[1] * canvas.height
-            contour = [(px, py), (px + w, py), (px + w, py + h), (px, py + h)]
-        else:
-            assert ins.center is not None and ins.radius is not None
-            ccx = ins.center[0] * canvas.width
-            ccy = ins.center[1] * canvas.height
-            rr = ins.radius * canvas.unit
-            count = renderer._stroke_sample_count(2 * math.pi * rr, canvas)
-            contour = [
-                (ccx + rr * math.cos(2 * math.pi * i / count), ccy + rr * math.sin(2 * math.pi * i / count))
-                for i in range(count)
-            ]
+            return [(px, py), (px + w, py), (px + w, py + h), (px, py + h)]
+        assert ins.center is not None and ins.radius is not None
+        ccx = ins.center[0] * canvas.width
+        ccy = ins.center[1] * canvas.height
+        rr = ins.radius * canvas.unit
+        count = renderer._stroke_sample_count(2 * math.pi * rr, canvas)
+        return [
+            (ccx + rr * math.cos(2 * math.pi * i / count), ccy + rr * math.sin(2 * math.pi * i / count))
+            for i in range(count)
+        ]
+
+    for name, (ins, aspect) in fill_group_cases.items():
+        canvas = canvases[aspect]
+        seed = renderer._seed_for_instruction(ins, RENDER_SEED)
+        contour = contour_for(ins, canvas)
         attrs = {"stroke": "#111111", "fill": "#111111", "fill_opacity": 1.0, "stroke_opacity": 1.0}
         group = renderer._render_fill_strokes(
             svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
         )
-        paths = [] if group is None else [e.attribs.get("d", "") for e in group.elements]
+        paths = path_d_list(group)
         out["fill_stroke_group"].append({
             "case": name,
             "aspect": aspect,
@@ -801,6 +867,62 @@ def fill_and_arc_fixtures() -> None:
             "class": None if group is None else group.attribs.get("class"),
             "stroke_count": len(paths),
             "path_d": paths,
+        })
+
+    # engine 16 stage 2: a fill too small to scan is not flattened into a region
+    # fill, it is placed as one stroke. The cases below pin the routing decision
+    # itself (`_interior_fill`), not just the dab: the machine tool still gets a
+    # region fill, the sizes either side of the measured ~3% boundary go opposite
+    # ways, and the thinned dab is narrower than the default one.
+    fill_dab_cases = {
+        "tiny_circle_pen": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.005, weight="pen", filled=True),
+        "tiny_circle_pencil": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.004, weight="pencil", filled=True),
+        "tiny_circle_brush_thick": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.005, weight="brush_thick", filled=True),
+        "tiny_circle_silverpoint": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.005, weight="silverpoint", filled=True),
+        # The machine pole: rotring never leaves the region fill, at any size.
+        "tiny_circle_rotring": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.005, weight="rotring", filled=True),
+        # A sliver still has enough scanlines to be scanned, so `interior_class`
+        # stays a scan here; the recorded dab is what the long axis would give.
+        "sliver_square_pen": Instruction(primitive="square", position=(0.4, 0.49), size=(0.2, 0.004), weight="pen", filled=True),
+        # Either side of the boundary measured at 2.9-3.2% of the short side.
+        "boundary_below_pen": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.014, weight="pen", filled=True),
+        "boundary_above_pen": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.017, weight="pen", filled=True),
+        "large_circle_pen": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.2, weight="pen", filled=True),
+        # The thickness axis does NOT narrow a dab this small: the width is
+        # `max(tool width, short axis)` and the shape wins (2.0 and 0.7 both lose
+        # to 10px). What moves is the seed, so the same dab is played by another
+        # hand. `base_width` records the tool width either way.
+        "tiny_circle_pen_extra_fine": Instruction(primitive="circle", center=(0.5, 0.5), radius=0.005, weight="pen", filled=True, thinness="extra_fine"),
+    }
+    for name, ins in fill_dab_cases.items():
+        canvas = canvases["square"]
+        contour = contour_for(ins, canvas)
+        attrs = {"stroke": "#111111", "fill": "#111111", "fill_opacity": 1.0, "stroke_opacity": 1.0}
+        scan = renderer._render_fill_strokes(
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+        )
+        dab = renderer._render_fill_dab(
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+        )
+        chosen, region_fill = renderer._interior_fill(
+            svgwrite.Drawing(), ins, contour, attrs, canvas, RENDER_SEED, use_filters=False
+        )
+        dab_paths = path_d_list(dab)
+        out["fill_dab_group"].append({
+            "case": name,
+            "weight": ins.weight,
+            "thinness": ins.thinness,
+            "seed": renderer._seed_for_instruction(ins, RENDER_SEED),
+            "contour": poly(contour),
+            "base_width": round(renderer._stroke_width_px(ins.weight, canvas, ins.thinness), 9),
+            # None here is what engine 15 called the degradation point.
+            "scan_class": None if scan is None else scan.attribs.get("class"),
+            "dab_class": None if dab is None else dab.attribs.get("class"),
+            "dab_path_count": len(dab_paths),
+            "dab_path_d": dab_paths,
+            # What `_interior_fill` actually returns for this instruction.
+            "interior_class": None if chosen is None else chosen.attribs.get("class"),
+            "interior_region_fill": region_fill,
         })
 
     for contour_name, contour in contours.items():

@@ -63,6 +63,10 @@ internal object ServerScoreCoercer {
         val data = ServerScoreCompat.migrateInstruction(JSONObject(source.toString())).put("primitive", primitive)
         data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray") } ?: "black")
         data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint", "computer") } ?: "pen")
+        if (data.has("thinness")) {
+            val thinness = data.optString("thinness").takeIf { it in setOf("fine", "extra_fine") }
+            if (thinness != null) data.put("thinness", thinness) else data.remove("thinness")
+        }
         data.put("style", data.optString("style", "solid").ifBlank { "solid" })
         if (!data.has("filled")) data.put("filled", false)
         if (data.has("mode")) {
@@ -89,7 +93,7 @@ internal object ServerScoreCoercer {
         // Strip unknown extra fields to comply with ConfigDict(extra="forbid")
         val allowedKeys = setOf(
             "primitive", "from", "to", "center", "radius", "sides", "position", "size",
-            "angle_start", "angle_end", "rotation", "filled", "style", "weight",
+            "angle_start", "angle_end", "rotation", "filled", "style", "weight", "thinness",
             "mode", "carve_depth", "color", "color_hint", "variation", "arrangement",
             "at", "relation", "surface",
         )

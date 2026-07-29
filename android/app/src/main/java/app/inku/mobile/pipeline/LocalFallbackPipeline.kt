@@ -1604,7 +1604,7 @@ class LocalFallbackPipeline(
         val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
         val renderSeed = canonicalSeed(metadata.opt("render_seed") ?: metadata.opt("seed"))
         val engineId = metadata.optString("render_engine_id", "default").ifBlank { "default" }
-        val engineVersion = metadata.optString("render_engine_version", "15").ifBlank { "15" }
+        val engineVersion = metadata.optString("render_engine_version", "16").ifBlank { "16" }
         val colorCatalogId = metadata.optString("render_color_catalog_id", catalogId).ifBlank { catalogId }
         val wild = metadata.optBoolean("render_wild", metadata.optBoolean("wild", false))
 

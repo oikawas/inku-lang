@@ -7,7 +7,7 @@ import kotlin.math.sqrt
 import org.json.JSONObject
 
 internal object ServerRendererMaterial {
-    private data class OutlineProfile(val offset: Double, val width: Double, val opacity: Double, val dash: String?)
+    internal data class OutlineProfile(val offset: Double, val width: Double, val opacity: Double, val dash: String?)
     private data class SpeckProfile(val count: Int, val spread: Double, val radius: Double, val opacity: Double)
 
     // render engine 15: strength is darkness, not distance. The intensity ladder answered
@@ -222,7 +222,7 @@ internal object ServerRendererMaterial {
                 val amounts = if (weight == "crayon") listOf(-3.2, -1.4, 2.0, 3.6) else listOf(-3.5, 2.8, 5.0)
                 val (mark, gap) = if (weight == "crayon") Pair(6.0, 6.0) else Pair(14.0, 9.0)
                 amounts.forEachIndexed { k, amount ->
-                    val baseW = ServerRendererStyle.strokeWidth(weight, unit)
+                    val baseW = ServerRendererStyle.strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
                     val layerAttrs = attrs.copy(
                         strokeWidth = Math.max(0.8 * scale, baseW * (if (weight == "crayon") 0.25 else 0.30)),
                         strokeOpacity = layerOpacity(if (weight == "crayon") 0.24 else 0.38)
@@ -244,7 +244,7 @@ internal object ServerRendererMaterial {
         val weight = ins.optString("weight", "pen")
         val seed = ins.toString()
         val out = StringBuilder()
-        materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
+        materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
             out.append("""<circle cx="${ServerRendererGeometry.fmt(cx)}" cy="${ServerRendererGeometry.fmt(cy)}" r="${ServerRendererGeometry.fmt(max(0.0, r + offset))}" ${outline.toSvgAttributes()} class="material-outline"/>""")
         }
@@ -258,7 +258,7 @@ internal object ServerRendererMaterial {
         val weight = ins.optString("weight", "pen")
         val seed = ins.toString()
         val out = StringBuilder()
-        materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
+        materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
             out.append("""<ellipse cx="${ServerRendererGeometry.fmt(cx)}" cy="${ServerRendererGeometry.fmt(cy)}" rx="${ServerRendererGeometry.fmt(max(0.0, rx + offset))}" ry="${ServerRendererGeometry.fmt(max(0.0, ry + offset))}" ${outline.toSvgAttributes()} class="material-outline"/>""")
         }
@@ -272,7 +272,7 @@ internal object ServerRendererMaterial {
         val weight = ins.optString("weight", "pen")
         val seed = ins.toString()
         val out = StringBuilder()
-        materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
+        materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
             out.append("""<rect x="${ServerRendererGeometry.fmt(x - offset)}" y="${ServerRendererGeometry.fmt(y - offset)}" width="${ServerRendererGeometry.fmt(max(0.0, w + offset * 2.0))}" height="${ServerRendererGeometry.fmt(max(0.0, h + offset * 2.0))}" ${outline.toSvgAttributes()} class="material-outline"/>""")
         }
@@ -286,7 +286,7 @@ internal object ServerRendererMaterial {
         val weight = ins.optString("weight", "pen")
         val seed = ins.toString()
         val out = StringBuilder()
-        materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
+        materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }).forEach { (offset, width, opacity, dash) ->
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
             out.append("""<path class="material-outline" d="${ServerRendererGeometry.arcPathD(cx, cy, max(0.0, r + offset), start, end)}" ${outline.toSvgAttributes()}/>""")
         }
@@ -335,7 +335,7 @@ internal object ServerRendererMaterial {
         val weight = ins.optString("weight", "pen")
         val seedStr = instructionSeed ?: ServerRendererGeometry.seedForInstruction(ins, renderSeed).toString()
         val out = StringBuilder()
-        materialOutlineProfile(weight, unit).forEach { (offset, width, opacity, dash) ->
+        materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }).forEach { (offset, width, opacity, dash) ->
             val pts = offsetPerformedPath(path, offset, closed, center)
             val ptsStr = pts.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
             val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
@@ -353,9 +353,9 @@ internal object ServerRendererMaterial {
     }
 
 
-    private fun materialOutlineProfile(weight: String, unit: Double): List<OutlineProfile> {
+    internal fun materialOutlineProfile(weight: String, unit: Double, thinness: String? = null): List<OutlineProfile> {
         val scale = unit / 1000.0
-        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, thinness)
         val offsetGain = OUTLINE_OFFSET_GAIN
         val opacityGain = OUTLINE_OPACITY_GAIN
         val offsetFloor = OUTLINE_OFFSET_FLOOR_RATIO * unit

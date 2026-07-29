@@ -925,3 +925,40 @@ The development server still held `android/` at 174M and `macos_swift/` at 587M.
 - **A third copy (1.9M) sat in the bench container source tree.** All three were removed.
 - **The exclusion was written down permanently.** `android` and `macos_swift` were added to `.dockerignore`, and the standing rule was placed in three operational documents. `server/Dockerfile` and `web/Dockerfile` `COPY` `shared/`, `server/` and `web/` by name, so **the image contents are unchanged**; what shrinks is only the context sent to the Docker daemon.
 - **`macos_swift/` is not in Git at all** (`.git/info/exclude`). Its only copy is the Mac working tree, so **the server copy was never a backup**.
+
+### v2.9.9 — The machine's notes leave the color channel (Build 780, 2026-07-30)
+
+Stage 1-A of the color catalog work. **`color_hint` had been carrying four roles at once** — a color description, coerce's idempotency guard, the renderer's own effect annotation, and a descriptive marker. Only the machine-written diagnostics move, into a new `Instruction.note`.
+
+#### What was separated, and what stayed
+
+- **85 of the 92 write sites moved to `note`** (72 in compose, 3 in normalize, 10 in the API). **The 7 that stayed are descriptive markers** (`soft light`, `scent layer`, `waiting buds`, `five-sense presence`, `membrane haze`, `reflection`, `fading`): the renderer reads those as the character of the drawing, not as a diagnostic. **A field's roles are counted by its readers, not its writers.**
+- **The 20 read-back guards followed.** A branch that read `color_hint` to stay idempotent would, if left behind, stack the same diagnostic twice on the second coerce.
+- **`note` is declared second.** An optional field's fill rate follows its declaration position monotonically and **rises toward the tail** (measured: 0% at position 0, 89% at position 23). `note` is a field the model **must not** fill, so the rule was used in reverse and it was put at the front; both prompts also state that Stage 2 never emits it. `thinness` stays last, untouched.
+- **Instructions carrying `color_hint` in new work fell from 74.7% to 7.6%.** That 7.6% **equals the share of instructions that actually carry a color description** — what remains is only what talks about color. **The 2825 cases where a diagnostic had misfired color resolution are now 0.**
+
+#### Only the color moved
+
+- **Across the 14 cases that traverse coerce: the performance seed is unchanged in 14/14, the path geometry (a digest of the `d` attributes) is unchanged in 14/14, and the color attributes moved in 6.** `color_hint` moved in 8 of them, and **in 2 of those the color did not change** — the diagnostic had not hit a color word, so nothing had misfired there.
+- This holds because of the **seed allowlist** introduced in engine 15. Up to engine 14 the seed came from an instruction's whole dump, so **editing `color_hint` alone moved the strokes**. It is now an allowlist of 20 fields, and `color`, `color_hint` and `note` are all outside it.
+- **So "if the strokes moved, it is not the effect of 1-A but an accident" is a usable discriminator.** Perturbing `note` into the allowlist turns `test_seed_payload` red.
+
+#### The corpus could not see the subject of this change
+
+- **Acceptance found one missing discriminator.** The implementation added a projection to the DDL corpus generator that folded `note` back into `color_hint`, **keeping the frozen files byte-identical**, on the grounds that machine-only diagnostics belong outside the DDL engine identity.
+- **With the projection removed, all 14 coerce cases of `ddl-engine-3` and the manifest moved.** The contract said a byte-identical corpus was the correct outcome, but **that is true only of the render corpus** (which never calls `coerce_score`); **the DDL corpus does traverse coerce**.
+- **What settled it: each frozen file already pins `branch_report` with its 34 coerce branch counters.** Machine diagnostics are part of this artifact by construction, so there is no ground for keeping one of them out.
+- **Regressing the write channel back to `color_hint` left `check_frozen_corpora.py` green while the projection stood.** Since **CI runs corpus regeneration and not one test**, that meant CI was blind to the whole subject of this change. With the projection removed and the 14 files plus the manifest refrozen, the same perturbation turns **red, naming 6 files**.
+- **`DDL_ENGINE_VERSION` stays 3.** What moved is the recorded output, which is what "freeze what moved" means. **The render corpus (`render-engine-16`, 365 cases / 333 SVG files) is byte-identical.**
+
+#### The build number skipped
+
+**777, 778 and 779 were taken by parallel branches, and 778 and 779 were each written by two of them.** This version takes 780. **The counter is shared, not per branch — and it moves between measuring and claiming.** This version had already been numbered 779 and written into the documents when a re-measurement just before deployment found the development host sitting at 779 (written by another session at 08:04:50), so it was renumbered to 780. **Measure again immediately before deploying.**
+
+#### Verification
+
+server **1695 passed / 31 skipped** (+27), cli 76, ruff clean, `npm run check` 219 files / 0 errors / 2 warnings, `check_frozen_corpora.py` byte-identical, `check_docs.py` green.
+
+**The implementing session's perturbations were 112/112** (92 writes, 20 read-backs). **The accepting session applied five of its own and all five went red** (adding `note` to the seed allowlist, regressing the write channel, regressing a read-back guard, moving the declaration to the tail, and the corpus blind spot). **The fifth did not go red, so the corpus was refrozen on the spot.**
+
+**The version is a patch.** The schema gains an optional field defaulting to `None`, and stored Scores validate with or without it (`extra="forbid"` does not trip on an addition). The render engine stays at **16** and `ddl_version` / `ddl_engine_version` at **2 / 3**.

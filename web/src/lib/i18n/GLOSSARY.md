@@ -137,7 +137,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 
 | 語 | 許される意味 | 許容キー（これ以外は error） |
 |---|---|---|
-| `generat*` | **世代**の意味、または PNG/SVG のファイル生成という技術文脈 | `aiRefineVisionModeHint` / `aiRefineDirectionRandomHint` / `aiRefineGensLabel` / `settingsDbBackupMaxGenerations` / `okugakiDescription` / `okugakiBranchConfirm` / `okugakiProgress` / `svgExportDisplayUse` / `svgExportEditableFeature` / `svgExportCompatFeature` / `provenanceLabelGeneration` / `provenanceHintGeneration`（生成情報ドロワーの**世代**の行） / `historyGenerationTitle`（履歴管理の作品パネルの**世代番号**） |
+| `generat*` | **世代**の意味、または PNG/SVG のファイル生成という技術文脈 | `aiRefineVisionModeHint` / `aiRefineDirectionRandomHint` / `aiRefineGensLabel` / `settingsDbBackupMaxGenerations` / `okugakiDescription` / `okugakiBranchConfirm` / `okugakiProgress` / `svgExportDisplayUse` / `svgExportEditableFeature` / `svgExportCompatFeature` / `provenanceLabelGeneration` / `provenanceHintGeneration`（生成情報ドロワーの**世代**の行） / `historyGenerationTitle`（履歴管理の作品パネルの**世代番号**） / `settingsDbBackupListGeneration` / `settingsDbBackupEstimatedDiskHint`（DB バックアップの**保存世代**） |
 | `prompt` | **LLM プロンプトそのもの**の表示 | `tabPrompts` / `tooltipCanvasTabPrompts` / `promptStage1System` / `promptStage2System` / `CanvasPanel` の provenance 説明文 / `provenanceLabelStage1PromptDigest` / `provenanceLabelStage1PromptBaseDigest` / `provenanceLabelStage2PromptDigest` と対応する `provenanceHint*`（プロンプト digest の行。digest はプロンプトそのものの指紋なので description では言い換えられない） |
 | `creat*` | **完了・日時・肩書き** | `appInfoCreatorTitle` / `settingsDbBackupRunDone` / `bootstrapAdminNote` / `historyCreatedAtHeader` / `Created`（列見出し） |
 | `image` | **Vision が実際に画像を見る**文脈 | `modelSelectionVisionHint` / `aiRefineVisionModeHint` / `aiRefineVisionReading` / `aiRefineVisionSourceError` |

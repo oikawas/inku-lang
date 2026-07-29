@@ -12,7 +12,7 @@ import secrets
 import shutil
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, time as clock_time, timedelta
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
@@ -406,8 +406,13 @@ _MODEL_SETTINGS_KEY = "model_connection_settings"
 _DB_BACKUP_DEFAULT_SETTINGS = {
     "interval_days": 7,
     "max_generations": 4,
+    "backup_hour": 3,
+    "backup_minute": 0,
     "last_auto_backup_at": 0,
 }
+# How many entries the status payload carries. The counts and the total size are
+# reported for every file, so a truncated list never hides how much disk is used.
+_DB_BACKUP_LIST_LIMIT = 50
 _HISTORY_INDEX_MIGRATIONS = (
     ("ix_history_user_id", "CREATE INDEX IF NOT EXISTS ix_history_user_id ON history (user_id)"),
     (
@@ -1382,6 +1387,16 @@ def _normalize_db_backup_settings(settings: dict | None) -> dict:
         if max_generations < 1 or max_generations > 100:
             raise ValueError("backup max generations must be between 1 and 100")
         clean["max_generations"] = max_generations
+    for key, limit in (("backup_hour", 23), ("backup_minute", 59)):
+        if key not in settings:
+            continue
+        try:
+            value = int(settings[key])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"backup {key} must be an integer") from exc
+        if value < 0 or value > limit:
+            raise ValueError(f"backup {key} must be between 0 and {limit}")
+        clean[key] = value
     if "last_auto_backup_at" in settings:
         try:
             clean["last_auto_backup_at"] = max(0, int(settings["last_auto_backup_at"]))
@@ -1394,10 +1409,19 @@ def get_db_backup_settings() -> dict:
     return _normalize_db_backup_settings(_read_app_setting(_DB_BACKUP_SETTINGS_KEY))
 
 
-def update_db_backup_settings(interval_days: int, max_generations: int) -> dict:
+def update_db_backup_settings(
+    interval_days: int,
+    max_generations: int,
+    backup_hour: int | None = None,
+    backup_minute: int | None = None,
+) -> dict:
     current = get_db_backup_settings()
     current["interval_days"] = interval_days
     current["max_generations"] = max_generations
+    if backup_hour is not None:
+        current["backup_hour"] = backup_hour
+    if backup_minute is not None:
+        current["backup_minute"] = backup_minute
     clean = _normalize_db_backup_settings(current)
     return _write_app_setting(_DB_BACKUP_SETTINGS_KEY, clean)
 
@@ -1617,16 +1641,69 @@ def create_db_backup(*, manual: bool = False) -> dict:
     }
 
 
+def next_scheduled_db_backup_at(settings: dict | None = None) -> int:
+    """Wall-clock instant the next automatic backup is due, in ms.
+
+    The interval picks the day and the configured time picks the moment within
+    it, so a copy taken late in the evening does not drag every later one along
+    with it. 0 means "no automatic backup has ever run", which is due at once.
+    """
+    settings = settings or get_db_backup_settings()
+    last_at = int(settings.get("last_auto_backup_at") or 0)
+    if last_at <= 0:
+        return 0
+    due_date = (datetime.fromtimestamp(last_at / 1000) + timedelta(days=int(settings["interval_days"]))).date()
+    due = datetime.combine(due_date, clock_time(hour=int(settings["backup_hour"]), minute=int(settings["backup_minute"])))
+    return int(due.timestamp() * 1000)
+
+
 def ensure_scheduled_db_backup() -> dict | None:
     settings = get_db_backup_settings()
-    last_at = int(settings.get("last_auto_backup_at") or 0)
-    interval_ms = int(settings["interval_days"]) * 24 * 60 * 60 * 1000
-    if last_at > 0 and _now_ms() - last_at < interval_ms:
+    due_at = next_scheduled_db_backup_at(settings)
+    if due_at > 0 and _now_ms() < due_at:
         return None
     try:
         return create_db_backup(manual=False)
     except ValueError:
         return None
+
+
+def list_db_backups(limit: int = _DB_BACKUP_LIST_LIMIT) -> dict:
+    """Every retained copy, newest first, with the generation the prune counts by."""
+    entries: list[dict] = []
+    total_size = 0
+    for kind in ("auto", "manual"):
+        directory = _DB_BACKUP_DIR / kind
+        if not directory.exists():
+            continue
+        for path in directory.glob(f"inku-{kind}-*.db"):
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            entries.append({
+                "kind": kind,
+                "name": path.name,
+                "at": int(stat.st_mtime * 1000),
+                "size_bytes": stat.st_size,
+            })
+            total_size += stat.st_size
+    entries.sort(key=lambda entry: entry["at"], reverse=True)
+    # Generation 1 is the newest automatic copy, matching the order
+    # _prune_auto_backups walks: the highest number is the one dropped next.
+    # Manual copies are never pruned, so they are outside the numbering.
+    generation = 0
+    for entry in entries:
+        if entry["kind"] == "auto":
+            generation += 1
+            entry["generation"] = generation
+        else:
+            entry["generation"] = None
+    return {
+        "entries": entries[:limit],
+        "total_count": len(entries),
+        "total_size_bytes": total_size,
+    }
 
 
 def db_backup_status() -> dict:
@@ -1636,12 +1713,17 @@ def db_backup_status() -> dict:
     manual_dir = _DB_BACKUP_DIR / "manual"
     auto_count = len(list(auto_dir.glob("inku-auto-*.db"))) if auto_dir.exists() else 0
     manual_count = len(list(manual_dir.glob("inku-manual-*.db"))) if manual_dir.exists() else 0
+    listing = list_db_backups()
     return {
         **settings,
         "supported": supported,
         "backup_dir": str(_DB_BACKUP_DIR),
         "auto_count": auto_count,
         "manual_count": manual_count,
+        "next_auto_backup_at": next_scheduled_db_backup_at(settings),
+        "backups": listing["entries"],
+        "backups_total_count": listing["total_count"],
+        "backups_total_size_bytes": listing["total_size_bytes"],
     }
 
 

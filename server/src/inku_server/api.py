@@ -6,6 +6,7 @@ GET  /health      : liveness
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import importlib.metadata
 import json
@@ -22,7 +23,7 @@ import urllib.request
 import uuid
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -86,7 +87,50 @@ def _app_version() -> str:
 
 
 _APP_VERSION = _app_version()
-app = FastAPI(title="inku-server", version=_APP_VERSION)
+
+# The automatic DB backup used to run only inside GET /api/settings/status, so
+# it fired whenever an admin happened to open the settings — never at a stated
+# time. The loop below is what lets the configured hour and minute mean what
+# they say. Set INKU_DB_BACKUP_SCHEDULER=0 to keep it out of a process (tests
+# that drive the app without its lifespan never start it in the first place).
+_DB_BACKUP_SCHEDULER_TICK_SECONDS = 60
+
+
+async def _db_backup_scheduler_loop() -> None:
+    """Ask once a minute whether the backup is due; the due check decides.
+
+    A coarse tick is deliberate: a missed or late wake-up delays a copy, it
+    never skips one, because the schedule is derived from the last backup's
+    timestamp rather than from this loop's own cadence.
+    """
+    while True:
+        try:
+            result = await asyncio.to_thread(_db.ensure_scheduled_db_backup)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _logger.exception("scheduled DB backup failed; will retry on the next tick")
+        else:
+            if result is not None:
+                _logger.info("scheduled DB backup written to %s", result["path"])
+        await asyncio.sleep(_DB_BACKUP_SCHEDULER_TICK_SECONDS)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    task: asyncio.Task | None = None
+    if os.getenv("INKU_DB_BACKUP_SCHEDULER", "1") != "0":
+        task = asyncio.create_task(_db_backup_scheduler_loop())
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+
+app = FastAPI(title="inku-server", version=_APP_VERSION, lifespan=_lifespan)
 
 _db.init_db()
 
@@ -1447,19 +1491,35 @@ class DatabaseSettingsStatus(BaseModel):
     note: str
 
 
+class DbBackupEntry(BaseModel):
+    kind: Literal["auto", "manual"]
+    name: str
+    at: int
+    size_bytes: int
+    generation: int | None = None
+
+
 class DbBackupStatus(BaseModel):
     supported: bool
     interval_days: int
     max_generations: int
+    backup_hour: int = 3
+    backup_minute: int = 0
     last_auto_backup_at: int = 0
+    next_auto_backup_at: int = 0
     backup_dir: str
     auto_count: int = 0
     manual_count: int = 0
+    backups: list[DbBackupEntry] = Field(default_factory=list)
+    backups_total_count: int = 0
+    backups_total_size_bytes: int = 0
 
 
 class DbBackupSettingsBody(BaseModel):
     interval_days: int = Field(default=7, ge=1, le=365)
     max_generations: int = Field(default=4, ge=1, le=100)
+    backup_hour: int = Field(default=3, ge=0, le=23)
+    backup_minute: int = Field(default=0, ge=0, le=59)
 
 
 class OutputSaveSettingsBody(BaseModel):
@@ -2230,7 +2290,12 @@ def api_settings_update_db_backup(
     actor: dict = Depends(_admin_user),
 ) -> DbBackupStatus:
     try:
-        _db.update_db_backup_settings(body.interval_days, body.max_generations)
+        _db.update_db_backup_settings(
+            body.interval_days,
+            body.max_generations,
+            body.backup_hour,
+            body.backup_minute,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return DbBackupStatus(**_db.db_backup_status())

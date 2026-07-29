@@ -61,6 +61,7 @@ const RESTRICTED = [
 			'settingsDbBackupMaxGenerations', 'okugakiDescription', 'okugakiBranchConfirm',
 			'okugakiProgress', 'svgExportDisplayUse', 'svgExportEditableFeature', 'svgExportCompatFeature',
 			'provenanceLabelGeneration', 'provenanceHintGeneration', 'historyGenerationTitle',
+			'settingsDbBackupListGeneration', 'settingsDbBackupEstimatedDiskHint',
 		],
 		texts: [],
 	},

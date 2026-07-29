@@ -185,6 +185,14 @@
 		entries?: PluginEntry[];
 		reasons?: string[];
 	};
+	type DbBackupEntry = {
+		kind: 'auto' | 'manual';
+		name: string;
+		at: number;
+		size_bytes: number;
+		generation: number | null;
+	};
+
 	type SettingsStatus = {
 		database: {
 			backend: string;
@@ -201,10 +209,16 @@
 			supported: boolean;
 			interval_days: number;
 			max_generations: number;
+			backup_hour: number;
+			backup_minute: number;
 			last_auto_backup_at: number;
+			next_auto_backup_at: number;
 			backup_dir: string;
 			auto_count: number;
 			manual_count: number;
+			backups: DbBackupEntry[];
+			backups_total_count: number;
+			backups_total_size_bytes: number;
 		};
 		plugins: {
 			enabled: boolean;
@@ -1923,13 +1937,23 @@
 		}
 	}
 
-	async function updateDbBackupSettings(intervalDays: number, maxGenerations: number) {
+	async function updateDbBackupSettings(
+		intervalDays: number,
+		maxGenerations: number,
+		backupHour: number,
+		backupMinute: number
+	) {
 		dbBackupStatus = null;
 		try {
 			const r = await apiFetch('/api/settings/db-backup', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ interval_days: intervalDays, max_generations: maxGenerations })
+				body: JSON.stringify({
+					interval_days: intervalDays,
+					max_generations: maxGenerations,
+					backup_hour: backupHour,
+					backup_minute: backupMinute
+				})
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: unknown };

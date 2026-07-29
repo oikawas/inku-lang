@@ -68,6 +68,7 @@ from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware, SlidingWindowRateLimiter
 from .schema import CanvasSpec, Score
 from .model_settings import (
+    MODEL_METADATA_KEYS,
     connection_for,
     model_provider_catalog,
     normalize_model_settings,
@@ -2227,9 +2228,8 @@ def api_settings_fetch_provider_models(
         for model in previous_provider.get("models", [])
     }
     carried = (
-        "purposes", "recommendation_llm", "recommendation_vision",
-        "recommendation_level", "speed_class", "speed_label",
-        "comment_ja", "comment_en", "eol", "eol_date",
+        *MODEL_METADATA_KEYS,
+        "eol", "eol_date",
         # 有料プラン限定の印は提供元の一覧に現れない (一覧には載るが叩くと 403 が
         # 返る)。取得のたびに消えては困るので、EOL と違って再提供で外さない。
         "requires_subscription",

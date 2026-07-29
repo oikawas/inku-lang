@@ -10,6 +10,11 @@ export type ModelOption = {
 	recommendation_llm?: number;
 	recommendation_vision?: number;
 	recommendation_level?: number;
+	// 段ごとの推奨度。recommendation_llm を置き換えるのではなく狭める。通しで測った
+	// モデル (NVIDIA と Ollama Cloud の全部) は 1 数値しか持たず、両方の段がそれを読む。
+	// ローカルの Ollama は段ごとに測ってあり、二つの段が食い違う。
+	recommendation_stage1?: number;
+	recommendation_stage2?: number;
 	speed_class?: string;
 	speed_label?: string;
 	comment_ja?: string;

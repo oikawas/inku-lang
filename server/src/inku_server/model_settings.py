@@ -18,6 +18,34 @@ from .verified_model_catalog import (
     VERIFIED_OLLAMA_LOCAL_MODELS,
 )
 
+# Every recommendation key, named once. Three places have to agree about them --
+# the normalizer's receiving end, the metadata refresh a catalog version bump
+# triggers, and the set carried across a live model-list fetch (api.py) -- and a
+# key added to only some of them is lost in whichever path was missed, without
+# anything failing.
+#
+# The stage keys refine recommendation_llm rather than replacing it. A model
+# measured end to end -- every NVIDIA and Ollama Cloud entry -- has one number and
+# both stages read it, so adding these migrated nothing. They exist because the
+# local Ollama models were measured per stage and the two stages disagree: the
+# pair inku recommends is a Stage 1 model that covers 32% of Stage 2 and a Stage 2
+# model that breaks Stage 1 in English. One number cannot say that.
+MODEL_RECOMMENDATION_KEYS = (
+    "recommendation_llm",
+    "recommendation_vision",
+    "recommendation_stage1",
+    "recommendation_stage2",
+    "recommendation_level",
+)
+MODEL_METADATA_KEYS = (
+    "purposes",
+    *MODEL_RECOMMENDATION_KEYS,
+    "speed_class",
+    "speed_label",
+    "comment_ja",
+    "comment_en",
+)
+
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
     {
         "id": "openai",
@@ -185,6 +213,15 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
                     value = legacy if purpose in clean_purposes else None
                 if isinstance(value, int) and not isinstance(value, bool):
                     item[key] = max(1, min(5, value))
+            # Stage levels have no purpose of their own -- they narrow the LLM
+            # level -- so they are read straight through with no legacy fallback.
+            # Absent means "not measured for that stage", which the picker shows
+            # as an em dash; it must not be filled in with a 0 or with the other
+            # stage's number.
+            for key in ("recommendation_stage1", "recommendation_stage2"):
+                value = model.get(key)
+                if isinstance(value, int) and not isinstance(value, bool):
+                    item[key] = max(1, min(5, value))
             for key in ("speed_class", "speed_label", "comment_ja", "comment_en", "eol_date"):
                 value = model.get(key)
                 if isinstance(value, str) and value.strip():
@@ -318,11 +355,7 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 catalog_moved = incoming_catalog_version != MODEL_CONFIG_VERSION
                 builtin_by_id = {str(model["id"]): model for model in provider["models"]}
                 if builtin and (provider_id == "nvidia" or catalog_moved):
-                    metadata_keys = (
-                        "purposes", "recommendation_llm", "recommendation_vision",
-                        "recommendation_level", "speed_class", "speed_label",
-                        "comment_ja", "comment_en",
-                    )
+                    metadata_keys = MODEL_METADATA_KEYS
                     # NVIDIA additionally keeps builtin-only models the stored list has
                     # dropped, because artworks name them and a dropped id would leave
                     # those artworks labelless.

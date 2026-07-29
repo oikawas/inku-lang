@@ -10,32 +10,62 @@ export function modelPurposes(model: ModelOption): string {
 
 export type ModelPurpose = 'llm' | 'vision';
 
+// どの段のために選んでいるか。'both' は 1 つのモデルを両方の段へ充てる場合。
+export type ModelStage = 'stage1' | 'stage2' | 'both';
+
 // v1.98: 推奨度は用途ごとに測る。LLM は「3 回成功したか・スキーマを壊さないか・補正発火が
 // 少ないか」、Vision は画像特徴の再現率で決まり、同じ尺度に乗らないため。
 // purpose を渡さない呼び出しは、そのモデルが持つ最も高い推奨度を見る。
-export function modelRecommendationLevel(model: ModelOption, purpose?: ModelPurpose): number {
+//
+// stage は LLM の値をさらに狭める。段ごとの値を持たないモデル (通しで測った NVIDIA と
+// Ollama Cloud の全部) は recommendation_llm へ落ちるので、段を渡しても答えは変わらない。
+// 'both' は 2 つの低い方を採る — 両方の段をこなす必要があるモデルは、苦手な段のほうで
+// 律速される。ここを max にすると、第一段階の推奨 (qwen3.5:4b) が第二段階の被覆 32% を
+// 隠して★5 に見える。
+function stageLevel(model: ModelOption, llm: number, stage?: ModelStage): number {
+	const s1 = model.recommendation_stage1;
+	const s2 = model.recommendation_stage2;
+	if (stage === 'stage1') return Number(s1 ?? llm);
+	if (stage === 'stage2') return Number(s2 ?? llm);
+	if (stage === 'both') {
+		const measured = [s1, s2].filter((value): value is number => typeof value === 'number');
+		return measured.length > 0 ? Math.min(...measured) : llm;
+	}
+	return llm;
+}
+
+export function modelRecommendationLevel(
+	model: ModelOption,
+	purpose?: ModelPurpose,
+	stage?: ModelStage
+): number {
 	const llm = Number(model.recommendation_llm ?? model.recommendation_level ?? 0);
 	const vision = Number(model.recommendation_vision ?? model.recommendation_level ?? 0);
 	const purposes = model.purposes ?? ['llm'];
+	const forLlm = stageLevel(model, llm, stage);
 	const raw =
-		purpose === 'llm' ? llm
+		purpose === 'llm' ? forLlm
 		: purpose === 'vision' ? vision
-		: Math.max(purposes.includes('llm') ? llm : 0, purposes.includes('vision') ? vision : 0);
+		: Math.max(purposes.includes('llm') ? forLlm : 0, purposes.includes('vision') ? vision : 0);
 	return Math.max(0, Math.min(5, Number.isFinite(raw) ? raw : 0));
 }
 
-export function modelRecommendation(model: ModelOption, purpose?: ModelPurpose): string {
-	const level = modelRecommendationLevel(model, purpose);
+export function modelRecommendation(
+	model: ModelOption,
+	purpose?: ModelPurpose,
+	stage?: ModelStage
+): string {
+	const level = modelRecommendationLevel(model, purpose, stage);
 	return level > 0 ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
 }
 
 // 一覧の並び。提供終了を末尾へ送り、その中で推奨度の高い順に見せる。取得ボタンは提供元の
 // 順序で配列を作り直すため、カタログの配列順では順序を維持できない (v1.98)。
-export function sortModels(models: ModelOption[], purpose?: ModelPurpose): ModelOption[] {
+export function sortModels(models: ModelOption[], purpose?: ModelPurpose, stage?: ModelStage): ModelOption[] {
 	return [...models].sort((a, b) => {
 		const unselectable = Number(isModelUnselectable(a)) - Number(isModelUnselectable(b));
 		if (unselectable !== 0) return unselectable;
-		const level = modelRecommendationLevel(b, purpose) - modelRecommendationLevel(a, purpose);
+		const level = modelRecommendationLevel(b, purpose, stage) - modelRecommendationLevel(a, purpose, stage);
 		if (level !== 0) return level;
 		return (a.label || a.id).localeCompare(b.label || b.id);
 	});

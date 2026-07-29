@@ -48,7 +48,7 @@ export const en: LangPack = {
 	providerLabel: 'Provider:',
 	modelLabel: 'Model:',
 	showThinkingLabel: 'Show thinking',
-	modelSelectionSharedHint: 'Use the selected model for both Stage 1 and Stage 2.',
+	modelSelectionSharedHint: 'Use the selected model for both Stage 1 and Stage 2. For models measured per stage, the recommendation shown is the lower of the two.',
 	modelSelectionSeparateHint: 'Choose the model for this stage only. Stage 1 and Stage 2 can use different models.',
 	modelSelectionVisionHint: 'Choose the model used for Vision processing of images.',
 

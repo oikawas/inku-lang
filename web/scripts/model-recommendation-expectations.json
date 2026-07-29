@@ -1,0 +1,66 @@
+{
+  "note": [
+    "Recommendation levels, asserted by both languages from this one file.",
+    "server/tests/test_model_recommendation.py checks the shipped catalog carries these values;",
+    "web/scripts/model-recommendation-check.mjs checks modelMeta.ts hands them back.",
+    "Two tables that agree today would drift; one table cannot.",
+    "",
+    "The stage keys narrow recommendation_llm rather than replacing it. A model measured end to",
+    "end -- every NVIDIA and Ollama Cloud entry -- has one number and both stages read it, so",
+    "adding these keys migrated nothing. Local Ollama models were measured per stage and the two",
+    "stages disagree, which is why the keys exist at all.",
+    "",
+    "'absent' means not measured for that stage. It is not a zero: the picker shows an em dash,",
+    "and 1 is reserved for 'measured and poor'."
+  ],
+  "rules": {
+    "stage1": {
+      "material": "Japanese n/6 and English n/6 attempts that came back as usable normalized DDL, plus explicit-rule violations",
+      "5": "6/6 in both languages and zero explicit-rule violations",
+      "4": "6/6 in both languages, violations unrecorded or slight",
+      "3": "6/6 in one language, the other breaks down",
+      "2": "one or two attempts failed",
+      "1": "three or more attempts failed"
+    },
+    "stage2": {
+      "material": "coverage over 28 sentences of the five complex cases, plus the three failure kinds (budget / malformed / transport)",
+      "5": "coverage 70% or more and no failures of any kind",
+      "4": "coverage 60-69% and no failures",
+      "3": "coverage 45-59% and no failures",
+      "2": "coverage 28-44% and no failures",
+      "1": "coverage below 28%, or any failure"
+    },
+    "excluded": [
+      "Capacity (GB) is not an axis. It is in the label and the comment (adjudicated 2026-07-30).",
+      "Speed is not an axis (adjudicated 2026-07-27, narrowed 2026-07-29 to developer mode only)."
+    ]
+  },
+  "ollama": [
+    { "id": "gemma4:31b-it-q4_K_M", "stage1": 5, "stage2": 4, "why": "best of anything measured in both languages / coverage 64%, taken under the pre-Build-748 conditions" },
+    { "id": "qwen3.5:4b-q4_K_M", "stage1": 5, "stage2": 2, "why": "6/6 both languages, zero English violations / coverage 32%" },
+    { "id": "qwen3.5:27b-q4_K_M", "stage1": 4, "stage2": 2, "why": "6/6 both languages, violations unrecorded / coverage 36%" },
+    { "id": "ministral-3:8b-instruct-2512-q4_K_M", "stage1": 3, "stage2": 5, "why": "writes coordinates outright in English / coverage 71%, no failures" },
+    { "id": "gemma4:e4b-it-q4_K_M", "stage1": 3, "stage2": 4, "why": "five explanatory sentences in English / coverage 64%" },
+    { "id": "gemma4:12b-it-q4_K_M", "stage1": 3, "stage2": 3, "why": "Japanese particles break / coverage 50%" },
+    { "id": "qwen3.5:9b-q4_K_M", "stage1": 3, "stage2": 2, "why": "four explanatory sentences in English / coverage 29%" },
+    { "id": "granite4.1:8b-q4_K_M", "stage1": 1, "stage2": null, "why": "four of six Japanese attempts failed / Stage 2 not measured" },
+    { "id": "qwen3.5:2b-q4_K_M", "stage1": 1, "stage2": null, "why": "three of six Japanese attempts failed / Stage 2 not measured" },
+    { "id": "qwen3.5:0.8b-q8_0", "stage1": 1, "stage2": null, "why": "three of six Japanese attempts failed / Stage 2 not measured" }
+  ],
+  "display": {
+    "note": [
+      "Read by the node check only; the server has no path that renders a level.",
+      "The 'both' cases are the load-bearing ones: with Math.max the Stage 1 recommendation",
+      "would hide its 32% Stage 2 coverage behind five stars."
+    ],
+    "cases": [
+      { "model": { "recommendation_stage1": 5, "recommendation_stage2": 2 }, "stage1": 5, "stage2": 2, "both": 2, "why": "qwen3.5:4b -- the whole reason the stage keys exist" },
+      { "model": { "recommendation_stage1": 3, "recommendation_stage2": 5 }, "stage1": 3, "stage2": 5, "both": 3, "why": "ministral-3:8b -- limited by the stage it is weaker at" },
+      { "model": { "recommendation_llm": 4 }, "stage1": 4, "stage2": 4, "both": 4, "why": "measured end to end (NVIDIA, Ollama Cloud): one number, both stages read it" },
+      { "model": { "recommendation_level": 3 }, "stage1": 3, "stage2": 3, "both": 3, "why": "the pre-v1.98 shape still reads through" },
+      { "model": { "recommendation_stage1": 1 }, "stage1": 1, "stage2": 0, "both": 1, "why": "Stage 2 unmeasured is an em dash, not a zero-filled star row" },
+      { "model": {}, "stage1": 0, "stage2": 0, "both": 0, "why": "nothing measured at all" },
+      { "model": { "recommendation_llm": 4, "recommendation_stage2": 2 }, "stage1": 4, "stage2": 2, "both": 2, "why": "a stage value narrows the end-to-end number; the unnarrowed stage keeps it" }
+    ]
+  }
+}

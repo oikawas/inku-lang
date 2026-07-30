@@ -50,6 +50,7 @@
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
+	import { DEFAULT_ANIMATION_EXPORT_SETTINGS, parseAnimationExportSettings, type AnimationExportSettings } from '$lib/animationExport';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
 		DEFAULT_CANVAS_ASPECT_ID,
@@ -72,6 +73,7 @@
 	const TENKEI_KEY          = 'inku-tenkei';
 	const WILD_KEY            = 'inku-wild';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
+	const ANIMATION_EXPORT_SETTINGS_KEY = 'inku-animation-export-settings';
 	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
@@ -532,6 +534,7 @@
 	let pngAlphaWhite = $state(false);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
+	let animationExportSettings = $state<AnimationExportSettings>({ ...DEFAULT_ANIMATION_EXPORT_SETTINGS });
 	let saveReplayAsNewVersion = $state(true);
 	let miscSettingsLoaded = $state(false);
 
@@ -2455,6 +2458,7 @@
 	function persistMiscSettings() {
 		try {
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
+			localStorage.setItem(ANIMATION_EXPORT_SETTINGS_KEY, JSON.stringify(animationExportSettings));
 			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
 			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
 			localStorage.setItem(HISTORY_SELECTION_CATALOG_KEY, historySelectionCatalog);
@@ -6067,6 +6071,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
 			const wild = localStorage.getItem(WILD_KEY); if (wild !== null) wildEnabled = wild === '1';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
+			animationExportSettings = parseAnimationExportSettings(localStorage.getItem(ANIMATION_EXPORT_SETTINGS_KEY));
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
 			historySelectionCatalog = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CATALOG_KEY));
@@ -6089,7 +6094,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
+		pngAlphaWhite; animationExportSettings; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -6507,6 +6512,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onPaintOne={paintOne}
 				onVisionAdvice={requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}
+				{animationExportSettings}
+				{apiFetch}
 			/>
 		</div><!-- /body -->
 
@@ -6627,6 +6634,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{editGroupId}
 		bind:autoRepairEnabled={ddlAutoRepairEnabled}
 		bind:pngAlphaWhite
+		bind:animationExportSettings
 		{exportTemplates}
 		{exportTemplateStatus}
 		bind:saveReplayAsNewVersion
@@ -6791,6 +6799,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		managerTrashTotal={historyManager.trashTotal}
 		{trashTotal}
 		selectedHistoryIds={historyManager.selectedIds}
+		{animationExportSettings}
 		historyManagerStarredOnly={historyManager.starredOnly}
 		onClose={() => (historyManager.open = false)}
 		onSetView={historyManager.setView}

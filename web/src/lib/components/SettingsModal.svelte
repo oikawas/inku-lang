@@ -5,6 +5,7 @@
 	import { modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
+	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 
@@ -188,6 +189,7 @@
 		pngAlphaWhite: boolean;
 		exportTemplates: ExportTemplate[];
 		exportTemplateStatus: string | null;
+		animationExportSettings: AnimationExportSettings;
 		saveReplayAsNewVersion: boolean;
 		historySelectionCanvas: HistorySelectionBehavior;
 		historySelectionCatalog: HistorySelectionBehavior;
@@ -299,6 +301,7 @@
 		pngAlphaWhite = $bindable(),
 		exportTemplates,
 		exportTemplateStatus,
+		animationExportSettings = $bindable(),
 		saveReplayAsNewVersion = $bindable(),
 		historySelectionCanvas = $bindable(),
 		historySelectionCatalog = $bindable(),
@@ -1488,6 +1491,41 @@
 				</div>
 			</div>
 			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsAnimationExportTitle}</div>
+				<div class="db-test-result">{t().settingsAnimationExportDescription}</div>
+				<div class="animation-settings-grid">
+					<label>
+						<span>{t().settingsAnimationFormat}</span>
+						<select value={animationExportSettings.format} onchange={(event) => (animationExportSettings = { ...animationExportSettings, format: event.currentTarget.value as AnimationExportSettings["format"] })}>
+							<option value="apng">{t().animationFormatApng}</option>
+							<option value="gif">{t().animationFormatGif}</option>
+						</select>
+					</label>
+					<label>
+						<span>{t().settingsAnimationPattern}</span>
+						<select value={animationExportSettings.pattern} onchange={(event) => (animationExportSettings = { ...animationExportSettings, pattern: event.currentTarget.value as AnimationExportSettings["pattern"] })}>
+							<option value="cut">{t().animationPatternCut}</option>
+							<option value="crossfade">{t().animationPatternCrossfade}</option>
+							<option value="fade_white">{t().animationPatternFadeWhite}</option>
+							<option value="slide">{t().animationPatternSlide}</option>
+						</select>
+					</label>
+					<label>
+						<span>{t().settingsAnimationHold}</span>
+						<input type="number" min="0.1" max="30" step="0.1" value={animationExportSettings.holdSeconds} onchange={(event) => (animationExportSettings = { ...animationExportSettings, holdSeconds: Math.max(0.1, Math.min(30, Number(event.currentTarget.value) || 1)) })} />
+						<small>{t().settingsAnimationHoldHint}</small>
+					</label>
+					<label>
+						<span>{t().settingsAnimationResolution}</span>
+						<select value={animationExportSettings.resolution} onchange={(event) => (animationExportSettings = { ...animationExportSettings, resolution: event.currentTarget.value as AnimationExportSettings["resolution"] })}>
+							<option value="1k">{t().animationResolution1k}</option>
+							<option value="4k">{t().animationResolution4k}</option>
+							<option value="8k">{t().animationResolution8k}</option>
+						</select>
+					</label>
+				</div>
+			</div>
+			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsExportLabel}</div>
 				<label class="setting-toggle">
 					<input type="checkbox" bind:checked={pngAlphaWhite} />
@@ -2535,6 +2573,25 @@
 		text-align: right;
 		font-variant-numeric: tabular-nums;
 	}
+	.animation-settings-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px;
+		margin-top: 10px;
+	}
+	.animation-settings-grid label { display: flex; min-width: 0; flex-direction: column; gap: 5px; color: var(--fg2); font-size: 11px; }
+	.animation-settings-grid select,
+	.animation-settings-grid input {
+		min-width: 0;
+		padding: 6px 8px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--panel);
+		color: var(--fg);
+		font: inherit;
+	}
+	.animation-settings-grid small { color: var(--fg3); font-size: 10px; }
+	@media (max-width: 720px) { .animation-settings-grid { grid-template-columns: 1fr; } }
 	.system-plugin-panel {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;

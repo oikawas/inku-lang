@@ -98,6 +98,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "iro": (
         ("白", "white"), ("黒", "black"), ("青", "blue"),
         ("赤", "red"), ("緑", "green"), ("灰", "gray"),
+        ("黄", "yellow"), ("橙", "orange"), ("紫", "purple"),
     ),
     "yuragi": (
         ("細かく", "fine"), ("大きく", "large"), ("ゆっくり", "slowly"), ("速く", "quickly"),

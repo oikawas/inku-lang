@@ -189,6 +189,9 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("赤", "red", score_value="red"),
             _w("緑", "green", score_value="green"),
             _w("灰", "gray", score_value="gray"),
+            _w("黄", "yellow", score_value="yellow"),
+            _w("橙", "orange", score_value="orange"),
+            _w("紫", "purple", score_value="purple"),
         ),
     ),
     SaijikiCategory(

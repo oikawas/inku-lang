@@ -32,20 +32,20 @@ def _aliases(model) -> set[str]:
 def test_ddl_reference_versions_and_parts() -> None:
     manifest = _manifest()
     assert DDL_VERSION == "2"
-    # engine 2 (2026-07-28): `Instruction` が `thinness` を得たので、この層の
-    # 凍結出力は振る舞いが変わらないまま dump の形だけが変わった。凍結済みの
-    # ディレクトリは書き換えないという規約に従い、次の版へ焼いた。
-    # engine 3 (2026-07-29): `thinness` の宣言を末尾へ移した。Stage 2 の tool schema は
-    # 並び順ごと LLM へ渡るので、この層の出力は 1 バイトも動かないまま、書かれる Score が
-    # 変わる。**このコーパスが 1 件も動かないことが、この版が何をした版かの説明である**
-    # （manifest の `changed_from_previous` は空）。
-    assert DDL_ENGINE_VERSION == "3"
+    # Engine 4 adds three color markers and freezes four discriminating cases.
+    assert DDL_ENGINE_VERSION == "4"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
-    assert len(manifest["cases"]) == 29
+    assert len(manifest["cases"]) == 33
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 15
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 14
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 18
+    assert manifest["changed_from_previous"] == [
+        "B-orange-from-ddl",
+        "B-purple-from-ddl",
+        "B-yellow-from-ddl",
+        "B-yellow-from-ddl-en",
+    ]
 
 def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     generator = _generator()
@@ -110,6 +110,25 @@ def test_ddl_reference_coerce_discriminators() -> None:
         "B-dense-forty": set(),
         "B-cloudform": set(),
         "B-presence-no-ddl": set(),
+        "B-yellow-from-ddl": {
+            "with_color_delivery_repair",
+            "with_composition_diversity_repair",
+        },
+        "B-orange-from-ddl": {
+            "with_color_delivery_repair",
+            "with_composition_diversity_repair",
+            "with_existing_event_counterweight",
+            "with_motion_energy",
+            "with_motion_floor",
+        },
+        "B-purple-from-ddl": {
+            "with_color_delivery_repair",
+            "with_composition_diversity_repair",
+        },
+        "B-yellow-from-ddl-en": {
+            "with_color_delivery_repair",
+            "with_composition_diversity_repair",
+        },
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired

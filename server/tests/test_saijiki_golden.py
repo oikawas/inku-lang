@@ -207,7 +207,7 @@ _EXPECTED_CORE_MARKERS = {
         "置く", "引く", "並べる", "散らす", "敷き詰める", "埋める",  # 描く 削剪
         "触れる", "沿う", "切る", "触れない", "間に",
         "銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ",
-        "白", "黒", "青", "赤", "緑", "灰",
+        "白", "黒", "青", "赤", "緑", "灰", "黄", "橙", "紫",
         "細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む",
         "水平", "垂直", "斜め", "右上がり", "右下がり", "回転",
         "縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月",
@@ -219,7 +219,7 @@ _EXPECTED_CORE_MARKERS = {
         "place", "draw", "arrange", "scatter", "tile", "fill",
         "touching", "along", "cutting", "not touching", "between",
         "silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "fine-brush", "thick-brush", "burin", "drypoint", "computer",
-        "white", "black", "blue", "red", "green", "gray",
+        "white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple",
         "fine", "large", "slowly", "quickly", "swaying", "undulating", "trembling", "blurring",
         "horizontal", "vertical", "diagonal", "rising", "falling", "rotated",
         "tall", "wide", "full-width", "half-width", "semicircle", "waxing", "waning", "crescent",

@@ -76,6 +76,7 @@
 	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
 	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
+	const RESULT_LOG_OPEN_KEY = 'inku-result-log-open';
 	const APP_VERSION = 'v2.9.12';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
@@ -2459,6 +2460,11 @@
 			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
 			localStorage.setItem(HISTORY_SELECTION_CATALOG_KEY, historySelectionCatalog);
 		} catch {}
+	}
+
+	function toggleStatsOpen() {
+		statsOpen = !statsOpen;
+		try { localStorage.setItem(RESULT_LOG_OPEN_KEY, statsOpen ? '1' : '0'); } catch {}
 	}
 
 	function normalizeHistorySelectionBehavior(value: string | null): HistorySelectionBehavior {
@@ -6070,6 +6076,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
 			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
 			historySelectionCatalog = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CATALOG_KEY));
+			statsOpen = localStorage.getItem(RESULT_LOG_OPEN_KEY) === '1';
 			const savedBatchFailureReport = loadBatchFailureReport();
 			setBatchFailureReport(savedBatchFailureReport);
 			miscSettingsLoaded = true;
@@ -6297,7 +6304,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{#if result && elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
 							<Tooltip placement="right" text={t().tooltipStatsToggle}>
-								<button class="stats-toggle" onclick={() => (statsOpen = !statsOpen)}>
+								<button class="stats-toggle" onclick={toggleStatsOpen}>
 									<span class="stats-arrow" class:open={statsOpen}>▶</span>
 									<span>{t().resultLogLabel}</span>
 								</button>

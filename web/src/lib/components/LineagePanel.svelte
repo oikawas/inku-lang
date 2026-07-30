@@ -87,6 +87,8 @@
 	let overviewLoading = $state(false);
 	let overviewScale = $state(1);
 	let lineageOrientation = $state<LineageOrientation>('vertical');
+	let lineagePanning = $state(false);
+	let panSession: { pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null = null;
 	let activeMenuNodeId = $state<string | null>(null);
 	let activeAIRefineNode = $state<LineageNode | null>(null);
 	let activeEditNode = $state<LineageNode | null>(null);
@@ -406,6 +408,36 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		overviewScale = 1;
 		void tick().then(scheduleArrowUpdate);
 	}
+	function startLineagePan(event: PointerEvent): void {
+		if (event.pointerType !== 'mouse' || event.button !== 0 || !event.isPrimary) return;
+		const target = event.target;
+		if (!(target instanceof Element) || target.closest('.lineage-card, button, input, textarea, select, label, a, summary, [role="menuitem"]')) return;
+		const scroll = event.currentTarget as HTMLDivElement;
+		panSession = {
+			pointerId: event.pointerId,
+			x: event.clientX,
+			y: event.clientY,
+			scrollLeft: scroll.scrollLeft,
+			scrollTop: scroll.scrollTop,
+		};
+		lineagePanning = true;
+		scroll.setPointerCapture(event.pointerId);
+		event.preventDefault();
+	}
+	function moveLineagePan(event: PointerEvent): void {
+		if (!panSession || event.pointerId !== panSession.pointerId) return;
+		const scroll = event.currentTarget as HTMLDivElement;
+		scroll.scrollLeft = panSession.scrollLeft - (event.clientX - panSession.x);
+		scroll.scrollTop = panSession.scrollTop - (event.clientY - panSession.y);
+		event.preventDefault();
+	}
+	function endLineagePan(event: PointerEvent): void {
+		if (!panSession || event.pointerId !== panSession.pointerId) return;
+		const scroll = event.currentTarget as HTMLDivElement;
+		panSession = null;
+		lineagePanning = false;
+		if (scroll.hasPointerCapture(event.pointerId)) scroll.releasePointerCapture(event.pointerId);
+	}
 	function getRelativeCoords(el: HTMLElement, container: HTMLElement): { left: number; top: number; width: number; height: number } {
 		let left = 0;
 		let top = 0;
@@ -545,7 +577,7 @@ $effect(() => {
 <section class="lineage-panel" class:overview={overviewOpen}>
 	<header>
 		<div>
-			<h2>{isJapanese ? '作品の系譜' : 'Lineage of the work'}</h2>
+			<h2 id="lineage-title">{isJapanese ? '作品の系譜' : 'Lineage of the work'}</h2>
 			{#if overviewOpen}<p>{lineageOrientation === 'horizontal' ? (isJapanese ? '全体を左から右へ見渡せます。' : 'Review the complete tree from left to right.') : (isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.')}</p>{/if}
 		</div>
 <div class="lineage-actions">
@@ -574,7 +606,20 @@ $effect(() => {
 	{:else if !graph || graph.nodes.length === 0}
 		<div class="lineage-message">{isJapanese ? '保存すると、ここに系譜が表示されます。' : 'Save a work to begin its lineage.'}</div>
 	{:else}
-		<div class="lineage-scroll" class:overview-scroll={overviewOpen} class:horizontal={lineageOrientation === 'horizontal'} bind:this={lineageScrollEl}>
+		<div
+			class="lineage-scroll"
+			role="region"
+			aria-labelledby="lineage-title"
+			class:overview-scroll={overviewOpen}
+			class:horizontal={lineageOrientation === 'horizontal'}
+			class:panning={lineagePanning}
+			bind:this={lineageScrollEl}
+			onpointerdown={startLineagePan}
+			onpointermove={moveLineagePan}
+			onpointerup={endLineagePan}
+			onpointercancel={endLineagePan}
+			onlostpointercapture={endLineagePan}
+		>
 			<div class="lineage-columns" class:horizontal={lineageOrientation === 'horizontal'} bind:this={lineageColumnsEl} style={overviewOpen ? (lineageOrientation === 'horizontal' ? `transform: scale(${overviewScale}); transform-origin: top left;` : `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;`) : undefined}>
 				<svg class="lineage-arrows" aria-hidden="true">
 					<defs>
@@ -802,8 +847,9 @@ $effect(() => {
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
 	.lineage-message { margin: auto; color: var(--fg3); }
 	.lineage-message.error { color: var(--danger, #9b3d32); white-space: pre-line; }
-	.lineage-scroll { min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 8px 18px 24px 8px; }
+	.lineage-scroll { min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 8px 18px 24px 8px; cursor: grab; }
 	.lineage-scroll.horizontal { overflow: auto; }
+	.lineage-scroll.panning { cursor: grabbing; user-select: none; }
 	.lineage-columns { position: relative; width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 58px; transform-origin: top center; }
 	.lineage-columns.horizontal { width: max-content; min-width: 100%; flex-direction: row; align-items: flex-start; transform-origin: top left; }
 	.lineage-arrows { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
@@ -818,7 +864,7 @@ $effect(() => {
 	.lineage-column.menu-layer { z-index: 20; }
 	.generation { flex: 0 0 100%; color: var(--fg3); font-size: .72rem; text-align: center; }
 	.lineage-columns.horizontal .generation { flex: 0 0 auto; width: 100%; }
-	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); }
+	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); cursor: default; }
 	.lineage-card.menu-open { z-index: 10; overflow: visible; }
 	.lineage-card.focus { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 	.lineage-card.tombstone { border-style: dashed; opacity: .72; }

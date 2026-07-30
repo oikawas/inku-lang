@@ -105,12 +105,12 @@ but never asserts "the output will change"**.
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
 | `render_engine_version` | the drawing engine | `16` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `3` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
-| `ddl_version` | the DDL language itself (grammar, keywords) | `2` | grammar is added, changed, or retired |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `4` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
-| `MODEL_CONFIG_VERSION` | the model catalog's content | `2.4.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.8 | per release |
-| `web/BUILD_NUMBER` | build serial | 776 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
+| `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.11 | per release |
+| `web/BUILD_NUMBER` | build serial | 782 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -185,8 +185,8 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-14/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 347 |
-| Deterministic DDL layers | `server/reference/ddl-engine-1/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 29 (A 15 / B 14) |
+| Drawing | `server/reference/render-engine-16/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 365 (333 SVG) |
+| Deterministic DDL layers | `server/reference/ddl-engine-4/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
 adjacent** ("Deterministic and non-deterministic layers" in this document). Stage 2's LLM sits between Stage 1.5 (DDL→DDL) and coercion

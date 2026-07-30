@@ -85,13 +85,13 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
-| colors | いろ | white, black (default), blue, red, green, gray |
+| colors | いろ | white, black (default), blue, red, green, gray, yellow, orange, purple |
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision. In v2.7.9 the second of those came back under the name it should have had: `hair` was never a brush but a **silverpoint** — 0.5px, the least wavering line a hand can draw — and it is now 銀筆 / silverpoint, first in the touches list. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
 `Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
 
-The core color vocabulary is the six abstract colors that authors can write: white, black, blue, red, green, and gray. Color catalogs are server-owned metadata that change how those six colors are resolved at render time; they are not vocabulary extensions. Yellow and orange appear in some catalog palettes and can be reached through palette resolution or `color_hint`, but they are not added to the core color vocabulary.
+The core color vocabulary is the nine abstract colors that authors can write: white, black, blue, red, green, gray, yellow, orange, and purple. Color catalogs are server-owned metadata that change how those nine colors are resolved at render time; they are not vocabulary extensions. **Yellow, orange, and purple were added in v2.9.11.** Catalog palettes already carried twelve yellows, a nominal 13.6%, yet yellow reached only 0.6% of what was actually drawn: there was no word to leave by. The three are peers of the other abstract colors, and `color_hint` remains the place for nuance that no abstract color holds.
 
 Colors in JSON Score are abstract color names.  Rendering resolves them through
 the selected color catalog.  The server is the source of truth for color
@@ -107,7 +107,9 @@ palette identity: `ink_season`, `fresco_study`, `open_air_light`,
 `vivid_material`, `weathered_heritage`, and `sea_stone`.
 Catalog `map` values must preserve the meaning of the abstract colors
 `white / black / blue / red / green / gray`; stronger identity colors belong in
-`palette` rather than replacing structural colors.  The Build 265 review leaves
+`palette` rather than replacing structural colors.  The three colors added in
+v2.9.11 carry no catalog `map` entry yet and resolve through shared neutral
+defaults, so every catalog draws the same yellow, orange and purple.  The Build 265 review leaves
 `open_air_light`, `dye_earth`, and `desert_mineral` as known tuning targets:
 their dark backgrounds, high-chroma accents, or paper/sand tones can dominate
 quiet prompts, so future tuning should adjust core brightness and saturation

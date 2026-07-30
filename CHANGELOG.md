@@ -1001,3 +1001,41 @@ server **1732 passed / 31 skipped** (+37), cli 76, ruff clean, `npm run check` 2
 #### The build number did not skip
 
 **This branch used 777, 778 and 779, and main reached 780 while it was open.** This version takes 781, and the three branch numbers survive only inside its commits. **The counter is shared, not per branch.**
+
+### v2.9.11 — The abstract colors go from six words to nine, and yellow gets a way out (Build 782, 2026-07-30)
+
+Score's `color` gains **`yellow`, `orange` and `purple`**. **Catalog palettes already held twelve yellows, a nominal 13.6%, yet the yellow actually drawn was 0.6%** — there was no word to leave by. The order of the existing six is untouched; the three are appended.
+
+**`color` keeps declaration position 17 in a 25-field tool schema.** An optional field's fill rate depends on where it is declared, but `color` is required, so its position does not drive carry. It was still left alone, because the prior measurement was taken at that position and the arms have to stay comparable.
+
+**Two rules were added to Stage 2's prompt** (sunlight, harvest, metal and lamplight → yellow/orange; dusk, twilight and shadowed flowers → purple; plus "the three are peers of the other abstract colors"). **Without the rules `orange` stays at 0.6%** — in the prior measurement the schema-only arm gave `yellow` 7.6% / `orange` 0.6%, and the arm with the rules gave 8.5% / 2.4%. Measured after implementation over a fixed 60 inputs: Japanese `yellow` 13.7% / `orange` 6.0%, English 6.5% / 3.0%, new words together 19.7% (ja) and 10.1% (en) — past the acceptance thresholds (yellow 5%, orange 1%, together 8%) in both languages. **Instruction totals moved -0.8% (ja) and +5.7% (en)**, so the "carrying it thins the Score" effect seen with `thinness` did not recur.
+
+**`purple` is deliberately not an acceptance condition.** Across 821 distinct production inputs, purple-leaning demand is 7 (0.9%), and only 3 of the 60 sampled inputs lean purple, so the rate carries no discriminating power. **Zero purple in Japanese is not treated as a fault.**
+
+**The saijiki's colors gained the three words as well**, which puts yellow, orange and purple into Stage 1's vocabulary listing — **the description language's own vocabulary grew**, so `ddl_version` moves **2 → 3**. Holding it at 2 was considered, but `ddl_version` rose from 1 to 2 because "thinness became a word independent of the tool name; the version rises when the vocabulary grows", and holding a change of the same shape would contradict that precedent. **The contradiction came from `docs/spec/render-engine-history`, whose "incremented when" column read "grammar is added, changed, or retired"**; that clause now reads "vocabulary is added, changed or retired, or grammar is".
+
+**Coercion was widened in the same stage.** `COLOR_MARKERS` gained three entries per language. **Without them the new `ddl-engine-4` corpus would be an exact copy of `ddl-engine-3`** — measured before the contract was handed over, changing only the schema and the saijiki and running both generators moved neither corpus by a byte. **This change widens Stage 2's exit, but the corpus never calls Stage 2** (it takes DDL strings as input), so unless the color words reach coercion this layer cannot see the work.
+
+**`renderer.COLOR_MAP` gained a default for each new word** (`yellow` `#a18308`, `orange` `#a95a00`, `purple` `#583a84`). The first line of `_resolve_color` is `cmap[color]`, so without them a new word raises `KeyError`. The drafted design was a `FALLBACK_TO_SIX` that rounded yellow and orange to `red` and purple to `blue`, but **Stage 2 emits `yellow` 8.5% of the time, so rounding means "every yellow chosen becomes more red"**. Red is 44.6% of what is drawn and **lowering that is the point of this stage**, so the interim measure would have pointed the opposite way. The three hexes sit in the same register as the existing chromatic three (L 0.42–0.62, C 0.12–0.13), and **a test pins that the renderer's own classifier `_hue_from_hex()` sorts each one back into its own word**. **The eleven catalogs' `map` tables are untouched**, so every catalog draws the same yellow; a per-catalog yellow is stage 1-C's work.
+
+**`ddl_engine_version` moves 3 → 4 and `ddl-engine-4` is frozen at 33 cases** (`a_expand` 15, `b_coerce` 18). `changed_from_previous` is exactly the four new cases, and **the twenty-nine older ones did not move by a byte**. **`render-engine-16` (365 cases, 333 SVG) is byte-identical** — proof that adding three lines to `COLOR_MAP` changed no line of how the existing six resolve.
+
+#### One frozen behavior did move
+
+**H-01 in `server/tests/golden/coerce_golden.json` moved.** Its DDL literally says "small yellow crayon squares": `with_color_delivery_repair` went 0 → 1 and `color_cycle` went `["red","black"]` → `["red","red","black","yellow"]`. **That is exactly what this change is for** (yellow became readable), and `gen_coerce_golden.py --refreeze` is the generator's sanctioned path. The duplicated `red`, however, is not from this change — **`_with_color_cycle_delivery` inserts `base_color` at the head of the cycle unconditionally, while the lines two and four below it do check for duplicates.** Filed on the ledger.
+
+#### A check was supplying its own answer
+
+**One perturbation applied during acceptance found a shape the implementing session's six had not.** Make `_resolve_color` return `cmap["black"]` for yellow, orange and purple only — **the regression that erases this version's visible effect**. **All 1751 tests stayed green.** The cause was in the new test `test_all_catalogs_resolve_all_nine_colors`, which **compared the keys of its own comprehension against the list those keys came from**, so it held whatever `_resolve_color` returned. Pinning the values, and requiring the three new words to classify back to themselves through `_hue_from_hex()`, turns the same perturbation **11 red** (one per catalog). **`render-engine-16` being byte-identical does not close this hole** — no case in that corpus uses a new color.
+
+#### Staffage does not follow the new colors (a pre-existing hole)
+
+`ddl_expander` keeps its own six-word color tuples (`_JA_COLORS` / `_EN_COLORS`), separate from `COLOR_MARKERS`, and `_dominant_ja_color` reads them to pick the staffage's main color. **Measured over 60 seeds, yellow, orange and purple get their own color 0/60 times and fall to black every time** (red 48/60, green 46/60). **This is not a hole this version opened** — reading the development server's database, **19 of 282 stored DDL strings already contained "黄色い" before it**. Stage 1 was writing yellow whether or not the vocabulary listing offered it; what changed is that **the yellow now reaches coercion and survives into the Score.** The staffage side is filed on the ledger.
+
+#### The Android copies are two versions behind
+
+`pipeline/ServerScoreCoercer.kt:64` holds a six-word set and **silently rewrites anything else to `black`**. `pipeline/ServerScoreSchemaJson.kt:5` is a frozen copy of the tool schema whose `Instruction` has **24 fields, `thinness` at 14, and no `note`** — neither [I-036] nor v2.9.9's `note` reached it. **This version did not create that lag**, so it is not chased here; it is handed to ledger item [I-029].
+
+#### Perturbations
+
+**Six from the implementing session** — the three words removed from `Color` (6 red); the prompt additions reverted (2 red); the three words removed from the saijiki (17 red); the three removed from `COLOR_MARKERS` (generator exit 1, 5 files moved); the three defaults removed from `COLOR_MAP` (11 red); `yellow` set to `red`'s hex (1 red). **The accepting session** reproduced the `COLOR_MARKERS` perturbation independently, confirming **exactly five files** (four `b_coerce` cases plus `manifest.json`) and the generator's non-zero exit, and then applied the `_resolve_color` perturbation above.

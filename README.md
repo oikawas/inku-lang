@@ -236,7 +236,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
-| colors | いろ | white, black, blue, red, green, gray |
+| colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | relations | あいだ | along, not touching, cutting, between, touching (used as "along the previous line") |

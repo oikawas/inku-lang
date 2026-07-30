@@ -59,7 +59,7 @@ Place three small red circles in the upper right.
 | Type | Examples |
 |---|---|
 | forms | circle, ellipse, triangle, square, line, arc |
-| colors | white, black, blue, red, green, gray |
+| colors | white, black, blue, red, green, gray, yellow, orange, purple |
 | places | top, bottom, center, left edge, right edge, upper edge, lower edge, corner |
 | motions | place, align, fill, scatter, draw, tile |
 | touches | pencil, pen, rotring, crayon, chalk, fine brush, thick brush, burin, drypoint |

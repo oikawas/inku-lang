@@ -20,14 +20,11 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-29"
+FROZEN_AT = "2026-07-30"
 REASON = (
-    "`Instruction.thinness` moves to the end of the declaration. The Stage 2 tool "
-    "schema reaches the model with its property order intact and an optional "
-    "field's fill rate follows its position, so a reordering that changes no "
-    "behaviour still changes which Scores are written. Nothing in this corpus "
-    "moves: it fixes the Score and watches the transform, and this version "
-    "changes which Scores arrive."
+    "The abstract Score color vocabulary grows from six colors to nine. Coerce "
+    "now recognizes yellow, orange, and purple markers in Japanese and English "
+    "DDL, so four new cases freeze delivery of those colors."
 )
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
 
@@ -137,6 +134,12 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
             primitive="cloudform", **{"from": None}, to=None, center=[0.5, 0.5], size=[0.4, 0.3],
         )])),
         "B-presence-no-ddl": _coerce_input(_score([line], presence=copy.deepcopy(BASE_PRESENCE))),
+        "B-yellow-from-ddl": _coerce_input(_score([line]), ddl="黄色い円を三つ散らす。"),
+        "B-orange-from-ddl": _coerce_input(_score([line]), ddl="橙の灯火が揺れる。"),
+        "B-purple-from-ddl": _coerce_input(_score([line]), ddl="紫の菫が咲く。"),
+        "B-yellow-from-ddl-en": _coerce_input(
+            _score([line]), ddl="Scatter three yellow circles."
+        ),
     }
     return cases
 

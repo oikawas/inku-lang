@@ -30,7 +30,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'iro',
 		label: 'いろ',
 		en: 'colors',
-		words: ['白', '黒', '青', '赤', '緑', '灰']
+		words: ['白', '黒', '青', '赤', '緑', '灰', '黄', '橙', '紫']
 	},
 	{
 		key: 'yuragi',
@@ -93,7 +93,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'iro',
 		label: 'いろ',
 		en: 'colors',
-		words: ['white', 'black', 'blue', 'red', 'green', 'gray']
+		words: ['white', 'black', 'blue', 'red', 'green', 'gray', 'yellow', 'orange', 'purple']
 	},
 	{
 		key: 'yuragi',

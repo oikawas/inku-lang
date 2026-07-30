@@ -1,4 +1,13 @@
-export type ColorKey = 'white' | 'black' | 'blue' | 'red' | 'green' | 'gray';
+export type ColorKey =
+	| 'white'
+	| 'black'
+	| 'blue'
+	| 'red'
+	| 'green'
+	| 'gray'
+	| 'yellow'
+	| 'orange'
+	| 'purple';
 export type ColorMap = Partial<Record<ColorKey, string>>;
 
 export type ColorCatalog = {

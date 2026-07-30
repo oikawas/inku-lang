@@ -38,6 +38,9 @@ COERCE_MARKERS = {
         (("red",), "red"),
         (("green", "forest", "leaf", "grass", "moss", "bamboo", "garden", "scent", "fragrance"), "green"),
         (("gray", "grey"), "gray"),
+        (("yellow", "gold"), "yellow"),
+        (("orange", "lantern"), "orange"),
+        (("purple", "violet", "lilac"), "purple"),
     ),
     "negated_color_markers": {
         "green": ("not green", "avoid green", "without green", "no green"),

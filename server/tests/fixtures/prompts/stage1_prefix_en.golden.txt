@@ -176,7 +176,7 @@ forms: circle, ellipse, triangle, square, line, arc, cloudform
 angles: horizontal, vertical, diagonal, rising, falling, rotated
 touches: hair, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint
 continuity: solid (default), dashed, dotted, dash-dot
-colors: white, black (default), blue, red, green, gray
+colors: white, black (default), blue, red, green, gray, yellow, orange, purple
 movements: fine, large, slowly, quickly, swaying, undulating, trembling, blurring
 places: top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner
 motions: place, line-up, fill, scatter, draw, tile

@@ -30,7 +30,17 @@ Weight = Literal[
     "computer",
 ]
 Thinness = Literal["fine", "extra_fine"]
-Color = Literal["white", "black", "blue", "red", "green", "gray"]
+Color = Literal[
+    "white",
+    "black",
+    "blue",
+    "red",
+    "green",
+    "gray",
+    "yellow",
+    "orange",
+    "purple",
+]
 SurfaceTexture = Literal[
     "none",
     "stipple",
@@ -478,7 +488,10 @@ class Instruction(BaseModel):
     )
     color: Color = Field(
         default="black",
-        description="white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰",
+        description=(
+            "white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰"
+            " / yellow=黄 / orange=橙 / purple=紫"
+        ),
     )
     color_hint: Optional[str] = Field(
         default=None,
@@ -600,7 +613,11 @@ class Score(BaseModel):
     )
     background: Color = Field(
         default="white",
-        description="背景色 (省略=white)。「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ",
+        description=(
+            "背景色: white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰"
+            " / yellow=黄 / orange=橙 / purple=紫 (省略=white)。"
+            "「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ"
+        ),
     )
     presence: Optional[Presence] = Field(
         default=None,

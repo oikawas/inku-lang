@@ -47,7 +47,7 @@ def test_the_legal_version_survives_untouched() -> None:
 def test_other_validation_errors_still_raise() -> None:
     """version を許したのであって、検証を緩めたのではない。"""
     with pytest.raises(Exception):
-        _score_from_model_output({**MINIMAL, "instructions": [{"primitive": "circle", "color": "yellow"}]})
+        _score_from_model_output({**MINIMAL, "instructions": [{"primitive": "circle", "color": "cyan"}]})
     with pytest.raises(Exception):
         _score_from_model_output({"version": "1.0"})
 

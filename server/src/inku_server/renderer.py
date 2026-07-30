@@ -81,6 +81,11 @@ COLOR_MAP: dict[str, str] = {
     "red": "#a2342a",
     "green": "#2f6b3a",
     "gray": "#888888",
+    # These neutral defaults keep all nine abstract colors renderable. Catalogs
+    # may override them; band-based catalog resolution can still use them last.
+    "yellow": "#a18308",
+    "orange": "#a95a00",
+    "purple": "#583a84",
 }
 
 SVG_PROFILES = frozenset({"display", "editable", "compat"})

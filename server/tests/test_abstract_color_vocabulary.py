@@ -74,9 +74,17 @@ def test_all_catalogs_resolve_all_nine_colors(catalog: dict[str, object]) -> Non
     catalog_map = render_color_map_for_catalog(str(catalog["id"]))
     cmap = {**COLOR_MAP, **(catalog_map or {})}
 
-    assert {
-        color: _resolve_color(color, None, cmap) for color in EXPECTED_COLORS
-    }.keys() == set(EXPECTED_COLORS)
+    resolved = {color: _resolve_color(color, None, cmap) for color in EXPECTED_COLORS}
+
+    # Comparing the keys alone would hold whatever the resolver returned. Pin the
+    # values: with no hint, resolution is the catalog map over the defaults.
+    assert resolved == {color: cmap[color] for color in EXPECTED_COLORS}
+    # And the three new words must land on a hex the renderer classifies back to
+    # themselves, so a resolution that quietly rounds them to an existing color
+    # fails here rather than passing silently.
+    assert {color: _hue_from_hex(resolved[color]) for color in NEW_DEFAULTS} == {
+        color: color for color in NEW_DEFAULTS
+    }
 
 
 def test_saijiki_color_words_have_paired_surfaces_and_score_values() -> None:

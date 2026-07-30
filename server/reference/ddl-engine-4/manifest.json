@@ -2673,7 +2673,7 @@
   ],
   "commit": "c68f23fdae67737cfe261aede1b93f92e3a4b298",
   "corpus_format_version": "1",
-  "ddl_version": "2",
+  "ddl_version": "3",
   "engine_version": "4",
   "frozen_at": "2026-07-30",
   "layer": "ddl-engine",

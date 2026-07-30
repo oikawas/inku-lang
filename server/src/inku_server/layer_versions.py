@@ -3,6 +3,8 @@
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 DDL_ENGINE_VERSION = "4"
-# 2 (2026-07-29): 太さが道具名から独立した語になり、「極細の黒い線」と書けるように
-# なった。語彙が増えたら版を上げるという規約に従う。保存済みの作品は "1" のまま残る。
-DDL_VERSION = "2"
+# 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
+# them and Stage 1 offers them. This follows the same rule version 2 followed for the
+# thinness word: the language version rises when its vocabulary grows, not when its
+# grammar changes. Works saved earlier keep the version they were written under.
+DDL_VERSION = "3"

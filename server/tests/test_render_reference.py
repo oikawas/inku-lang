@@ -32,20 +32,14 @@ def _manifest() -> dict:
 
 def test_render_reference_case_counts() -> None:
     cases = _manifest()["cases"]
-    # engine 15 で C 群が 40 → 43。`ground.seed` を明示しない 4 件を足し
-    # (それまでコーパスは `_texture_seed` を一度も呼んでいなかった)、
-    # `absorbency` の退役でその判別ケースが `C-ground-paper` の重複になったので外した。
-    # engine 16 で C 群が 43 -> 51。コーパスは 350 件すべてが `editable` で、
-    # 本番既定の `display` 固有の分岐を一度も実行していなかったので `display` を
-    # 通す 4 件 (`C-display-surface-*`) を足し、微小な塗りの機構が切り替わる
-    # 境界の両側を留める 4 件 (`C-tinyfill-*`) を足した。
-    # 段 3 で C 群が 51 -> 58。太さの軸 (`thinness`) は道具 3 種 × 2 段の 6 件と、
-    # 既定を明示した 1 件 (`C-thinness-default-pen`) で留める。
-    assert len(cases) == 365
+    # Engine 17 adds group F without changing the original 365 cases. Its 110
+    # cases are 11 catalogs x 9 abstract colors, six hint cases, and five
+    # non-white backgrounds.
+    assert len(cases) == 475
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
-        for prefix in ("A", "B", "C", "D", "E")
-    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119}
+        for prefix in ("A", "B", "C", "D", "E", "F")
+    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 110}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -58,11 +52,16 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
     assert score_fields == set(Score.model_fields)
     assert set(generator.BASE_SURFACE) == set(SurfaceSpec.model_fields)
     assert set(generator.BASE_GROUND) == set(CanvasGroundSpec.model_fields)
-    for case in generator.build_inputs().values():
+    for case_id, case in generator.build_inputs().items():
         score = case["score"]
         assert set(score) == score_fields
         assert set(score["instructions"][0]) == instruction_fields
-        assert set(case["color_map"]) == set(generator.DEFAULT_COLOR_MAP)
+        if case_id.startswith("F-"):
+            assert case["catalog_id"] is not None
+            assert any(key.startswith("palette:") for key in case["color_map"])
+        else:
+            assert case["catalog_id"] is None
+            assert set(case["color_map"]) == set(generator.DEFAULT_COLOR_MAP)
         assert case["svg_profile"] in ("editable", "display")
         assert isinstance(case["render_seed"], int)
         assert isinstance(case["wild"], bool)
@@ -86,35 +85,77 @@ def test_render_reference_keeps_the_display_profile_covered() -> None:
     ]
 
 
-def test_engine_15_left_only_the_machine_poles_untouched() -> None:
-    """engine 15 が動かさなかったのは機械の極だけである。
-
-    本版は演奏 seed の作り方を変えたので、手の演奏を持つ道具は全部動く。動かない
-    のは、幾何のまま描かれる `rotring` と、誤差なく反復する `computer` だけ。
-    **ただし cloudform は両極とも動く** — 段 3 でその図形が共通の閉輪郭経路に
-    載り、`rotring` は class から偽りの `stroke-engine-touch` を落とし、`computer`
-    は raster-bleed を得たからである。
-
-    契約は「段 1 で 347 件すべてが動くので、不変の側が版の説明になるという読み方は
-    失われる」と書いていたが、**実際には失われていない**。32 件が engine 14 と
-    バイト一致で残り、その内訳がそのまま「本版が触れなかったもの」を語る。
-    """
+def test_engine_17_moves_only_the_new_palette_cases() -> None:
+    """The unchanged side states that six-key legacy rendering did not move."""
     manifest = _manifest()
-    unchanged = set(manifest["cases"]) - set(manifest["changed_from_previous"])
-    shapes_without_cloudform = (
-        "arc", "circle", "ellipse", "line", "polygon", "square", "triangle",
-    )
-    assert unchanged == {
-        f"{prefix}-{tool}-{primitive}"
-        for prefix in ("A", "E-wild")
-        for tool in ("computer", "rotring")
-        for primitive in shapes_without_cloudform
-    } | {
-        f"D-canvas-{aspect}-filled-square-rotring"
-        for aspect in ("square", "wide", "pillar", "vertical")
+    changed = set(manifest["changed_from_previous"])
+    original = {
+        case_id for case_id in manifest["cases"] if not case_id.startswith("F-")
     }
-    for tool in ("computer", "rotring"):
-        assert f"A-{tool}-cloudform" in manifest["changed_from_previous"]
+    added = {
+        case_id for case_id in manifest["cases"] if case_id.startswith("F-")
+    }
+
+    assert len(original) == 365
+    assert len(added) == 110
+    assert changed == added
+    assert not (changed & original)
+
+
+def test_engine_17_palette_cases_cover_the_resolution_chain() -> None:
+    generator = _generator()
+    inputs = generator.build_inputs()
+    cases = _manifest()["cases"]
+    catalog_cases = {
+        case_id: case
+        for case_id, case in inputs.items()
+        if case_id.startswith("F-catalog-")
+    }
+
+    assert {case["catalog_id"] for case in catalog_cases.values()} == {
+        str(catalog["id"]) for catalog in generator.COLOR_CATALOGS
+    }
+    assert {
+        case["score"]["instructions"][0]["color"]
+        for case in catalog_cases.values()
+    } == set(generator.ABSTRACT_COLORS)
+
+    assert cases["F-hint-deep-blue"]["digest"] != cases[
+        "F-catalog-ink_season-black"
+    ]["digest"]
+    assert cases["F-hint-vertical"]["digest"] == cases[
+        "F-catalog-ink_season-black"
+    ]["digest"]
+    assert cases["F-hint-restored"]["digest"] == cases[
+        "F-catalog-default-gray"
+    ]["digest"]
+    assert 'stroke="#d3381c"' in _resolve_svg("F-hint-sakura").read_text()
+    assert 'stroke="#2c3e91"' in _resolve_svg("F-hint-missing-purple").read_text()
+    assert 'stroke="#a0522d"' in _resolve_svg("F-hint-brown").read_text()
+    assert all(
+        inputs[case_id]["score"]["background"] != "white"
+        for case_id in inputs
+        if case_id.startswith("F-background-")
+    )
+
+
+def test_engine_17_palette_cases_match_the_current_renderer() -> None:
+    """Group F must traverse the live resolver, not only frozen SVG files."""
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    for case_id, render_input in inputs.items():
+        if not case_id.startswith("F-"):
+            continue
+        svg = generator.render(
+            Score.model_validate(render_input["score"]),
+            color_map=render_input["color_map"],
+            catalog_id=render_input["catalog_id"],
+            render_seed=render_input["render_seed"],
+            svg_profile=render_input["svg_profile"],
+            wild=render_input["wild"],
+        )
+        assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"]
 
 
 def test_render_reference_discriminator_cases() -> None:

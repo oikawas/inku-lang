@@ -10,7 +10,13 @@ from inku_server import composer, saijiki
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.language_support.en import COERCE_MARKERS as EN_COERCE_MARKERS
 from inku_server.language_support.ja import COERCE_MARKERS as JA_COERCE_MARKERS
-from inku_server.renderer import COLOR_MAP, _hue_from_hex, _resolve_color, render
+from inku_server.renderer import (
+    COLOR_MAP,
+    _hue_from_hex,
+    _resolve_color,
+    _work_color_assignment,
+    render,
+)
 from inku_server.schema import Color, Instruction, Score
 
 
@@ -29,6 +35,64 @@ NEW_DEFAULTS = {
     "yellow": "#a18308",
     "orange": "#a95a00",
     "purple": "#583a84",
+}
+
+EXPECTED_WORK_ASSIGNMENTS = {
+    "default": {
+        "white": "#ffffff", "black": "#111111", "blue": "#2c3e91",
+        "red": "#a2342a", "green": "#2f6b3a", "gray": "#888888",
+        "yellow": "#2f6b3a", "orange": "#a2342a", "purple": "#2c3e91",
+    },
+    "ink_season": {
+        "white": "#fffffb", "black": "#111111", "blue": "#165e83",
+        "red": "#d3381c", "green": "#007b43", "gray": "#595857",
+        "yellow": "#ffb61e", "orange": "#ffb61e", "purple": "#a591c5",
+    },
+    "fresco_study": {
+        "white": "#f5f1e8", "black": "#4a342e", "blue": "#1f4e8c",
+        "red": "#a0522d", "green": "#4f7942", "gray": "#8a8178",
+        "yellow": "#f7e89f", "orange": "#a0522d", "purple": "#1f4e8c",
+    },
+    "open_air_light": {
+        "white": "#ffffff", "black": "#4b4a78", "blue": "#82c7de",
+        "red": "#ee8fa2", "green": "#4e8372", "gray": "#afa6bd",
+        "yellow": "#ffce00", "orange": "#fbceb1", "purple": "#4b4a78",
+    },
+    "ink_porcelain": {
+        "white": "#fffdfa", "black": "#1a1a1b", "blue": "#0057a8",
+        "red": "#c91f24", "green": "#00896c", "gray": "#4b4b4f",
+        "yellow": "#d6a01d", "orange": "#d6a01d", "purple": "#6a4c8c",
+    },
+    "cool_material": {
+        "white": "#fcfcfc", "black": "#e5e8e8", "blue": "#4f8fb8",
+        "red": "#a98467", "green": "#4b5d43", "gray": "#95a5a6",
+        "yellow": "#4b5d43", "orange": "#a98467", "purple": "#2c3e50",
+    },
+    "dye_earth": {
+        "white": "#fffaf0", "black": "#2b2736", "blue": "#006c8f",
+        "red": "#b7285f", "green": "#6b7d3a", "gray": "#8d7f73",
+        "yellow": "#d6b72a", "orange": "#e8862e", "purple": "#d83fb1",
+    },
+    "desert_mineral": {
+        "white": "#f1e4c8", "black": "#1c1b18", "blue": "#1f4b8f",
+        "red": "#b31b1b", "green": "#1c8a68", "gray": "#8f8878",
+        "yellow": "#f1e4c8", "orange": "#bd6f2c", "purple": "#1f4b8f",
+    },
+    "vivid_material": {
+        "white": "#f4f4f4", "black": "#1c1c1c", "blue": "#73c2fb",
+        "red": "#f50087", "green": "#008f39", "gray": "#7d6f66",
+        "yellow": "#fff200", "orange": "#ff9800", "purple": "#f50087",
+    },
+    "weathered_heritage": {
+        "white": "#dcdcdc", "black": "#1f2933", "blue": "#4169e1",
+        "red": "#b93a32", "green": "#004225", "gray": "#708090",
+        "yellow": "#fffdd0", "orange": "#b93a32", "purple": "#4169e1",
+    },
+    "sea_stone": {
+        "white": "#ffffff", "black": "#191970", "blue": "#191970",
+        "red": "#e2725b", "green": "#808000", "gray": "#b2beb5",
+        "yellow": "#f9d71c", "orange": "#e2725b", "purple": "#191970",
+    },
 }
 
 
@@ -71,20 +135,18 @@ def test_new_default_colors_classify_as_themselves() -> None:
 
 @pytest.mark.parametrize("catalog", COLOR_CATALOGS, ids=lambda catalog: catalog["id"])
 def test_all_catalogs_resolve_all_nine_colors(catalog: dict[str, object]) -> None:
-    catalog_map = render_color_map_for_catalog(str(catalog["id"]))
+    catalog_id = str(catalog["id"])
+    catalog_map = render_color_map_for_catalog(catalog_id)
     cmap = {**COLOR_MAP, **(catalog_map or {})}
+    assignment = _work_color_assignment(cmap, 12345, catalog_id)
 
-    resolved = {color: _resolve_color(color, None, cmap) for color in EXPECTED_COLORS}
-
-    # Comparing the keys alone would hold whatever the resolver returned. Pin the
-    # values: with no hint, resolution is the catalog map over the defaults.
-    assert resolved == {color: cmap[color] for color in EXPECTED_COLORS}
-    # And the three new words must land on a hex the renderer classifies back to
-    # themselves, so a resolution that quietly rounds them to an existing color
-    # fails here rather than passing silently.
-    assert {color: _hue_from_hex(resolved[color]) for color in NEW_DEFAULTS} == {
-        color: color for color in NEW_DEFAULTS
+    resolved = {
+        color: _resolve_color(color, None, cmap, work_assignment=assignment)
+        for color in EXPECTED_COLORS
     }
+
+    assert resolved == EXPECTED_WORK_ASSIGNMENTS[catalog_id]
+    assert len({resolved[color] for color in ("white", "black", "gray")}) == 3
 
 
 def test_saijiki_color_words_have_paired_surfaces_and_score_values() -> None:
@@ -145,7 +207,15 @@ def test_new_background_colors_render(background: str) -> None:
             )
         ],
     )
+    catalog_map = render_color_map_for_catalog("ink_season")
+    cmap = {**COLOR_MAP, **(catalog_map or {})}
+    assignment = _work_color_assignment(cmap, 1, "ink_season")
 
-    svg = render(score, render_seed=1)
+    svg = render(
+        score,
+        color_map=cmap,
+        catalog_id="ink_season",
+        render_seed=1,
+    )
 
-    assert f'fill="{COLOR_MAP[background]}"' in svg
+    assert f'fill="{assignment[background]}"' in svg

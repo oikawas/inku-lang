@@ -10,13 +10,14 @@ from .base import RenderEngineResult
 @dataclass(frozen=True)
 class DefaultRenderEngine:
     id: str = "default"
-    version: str = "16"
+    version: str = "17"
 
     def render(
         self,
         score: Score,
         *,
         color_map: dict[str, str] | None = None,
+        catalog_id: str | None = None,
         svg_profile: str | None = None,
         render_seed: int | None = None,
         wild: bool = False,
@@ -24,6 +25,7 @@ class DefaultRenderEngine:
         svg = render_svg(
             score,
             color_map=color_map,
+            catalog_id=catalog_id,
             svg_profile=svg_profile,
             render_seed=render_seed,
             wild=wild,

@@ -48,6 +48,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **17** | v2.9.12 | 783 | 2026-07-30 | 475 | **110** | **365** |
 | **16** | v2.9.3 | 749 / 754 | 2026-07-28 | 365 | **333** | **32** |
 | **15** | v2.7.8 (v2.7.12 folded in) | 717 / 721 | 2026-07-27 | 350 | **318** | **32** |
 | **14** | v2.7.0 | 709 | 2026-07-25 | 347 | **126** | **221** |
@@ -185,7 +186,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-16/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 365 (333 SVG) |
+| Drawing | `server/reference/render-engine-17/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 475 (110 SVG) |
 | Deterministic DDL layers | `server/reference/ddl-engine-4/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -374,6 +375,93 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 17 — the catalog's `palette` reaches the drawing (v2.9.12)
+
+**Until this version the eight named entries of a catalog's `palette` reached the drawing only
+through substring matching on `color_hint`.** That description channel is nearly empty: of the 7463
+stored instructions, only **945 (12.7%)** carry a color word in the segment Stage 2 wrote.
+**For 87% of instructions there is nothing to match against**, and resolution ended at
+`cmap[color]` — the catalog's six-key `map` plus the three defaults v2.9.11 added.
+
+**This version builds a deterministic path from the `palette`.** The assignment is computed
+**once per work**, and its only inputs are **`(render_seed, catalog_id, abstract color)`**.
+The full instruction dump is not used (using it would change the color whenever `color_hint`
+is edited, confounding any A/B), and neither is `performance_seed` — **color is a property of the
+work, not of the performance.**
+
+- **The six chromatic words** are classified by OKLCh hue band (red 345–50°, orange 50–80°,
+  yellow 80–137°, green 137–200°, blue 200–280°, purple 280–345°). **CIELAB cannot be used**:
+  it puts pure blue at 306° next to pure magenta at 328° and cannot separate blue from purple.
+  With several candidates in a band the seed picks one; with none, the nearest chromatic entry by
+  hue angle; with no chromatic entry at all, the `map` value.
+- **The three achromatic roles** first **reserve** the candidate whose hex equals their own `map`
+  value, then take the remaining candidates in order of nearest L to that `map` value. The naive
+  "highest L / lowest L / middle" rule **collapses white and black onto the same hex in the five
+  catalogs that hold fewer than three achromatic entries** (`desert_mineral` holds one).
+- **The background goes through the same assignment.**
+- **`catalog_id` now reaches the renderer.** The identifier did not appear in `renderer.py` even
+  once before: four files carry it — the two calls in `api.py`, `RenderEngine.render()`,
+  `DefaultRenderEngine`, and `render()`. Omitting it means `DEFAULT_COLOR_CATALOG_ID`.
+- **`_hint_hues` matches ASCII on word boundaries** (CJK keeps substring matching, having no word
+  boundaries). **Five tokens that are not words were dropped from the table** — `blu` and `ai`
+  (blue), `vert` and `tall` (green), `shu` (red) — which stops 166 `vertical`, 20 `constraint` and
+  13 `blur` misfires. **Genuine French `vert` becomes unreadable too**; stopping the misfires was
+  chosen over keeping it. `brown` has no band of its own and is sent to `orange`.
+
+**110 moved, 365 unchanged, and the unchanged side is this version's boundary**: a call that gets
+only the six-key `map`, holds no `palette:` key and no `color_hint`, and draws on a `white`
+background is byte-identical to engine 16. **Every one of the 365 existing cases had that shape**
+(zero `palette:` keys, zero `color_hint`, instruction colors only `black` 364 and `green` 1,
+backgrounds all `white`), so **without extending the case table nothing would have moved at all.**
+Group F adds 110 cases: 11 catalogs x 9 abstract colors, six description cases, five non-white
+backgrounds.
+
+### What it reaches
+
+Measured over 1847 stored works and 7463 instructions, on the **surface v2.9.9 produced when it
+moved diagnostics into `note`** (the stored `color_hint` with its diagnostic segments removed).
+
+| Metric | v2.9.11 | v2.9.12 |
+|---|---|---|
+| `palette` entries never chosen | 12 / 88 | **6 / 88** |
+| Distinct resolved hexes | 76 | **82** |
+| Color decisions from a misfire | 148 | **0** |
+| Achromatic share of what is drawn | 57.9% | **61.4%** |
+
+**This version does not add color; the achromatic share rises.** The band is decided by the
+abstract color, and **69.5% of the abstract colors in stored works are achromatic**.
+**What moves is which `palette` entry gets used, not the distribution of bands.**
+
+### Eight roles that dissolve into the paper (not fixed here)
+
+**Roles within ΔL 0.15 of the paper went from 0 / 88 under engine 16 to 8 / 88 under engine 17.**
+Seven are yellow and orange, because those two bands are light in the catalogs (a yellow line on
+paper is pale by nature). **The eighth is a regression**: `black` in `cool_material` moves from
+`#2c3e50` (L 0.356) to `#e5e8e8` (L 0.929), and its ΔL against the `#fcfcfc` paper falls
+**0.635 → 0.062**. That catalog's own black has chroma 0.039, **just past the 0.035 achromatic
+floor**, so it is not an achromatic candidate, and the only remaining candidate (`Pale Birch
+#e5e8e8`) is taken by the nearest-L rule **which has no distance limit**. In production
+`cool_material` holds **102 works and 412 instructions, 205 of them (49.8%) `color=black`**, over
+76 white and 19 black backgrounds. `yellow` in `desert_mineral` lands on the **same hex** as the
+paper (ΔL 0.000). **A check that compares hexes alone passes both**, since the three roles do
+remain distinct from one another. **By the author's decision of 2026-07-30 this version ships
+unfixed and the matter is handled in stage 2** (ledger item [I-062]).
+
+### Version and corpus
+
+- **`render_engine_version` 16 → 17**
+- **`ddl_engine_version` stays 4 and `ddl_version` stays 3** — neither DDL vocabulary nor grammar moves
+- **Reference corpus `render-engine-17/`** — 475 cases (A 88 / B 72 / C 58 / D 28 / E 119 / **F 110**),
+  holding the SVG of the 110 that moved
+- **The meaning of the manifest's `color_map_digest` was changed.** It used to be the digest of the
+  generator's own six-key `DEFAULT_COLOR_MAP`, so **changing `renderer.COLOR_MAP` never moved it**
+  (v2.9.11's three new words passed with the digest unchanged). Group F gives each case its own
+  `color_map`, so the digest is now taken over the **set of `(case_id, catalog_id, color_map)` for
+  all 475 cases**.
+- **Reading frozen SVG alone lets an identity-assignment perturbation pass**, so a test was added
+  that **re-performs all 110 group F cases through the live renderer** and compares against the
+  manifest digest.
 
 ## engine 16 — a surface becomes a mark, and thinness becomes an axis (v2.9.3)
 

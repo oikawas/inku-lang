@@ -1039,3 +1039,88 @@ Score's `color` gains **`yellow`, `orange` and `purple`**. **Catalog palettes al
 #### Perturbations
 
 **Six from the implementing session** — the three words removed from `Color` (6 red); the prompt additions reverted (2 red); the three words removed from the saijiki (17 red); the three removed from `COLOR_MARKERS` (generator exit 1, 5 files moved); the three defaults removed from `COLOR_MAP` (11 red); `yellow` set to `red`'s hex (1 red). **The accepting session** reproduced the `COLOR_MARKERS` perturbation independently, confirming **exactly five files** (four `b_coerce` cases plus `manifest.json`) and the generator's non-zero exit, and then applied the `_resolve_color` perturbation above.
+
+### v2.9.12 — The catalog's `palette` reaches the drawing (Build 783, 2026-07-30)
+
+**Each of the eleven catalogs holds eight named `palette` entries, and the only path by which they
+reached the drawing was substring matching on `color_hint`.** That description channel is nearly
+empty: of 7463 stored instructions, only **945 (12.7%)** carry a color word in the segment Stage 2
+wrote. The other 87% ended at `cmap[color]` — the catalog's six-key `map` plus the three defaults
+v2.9.11 added. **This version builds a deterministic path from the `palette`.**
+
+**The assignment is computed once per work, and its only inputs are `(render_seed, catalog_id,
+abstract color)`.** The full instruction dump is not used: with it, editing `color_hint` alone
+would change the color and confound any A/B. `performance_seed` is not used either — **color is a
+property of the work, not of the performance.** The six chromatic words are classified by **OKLCh**
+hue band (**CIELAB puts pure blue at 306° next to pure magenta at 328° and cannot separate blue
+from purple**). The three achromatic roles **first reserve the candidate whose hex equals their own
+`map` value** and then take the rest by nearest L — the naive "highest / lowest / middle L" the
+contract drafted **collapses white and black onto one hex in the five catalogs holding fewer than
+three achromatic entries** (`desert_mineral` holds one). The background goes through the same
+assignment.
+
+**`catalog_id` now reaches the renderer**: the identifier did not appear in `renderer.py` even once
+before. Four files carry it — the two calls in `api.py`, `RenderEngine.render()`,
+`DefaultRenderEngine` and `render()` — and omitting it means `DEFAULT_COLOR_CATALOG_ID`.
+**`_hint_hues` now matches ASCII on word boundaries** (CJK keeps substring matching, having no word
+boundaries) and **five tokens that are not words were dropped** — `blu` and `ai` (blue), `vert` and
+`tall` (green), `shu` (red) — stopping 166 `vertical`, 20 `constraint` and 13 `blur` misfires.
+**Genuine French `vert` becomes unreadable too**; stopping the misfires was chosen over keeping it.
+`brown` has no band of its own and is sent to `orange`.
+
+#### Without extending the case table nothing would have moved
+
+**All 365 cases of `render-engine-16` held zero `palette:` keys, zero `color_hint`, instruction
+colors of only `black` (364) and `green` (1), and a `white` background in every case.** The
+resolution chain finds neither a description nor a candidate set, falls to `map[color]`, and
+**produces byte-identical output even though the work does traverse the layer.** By the author's
+decision the case table was extended with **110 group F cases** (11 catalogs x 9 abstract colors,
+six description cases, five non-white backgrounds). **110 moved, 365 unchanged**, and the unchanged
+side is this version's boundary: a call that gets only the six-key `map`, holds no `palette:` key
+and no `color_hint`, and draws on `white` produces the same picture as engine 16.
+
+**The meaning of the manifest's `color_map_digest` was changed.** It used to be the digest of the
+generator's own six-key `DEFAULT_COLOR_MAP`, so **changing `renderer.COLOR_MAP` never moved it**
+(v2.9.11's three new words passed with the digest unchanged). Group F gives each case its own
+`color_map`, so it is now taken over the **set of `(case_id, catalog_id, color_map)` for all 475
+cases**. **Reading frozen SVG alone lets an identity-assignment perturbation pass**, so a test was
+added that re-performs all 110 group F cases through the live renderer and compares digests.
+
+#### What it reaches (no more color; more achromatic)
+
+Measured over 1847 stored works and 7463 instructions on the **surface v2.9.9 produced when it moved
+diagnostics into `note`**: **`palette` entries never chosen 12 → 6 / 88**, **distinct resolved hexes
+76 → 82**, **color decisions from a misfire 148 → 0**, **achromatic share of what is drawn 57.9% →
+61.4%**. The band is decided by the abstract color and **69.5% of the abstract colors in stored
+works are achromatic**, so **what moves is which `palette` entry gets used, not the distribution of
+bands.**
+
+#### Eight roles that dissolve into the paper (not fixed here)
+
+**Roles within ΔL 0.15 of the paper went from 0 / 88 under engine 16 to 8 / 88.** Seven are yellow
+and orange, because those two bands are light in the catalogs. **The eighth is a regression**:
+`black` in `cool_material` moves from `#2c3e50` (L 0.356) to `#e5e8e8` (L 0.929) and its ΔL against
+the `#fcfcfc` paper falls **0.635 → 0.062**. That catalog's own black has chroma 0.039, **just past
+the 0.035 achromatic floor**, so it is not an achromatic candidate and the one remaining candidate
+is taken by the nearest-L rule, **which has no distance limit**. In production `cool_material` holds
+**102 works and 412 instructions, 205 of them (49.8%) `color=black`**, over 76 white and 19 black
+backgrounds. `yellow` in `desert_mineral` lands on the **same hex** as the paper (ΔL 0.000).
+**A check that compares hexes alone passes both**, since the three roles do stay distinct from one
+another. **The regression is in the contract's design, not a deviation by the implementation** — the
+contract's warning looked only at hexes being equal and never at the lightness distance. **By the
+author's decision of 2026-07-30 it ships unfixed and is handled in stage 2** (ledger item [I-062]).
+
+#### Perturbations
+
+**Three on the implementation side** — restore `work_assignment` to an identity map, restore ASCII
+matching to substrings, restore the achromatic rule to "highest / lowest / middle L". **Four more
+were applied independently during acceptance and all four went red**: the identity map (13 tests),
+**removing `catalog_id` from the seed material** (6), moving the achromatic floor 0.035 → 0.05 (4),
+and killing the nearest-hue fallback for an empty band (10). **The second checks whether
+`catalog_id` really enters the seed**, and none of the implementation's three look at it: the new
+`test_catalog_id_participates_in_multi_candidate_choice` passes on catalog `palette` differences
+alone, so an implementation that ignored `catalog_id` would stay green.
+
+pytest **1771/31** (+20), cli 76, ruff clean, `npm run check` 219/0/2, both frozen corpora
+byte-identical on regeneration. **Android stays at engine 16** (ledger item [I-029]). **The version
+is a patch**: an engine version rises, and no stored data changes shape.

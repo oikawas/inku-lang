@@ -131,7 +131,7 @@ def test_ddl_coerce_outputs_keep_machine_diagnostics_out_of_color_hint() -> None
     assert seen_color_hints > 0
 
 
-def test_diagnostic_split_stops_restored_from_selecting_red_without_moving_the_seed() -> None:
+def test_word_boundary_stops_restored_from_selecting_red_without_moving_the_seed() -> None:
     diagnostic = "motion floor restored as a small directional trace"
     before = Instruction.model_validate(
         {
@@ -152,7 +152,7 @@ def test_diagnostic_split_stops_restored_from_selecting_red_without_moving_the_s
         }
     )
 
-    assert _resolve_color(before.color, before.color_hint, COLOR_MAP) == COLOR_MAP["red"]
+    assert _resolve_color(before.color, before.color_hint, COLOR_MAP) == COLOR_MAP["gray"]
     assert _resolve_color(after.color, after.color_hint, COLOR_MAP) == COLOR_MAP["gray"]
     assert _seed_for_instruction(before, 4242) == _seed_for_instruction(after, 4242)
 

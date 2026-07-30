@@ -631,6 +631,7 @@ def _render_score_svg(
         return current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
+            catalog_id=render_metadata.get("render_color_catalog_id"),
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=render_seed,
             wild=wild,
@@ -811,6 +812,7 @@ def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: s
         result = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
+            catalog_id=render_metadata.get("render_color_catalog_id"),
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=effective_seed,
             wild=wild,

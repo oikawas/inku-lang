@@ -18,6 +18,7 @@ from xml.sax.saxutils import escape
 import svgwrite
 
 from .cloudform import generate_cloudform_contour, sample_closed_catmull_rom
+from .color_catalogs import DEFAULT_COLOR_CATALOG_ID
 from .master_grid import fmt
 from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import (
@@ -124,8 +125,6 @@ HUE_HINTS: dict[str, tuple[str, ...]] = {
         "cobalt",
         "lapis",
         "bleu",
-        "blu",
-        "ai",
         "azul",
         "青",
         "藍",
@@ -136,11 +135,9 @@ HUE_HINTS: dict[str, tuple[str, ...]] = {
     "green": (
         "green",
         "verd",
-        "vert",
         "jade",
         "olive",
         "cactus",
-        "tall",
         "緑",
         "青緑",
         "翡翠",
@@ -169,7 +166,6 @@ HUE_HINTS: dict[str, tuple[str, ...]] = {
         "cinnabar",
         "terra",
         "rosa",
-        "shu",
         "vermilion",
         "赤",
         "朱",
@@ -523,6 +519,7 @@ def _texture_filter_xml(weight: str, canvas: CanvasSize) -> str:
 _VARIATION_SEED_FIELDS_ALL = frozenset(
     {"amplitude", "frequency", "quality", "dimensions"}
 )
+_WORK_COLOR_SEED_FIELDS = ("render_seed", "catalog_id", "abstract_color")
 
 _SEED_INSTRUCTION_FIELDS = (
     "primitive",
@@ -2276,8 +2273,15 @@ def _point_in_polygon(px: float, py: float, contour: list[tuple[float, float]]) 
     return inside
 
 
-def _surface_color(ins: Instruction, cmap: dict[str, str]) -> str:
-    return _resolve_color(ins.color, ins.color_hint, cmap)
+def _surface_color(
+    ins: Instruction, cmap: dict[str, str], work_assignment: dict[str, str]
+) -> str:
+    return _resolve_color(
+        ins.color,
+        ins.color_hint,
+        cmap,
+        work_assignment=work_assignment,
+    )
 
 
 def _surface_line_angle(surface: SurfaceSpec) -> float:
@@ -2485,6 +2489,7 @@ def _render_surface_vectors(
     ins: Instruction,
     canvas: CanvasSize,
     cmap: dict[str, str],
+    work_assignment: dict[str, str],
     *,
     seed: int,
     contour: list[tuple[float, float]],
@@ -2496,7 +2501,7 @@ def _render_surface_vectors(
     if surface is None or surface.texture == "none" or bbox is None:
         return
     x, y, w, h = bbox
-    color = _surface_color(ins, cmap)
+    color = _surface_color(ins, cmap, work_assignment)
     opacity = min(0.75, surface.opacity)
     density = max(0.02, surface.density)
     scale = max(0.04, surface.scale)
@@ -2727,6 +2732,7 @@ def _render_surface_texture(
     dwg: svgwrite.Drawing,
     ins: Instruction,
     cmap: dict[str, str],
+    work_assignment: dict[str, str],
     canvas: CanvasSize,
     *,
     profile: str,
@@ -2766,6 +2772,7 @@ def _render_surface_texture(
         ins,
         canvas,
         cmap,
+        work_assignment,
         seed=seed,
         contour=contour,
         wild=wild,
@@ -2853,6 +2860,7 @@ def render(
     score: Score,
     color_map: dict[str, str] | None = None,
     *,
+    catalog_id: str | None = None,
     canvas_aspect: str | None = None,
     svg_profile: str | None = None,
     render_seed: int | None = None,
@@ -2863,12 +2871,13 @@ def render(
     structured = profile != "display"
     use_filters = profile == "display"
     cmap = {**COLOR_MAP, **(color_map or {})}
+    work_assignment = _work_color_assignment(cmap, render_seed, catalog_id)
     canvas = canvas_size_for_aspect(canvas_aspect or _score_canvas_aspect(score))
     dwg = svgwrite.Drawing(
         size=(canvas.width, canvas.height),
         viewBox=f"0 0 {canvas.width} {canvas.height}",
     )
-    bg = cmap.get(score.background, BACKGROUND)
+    bg = work_assignment.get(score.background, cmap.get(score.background, BACKGROUND))
     ground_layer, ground_filter_xml = _render_canvas_ground(
         dwg, score, canvas, bg, profile=profile, render_seed=render_seed
     )
@@ -2929,6 +2938,7 @@ def render(
                 single,
                 cmap,
                 canvas,
+                work_assignment=work_assignment,
                 use_filters=use_filters,
                 render_seed=render_seed,
                 ins_idx=ins_idx,
@@ -2953,6 +2963,7 @@ def render(
                 dwg,
                 single,
                 cmap,
+                work_assignment,
                 canvas,
                 profile=profile,
                 render_seed=render_seed,
@@ -2985,7 +2996,9 @@ def render(
         )
         content.add(plate)
 
-    presence_layer = _render_presence_layer(dwg, score, cmap, canvas)
+    presence_layer = _render_presence_layer(
+        dwg, score, cmap, canvas, work_assignment=work_assignment
+    )
     if presence_layer is not None:
         presence_content.add(presence_layer)
 
@@ -3060,7 +3073,12 @@ def _presence_seed(score: Score) -> int:
 
 
 def _render_presence_layer(
-    dwg: svgwrite.Drawing, score: Score, cmap: dict[str, str], canvas: CanvasSize
+    dwg: svgwrite.Drawing,
+    score: Score,
+    cmap: dict[str, str],
+    canvas: CanvasSize,
+    *,
+    work_assignment: dict[str, str],
 ):
     """抽象化された存在感を描く。自然文キーワードや具象部品はここでは扱わない。"""
     presence = score.presence
@@ -3069,8 +3087,8 @@ def _render_presence_layer(
 
     cx, cy = _presence_center_px(score, canvas)
     unit = canvas.unit
-    color = cmap.get("gray", COLOR_MAP["gray"])
-    dark = cmap.get("black", COLOR_MAP["black"])
+    color = work_assignment.get("gray", cmap.get("gray", COLOR_MAP["gray"]))
+    dark = work_assignment.get("black", cmap.get("black", COLOR_MAP["black"]))
     visual_load = _score_visual_load(score)
     load_opacity = 0.52 if visual_load >= 120 else 0.70 if visual_load >= 60 else 1.0
     intensity_opacity = {"low": 0.13, "medium": 0.21, "high": 0.30}[
@@ -3254,53 +3272,225 @@ def _hue_from_hex(value: str) -> str | None:
     return "red"
 
 
+_ASCII_HINT_TOKEN_RE = re.compile(r"^[a-z]+$")
+_ASCII_HINT_WORD_RE = re.compile(r"[0-9a-z]+")
+_ACHROMATIC_COLORS = ("black", "gray", "white")
+_CHROMATIC_COLORS = ("red", "orange", "yellow", "green", "blue", "purple")
+_CHROMATIC_BANDS = {
+    "red": (345.0, 50.0),
+    "orange": (50.0, 80.0),
+    "yellow": (80.0, 137.0),
+    "green": (137.0, 200.0),
+    "blue": (200.0, 280.0),
+    "purple": (280.0, 345.0),
+}
+_CHROMATIC_BAND_CENTERS = {
+    "red": 27.5,
+    "orange": 65.0,
+    "yellow": 108.5,
+    "green": 168.5,
+    "blue": 240.0,
+    "purple": 312.5,
+}
+_OKLCH_CHROMA_FLOOR = 0.035
+_HINT_HUE_PRIORITY = (
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "blue",
+    "purple",
+    "white",
+    "black",
+    "gray",
+)
+
+
+def _oklch_from_hex(value: str) -> tuple[float, float, float] | None:
+    rgb = _hex_to_rgb(value)
+    if rgb is None:
+        return None
+
+    def linearize(component: int) -> float:
+        channel = component / 255
+        return (
+            channel / 12.92
+            if channel <= 0.04045
+            else ((channel + 0.055) / 1.055) ** 2.4
+        )
+
+    r, g, b = (linearize(component) for component in rgb)
+    l_channel = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+    m_channel = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+    s_channel = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+    l_root, m_root, s_root = (
+        value ** (1 / 3) if value >= 0 else -((-value) ** (1 / 3))
+        for value in (l_channel, m_channel, s_channel)
+    )
+    lightness = (
+        0.2104542553 * l_root
+        + 0.7936177850 * m_root
+        - 0.0040720468 * s_root
+    )
+    a = 1.9779984951 * l_root - 2.4285922050 * m_root + 0.4505937099 * s_root
+    b_axis = 0.0259040371 * l_root + 0.7827717662 * m_root - 0.8086757660 * s_root
+    return lightness, math.hypot(a, b_axis), math.degrees(math.atan2(b_axis, a)) % 360
+
+
+def _chromatic_band(hue: float) -> str:
+    for name, (lower, upper) in _CHROMATIC_BANDS.items():
+        if lower > upper:
+            if hue >= lower or hue < upper:
+                return name
+        elif lower <= hue < upper:
+            return name
+    return "red"
+
+
+def _circular_hue_distance(left: float, right: float) -> float:
+    distance = abs(left - right) % 360
+    return min(distance, 360 - distance)
+
+
+def _work_color_choice(
+    candidates: list[str],
+    render_seed: int | None,
+    catalog_id: str,
+    abstract_color: str,
+) -> str:
+    ordered = sorted(set(candidates))
+    if len(ordered) == 1:
+        return ordered[0]
+    values = {
+        "render_seed": render_seed,
+        "catalog_id": catalog_id,
+        "abstract_color": abstract_color,
+    }
+    payload = "|".join(str(values[field]) for field in _WORK_COLOR_SEED_FIELDS)
+    digest = hashlib.sha256(payload.encode("utf-8")).digest()
+    return ordered[int.from_bytes(digest[:8], "big") % len(ordered)]
+
+
+def _work_color_assignment(
+    cmap: dict[str, str],
+    render_seed: int | None,
+    catalog_id: str | None,
+) -> dict[str, str]:
+    resolved_catalog_id = catalog_id or DEFAULT_COLOR_CATALOG_ID
+    achromatic: list[tuple[float, str]] = []
+    chromatic: dict[str, list[str]] = {
+        color: [] for color in _CHROMATIC_COLORS
+    }
+    chromatic_hues: list[tuple[float, str]] = []
+    seen: set[str] = set()
+    for key, hex_value in cmap.items():
+        if not key.startswith("palette:") or hex_value in seen:
+            continue
+        oklch = _oklch_from_hex(hex_value)
+        if oklch is None:
+            continue
+        seen.add(hex_value)
+        lightness, chroma, hue = oklch
+        if chroma < _OKLCH_CHROMA_FLOOR:
+            achromatic.append((lightness, hex_value))
+        else:
+            chromatic[_chromatic_band(hue)].append(hex_value)
+            chromatic_hues.append((hue, hex_value))
+
+    assignment: dict[str, str] = {}
+    remaining = sorted(achromatic)
+    for color in _ACHROMATIC_COLORS:
+        fallback = cmap.get(color, COLOR_MAP[color])
+        exact = next(
+            (
+                candidate
+                for candidate in remaining
+                if candidate[1].lower() == fallback.lower()
+            ),
+            None,
+        )
+        if exact is not None:
+            remaining.remove(exact)
+            assignment[color] = exact[1]
+    for color in _ACHROMATIC_COLORS:
+        if color in assignment:
+            continue
+        fallback = cmap.get(color, COLOR_MAP[color])
+        if not remaining:
+            assignment[color] = fallback
+            continue
+        target = _oklch_from_hex(fallback)
+        target_lightness = target[0] if target is not None else 0.0
+        best = min(
+            remaining,
+            key=lambda candidate: (
+                abs(candidate[0] - target_lightness),
+                candidate[1],
+            ),
+        )
+        remaining.remove(best)
+        assignment[color] = best[1]
+
+    for color in _CHROMATIC_COLORS:
+        candidates = chromatic[color]
+        if candidates:
+            assignment[color] = _work_color_choice(
+                candidates, render_seed, resolved_catalog_id, color
+            )
+        elif chromatic_hues:
+            target = _CHROMATIC_BAND_CENTERS[color]
+            assignment[color] = min(
+                chromatic_hues,
+                key=lambda candidate: (
+                    _circular_hue_distance(candidate[0], target),
+                    candidate[1],
+                ),
+            )[1]
+        else:
+            assignment[color] = cmap.get(color, COLOR_MAP[color])
+    return assignment
+
+
 def _hint_hues(hint: str) -> set[str]:
     normalized = _norm_label(hint)
+    words = set(_ASCII_HINT_WORD_RE.findall(normalized))
     hues: set[str] = set()
     for hue, tokens in HUE_HINTS.items():
-        if any(token.lower() in normalized or token in hint for token in tokens):
-            hues.add(hue)
+        for token in tokens:
+            lowered = token.lower()
+            if (
+                lowered in words
+                if _ASCII_HINT_TOKEN_RE.fullmatch(lowered)
+                else token in hint
+            ):
+                hues.add(hue)
+                break
     return hues
 
 
-def _resolve_color(color: str, color_hint: str | None, cmap: dict[str, str]) -> str:
-    fallback = cmap[color]
+def _resolve_color(
+    color: str,
+    color_hint: str | None,
+    cmap: dict[str, str],
+    *,
+    work_assignment: dict[str, str] | None = None,
+    render_seed: int | None = None,
+    catalog_id: str | None = None,
+) -> str:
+    assignment = work_assignment or _work_color_assignment(
+        cmap, render_seed, catalog_id
+    )
+    fallback = assignment.get(color, cmap[color])
     if not color_hint:
         return fallback
-
-    hint = _norm_label(color_hint)
     desired_hues = _hint_hues(color_hint)
-    if not hint and not desired_hues:
-        return fallback
-
-    best_score = 0
-    best_hex = fallback
-    for key, hex_value in cmap.items():
-        if not isinstance(hex_value, str) or not hex_value.startswith("#"):
-            continue
-        is_palette = key.startswith("palette:")
-        label = _norm_label(key.removeprefix("palette:"))
-        score = 0
-        if label and label in hint:
-            score += 6
-        for part in label.split():
-            if len(part) >= 3 and part in hint:
-                score += 3
-        candidate_hue = _hue_from_hex(hex_value)
-        if candidate_hue in desired_hues:
-            score += 4
-        for hue in desired_hues:
-            if is_palette and any(token.lower() in label for token in HUE_HINTS[hue]):
-                score += 2
-        if is_palette and score > 0:
-            score += 1
-        if key == color:
-            score += 1
-        if score > best_score:
-            best_score = score
-            best_hex = hex_value
-
-    return best_hex
+    if desired_hues == {"brown"}:
+        return assignment["orange"]
+    desired_hues.discard("brown")
+    for desired in _HINT_HUE_PRIORITY:
+        if desired in desired_hues:
+            return assignment[desired]
+    return fallback
 
 
 def _has_surface_texture(ins: Instruction) -> bool:
@@ -3329,10 +3519,16 @@ def _stroke_attrs(
     cmap: dict[str, str],
     canvas: CanvasSize,
     *,
+    work_assignment: dict[str, str],
     use_filters: bool = True,
 ) -> dict:
     do_fill = _fills_interior(ins)
-    color = _resolve_color(ins.color, ins.color_hint, cmap)
+    color = _resolve_color(
+        ins.color,
+        ins.color_hint,
+        cmap,
+        work_assignment=work_assignment,
+    )
     weight_style = WEIGHT_STYLE.get(ins.weight, {})
     hint = _norm_label(ins.color_hint or "")
     attrs = {
@@ -4903,6 +5099,7 @@ def _render_instruction(
     cmap: dict[str, str] = COLOR_MAP,
     canvas: CanvasSize | None = None,
     *,
+    work_assignment: dict[str, str] | None = None,
     use_filters: bool = True,
     render_seed: int | None = None,
     ins_idx: int = 0,
@@ -4910,7 +5107,14 @@ def _render_instruction(
     wild: bool = False,
 ):
     canvas = canvas or canvas_size_for_aspect(None)
-    attrs = _stroke_attrs(ins, cmap, canvas, use_filters=use_filters)
+    assignment = work_assignment or _work_color_assignment(cmap, render_seed, None)
+    attrs = _stroke_attrs(
+        ins,
+        cmap,
+        canvas,
+        work_assignment=assignment,
+        use_filters=use_filters,
+    )
     if ins.mode == "carve":
         depth = ins.carve_depth or "half"
         attrs["stroke"] = {"light": "#8a8a8a", "half": "#c7c7c7", "bright": "#ffffff"}[

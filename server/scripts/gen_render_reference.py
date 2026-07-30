@@ -15,6 +15,7 @@ import re
 import subprocess
 from typing import Any
 
+from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import render
 from inku_server.schema import Score
@@ -27,25 +28,15 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-28"
+FROZEN_AT = "2026-07-30"
 REASON = (
-    "A surface is played, not filled in. Six of the eight texture words had been "
-    "circles scattered by a uniform random inside the bounding box - they never saw "
-    "the shape they belonged to - and bleed was a single ellipse behind a blur. All "
-    "six now run through stroke synthesis and follow the contour, and the display "
-    "profile draws the same marks the editable one does instead of a filter over a "
-    "clipped rectangle; hatch and crosshatch, which already took that road, do not "
-    "move. A tiny fill is placed rather than scanned. Below a short side of about "
-    "three percent of the canvas the scan could not fit its three lines and the "
-    "interior collapsed to a flat region fill; a mark that small is one touch of the "
-    "tool, so it is drawn as one dab. Above the boundary nothing changes. And "
-    "thinness becomes a dimension of its own: asking for a thin line had meant "
-    "naming a thinner tool, so the request bent the choice of tool. The eleven tool "
-    "widths are untouched and no tool goes below the thinnest of them, so the order "
-    "of the tool vocabulary survives being thinned. The axis joins the seed of a "
-    "mark, so a line asked to be thin is played by another hand as well as drawn "
-    "narrower - which is why nearly every case moves, and why the ones that do not "
-    "are again rotring and computer."
+    "Each work now receives a deterministic assignment from its named catalog "
+    "palette before descriptions override it. ASCII hue hints match whole words, "
+    "CJK hints retain substring matching, backgrounds use the same assignment, "
+    "and sparse achromatic palettes cannot collapse black, gray, and white. The "
+    "original 365 cases remain byte-identical because they carry only the literal "
+    "six-key map; the new F group traverses all eleven catalogs, all nine abstract "
+    "colors, hint boundaries, missing bands, brown, and non-white backgrounds."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -56,6 +47,9 @@ TOOLS = (
 )
 PRIMITIVES = (
     "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform",
+)
+ABSTRACT_COLORS = (
+    "white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple",
 )
 
 # Literal copies. Do not replace these with renderer or catalog imports.
@@ -118,25 +112,37 @@ def _instruction(primitive: str, **changes: Any) -> dict[str, Any]:
     return result
 
 
-def _score(instruction: dict[str, Any], *, aspect: str = "square", ground: dict[str, Any] | None = None) -> dict[str, Any]:
+def _score(
+    instruction: dict[str, Any],
+    *,
+    aspect: str = "square",
+    ground: dict[str, Any] | None = None,
+    background: str = "white",
+) -> dict[str, Any]:
     result = copy.deepcopy(BASE_SCORE)
     result["canvas"] = {"aspect": aspect, "ground": copy.deepcopy(ground)}
+    result["background"] = background
     result["instructions"] = [copy.deepcopy(instruction)]
     return result
 
 
 def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str, Any], *,
           aspect: str = "square", ground: dict[str, Any] | None = None,
+          background: str = "white",
           render_seed: int = DEFAULT_RENDER_SEED,
           color_map: dict[str, str] = DEFAULT_COLOR_MAP,
+          catalog_id: str | None = None,
           svg_profile: str = SVG_PROFILE,
           wild: bool = False) -> None:
     if case_id in cases:
         raise ValueError(f"duplicate case ID: {case_id}")
     cases[case_id] = {
-        "score": _score(instruction, aspect=aspect, ground=ground),
+        "score": _score(
+            instruction, aspect=aspect, ground=ground, background=background
+        ),
         "render_seed": render_seed,
         "color_map": copy.deepcopy(color_map),
+        "catalog_id": catalog_id,
         "svg_profile": svg_profile,
         "wild": wild,
     }
@@ -279,9 +285,60 @@ def build_inputs() -> dict[str, dict[str, Any]]:
                   _instruction("square", weight=tool, filled=False, surface=surface),
                   wild=True)
 
-    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119}
+    # F: deterministic catalog assignment. The first 99 cases cross every
+    # catalog with every abstract color. The remaining cases pin description
+    # matching and the background path that the original corpus never reached.
+    catalog_maps: dict[str, dict[str, str]] = {}
+    for catalog in COLOR_CATALOGS:
+        catalog_id = str(catalog["id"])
+        catalog_map = render_color_map_for_catalog(catalog_id)
+        if catalog_map is None:
+            raise AssertionError(f"missing reference catalog: {catalog_id}")
+        catalog_maps[catalog_id] = catalog_map
+        for color in ABSTRACT_COLORS:
+            _case(
+                cases,
+                f"F-catalog-{catalog_id}-{color}",
+                _instruction("line", weight="pen", color=color),
+                color_map=catalog_map,
+                catalog_id=catalog_id,
+            )
+
+    for suffix, catalog_id, color, hint in (
+        ("hint-deep-blue", "ink_season", "black", "deep blue wash"),
+        ("hint-vertical", "ink_season", "black", "vertical trace"),
+        ("hint-restored", "default", "gray", "restored edge"),
+        ("hint-sakura", "ink_season", "black", "桜色の薄い層"),
+        ("hint-missing-purple", "default", "black", "purple"),
+        ("hint-brown", "fresco_study", "black", "umber earth"),
+    ):
+        _case(
+            cases,
+            f"F-{suffix}",
+            _instruction("line", weight="pen", color=color, color_hint=hint),
+            color_map=catalog_maps[catalog_id],
+            catalog_id=catalog_id,
+        )
+
+    for suffix, catalog_id, background in (
+        ("black", "default", "black"),
+        ("blue", "ink_season", "blue"),
+        ("gray", "fresco_study", "gray"),
+        ("red", "vivid_material", "red"),
+        ("green", "dye_earth", "green"),
+    ):
+        _case(
+            cases,
+            f"F-background-{suffix}",
+            _instruction("line", weight="pen", color="black"),
+            background=background,
+            color_map=catalog_maps[catalog_id],
+            catalog_id=catalog_id,
+        )
+
+    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 110}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 365:
+    if actual != expected or len(cases) != 475:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 
@@ -291,8 +348,17 @@ def _normalized_digest(svg: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:32]
 
 
-def _color_map_digest(color_map: dict[str, str]) -> str:
-    encoded = json.dumps(color_map, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+def _color_map_digest(inputs: dict[str, dict[str, Any]]) -> str:
+    payload = {
+        case_id: {
+            "catalog_id": render_input["catalog_id"],
+            "color_map": render_input["color_map"],
+        }
+        for case_id, render_input in sorted(inputs.items())
+    }
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
     return hashlib.sha256(encoded).hexdigest()[:32]
 
 
@@ -327,7 +393,9 @@ def generate() -> None:
     cases: dict[str, dict[str, Any]] = {}
     for case_id, render_input in sorted(inputs.items()):
         svg = render(Score.model_validate(render_input["score"]),
-                     color_map=render_input["color_map"], render_seed=render_input["render_seed"],
+                     color_map=render_input["color_map"],
+                     catalog_id=render_input["catalog_id"],
+                     render_seed=render_input["render_seed"],
                      svg_profile=render_input["svg_profile"], wild=render_input["wild"])
         rendered[case_id] = svg
         cases[case_id] = {
@@ -359,7 +427,7 @@ def generate() -> None:
         "corpus_format_version": CORPUS_FORMAT_VERSION, "layer": "render-engine",
         "engine_id": ENGINE.id, "engine_version": ENGINE_VERSION,
         "schema_version": SCHEMA_VERSION,
-        "color_map_digest": _color_map_digest(DEFAULT_COLOR_MAP),
+        "color_map_digest": _color_map_digest(inputs),
         **frozen, "cases": cases,
     }
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

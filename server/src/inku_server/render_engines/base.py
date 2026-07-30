@@ -21,6 +21,7 @@ class RenderEngine(Protocol):
         score: Score,
         *,
         color_map: dict[str, str] | None = None,
+        catalog_id: str | None = None,
         svg_profile: str | None = None,
         render_seed: int | None = None,
         wild: bool = False,

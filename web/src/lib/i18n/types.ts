@@ -580,16 +580,9 @@ export interface LangPack {
 	settingsExportTemplateAdd: string;
 	settingsExportTemplateDelete: string;
 	settingsExportTemplateSaveFailed: string;
-	settingsHistoryLabel: string;
 	settingsMascotIncu: string;
 	settingsMascotYuragi: string;
 	settingsPngAlpha: string;
-	settingsSaveReplay: string;
-	settingsHistorySelectionTitle: string;
-	settingsHistorySelectionCanvasHistory: string;
-	settingsHistorySelectionCanvasCurrent: string;
-	settingsHistorySelectionCatalogHistory: string;
-	settingsHistorySelectionCatalogCurrent: string;
 	colorCatalogTitle: string;
 	colorCatalogDetail: string;
 	colorCatalogConfirm: string;

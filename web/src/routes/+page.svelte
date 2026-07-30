@@ -72,9 +72,6 @@
 	const TENKEI_KEY          = 'inku-tenkei';
 	const WILD_KEY            = 'inku-wild';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
-	const SAVE_REPLAY_KEY     = 'inku-save-replay-history';
-	const HISTORY_SELECTION_CANVAS_KEY = 'inku-history-selection-canvas';
-	const HISTORY_SELECTION_CATALOG_KEY = 'inku-history-selection-catalog';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const APP_VERSION = 'v2.9.12';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
@@ -90,7 +87,6 @@
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
 	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
 	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;
-	type HistorySelectionBehavior = 'history' | 'current';
 	type InstructionLang = 'auto' | 'ja' | 'en';
 
 	type PaintResult = {
@@ -532,7 +528,6 @@
 	let pngAlphaWhite = $state(false);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
-	let saveReplayAsNewVersion = $state(true);
 	let miscSettingsLoaded = $state(false);
 
 	// DOM refs for outside-click handling
@@ -713,8 +708,6 @@
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
 	const currentCatalog = $derived(catalogById(colorCatalogs, selectedCatalog) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
-	let historySelectionCanvas = $state<HistorySelectionBehavior>('current');
-	let historySelectionCatalog = $state<HistorySelectionBehavior>('current');
 
 	// ── Settings tabs ────────────────────────────────────────
 	let settingsStatus = $state<SettingsStatus | null>(null);
@@ -2455,14 +2448,7 @@
 	function persistMiscSettings() {
 		try {
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
-			localStorage.setItem(SAVE_REPLAY_KEY, saveReplayAsNewVersion ? '1' : '0');
-			localStorage.setItem(HISTORY_SELECTION_CANVAS_KEY, historySelectionCanvas);
-			localStorage.setItem(HISTORY_SELECTION_CATALOG_KEY, historySelectionCatalog);
 		} catch {}
-	}
-
-	function normalizeHistorySelectionBehavior(value: string | null): HistorySelectionBehavior {
-		return value === 'history' ? 'history' : 'current';
 	}
 
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
@@ -3479,32 +3465,30 @@ if (unreadWords.length > 0) {
 			}
 			elapsedStage1Ms = 0; elapsedStage2Ms = elapsedMs; elapsedTotalMs = elapsedMs;
 			tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = d.tokens_in; tokensOutStage2 = d.tokens_out;
-			if (saveReplayAsNewVersion) {
-				const savedHistory = await pushHistory({
-					input: replayInput,
-					ddl,
-					score: d.score,
-					svg: d.svg,
-					at: Date.now(),
-					elapsed_ms: elapsedMs,
-					stage1_model: resolvedStage1Model,
-					stage2_model: savedStage2Model,
-					tokens_in: d.tokens_in,
-					tokens_out: d.tokens_out,
-					catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
-				}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
-				if (savedHistory && result) {
-					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
-					lineageDetached = false;
-					displayedHistoryItem = savedHistory;
-					result = {
-						...result,
-						history_id: savedHistory.id,
-						history_at: savedHistory.at,
-						render_hash: savedHistory.render_hash,
-						render_hash_short: savedHistory.render_hash_short,
-					};
-				}
+			const savedHistory = await pushHistory({
+				input: replayInput,
+				ddl,
+				score: d.score,
+				svg: d.svg,
+				at: Date.now(),
+				elapsed_ms: elapsedMs,
+				stage1_model: resolvedStage1Model,
+				stage2_model: savedStage2Model,
+				tokens_in: d.tokens_in,
+				tokens_out: d.tokens_out,
+				catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
+			}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
+			if (savedHistory && result) {
+				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
+				lineageDetached = false;
+				displayedHistoryItem = savedHistory;
+				result = {
+					...result,
+					history_id: savedHistory.id,
+					history_at: savedHistory.at,
+					render_hash: savedHistory.render_hash,
+					render_hash_short: savedHistory.render_hash_short,
+				};
 			}
 			outputTab = 'canvas';
 			fitCanvasZoom();
@@ -4802,20 +4786,6 @@ $effect(() => {
 		displayedHistoryItem = it;
 		void syncHistoryStripToItem(it);
 		lineageDetached = false;
-		if (historySelectionCatalog === 'history') {
-			const catalogId = it.render_color_catalog_id ?? it.catalog_id;
-			if (catalogId && catalogById(colorCatalogs, catalogId)) {
-				selectedCatalog = catalogId;
-				persistSelectedCatalog();
-			}
-		}
-		if (historySelectionCanvas === 'history') {
-			const canvasId = it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? it.score?.canvas;
-			if (canvasId) {
-				canvasAspectId = normalizeCanvasAspectId(canvasId);
-				void saveCanvasAspectPluginValue();
-			}
-		}
 		const itemDDL = it.ddl ?? '';
 		const sourceText = it.source_text ?? it.input;
 		expandedDdl = it.expanded_ddl ?? null;
@@ -6067,9 +6037,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
 			const wild = localStorage.getItem(WILD_KEY); if (wild !== null) wildEnabled = wild === '1';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
-			const replay = localStorage.getItem(SAVE_REPLAY_KEY); if (replay !== null) saveReplayAsNewVersion = replay !== '0';
-			historySelectionCanvas = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CANVAS_KEY));
-			historySelectionCatalog = normalizeHistorySelectionBehavior(localStorage.getItem(HISTORY_SELECTION_CATALOG_KEY));
 			const savedBatchFailureReport = loadBatchFailureReport();
 			setBatchFailureReport(savedBatchFailureReport);
 			miscSettingsLoaded = true;
@@ -6089,7 +6056,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
-		pngAlphaWhite; saveReplayAsNewVersion; historySelectionCanvas; historySelectionCatalog;
+		void pngAlphaWhite;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -6629,9 +6596,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:pngAlphaWhite
 		{exportTemplates}
 		{exportTemplateStatus}
-		bind:saveReplayAsNewVersion
-		bind:historySelectionCanvas
-		bind:historySelectionCatalog
 		{canvasAspectEnabled}
 		onSetCanvasAspectEnabled={setCanvasAspectEnabled}
 		onClose={closeSettingsModal}

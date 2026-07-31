@@ -1262,3 +1262,19 @@ Score の `color` に **`yellow` / `orange` / `purple`** を足した。**カタ
 **実装側 3 件** — `work_assignment` を map 恒等割当に戻す / ASCII の照合を部分文字列へ戻す / 無彩を「L 最大・最小・中間」へ戻す。**受け入れ側は 4 件を独立に当てて 4/4 が赤** — 恒等割当（13 件）・**`catalog_id` を seed 材料から外す**（6 件）・無彩のしきい値 0.035 → 0.05（4 件）・帯が空のときの最近傍を殺す（10 件）。**2 番目は「`catalog_id` が本当に seed に入っているか」を確かめるもの**で、実装側の 3 件はどれもこれを見ていない（新設テストの `test_catalog_id_participates_in_multi_candidate_choice` は palette の違いだけでも通るので、`catalog_id` を無視した実装でも緑になる）。
 
 pytest **1771/31**（+20）、cli 76、ruff clean、`npm run check` 219/0/2、凍結コーパスは再生成バイト一致。**Android は engine 16 のまま**（台帳 [I-029]）。**版数は patch** — engine の版上げであり、保存済みデータの形式は変わらない。
+
+---
+
+### 2026-07-30 — Android の engine 版数が、一箇所で決まる（android Build 148090、**採番なし**）
+
+**Android は engine 版数の文字列を 3 箇所に別々に持っており、値が 2 種類に割れていた。** 描画 metadata の生成元（`DefaultSvgRenderer`）と `renderHash` のフォールバック（`LocalFallbackPipeline`）は `"16"` を、**UI の版数表示が読む `CompatibilityConstants` だけが `"1"` を**持っていた。engine 16 への追随（台帳 [I-029]、2026-07-29 完了）でも表示は取り残されている。3 箇所を `CompatibilityConstants` へ寄せ、値を実体の `16` に揃えた。
+
+**値は動かしていない。** engineVersion は**エディション ID `rh3` の材料**であり、`16` から動かすと保存済みの ID と一致しなくなる。本変更で動いたのは UI 表示の `1` → `16` だけで、metadata の JSON も `renderHash` も 1 バイトも変わらない（`Engine16VersionTest` の metadata 検査と `ServerScoreParityTest` の rh3 期待値 4 件が緑のまま）。`renderEngineId` も同じ形で割れていたので `"default"` のまま同時に寄せた。
+
+**既存 99 件はこの定数を一度も読んでいなかった** — 定数が `"1"` のままでも全件緑になる状態で、**直そうとしている値を誰も見ていなかった**。リテラルを固定するテストを足して判別力を作った。**一致検査だけでは足りない** — 表示側と metadata 側が同じ定数を参照した瞬間に**何を入れても真になる**。実測でもそうなっており、定数を `"17"` にする摂動で赤くなったのは `testCompatibilityConstantsDeclareEngine16` / `testRendererMetadataDeclaresEngine16` / `testRenderHashDefaultsMissingAndBlankMetadataToEngine16` の 3 件で、**一致検査 `testUiConstantsMatchRendererMetadata` は緑のまま通った**（恒真であることを承知で残してある。連動が切れたときに効く）。
+
+**フォールバック機構そのものは撤去していない**（作者裁定）。`renderHash` の呼び出し元 2 箇所はどちらも metadata が `renderer.render()` 由来なので、この既定値には現状到達しない。server 側（`db.py`）が同じ既定値を持たない件は台帳 [I-011] に残る。**[I-012]（UI の版数表示が `1`）は解消。**
+
+Android 単体テスト **101 / failures 0 / errors 0 / skipped 0**（起点 99 + 新規 2）。**`APP_VERSION`・`web/BUILD_NUMBER`・`android/VERSION`・`android/BUILD_NUMBER` はいずれも不動**（Android のみの変更で、パッケージングタスクを走らせていないため Gradle の自動採番も起きない）。**pentala 反映は無し**（`android/` は全経路から恒久除外）。`server/` `web/` `cli/` `shared/` の差分はゼロ。
+
+**`ANDROID_SPEC` は追随していない。** 冒頭の「追随状況」は `2.0.0-android.1` / engine `11` のままで、実体（`2.1.3-android.1` / engine 16）と 5 版ずれている。台帳 [I-013] は「engine 15 に未追随」と記録していたが、**実際の遅れはそれより大きい**。

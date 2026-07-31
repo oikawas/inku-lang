@@ -1124,3 +1124,45 @@ alone, so an implementation that ignored `catalog_id` would stay green.
 pytest **1771/31** (+20), cli 76, ruff clean, `npm run check` 219/0/2, both frozen corpora
 byte-identical on regeneration. **Android stays at engine 16** (ledger item [I-029]). **The version
 is a patch**: an engine version rises, and no stored data changes shape.
+
+---
+
+### Android names its engine version in one place (android Build 148090, no version, 2026-07-30)
+
+**Android held the engine version string in three separate places, and the two values disagreed.**
+The renderer that writes the drawing metadata (`DefaultSvgRenderer`) and the `renderHash` fallback
+(`LocalFallbackPipeline`) both said `"16"`, while `CompatibilityConstants` — **the one the version
+panel reads** — still said `"1"`. The catch-up to engine 16 (ledger item [I-029], finished
+2026-07-29) had left the displayed value behind. The three now resolve to `CompatibilityConstants`,
+and its value is the one the implementation actually is: `16`.
+
+**The value itself did not move.** The engine version is **material for the edition identity
+`rh3`**, so moving it away from `16` would stop matching the identities already stored. What
+changed is the displayed version, `1` to `16`; the metadata JSON and every `renderHash` are
+byte-identical (`Engine16VersionTest`'s metadata assertion and `ServerScoreParityTest`'s four
+pinned `rh3` values stay green). `renderEngineId` was split the same way, so it moved to the same
+constant while keeping the value `"default"`.
+
+**None of the existing 99 tests ever read that constant** — they all stayed green with it set to
+`"1"`, so **nothing was watching the very value this change repairs**. A test pinning the literal
+supplies the discrimination. **An agreement check alone would not**: once the display and the
+metadata read the same constant, it is true whatever the constant holds. Measurement confirms it —
+setting the constant to `"17"` turned `testCompatibilityConstantsDeclareEngine16`,
+`testRendererMetadataDeclaresEngine16` and `testRenderHashDefaultsMissingAndBlankMetadataToEngine16`
+red, while the agreement check `testUiConstantsMatchRendererMetadata` **stayed green**. It is kept
+in that knowledge: it earns its place only if the two ever stop being wired together.
+
+**The fallback mechanism itself was not removed** (author's ruling). Both callers of `renderHash`
+receive metadata produced by `renderer.render()`, so that default is unreachable today. That the
+server side (`db.py`) carries no such default remains ledger item [I-011]. **[I-012] — the version
+panel reading `1` — is closed.**
+
+Android unit tests **101 / 0 failures / 0 errors / 0 skipped** (99 at the start, plus two).
+**`APP_VERSION`, `web/BUILD_NUMBER`, `android/VERSION` and `android/BUILD_NUMBER` all stand still**:
+the change is Android-only, and no packaging task ran, so Gradle's automatic increment never fired.
+**Nothing was deployed** (`android/` is permanently excluded from every server sync path).
+`server/`, `web/`, `cli/` and `shared/` have no diff.
+
+**`ANDROID_SPEC` has not followed.** Its opening status still reads `2.0.0-android.1` / engine
+`11`, five versions behind what the tree holds (`2.1.3-android.1` / engine 16). Ledger item [I-013]
+recorded this as "not caught up to engine 15"; **the actual distance is larger.**

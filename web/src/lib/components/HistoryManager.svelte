@@ -1125,7 +1125,7 @@
 		border-radius: 50%;
 		background: var(--panel);
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--btn-sm-font-size);
 		line-height: 1;
 		cursor: pointer;
 		pointer-events: auto;
@@ -1139,7 +1139,7 @@
 		background: var(--star-bg);
 		border-color: var(--star-border);
 	}
-	:global(html[data-theme='dark']) .hash-row-star {
+	:global(html[data-theme='dark']) .hash-row-star:not(.starred) {
 		color: #b8c0cc;
 		border-color: rgba(255,255,255,0.22);
 		background: rgba(255,255,255,0.06);

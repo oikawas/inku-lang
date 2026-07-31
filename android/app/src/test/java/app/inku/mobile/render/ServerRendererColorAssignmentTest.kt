@@ -94,6 +94,46 @@ class ServerRendererColorAssignmentTest {
         return rect.groupValues[1].lowercase()
     }
 
+    /**
+     * The conversion the assignment stands on.
+     *
+     * Every color in the 11 catalogs sits far from a decision boundary — the
+     * nearest is 8.8e-4 from the chroma floor, and 0.80 degrees from a band
+     * edge — so a wrong coefficient moves no assignment today and the table
+     * below cannot see it. engine 18 replaces every catalog color, which is
+     * why the constants have to be pinned rather than their consequences.
+     *
+     * Tolerances: published OKLab matrices disagree in the eighth decimal,
+     * which shows as 6.5e-9 in L, 3.7e-8 in C and 1.9e-5 degrees in H on these
+     * colors. The thresholds sit an order of magnitude under that and five
+     * orders over cube-root noise. A gray's hue is numerically meaningless
+     * (a and b are both zero), and the assignment never reads it, so hue is
+     * only compared where the color is chromatic.
+     */
+    @Test
+    fun testTheOklchConversionKeepsTheServersCoefficients() {
+        val oklch = fixture.getJSONObject("oklch")
+        val floor = fixture.getJSONObject("constants").getDouble("oklch_chroma_floor")
+        val failures = mutableListOf<String>()
+        for (hex in oklch.keys()) {
+            val want = oklch.getJSONObject(hex)
+            val got = ServerRendererStyle.oklchFromHex(hex)
+            val wantChroma = want.getDouble("chroma")
+            if (Math.abs(got.l - want.getDouble("lightness")) > 1e-10) {
+                failures.add("$hex lightness ${want.getDouble("lightness")} but got ${got.l}")
+            }
+            if (Math.abs(got.c - wantChroma) > 1e-10) {
+                failures.add("$hex chroma $wantChroma but got ${got.c}")
+            }
+            if (wantChroma >= floor) {
+                val wantHue = want.getDouble("hue")
+                val delta = Math.abs(got.h - wantHue).let { Math.min(it, 360.0 - it) }
+                if (delta > 1e-6) failures.add("$hex hue $wantHue but got ${got.h}")
+            }
+        }
+        assertEquals(failures.joinToString("\n"), 0, failures.size)
+    }
+
     /** The whole answer: 11 catalogs x 9 abstract colors, at the corpus seed. */
     @Test
     fun testEveryCatalogAssignsEveryAbstractColorTheWayTheServerDoes() {

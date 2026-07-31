@@ -28,15 +28,18 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-30"
+FROZEN_AT = "2026-07-31"
 REASON = (
-    "Each work now receives a deterministic assignment from its named catalog "
-    "palette before descriptions override it. ASCII hue hints match whole words, "
-    "CJK hints retain substring matching, backgrounds use the same assignment, "
-    "and sparse achromatic palettes cannot collapse black, gray, and white. The "
-    "original 365 cases remain byte-identical because they carry only the literal "
-    "six-key map; the new F group traverses all eleven catalogs, all nine abstract "
-    "colors, hint boundaries, missing bands, brown, and non-white backgrounds."
+    "The catalog data was replaced. Thirteen catalogs each carry exactly three "
+    "achromatic and seven chromatic colors, so a description that asks for a band "
+    "is answered from that band instead of the nearest hue the catalog happened to "
+    "hold. desert_mineral retired; moss_bark, neon_plate, and lantern_dew joined. "
+    "The core map grew from six keys to nine and the swatch strip is derived from "
+    "it, chromatic keys first. The resolution chain itself is unchanged from "
+    "engine 17. The original 365 cases remain byte-identical because they carry "
+    "only the literal six-key map; the F group traverses all thirteen catalogs, "
+    "all nine abstract colors, hint boundaries, the one band left empty on "
+    "purpose (sea_stone purple), brown, and non-white backgrounds."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -309,7 +312,7 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         ("hint-vertical", "ink_season", "black", "vertical trace"),
         ("hint-restored", "default", "gray", "restored edge"),
         ("hint-sakura", "ink_season", "black", "桜色の薄い層"),
-        ("hint-missing-purple", "default", "black", "purple"),
+        ("hint-missing-purple-sea-stone", "sea_stone", "black", "purple"),
         ("hint-brown", "fresco_study", "black", "umber earth"),
     ):
         _case(
@@ -336,9 +339,9 @@ def build_inputs() -> dict[str, dict[str, Any]]:
             catalog_id=catalog_id,
         )
 
-    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 110}
+    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 475:
+    if actual != expected or len(cases) != 493:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

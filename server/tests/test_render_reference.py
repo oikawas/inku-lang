@@ -32,14 +32,14 @@ def _manifest() -> dict:
 
 def test_render_reference_case_counts() -> None:
     cases = _manifest()["cases"]
-    # Engine 17 adds group F without changing the original 365 cases. Its 110
-    # cases are 11 catalogs x 9 abstract colors, six hint cases, and five
-    # non-white backgrounds.
-    assert len(cases) == 475
+    # Engine 18 replaced the catalog data without touching the original 365
+    # cases. Group F is now 13 catalogs x 9 abstract colors, six hint cases, and
+    # five non-white backgrounds.
+    assert len(cases) == 493
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F")
-    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 110}
+    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -85,24 +85,28 @@ def test_render_reference_keeps_the_display_profile_covered() -> None:
     ]
 
 
-def test_engine_17_moves_only_the_new_palette_cases() -> None:
+def test_engine_18_moves_only_the_catalog_dependent_cases() -> None:
     """The unchanged side states that six-key legacy rendering did not move."""
     manifest = _manifest()
     changed = set(manifest["changed_from_previous"])
     original = {
         case_id for case_id in manifest["cases"] if not case_id.startswith("F-")
     }
-    added = {
+    palette = {
         case_id for case_id in manifest["cases"] if case_id.startswith("F-")
     }
 
     assert len(original) == 365
-    assert len(added) == 110
-    assert changed == added
+    assert len(palette) == 128
+    # 27 cases the three new catalogs brought, one for the relocated purple
+    # case, and 42 whose hex moved because their catalog's data was replaced.
+    # The other 58 F cases held still: engine 18 changes data, not the chain.
+    assert len(changed) == 70
+    assert changed <= palette
     assert not (changed & original)
 
 
-def test_engine_17_palette_cases_cover_the_resolution_chain() -> None:
+def test_engine_18_palette_cases_cover_the_resolution_chain() -> None:
     generator = _generator()
     inputs = generator.build_inputs()
     cases = _manifest()["cases"]
@@ -129,9 +133,15 @@ def test_engine_17_palette_cases_cover_the_resolution_chain() -> None:
     assert cases["F-hint-restored"]["digest"] == cases[
         "F-catalog-default-gray"
     ]["digest"]
-    assert 'stroke="#d3381c"' in _resolve_svg("F-hint-sakura").read_text()
-    assert 'stroke="#2c3e91"' in _resolve_svg("F-hint-missing-purple").read_text()
-    assert 'stroke="#a0522d"' in _resolve_svg("F-hint-brown").read_text()
+    # ink_season's red band holds two colors; the work assignment picks Madder.
+    assert 'stroke="#8c2d1d"' in _resolve_svg("F-hint-sakura").read_text()
+    # The empty-band witness moved to sea_stone: engine 18's default catalog has
+    # a purple, and sea_stone's purple is the one band left empty by ruling. The
+    # stand-in is Night Sea, which is also this catalog's blue.
+    assert 'stroke="#191970"' in _resolve_svg(
+        "F-hint-missing-purple-sea-stone"
+    ).read_text()
+    assert 'stroke="#b06a2f"' in _resolve_svg("F-hint-brown").read_text()
     assert all(
         inputs[case_id]["score"]["background"] != "white"
         for case_id in inputs
@@ -139,7 +149,7 @@ def test_engine_17_palette_cases_cover_the_resolution_chain() -> None:
     )
 
 
-def test_engine_17_palette_cases_match_the_current_renderer() -> None:
+def test_engine_18_palette_cases_match_the_current_renderer() -> None:
     """Group F must traverse the live resolver, not only frozen SVG files."""
     generator = _generator()
     manifest = _manifest()

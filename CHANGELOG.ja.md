@@ -1338,3 +1338,41 @@ Android 単体テスト **101 / failures 0 / errors 0 / skipped 0**（起点 99 
 - **`TooltipTest` は製品の呼び出し箇所の引数を読まない。** `ProvenanceTooltipTarget` は `CanvasHeroCard` から呼ばれるようになったが、テストは自前の文字列で直接呼ぶ
 - **`state.selectedTenkei` が展開へ届くことを見る検査が無い**（型としては通したが、経路を通す検査は置いていない）
 - **マスコット設定の二重**（既存の Kiwi / Crab と新しい Incu / Yuragi）は [I-066] の裁定待ちなので触っていない
+
+---
+
+### v2.9.13 — 複数の作品が、ひとつのループになる（Build 789、2026-07-31）
+
+**5 本の独立した枝を統合した版である**（Build 784〜788）。中核は **複数作品のアニメーション書き出し**で、`POST /api/history/export-animation` が保存済みの SVG を並べて 1 本の APNG または GIF にする。
+
+**呼び出し元は 2 つで、並び順の決め方が違う。** 履歴管理はチェックした作品を `at` 昇順（同時刻は id 順）で古いものから並べ、系譜は選択中の作品から親を辿って**起点から選択作品の順**へ反転する。どちらも 2 件以上でなければボタンが押せない。
+
+**要求順はサーバー側で保たれる。** `db.get_items` は `id.in_(ids)` で引いた行を、要求された `ids` の位置で並べ直して返す（DB の返却順ではない）。API は `dict.fromkeys` で重複を落としてから所有者検査を通し、**保存済み SVG を持たない作品が 1 つでもあれば 409 を返す**。
+
+**設定は `設定 > エクスポート` にあり、localStorage の `inku-animation-export-settings` に載る。** 形式は APNG（可逆）と GIF（256 色）、切り替えは **カット / クロスフェード / 白を介したフェード / 横スライド** の 4 種、表示ウェイトは 0.1〜30 秒、解像度（Y 軸）は 1K=1080 px・4K=2160 px・8K=4320 px。**遷移フレーム数は解像度で変える**（1K=6・4K=4・8K=2）。符号化するピクセル総量には **600,000,000** の上限があり、超えると 400 を返す。
+
+**ラスタライズは既存の `svg_to_png`（resvg）を通す。** 新規依存の **Pillow 12.3** が担うのは、ラスタライズ済み PNG の合成・遷移・符号化だけである（`cairosvg` の番人 4 件は無傷で、`animation_export.py` は `cairosvg` を import しない）。
+
+#### 同じ版に入った 4 つ
+
+- **系譜の空白部をドラッグしてパンできる**（Build 784）。マウスの主ボタンのみで、カード・ボタン・入力・メニュー項目の上では始まらない。`.lineage-scroll` に `role="region"` と `aria-labelledby` を足した
+- **記述タブの結果ログの開閉状態が次回描画へ継承される**（Build 785）。`inku-result-log-open` に載る
+- **設定 > その他から履歴パネルの設定 3 つを削除した**（Build 786）。**挙動は従来の既定へ固定される** — 再編集は常に新バージョンとして保存し、履歴選択はキャンバスサイズも色カタログも上書きしない。i18n の鍵 6 つと `HistorySelectionBehavior` 型が消えた
+- **生成ラベルの横に i 印を置き、自動補正が何をするか 8 項目で説明する**（Build 787）
+
+#### 受け入れで測ったこと
+
+**マージ結果の web 9 ファイルは、作者が目視裁定し pentala が稼働させている合成物と SHA-256 が全件一致する。** 衝突は 5 枝の相互のみで（`web/BUILD_NUMBER`・`+page.svelte`・`SettingsModal.svelte`・i18n 3 ファイル）、**分岐点 `0505961` から main までの 32 commit はこの 9 ファイルに 1 行も触れていない**（触れたのは `server/scripts/gen_android_reference.py` 1 件で、本版の server 変更とは重ならない）。
+
+**摂動 3 件はいずれも狙った 1 件だけを赤くした** — ①`ids` の要求順を `sorted(set(...))` へ壊す → `test_history_animation_export_preserves_requested_order` ②**形を変えずデータだけ壊す**フレーム順の反転（フレーム数も形式も不変）→ `test_builds_looping_apng_in_input_order` の pixel 検査 ③遷移フレームを常に空にする → `test_builds_gif_with_transition_frames`。
+
+**テストが通らない面を直接叩いて確かめた** — 4 パターン × 2 形式の 8 通りはすべて出力を返し、上限ガードは 8K × 40 件で発火する。**単体テストが通るのは `cut` と `crossfade` だけで、`fade_white` と `slide`、上限ガード、4K / 8K、404 / 409 の経路には検査が無い。**
+
+#### 直していないこと
+
+- **`fade_white` と `slide` に自動検査が無い**（本サイクルでは手で 1 回叩いて出力を確認しただけ）
+- **`get_items` はゴミ箱の作品を除外しない。** UI からは選べないが、id を直接送れば書き出せる
+- **8K の記憶域は上限で RGBA 約 2.4 GB になる**（実測: 8K × 3 件クロスフェードでピーク RSS 1.37 GB）。pentala は 64 GB 搭載で 59 GB 空きのため本版では上限を下げていない
+- **SPEC は更新していない** — API 一覧も出力形式の節も持たず、render engine・DDL・coerce のいずれも動いていない
+
+pytest **1775/31**（+4）、cli 76、ruff clean、`npm run check` **220/0/2**（+1 ファイル＝`animationExport.ts`）、`lint:i18n` **934/47/0/0**（+22 −6）、`lint:models` 68、`lint:recommendations` 37。**決定的な層に差分が無いので凍結コーパスは焼き直していない。** **Android に差分は無い**（`android/VERSION` 据え置き）。**版数は patch** — 追加は任意の API と UI だけで、保存形式も API の互換も切れていない。

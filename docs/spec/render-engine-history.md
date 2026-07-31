@@ -105,13 +105,13 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `16` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `17` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `4` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.11 | per release |
-| `web/BUILD_NUMBER` | build serial | 782 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.13 | per release |
+| `web/BUILD_NUMBER` | build serial | 789 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.

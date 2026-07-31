@@ -1226,3 +1226,41 @@ The previous two passes only rewrote test expectations, so **the product code wa
 - **`TooltipTest` does not read the arguments at the product's call site.** `CanvasHeroCard` calls `ProvenanceTooltipTarget` now, but the test calls it directly with its own strings
 - **No test watches `state.selectedTenkei` arrive at the expander** — the type threads through, but the path is not gated
 - **The duplicate mascot settings** (the existing Kiwi / Crab beside the new Incu / Yuragi) are left alone, pending [I-066]
+
+---
+
+### v2.9.13 — several works become one loop (Build 789, 2026-07-31)
+
+**This version integrates five independent branches** (Builds 784-788). At its center is **animation export for multiple works**: `POST /api/history/export-animation` lays saved SVGs end to end and encodes one APNG or GIF.
+
+**There are two call sites, and they order the works differently.** History management takes the checked works by ascending `at` (ties by id), oldest first; lineage walks parents up from the selected work and reverses, so the sequence runs **from the origin to the selected work**. Neither button is enabled below two works.
+
+**The requested order survives on the server.** `db.get_items` fetches rows with `id.in_(ids)` and re-sorts them by each id's position in the requested list, not by the database's return order. The endpoint drops duplicates with `dict.fromkeys`, checks ownership, and **returns 409 if any work has no saved SVG**.
+
+**The settings live under Settings > Export and persist in localStorage under `inku-animation-export-settings`.** Formats are APNG (lossless) and GIF (256 colors); the transition is one of **cut, crossfade, fade through white, horizontal slide**; the display hold runs 0.1-30 seconds; the resolution (y-axis) is 1K = 1080 px, 4K = 2160 px, 8K = 4320 px. **The transition frame count falls with resolution** (1K = 6, 4K = 4, 8K = 2). Total encoded pixels are capped at **600,000,000**; past that the endpoint returns 400.
+
+**Rasterization still goes through the existing `svg_to_png` (resvg).** The new dependency, **Pillow 12.3**, only composites, blends and encodes PNGs that resvg has already produced (the four `cairosvg` guards are untouched, and `animation_export.py` does not import `cairosvg`).
+
+#### The four that rode along
+
+- **The lineage tree pans when its empty space is dragged** (Build 784). Primary mouse button only, and never starting on a card, button, input or menu item. `.lineage-scroll` gained `role="region"` and `aria-labelledby`
+- **The description tab's result log remembers whether it was open** (Build 785), under `inku-result-log-open`
+- **Three history panel settings left Settings > Misc** (Build 786). **The behavior is fixed at the former defaults**: a re-edit always saves as a new version, and selecting from history overrides neither the canvas size nor the color catalog. Six i18n keys and the `HistorySelectionBehavior` type went with them
+- **An i mark beside the generation label** lists the eight things auto-repair does (Build 787)
+
+#### What acceptance measured
+
+**The nine web files in the merge result are SHA-256 identical to the composite the author approved by eye and pentala is running.** Every conflict was between the five branches themselves (`web/BUILD_NUMBER`, `+page.svelte`, `SettingsModal.svelte`, three i18n files), and **the 32 commits between the branch point `0505961` and main touch none of those nine files** — the one file they do touch, `server/scripts/gen_android_reference.py`, does not overlap this version's server changes.
+
+**All three perturbations turned exactly one test red**: (1) breaking the requested order into `sorted(set(...))` reddened `test_history_animation_export_preserves_requested_order`; (2) **a shape-preserving, data-only** reversal of the frame list — same frame count, same format — was caught by the pixel assertion in `test_builds_looping_apng_in_input_order`; (3) always returning an empty transition list reddened `test_builds_gif_with_transition_frames`.
+
+**The surfaces no test reaches were exercised by hand**: all eight combinations of four patterns and two formats produced output, and the cap fires at 8K across 40 works. **The unit tests cover only `cut` and `crossfade`; `fade_white`, `slide`, the pixel cap, 4K / 8K and the 404 / 409 paths have no gate.**
+
+#### Not fixed here
+
+- **`fade_white` and `slide` have no automated check** (this cycle only ran them by hand once and read the output)
+- **`get_items` does not exclude trashed works.** The UI cannot select them, but sending the ids directly will export them
+- **8K holds about 2.4 GB of RGBA at the cap** (measured: 8K across three works, crossfade, peaked at 1.37 GB RSS). pentala carries 64 GB with 59 GB free, so the cap was not lowered
+- **SPEC is untouched** — it carries neither an endpoint list nor an output-format section, and the render engine, DDL and coerce layers did not move
+
+pytest **1775/31** (+4), cli 76, ruff clean, `npm run check` **220/0/2** (+1 file, `animationExport.ts`), `lint:i18n` **934/47/0/0** (+22, -6), `lint:models` 68, `lint:recommendations` 37. **No decisive layer changed, so the frozen corpora were not re-baked.** **Android has no diff** (`android/VERSION` unchanged). **The version is a patch** — what was added is an optional endpoint and UI, and neither the stored format nor the API's compatibility broke.

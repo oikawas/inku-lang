@@ -58,6 +58,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -5128,6 +5129,101 @@ internal fun LineagePanel(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+internal fun UnreadWordsPanel(
+    words: List<String>,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("unread_words_panel")
+            .padding(8.dp),
+    ) {
+        Text(
+            text = "読まれなかった語 (${words.size})",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        if (words.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                words.forEach { word ->
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(word, style = MaterialTheme.typography.labelSmall) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun AIRefineModal(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    onApplyRefine: (derivationKind: String) -> Unit,
+) {
+    CustomModalContainer(visible = visible, onDismissRequest = onDismissRequest) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("ai_refine_modal")
+                .padding(16.dp),
+        ) {
+            Text(
+                text = "AI 推敲・派生作成",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            app.inku.mobile.data.model.DerivationKindRegistry.ALL_INFOS.take(6).forEach { info ->
+                OutlinedButton(
+                    onClick = { onApplyRefine(info.kind) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("推敲: ${info.labelJa} (${info.kind})")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ManualRefineModal(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    onApplyRefine: (derivationKind: String) -> Unit,
+) {
+    CustomModalContainer(visible = visible, onDismissRequest = onDismissRequest) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("manual_refine_modal")
+                .padding(16.dp),
+        ) {
+            Text(
+                text = "手動推敲・派生作成",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            app.inku.mobile.data.model.DerivationKindRegistry.ALL_INFOS.drop(6).forEach { info ->
+                OutlinedButton(
+                    onClick = { onApplyRefine(info.kind) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("手動派生: ${info.labelJa} (${info.kind})")
+                }
+            }
         }
     }
 }

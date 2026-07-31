@@ -5,6 +5,7 @@
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import { modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
+	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -920,49 +921,47 @@
 						<div class="inline-message">{t().settingsDbBackupUnsupported}</div>
 					{/if}
 					<div class="db-backup-grid">
-						<label>
+						<div class="db-backup-field">
 							<span>{t().settingsDbBackupInterval}</span>
-							<input
-								type="number"
-								min="1"
-								max="365"
+							<NumberStepper
+								label={t().settingsDbBackupInterval}
+								min={1}
+								max={365}
 								value={settingsStatus.db_backup.interval_days}
 								disabled={!settingsStatus.db_backup.supported}
-								onchange={(e) => saveDbBackupSettings({ intervalDays: Number((e.currentTarget as HTMLInputElement).value) })}
+								onChange={(value) => saveDbBackupSettings({ intervalDays: value })}
 							/>
-						</label>
-						<label>
+						</div>
+						<div class="db-backup-field">
 							<span>{t().settingsDbBackupMaxGenerations}</span>
-							<input
-								type="number"
-								min="1"
-								max="100"
+							<NumberStepper
+								label={t().settingsDbBackupMaxGenerations}
+								min={1}
+								max={100}
 								value={settingsStatus.db_backup.max_generations}
 								disabled={!settingsStatus.db_backup.supported}
-								onchange={(e) => saveDbBackupSettings({ maxGenerations: Number((e.currentTarget as HTMLInputElement).value) })}
+								onChange={(value) => saveDbBackupSettings({ maxGenerations: value })}
 							/>
-						</label>
+						</div>
 						<div class="db-backup-field db-backup-time">
 							<span>{t().settingsDbBackupTime}</span>
 							<div class="db-backup-time-fields">
-								<input
-									type="number"
-									min="0"
-									max="23"
-									aria-label={t().settingsDbBackupTimeHourLabel}
+								<NumberStepper
+									min={0}
+									max={23}
+									label={t().settingsDbBackupTimeHourLabel}
 									value={settingsStatus.db_backup.backup_hour}
 									disabled={!settingsStatus.db_backup.supported}
-									onchange={(e) => saveDbBackupSettings({ hour: Number((e.currentTarget as HTMLInputElement).value) })}
+									onChange={(value) => saveDbBackupSettings({ hour: value })}
 								/>
 								<span class="db-backup-time-unit">{t().settingsDbBackupTimeHourUnit}</span>
-								<input
-									type="number"
-									min="0"
-									max="59"
-									aria-label={t().settingsDbBackupTimeMinuteLabel}
+								<NumberStepper
+									min={0}
+									max={59}
+									label={t().settingsDbBackupTimeMinuteLabel}
 									value={settingsStatus.db_backup.backup_minute}
 									disabled={!settingsStatus.db_backup.supported}
-									onchange={(e) => saveDbBackupSettings({ minute: Number((e.currentTarget as HTMLInputElement).value) })}
+									onChange={(value) => saveDbBackupSettings({ minute: value })}
 								/>
 								<span class="db-backup-time-unit">{t().settingsDbBackupTimeMinuteUnit}</span>
 							</div>
@@ -1957,7 +1956,7 @@
 		gap: 4px;
 		min-width: 0;
 	}
-	.db-backup-time-fields input { flex: 1 1 0; }
+	.db-backup-time-fields :global(.number-stepper) { flex: 1 1 0; }
 	.db-backup-time-unit {
 		flex: 0 0 auto;
 		color: var(--fg2);
@@ -1965,7 +1964,6 @@
 		letter-spacing: 0;
 		text-transform: none;
 	}
-	.db-backup-grid input,
 	.db-backup-grid select {
 		min-width: 0;
 		padding: 5px 7px;
@@ -1976,12 +1974,6 @@
 		font-size: 12px;
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
-	}
-	/* WebKit reveals the stepper only on hover or focus; these fields are meant
-	   to be nudged, so the arrows stay out. */
-	.db-backup-grid input[type='number']::-webkit-inner-spin-button,
-	.db-backup-grid input[type='number']::-webkit-outer-spin-button {
-		opacity: 1;
 	}
 	.db-backup-hint {
 		margin-top: 6px;

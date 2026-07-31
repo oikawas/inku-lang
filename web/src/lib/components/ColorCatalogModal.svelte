@@ -13,7 +13,7 @@
 
 	let {
 		selectedCatalog,
-		currentCatalog,
+		currentCatalog: _currentCatalog,
 		catalogs,
 		onSelectCatalog,
 		onCancel,
@@ -32,9 +32,9 @@
 		return getLang() === 'ja' ? (catalog.sub_ja ?? catalog.sub) : catalog.sub;
 	}
 
-	function paletteName(color: { name: string; name_ja?: string }): string {
-		if (getLang() !== 'ja' || !color.name_ja) return color.name;
-		return `${color.name}（${color.name_ja}）`;
+	function localizedPaletteName(color: { name: string; name_ja?: string }): string | undefined {
+		if (getLang() !== 'ja' || !color.name_ja) return undefined;
+		return color.name_ja;
 	}
 </script>
 
@@ -51,31 +51,30 @@
 					class="catalog-item"
 					class:active
 					onclick={() => onSelectCatalog(cat.id)}
+					aria-pressed={active}
 				>
-					<div class="catalog-swatches">
-						{#each cat.swatches as hex (hex)}
-							<div class="catalog-swatch" style="background:{hex}"></div>
-						{/each}
-					</div>
 					<div class="catalog-info">
-						<div class="catalog-name">{cat.name}</div>
+						<div class="catalog-name-row">
+							<div class="catalog-name">{cat.name}</div>
+							{#if active}<span class="catalog-check" aria-hidden="true">✓</span>{/if}
+						</div>
+						<div class="catalog-id">{cat.id}</div>
 						<div class="catalog-sub">{catalogSub(cat)}</div>
 					</div>
-					{#if active}<span class="catalog-check">✓</span>{/if}
+					<div class="catalog-palette">
+						{#each cat.palette as color (color.code)}
+							<div class="catalog-color">
+								<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
+								<span class="catalog-color-code">{color.code}</span>
+								<span class="catalog-color-name">{color.name}</span>
+								{#if localizedPaletteName(color)}
+									<span class="catalog-color-localized">{localizedPaletteName(color)}</span>
+								{/if}
+							</div>
+						{/each}
+					</div>
 				</button>
 			{/each}
-		</div>
-		<div class="catalog-detail">
-			<div class="section-label">{currentCatalog.name} — {t().colorCatalogDetail}</div>
-			<div class="catalog-detail-list">
-				{#each currentCatalog.palette as color (color.code)}
-					<div class="catalog-color-row">
-						<div class="catalog-color-box" class:light={isLightColor(color.code)} style="background:{color.code}"></div>
-						<span class="catalog-color-name">{paletteName(color)}</span>
-						<span class="catalog-color-code">{color.code}</span>
-					</div>
-				{/each}
-			</div>
 		</div>
 	</div>
 	<div class="catalog-modal-foot">
@@ -92,7 +91,7 @@
 	.catalog-modal {
 		position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
 		z-index: 401;
-		width: min(820px, calc(100vw - 32px)); max-height: 88vh;
+		width: min(1180px, calc(100vw - 32px)); max-height: 92vh;
 		background: var(--panel2); border-radius: var(--r-lg);
 		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex; flex-direction: column; overflow: hidden;
@@ -102,52 +101,39 @@
 		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 	}
 	.catalog-modal-title { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; }
-	.catalog-body {
-		display: grid;
-		grid-template-columns: minmax(340px, 1fr) minmax(260px, 0.75fr);
-		flex: 1;
-		min-height: 0;
-	}
-	.catalog-scroll { min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+	.catalog-body { flex: 1; min-height: 0; }
+	.catalog-scroll { height: 100%; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 	.catalog-item {
-		display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+		display: grid; grid-template-columns: minmax(112px, 0.16fr) minmax(0, 1fr);
+		align-items: start; gap: 12px; padding: 8px;
 		border: 1px solid var(--border); border-radius: var(--r);
 		background: var(--panel); cursor: pointer; text-align: left;
 		transition: border-color 0.12s, background 0.12s; font-family: inherit; width: 100%;
 	}
-	.catalog-item.active { border: 1.5px solid var(--accent); background: var(--accent-light); }
+	.catalog-item.active { border-color: var(--accent); background: var(--accent-light); box-shadow: inset 3px 0 0 var(--accent); }
 	.catalog-item:hover:not(.active) { background: var(--bg); }
-	.catalog-swatches {
-		display: flex; flex-shrink: 0; border-radius: 3px; overflow: hidden; height: 32px; width: 64px;
+	.catalog-info { min-width: 0; padding: 2px 2px 0; }
+	.catalog-name-row { display: flex; align-items: baseline; gap: 5px; }
+	.catalog-name { font-size: 12px; font-weight: 600; color: var(--fg); line-height: 1.15; }
+	.catalog-id { margin-top: 1px; color: var(--fg3); font: 9px/1.15 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+	.catalog-sub { margin-top: 5px; font-size: 9px; line-height: 1.25; color: var(--fg3); }
+	.catalog-check { color: var(--accent); font-size: 12px; flex-shrink: 0; }
+	.catalog-palette {
+		display: grid;
+		grid-template-columns: repeat(10, minmax(56px, 1fr));
+		gap: 5px;
+		min-width: 0;
 	}
-	.catalog-swatch { flex: 1; }
-	.catalog-info { flex: 1; min-width: 0; }
-	.catalog-name { font-size: 12px; font-weight: 500; color: var(--fg); margin-bottom: 1px; }
-	.catalog-sub { font-size: 11px; color: var(--fg3); }
-	.catalog-check { color: var(--accent); font-size: 13px; flex-shrink: 0; }
-	.catalog-detail {
-		border-left: 1px solid var(--border);
-		padding: 12px 16px 14px;
-		background: var(--panel);
-		min-height: 0;
-		overflow-y: auto;
-	}
-	.section-label {
-		font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
-		color: var(--fg3); text-transform: uppercase;
-	}
-	.catalog-detail-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-	.catalog-color-row {
-		display: flex; align-items: center; gap: 10px;
-		font-size: 12px;
-	}
-	.catalog-color-box {
-		width: 28px; height: 28px; border-radius: 3px; flex-shrink: 0;
-	}
+	.catalog-color { min-width: 0; text-align: center; }
+	.catalog-color-box { width: 100%; height: 38px; border-radius: 2px; }
 	.catalog-color-box.light { border: 1px solid var(--border); }
-	.catalog-color-name { color: var(--fg); flex: 1; }
+	.catalog-color-name, .catalog-color-localized {
+		display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	}
+	.catalog-color-name { margin-top: 1px; color: var(--fg2); font-size: 8px; line-height: 1.15; }
+	.catalog-color-localized { color: var(--fg3); font-size: 7px; line-height: 1.15; }
 	.catalog-color-code {
-		font-size: 11px; color: var(--fg3);
+		display: block; margin-top: 2px; font-size: 7px; line-height: 1.1; color: var(--fg3);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	}
 	.catalog-modal-foot {
@@ -178,8 +164,24 @@
 		border-color: var(--action-bg);
 	}
 	.primary-inline:hover { background: var(--action-hover); border-color: var(--action-hover); }
-	@media (max-width: 760px) {
-		.catalog-body { grid-template-columns: 1fr; }
-		.catalog-detail { border-left: none; border-top: 1px solid var(--border); }
+	@media (max-width: 980px) {
+		.catalog-palette { grid-template-columns: repeat(5, minmax(64px, 1fr)); row-gap: 8px; }
+	}
+	@media (max-width: 640px) {
+		.catalog-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+		.catalog-modal-head { padding: 12px 14px 9px; }
+		.catalog-scroll { padding: 8px; }
+		.catalog-item { grid-template-columns: 1fr; gap: 7px; }
+		.catalog-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; }
+		.catalog-name-row { min-width: 0; }
+		.catalog-id { grid-column: 1; }
+		.catalog-sub { grid-column: 2; grid-row: 1 / span 2; align-self: center; margin: 0; text-align: right; }
+		.catalog-palette { grid-template-columns: repeat(5, minmax(44px, 1fr)); gap: 5px; row-gap: 8px; }
+		.catalog-color-box { height: 32px; }
+		.catalog-modal-foot { padding: 9px 12px 11px; }
+	}
+	@media (max-width: 380px) {
+		.catalog-palette { grid-template-columns: repeat(3, minmax(56px, 1fr)); }
+		.catalog-sub { display: none; }
 	}
 </style>

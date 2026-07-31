@@ -4952,3 +4952,29 @@ internal fun CustomModalContainer(
         }
     }
 }
+
+@Composable
+internal fun ToastQueueWidget(
+    messages: List<ToastMessage>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        messages.forEach { toast ->
+            Surface(
+                color = MaterialTheme.colorScheme.inverseSurface,
+                shape = RoundedCornerShape(8.dp),
+                tonalElevation = 6.dp,
+            ) {
+                Text(
+                    text = toast.text,
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}

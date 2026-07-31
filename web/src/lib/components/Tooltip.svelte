@@ -3,13 +3,14 @@
 		text: string;
 		placement?: 'top' | 'bottom' | 'left' | 'right' | 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
 		wide?: boolean;
+		disabled?: boolean;
 		children: import('svelte').Snippet;
 	};
 
-	let { text, placement = 'top', wide = false, children }: Props = $props();
+	let { text, placement = 'top', wide = false, disabled = false, children }: Props = $props();
 </script>
 
-<span class="tooltip-wrap">
+<span class="tooltip-wrap" class:disabled>
 	{@render children()}
 	<span
 		class="tooltip-bubble"
@@ -35,6 +36,9 @@
 	.tooltip-wrap:hover,
 	.tooltip-wrap:focus-within {
 		z-index: 1010;
+	}
+	.tooltip-wrap.disabled {
+		z-index: auto;
 	}
 	.tooltip-bubble {
 		position: absolute;
@@ -193,6 +197,10 @@
 	.tooltip-wrap:hover .tooltip-bubble,
 	.tooltip-wrap:focus-within .tooltip-bubble {
 		opacity: 1;
+	}
+	.tooltip-wrap.disabled .tooltip-bubble {
+		opacity: 0;
+		visibility: hidden;
 	}
 	.tooltip-wrap:hover .tooltip-bubble:not(.bottom):not(.left):not(.right):not(.bottom-left):not(.bottom-right):not(.top-left):not(.top-right),
 	.tooltip-wrap:focus-within .tooltip-bubble:not(.bottom):not(.left):not(.right):not(.bottom-left):not(.bottom-right):not(.top-left):not(.top-right) {

@@ -118,9 +118,9 @@
 		</div>
 
 		<div class="rail-menu-wrap" bind:this={uiModeWrapEl}>
-			<Tooltip placement="right" text={t().uiModeLabel}>
+			<Tooltip placement="right" text={t().uiModeLabel} disabled={uiModeOpen}>
 				<button class="rail-action" class:active={uiModeOpen} type="button" aria-haspopup="menu" aria-expanded={uiModeOpen} onclick={() => (uiModeOpen = !uiModeOpen)}>
-					<span class="rail-icon ui-mode-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+					<span class="rail-icon ui-mode-icon" aria-hidden="true"></span>
 					{#if expanded}<span class="rail-label">{uiModeLabel}</span>{/if}
 				</button>
 			</Tooltip>
@@ -309,8 +309,25 @@
 		border-color: var(--border2);
 		color: var(--fg);
 	}
-	.ui-mode-icon { flex-direction: column; gap: 2px; }
-	.ui-mode-icon i { display: block; width: 11px; height: 1px; background: currentColor; }
+	/* A panel-layout mark distinguishes UI mode from a generic menu and the settings gear. */
+	.ui-mode-icon::before {
+		content: "";
+		width: 12px;
+		height: 10px;
+		border: 1.5px solid currentColor;
+		border-radius: 2px;
+		background: linear-gradient(90deg, transparent 35%, currentColor 35% 47%, transparent 47%);
+	}
+	.ui-mode-icon::after {
+		content: "";
+		position: absolute;
+		right: 4px;
+		bottom: 4px;
+		width: 4px;
+		height: 2px;
+		border-radius: 1px;
+		background: currentColor;
+	}
 	.ui-mode-menu button.selected { color: var(--fg); font-weight: 600; }
 	.ui-mode-menu button.selected::before { content: '✓'; margin-right: 6px; }
 

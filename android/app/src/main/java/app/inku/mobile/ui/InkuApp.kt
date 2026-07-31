@@ -4978,3 +4978,71 @@ internal fun ToastQueueWidget(
         }
     }
 }
+
+@Composable
+internal fun ConditionChipsContainer(
+    expanded: Boolean = true,
+    onToggleExpand: () -> Unit = {},
+    aspectRatio: String = "1:1",
+    colorCatalog: String = "標準",
+    uiMode: String = "simple",
+    mascotKind: String = "incu",
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+    ) {
+        TextButton(
+            onClick = onToggleExpand,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("condition_chips_toggle"),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "生成条件チップ",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Text(
+                    text = if (expanded) "▲ 折りたたむ" else "▼ 展開する",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+
+        if (expanded) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("condition_chips_content")
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                ConditionChip(label = "比率: $aspectRatio")
+                ConditionChip(label = "配色: $colorCatalog")
+                ConditionChip(label = "モード: $uiMode")
+                ConditionChip(label = "マスコット: $mascotKind")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConditionChip(label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+        )
+    }
+}

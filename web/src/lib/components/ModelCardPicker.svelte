@@ -69,7 +69,7 @@
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
 							<strong>{model.label}</strong>{#if isModelUnselectable(model)}<small class="eol-mark">{modelStatusLabel(model, isJapanese)}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
-								{#if isModelUnselectable(model)}<span><b>{isJapanese ? '状態 / Status' : 'Status'}</b>{modelStatusLabel(model, isJapanese)}</span>{/if}
+								{#if isModelUnselectable(model)}<span><b>状態 / Status</b>{modelStatusLabel(model, isJapanese)}</span>{/if}
 								<span><b>用途 / Use</b>{modelPurposes(model)}</span>
 								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model, purpose)}</span>
 								<span><b>速度 / Speed</b>{modelSpeed(model)}</span>

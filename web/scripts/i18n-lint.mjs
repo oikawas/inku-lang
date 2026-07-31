@@ -4,10 +4,11 @@
 //   npm run lint:i18n            report
 //   npm run lint:i18n -- --list  also print every allowed exception it matched
 //
-// It reads the three channels the English UI actually lives in:
+// It reads the four channels the English UI actually lives in:
 //   1. src/lib/i18n/en.ts               (the i18n pack; values only, never key names)
 //   2. isJapanese ? '…' : '…'           (ternaries inside components)
 //   3. getLang() === 'ja' ? '…' : '…'   (branches in +page.svelte and friends)
+//   4. 日本語 / English                  (bilingual labels in component markup)
 //
 // Every rule below has its prose counterpart in GLOSSARY.md. When you change one,
 // change the other in the same commit — the file and this script are one pair.
@@ -144,13 +145,14 @@ function walk(dir, acc = []) {
 
 const TERNARY = /isJapanese \? '((?:[^'\\]|\\.)*)' : '((?:[^'\\]|\\.)*)'/g;
 const GETLANG = /getLang\(\) === 'ja'\s*\n?\s*\? '((?:[^'\\]|\\.)*)'\s*\n?\s*: '((?:[^'\\]|\\.)*)'/g;
+const BILINGUAL_LABEL = />\s*([^<>\n]*[\u3040-\u30ff\u3400-\u9fff][^<>\n]*?)\s+\/\s+([A-Za-z][^<>\n]*?)\s*</g;
 
 const strings = [];
 for (const e of pack(EN)) strings.push({ where: `en.ts ${e.key}`, key: e.key, text: e.text });
 for (const file of walk(SRC)) {
 	if (file === EN || file === JA) continue;
 	const body = readFileSync(file, 'utf8');
-	for (const re of [TERNARY, GETLANG]) {
+	for (const re of [TERNARY, GETLANG, BILINGUAL_LABEL]) {
 		re.lastIndex = 0;
 		let m;
 		while ((m = re.exec(body)) !== null) {

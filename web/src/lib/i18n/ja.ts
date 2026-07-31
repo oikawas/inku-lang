@@ -500,7 +500,7 @@ export const ja: LangPack = {
 	settingsLogRetentionSystemdPreview: 'systemd drop-inプレビュー',
 	settingsLogRetentionNote: 'ログ保存ポリシーはアプリDBに保存されます。systemd / logrotateへの実適用にはサーバーOSの権限が必要です。',
 	settingsLogRetentionSaved: 'ログ保存ポリシーを保存しました。',
-	settingsReloadSettings: '設定再読み込み',
+	settingsReloadSettings: '表示更新',
 	settingsLoading: '設定状態を読み込んでいます。',
 	settingsLoadFailed: '設定状態を取得できません。',
 	settingsReload: '表示更新',

@@ -110,7 +110,6 @@
 	};
 	type SettingsMode = 'model' | 'settings';
 	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs';
-	type HistorySelectionBehavior = 'history' | 'current';
 	type ModelProviderSetting = {
 		label?: string;
 		kind?: string;
@@ -188,9 +187,6 @@
 		pngAlphaWhite: boolean;
 		exportTemplates: ExportTemplate[];
 		exportTemplateStatus: string | null;
-		saveReplayAsNewVersion: boolean;
-		historySelectionCanvas: HistorySelectionBehavior;
-		historySelectionCatalog: HistorySelectionBehavior;
 		canvasAspectEnabled: boolean;
 		onClose: () => void;
 		onCloseSettings: () => void;
@@ -299,9 +295,6 @@
 		pngAlphaWhite = $bindable(),
 		exportTemplates,
 		exportTemplateStatus,
-		saveReplayAsNewVersion = $bindable(),
-		historySelectionCanvas = $bindable(),
-		historySelectionCatalog = $bindable(),
 		canvasAspectEnabled,
 		onClose,
 		onCloseSettings,
@@ -1558,34 +1551,6 @@
 				<label class="setting-toggle" title={t().tooltipDdlAutoRepair}>
 					<input type="checkbox" bind:checked={autoRepairEnabled} />
 					<span>{t().ddlAutoRepairLabel}</span>
-				</label>
-			</div>
-			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsHistoryLabel}</div>
-				<div class="settings-radio-title">{t().settingsHistorySelectionTitle}</div>
-				<div class="settings-radio-set">
-					<label class="setting-toggle">
-						<input type="radio" name="history-selection-canvas" value="history" bind:group={historySelectionCanvas} />
-						<span>{t().settingsHistorySelectionCanvasHistory}</span>
-					</label>
-					<label class="setting-toggle">
-						<input type="radio" name="history-selection-canvas" value="current" bind:group={historySelectionCanvas} />
-						<span>{t().settingsHistorySelectionCanvasCurrent}</span>
-					</label>
-				</div>
-				<div class="settings-radio-set">
-					<label class="setting-toggle">
-						<input type="radio" name="history-selection-catalog" value="history" bind:group={historySelectionCatalog} />
-						<span>{t().settingsHistorySelectionCatalogHistory}</span>
-					</label>
-					<label class="setting-toggle">
-						<input type="radio" name="history-selection-catalog" value="current" bind:group={historySelectionCatalog} />
-						<span>{t().settingsHistorySelectionCatalogCurrent}</span>
-					</label>
-				</div>
-				<label class="setting-toggle">
-					<input type="checkbox" bind:checked={saveReplayAsNewVersion} />
-					<span>{t().settingsSaveReplay}</span>
 				</label>
 			</div>
 		{/if}

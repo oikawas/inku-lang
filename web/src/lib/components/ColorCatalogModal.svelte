@@ -79,7 +79,7 @@
 	</div>
 	<div class="catalog-modal-foot">
 		<button class="ghost-btn" onclick={onCancel}>{t().confirmCancel}</button>
-		<button class="ghost-btn primary-inline" onclick={onConfirm}>{t().colorCatalogConfirm}</button>
+		<button class="ghost-btn" onclick={onConfirm}>{t().colorCatalogConfirm}</button>
 	</div>
 </div>
 
@@ -156,14 +156,6 @@
 		font-family: inherit;
 	}
 	.ghost-btn:hover { background: var(--bg2); }
-	/* --action-* is the theme-aware primary pair. Painting var(--fg) with a
-	   hardcoded white label collapses to white-on-white in the dark theme. */
-	.primary-inline {
-		background: var(--action-bg);
-		color: var(--action-fg);
-		border-color: var(--action-bg);
-	}
-	.primary-inline:hover { background: var(--action-hover); border-color: var(--action-hover); }
 	@media (max-width: 980px) {
 		.catalog-palette { grid-template-columns: repeat(5, minmax(64px, 1fr)); row-gap: 8px; }
 	}

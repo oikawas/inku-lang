@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.render.DefaultSvgRenderer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -47,4 +48,29 @@ class Engine16VersionTest {
         assertEquals(explicit16, hash(JSONObject()))
         assertEquals(explicit16, hash(JSONObject().put("render_engine_version", "")))
     }
+
+    // The version the UI shows is pinned to a literal so that leaving it stale fails here.
+    @Test
+    fun testCompatibilityConstantsDeclareEngine16() {
+        assertEquals("16", CompatibilityConstants.renderEngineVersion)
+        assertEquals("default", CompatibilityConstants.renderEngineId)
+    }
+
+    // The label the UI shows and the metadata the renderer emits must never drift apart again.
+    @Test
+    fun testUiConstantsMatchRendererMetadata() {
+        val metadata = JSONObject(
+            DefaultSvgRenderer().render(
+                RenderRequest(
+                    scoreJson = """{"instructions":[]}""",
+                    colorCatalogId = "default",
+                    canvasAspect = "square",
+                    svgProfile = "editable",
+                )
+            ).metadataJson
+        )
+        assertEquals(metadata.getString("render_engine_version"), CompatibilityConstants.renderEngineVersion)
+        assertEquals(metadata.getString("render_engine_id"), CompatibilityConstants.renderEngineId)
+    }
 }
+

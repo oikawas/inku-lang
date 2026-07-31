@@ -1,6 +1,7 @@
 package app.inku.mobile.pipeline
 
 import android.util.Log
+import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.render.DefaultSvgRenderer
@@ -1603,8 +1604,8 @@ class LocalFallbackPipeline(
         val metadata = JSONObject(renderMetadataJson)
         val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
         val renderSeed = canonicalSeed(metadata.opt("render_seed") ?: metadata.opt("seed"))
-        val engineId = metadata.optString("render_engine_id", "default").ifBlank { "default" }
-        val engineVersion = metadata.optString("render_engine_version", "16").ifBlank { "16" }
+        val engineId = metadata.optString("render_engine_id", CompatibilityConstants.renderEngineId).ifBlank { CompatibilityConstants.renderEngineId }
+        val engineVersion = metadata.optString("render_engine_version", CompatibilityConstants.renderEngineVersion).ifBlank { CompatibilityConstants.renderEngineVersion }
         val colorCatalogId = metadata.optString("render_color_catalog_id", catalogId).ifBlank { catalogId }
         val wild = metadata.optBoolean("render_wild", metadata.optBoolean("wild", false))
 

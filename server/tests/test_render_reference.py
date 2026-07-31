@@ -16,6 +16,9 @@ GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
 ENGINE_VERSION = current_render_engine().version
 CORPUS_DIR = SERVER_ROOT / "reference" / f"render-engine-{ENGINE_VERSION}"
 MANIFEST_PATH = CORPUS_DIR / "manifest.json"
+# 帰属の主張は版に紐づく。「そのとき何が動いたか」を後の版の manifest で読むと、
+# 主張の対象が黙って入れ替わる。
+ENGINE_18_MANIFEST = SERVER_ROOT / "reference" / "render-engine-18" / "manifest.json"
 
 
 def _generator():
@@ -86,8 +89,11 @@ def test_render_reference_keeps_the_display_profile_covered() -> None:
 
 
 def test_engine_18_moves_only_the_catalog_dependent_cases() -> None:
-    """The unchanged side states that six-key legacy rendering did not move."""
-    manifest = _manifest()
+    """The unchanged side states that six-key legacy rendering did not move.
+
+    engine 18 についての主張なので、engine 18 の manifest を読む。
+    """
+    manifest = json.loads(ENGINE_18_MANIFEST.read_text(encoding="utf-8"))
     changed = set(manifest["changed_from_previous"])
     original = {
         case_id for case_id in manifest["cases"] if not case_id.startswith("F-")
@@ -104,6 +110,47 @@ def test_engine_18_moves_only_the_catalog_dependent_cases() -> None:
     assert len(changed) == 70
     assert changed <= palette
     assert not (changed & original)
+
+
+def test_engine_19_moves_the_tools_the_sheet_meets_and_no_others() -> None:
+    """engine 19 が動かした 227 件の帰属。
+
+    地の抵抗は道具の性質なので、動いた / 動かないの境目は道具にある。
+    機械 (rotring / computer) が 1 件でも入っていたら、抵抗が道具でなく
+    全体にかかる効果になっている。
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "19"
+    changed = set(manifest["changed_from_previous"])
+    assert len(changed) == 227
+
+    inputs = _generator().build_inputs()
+
+    def tools(case_id: str) -> set[str]:
+        return {
+            instruction.get("weight")
+            for instruction in inputs[case_id]["score"].get("instructions", [])
+        }
+
+    machines_only = {
+        case_id
+        for case_id in manifest["cases"]
+        if tools(case_id) and tools(case_id) <= {"rotring", "computer"}
+    }
+    assert machines_only, "機械だけのケースが無ければ、下の主張は恒真である"
+    assert not (changed & machines_only)
+
+    # 対照。到着は疎なので、動かない手の道具のケースもある (brush 全体では
+    # 72/86)。1 件残らず動く群を対照に置く — 細筆だけの 16 件と crayon だけの
+    # 30 件。ここが 1 件でも欠けたら、機械が動かないことは何も言っていない。
+    for group, expected in (({"brush_thin"}, 16), ({"crayon"}, 30)):
+        only = {
+            case_id
+            for case_id in manifest["cases"]
+            if tools(case_id) and tools(case_id) <= group
+        }
+        assert len(only) == expected, (group, len(only))
+        assert only <= changed, sorted(only - changed)
 
 
 def test_engine_18_palette_cases_cover_the_resolution_chain() -> None:

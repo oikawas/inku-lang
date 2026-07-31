@@ -4457,8 +4457,11 @@ def _render_hand_stroke(
             wild=wild,
             grid_step=grid_step,
         )
+        # The varied centerline gets its own outline, but the sheet already met
+        # the tool: carry the breaks over so a wavering line is refused exactly
+        # where a straight one would be.
         outline = outline_for_centerline(
-            centerline, [sample.width for sample in varied.samples]
+            centerline, [sample.width for sample in varied.samples], varied.cuts
         )
         material_centerline = centerline
     path_attrs = {

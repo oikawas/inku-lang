@@ -22,6 +22,7 @@ import re
 import pytest
 
 import inku_server.renderer as renderer
+import inku_server.stroke_engine as stroke_engine
 from inku_server.renderer import (
     _point_in_polygon,
     _surface_contour,
@@ -123,10 +124,16 @@ def _engine_15_seed_material():
     reverted = tuple(name for name in original if name != "thinness")
     assert len(reverted) == len(original) - 1, "allowlist から thinness が消えている"
     renderer._SEED_INSTRUCTION_FIELDS = reverted
+    original_resistance = stroke_engine.RESISTANCE
+    # engine 19 (地の抵抗) はストローク合成そのものを動かすので、engine 15 との
+    # バイト比較は抵抗を切った状態で行う。段 3 の `thinness` と同じ扱い。
+    # engine 19 の側は `test_ground_resistance.py` が別に留めている。
+    stroke_engine.RESISTANCE = stroke_engine.RESISTANCE_LEVELS["g0"]
     try:
         yield
     finally:
         renderer._SEED_INSTRUCTION_FIELDS = original
+        stroke_engine.RESISTANCE = original_resistance
 
 
 def _replay(case: dict) -> str:

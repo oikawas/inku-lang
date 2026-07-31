@@ -114,12 +114,16 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # もともと書いていた距離 — 帯の半幅の 0.7〜2.3 倍 — へ戻ったことである。
 # engine 16 段 3 (太さの軸) で再採取。`thinness` が演奏 seed の allowlist に
 # 入った (C-7) ので、既定 None のままでも seed 鍵が動く。
+# engine 19 (地の抵抗) で再採取。地が道具に抵抗するようになり、吸われる道具は
+# 幅が膨らみ、弾かれる道具は墨が切れる。5 件のうち 4 件が動き、`pencil_circle`
+# だけが不動 — 閉じた輪郭の帯は切らない (SPEC: even-odd の帯を保つ) ので、
+# pencil の吸い (0.10) が 1 度も到着しなかったこの 1 件は 1 バイトも動かない。
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "532e64970f0dbe20f303e40696f56b6a",
-    "chalk_square": "8821b5468bbdd99133a5bff39ea60612",
-    "crayon_arc": "bf3b2adeddbd488400d6032155cf3537",
+    "brush_thin_line": "896b28849045ca35bbdd94605ba4a5cf",
+    "chalk_square": "d7ef771643bd96c50f47894c69e4381e",
+    "crayon_arc": "67cdabd624a76ad7059118d46448e730",
     "pencil_circle": "e950ff63e16c5859100c9ffa4f85d978",
-    "pencil_ellipse": "87de69f3c6602833a71acc5d735a013e",
+    "pencil_ellipse": "21859684c56809933104f8efdcf0197f",
 }
 
 

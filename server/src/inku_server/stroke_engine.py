@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 import hashlib
 import math
@@ -68,6 +69,71 @@ WILD_GAIN = 3.5
 
 
 @dataclass(frozen=True)
+class Support:
+    """The sheet the tool works on.
+
+    In painting the ground resists the hand: an absorbent sheet lets the ink
+    spread, a toothy one refuses the tool and leaves the paper bare. There is
+    one constant sheet by default, so what varies between works is which tool
+    met it, not which paper was used.
+    """
+
+    absorb: float  # how much ink the sheet draws in
+    tooth: float  # how much the sheet refuses the tool
+
+
+DEFAULT_SUPPORT = Support(absorb=1.0, tooth=1.0)
+
+# Which of the two quantities each tool actually meets, as (absorb, tooth).
+# A brush is drunk by the sheet; a waxy or hard tool is refused by it; a pen
+# barely meets either. The machines meet neither: a plotter or a sampled curve
+# has no contact with paper at all, so they must stay byte-identical.
+TOOL_SUPPORT_BIAS: dict[str, tuple[float, float]] = {
+    "brush_thin": (1.00, 0.15),
+    "brush_thick": (1.00, 0.15),
+    "crayon": (0.10, 1.00),
+    "pencil": (0.10, 1.00),
+    "chalk": (0.10, 1.00),
+    "pen": (0.15, 0.15),
+    "silverpoint": (0.05, 0.25),
+    "drypoint": (0.00, 0.35),
+    "burin": (0.00, 0.10),
+    "rotring": (0.00, 0.00),
+    "computer": (0.00, 0.00),
+}
+
+
+@dataclass(frozen=True)
+class ResistanceLevel:
+    """How hard the sheet pushes back. `g0` reproduces engine 18 exactly."""
+
+    bleed_amp: float
+    bleed_span: float  # window half-width as a fraction of the sample count
+    bleed_rate: float
+    skip_depth: float
+    skip_span: float
+    skip_rate: float
+
+
+RESISTANCE_LEVELS: dict[str, ResistanceLevel] = {
+    "g0": ResistanceLevel(0.00, 0.00, 0.0, 0.00, 0.00, 0.0),
+    "g1": ResistanceLevel(0.35, 0.10, 0.9, 0.70, 0.05, 0.9),
+    "g2": ResistanceLevel(0.70, 0.16, 1.5, 0.88, 0.07, 1.5),
+    "g3": ResistanceLevel(1.20, 0.24, 2.2, 1.00, 0.10, 2.2),
+}
+
+# The adopted level (author, 2026-07-31). The others are kept so the monotonic
+# ordering g1 < g2 < g3 stays checkable.
+RESISTANCE = RESISTANCE_LEVELS["g2"]
+
+# Envelope level above which no ink is laid down at all. Narrowing the width
+# was measured to be invisible — the tools the sheet refuses are also the
+# thinnest ones (pencil 1.5px), so a pinch sinks into the antialiasing. A gap
+# is not a thin line: it is bare paper.
+SKIP_CUT_LEVEL = 0.55
+
+
+@dataclass(frozen=True)
 class StrokeSample:
     t: float
     x: float
@@ -91,6 +157,10 @@ class StrokeResult:
     burr_opacity: float
     # Side of one lattice cell, in px. Zero unless the tool quantizes.
     grid_step: float = 0.0
+    # Samples where the sheet refused the tool and no ink is laid down. The
+    # outline above already carries the breaks; a caller that rebuilds the
+    # outline around its own centerline needs the mask to keep them.
+    cuts: tuple[bool, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -226,6 +296,90 @@ def _event_map(seed: int, rate: float, count: int) -> dict[int, str]:
     return events
 
 
+def _support_envelope(
+    n: int, seed: int, label: str, bias: float, rate: float, span_ratio: float
+) -> list[float]:
+    """Sparse raised-cosine arrivals over the run. Endpoints stay pinned."""
+    # Short runs and zero-bias tools never receive an arrival.
+    if bias <= 0 or rate <= 0 or span_ratio <= 0 or n < 8:
+        return [0.0] * n
+    span = max(2, int(round(n * span_ratio)))
+    # The eligible range must NOT shrink with the span, or a stronger level
+    # fires less often than a weaker one (measured: bleed vanished at g2/g3).
+    probability = min(0.35, rate * bias / max(1, n - 4))
+    centres: list[int] = []
+    for i in range(2, n - 2):
+        if _unit(seed, f"{label}-arrival", i) < probability:
+            centres.append(i)
+            if len(centres) >= 3:
+                break
+    out = [0.0] * n
+    for c in centres:
+        size = 0.6 + 0.4 * _unit(seed, f"{label}-size", c)
+        for k in range(-span, span + 1):
+            idx = c + k
+            if 0 <= idx < n:
+                # Raised cosine: the event has no edge of its own.
+                window = 0.5 * (1 + math.cos(math.pi * k / span))
+                # Overlaps take the strongest, never the product: two drops
+                # that meet make one wider drop, not a blob.
+                out[idx] = max(out[idx], size * window)
+    return out
+
+
+def _support_response(
+    widths: list[float], weight: str, seed: int, support: Support
+) -> tuple[list[float], list[bool]]:
+    """Meet the sheet: swell where it drank the ink, cut where it refused.
+
+    One mechanism, two signs, drawn from two independent seeds so a sheet that
+    absorbs and a sheet that refuses do not fire in the same places.
+    """
+    absorb, tooth = TOOL_SUPPORT_BIAS.get(weight, (0.0, 0.0))
+    absorb *= support.absorb
+    tooth *= support.tooth
+    level = RESISTANCE
+    n = len(widths)
+    swell = _support_envelope(
+        n, seed, "bleed", absorb, level.bleed_rate, level.bleed_span
+    )
+    pinch = _support_envelope(
+        n, seed ^ 0x5BD1, "skip", tooth, level.skip_rate, level.skip_span
+    )
+    strength = level.skip_depth * tooth
+    out = [
+        max(0.015, w * (1.0 + level.bleed_amp * absorb * s) * (1.0 - strength * p))
+        for w, s, p in zip(widths, swell, pinch)
+    ]
+    return out, [strength * p >= SKIP_CUT_LEVEL for p in pinch]
+
+
+def _cut_runs(cuts: list[bool], minimum: int) -> list[list[int]]:
+    """Index runs of samples that still carry ink, split at the bare paper."""
+    runs: list[list[int]] = []
+    current: list[int] = []
+    for index, cut in enumerate(cuts):
+        if cut:
+            if len(current) >= minimum:
+                runs.append(current)
+            current = []
+        else:
+            current.append(index)
+    if len(current) >= minimum:
+        runs.append(current)
+    return runs
+
+
+# A break between two subpaths of one `d`. Kept inside the point tuple rather
+# than beside it so every existing consumer of `outline` / `left` / `right`
+# keeps its shape; the path builders below are the only readers.
+_BREAK = (float("nan"), float("nan"))
+
+
+def _is_break(point: tuple[float, float]) -> bool:
+    return point[0] != point[0]
+
+
 def synthesize_stroke(
     start: tuple[float, float],
     end: tuple[float, float],
@@ -236,11 +390,15 @@ def synthesize_stroke(
     *,
     wild: bool = False,
     grid_step: float = 0.0,
+    support: Support = DEFAULT_SUPPORT,
 ) -> StrokeResult:
     """Synthesize one straight stroke.
 
     `grid_step` is the side of one lattice cell in px, already resolved against
     the canvas by the caller. Zero means the tool does not quantize.
+
+    `support` is the sheet being worked on. It is one constant by default; a
+    work that names its own ground swaps it here.
     """
     grammar = GRAMMARS[weight]
     dx, dy = end[0] - start[0], end[1] - start[1]
@@ -338,25 +496,83 @@ def synthesize_stroke(
     result[-1] = StrokeSample(
         1.0, end[0], end[1], result[-1].width, result[-1].energy, 0.0, None
     )
-    left = [(p.x + nx * p.width / 2, p.y + ny * p.width / 2) for p in result]
-    right = [(p.x - nx * p.width / 2, p.y - ny * p.width / 2) for p in reversed(result)]
+    # Meet the sheet last, so the tool grammar is what arrives at the paper.
+    widths, cuts = _support_response(
+        [p.width for p in result], weight, seed, support
+    )
+    result = [
+        StrokeSample(p.t, p.x, p.y, w, p.energy, p.lateral, p.event, p.residual)
+        for p, w in zip(result, widths)
+    ]
+    if any(cuts):
+        outline: list[tuple[float, float]] = []
+        for run in _cut_runs(cuts, minimum=2):
+            if outline:
+                outline.append(_BREAK)
+            outline.extend(
+                (result[i].x + nx * result[i].width / 2, result[i].y + ny * result[i].width / 2)
+                for i in run
+            )
+            outline.extend(
+                (result[i].x - nx * result[i].width / 2, result[i].y - ny * result[i].width / 2)
+                for i in reversed(run)
+            )
+    else:
+        left = [(p.x + nx * p.width / 2, p.y + ny * p.width / 2) for p in result]
+        right = [
+            (p.x - nx * p.width / 2, p.y - ny * p.width / 2) for p in reversed(result)
+        ]
+        outline = left + right
     side = -1 if _unit(seed, "burr-side", 0) < 0.5 else 1
     slow_energy = sum(p.energy for p in result) / len(result)
     burr_opacity = 0.15 + 0.12 * (1 - slow_energy) + 0.08 * _unit(seed, "burr-ink", 0)
     return StrokeResult(
         tuple(result),
-        tuple(left + right),
+        tuple(outline),
         len(events),
         side,
         min(0.35, burr_opacity),
         grid_step,
+        tuple(cuts),
     )
 
 
+def _closed_subpath(points) -> str:
+    return "M " + " L ".join(f"{fmt(x)} {fmt(y)}" for x, y in points) + " Z"
+
+
+def _split_at_breaks(
+    points: tuple[tuple[float, float], ...], minimum: int
+) -> list[list[tuple[float, float]]]:
+    runs: list[list[tuple[float, float]]] = []
+    current: list[tuple[float, float]] = []
+    for point in points:
+        if _is_break(point):
+            if len(current) >= minimum:
+                runs.append(current)
+            current = []
+        else:
+            current.append(point)
+    if len(current) >= minimum:
+        runs.append(current)
+    return runs
+
+
 def polygon_path(points: tuple[tuple[float, float], ...]) -> str:
+    """One `d` for one stroke, however many runs the sheet left it in.
+
+    Where the ground refused the tool the outline carries a break, and the ink
+    on either side becomes a separate subpath. Several subpaths inside one `d`
+    are still ONE element (`ring_path` already relies on this), so cutting the
+    ink never adds an element to the drawing.
+    """
     if not points:
         return ""
-    return "M " + " L ".join(f"{fmt(x)} {fmt(y)}" for x, y in points) + " Z"
+    if any(_is_break(point) for point in points):
+        return " ".join(
+            _closed_subpath(run) for run in _split_at_breaks(points, 3)
+        ).strip()
+    return _closed_subpath(points)
 
 
 def ring_path(
@@ -368,8 +584,18 @@ def ring_path(
 
 def contour_stroke_path(result: ContourStrokeResult) -> str:
     if result.closed:
+        # A closed band keeps its even-odd ring: cutting it would open the
+        # figure rather than leave bare paper inside the line.
         return ring_path(result.left, result.right)
-    return polygon_path(result.left + tuple(reversed(result.right)))
+    if not any(_is_break(point) for point in result.left):
+        return polygon_path(result.left + tuple(reversed(result.right)))
+    left_runs = _split_at_breaks(result.left, 2)
+    right_runs = _split_at_breaks(result.right, 2)
+    # Both banks are cut at the same samples, so the runs pair up.
+    return " ".join(
+        _closed_subpath(left_run + list(reversed(right_run)))
+        for left_run, right_run in zip(left_runs, right_runs)
+    ).strip()
 
 
 def centerline_normals(
@@ -410,13 +636,28 @@ def _arc_length_parameters(
 
 
 def outline_for_centerline(
-    points: list[tuple[float, float]], widths: list[float]
+    points: list[tuple[float, float]],
+    widths: list[float],
+    cuts: Sequence[bool] = (),
 ) -> tuple[tuple[float, float], ...]:
-    """Build one variable-width polygon around an arbitrary intended centerline."""
+    """Build one variable-width polygon around an arbitrary intended centerline.
+
+    `cuts` marks the samples where the sheet refused the tool. Rebuilding the
+    outline around a centerline the caller varied would otherwise drop those
+    breaks and leave the ink whole, so the runs are carried over here too.
+    """
     if len(points) < 2:
         return tuple(points)
     left, right = _banks_for_centerline(points, widths, closed=False)
-    return tuple(list(left) + list(reversed(right)))
+    if not any(cuts):
+        return tuple(list(left) + list(reversed(right)))
+    outline: list[tuple[float, float]] = []
+    for run in _cut_runs(list(cuts)[: len(left)], minimum=2):
+        if outline:
+            outline.append(_BREAK)
+        outline.extend(left[index] for index in run)
+        outline.extend(right[index] for index in reversed(run))
+    return tuple(outline)
 
 
 def _banks_for_centerline(
@@ -443,6 +684,7 @@ def synthesize_along(
     anchors: frozenset[int] = frozenset(),
     grid_step: float = 0.0,
     wild: bool = False,
+    support: Support = DEFAULT_SUPPORT,
 ) -> ContourStrokeResult:
     """Synthesize one stroke that follows an arbitrary intended centerline.
 
@@ -607,9 +849,23 @@ def synthesize_along(
     elif not anchors and count > 2:
         samples = _closed_seam_correction(samples, points, parameters)
 
+    # Meet the sheet last, so the tool grammar is what arrives at the paper.
+    widths, cuts = _support_response(
+        [sample.width for sample in samples], weight, seed, support
+    )
+    samples = [
+        StrokeSample(s.t, s.x, s.y, w, s.energy, s.lateral, s.event, s.residual)
+        for s, w in zip(samples, widths)
+    ]
     performed = [(sample.x, sample.y) for sample in samples]
-    widths = [sample.width for sample in samples]
     left, right = _banks_for_centerline(performed, widths, closed)
+    if not closed and any(cuts):
+        left = tuple(
+            _BREAK if cut else point for point, cut in zip(left, cuts)
+        )
+        right = tuple(
+            _BREAK if cut else point for point, cut in zip(right, cuts)
+        )
     side = -1 if _unit(seed, "burr-side", 0) < 0.5 else 1
     slow_energy = sum(sample.energy for sample in samples) / len(samples)
     burr_opacity = 0.15 + 0.12 * (1 - slow_energy) + 0.08 * _unit(seed, "burr-ink", 0)

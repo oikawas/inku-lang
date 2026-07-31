@@ -2958,13 +2958,17 @@ private fun ModelChoiceRow(
     selectedValue: String,
     onSelect: (String) -> Unit,
 ) {
-    WrapRow {
-        choices.forEach { choice ->
-            MiniPill(
-                text = "${choice.providerName.take(10)} / ${choice.label.take(18)}",
-                selected = choice.id == selectedValue,
-                onClick = { onSelect(choice.id) },
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        WrapRow {
+            choices.forEach { choice ->
+                val rec = app.inku.mobile.data.model.ModelRecommendations.items.find { it.modelId == choice.id }
+                val badgeText = if (rec != null) " (推奨: S${rec.recommendedStage})" else ""
+                MiniPill(
+                    text = "${choice.providerName.take(10)} / ${choice.label.take(18)}$badgeText",
+                    selected = choice.id == selectedValue,
+                    onClick = { onSelect(choice.id) },
+                )
+            }
         }
     }
 }

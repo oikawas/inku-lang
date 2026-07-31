@@ -6,8 +6,8 @@
   "schema_version": "0.1.0",
   "color_map_digest": "96f2809778344689d8fc1dbab03827b0",
   "frozen_at": "2026-08-01",
-  "commit": "187d84b274a5533db3a7326b745dd9392b90246c",
-  "reason": "The ground began to resist the hand. Until engine 18 the ground and the drawing were composited independently and never met, so a stroke looked the same whether it was laid on paper or on nothing. Every work now has one constant support, and which of its two quantities a tool meets is a property of the tool: a brush is drunk by the sheet and swells, a waxy or hard tool is refused and the ink is cut, leaving bare paper. The cut removes ink rather than narrowing it, because narrowing was measured to be invisible on exactly the tools that get refused. A cut stroke is still one element: the runs are subpaths of the same `d`. 227 of the 493 cases move and 266 do not; rotring and computer are byte-identical because a machine has no contact with paper.",
+  "commit": "fd44d382bb0184962bf814bc32f55a7feedd6555",
+  "reason": "The ground began to resist the hand. Until engine 18 the ground and the drawing were composited independently and never met, so a stroke looked the same whether it was laid on paper or on nothing. Every work now has one constant support, and which of its two quantities a tool meets is a property of the tool: a brush is drunk by the sheet and swells, a waxy or hard tool is refused and the ink is cut, leaving bare paper. The cut removes ink rather than narrowing it, because narrowing was measured to be invisible on exactly the tools that get refused. A cut stroke is still one element: the runs are subpaths of the same `d`. A line the description made waver meets the same sheet: the renderer rebuilds its outline around the varied centerline and carries the cuts across. 227 of the 493 cases move and 266 do not; rotring and computer are byte-identical because a machine has no contact with paper.",
   "changed_from_previous": [
     "A-brush_thick-arc",
     "A-brush_thick-circle",
@@ -7168,8 +7168,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "c73c600dd7aa2e72a5533465148d6c96",
-      "bytes": 10630,
+      "digest": "a379807f216bc3f78e11ebb580845131",
+      "bytes": 10392,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -7650,8 +7650,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "4126976c45e37ce35974d408bbfb9d0c",
-      "bytes": 10626,
+      "digest": "8da891cfab6a6e2b774704a6df238737",
+      "bytes": 10484,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -10060,8 +10060,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "3a7912d572c9f57386ffc5574b752b17",
-      "bytes": 10631,
+      "digest": "a10db433a83248ffbc03f7aadfdb8770",
+      "bytes": 10301,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -11024,8 +11024,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "6f28f08e49803c5806d99e98e6ef8ef3",
-      "bytes": 10633,
+      "digest": "3d66be1340f5a40c729f734f0443e8b4",
+      "bytes": 10349,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -11506,8 +11506,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "078f068b9f8deaaa93638c868b8ae81f",
-      "bytes": 10639,
+      "digest": "60cd170bed23f0d78a7a94caad19b043",
+      "bytes": 10355,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -11988,8 +11988,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "547a608e34aac6fecfee3799bd067e7c",
-      "bytes": 10635,
+      "digest": "783506b60758925f7c5bd3e09f59fb92",
+      "bytes": 10589,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -12470,8 +12470,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "3f1aad66b3b97a7ca5539c5923541c6d",
-      "bytes": 10640,
+      "digest": "bad431e00bbe4f821beed830bffe6c24",
+      "bytes": 10354,
       "counts": {
         "path": 1,
         "polyline": 2,

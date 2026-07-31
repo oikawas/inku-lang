@@ -38,7 +38,9 @@ REASON = (
     "refused and the ink is cut, leaving bare paper. The cut removes ink rather "
     "than narrowing it, because narrowing was measured to be invisible on exactly "
     "the tools that get refused. A cut stroke is still one element: the runs are "
-    "subpaths of the same `d`. 227 of the 493 cases move and 266 do not; rotring "
+    "subpaths of the same `d`. A line the description made waver meets the same "
+    "sheet: the renderer rebuilds its outline around the varied centerline and "
+    "carries the cuts across. 227 of the 493 cases move and 266 do not; rotring "
     "and computer are byte-identical because a machine has no contact with paper."
 )
 SVG_PROFILE = "editable"

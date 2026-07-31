@@ -194,6 +194,7 @@ export const en: LangPack = {
 	tooltipVariationGridSaveSelected: 'Keep the ones you choose — choosing is part of the writing. Saved candidates can be starred and annotated with a note.',
 	tooltipModelCompare: 'Interpret the same description with another Stage 1 model and compare the instructions and the performance side by side.',
 	tooltipDdlAutoRepair: 'Apply deterministic repair to the JSON Score made from the edited instructions, including invisible colors, over-density, and contract violations.',
+	tooltipDdlAutoRepairDetails: 'When Stage 2 converts the instructions into a JSON Score, it applies the following repairs:\n- Makes colors visible against the background\n- Reduces overdense lines, particles, and fills\n- Completes missing shape parameters\n- Organizes duplicate instructions\n- Removes invalid touching and positional relationships\n- Supplies colors and shapes missing from the DDL\n- Completes composition anchors, motion, and rhythm\n- Adds or suppresses staffage (minor accompanying elements) according to the selected amount',
 	tooltipAppRailToggle: 'Expand sidebar / Collapse sidebar',
 	tooltipAppRailLogo: 'About inku-lang',
 	tooltipAppRailUser: 'User profile / Logout',

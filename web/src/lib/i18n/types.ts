@@ -197,6 +197,7 @@ export interface LangPack {
 	tooltipVariationGridSaveSelected: string;
 	tooltipModelCompare: string;
 	tooltipDdlAutoRepair: string;
+	tooltipDdlAutoRepairDetails: string;
 	tooltipAppRailToggle: string;
 	tooltipAppRailLogo: string;
 	tooltipAppRailUser: string;

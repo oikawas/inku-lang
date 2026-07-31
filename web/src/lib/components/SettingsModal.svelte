@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { getMascot, setMascot } from '$lib/mascot.svelte';
+	import Tooltip from './Tooltip.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import { modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
@@ -1547,7 +1548,12 @@
 				</div>
 			</div>
 			<div class="popover-group">
-				<div class="popover-group-label">{t().settingsGenerationLabel}</div>
+				<div class="popover-group-label generation-label">
+					<span>{t().settingsGenerationLabel}</span>
+					<Tooltip placement="bottom-right" wide text={t().tooltipDdlAutoRepairDetails}>
+						<span class="settings-info-mark" aria-hidden="true">i</span>
+					</Tooltip>
+				</div>
 				<label class="setting-toggle" title={t().tooltipDdlAutoRepair}>
 					<input type="checkbox" bind:checked={autoRepairEnabled} />
 					<span>{t().ddlAutoRepairLabel}</span>
@@ -1833,6 +1839,8 @@
 		font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;
 		font-weight: 500; margin-bottom: 7px;
 	}
+	.generation-label { display: flex; align-items: center; gap: 5px; }
+	.settings-info-mark { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border: 1px solid var(--border2); border-radius: 50%; color: var(--fg3); font-size: 9px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 	.model-connections-heading {
 		display: flex;
 		align-items: baseline;

@@ -194,6 +194,7 @@ export const ja: LangPack = {
 	tooltipVariationGridSaveSelected: 'チェックした候補を履歴に保存し、スターと選んだ理由を残せるようにします。',
 	tooltipModelCompare: '同じ記述を別のStage 1モデルでも解釈し、正規化DDLと描画を横並びで見比べます。',
 	tooltipDdlAutoRepair: '指示書から作られたJSON Scoreに、不可視色・過密・契約違反などの決定的な補正を適用します。',
+	tooltipDdlAutoRepairDetails: 'Stage 2からJSONに変換する際に以下の補正を行います\n- 背景と同化する色の可視化\n- 過密な線・粒・塗りの抑制\n- 欠けた形状パラメータの補完\n- 重複した命令の整理\n- 不正な接触・位置関係の除去\n- DDLに書かれた色や形の不足補完\n- 構図の支点、動き、リズムなどの補完\n- 添景量に応じた追加・抑制',
 	tooltipAppRailToggle: 'サイドバーを展開 / 折りたたむ',
 	tooltipAppRailLogo: 'inku-lang について',
 	tooltipAppRailUser: 'ユーザープロフィール / ログアウト',

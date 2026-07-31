@@ -73,7 +73,7 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
 
 * **推敲候補の自動生成**:
   ```sh
-  uv run inku-cli refine generate WORK_ID --kind touch -o ./refinements --png
+  uv run inku-cli refine perform WORK_ID --kind touch -o ./refinements --png
   ```
   `--kind` に `touch` (タッチ), `layout` (構図), `reading` (解釈), `color` (配色カタログ) のいずれかを指定し、別案を生成してサーバーに保存します。`-o` が指定された場合はローカルファイルとしても書き出します。
 * **手動候補の系譜保存**:

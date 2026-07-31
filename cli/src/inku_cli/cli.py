@@ -2912,7 +2912,7 @@ def command_refine(args: argparse.Namespace) -> int:
         config.token,
         timeout_seconds=_resolved_timeout_seconds(args, config),
     )
-    if args.refine_cmd == "generate":
+    if args.refine_cmd in {"perform", "generate"}:
         history_data, _ = client.request("GET", "/api/history", query={"limit": 100})
         items = history_data.get("items", [])
         target = next((item for item in items if item["id"] == args.item_id), None)
@@ -3614,19 +3614,27 @@ def build_parser() -> argparse.ArgumentParser:
     colophon.set_defaults(func=command_colophon)
 
     # refine
-    refine = subparsers.add_parser("refine", help="generate refined options from an existing work")
+    refine = subparsers.add_parser("refine", help="refine an existing work")
     _add_common_server_args(refine)
-    refine_sub = refine.add_subparsers(dest="refine_cmd", required=True)
-    
-    refine_gen = refine_sub.add_parser("generate", help="generate a variation option from a work")
-    refine_gen.add_argument("item_id", help="target history item ID to refine")
-    refine_gen.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
-    refine_gen.add_argument("--description", help="override the description for layout/reading variations")
-    refine_gen.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
-    refine_gen.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
-    refine_gen.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")
-    refine_gen.add_argument("--png", action="store_true", help="generate PNG rendering in output directory")
-    
+    refine_sub = refine.add_subparsers(dest="refine_cmd", required=True, metavar="{perform,save}")
+
+    def add_refine_perform_arguments(command: argparse.ArgumentParser) -> None:
+        command.add_argument("item_id", help="target history item ID to refine")
+        command.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
+        command.add_argument("--description", help="override the description for layout/reading variations")
+        command.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
+        command.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
+        command.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")
+        command.add_argument("--png", action="store_true", help="perform PNG rendering in output directory")
+        command.set_defaults(func=command_refine)
+
+    refine_perform = refine_sub.add_parser("perform", help="perform a refinement from an existing work")
+    add_refine_perform_arguments(refine_perform)
+    refine_generate = refine_sub.add_parser("generate", help=argparse.SUPPRESS)
+    add_refine_perform_arguments(refine_generate)
+    # Keep the parser registered for compatibility but omit it from public help.
+    refine_sub._choices_actions = [action for action in refine_sub._choices_actions if action.dest != "generate"]
+
     refine_save = refine_sub.add_parser("save", help="save a candidate score into history connected to a parent")
     refine_save.add_argument("parent_node_id", help="parent lineage node ID")
     refine_save.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="derivation kind")
@@ -3635,8 +3643,7 @@ def build_parser() -> argparse.ArgumentParser:
     refine_save.add_argument("--input-text", required=True, help="original user text")
     refine_save.add_argument("--ddl-text", help="normalized DDL text")
     refine_save.add_argument("--visibility", choices=("normal", "lineage_only"), default="normal", help="history visibility")
-    
-    refine_gen.set_defaults(func=command_refine)
+
     refine_save.set_defaults(func=command_refine)
 
     # inspect

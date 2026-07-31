@@ -73,7 +73,7 @@ Create or import variations derived from an existing parent work.
 
 * **Make a Variation Option**:
   ```sh
-  uv run inku-cli refine generate WORK_ID --kind touch -o ./refinements --png
+  uv run inku-cli refine perform WORK_ID --kind touch -o ./refinements --png
   ```
   Set `--kind` to `touch` (line texture/bleed), `layout` (composition), `reading` (interpretation), or `color` (catalog). The server generates a variation and attaches it to the parent. Optionally saves SVG/JSON/PNG to the specified directory.
 * **Import a Refinement Score**:

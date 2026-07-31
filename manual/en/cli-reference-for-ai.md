@@ -35,7 +35,7 @@ Create a localized variation of the work and attach it as a child node in the li
 
 ```sh
 # Generate a layout variation for the PARENT_ID (e.g., d5989732-9f3a-4dd2-82df-c49c50761119)
-uv run inku-cli refine generate PARENT_ID --kind layout -o ./test_output --png
+uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **Choosing the `--kind` parameter**:
   * `touch`: Refine only line textures and weights (very fast; no LLM call).
@@ -106,7 +106,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
   * Promotes a hidden intermediate work (`lineage_only` visibility) to standard history.
 
 ### 2. `refine`
-* **`refine generate <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png]`**
+* **`refine perform <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png]`**
   * Generates a variation of the target work and connects it to the parent.
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * Manually imports a Score JSON as a child node connected to a parent.

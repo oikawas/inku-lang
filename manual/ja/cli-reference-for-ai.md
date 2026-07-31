@@ -35,7 +35,7 @@ uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。
 
 ```sh
 # 親ID: PARENT_ID (例: d5989732-9f3a-4dd2-82df-c49c50761119) に対して構図のバリエーションを生成
-uv run inku-cli refine generate PARENT_ID --kind layout -o ./test_output --png
+uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **パラメータ `--kind` の選択基準**:
   * `touch`: 画の質感（筆圧や掠れ）のみを変更したいとき（LLM呼び出しなし / 高速）
@@ -106,7 +106,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
   * 中間ノード（通常履歴に表示されない `lineage_only`）を通常履歴に昇格させます。
 
 ### 2. `refine`
-* **`refine generate <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png]`**
+* **`refine perform <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png]`**
   * ターゲットID of the work from局所変種を自動生成し、系譜を繋いで履歴に保存します。
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * ローカルで編集・生成した Score JSON を、任意の親ノードに接続する子ノードとして直接インポートします。

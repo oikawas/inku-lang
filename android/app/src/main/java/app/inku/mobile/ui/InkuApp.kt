@@ -70,6 +70,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -1174,13 +1179,24 @@ private fun CanvasHeroCard(
                     ) {
                         item?.let {
                             MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
-                            MiniPill(
-                                text = "F${it.renderHashShort}",
-                                onClick = {
-                                    clipboard.setText(AnnotatedString(it.renderHashShort))
-                                    canvasMessage = "Hash copied."
+                            @OptIn(ExperimentalMaterial3Api::class)
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                tooltip = {
+                                    PlainTooltip {
+                                        Text("作品の来歴ハッシュ")
+                                    }
                                 },
-                            )
+                                state = rememberTooltipState(),
+                            ) {
+                                MiniPill(
+                                    text = "F${it.renderHashShort}",
+                                    onClick = {
+                                        clipboard.setText(AnnotatedString(it.renderHashShort))
+                                        canvasMessage = "Hash copied."
+                                    },
+                                )
+                            }
                         }
                     }
                     Row(
@@ -4800,4 +4816,25 @@ private fun hash01(index: Int, seed: String): Double {
     val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$index".toByteArray())
     val raw = ((digest[0].toInt() and 0xff) shl 24) or ((digest[1].toInt() and 0xff) shl 16) or ((digest[2].toInt() and 0xff) shl 8) or (digest[3].toInt() and 0xff)
     return (raw.toLong() and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ProvenanceTooltipTarget(
+    tooltipText: String,
+    contentLabel: String,
+    onContentClick: () -> Unit = {},
+) {
+    val state = rememberTooltipState()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(tooltipText)
+            }
+        },
+        state = state,
+    ) {
+        MiniPill(text = contentLabel, onClick = onContentClick)
+    }
 }

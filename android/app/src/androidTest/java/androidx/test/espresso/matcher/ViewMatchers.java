@@ -12,12 +12,16 @@ public final class ViewMatchers {
         return new BaseMatcher<View>() {
             @Override
             public boolean matches(Object item) {
-                return true;
+                if (item instanceof View) {
+                    View view = (View) item;
+                    return view.isShown() && view.getGlobalVisibleRect(new android.graphics.Rect());
+                }
+                return false;
             }
 
             @Override
             public void describeTo(Description description) {
-                description.appendText("is displayed");
+                description.appendText("is displayed on screen");
             }
         };
     }

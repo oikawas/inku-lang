@@ -136,7 +136,12 @@ def test_score_schema_enums_match_get_args() -> None:
 
 def test_color_resolution_hex_matches_catalogs() -> None:
     color = _ref()["color_resolution"]
-    assert color["core_keys"] == list(COLOR_KEYS)
+    # Spelled out rather than compared against COLOR_KEYS: the reference dump is
+    # what a port reads, so the nine words have to be pinned by value. Comparing
+    # the dump with the constant it was built from passes at any length.
+    assert color["core_keys"] == [
+        "white", "black", "gray", "red", "orange", "yellow", "green", "blue", "purple",
+    ]
     assert len(color["catalogs"]) == len(COLOR_CATALOGS)
     source = {catalog["id"]: catalog["map"] for catalog in color_catalogs()}
     for catalog in color["catalogs"]:

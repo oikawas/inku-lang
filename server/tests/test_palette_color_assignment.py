@@ -45,16 +45,52 @@ def test_every_catalog_assigns_distinct_achromatic_roles(catalog: dict) -> None:
     assert len({assignment[color].lower() for color in ("black", "gray", "white")}) == 3
 
 
-def test_desert_mineral_does_not_collapse_achromatic_roles() -> None:
-    assignment = _work_color_assignment(
-        _catalog_map("desert_mineral"), 12345, "desert_mineral"
-    )
+# Every shipped catalog now carries exactly three achromatic colors, so no real
+# catalog can exercise the anti-collapse rule any more -- the witness for it has
+# to be built here or the rule goes untested. `desert_mineral`, which used to be
+# that witness, was retired with engine 18.
+SPARSE_ACHROMATIC_CATALOG = {
+    "map": {
+        "black": "#101010",
+        "gray": "#7a7a7a",
+        "white": "#f7f7f7",
+        "red": "#b03a2e",
+        "orange": "#b9671e",
+        "yellow": "#b8901f",
+        "green": "#2f6b3a",
+        "blue": "#2c3e91",
+        "purple": "#6a4d94",
+    },
+    # One achromatic entry, and it matches none of the three map values.
+    "palette": {
+        "Single Ash": "#3d3d3d",
+        "Only Red": "#b03a2e",
+        "Only Blue": "#2c3e91",
+    },
+}
 
+
+def _sparse_achromatic_map() -> dict[str, str]:
+    catalog = SPARSE_ACHROMATIC_CATALOG
+    cmap = {**COLOR_MAP, **catalog["map"]}
+    for name, code in catalog["palette"].items():
+        cmap[f"palette:{name}"] = code
+    return cmap
+
+
+def test_a_single_achromatic_palette_color_does_not_collapse_the_three_roles() -> None:
+    cmap = _sparse_achromatic_map()
+
+    assignment = _work_color_assignment(cmap, 12345, "sparse_achromatic")
+
+    # The one palette ash goes to the nearest role by lightness; the other two
+    # keep the catalog's own map values instead of repeating it.
     assert {color: assignment[color] for color in ("black", "gray", "white")} == {
-        "black": "#1c1b18",
-        "gray": "#8f8878",
-        "white": "#f1e4c8",
+        "black": "#3d3d3d",
+        "gray": "#7a7a7a",
+        "white": "#f7f7f7",
     }
+    assert len({assignment[color] for color in ("black", "gray", "white")}) == 3
 
 
 def test_hint_matching_uses_ascii_words_and_cjk_substrings() -> None:

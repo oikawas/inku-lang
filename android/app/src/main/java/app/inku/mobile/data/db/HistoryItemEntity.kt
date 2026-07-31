@@ -62,4 +62,6 @@ data class HistoryItemEntity(
     val thumbnailHeight: Int? = null,
     @ColumnInfo(name = "render_wild")
     val renderWild: Boolean? = null,
+    @ColumnInfo(name = "lineage_node_id")
+    val lineageNodeId: String? = null,
 )

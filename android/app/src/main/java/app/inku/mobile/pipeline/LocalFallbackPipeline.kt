@@ -40,7 +40,7 @@ class LocalFallbackPipeline(
             interpretText(request.description)
         }
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(normalizedDdl, request.originalText)
+            expandIntermediateDdl(normalizedDdl, request.originalText, request.tenkei)
         } else {
             normalizedDdl
         }
@@ -54,7 +54,7 @@ class LocalFallbackPipeline(
 
     suspend fun composeFromDdl(ddl: String, request: PaintRequest): PaintResult {
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(ddl, request.originalText)
+            expandIntermediateDdl(ddl, request.originalText, request.tenkei)
         } else {
             ddl
         }
@@ -310,8 +310,8 @@ class LocalFallbackPipeline(
         return ensurePlacement(cleaned)
     }
 
-    private fun expandIntermediateDdl(ddl: String, originalText: String): String {
-        return WebDdlExpander.expandIntermediateDdl(ddl, contextText = originalText)
+    private fun expandIntermediateDdl(ddl: String, originalText: String, tenkei: String = "auto"): String {
+        return WebDdlExpander.expandIntermediateDdl(ddl, contextText = originalText, tenkei = tenkei)
     }
 
     private fun fallbackDdlFromText(text: String): String {

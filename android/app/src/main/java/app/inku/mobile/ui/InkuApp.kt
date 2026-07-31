@@ -58,9 +58,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -70,6 +72,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -127,6 +134,7 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.testTag
 import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -1098,8 +1106,25 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             BatchPanel(state, viewModel)
             CanvasHeroCard(state, viewModel)
         } else {
-            CanvasHeroCard(state, viewModel)
-            DrawPanel(state, viewModel)
+            // The display mode decides how much surrounds the canvas; the mascot
+            // and the condition strip only appear in the full mode.
+            UiModeContainer(
+                uiMode = state.uiMode,
+                simpleContent = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CanvasHeroCard(state, viewModel)
+                        DrawPanel(state, viewModel)
+                    }
+                },
+                fullContent = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MascotWidget(mascotKind = state.mascotKind)
+                        ConditionChips(state, viewModel)
+                        CanvasHeroCard(state, viewModel)
+                        DrawPanel(state, viewModel)
+                    }
+                },
+            )
         }
         Spacer(Modifier.height(96.dp))
     }
@@ -1174,9 +1199,10 @@ private fun CanvasHeroCard(
                     ) {
                         item?.let {
                             MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
-                            MiniPill(
-                                text = "F${it.renderHashShort}",
-                                onClick = {
+                            ProvenanceTooltipTarget(
+                                tooltipText = "作品の来歴ハッシュ",
+                                contentLabel = "F${it.renderHashShort}",
+                                onContentClick = {
                                     clipboard.setText(AnnotatedString(it.renderHashShort))
                                     canvasMessage = "Hash copied."
                                 },
@@ -1552,6 +1578,10 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             modifier = Modifier.fillMaxWidth(),
             minLines = 5,
             maxLines = 8,
+        )
+        TenkeiSelect(
+            selected = state.selectedTenkei,
+            onSelect = viewModel::setSelectedTenkei,
         )
         DrawingActionButton(
             idleText = "▶  描画する",
@@ -2141,6 +2171,18 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
+        SettingsCard("表示モード", "UIの表示密度・構成", state.uiMode) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipButton("フルモード", selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })
+                ChipButton("シンプルモード", selected = state.uiMode == "simple", onClick = { viewModel.setUiMode("simple") })
+            }
+        }
+        SettingsCard("マスコット選択", "Incu (立方体) または Yuragi (蟹)", state.mascotKind) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipButton("Incu (立方体)", selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
+                ChipButton("Yuragi (蟹)", selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
+            }
+        }
         SettingsCard("マスコット", "Web版の表示設定", "保存済み") {
             SettingCheckRow(state.showKiwi, "進行表示のKiwi", viewModel::setShowKiwi)
             SettingCheckRow(state.showCrab, "バッチ表示のCrab", viewModel::setShowCrab)
@@ -2162,7 +2204,7 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
 }
 
 @Composable
-private fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -2928,13 +2970,17 @@ private fun ModelChoiceRow(
     selectedValue: String,
     onSelect: (String) -> Unit,
 ) {
-    WrapRow {
-        choices.forEach { choice ->
-            MiniPill(
-                text = "${choice.providerName.take(10)} / ${choice.label.take(18)}",
-                selected = choice.id == selectedValue,
-                onClick = { onSelect(choice.id) },
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        WrapRow {
+            choices.forEach { choice ->
+                val rec = app.inku.mobile.data.model.ModelRecommendations.items.find { it.modelId == choice.id }
+                val badgeText = if (rec != null) " (推奨: S${rec.recommendedStage})" else ""
+                MiniPill(
+                    text = "${choice.providerName.take(10)} / ${choice.label.take(18)}$badgeText",
+                    selected = choice.id == selectedValue,
+                    onClick = { onSelect(choice.id) },
+                )
+            }
         }
     }
 }
@@ -4800,4 +4846,110 @@ private fun hash01(index: Int, seed: String): Double {
     val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$index".toByteArray())
     val raw = ((digest[0].toInt() and 0xff) shl 24) or ((digest[1].toInt() and 0xff) shl 16) or ((digest[2].toInt() and 0xff) shl 8) or (digest[3].toInt() and 0xff)
     return (raw.toLong() and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ProvenanceTooltipTarget(
+    tooltipText: String,
+    contentLabel: String,
+    onContentClick: () -> Unit = {},
+) {
+    val state = rememberTooltipState()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(tooltipText)
+            }
+        },
+        state = state,
+    ) {
+        MiniPill(text = contentLabel, onClick = onContentClick)
+    }
+}
+
+@Composable
+internal fun UiModeContainer(
+    uiMode: String,
+    modifier: Modifier = Modifier,
+    fullContent: @Composable () -> Unit = { Text("フルモード表示") },
+    simpleContent: @Composable () -> Unit = { Text("シンプルモード表示") },
+) {
+    Box(modifier = modifier) {
+        if (uiMode == "simple") {
+            simpleContent()
+        } else {
+            fullContent()
+        }
+    }
+}
+
+@Composable
+internal fun MascotWidget(
+    mascotKind: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.padding(4.dp)) {
+        if (mascotKind == "yuragi") {
+            YuragiMascotView()
+        } else {
+            IncuMascotView()
+        }
+    }
+}
+
+@Composable
+internal fun IncuMascotView(modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(6.dp),
+    ) {
+        Text("🧊", style = MaterialTheme.typography.bodyMedium)
+        Text("Incu (立方体)", style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+internal fun YuragiMascotView(modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(6.dp),
+    ) {
+        Text("🦀", style = MaterialTheme.typography.bodyMedium)
+        Text("Yuragi (蟹)", style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+internal fun TenkeiSelect(
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "添景選択",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("tenkei_select_row"),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            app.inku.mobile.data.model.TenkeiOptions.forEach { item ->
+                val isSelected = item.id == selected
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelect(item.id) },
+                    label = { Text(item.labelJa) },
+                    modifier = Modifier.testTag("tenkei_chip_${item.id}"),
+                )
+            }
+        }
+    }
 }

@@ -16,8 +16,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ColorCatalogEntity::class,
         PluginSettingEntity::class,
         ExportTemplateEntity::class,
+        LineageNodeEntity::class,
+        LineageEdgeEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -28,18 +30,17 @@ abstract class InkuDatabase : RoomDatabase() {
     abstract fun colorCatalogDao(): ColorCatalogDao
     abstract fun pluginSettingDao(): PluginSettingDao
     abstract fun exportTemplateDao(): ExportTemplateDao
+    abstract fun lineageDao(): LineageDao
 
     companion object {
         private const val DB_NAME = "inku.sqlite"
 
         fun open(context: Context): InkuDatabase {
-            // Do not use destructive migration. History, provider settings, and encrypted API keys
-            // are user data; schema changes must add explicit Room migrations.
             return Room.databaseBuilder(
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -60,6 +61,35 @@ abstract class InkuDatabase : RoomDatabase() {
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE history_items ADD COLUMN render_wild INTEGER")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history_items ADD COLUMN lineage_node_id TEXT")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `lineage_nodes` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `history_id` TEXT,
+                        `state` TEXT NOT NULL,
+                        `description_hash` TEXT,
+                        `render_hash` TEXT,
+                        `at` INTEGER NOT NULL,
+                        `deleted_at` INTEGER,
+                        `root_node_id` TEXT
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `lineage_edges` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `parent_node_id` TEXT NOT NULL,
+                        `child_node_id` TEXT NOT NULL,
+                        `derivation_kind` TEXT NOT NULL,
+                        `metadata_json` TEXT NOT NULL DEFAULT '{}',
+                        `at` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `uq_lineage_primary_parent` ON `lineage_edges` (`child_node_id`)")
             }
         }
     }

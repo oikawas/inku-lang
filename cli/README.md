@@ -636,11 +636,11 @@ options:
 ```
 usage: inku-cli refine [-h] [--base-url BASE_URL]
                        [--timeout-seconds TIMEOUT_SECONDS]
-                       {generate,save} ...
+                       {perform,save} ...
 
 positional arguments:
-  {generate,save}
-    generate            generate a variation option from a work
+  {perform,save}
+    perform             perform a refinement from an existing work
     save                save a candidate score into history connected to a
                         parent
 
@@ -652,11 +652,11 @@ options:
 
 ```
 
-### `inku-cli refine generate`
+### `inku-cli refine perform`
 
 ```
-usage: inku-cli refine generate [-h] --kind {touch,layout,reading,color}
-                                [--text TEXT] [--save-history] [--no-save]
+usage: inku-cli refine perform [-h] --kind {touch,layout,reading,color}
+                               [--description DESCRIPTION] [--save-history] [--no-save]
                                 [-o OUT_DIR] [--png]
                                 item_id
 
@@ -667,12 +667,13 @@ options:
   -h, --help            show this help message and exit
   --kind {touch,layout,reading,color}
                         refinement element type
-  --text TEXT           override input text for layout/reading variations
+  --description DESCRIPTION
+                        override the description for layout/reading variations
   --save-history        automatically save the result to history
   --no-save             do not save the result to history
   -o OUT_DIR, --out-dir OUT_DIR
                         save outputs (svg/json) to this directory
-  --png                 generate PNG rendering in output directory
+  --png                 perform PNG rendering in output directory
 
 ```
 

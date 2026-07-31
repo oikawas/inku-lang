@@ -306,6 +306,7 @@ def test_models_command_accepts_providers():
 
 
 def test_the_colophon_subcommand_replaced_okugaki_outright():
+
     """奥書のサブコマンドは `colophon`。**ローマ字は残していない。**
 
     辞書 (`web/src/lib/i18n/GLOSSARY.md`) が 奥書 = colophon と定めており、
@@ -319,6 +320,7 @@ def test_the_colophon_subcommand_replaced_okugaki_outright():
 
 
 def test_the_staffage_flag_replaced_tenkei_outright():
+
     """添景の旗は `--staffage`。**ローマ字は残していない。**
 
     辞書 (`web/src/lib/i18n/GLOSSARY.md`) が 添景 = staffage と定めており、web は
@@ -1358,3 +1360,53 @@ def test_no_warning_when_resvg_is_present(tmp_path, monkeypatch, capsys):
     cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="quiet", png=True)
 
     assert capsys.readouterr().err == ""
+
+def test_refine_perform_replaces_generate_but_keeps_the_legacy_spelling(monkeypatch):
+    """`perform` is public; `generate` remains parseable without appearing in help."""
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            if method == "GET":
+                return {
+                    "items": [
+                        {
+                            "id": "work-1",
+                            "lineage_node_id": "node-1",
+                            "source_text": "a small black circle",
+                            "render_seed": 1,
+                            "composition_seed": 2,
+                            "interpretation_seed": "seed",
+                            "render_color_catalog_id": "default",
+                        }
+                    ]
+                }, None
+            return {"svg": "<svg />", "render_hash_short": "ABCD"}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    parser = cli.build_parser()
+    public = parser.parse_args(["refine", "perform", "work-1", "--kind", "color"])
+    legacy = parser.parse_args(["refine", "generate", "work-1", "--kind", "color"])
+
+    assert public.refine_cmd == "perform"
+    assert legacy.refine_cmd == "generate"
+    assert cli.command_refine(public) == 0
+    assert cli.command_refine(legacy) == 0
+
+    posted = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
+    assert len(posted) == 2
+    assert posted[0] == posted[1]
+
+    refine = next(
+        action.choices["refine"]
+        for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
+    help_text = refine.format_help()
+    assert "perform" in help_text
+    assert "generate" not in help_text

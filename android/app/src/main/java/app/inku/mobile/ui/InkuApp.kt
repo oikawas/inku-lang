@@ -2157,6 +2157,18 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
+        SettingsCard("表示モード", "UIの表示密度・構成", state.uiMode) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipButton("フルモード", selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })
+                ChipButton("シンプルモード", selected = state.uiMode == "simple", onClick = { viewModel.setUiMode("simple") })
+            }
+        }
+        SettingsCard("マスコット選択", "Incu (立方体) または Yuragi (蟹)", state.mascotKind) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipButton("Incu (立方体)", selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
+                ChipButton("Yuragi (蟹)", selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
+            }
+        }
         SettingsCard("マスコット", "Web版の表示設定", "保存済み") {
             SettingCheckRow(state.showKiwi, "進行表示のKiwi", viewModel::setShowKiwi)
             SettingCheckRow(state.showCrab, "バッチ表示のCrab", viewModel::setShowCrab)
@@ -4836,5 +4848,59 @@ internal fun ProvenanceTooltipTarget(
         state = state,
     ) {
         MiniPill(text = contentLabel, onClick = onContentClick)
+    }
+}
+
+@Composable
+internal fun UiModeContainer(
+    uiMode: String,
+    modifier: Modifier = Modifier,
+    fullContent: @Composable () -> Unit = { Text("フルモード表示") },
+    simpleContent: @Composable () -> Unit = { Text("シンプルモード表示") },
+) {
+    Box(modifier = modifier) {
+        if (uiMode == "simple") {
+            simpleContent()
+        } else {
+            fullContent()
+        }
+    }
+}
+
+@Composable
+internal fun MascotWidget(
+    mascotKind: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.padding(4.dp)) {
+        if (mascotKind == "yuragi") {
+            YuragiMascotView()
+        } else {
+            IncuMascotView()
+        }
+    }
+}
+
+@Composable
+internal fun IncuMascotView(modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(6.dp),
+    ) {
+        Text("🧊", style = MaterialTheme.typography.bodyMedium)
+        Text("Incu (立方体)", style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+internal fun YuragiMascotView(modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(6.dp),
+    ) {
+        Text("🦀", style = MaterialTheme.typography.bodyMedium)
+        Text("Yuragi (蟹)", style = MaterialTheme.typography.labelMedium)
     }
 }

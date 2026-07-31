@@ -98,6 +98,8 @@ data class InkuUiState(
     val settingsPane: SettingsPane = SettingsPane.Home,
     val composeMode: ComposeMode = ComposeMode.Write,
     val renderTab: RenderTab = RenderTab.Artwork,
+    val uiMode: String = "full",
+    val mascotKind: String = "incu",
     val canvasZoom: Float = 1.0f,
     val canvasPanX: Float = 0f,
     val canvasPanY: Float = 0f,
@@ -531,6 +533,18 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun setLiteRtStage1PromptOptimization(enabled: Boolean) {
         localState.value = localState.value.copy(litertStage1PromptOptimization = enabled, message = null)
         persistSetting("litert_stage1_prompt_optimization", JSONObject().put("enabled", enabled).toString())
+    }
+
+    fun setUiMode(mode: String) {
+        val normalized = if (mode == "simple") "simple" else "full"
+        localState.value = localState.value.copy(uiMode = normalized, message = null)
+        persistSetting("ui_mode", JSONObject().put("value", normalized).toString())
+    }
+
+    fun setMascotKind(kind: String) {
+        val normalized = if (kind == "yuragi") "yuragi" else "incu"
+        localState.value = localState.value.copy(mascotKind = normalized, message = null)
+        persistSetting("mascot_kind", JSONObject().put("value", normalized).toString())
     }
 
     fun toggleSaijiki() {
@@ -1164,6 +1178,8 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val ddlAutoRepair = settings["ddl_auto_repair"]?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
         val litertPromptOptimization = settings["litert_stage1_prompt_optimization"]?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
+        val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
+        val mascotKind = settings["mascot_kind"]?.let { JSONObject(it).optString("value", current.mascotKind) } ?: current.mascotKind
         val batchRandom = settings["batch_random_color_catalog"]?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
@@ -1188,6 +1204,8 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             historySelectionCatalog = histCatalog,
             ddlAutoRepairEnabled = ddlAutoRepair,
             litertStage1PromptOptimization = litertPromptOptimization,
+            uiMode = uiMode,
+            mascotKind = mascotKind,
             batchRandomColorCatalog = batchRandom,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),

@@ -2,6 +2,7 @@ package app.inku.mobile.render
 
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.ColorCatalogs
+import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.RenderRequest
 import app.inku.mobile.pipeline.ServerScoreCompat
 import java.security.MessageDigest
@@ -80,8 +81,8 @@ class DefaultSvgRenderer : SvgRenderer {
         }
         val svg = applyMasterGrid(rawSvg)
         val metadata = JSONObject()
-            .put("render_engine_id", "default")
-            .put("render_engine_version", "16")
+            .put("render_engine_id", CompatibilityConstants.renderEngineId)
+            .put("render_engine_version", CompatibilityConstants.renderEngineVersion)
             .put("render_canvas_aspect", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_id", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_ratio", CanvasAspects.ratioFor(request.canvasAspect))

@@ -2,7 +2,7 @@ package app.inku.mobile.data.model
 
 object CompatibilityConstants {
     const val renderEngineId = "default"
-    const val renderEngineVersion = "1"
+    const val renderEngineVersion = "16"
     const val renderColorProfileId = "srgb"
     const val defaultColorCatalogId = "default"
     const val defaultCanvasAspect = "square"

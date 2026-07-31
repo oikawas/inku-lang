@@ -96,9 +96,10 @@ const RESTRICTED = [
 		texts: [],
 	},
 	{
-		// The romaji gloss is allowed once, in the vocabulary dialog that teaches the term.
+		// No English string glosses the romaji any more: the vocabulary dialog dropped
+		// its headnote row in Build 793-796, so the word is restricted without exception.
 		word: 'kotobagaki', re: /\bkotobagaki\b/i, instead: 'use "headnote"',
-		keys: ['appInfoVocabRows'],
+		keys: [],
 		texts: [],
 	},
 	{

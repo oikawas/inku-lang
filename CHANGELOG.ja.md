@@ -1431,3 +1431,82 @@ pytest **1775/31**（+4）、cli 76、ruff clean、`npm run check` **220/0/2**�
 - **`renderer.py`**・`_oklch_from_hex`・確定案の色と名前と並び
 
 pytest **1847/31**（+72 = 新設 `test_color_catalog_content.py` の 68 ＋ カタログが 11 → 13 になったパラメタ化 `test_abstract_color_vocabulary.py` +2 と `test_palette_color_assignment.py` +2）、cli 76、ruff clean、`npm run check` **220/0/2**、`lint:i18n` **934/47/0/0**、凍結コーパスは再生成バイト一致。**版数は patch** — engine の版上げであり、保存済みデータの形式は変わらない。
+
+### v2.9.15 — 四桁で作品を引き、画面の手触りが揃う（Build 801、2026-08-01）
+
+独立した 7 枝（Build 791〜800）を統合した版で、**台帳の 4 項目が閉じた**（[I-049] / [I-050] / [I-058] / [I-071]）。
+
+#### 履歴を四桁で引く（[I-071]・Build 798）
+
+作品パネルが表示している **render hash の下位 4 桁**で作品を引けるようにした。適用は 3 経路
+（`/api/history`・`/api/history/lineage-groups`・`/api/history/lineage-groups/{root}/items`）。
+
+- **ASCII 英数字ちょうど 4 文字のときだけ** hash の照合を足す。大文字小文字は区別しない
+- 従来の検索（記述・DDL・Stage 1/2 model・catalog ID）は **4 文字でもそのまま効く**。hash は OR で足される
+- **3 文字・5 文字・記号入りは hash 検索に入らない**
+- **この形のときだけ FTS を迂回する** — `_use_history_fts` は 3 文字以上で FTS を使うので、
+  迂回しないと hash 列を見ない索引に当たって 0 件になる
+- 検索ラベルは日本語 `検索（記述 / ハッシュ値下位4桁）:` / 英語 `Search (description / last 4 hash characters):`
+- 3 経路が持っていた**同じ 5 条件の OR が 3 箇所に複製されていた**ので `_history_search_clause` 1 本へ畳んだ
+
+#### 併記ラベルが lint の視界に入る（[I-058]・Build 797）
+
+`lint:i18n` に**第 4 経路**を足した。`en.ts` の値・`isJapanese ? …` の三項・`getLang() === 'ja'` の分岐に加え、
+**コンポーネントのマークアップに直接書かれた `日本語 / English` 形のテキストノード**から英語側を抽出する。
+
+- **この経路が運ぶのは 17 件**（実測: 経路を外すと 949 → **932**）
+- モデル情報カード・モデル選択カード・設定画面が対象
+- `isJapanese ? '状態 / Status' : 'Status'` の 2 箇所を `状態 / Status` へ統一した ＝
+  **英語 UI に日本語が出る箇所が 2 つ増えた**（同じカードの他の 15 箇所は前から無条件併記だった）
+
+#### 設定の数字に手がかかる（[I-050]・Build 799）
+
+`NumberStepper.svelte` を新設し、DB バックアップ設定の 4 欄（保存間隔 1–365 日 / 最大保存世代数 1–100 /
+時 0–23 / 分 0–59）へ **自前の −/+ ボタン**を置いた。**Firefox には `::-webkit-inner-spin-button` に当たる
+CSS フックが無い**ので native spinner をやめた、という [I-050] の前提どおりの解である。
+ボタンの寸法は `--btn-sm-padding` / `--btn-sm-radius` / `--btn-sm-font-size` を使う。
+値は上下限へ clamp し、上下限では対応するボタンが disabled になる。直接入力とキーボード操作は残る。
+
+#### 同じ動作に当たっていた 2 つの語（[I-049]・Build 800）
+
+`settingsReloadSettings` を `settingsReload` と同じ表示へ揃えた（日本語 `設定再読み込み` → `表示更新`、
+英語 `Reload settings` → `Refresh`）。**キー・クリック処理・取得 API は不変**で、動くのは表示文字列だけ。
+
+#### Info モーダル（Build 793〜796）と、そのほか
+
+- **題は `inku-lang` から `inku` へ**。フォントを 18px → 24px にし、左に 32px の Incu アイコン
+  （`/favicon-192.png`。既存の静的資産で、animation は持たない）を置いた。横幅 520px → **780px**
+- コンセプト本文と制作者説明を**作者指定の日英文**へ差し替え、作者名を日英共通の
+  `及川 信一郎 (Shinichiro Oikawa)` にした。「用語と層」の前置きは「inku の UI で使われている代表的な用語。」へ
+- **語彙表から「詞書」と「読み取り」の 2 行を落とした**。これで英語表示に `kotobagaki` が 1 件も無くなったので、
+  **`GLOSSARY.md` と `i18n-lint.mjs` が持っていたその例外を外した**（受け入れ側で実施）
+- 作者指定文が `image` を使うため、**`appInfoConceptBody` を `image` の例外へ足した**（辞書に理由つきで記載）
+- **ユーザープラグインの ON/OFF スイッチを行の右端へ**（Build 791）。動作・保存 API は不変
+- **ダークテーマでスターが常に消灯して見えた**（Build 792）。`:global(html[data-theme='dark']) .hash-row-star` が
+  `.hash-row-star.starred` より詳細度で勝っていたためで、`:not(.starred)` を足して解いた。
+  同じ規則の `font-size: 10px` は `var(--btn-sm-font-size)` へ寄せた（**11px になるので星はわずかに大きくなる**）
+
+#### 受け入れ
+
+**決め手は SHA-256 だった** — 7 枝を順に `--no-ff` で入れると衝突は **`web/BUILD_NUMBER` の 6 回だけ**で、
+`SettingsModal.svelte`（791 + 799）・`en.ts` / `ja.ts`（793–796 + 798 + 800）・`i18n-lint.mjs`（793–796 + 797）は
+すべて自動合成された。その合成結果が、**作者が目視し pentala が Build 800 で稼働させている木と
+11 ファイル中 9 件で完全一致**した。残る 2 件は **`+page.svelte` の `APP_VERSION` 1 行**と
+**`GLOSSARY.md` の docs commit `407f536` ぶん**（-2 / +11 行）で、どちらも帰属を確認した。
+
+**摂動 3 件のうち 1 件が検査の欠落を掘り出した。**
+
+1. `len(search) == 4` を `== 5` へ → **2 件が赤**（3 経路のうち API と系譜の両方）
+2. `_use_history_fts` の迂回ガードを外す → **1 件が赤**。
+   **FTS がテストでも本当に有効であることが、これで示せた**（系譜側は FTS を通らないので緑のまま）
+3. **形を変えない摂動** — `ilike(f"%{search}")` を `ilike(f"%{search}%")` へ（末尾一致 → どこかに含む）。
+   **120 件すべてが緑のまま**だった。**契約は「下位 4 桁」なのに、検査は「4 文字で引ける」しか見ていない**
+
+3 を捕らえる検査を受け入れ側で足した — **同じ 4 文字を hash の途中に持つ行**をもう 1 つ置き、
+検索が 1 件だけを返すことを固定する（摂動 3 で赤・無改変で緑）。
+
+pytest **1847/31**（**件数は増えない** — I-071 は既存の 2 つのテスト関数へ assertion を足す形なので）、
+cli 76、ruff clean、`npm run check` **221/0/2**（+1 ファイル = `NumberStepper.svelte`）、
+`lint:i18n` **949/47/0/0**、`lint:models` 68、`lint:recommendations` 37。
+**決定的な層に差分が無いので凍結コーパスは焼き直していない。Android にも差分は無い。SPEC は
+検索対象のフィールドを列挙していないので不変更。版数は patch。**

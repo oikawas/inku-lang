@@ -59,7 +59,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 揺らぎ | **sway** | 名詞 | ~~fluctuation~~（計測器）、~~jitter~~（信号） |
 | 添景 | **staffage** | 名詞。tooltip に "minor accompanying elements" を添える | ~~decoration~~, ~~props~~ |
 | 歳時記 | **Saijiki** | 固有名詞・大文字 | ~~almanac~~ 単独 |
-| 詞書 | **headnote** | 名詞。語彙ダイアログでのみ "kotobagaki" の注記可 | ~~caption~~, ~~Kotobagaki~~（ラベルとして） |
+| 詞書 | **headnote** | 名詞。**語彙ダイアログの行は v2.9.15 で消えたので "kotobagaki" の注記は許さない** | ~~caption~~, ~~Kotobagaki~~（ラベルとして） |
 | 奥書 | **colophon** | 名詞。**CLI サブコマンドと API パスも `colophon`**（§6 の例外・v2.8.0） | ~~Okugaki~~（ローマ字残しは不採用） |
 | 系譜 | **lineage** | 名詞 | — |
 | 系譜全体図 | **lineage map**（ボタンは **Map**） | 名詞句 | ~~Overview~~ |
@@ -145,7 +145,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `creat*` | **完了・日時・肩書き** | `appInfoCreatorTitle` / `settingsDbBackupRunDone` / `bootstrapAdminNote` / `historyCreatedAtHeader` / `Created`（列見出し） |
 | `image` | **Vision が実際に画像を見る**文脈、またはInfoの作者指定文で心にある像を指す用法 | `appInfoConceptBody` / `modelSelectionVisionHint` / `aiRefineVisionModeHint` / `aiRefineVisionReading` / `aiRefineVisionSourceError` |
 | `render*` | **サーバー側の技術設定・DB フィールド名・置換トークン** | `canvasSeedSummary`(`{render}`) / `settingsRenderConcurrency*`(5 件) / `historyReplayMissingSeed`(`render_seed`) / `replayComparisonTitle`(Renderer) |
-| `kotobagaki` | 語彙ダイアログの**注記としての一度だけ** | `appInfoVocabRows` |
+| `kotobagaki` | **例外なし**（v2.9.15 で語彙ダイアログの詞書の行が消え、英語表示に残る用例は 0 件） | — |
 | `Moderate` | **変奏の強度・中** | `variationMedium` / `variationTooltipLarge` |
 
 **新しく例外を足すときは、`i18n-lint.mjs` の該当リストとこの表を同じ commit で更新する。**

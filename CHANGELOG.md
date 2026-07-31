@@ -1319,3 +1319,95 @@ Measured by running the 7463 stored instructions through both engines.
 - **`renderer.py`**, `_oklch_from_hex`, and the decided colors, names and order
 
 pytest **1847/31** (+72 = 68 in the new `test_color_catalog_content.py`, plus 2 each in `test_abstract_color_vocabulary.py` and `test_palette_color_assignment.py` where the parametrization went from 11 catalogs to 13), cli 76, ruff clean, `npm run check` **220/0/2**, `lint:i18n` **934/47/0/0**, frozen corpora byte-identical on regeneration. **The version is a patch** — an engine version rises, and no stored format changes.
+
+### v2.9.15 — four characters find a work, and the surfaces line up (Build 801, 2026-08-01)
+
+Seven independent branches (Builds 791-800) merged into one version, **closing four ledger items**
+([I-049] / [I-050] / [I-058] / [I-071]).
+
+#### Finding a work by four characters ([I-071], Build 798)
+
+A work can now be found by the **last four characters of its render hash** — the same four the work
+panel already shows. Three routes carry it: `/api/history`, `/api/history/lineage-groups` and
+`/api/history/lineage-groups/{root}/items`.
+
+- The hash clause is added **only for exactly four ASCII alphanumerics**, matched case-insensitively
+- The existing search (description, DDL, Stage 1/2 model, catalog ID) **still runs for four-character
+  queries**; the hash is an additional OR
+- **Three characters, five characters and anything punctuated never reach the hash**
+- **This shape alone bypasses FTS**: `_use_history_fts` takes over at three characters, and the index
+  does not hold the hash column, so without the bypass the query would answer nothing
+- Labels: `検索（記述 / ハッシュ値下位4桁）:` and `Search (description / last 4 hash characters):`
+- The same five-clause OR **was duplicated across the three routes** and is now one
+  `_history_search_clause`
+
+#### Bilingual labels enter the linter's view ([I-058], Build 797)
+
+`lint:i18n` gains a **fourth channel**. Alongside `en.ts` values, `isJapanese ? …` ternaries and
+`getLang() === 'ja'` branches, it now extracts the English half of **`Japanese / English` text nodes
+written straight into component markup**.
+
+- **The channel carries 17 strings** (measured: removing it drops 949 to **932**)
+- It covers the model meta card, the model picker and the settings screen
+- Two `isJapanese ? '状態 / Status' : 'Status'` sites became plain `状態 / Status`, so **two more places
+  show Japanese in the English UI** — the other fifteen labels on those cards were already unconditional
+
+#### A grip on the numbers in settings ([I-050], Build 799)
+
+A new `NumberStepper.svelte` puts **hand-built −/+ buttons** on the four DB-backup fields (interval
+1-365 days, generations 1-100, hour 0-23, minute 0-59). **Firefox has no hook equivalent to
+`::-webkit-inner-spin-button`**, which is exactly why [I-050] said the native spinner would have to go.
+Button metrics come from `--btn-sm-padding` / `--btn-sm-radius` / `--btn-sm-font-size`. Values clamp to
+the bounds and the matching button disables at each end; typing and keyboard input still work.
+
+#### Two words for one action ([I-049], Build 800)
+
+`settingsReloadSettings` now reads the same as `settingsReload` (`設定再読み込み` → `表示更新`,
+`Reload settings` → `Refresh`). **The key, the click handler and the API call are unchanged** — only
+the displayed string moves.
+
+#### The Info modal (Builds 793-796) and the rest
+
+- **The title goes from `inku-lang` to `inku`**, 18px to 24px, with a 32px Incu icon
+  (`/favicon-192.png`, an existing static asset, no animation) to its left. Width 520px → **780px**
+- The concept body and the creator note were replaced with **copy the author specified in both
+  languages**, and the creator name is now `及川 信一郎 (Shinichiro Oikawa)` in both
+- **The vocabulary table dropped its "headnote" and "reading" rows.** No English string glosses
+  `kotobagaki` any more, so **the exception `GLOSSARY.md` and `i18n-lint.mjs` held for it was removed**
+  (done during acceptance)
+- The author's copy uses "image", so **`appInfoConceptBody` joined the `image` exception**, with the
+  reason recorded in the glossary
+- **The user-plugin on/off switch moved to the right end of its row** (Build 791); behavior and the
+  save API are unchanged
+- **A starred work read as unstarred in the dark theme** (Build 792):
+  `:global(html[data-theme='dark']) .hash-row-star` outweighed `.hash-row-star.starred` in specificity,
+  fixed by `:not(.starred)`. The same rule's `font-size: 10px` moved to `var(--btn-sm-font-size)`,
+  so **the star grows to 11px**
+
+#### Acceptance
+
+**SHA-256 decided it.** Merging the seven branches with `--no-ff` conflicted **only on
+`web/BUILD_NUMBER`, six times**; `SettingsModal.svelte` (791 + 799), `en.ts` / `ja.ts`
+(793-796 + 798 + 800) and `i18n-lint.mjs` (793-796 + 797) all combined on their own. That combination
+**matched the tree the author reviewed and pentala runs at Build 800 for 9 of 11 files exactly**. The
+two that differ are **one `APP_VERSION` line in `+page.svelte`** and **the docs commit `407f536` in
+`GLOSSARY.md`** (-2 / +11 lines); both were accounted for.
+
+**One of the three perturbations dug out a missing gate.**
+
+1. `len(search) == 4` → `== 5`: **two tests red**, covering both the API and the lineage routes
+2. Removing the FTS bypass guard: **one test red** — which is also what proves **FTS is genuinely
+   enabled under test** (the lineage routes never reach it and stayed green)
+3. **A shape-preserving perturbation**: `ilike(f"%{search}")` → `ilike(f"%{search}%")`, turning a
+   suffix match into a substring match. **All 120 stayed green.** The item says *last four characters*,
+   but the tests only saw *four characters find the work*
+
+A test added during acceptance catches it: a second row now carries the same four characters **in the
+middle** of its hash, so the search returning exactly one work fails under perturbation 3 and passes
+unperturbed.
+
+pytest **1847/31** (**the count does not move** — I-071 adds assertions to two existing test
+functions), cli 76, ruff clean, `npm run check` **221/0/2** (+1 file, `NumberStepper.svelte`),
+`lint:i18n` **949/47/0/0**, `lint:models` 68, `lint:recommendations` 37.
+**No deterministic layer changed, so the frozen corpora were not regenerated. Android has no diff.
+SPEC does not enumerate the searched fields and is unchanged. The version is a patch.**

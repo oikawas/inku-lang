@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
+	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { Score } from '$lib/historyManagerState.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import OutputTabsContent from './OutputTabsContent.svelte';
@@ -18,6 +19,7 @@
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
+	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
 	type HistoryItem = { id?: string; starred?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
@@ -75,6 +77,8 @@
 		pngMenuOpen: boolean;
 		pngWrapEl: HTMLDivElement | null;
 		pngTemplates: ExportTemplate[];
+		animationExportSettings: AnimationExportSettings;
+		apiFetch: ApiFetch;
 		onGotoNext: () => void | Promise<void>;
 		onGotoPrev: () => void | Promise<void>;
 		onGotoLatest: () => void | Promise<void>;
@@ -230,6 +234,8 @@
 		pngMenuOpen = $bindable(false),
 		pngWrapEl = $bindable(null),
 		pngTemplates,
+		animationExportSettings,
+		apiFetch,
 		onGotoNext,
 		onGotoPrev,
 		onGotoLatest,
@@ -1024,7 +1030,7 @@
 					{/if}
 				</div>
 			{:else if outputTab === 'lineage'}
-				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} />
+				<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} {animationExportSettings} {apiFetch} />
 			{/if}
 		</div>
 

@@ -10,6 +10,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
+	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
 
 	export type LineageNode = {
 		id: string;
@@ -61,12 +62,14 @@
 		visionModel: string;
 		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
+		animationExportSettings: AnimationExportSettings;
+		apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -79,6 +82,8 @@
 	let arrowFrame: number | null = null;
 	let arrowPaths = $state<ArrowPath[]>([]);
 	let checkedHistoryIds = $state<string[]>([]);
+	let animationExportBusy = $state(false);
+	let animationExportError = $state<string | null>(null);
 	let noteDrafts = $state<Record<string, string>>({});
 	let savingNoteIds = $state<string[]>([]);
 	let expandedNodeIds = $state<string[]>([]);
@@ -120,6 +125,18 @@
 	const nodeById = $derived(new Map((graph?.nodes ?? []).map((node) => [node.id, node])));
 	const focusNode = $derived(graph?.nodes.find((node) => node.id === graph.focus_node_id) ?? null);
 	const edgeByChild = $derived(new Map((graph?.edges ?? []).map((edge) => [edge.child_node_id, edge])));
+	const focusAnimationHistoryIds = $derived.by(() => {
+		const ids: string[] = [];
+		const seen = new Set<string>();
+		let current = graph?.focus_node_id ?? null;
+		while (current && !seen.has(current)) {
+			seen.add(current);
+			const node = nodeById.get(current);
+			if (node?.history?.id) ids.unshift(node.history.id);
+			current = edgeByChild.get(current)?.parent_node_id ?? null;
+		}
+		return ids;
+	});
 	const childrenByParent = $derived.by(() => {
 		const children = new Map<string, LineageNode[]>();
 		for (const edge of graph?.edges ?? []) {
@@ -213,6 +230,20 @@ function toggleCheckedHistory(historyId: string): void {
 
 function askTrashChecked(): void {
 	if (checkedHistoryIds.length > 0) onAskTrash([...checkedHistoryIds]);
+}
+
+async function downloadFocusAnimation(): Promise<void> {
+	if (animationExportBusy || focusAnimationHistoryIds.length < 2) return;
+	animationExportBusy = true;
+	animationExportError = null;
+	try {
+		await downloadAnimation(apiFetch, focusAnimationHistoryIds, animationExportSettings);
+	} catch (cause) {
+		const reason = cause instanceof Error ? cause.message : String(cause);
+		animationExportError = t().animationExportFailed(reason);
+	} finally {
+		animationExportBusy = false;
+	}
 }
 
 function noteValue(node: LineageNode): string {
@@ -592,6 +623,10 @@ $effect(() => {
 	{:else}
 		<button type="button" onclick={openOverview}>{isJapanese ? '全体図' : 'Map'}</button>
 	{/if}
+	<button type="button" disabled={focusAnimationHistoryIds.length < 2 || animationExportBusy} title={t().lineageAnimationExportHint} onclick={downloadFocusAnimation}>
+		{animationExportBusy ? t().animationExportBusy : t().lineageAnimationExport}
+		{#if !animationExportBusy && focusAnimationHistoryIds.length > 1}<span>({focusAnimationHistoryIds.length})</span>{/if}
+	</button>
 	<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
 		<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
 		{#if checkedHistoryIds.length > 0}<span>{checkedHistoryIds.length}</span>{/if}
@@ -599,6 +634,7 @@ $effect(() => {
 	<button type="button" class="detach-btn" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
 </div>
 	</header>
+	{#if animationExportError}<div class="lineage-message error">{animationExportError}</div>{/if}
 	{#if loading || overviewLoading}
 		<div class="lineage-message">{isJapanese ? '系譜を読み込み中…' : 'Loading lineage…'}</div>
 	{:else if error}

@@ -50,6 +50,7 @@
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
+	import { DEFAULT_ANIMATION_EXPORT_SETTINGS, parseAnimationExportSettings, type AnimationExportSettings } from '$lib/animationExport';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
 		DEFAULT_CANVAS_ASPECT_ID,
@@ -72,6 +73,7 @@
 	const TENKEI_KEY          = 'inku-tenkei';
 	const WILD_KEY            = 'inku-wild';
 	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
+	const ANIMATION_EXPORT_SETTINGS_KEY = 'inku-animation-export-settings';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const RESULT_LOG_OPEN_KEY = 'inku-result-log-open';
 	const APP_VERSION = 'v2.9.12';
@@ -529,6 +531,7 @@
 	let pngAlphaWhite = $state(false);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
+	let animationExportSettings = $state<AnimationExportSettings>({ ...DEFAULT_ANIMATION_EXPORT_SETTINGS });
 	let miscSettingsLoaded = $state(false);
 
 	// DOM refs for outside-click handling
@@ -2449,6 +2452,7 @@
 	function persistMiscSettings() {
 		try {
 			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
+			localStorage.setItem(ANIMATION_EXPORT_SETTINGS_KEY, JSON.stringify(animationExportSettings));
 		} catch {}
 	}
 
@@ -6043,6 +6047,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
 			const wild = localStorage.getItem(WILD_KEY); if (wild !== null) wildEnabled = wild === '1';
 			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
+			animationExportSettings = parseAnimationExportSettings(localStorage.getItem(ANIMATION_EXPORT_SETTINGS_KEY));
 			statsOpen = localStorage.getItem(RESULT_LOG_OPEN_KEY) === '1';
 			const savedBatchFailureReport = loadBatchFailureReport();
 			setBatchFailureReport(savedBatchFailureReport);
@@ -6064,6 +6069,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	$effect(() => {
 		void pngAlphaWhite;
+		void animationExportSettings;
 		if (miscSettingsLoaded) persistMiscSettings();
 	});
 	$effect(() => {
@@ -6481,6 +6487,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onPaintOne={paintOne}
 				onVisionAdvice={requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}
+				{animationExportSettings}
+				{apiFetch}
 			/>
 		</div><!-- /body -->
 
@@ -6601,6 +6609,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{editGroupId}
 		bind:autoRepairEnabled={ddlAutoRepairEnabled}
 		bind:pngAlphaWhite
+		bind:animationExportSettings
 		{exportTemplates}
 		{exportTemplateStatus}
 		{canvasAspectEnabled}
@@ -6762,6 +6771,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		managerTrashTotal={historyManager.trashTotal}
 		{trashTotal}
 		selectedHistoryIds={historyManager.selectedIds}
+		{animationExportSettings}
 		historyManagerStarredOnly={historyManager.starredOnly}
 		onClose={() => (historyManager.open = false)}
 		onSetView={historyManager.setView}

@@ -35,6 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from .animation_export import build_animation
 from .autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from .feature_analysis import composition_distance
 from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
@@ -1360,6 +1361,14 @@ class OkugakiItem(BaseModel):
 
 class HistoryIdsBody(BaseModel):
     ids: list[str] = Field(default_factory=list, max_length=1000)
+
+
+class AnimationExportBody(BaseModel):
+    ids: list[str] = Field(..., min_length=2, max_length=100)
+    format: Literal["apng", "gif"] = "apng"
+    pattern: Literal["cut", "crossfade", "fade_white", "slide"] = "cut"
+    hold_seconds: float = Field(default=1.0, ge=0.1, le=30.0)
+    resolution: Literal["1k", "4k", "8k"] = "1k"
 
 
 class HistoryStarBody(BaseModel):
@@ -4093,6 +4102,44 @@ def api_history_get(
     )
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
+
+
+@app.post("/api/history/export-animation")
+def api_history_export_animation(
+    body: AnimationExportBody,
+    actor: dict = Depends(_current_user),
+) -> Response:
+    ids = list(dict.fromkeys(body.ids))
+    if len(ids) < 2:
+        raise HTTPException(status_code=400, detail="at least two distinct works are required")
+    items = _db.get_items(actor["id"], ids)
+    if len(items) != len(ids):
+        raise HTTPException(status_code=404, detail="one or more history items were not found")
+    svgs = [str(item.get("svg") or "") for item in items]
+    if any(not svg for svg in svgs):
+        raise HTTPException(status_code=409, detail="one or more works have no saved SVG")
+    try:
+        payload = build_animation(
+            svgs,
+            output_format=body.format,
+            pattern=body.pattern,
+            hold_seconds=body.hold_seconds,
+            resolution=body.resolution,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    extension = "png" if body.format == "apng" else "gif"
+    media_type = "image/apng" if body.format == "apng" else "image/gif"
+    filename = f"inku-animation-{timestamp}.{extension}"
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": "attachment; filename=\"" + filename + "\"",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @app.get("/api/history/{item_id}/neighbors", response_model=list[HistoryItem], response_model_exclude_none=True)

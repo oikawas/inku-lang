@@ -6,6 +6,7 @@
 	import { buildContactSheet, sheetCapacity, sheetPageCount, type ContactSheetEntry, type SheetVariant } from '$lib/contactSheet';
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
 	import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
+	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
 
 	type HistoryItem = {
 		id?: string;
@@ -64,6 +65,7 @@
 		managerTrashTotal: number;
 		trashTotal: number;
 		selectedHistoryIds: string[];
+		animationExportSettings: AnimationExportSettings;
 		historySearch: string;
 		historyManagerStarredOnly: boolean;
 		onClose: () => void;
@@ -104,6 +106,7 @@
 		managerTrashTotal,
 		trashTotal,
 		selectedHistoryIds,
+		animationExportSettings,
 		historySearch = $bindable(''),
 		historyManagerStarredOnly,
 		onClose,
@@ -239,6 +242,8 @@
 
 	let contactSheetBusy = $state<SheetVariant | null>(null);
 	let contactSheetError = $state<string | null>(null);
+	let animationExportBusy = $state(false);
+	let animationExportError = $state<string | null>(null);
 
 	// Selection is confined to the page on screen, but in lineage mode the
 	// expanded members come from a separate request, so both pools are searched.
@@ -261,6 +266,27 @@
 			return items.find((it) => it.id === id) ?? null;
 		} catch {
 			return null;
+		}
+	}
+
+	async function downloadSelectedAnimation(): Promise<void> {
+		if (animationExportBusy || selectedHistoryIds.length < 2) return;
+		animationExportBusy = true;
+		animationExportError = null;
+		try {
+			const items: HistoryItem[] = [];
+			for (const id of selectedHistoryIds) {
+				const item = findSelectedItem(id) ?? await fetchHistoryItem(id);
+				if (item?.id) items.push(item);
+			}
+			if (items.length < 2) throw new Error("At least two saved works are required.");
+			items.sort((left, right) => left.at - right.at || String(left.id).localeCompare(String(right.id)));
+			await downloadAnimation(apiFetch, items.map((item) => item.id as string), animationExportSettings);
+		} catch (cause) {
+			const reason = cause instanceof Error ? cause.message : String(cause);
+			animationExportError = t().animationExportFailed(reason);
+		} finally {
+			animationExportBusy = false;
 		}
 	}
 
@@ -610,6 +636,18 @@
 					{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
 				</button>
 			</Tooltip>
+			<Tooltip placement="bottom-left" wide text={t().historyAnimationExportHint}>
+				<button
+					class="ghost-btn"
+					type="button"
+					onclick={downloadSelectedAnimation}
+					disabled={selectedHistoryIds.length < 2 || animationExportBusy}
+				>
+					{animationExportBusy ? t().animationExportBusy : t().historyAnimationExport}
+					{#if !animationExportBusy && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
+				</button>
+			</Tooltip>
+			{#if animationExportError}<span class="tool-error">{animationExportError}</span>{/if}
 			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
 		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>

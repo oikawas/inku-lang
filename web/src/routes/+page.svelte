@@ -21,7 +21,6 @@
 	import DdlEditorDialog from '$lib/components/DdlEditorDialog.svelte';
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
-	import IncuMascot from '$lib/components/IncuMascot.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import ProfileModal from '$lib/components/ProfileModal.svelte';
@@ -6673,7 +6672,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	<div class="app-info-modal" role="dialog" aria-modal="true" aria-labelledby="app-info-title">
 		<div class="app-info-head">
 			<div class="app-info-brand">
-				<IncuMascot />
+				<img class="app-info-icon" src="/favicon-192.png" alt="" aria-hidden="true" />
 				<div id="app-info-title" class="app-info-title">{t().appInfoTitle}</div>
 			</div>
 			<button class="app-info-close" onclick={() => (appInfoOpen = false)} aria-label={t().appInfoClose}>×</button>
@@ -7188,6 +7187,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		align-items: center;
 		gap: 10px;
 		min-width: 0;
+	}
+	.app-info-icon {
+		width: 32px;
+		height: 32px;
+		object-fit: contain;
+		flex: 0 0 auto;
 	}
 	.app-info-title {
 		font-size: 24px;

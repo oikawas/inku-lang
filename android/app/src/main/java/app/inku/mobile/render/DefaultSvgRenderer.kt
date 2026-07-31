@@ -1441,6 +1441,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val dumpJson = buildString {
             append("{")
             append("\"primitive\":"); append(jsonString(ins.optString("primitive", "line")))
+            append(",\"note\":"); append(stringOrNull(ins, "note"))
             append(",\"from\":"); append(coordJson(ins.optJSONArray("from_") ?: ins.optJSONArray("from")))
             append(",\"to\":"); append(coordJson(ins.optJSONArray("to")))
             append(",\"center\":"); append(coordJson(ins.optJSONArray("center")))
@@ -1454,7 +1455,6 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"filled\":"); append(ins.optBoolean("filled", false))
             append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
             append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
-            append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
             append(",\"mode\":"); append(jsonString(ins.optString("mode", "additive")))
             append(",\"carve_depth\":"); append(stringOrNull(ins, "carve_depth"))
             append(",\"color\":"); append(jsonString(ins.optString("color", "black")))
@@ -1464,6 +1464,7 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"at\":null")
             append(",\"relation\":null")
             append(",\"surface\":"); append(dumpSurfaceJson(ins.optJSONObject("surface")))
+            append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
             append("}")
         }
         val key = "$dumpJson:surface:$insIdx:$markIdx:${renderSeed ?: "None"}"

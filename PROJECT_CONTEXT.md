@@ -2,28 +2,42 @@
 
 **Target version: v2.9.17 / Build 807**
 
-This is the starting point for developers and AI agents. It avoids reloading the full specification for every task. `SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the Japanese specification.
+This is the starting point for developers and AI agents.
+It avoids reloading the full specification for every task.
+`SPEC.ja.md` remains the canonical design source; when this summary conflicts with it, follow the
+Japanese specification.
 
 ## What to Read First
 
 For ordinary work, read only what the task requires:
 
-1. If a local `AGENTS.md` exists, read it for development, verification, deployment, and security rules.
-2. Read this file for the purpose, architecture, and current contracts.
-3. Inspect `git status --short --branch` and recent history.
-4. Read only the relevant sections of `SPEC.ja.md` or its public English adaptation, `SPEC.md`, plus the implementation files being changed.
-5. Search `CHANGELOG.md` or the more detailed `CHANGELOG.ja.md` only when historical context matters.
+1.
+If a local `AGENTS.md` exists, read it for development, verification, deployment, and security
+rules.
+2.
+Read this file for the purpose, architecture, and current contracts.
+3.
+Inspect `git status --short --branch` and recent history.
+4.
+Read only the relevant sections of `SPEC.ja.md` or its public English adaptation, `SPEC.md`, plus
+the implementation files being changed.
+5.
+Search `CHANGELOG.md` or the more detailed `CHANGELOG.ja.md` only when historical context matters.
 
-A full specification read is appropriate for first-time onboarding, design-philosophy changes, broad cross-cutting work, or a specification consistency audit.
+A full specification read is appropriate for first-time onboarding, design-philosophy changes,
+broad cross-cutting work, or a specification consistency audit.
 
 ## Purpose
 
-`inku` is the reference implementation of DDL, the Drawing Description Language. DDL is conceived as a language for writing visual tanka rather than as a conventional drawing command language.
+`inku` is the reference implementation of DDL, the Drawing Description Language.
+DDL is conceived as a language for writing visual tanka rather than as a conventional drawing
+command language.
 
 - The description is the durable work; an SVG is one performance.
 - Authors write physical material, placement, motion, and observable relations rather than emotional judgments.
 - Brevity and constraint reduce assertion and foreground presentation.
-- The default path is reproducible. Variation belongs to renderer performance and explicit user operations.
+- The default path is reproducible.
+Variation belongs to renderer performance and explicit user operations.
 
 ## Current Architecture
 
@@ -49,18 +63,31 @@ instruction
 
 ## Contracts That Must Remain Intact
 
-- DDL text may be written in the author's language. JSON Score keys remain English.
+- DDL text may be written in the author's language.
+JSON Score keys remain English.
 - Keep Stage 1 interpretation separate from Stage 2 structuring.
 - Stage 1.5 must not overwrite interpreted intent or accumulate fixed finished-work recipes.
-- Coerce should shrink over time. It must not inject a house style; invalid optional data should prefer drop-only handling.
-- The same Score and seed reproduce the same work. Do not add implicit time seeds or automatic variation counters.
+- Coerce should shrink over time.
+It must not inject a house style; invalid optional data should prefer drop-only handling.
+- The same Score and seed reproduce the same work.
+Do not add implicit time seeds or automatic variation counters.
 - Keep `dh1` description identity, `rh3` work-edition identity (legacy `rh2` values are retained), history IDs, and lineage node IDs distinct.
-- Lineage records explicit derivation operations only. Never infer parentage from similarity, time, or matching hashes.
+- Lineage records explicit derivation operations only.
+Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
-- Plugins are validated declarative documents, expanded to core DDL immediately after Stage 1. Stage 1.5, coerce, Score, replay, and rh2 do not depend on plugin content.
-- The saijiki table (`server/src/inku_server/saijiki.py`, v1.92) is the source of truth for vocabulary. The Stage 1 prompt vocabulary block, plugin closure markers, relation phrases, web Saijiki display, and reference §1 are derived from it; vocabulary changes go through the table and its golden tests.
-- Japanese and English behavior must stay aligned. Do not introduce English-only requirements.
-- **The engine does not go backwards** (SPEC "Design Principles", principle 9). Past drawing engines are not kept in the system and no mechanism selects a version. Replay always runs on the latest engine, and reproducing an edition as it was is **guaranteed by returning the saved SVG**. As in printmaking, the carving advances and the prints remain, but the block cannot be restored — **which is why the reference corpus, a proof print, is pulled while a version is still current.**
+- Plugins are validated declarative documents, expanded to core DDL immediately after Stage 1.
+Stage 1.5, coerce, Score, replay, and rh2 do not depend on plugin content.
+- The saijiki table (`server/src/inku_server/saijiki.py`, v1.92) is the source of truth for vocabulary.
+The Stage 1 prompt vocabulary block, plugin closure markers, relation phrases, web Saijiki display,
+and reference §1 are derived from it; vocabulary changes go through the table and its golden tests.
+- Japanese and English behavior must stay aligned.
+Do not introduce English-only requirements.
+- **The engine does not go backwards** (SPEC "Design Principles", principle 9).
+Past drawing engines are not kept in the system and no mechanism selects a version.
+Replay always runs on the latest engine, and reproducing an edition as it was is **guaranteed by
+returning the saved SVG**.
+As in printmaking, the carving advances and the prints remain, but the block cannot be restored —
+**which is why the reference corpus, a proof print, is pulled while a version is still current.**
 
 ## Current Product State
 
@@ -74,131 +101,1662 @@ As of v1.89, the authenticated web application includes:
 - a public-API CLI with administration and benchmark support;
 - a `default` Render Engine behind an internal boundary for future Engine Packs.
 
-In v1.90.0, Build 586 formalized `touching`, Build 587 unified relation geometry in transform-composed canvas coordinates, and Build 588 removed duplicate touching assignment. Build 589 adds validated `.inku-plugin.md` documents and a deterministic expansion layer immediately after Stage 1. Explicit qualified terms and `fires_on` nouns that are stated subjects may fire; metaphors and unknown objects may not. Validation rejects recursion, expansion beyond 48 instructions, fixed-coordinate repetition, external references, and namespace collisions. Provenance is ordinary history metadata, while Score, canonical artwork data, rh2, and replay remain independent of plugin documents. Build 590 adds a general boundary preventing Stage 1.5 from appending auxiliary shapes and Score from retaining instructions beyond the explicit numeric-region count after structural expansion. The boundary caps instruction count, while arrangement-driven visible multiplicity remains model-dependent between Mistral and Qwen. Build 591 extends the declarative plugin format to v2, accepting `member` composites, `note:` comment lines, a `bottom band` and a computed diagonal band, load-time rejection of unknown region keys (removing the silent fallback), English repetition units with unit-preserving singulars, `anchor ... at N to M spots` nested repetition, and longest-match `fires_on` resolution at a position. Score, coerce, and rh2 are unchanged, and Nature.leaves v0.3.0 passes `plugin validate`.
+In v1.90.0, Build 586 formalized `touching`, Build 587 unified relation geometry in
+transform-composed canvas coordinates, and Build 588 removed duplicate touching assignment.
+Build 589 adds validated `.inku-plugin.md` documents and a deterministic expansion layer
+immediately after Stage 1.
+Explicit qualified terms and `fires_on` nouns that are stated subjects may fire; metaphors and
+unknown objects may not.
+Validation rejects recursion, expansion beyond 48 instructions, fixed-coordinate repetition,
+external references, and namespace collisions.
+Provenance is ordinary history metadata, while Score, canonical artwork data, rh2, and replay
+remain independent of plugin documents.
+Build 590 adds a general boundary preventing Stage 1.5 from appending auxiliary shapes and Score
+from retaining instructions beyond the explicit numeric-region count after structural expansion.
+The boundary caps instruction count, while arrangement-driven visible multiplicity remains
+model-dependent between Mistral and Qwen.
+Build 591 extends the declarative plugin format to v2, accepting `member` composites, `note:`
+comment lines, a `bottom band` and a computed diagonal band, load-time rejection of unknown region
+keys (removing the silent fallback), English repetition units with unit-preserving singulars,
+`anchor ... at N to M spots` nested repetition, and longest-match `fires_on` resolution at a
+position.
+Score, coerce, and rh2 are unchanged, and Nature.leaves v0.3.0 passes `plugin validate`.
 
-v1.92.0 (Build 592) restructures the Saijiki. A single table (`saijiki.py`) now derives the Stage 1 prompt vocabulary block, the plugin closure markers, the relation phrases, reference §1, and the web Saijiki display (`GET /api/saijiki` plus a snapshot-seeded synchronous store). Pre-restructuring prompts are frozen as golden fixtures so any assembly drift beyond the approved pruning fails tests. The words 描く (draw) and 髪 / hair were pruned from the vocabulary by the author's decision (the Score `Weight` enum keeps `hair` for replay compatibility), 彫る (carve) was removed from the web display, and the static Nature entries are frozen until their declarative migration.
+v1.92.0 (Build 592) restructures the Saijiki.
+A single table (`saijiki.py`) now derives the Stage 1 prompt vocabulary block, the plugin closure
+markers, the relation phrases, reference §1, and the web Saijiki display (`GET /api/saijiki` plus a
+snapshot-seeded synchronous store).
+Pre-restructuring prompts are frozen as golden fixtures so any assembly drift beyond the approved
+pruning fails tests.
+The words 描く (draw) and 髪 / hair were pruned from the vocabulary by the author's decision (the
+Score `Weight` enum keeps `hair` for replay compatibility), 彫る (carve) was removed from the web
+display, and the static Nature entries are frozen until their declarative migration.
 
-v1.93 (Build 593) adds the RAW trace option. `include_trace` (default false) on `/api/paint` and `/api/compose` returns each layer's intermediate output in a single response; it is observation-only, changes no Score/render/branch/count, and is never persisted (the entry point for the intent-audit harness). A bench-dedicated container environment (api 8101 / web 5174, dedicated volume, version-frozen images) now runs alongside the bare-metal deployment on the development server; operational details live in the local `AGENTS.md`.
+v1.93 (Build 593) adds the RAW trace option.
+`include_trace` (default false) on `/api/paint` and `/api/compose` returns each layer's
+intermediate output in a single response; it is observation-only, changes no
+Score/render/branch/count, and is never persisted (the entry point for the intent-audit harness).
+A bench-dedicated container environment (api 8101 / web 5174, dedicated volume, version-frozen
+images) now runs alongside the bare-metal deployment on the development server; operational details
+live in the local `AGENTS.md`.
 
-v1.94.0 (Build 594–599) is web-UI-only cleanup that touches neither the drawing machinery nor the server. A read-only "current selection" (model, color catalog, canvas; interpretation/rendering labels when the stages differ; full model names) moved into the input tab below the instruction and buttons. The canvas status bar drops the model/catalog/canvas display in favor of a render-hash button (last four digits) that copies the full hash on click. The left panel (input, batch, demo) is collapsible to the left, and the canvas artwork supports mouse-wheel zoom. Vision models are organized by purpose: the model chosen in AI autonomous refinement persists as `vision_model` and the okugaki model as `okugaki_model`, and the Vision tab is dropped from the model dialog opened from the input tab (vision is used only for readings and refinement observation, never for generation). Bottom history thumbnails show the Stage 1 short name with a Stage 1 / Stage 2 full-name tooltip, the state badge is removed (kept in the tooltip), and English labels use "Gen." Button styling and placement were aligned (new-root matches the "new" button, the hash button matches the other status-bar buttons, the Latest button moved left, the input tab is model-then-catalog order), and the refinement/okugaki model-picker tooltip is `position: fixed` to avoid scroll-container clipping. "Move to trash" was removed from the lineage artwork card menu (the header bulk-trash stays).
+v1.94.0 (Build 594–599) is web-UI-only cleanup that touches neither the drawing machinery nor the
+server.
+A read-only "current selection" (model, color catalog, canvas; interpretation/rendering labels when
+the stages differ; full model names) moved into the input tab below the instruction and buttons.
+The canvas status bar drops the model/catalog/canvas display in favor of a render-hash button (last
+four digits) that copies the full hash on click.
+The left panel (input, batch, demo) is collapsible to the left, and the canvas artwork supports
+mouse-wheel zoom.
+Vision models are organized by purpose: the model chosen in AI autonomous refinement persists as
+`vision_model` and the okugaki model as `okugaki_model`, and the Vision tab is dropped from the
+model dialog opened from the input tab (vision is used only for readings and refinement
+observation, never for generation).
+Bottom history thumbnails show the Stage 1 short name with a Stage 1 / Stage 2 full-name tooltip,
+the state badge is removed (kept in the tooltip), and English labels use "Gen." Button styling and
+placement were aligned (new-root matches the "new" button, the hash button matches the other
+status-bar buttons, the Latest button moved left, the input tab is model-then-catalog order), and
+the refinement/okugaki model-picker tooltip is `position: fixed` to avoid scroll-container
+clipping.
+"Move to trash" was removed from the lineage artwork card menu (the header bulk-trash stays).
 
-Build 600 fixes an instruction carrying both a region (`at`) and a relation losing its relation silently during region placement, so touching resolution was never reached. Region placement now runs first and relation resolution follows; plugin-member double arcs (leaf forms) perform as designed as endpoint-pinned opposing minor arcs (intent-audit finding F-1). Relations unresolvable only at performance time drop with a recorded warning per §14.4. The rh2 contract and Score schema are unchanged.
+Build 600 fixes an instruction carrying both a region (`at`) and a relation losing its relation
+silently during region placement, so touching resolution was never reached.
+Region placement now runs first and relation resolution follows; plugin-member double arcs (leaf
+forms) perform as designed as endpoint-pinned opposing minor arcs (intent-audit finding F-1).
+Relations unresolvable only at performance time drop with a recorded warning per §14.4.
+The rh2 contract and Score schema are unchanged.
 
-v1.95 (Builds 601–604) is a second web-UI phase; server, Score, and rh2 are unchanged. Comparison dialogs became single-view, the standalone refine tab was removed, the instruction tab was restructured (read-only normalized DDL, a shared DDL editor dialog, DDL-origin works identified by `display_label='DDL'` with instruction-based actions hidden), the Drawing tab became Artwork with a generation badge, and autonomous-refinement UX was polished. Build 600 also added deterministic transcription of expansion-layer pair members into Score instructions (style-sentence consumption, merging past coerce) plus the inspection-only `carriage_warnings` mirror, making vocabulary carriage model-independent so model choice purely widens expression.
+v1.95 (Builds 601–604) is a second web-UI phase; server, Score, and rh2 are unchanged.
+Comparison dialogs became single-view, the standalone refine tab was removed, the instruction tab
+was restructured (read-only normalized DDL, a shared DDL editor dialog, DDL-origin works identified
+by `display_label='DDL'` with instruction-based actions hidden), the Drawing tab became Artwork
+with a generation badge, and autonomous-refinement UX was polished.
+Build 600 also added deterministic transcription of expansion-layer pair members into Score
+instructions (style-sentence consumption, merging past coerce) plus the inspection-only
+`carriage_warnings` mirror, making vocabulary carriage model-independent so model choice purely
+widens expression.
 
-v1.96 (Builds 605–606) introduced the user-selectable scenery level `tenkei` (none / sparse / auto, default auto), mapped deterministically onto all three layers (Stage 1 norm sections plus a pure-invocation bypass, Stage 1.5 pool reduction, a coerce insertion budget) with no post-hoc thinning governor and no effect on rh2. It also restored the §4.6 Stage 1.5 addition guard that Build 600 pair transcription had bypassed, implemented the user plugin management API (content read, create, overwrite, delete, enable/disable persisted in `.plugin-state.json`) with its settings UI, and attached `lineage_generation` to lineage responses. UI phase 3 replaced the mascot with the inku cube, unified the abortable generation-status element across dialogs, redesigned language comparison as direct Stage 1 × Stage 2 combinations, and single-sourced model metadata.
+v1.96 (Builds 605–606) introduced the user-selectable scenery level `tenkei` (none / sparse / auto,
+default auto), mapped deterministically onto all three layers (Stage 1 norm sections plus a
+pure-invocation bypass, Stage 1.5 pool reduction, a coerce insertion budget) with no post-hoc
+thinning governor and no effect on rh2.
+It also restored the §4.6 Stage 1.5 addition guard that Build 600 pair transcription had bypassed,
+implemented the user plugin management API (content read, create, overwrite, delete, enable/disable
+persisted in `.plugin-state.json`) with its settings UI, and attached `lineage_generation` to
+lineage responses.
+UI phase 3 replaced the mascot with the inku cube, unified the abortable generation-status element
+across dialogs, redesigned language comparison as direct Stage 1 × Stage 2 combinations, and
+single-sourced model metadata.
 
-v1.97 (Builds 607–608) made the scenery level per-artwork: a history `tenkei` column with server-side resolution (explicit value > inherited from the lineage parent > auto) keeps a lineage's level intact through refinement, autonomous loops, and the CLI (save-time resolution covers renderer-only derivations such as touch variation). The UI wires the instruction-tab selector (localStorage-persisted) and inheritance-defaulted 3-way selectors in six refinement dialogs (changing one creates a branching point), with the level shown in generation info and history tooltips.
+v1.97 (Builds 607–608) made the scenery level per-artwork: a history `tenkei` column with
+server-side resolution (explicit value > inherited from the lineage parent > auto) keeps a
+lineage's level intact through refinement, autonomous loops, and the CLI (save-time resolution
+covers renderer-only derivations such as touch variation).
+The UI wires the instruction-tab selector (localStorage-persisted) and inheritance-defaulted 3-way
+selectors in six refinement dialogs (changing one creates a branching point), with the level shown
+in generation info and history tooltips.
 
-v1.98 (Build 609) moved single drawing to `POST /api/paint/stream` (NDJSON), showing the normalized DDL as soon as interpretation completes (`/api/paint` stays a wrapper over the same logic with an unchanged response shape). History now stores the input-side DDL (`ddl`) separately from the expanded DDL (`expanded_ddl`; a one-time backfill leaves pre-split works with only the expanded form), adds explicit `focus` selection, and records `interpret_fallback` (an empty Stage 1 output is a failure; fallback-drawn works are marked). The verified model catalog was rebuilt as v2 from two measured benchmark runs (29 → 43 entries, per-purpose recommendations `recommendation_llm` / `recommendation_vision`, retired models kept as marked EOL entries, one shared sort path), and provider failures are classified and explained by kind. The Saijiki drawer became browse-only; word insertion is concentrated in the DDL editor dialog's inline Saijiki, which also lists plugin vocabulary.
+v1.98 (Build 609) moved single drawing to `POST /api/paint/stream` (NDJSON), showing the normalized
+DDL as soon as interpretation completes (`/api/paint` stays a wrapper over the same logic with an
+unchanged response shape).
+History now stores the input-side DDL (`ddl`) separately from the expanded DDL (`expanded_ddl`; a
+one-time backfill leaves pre-split works with only the expanded form), adds explicit `focus`
+selection, and records `interpret_fallback` (an empty Stage 1 output is a failure; fallback-drawn
+works are marked).
+The verified model catalog was rebuilt as v2 from two measured benchmark runs (29 → 43 entries,
+per-purpose recommendations `recommendation_llm` / `recommendation_vision`, retired models kept as
+marked EOL entries, one shared sort path), and provider failures are classified and explained by
+kind.
+The Saijiki drawer became browse-only; word insertion is concentrated in the DDL editor dialog's
+inline Saijiki, which also lists plugin vocabulary.
 
-v1.99 (Build 610) extended variation performance from lines only to arcs and closed shapes (circle, ellipse, triangle, square, polygon) — F-4. The gate mirrors the line gate (quality in {perlin, wave, white} with position_x/position_y/radius dims). Closed contours use seam-continuous periodic noise, polygonal shapes keep corners fixed, and arcs keep both endpoints fixed to preserve the touching contact contract. Because performances change, the render engine version was bumped to 5 (saved SVGs, Scores, and rh2 untouched). The author's visual confirmation and the Phase 2 material-outline decision remain.
+v1.99 (Build 610) extended variation performance from lines only to arcs and closed shapes (circle,
+ellipse, triangle, square, polygon) — F-4.
+The gate mirrors the line gate (quality in {perlin, wave, white} with position_x/position_y/radius
+dims).
+Closed contours use seam-continuous periodic noise, polygonal shapes keep corners fixed, and arcs
+keep both endpoints fixed to preserve the touching contact contract.
+Because performances change, the render engine version was bumped to 5 (saved SVGs, Scores, and rh2
+untouched).
+The author's visual confirmation and the Phase 2 material-outline decision remain.
 
-v2.0 (Build 611) implemented Stage 1.5 variation, "hensou" (SPEC §12.13): one explicit operation that shakes the whole expansion layer. Three discrete amplitudes move seven axes (type swap, adopted count, touch material, focus, main/contrast colors, composition family, type family) under weighted staged release, fully reproducible from (amplitude, seed), never inherited along a lineage, and always within the tenkei cap. Four candidates per run (server-issued seeds via `/api/variation/seeds`), each card showing what moved in the official vocabulary, with a real-difference guarantee for every reported axis. The external focus input (`PaintRequest.focus` etc.) and the "vary focus" refinement were retired, returning refinement to four kinds; the layer's resolved focus is wired into render_metadata so `history.focus` keeps recording. History gains `variation_amplitude` / `variation_seed`. Follow-ups: rework of the variation section's UI placement (differs from the author's image), `loadIterationItem` not restoring variation fields, and the pre-existing `api_history_neighbors` bug.
+v2.0 (Build 611) implemented Stage 1.5 variation, "hensou" (SPEC §12.13): one explicit operation
+that shakes the whole expansion layer.
+Three discrete amplitudes move seven axes (type swap, adopted count, touch material, focus,
+main/contrast colors, composition family, type family) under weighted staged release, fully
+reproducible from (amplitude, seed), never inherited along a lineage, and always within the tenkei
+cap.
+Four candidates per run (server-issued seeds via `/api/variation/seeds`), each card showing what
+moved in the official vocabulary, with a real-difference guarantee for every reported axis.
+The external focus input (`PaintRequest.focus` etc.) and the "vary focus" refinement were retired,
+returning refinement to four kinds; the layer's resolved focus is wired into render_metadata so
+`history.focus` keeps recording.
+History gains `variation_amplitude` / `variation_seed`.
+Follow-ups: rework of the variation section's UI placement (differs from the author's image),
+`loadIterationItem` not restoring variation fields, and the pre-existing `api_history_neighbors`
+bug.
 
-v2.0.1–v2.0.3 (Builds 612–630) updated the model catalog to v2.1 from three combined measured runs (44 entries; the time-of-day question is closed) and resolved the v2.0 follow-ups: the `api_history_neighbors` 500 (raw score string) and variation-field restoration in `loadIterationItem` (v2.0.2), and the variation UI placement (v2.0.3 — ruled into the fifth refinement element, showing small/medium/large only while selected, execution folded into the one/four-candidate buttons, separate section removed). Variation also joined the autonomous-refinement elements (cap 5), the artwork-card menu and dialog headings were reorganized, the candidate grid now fits the window with three-state save buttons, and button size tokens (`--btn-sm-*`) were introduced with an incremental-migration convention. v2.0.4 (Build 634) added an amplitude choice to autonomous-refinement variation (small/medium/large, default medium, applied to every variation generation in the run) and completed the small-button size-token migration (the six partially-matching blocks were unified under the author's ruling).
+v2.0.1–v2.0.3 (Builds 612–630) updated the model catalog to v2.1 from three combined measured runs
+(44 entries; the time-of-day question is closed) and resolved the v2.0 follow-ups: the
+`api_history_neighbors` 500 (raw score string) and variation-field restoration in
+`loadIterationItem` (v2.0.2), and the variation UI placement (v2.0.3 — ruled into the fifth
+refinement element, showing small/medium/large only while selected, execution folded into the
+one/four-candidate buttons, separate section removed).
+Variation also joined the autonomous-refinement elements (cap 5), the artwork-card menu and dialog
+headings were reorganized, the candidate grid now fits the window with three-state save buttons,
+and button size tokens (`--btn-sm-*`) were introduced with an incremental-migration convention.
+v2.0.4 (Build 634) added an amplitude choice to autonomous-refinement variation
+(small/medium/large, default medium, applied to every variation generation in the run) and
+completed the small-button size-token migration (the six partially-matching blocks were unified
+under the author's ruling).
 
-v2.0.5 (Build 636) fixed the wave seed-independence bug the author's F-4 visual check uncovered (a fixed-phase sine) by introducing a performance-seed-derived phase, and made material outlines follow the performance seed (F-4 Phase 2). The render engine version is 6.
+v2.0.5 (Build 636) fixed the wave seed-independence bug the author's F-4 visual check uncovered (a
+fixed-phase sine) by introducing a performance-seed-derived phase, and made material outlines
+follow the performance seed (F-4 Phase 2).
+The render engine version is 6.
 
-v2.1.0 (Build 638) moved rendering from absolute pixels to proportional systems. Wobble amplitude and bleed are now ratios of a shape's representative size (fine / medium / broad = 0.025 / 0.08 / 0.18; bleed 0.009 / 0.03 / 0.07), segment and sample counts are length-proportional, and the material layer (stroke widths, dasharrays, texture filters, material outlines, specks) plus the display filter are `canvas.unit`-relative (near byte-identical at `unit=1000`; speck counts became perimeter-proportional). Two author calibration rounds adopted material intensity s1 (floors on outline offset / opacity and speck opacity / count; texture filters unchanged). Material outlines carry `class="material-outline"`. The render engine version is 7.
+v2.1.0 (Build 638) moved rendering from absolute pixels to proportional systems.
+Wobble amplitude and bleed are now ratios of a shape's representative size (fine / medium / broad =
+0.025 / 0.08 / 0.18; bleed 0.009 / 0.03 / 0.07), segment and sample counts are length-proportional,
+and the material layer (stroke widths, dasharrays, texture filters, material outlines, specks) plus
+the display filter are `canvas.unit`-relative (near byte-identical at `unit=1000`; speck counts
+became perimeter-proportional).
+Two author calibration rounds adopted material intensity s1 (floors on outline offset / opacity and
+speck opacity / count; texture filters unchanged).
+Material outlines carry `class="material-outline"`.
+The render engine version is 7.
 
-v2.2.0 (Build 640) draws closed-shape contours (circle / ellipse / square / triangle / polygon) with hand strokes from the stroke engine. `synthesize_along` synthesizes along arbitrary centerlines (a step-feed-forward integrator eliminates curvature distortion), rendering the contour as a filled band of outer and inner banks (`class="contour-stroke-v1"`). Corners are pinned as brush seams; cornerless contours close with a linear ramp. Rotring keeps its geometric contour, the band follows the post-variation contour, material outlines and specks coexist, and body elements stay geometric (bbox and touching unchanged). Line and arc output is byte-identical to v2.1 (arc stroke-ization is a follow-up including a touching arc-extractor redesign). The render engine version is 8. Awaiting author rulings: `filled` being a dead field for closed shapes (always filled), and "fill = covering the interior with fine strokes" (three prototypes recorded, engine 9 class, after pending items). A follow-up contract is filed for a filter-capable PNG rasterizer (`opus-png-filter-rasterizer.md`; cairosvg silently skips feTurbulence / feDisplacementMap / feGaussianBlur).
+v2.2.0 (Build 640) draws closed-shape contours (circle / ellipse / square / triangle / polygon)
+with hand strokes from the stroke engine.
+`synthesize_along` synthesizes along arbitrary centerlines (a step-feed-forward integrator
+eliminates curvature distortion), rendering the contour as a filled band of outer and inner banks
+(`class="contour-stroke-v1"`).
+Corners are pinned as brush seams; cornerless contours close with a linear ramp.
+Rotring keeps its geometric contour, the band follows the post-variation contour, material outlines
+and specks coexist, and body elements stay geometric (bbox and touching unchanged).
+Line and arc output is byte-identical to v2.1 (arc stroke-ization is a follow-up including a
+touching arc-extractor redesign).
+The render engine version is 8.
+Awaiting author rulings: `filled` being a dead field for closed shapes (always filled), and "fill =
+covering the interior with fine strokes" (three prototypes recorded, engine 9 class, after pending
+items).
+A follow-up contract is filed for a filter-capable PNG rasterizer (`opus-png-filter-rasterizer.md`;
+cairosvg silently skips feTurbulence / feDisplacementMap / feGaussianBlur).
 
-v2.2.1 (Build 643) replaced the PNG rasterizer with resvg-py, so texture filters and bleed now render in every PNG path (downloads, AI Vision input, Okugaki thumbnails, five CLI sites). A shared helper `shared/src/inku_analysis/rasterizer.py` prefers resvg with a cairosvg fallback and keeps the missing-dependency warning + skip behavior. Since the API has no PNG endpoint and the CLI rasterizes the response's `svg` in its own process, the CLI sites use the same helper. A cairosvg fallback triggers a CLI warning, a server WARNING, and a `png_rasterizer` (backend/version) record in artifacts. Python is unified at 3.12 across server / cli / shared (resvg-py wheel availability). `inku-analysis` became an editable dependency, removing the trap where rsyncing `shared/` did not take effect until `uv sync`. SVG bodies, rh2, and the engine (8) are unchanged. New PNGs are pixel-incompatible with old ones (direct pixel comparison against past runs is invalid). Lock unification (uv workspace) is a separate contract.
+v2.2.1 (Build 643) replaced the PNG rasterizer with resvg-py, so texture filters and bleed now
+render in every PNG path (downloads, AI Vision input, Okugaki thumbnails, five CLI sites).
+A shared helper `shared/src/inku_analysis/rasterizer.py` prefers resvg with a cairosvg fallback and
+keeps the missing-dependency warning + skip behavior.
+Since the API has no PNG endpoint and the CLI rasterizes the response's `svg` in its own process,
+the CLI sites use the same helper.
+A cairosvg fallback triggers a CLI warning, a server WARNING, and a `png_rasterizer`
+(backend/version) record in artifacts.
+Python is unified at 3.12 across server / cli / shared (resvg-py wheel availability).
+`inku-analysis` became an editable dependency, removing the trap where rsyncing `shared/` did not
+take effect until `uv sync`.
+SVG bodies, rh2, and the engine (8) are unchanged.
+New PNGs are pixel-incompatible with old ones (direct pixel comparison against past runs is
+invalid).
+Lock unification (uv workspace) is a separate contract.
 
-v2.3.0 (Build 645) replaces the area fill of closed shapes with stroke fill — the material's brushwork filling the interior (`class="fill-stroke-v1"`) — and restores the semantics of `filled` (`True` = fill with material strokes / `False` = contour only; previously a dead field, always filled). Scanlines are intersected with the closed contour and each interior span becomes one brush stroke through `synthesize_along` (no clipPath, concave shapes work, endpoints align with the contour). The scan angle derives from the render seed (0–180°); spacing is `max(stroke width × 1.5, canvas.unit × 0.012)` with ±12% jitter, leaving paper grain. Rotring keeps area fill; shapes with fewer than three scanlines degrade to area fill. A specified `surface` suppresses the material fill, and surface hatch / crosshatch lines became brushwork bands (`class="surface-stroke-v1"`). Unperformed variations are excluded from the seed key (per-primitive inactivity rules). Render engine version is 9. Sizes run 11–123KB per shape, 422KB for a 10-instruction work (a cap will be designed later from production distribution; the largest contributor is surface crosshatch banding). Remaining: live-UI inspection (fill spacing density) and strokification of grain / bleed textures. Next contract: arc strokification (engine 10; the rulings are recorded in the report's appendix).
+v2.3.0 (Build 645) replaces the area fill of closed shapes with stroke fill — the material's
+brushwork filling the interior (`class="fill-stroke-v1"`) — and restores the semantics of `filled`
+(`True` = fill with material strokes / `False` = contour only; previously a dead field, always
+filled).
+Scanlines are intersected with the closed contour and each interior span becomes one brush stroke
+through `synthesize_along` (no clipPath, concave shapes work, endpoints align with the contour).
+The scan angle derives from the render seed (0–180°); spacing is
+`max(stroke width × 1.5, canvas.unit × 0.012)` with ±12% jitter, leaving paper grain.
+Rotring keeps area fill; shapes with fewer than three scanlines degrade to area fill.
+A specified `surface` suppresses the material fill, and surface hatch / crosshatch lines became
+brushwork bands (`class="surface-stroke-v1"`).
+Unperformed variations are excluded from the seed key (per-primitive inactivity rules).
+Render engine version is 9.
+Sizes run 11–123KB per shape, 422KB for a 10-instruction work (a cap will be designed later from
+production distribution; the largest contributor is surface crosshatch banding).
+Remaining: live-UI inspection (fill spacing density) and strokification of grain / bleed textures.
+Next contract: arc strokification (engine 10; the rulings are recorded in the report's appendix).
 
-v2.3.1 (Build 647) performs arcs as hand-drawn stroke bands too (`class="arc-stroke-v1"`), closing the last strokification exclusion left by v2.2.0. The geometric arc remains as an invisible intent element (`stroke="none"`); the touching (contact) contract is verified by reading the intent arc back (arc extractor unchanged, full `test_touching.py` pass). Contact ends stay tapered (no width floor; leaf tips fade softly). Dashed / dotted styles make the intent arc thinly visible, drypoint emits burr along the centerline, material outlines and specks coexist with the band, and rotring stays geometric. Render engine version is 10. Fill spacing density was confirmed OK in the live UI. Remaining: live-UI inspection of arcs (re-inspecting Stage 3 leaves is a candidate), size caps, and strokification of grain / bleed textures. **Author versioning ruling (2026-07-21): small revisions bump the patch number (+0.0.1).**
+v2.3.1 (Build 647) performs arcs as hand-drawn stroke bands too (`class="arc-stroke-v1"`), closing
+the last strokification exclusion left by v2.2.0.
+The geometric arc remains as an invisible intent element (`stroke="none"`); the touching (contact)
+contract is verified by reading the intent arc back (arc extractor unchanged, full
+`test_touching.py` pass).
+Contact ends stay tapered (no width floor; leaf tips fade softly).
+Dashed / dotted styles make the intent arc thinly visible, drypoint emits burr along the
+centerline, material outlines and specks coexist with the band, and rotring stays geometric.
+Render engine version is 10.
+Fill spacing density was confirmed OK in the live UI.
+Remaining: live-UI inspection of arcs (re-inspecting Stage 3 leaves is a candidate), size caps, and
+strokification of grain / bleed textures. **Author versioning ruling (2026-07-21): small revisions
+bump the patch number (+0.0.1).**
 
-v2.3.2 (Build 683) brings the UI up to date with the v2.3.1 feature set through 35 interactive adjustments (Builds 648–682): English saijiki highlighting, instructions-editor upgrades, EXIF capture dates in PNG downloads, reorganized input tabs (shared settings strip, length-meter units), contact sheets (7×4 for people / 3×4 + markdown notes for AI), dark-mode contrast fixes (new `--accent-fg` token), and batch-following improvements. The only server change is admin render-concurrency settings (`_RenderCapacity`, `render_concurrency_settings`, `PUT /api/settings/render-concurrency`, `GET /api/client-config`; `INKU_RENDER_CONCURRENCY` demoted to an initial value). Vocabulary was stratified by layer (**LeWitt's instruction sheet = the normalized DDL; the author's description is the poem-like layer above it**; Stage 1's product is "Instructions"; kotobagaki = the description re-presented), reflected in a revised SPEC.ja §5 (four-stage diagram + §5.3 vocabulary table), SPEC.md "The Three-Layer Pipeline", both READMEs, and a permanent vocabulary dialog in App Info. Engine stays 10. UI adjustments continue in a new session.
+v2.3.2 (Build 683) brings the UI up to date with the v2.3.1 feature set through 35 interactive
+adjustments (Builds 648–682): English saijiki highlighting, instructions-editor upgrades, EXIF
+capture dates in PNG downloads, reorganized input tabs (shared settings strip, length-meter units),
+contact sheets (7×4 for people / 3×4 + markdown notes for AI), dark-mode contrast fixes (new
+`--accent-fg` token), and batch-following improvements.
+The only server change is admin render-concurrency settings (`_RenderCapacity`,
+`render_concurrency_settings`, `PUT /api/settings/render-concurrency`, `GET /api/client-config`;
+`INKU_RENDER_CONCURRENCY` demoted to an initial value).
+Vocabulary was stratified by layer (**LeWitt's instruction sheet = the normalized DDL; the author's
+description is the poem-like layer above it**; Stage 1's product is "Instructions"; kotobagaki =
+the description re-presented), reflected in a revised SPEC.ja §5 (four-stage diagram + §5.3
+vocabulary table), SPEC.md "The Three-Layer Pipeline", both READMEs, and a permanent vocabulary
+dialog in App Info.
+Engine stays 10.
+UI adjustments continue in a new session.
 
-v2.4.0 (Build 684) establishes the release distribution pipeline. Pushing a git tag `vX.Y.Z` makes GitHub Actions build and publish `ghcr.io/oikawas/inku-api` / `inku-web` as multi-arch (amd64 / arm64) images, and users run them with the compose file and `.env.example` under `deploy/` (SPEC.md §12.1). The build number is baked into the api image (fixing the null container `/api/info` and `render_build_number`), `/api/info`'s `version` now derives from `server/pyproject.toml` as the single source and is stamped per release (2.4.0 this release), the nature-leaves plugin v0.3.0 is tracked in git and bundled in the image, and a blank bootstrap-admin password is treated as unset with both compose files requiring the variable via `:?` (the no-self-signup premise is now stated in manual / SETUP / SPEC). Engine 10, the Score schema, and the web UI are unchanged.
+v2.4.0 (Build 684) establishes the release distribution pipeline.
+Pushing a git tag `vX.Y.Z` makes GitHub Actions build and publish `ghcr.io/oikawas/inku-api` /
+`inku-web` as multi-arch (amd64 / arm64) images, and users run them with the compose file and
+`.env.example` under `deploy/` (SPEC.md §12.1).
+The build number is baked into the api image (fixing the null container `/api/info` and
+`render_build_number`), `/api/info`'s `version` now derives from `server/pyproject.toml` as the
+single source and is stamped per release (2.4.0 this release), the nature-leaves plugin v0.3.0 is
+tracked in git and bundled in the image, and a blank bootstrap-admin password is treated as unset
+with both compose files requiring the variable via `:?` (the no-self-signup premise is now stated
+in manual / SETUP / SPEC).
+Engine 10, the Score schema, and the web UI are unchanged.
 
-The README visuals pass (2026-07-22, docs only, no version stamp) added a six-work gallery to both READMEs (`docs/assets/gallery/`, selected from the author's starred history; each work pairs the picture with its kotobagaki and a `<details>` block of instructions, SVG, and seed) and six UI screenshots (`docs/assets/ui/`, three per language, `*.ja/.en.png` so each README references only its own language), restructuring the page as "Works — descriptions become pictures → How it works (a layer walkthrough of a real Score) → Screens → … → Documentation (moved to the end)". Single-cell `<table>` wrappers provide the only border style that survives GitHub's sanitizer, and `.gitignore` became `docs/*` + `!docs/assets/`. The low-contrast second work was swapped post-publication for the silver-shoal piece (B962). Code, engine, and version stamps are unchanged.
+The README visuals pass (2026-07-22, docs only, no version stamp) added a six-work gallery to both
+READMEs (`docs/assets/gallery/`, selected from the author's starred history; each work pairs the
+picture with its kotobagaki and a `<details>` block of instructions, SVG, and seed) and six UI
+screenshots (`docs/assets/ui/`, three per language, `*.ja/.en.png` so each README references only
+its own language), restructuring the page as "Works — descriptions become pictures → How it works
+(a layer walkthrough of a real Score) → Screens → … → Documentation (moved to the end)".
+Single-cell `<table>` wrappers provide the only border style that survives GitHub's sanitizer, and
+`.gitignore` became `docs/*` + `!docs/assets/`.
+The low-contrast second work was swapped post-publication for the silver-shoal piece (B962).
+Code, engine, and version stamps are unchanged.
 
-v2.4.2 (Build 689) makes the saijiki ja/en pairing structural. The two parallel tuples `words_ja` / `words_en` on `SaijikiCategory` are replaced by one word list of `SaijikiWord` entries carrying `surface_ja` and `surface_en` together (flags shared across languages; `surface_en=None` expresses a pruned tombstone). Each tezawari and iro word also carries `score_value`, deleting `_surface_value_map`, which had zipped the word list against the Score enum values — **reordering a tezawari word used to reassign Score weight values silently**. This aligns the remaining categories with `RelationWord`, which already paired both surfaces in one entry. All 15 ja/en outputs hash identically before and after, the generated TS is byte-identical, and the 68 pairs in `_EXPECTED_PAIRING` pass unedited. Engine stays 10; no word was added, removed, or renamed. pytest 1028/30 (+2 structural tests).
+v2.4.2 (Build 689) makes the saijiki ja/en pairing structural.
+The two parallel tuples `words_ja` / `words_en` on `SaijikiCategory` are replaced by one word list
+of `SaijikiWord` entries carrying `surface_ja` and `surface_en` together (flags shared across
+languages; `surface_en=None` expresses a pruned tombstone).
+Each tezawari and iro word also carries `score_value`, deleting `_surface_value_map`, which had
+zipped the word list against the Score enum values — **reordering a tezawari word used to reassign
+Score weight values silently**.
+This aligns the remaining categories with `RelationWord`, which already paired both surfaces in one
+entry.
+All 15 ja/en outputs hash identically before and after, the generated TS is byte-identical, and the
+68 pairs in `_EXPECTED_PAIRING` pass unedited.
+Engine stays 10; no word was added, removed, or renamed. pytest 1028/30 (+2 structural tests).
 
-v2.4.1 (Build 687) is UI adjustments round 2. All 69 DDL-editor word-preview entries were localized, and two cross-language saijiki pairing bugs found mid-work were fixed (a pruned `髪`/`hair` lingering in i18n shifted the join by one; `words_en` ordering did not match `words_ja`, crossing explanations). The root cause — hand-maintained i18n copies (`saijikiWords`) — was removed; display words now come straight from the hydrated `SAIJIKI` / `SAIJIKI_EN`, and a test pins all 68 ja/en pairs explicitly. Side effect: the English Stage 1 prompt's `motions:` order changes (same word set, no bench run yet). The describe tab moved the tanka guide from the hint into the counter. Engine stays 10. UI adjustments continue interactively.
+v2.4.1 (Build 687) is UI adjustments round 2.
+All 69 DDL-editor word-preview entries were localized, and two cross-language saijiki pairing bugs
+found mid-work were fixed (a pruned `髪`/`hair` lingering in i18n shifted the join by one;
+`words_en` ordering did not match `words_ja`, crossing explanations).
+The root cause — hand-maintained i18n copies (`saijikiWords`) — was removed; display words now come
+straight from the hydrated `SAIJIKI` / `SAIJIKI_EN`, and a test pins all 68 ja/en pairs explicitly.
+Side effect: the English Stage 1 prompt's `motions:` order changes (same word set, no bench run
+yet).
+The describe tab moved the tanka guide from the hint into the counter.
+Engine stays 10.
+UI adjustments continue interactively.
 
-v2.4.3 (Build 693) is UI adjustments round 3. A new `INKU_DEVELOPER_MODE` environment variable confines NVIDIA NIM and the always-on Build number to development environments (**only the display is gated: the execution path, stored model settings, the model information on history entries, and `render_build_number` are unchanged when it is off**; the distributed compose file defaults it off and the development/bench one defaults it on — SPEC §12.1). The lineage panel and its overview share a new vertical/horizontal toggle (horizontal runs generations left to right and stacks same-generation works vertically; arrows and scrolling follow the direction, and the choice persists to the browser; the lineage API, schema, and stored data are unchanged). The demo gained a 1–1,440 minute (up to 24 hour) timeout, default 60 minutes, which lets the in-flight render finish and land before stopping and shows the remaining time as `HH:MM:SS`. Engine stays 10; Score schema / coerce / rh2 / renderer / stroke_engine are untouched. pytest 1029/30. Folded into this version: the SETUP container section plus three corrections in both languages (**the Python requirement was stated as 3.10 or later when it is 3.12 or later**, among others), and a full rewrite of the README regeneration section into pursuing a work through refinement. UI adjustments continue interactively.
+v2.4.3 (Build 693) is UI adjustments round 3.
+A new `INKU_DEVELOPER_MODE` environment variable confines NVIDIA NIM and the always-on Build number
+to development environments (**only the display is gated: the execution path, stored model
+settings, the model information on history entries, and `render_build_number` are unchanged when it
+is off**; the distributed compose file defaults it off and the development/bench one defaults it on
+— SPEC §12.1).
+The lineage panel and its overview share a new vertical/horizontal toggle (horizontal runs
+generations left to right and stacks same-generation works vertically; arrows and scrolling follow
+the direction, and the choice persists to the browser; the lineage API, schema, and stored data are
+unchanged).
+The demo gained a 1–1,440 minute (up to 24 hour) timeout, default 60 minutes, which lets the
+in-flight render finish and land before stopping and shows the remaining time as `HH:MM:SS`.
+Engine stays 10; Score schema / coerce / rh2 / renderer / stroke_engine are untouched. pytest
+1029/30.
+Folded into this version: the SETUP container section plus three corrections in both languages
+(**the Python requirement was stated as 3.10 or later when it is 3.12 or later**, among others),
+and a full rewrite of the README regeneration section into pursuing a work through refinement.
+UI adjustments continue interactively.
 
-v2.4.8 (Build 698) declares a master grid for the performed output and moves the drawing engine to **11**. It began with eight consecutive failures of the `reference-corpus` workflow, caused by **a corpus frozen on macOS while CI regenerates it on Linux**: `math.sin` differs by one unit in the last place, and because `points` / `cx` / `cy` reached svgwrite as raw floats, seventeen digits landed in the file and the difference became a byte difference (81 of 220 cases, zero structural differences, largest relative difference 2e-16; reproduced on pentala before anything changed). Measurement showed **the platform noise floor sits between ten and eleven decimals**, **the coordinate grid mixed `.1f`–`.3f` with seventeen digits**, and **shape fidelity is 2.2e-4 of the artboard** (strokes are chains of straight segments: 77,666 `L` commands against 490 `C`). The digits were therefore two hundred times finer than needed and **the effective resolution is set by sampling**, so this is not a change that discards resolution but one that **gathers scattered precisions into a single declaration** — drawing geometry actually moved up, from three decimals to six. `master_grid.py` is the sole source of truth: six fixed decimals, a canvas-relative step of 1e-9, four orders of magnitude above the noise floor and 100nm when stretched across a 100m wall. **Trailing zeros are kept** (author's ruling; the reason is verifiability rather than size — with a fixed width a single `-?\d+\.\d{6}` confirms the grid from the artifact itself). The grid is enforced at one point in `render()`, because fixing 48 svgwrite call sites individually leaves omissions that pass silently. **The drawing did not change**: across all 220 cases the count of numbers is identical and no number moved more than 5e-4, the half-step of the old three-decimal formatting. **The engine 10 corpus is kept** as the evidence for that claim, though it cannot be reproduced outside macOS and CI no longer checks it (documented in the README) — the **first practical use of the reference corpus**. CI now checks the whole `server/reference/` tree. Two checks (freshly rendered output across three profiles, and all 220 frozen files) were both confirmed to fail when perturbed, and the corpus is byte-identical on macOS arm64 and Ubuntu x86_64. **Reference corpus Phase 4** (prompt provenance digests) merged alongside: the saijiki is read by no deterministic layer and flows into the unversioned Stage 1 prompt, so `stage1_prompt_base_digest` is the only mechanism that can detect vocabulary growth (`stage2_prompt_base_digest` is deliberately absent). Existing rows are not backfilled. pytest 1062/30, cli 68, ruff clean, `npm run check` 0 errors / 2 warnings. **That gap is now closed by Phase 2h** (see the Android paragraph below): engine 11 fixed `path d` at six decimals and every Android parity fixture had broken.
+v2.4.8 (Build 698) declares a master grid for the performed output and moves the drawing engine to
+**11**.
+It began with eight consecutive failures of the `reference-corpus` workflow, caused by **a corpus
+frozen on macOS while CI regenerates it on Linux**: `math.sin` differs by one unit in the last
+place, and because `points` / `cx` / `cy` reached svgwrite as raw floats, seventeen digits landed
+in the file and the difference became a byte difference (81 of 220 cases, zero structural
+differences, largest relative difference 2e-16; reproduced on pentala before anything changed).
+Measurement showed **the platform noise floor sits between ten and eleven decimals**, **the
+coordinate grid mixed `.1f`–`.3f` with seventeen digits**, and **shape fidelity is 2.2e-4 of the
+artboard** (strokes are chains of straight segments: 77,666 `L` commands against 490 `C`).
+The digits were therefore two hundred times finer than needed and **the effective resolution is set
+by sampling**, so this is not a change that discards resolution but one that **gathers scattered
+precisions into a single declaration** — drawing geometry actually moved up, from three decimals to
+six.
+`master_grid.py` is the sole source of truth: six fixed decimals, a canvas-relative step of 1e-9,
+four orders of magnitude above the noise floor and 100nm when stretched across a 100m wall.
+**Trailing zeros are kept** (author's ruling; the reason is verifiability rather than size — with a
+fixed width a single `-?\d+\.\d{6}` confirms the grid from the artifact itself).
+The grid is enforced at one point in `render()`, because fixing 48 svgwrite call sites individually
+leaves omissions that pass silently. **The drawing did not change**: across all 220 cases the count
+of numbers is identical and no number moved more than 5e-4, the half-step of the old three-decimal
+formatting. **The engine 10 corpus is kept** as the evidence for that claim, though it cannot be
+reproduced outside macOS and CI no longer checks it (documented in the README) — the **first
+practical use of the reference corpus**.
+CI now checks the whole `server/reference/` tree.
+Two checks (freshly rendered output across three profiles, and all 220 frozen files) were both
+confirmed to fail when perturbed, and the corpus is byte-identical on macOS arm64 and Ubuntu
+x86_64. **Reference corpus Phase 4** (prompt provenance digests) merged alongside: the saijiki is
+read by no deterministic layer and flows into the unversioned Stage 1 prompt, so
+`stage1_prompt_base_digest` is the only mechanism that can detect vocabulary growth
+(`stage2_prompt_base_digest` is deliberately absent).
+Existing rows are not backfilled. pytest 1062/30, cli 68, ruff clean, `npm run check` 0 errors / 2
+warnings. **That gap is now closed by Phase 2h** (see the Android paragraph below): engine 11 fixed
+`path d` at six decimals and every Android parity fixture had broken.
 
-v2.4.9 (Build 705) brings the version drift to the user's screen in words on replay, **completing all five phases of the parent contract on the reference corpus and layer versions** (Phase 5, implementing SPEC.ja §15.8). After freezing a corpus that shows the engine 10 → 11 difference as "only the written digits changed, the shape did not," this phase **puts that version difference into words on screen**. The drawing core, stroke engine, Score schema, `server/reference/`, and every version number (`render_engine_version="11"`, `ddl_version="1"`, `ddl_engine_version="1"`) are all left as they were; only the display was added. The unauthenticated `GET /api/info` gained `render_engine_id` / `render_engine_version` / `ddl_version` / `ddl_engine_version`, read from `current_render_engine()` and `DDL_VERSION` / `DDL_ENGINE_VERSION` rather than hard-coded (the test pins that monkeypatching the engine object makes `/api/info` follow). The generation-info drawer shows a "DDL specification / transform layer" line whose absence reads as **"not recorded" rather than a guessed value** — of 1704 DB rows, 590 (35%) carry no engine-version record, so this distinguishes "no record" from "version 1" on screen. The new `ReplayComparisonModal.svelte` re-renders the saved Score through `/api/render-svg` with the current Renderer and **places the saved SVG (original) beside the re-rendered SVG (current)**; when the versions differ it shows "This artwork was rendered with engine 10. The image now on screen was re-rendered with engine 11." (with Japanese) outside the work, above the grid, never overlaid, and shows nothing when the recorded and current versions match, when `/api/info` fails, or when a work is merely opened from history. Closing returns to the caller (history manager / work tab / lineage tab); a replay button was added to the bottom canvas bar and the relevant buttons in `CanvasPanel` / `HistoryManager` aligned to the `--btn-sm-*` tokens. On the author's added instruction, **provisional comparison for seed-less works** was included: history with neither `render_seed` nor `seed_text` can be compared, with the DB left untouched and a fixed seed of `0` supplied only for the request (because the API omits NULL columns, **completeness is decided by the presence of the saved `score` and `svg`, not the `render_seed` field** — getting this wrong left the bottom-bar replay button disabled in Build 703; confirmed from an author screenshot and fixed in Build 704). **No retention, selection, or recall of past Renderers; no replacing saved SVGs; no backfill of existing versions or `render_seed`; no change to the `/api/render-svg` body; no new web test harness.** The spec did not move, so SPEC was not touched. pytest 1063/30 (+1 for the `/api/info` version fields), cli 68, ruff clean, `npm run check` 0 errors / 2 warnings (217 files including the new modal), `npm run build` succeeded. The change touches only one server file plus its test and web.
+v2.4.9 (Build 705) brings the version drift to the user's screen in words on replay, **completing
+all five phases of the parent contract on the reference corpus and layer versions** (Phase 5,
+implementing SPEC.ja §15.8).
+After freezing a corpus that shows the engine 10 → 11 difference as "only the written digits
+changed, the shape did not," this phase **puts that version difference into words on screen**.
+The drawing core, stroke engine, Score schema, `server/reference/`, and every version number
+(`render_engine_version="11"`, `ddl_version="1"`, `ddl_engine_version="1"`) are all left as they
+were; only the display was added.
+The unauthenticated `GET /api/info` gained `render_engine_id` / `render_engine_version` /
+`ddl_version` / `ddl_engine_version`, read from `current_render_engine()` and `DDL_VERSION` /
+`DDL_ENGINE_VERSION` rather than hard-coded (the test pins that monkeypatching the engine object
+makes `/api/info` follow).
+The generation-info drawer shows a "DDL specification / transform layer" line whose absence reads
+as **"not recorded" rather than a guessed value** — of 1704 DB rows, 590 (35%) carry no
+engine-version record, so this distinguishes "no record" from "version 1" on screen.
+The new `ReplayComparisonModal.svelte` re-renders the saved Score through `/api/render-svg` with
+the current Renderer and **places the saved SVG (original) beside the re-rendered SVG (current)**;
+when the versions differ it shows "This artwork was rendered with engine 10.
+The image now on screen was re-rendered with engine 11." (with Japanese) outside the work, above
+the grid, never overlaid, and shows nothing when the recorded and current versions match, when
+`/api/info` fails, or when a work is merely opened from history.
+Closing returns to the caller (history manager / work tab / lineage tab); a replay button was added
+to the bottom canvas bar and the relevant buttons in `CanvasPanel` / `HistoryManager` aligned to
+the `--btn-sm-*` tokens.
+On the author's added instruction, **provisional comparison for seed-less works** was included:
+history with neither `render_seed` nor `seed_text` can be compared, with the DB left untouched and
+a fixed seed of `0` supplied only for the request (because the API omits NULL columns,
+**completeness is decided by the presence of the saved `score` and `svg`, not the `render_seed`
+field** — getting this wrong left the bottom-bar replay button disabled in Build 703; confirmed
+from an author screenshot and fixed in Build 704). **No retention, selection, or recall of past
+Renderers; no replacing saved SVGs; no backfill of existing versions or `render_seed`; no change to
+the `/api/render-svg` body; no new web test harness.** The spec did not move, so SPEC was not
+touched. pytest 1063/30 (+1 for the `/api/info` version fields), cli 68, ruff clean,
+`npm run check` 0 errors / 2 warnings (217 files including the new modal), `npm run build`
+succeeded.
+The change touches only one server file plus its test and web.
 
-v2.5.0 (Build 706) de-regularizes the performance and moves the drawing engine to **12**. Up to engine 11 the performance looked varied but was periodic: the width envelope was a fixed `max(0, sin(pi t))` hump (**every stroke fattest exactly at its midpoint, symmetric to both ends**), the correction event beat with `i % 5` (**a period of five**), closed contours carried a thin seam opposite a fat middle, and the material outline used an even dash and evenly spaced specks. All four are replaced by seeded low-frequency noise (`_edge_window` × `_swell`), and `ToolGrammar` gains a tenth field, `gesture`, that **wanders the centreline itself at a scale set by stroke length** (bends, curls, self-overlap; endpoints pinned by the window, determinism from the seed). Alongside it, an **"unleashed" (`wild`) toggle** was placed as one switch for the whole work (`WILD_GAIN = 3.5`). **It lifts only the amplitude ceiling and the ban on self-intersection; endpoint pinning and determinism hold either way.** It is recorded as a generation parameter (`history.render_wild`; NULL means "from before the column", kept distinct from OFF), used on replay, and **included in the edition identity `rh3`**. The material changed, but `render_engine_version` lives in the same payload, so old values always contain `"11"` or lower and new ones `"12"` or higher and cannot collide — hence the format name stays. **That argument only holds because the engine version moved at the same time**, so the material must never be extended on its own. The `render-engine-12/` corpus was frozen with **199 of 220 cases changed and 21 unchanged**. What is unchanged is itself the explanation: the 12 `rotring` cases have an all-zero grammar, so de-regularization has nothing to reach (**the machine pole of the tool vocabulary is exactly where it was**), while the 9 `cloudform` cases are emitted as Catmull-Rom paths that never enter `stroke_engine` (**a gap engine 12 exposed rather than created**). This prompted implementing the "store only what moved" rule in the generator — the README and SPEC had required it for some time, but engine 11 moved every case, so **the two behaviours were indistinguishable**. The version-bump rule gained **"when the performable vocabulary grows"** (author's ruling: adding a tool leaves every existing case byte-identical and CI green, so a results-only condition would let the meaning of a version break on the input set instead of the output). SPEC gained the "unleashed" section in §13.4, the extended condition and the `rh3` note in §15.6, and the engine 12 measurements in §15.7. **Android was not brought forward, the "computer" touch was not added, `cloudform` was not moved onto stroke synthesis, and `render_wild` was not backfilled.** pytest 1066/30 (+7), cli 68, ruff clean, `npm run check` 0 errors / 2 warnings. The 6 re-baselined goldens were confirmed to fail as a set under a 1e-6 perturbation of `_swell`.
+v2.5.0 (Build 706) de-regularizes the performance and moves the drawing engine to **12**.
+Up to engine 11 the performance looked varied but was periodic: the width envelope was a fixed
+`max(0, sin(pi t))` hump (**every stroke fattest exactly at its midpoint, symmetric to both
+ends**), the correction event beat with `i % 5` (**a period of five**), closed contours carried a
+thin seam opposite a fat middle, and the material outline used an even dash and evenly spaced
+specks.
+All four are replaced by seeded low-frequency noise (`_edge_window` × `_swell`), and `ToolGrammar`
+gains a tenth field, `gesture`, that **wanders the centreline itself at a scale set by stroke
+length** (bends, curls, self-overlap; endpoints pinned by the window, determinism from the seed).
+Alongside it, an **"unleashed" (`wild`) toggle** was placed as one switch for the whole work
+(`WILD_GAIN = 3.5`). **It lifts only the amplitude ceiling and the ban on self-intersection;
+endpoint pinning and determinism hold either way.** It is recorded as a generation parameter
+(`history.render_wild`; NULL means "from before the column", kept distinct from OFF), used on
+replay, and **included in the edition identity `rh3`**.
+The material changed, but `render_engine_version` lives in the same payload, so old values always
+contain `"11"` or lower and new ones `"12"` or higher and cannot collide — hence the format name
+stays. **That argument only holds because the engine version moved at the same time**, so the
+material must never be extended on its own.
+The `render-engine-12/` corpus was frozen with **199 of 220 cases changed and 21 unchanged**.
+What is unchanged is itself the explanation: the 12 `rotring` cases have an all-zero grammar, so
+de-regularization has nothing to reach (**the machine pole of the tool vocabulary is exactly where
+it was**), while the 9 `cloudform` cases are emitted as Catmull-Rom paths that never enter
+`stroke_engine` (**a gap engine 12 exposed rather than created**).
+This prompted implementing the "store only what moved" rule in the generator — the README and SPEC
+had required it for some time, but engine 11 moved every case, so **the two behaviours were
+indistinguishable**.
+The version-bump rule gained **"when the performable vocabulary grows"** (author's ruling: adding a
+tool leaves every existing case byte-identical and CI green, so a results-only condition would let
+the meaning of a version break on the input set instead of the output).
+SPEC gained the "unleashed" section in §13.4, the extended condition and the `rh3` note in §15.6,
+and the engine 12 measurements in §15.7. **Android was not brought forward, the "computer" touch
+was not added, `cloudform` was not moved onto stroke synthesis, and `render_wild` was not
+backfilled.** pytest 1066/30 (+7), cli 68, ruff clean, `npm run check` 0 errors / 2 warnings.
+The 6 re-baselined goldens were confirmed to fail as a set under a 1e-6 perturbation of `_swell`.
 
-v2.6.0 (Build 707) adds an eleventh touch, **"computer"**, and moves the drawing engine to **13**. Its core is not "the hand does not shake" but **"it repeats without error"**: a hand cannot produce the same value twice, a machine can produce nothing else. **A cycle repeats along the line, a lattice repeats across the plane** — two axes of one property. That is what separates it from `rotring` (**rotring has no wobble to repeat**, while **the computer has wobble and repeats it exactly**), and why it is not a retreat to engine 11's symmetric envelope (that was a **default nobody could decline**; this is **vocabulary you choose**). `ToolGrammar` gains `periodic` / `quantize` / `width_steps` (all zero, hence unchanged, for the existing ten tools); under `periodic` the noise sources become whole-cycle sines that **take no seed**, centreline coordinates round to a lattice of `stroke length x 0.018`, and width falls onto four steps. `wild` has no effect. **The material is the remainder of sampling**: a hand tool's layer is what the tool drops beside the stroke (graphite dust, brush hair), but all a machine has is **the difference discarded when rounding to the lattice**. Samples with a non-zero residual get a one-cell square (`raster-bleed`) laid under the stroke, **placed on the lattice** and toned in proportion to the residual (capped at 0.45). **The geometry repeats without error; the material shows where the error went.** Endpoints and polygon corners return to the intention, so they carry no residual and emit no cell (39 cells from 41 samples on a line). **This material replaced a first version the author rejected on sight**: the original "ruled line plus one identical dash pattern" stayed pinned to the intended start and end while the performed centreline wanders up to 55.4px away, so the dashes detached and read as background ruling — **"they carry no pictorial meaning"**. (A "lattice halo" alternative was rejected too: it appears uniformly, regardless of how much the rounding moved.) The numbers — lattice 0.018, tone 0.45, cells on the lattice — were chosen from nine plus two rendered comparison panels. The `render-engine-13/` corpus holds 228 cases; the only new bodies are the eight `A-computer-*` ones and **not one of the 220 existing digests moved** (the proof sheet for "a block was added and the earlier prints did not change", and the first use of SPEC §15.6's "the performable vocabulary grows" clause). Regenerating after the material was rebuilt tripped the generator's guard against rewriting a frozen corpus, so **the unreleased engine 13 was re-frozen rather than bumped**. SPEC gains §15.9 (§12.6 in English). **Android was not brought forward, no radius modulation was written for closed contours, scanlines / dithering / surface textures were untouched, and no existing tool's performance values changed.** **The lattice applying to absolute coordinates with a step proportional to stroke length (thirty equal lines give nine distinct figures) is left unruled.** pytest 1091/30 (+2), cli 68, ruff clean, `npm run check` 0 errors / 2 warnings. Three perturbations measured the discriminating power, and **the snap perturbation passed unnoticed on open strokes until a closed-contour check was added**.
+v2.6.0 (Build 707) adds an eleventh touch, **"computer"**, and moves the drawing engine to **13**.
+Its core is not "the hand does not shake" but **"it repeats without error"**: a hand cannot produce
+the same value twice, a machine can produce nothing else. **A cycle repeats along the line, a
+lattice repeats across the plane** — two axes of one property.
+That is what separates it from `rotring` (**rotring has no wobble to repeat**, while **the computer
+has wobble and repeats it exactly**), and why it is not a retreat to engine 11's symmetric envelope
+(that was a **default nobody could decline**; this is **vocabulary you choose**).
+`ToolGrammar` gains `periodic` / `quantize` / `width_steps` (all zero, hence unchanged, for the
+existing ten tools); under `periodic` the noise sources become whole-cycle sines that **take no
+seed**, centreline coordinates round to a lattice of `stroke length x 0.018`, and width falls onto
+four steps.
+`wild` has no effect. **The material is the remainder of sampling**: a hand tool's layer is what
+the tool drops beside the stroke (graphite dust, brush hair), but all a machine has is **the
+difference discarded when rounding to the lattice**.
+Samples with a non-zero residual get a one-cell square (`raster-bleed`) laid under the stroke,
+**placed on the lattice** and toned in proportion to the residual (capped at 0.45). **The geometry
+repeats without error; the material shows where the error went.** Endpoints and polygon corners
+return to the intention, so they carry no residual and emit no cell (39 cells from 41 samples on a
+line). **This material replaced a first version the author rejected on sight**: the original "ruled
+line plus one identical dash pattern" stayed pinned to the intended start and end while the
+performed centreline wanders up to 55.4px away, so the dashes detached and read as background
+ruling — **"they carry no pictorial meaning"**. (A "lattice halo" alternative was rejected too: it
+appears uniformly, regardless of how much the rounding moved.) The numbers — lattice 0.018, tone
+0.45, cells on the lattice — were chosen from nine plus two rendered comparison panels.
+The `render-engine-13/` corpus holds 228 cases; the only new bodies are the eight `A-computer-*`
+ones and **not one of the 220 existing digests moved** (the proof sheet for "a block was added and
+the earlier prints did not change", and the first use of SPEC §15.6's "the performable vocabulary
+grows" clause).
+Regenerating after the material was rebuilt tripped the generator's guard against rewriting a
+frozen corpus, so **the unreleased engine 13 was re-frozen rather than bumped**.
+SPEC gains §15.9 (§12.6 in English). **Android was not brought forward, no radius modulation was
+written for closed contours, scanlines / dithering / surface textures were untouched, and no
+existing tool's performance values changed.** **The lattice applying to absolute coordinates with a
+step proportional to stroke length (thirty equal lines give nine distinct figures) is left
+unruled.** pytest 1091/30 (+2), cli 68, ruff clean, `npm run check` 0 errors / 2 warnings.
+Three perturbations measured the discriminating power, and **the snap perturbation passed unnoticed
+on open strokes until a closed-contour check was added**.
 
-v2.6.1 (Build 708) moves **the English interface** to the vocabulary of printmaking, music and tanka. **It changes English display text only; not one character of Japanese moved.** inku is built from three metaphors — score and performance (music), block and impression (printmaking), headnote and Saijiki (tanka and haiku) — so the English uses each tradition's established terms, and prefers the workshop's words (write, paint, perform) to the industry's (prompt, generate). **English display text lived in three channels**: the i18n pack `en.ts` (641 entries), inline `isJapanese ? … : …` ternaries in components (132 sites across 12 files), and `getLang() === 'ja'` branches (15 sites). **Fixing only the i18n pack would have left 147 sites on the old vocabulary**, so all three were inventoried first (236 entries rewritten). The five refinement operations became **`Another performance` / `Another composition` / `Another reading` / `Another catalog`, plus `Variation`**, so the names alone contrast what is redrawn against what is kept (the nouns wrap rather than abbreviate when a button is tight). Variation amplitudes became **`Subtle` / `Moderate` / `Sweeping`** — music does not call a variation "large" — and **the layout refinement cost label dropped its clashing `Moderate` for `Medium`**, to keep one word to one meaning. That discipline covers six words (`interpretation`, `reading`, `performance`, `variation`, `sway`, `color catalog`): **`palette` appears zero times** (the color catalog is an inku concept) and **`rendering` appears zero times in interface prose**. Only **`Saijiki` and `inku`** remain romanized; `Okugaki` became **`Colophon`** and `Kotobagaki (caption)` became **`Headnote`**, since more romanization drifts toward exoticism and costs the tool its credibility. `Generation Info` became **`Provenance`**, `artwork` became **`work`** (zero remain), `Unleashed` became **`Wild`**, and the main action button `Generate` became **`Paint`**. Microcopy was rewritten sentence by sentence: progress reads **`Interpreting your words…` / `Writing the score, then performing…`**, and the engine-mismatch notice reads **`This work was performed by engine N. What you see now is a new impression by engine M.`** **The Saijiki category names were left alone**: they are not web strings but `name_en` in `saijiki.py`, and **they flow through `prompt_block("en")` into the English Stage 1 prompt** (pinned by a golden fixture) — **part of the English DDL vocabulary, not the interface** — so the dictionary's suggestions were reported to the author instead of applied. **Where the dictionary and the implementation disagreed, measurement won**: the five operation names were justified as mirroring a Japanese "another ◯◯" form that is in fact the verb form "change the ◯◯" (on the author's ruling only the English became nominal), and `settingsGenerationLabel` turned out to be `'生成'`, the act, not a generation count. **That the Japanese did not move is guaranteed by three md5 fingerprints** (`ja.ts`, the Japanese side of the 132 ternaries, the Japanese side of the 14 `getLang()` branches); without `LC_ALL=C sort` the digest changes even when no content does. `npm run check` 0 errors / 2 warnings (217 files), the i18n key set unchanged at 641 and identical across languages, zero diff in `server`, `cli`, `android` and `saijiki.ts`, and four perturbations measured the discriminating power. **The English documentation (README.md, SPEC.md, `manual/en/`) has not followed**, so only the interface carries the new vocabulary (`artwork` 25 in SPEC and 26 in the manual, `palette` 12 in SPEC, and so on). That is separate work.
+v2.6.1 (Build 708) moves **the English interface** to the vocabulary of printmaking, music and
+tanka. **It changes English display text only; not one character of Japanese moved.** inku is built
+from three metaphors — score and performance (music), block and impression (printmaking), headnote
+and Saijiki (tanka and haiku) — so the English uses each tradition's established terms, and prefers
+the workshop's words (write, paint, perform) to the industry's (prompt, generate). **English
+display text lived in three channels**: the i18n pack `en.ts` (641 entries), inline
+`isJapanese ? … : …` ternaries in components (132 sites across 12 files), and `getLang() === 'ja'`
+branches (15 sites). **Fixing only the i18n pack would have left 147 sites on the old vocabulary**,
+so all three were inventoried first (236 entries rewritten).
+The five refinement operations became **`Another performance` / `Another composition` /
+`Another reading` / `Another catalog`, plus `Variation`**, so the names alone contrast what is
+redrawn against what is kept (the nouns wrap rather than abbreviate when a button is tight).
+Variation amplitudes became **`Subtle` / `Moderate` / `Sweeping`** — music does not call a
+variation "large" — and **the layout refinement cost label dropped its clashing `Moderate` for
+`Medium`**, to keep one word to one meaning.
+That discipline covers six words (`interpretation`, `reading`, `performance`, `variation`, `sway`,
+`color catalog`): **`palette` appears zero times** (the color catalog is an inku concept) and
+**`rendering` appears zero times in interface prose**.
+Only **`Saijiki` and `inku`** remain romanized; `Okugaki` became **`Colophon`** and
+`Kotobagaki (caption)` became **`Headnote`**, since more romanization drifts toward exoticism and
+costs the tool its credibility.
+`Generation Info` became **`Provenance`**, `artwork` became **`work`** (zero remain), `Unleashed`
+became **`Wild`**, and the main action button `Generate` became **`Paint`**.
+Microcopy was rewritten sentence by sentence: progress reads **`Interpreting your words…` /
+`Writing the score, then performing…`**, and the engine-mismatch notice reads
+**`This work was performed by engine N.
+What you see now is a new impression by engine
+M.`** **The Saijiki category names were left alone**: they are not web strings but `name_en` in `saijiki.py`, and **they flow through `promp
+t_block("en")` into the English Stage 1 prompt** (pinned by a golden fixture) — **part of the English DDL vocabulary, not the interface** — so the dictionary's suggestions were reported to the author instead of applied. **Where the dictionary and the implementation disagreed, measurement won**: the five operation names were justified as mirroring a Japanese "another ◯◯" form that is in fact the verb form "change the ◯◯" (on the author's ruling only the English became nominal), and `
+settingsGenerationLabel` turned out to be `'生成'`, the act, not a generation count. **That the Japanese did not move is guaranteed by three md5 fingerprints** (`
+ja.ts`, the Japanese side of the 132 ternaries, the Japanese side of the 14 `getLang()` branches); without `LC_ALL=C
+sort` the digest changes even when no content does.
+`npm run check` 0 errors / 2 warnings (217 files), the i18n key set unchanged at 641 and identical
+across languages, zero diff in `server`, `cli`, `android` and `saijiki.ts`, and four perturbations
+measured the discriminating power. **The English documentation (README.md, SPEC.md, `manual/en/`)
+has not followed**, so only the interface carries the new vocabulary (`artwork` 25 in SPEC and 26
+in the manual, `palette` 12 in SPEC, and so on).
+That is separate work.
 
-v2.7.0 (Build 709) closes **one sheet of graph paper** and **the reach of wild** together, moving the drawing engine to **14**. Both were holes engine 13 left open, and both change what is performed, so one version means the corpus is re-frozen once. **A lattice is a property of the paper, not of the object placed on it**: engine 13's step was **proportional to stroke length** (`step = length x 0.018`), so different lengths got different steps (100px -> 1.8, 800px -> 14.4px), **the same length changed figure with position** (thirty equal lines gave thirty distinct figures), and one picture held **as many sheets of graph paper as it held sizes**. Engine 14 derives it from **`canvas short side x quantize`** — the value is still 0.018 but **its meaning changed** — and since `stroke_engine` does not know about the canvas, **the renderer converts to pixels and passes it in, with all four length-relative sites deleted**. That is 18.000000px on a 1000px square, varying with aspect (3.600px on a pillar), and **every stroke in one picture now falls onto the same cells** (with three objects of different size in one Score, coordinates off the lattice went from 188/194 to 0/194). **Wild had reached only the `line` primitive**: 63 of 88 combinations were byte-identical with it on and off, contradicting "one switch for the whole work". It now reaches `synthesize_along` (circles, ellipses, triangles, squares, polygons, arcs, fills, hatches) while **leaving the off state byte-identical**; **exactly 25 combinations may still match** (`cloudform` across all 11 tools — it never enters `stroke_engine`, a known hole left unfixed — plus `rotring` x 7 and `computer` x 7). **A naive port breaks in three ways**: scaling amplitude by arc length destroys closed contours, a non-zero gesture mean rescales the figure (**size is decided by the score, not by the performance**), and a gesture beside a pinned corner produces spikes. **The material detaching from the ink was fixed too** — contour and arc material outlines were built from geometry, so under wild all nine measured combinations moved the ink and left the material behind (the same defect engine 12 fixed for lines); **it now follows the performed centreline, but only when wild is on**. The `render-engine-14/` corpus holds **347 cases** (`corpus_format_version` `"1"` -> `"2"`) with `changed_from_previous` at **126** — 7 existing (the `A-computer-*` set minus `cloudform`) plus 119 new E-block cases, leaving **221 unchanged**; **not one hand tool moved**. The expected values were **measured and handed over before the work began**, and both the implementation and an independent re-measurement reproduced them to the digit. **The perturbations showed one check was a step short**: reverting to length-relative inside `synthesize_stroke` alone leaves two lattice checks passing, because `_add_raster_bleed` **re-snaps** cells onto the step it is handed. **When one property is enforced in two places, a one-sided perturbation is absorbed downstream.** Acceptance also split the material perturbation between the arc path and the contour paths and confirmed each alone trips the check. SPEC gains §15.10 (§12.7 in English), and **the English "Unleashed" was aligned to the interface's "Wild"** (README and `manual/en/` still diverge). pytest 1100/30 (+9), cli 68, ruff clean, `npm run check` 0 errors / 2 warnings. **Android's suite was not run — `android/` has no diff — and Android stays on engine 12, now two versions behind.**
+v2.7.0 (Build 709) closes **one sheet of graph paper** and **the reach of wild** together, moving
+the drawing engine to **14**.
+Both were holes engine 13 left open, and both change what is performed, so one version means the
+corpus is re-frozen once. **A lattice is a property of the paper, not of the object placed on it**:
+engine 13's step was **proportional to stroke length** (`step = length x 0.018`), so different
+lengths got different steps (100px -> 1.8, 800px -> 14.4px), **the same length changed figure with
+position** (thirty equal lines gave thirty distinct figures), and one picture held **as many sheets
+of graph paper as it held sizes**.
+Engine 14 derives it from **`canvas short side x quantize`** — the value is still 0.018 but **its
+meaning changed** — and since `stroke_engine` does not know about the canvas, **the renderer
+converts to pixels and passes it in, with all four length-relative sites deleted**.
+That is 18.000000px on a 1000px square, varying with aspect (3.600px on a pillar), and **every
+stroke in one picture now falls onto the same cells** (with three objects of different size in one
+Score, coordinates off the lattice went from 188/194 to 0/194). **Wild had reached only the `line`
+primitive**: 63 of 88 combinations were byte-identical with it on and off, contradicting "one
+switch for the whole work".
+It now reaches `synthesize_along` (circles, ellipses, triangles, squares, polygons, arcs, fills,
+hatches) while **leaving the off state byte-identical**; **exactly 25 combinations may still
+match** (`cloudform` across all 11 tools — it never enters `stroke_engine`, a known hole left
+unfixed — plus `rotring` x 7 and `computer` x 7). **A naive port breaks in three ways**: scaling
+amplitude by arc length destroys closed contours, a non-zero gesture mean rescales the figure
+(**size is decided by the score, not by the performance**), and a gesture beside a pinned corner
+produces spikes. **The material detaching from the ink was fixed too** — contour and arc material
+outlines were built from geometry, so under wild all nine measured combinations moved the ink and
+left the material behind (the same defect engine 12 fixed for lines); **it now follows the
+performed centreline, but only when wild is on**.
+The `render-engine-14/` corpus holds **347 cases** (`corpus_format_version` `"1"` -> `"2"`) with
+`changed_from_previous` at **126** — 7 existing (the `A-computer-*` set minus `cloudform`) plus 119
+new E-block cases, leaving **221 unchanged**; **not one hand tool moved**.
+The expected values were **measured and handed over before the work began**, and both the
+implementation and an independent re-measurement reproduced them to the digit. **The perturbations
+showed one check was a step short**: reverting to length-relative inside `synthesize_stroke` alone
+leaves two lattice checks passing, because `_add_raster_bleed` **re-snaps** cells onto the step it
+is handed. **When one property is enforced in two places, a one-sided perturbation is absorbed
+downstream.** Acceptance also split the material perturbation between the arc path and the contour
+paths and confirmed each alone trips the check.
+SPEC gains §15.10 (§12.7 in English), and **the English "Unleashed" was aligned to the interface's
+"Wild"** (README and `manual/en/` still diverge). pytest 1100/30 (+9), cli 68, ruff clean,
+`npm run check` 0 errors / 2 warnings. **Android's suite was not run — `android/` has no diff — and
+Android stays on engine 12, now two versions behind.**
 
-v2.7.1 (Build 710) adds **the canonical English glossary and a lint that enforces it**. v2.6.1 aligned the English interface but **left nothing to keep it aligned**: one new string is enough to bring back a forbidden word or give a concept a second English term. `web/src/lib/i18n/GLOSSARY.md` (200 lines) is the rule text — the three display channels (`en.ts` 641, ternaries 132, `getLang()` 15), the core vocabulary, the fixed names of the five refinement operations and the variation amplitudes, the style rules, the forbidden words **with their allowed exceptions**, the paths that must not be touched, how to add a new string, what the checks look at, and the divergences still open. `web/scripts/i18n-lint.mjs` (221 lines, `npm run lint:i18n`) **scans all 788 English display strings and passes 36 named exceptions**. **The rule text and the lint are one pair**: changing either means changing the other in the same commit. **"Zero occurrences" is deliberately not the condition** — `generation` (a lineage generation), `prompt` (an actual LLM prompt on screen), `created` (completion and timestamps), `image` (what Vision looks at) and `render` (server-side settings) have legitimate uses, so words banned everywhere are separated from words allowed only in named places. Its discriminating power was measured during acceptance (`colorCatalogTitle` set to `Color palette` fails one check; reverting returns it to zero). One `en.ts` entry was corrected to sentence case along the way — a miss the lint found. `npm run check` 0 errors / 2 warnings, `lint:i18n` 788 / 36 exceptions / 0 errors, pytest 1100/30, cli 68, ruff clean. **The English documentation (`README.md`, `manual/en/`, the rest of `SPEC.md`) has not followed; the lint watches only the display strings under `web/`.**
+v2.7.1 (Build 710) adds **the canonical English glossary and a lint that enforces it**. v2.6.1
+aligned the English interface but **left nothing to keep it aligned**: one new string is enough to
+bring back a forbidden word or give a concept a second English term.
+`web/src/lib/i18n/GLOSSARY.md` (200 lines) is the rule text — the three display channels (`en.ts`
+641, ternaries 132, `getLang()` 15), the core vocabulary, the fixed names of the five refinement
+operations and the variation amplitudes, the style rules, the forbidden words **with their allowed
+exceptions**, the paths that must not be touched, how to add a new string, what the checks look at,
+and the divergences still open.
+`web/scripts/i18n-lint.mjs` (221 lines, `npm run lint:i18n`) **scans all 788 English display
+strings and passes 36 named exceptions**. **The rule text and the lint are one pair**: changing
+either means changing the other in the same commit. **"Zero occurrences" is deliberately not the
+condition** — `generation` (a lineage generation), `prompt` (an actual LLM prompt on screen),
+`created` (completion and timestamps), `image` (what Vision looks at) and `render` (server-side
+settings) have legitimate uses, so words banned everywhere are separated from words allowed only in
+named places.
+Its discriminating power was measured during acceptance (`colorCatalogTitle` set to `Color palette`
+fails one check; reverting returns it to zero).
+One `en.ts` entry was corrected to sentence case along the way — a miss the lint found.
+`npm run check` 0 errors / 2 warnings, `lint:i18n` 788 / 36 exceptions / 0 errors, pytest 1100/30,
+cli 68, ruff clean. **The English documentation (`README.md`, `manual/en/`, the rest of `SPEC.md`)
+has not followed; the lint watches only the display strings under `web/`.**
 
-v2.7.2 (Build 711) **retires two fields nothing reads** (`absorbency` and `contact`). **Being unread does not make a field harmless**: the ground's texture seed is a hash of the whole Score dump, so removing a field whose value is never used still moves the grain (18 of 23 saved works). Retired keys are stripped before validation, since the models forbid extras.
+v2.7.2 (Build 711) **retires two fields nothing reads** (`absorbency` and `contact`). **Being
+unread does not make a field harmless**: the ground's texture seed is a hash of the whole Score
+dump, so removing a field whose value is never used still moves the grain (18 of 23 saved works).
+Retired keys are stripped before validation, since the models forbid extras.
 
-v2.7.3 (Build 712) brings **the CLI's English into the terminology dictionary** (`artwork` and two others, plus the quotations in the manual). `npm run lint:i18n` watches only the display strings under `web/`, so **the CLI and the documentation have to be followed by hand**. The subcommand name `okugaki` is an identifier and was left pending a ruling.
+v2.7.3 (Build 712) brings **the CLI's English into the terminology dictionary** (`artwork` and two
+others, plus the quotations in the manual).
+`npm run lint:i18n` watches only the display strings under `web/`, so **the CLI and the
+documentation have to be followed by hand**.
+The subcommand name `okugaki` is an identifier and was left pending a ruling.
 
-v2.7.4 (Build 713) **splits coerce into `normalize` and `compose`**. **This is where composition is actually decided** — neither Stage 2 nor the renderer; in sixty production works, 27% of the instructions were written by coerce rather than by the DDL — and yet thirty-four branches ran mixed along one line. The dividing line is "does it take `ddl`?", a criterion a machine can check rather than a judgement call. Measured, that is six branches for normalize and twenty-eight for compose, and **not one call moved**: the two kinds alternate, so gathering them would change the result. Identity was proven by 39 golden cases coming out byte-identical and by disabling each branch in turn and matching the number of cases that move. **The frozen corpora were not guarding coerce** — the 347 cases of `render-engine-14` never call `coerce_score` and stay green with all thirty-four branches disabled — so the golden set (`server/tests/golden/coerce_golden.json`) was built in the same version.
+v2.7.4 (Build 713) **splits coerce into `normalize` and `compose`**. **This is where composition is
+actually decided** — neither Stage 2 nor the renderer; in sixty production works, 27% of the
+instructions were written by coerce rather than by the DDL — and yet thirty-four branches ran mixed
+along one line.
+The dividing line is "does it take `ddl`?", a criterion a machine can check rather than a judgement
+call.
+Measured, that is six branches for normalize and twenty-eight for compose, and **not one call
+moved**: the two kinds alternate, so gathering them would change the result.
+Identity was proven by 39 golden cases coming out byte-identical and by disabling each branch in
+turn and matching the number of cases that move. **The frozen corpora were not guarding coerce** —
+the 347 cases of `render-engine-14` never call `coerce_score` and stay green with all thirty-four
+branches disabled — so the golden set (`server/tests/golden/coerce_golden.json`) was built in the
+same version.
 
-v2.7.5 (Build 714) makes **an explicit count below 240 literal**. Asking for two hundred thirty-three strokes and getting two came from the prompt contradicting itself in three places: (1) "represent above 120 items" competing with "representation means 300 or more" across the 120–299 band, (2) "multiple instructions are absolutely forbidden" folding groups of differing counts together, and (3) **four worked examples answering a requested 137 with `"count":96`**. The threshold of 240 matches `MAX_EXPANDED_PER_INSTRUCTION`. **At the layer the prompts govern — before coerce — the worst band moves from 33% to 55% in Japanese and 37% to 92% in English, and the final Score does not follow.** Feeding a fully compliant Score through coerce leaves 20 of 25 single-group bench lines intact in Japanese and 11 of 25 in English; `_with_context_density_governor` rewrites the rest to 64, 48, or 16. **The 90–95% thresholds were unreachable without touching the coerce and compose code the contract put out of scope.** The language gap lives there too: the quiet-density marker fires on 36 of 87 Japanese descriptions against 72 of 87 English ones. **Count fidelity is taken up next as deterministic enforcement on the compose side.**
+v2.7.5 (Build 714) makes **an explicit count below 240 literal**.
+Asking for two hundred thirty-three strokes and getting two came from the prompt contradicting
+itself in three places: (1) "represent above 120 items" competing with "representation means 300 or
+more" across the 120–299 band, (2) "multiple instructions are absolutely forbidden" folding groups
+of differing counts together, and (3) **four worked examples answering a requested 137 with
+`"count":96`**.
+The threshold of 240 matches `MAX_EXPANDED_PER_INSTRUCTION`. **At the layer the prompts govern —
+before coerce — the worst band moves from 33% to 55% in Japanese and 37% to 92% in English, and the
+final Score does not follow.** Feeding a fully compliant Score through coerce leaves 20 of 25
+single-group bench lines intact in Japanese and 11 of 25 in English;
+`_with_context_density_governor` rewrites the rest to 64, 48, or 16. **The 90–95% thresholds were
+unreachable without touching the coerce and compose code the contract put out of scope.** The
+language gap lives there too: the quiet-density marker fires on 36 of 87 Japanese descriptions
+against 72 of 87 English ones. **Count fidelity is taken up next as deterministic enforcement on
+the compose side.**
 
-v2.7.6 (Build 715) makes **a stated count outrank any later reading of it**. v2.7.5 fixed the prompt and the final Score did not follow, because `_with_context_density_governor` read the scene — still, membranous, remembered — and **thinned every repetition it found**, including the groups written to order. **Quiet is a reading of the scene; "two hundred thirty-three" is not.** A group whose count the description states outright now passes the three count caps untouched; the shape temperings still apply, since they touch size rather than how many. **The fifty frozen cases go from 31 to 50, and to 25/25 in both languages** (English was 11/25). **The language gap was the English marker `"one "`** matching `one hundred twenty ... lines`, though **removing it saves nothing on its own** — 19 of the 19 belong to the exemption. The total density budget also stopped shrinking in proportion: the largest group is represented first and the budget rechecked before the next gives way (the old pass **raised a requested 120 to 232**). **This gate calls no LLM and runs in two seconds.**
+v2.7.6 (Build 715) makes **a stated count outrank any later reading of it**. v2.7.5 fixed the
+prompt and the final Score did not follow, because `_with_context_density_governor` read the scene
+— still, membranous, remembered — and **thinned every repetition it found**, including the groups
+written to order. **Quiet is a reading of the scene; "two hundred thirty-three" is not.** A group
+whose count the description states outright now passes the three count caps untouched; the shape
+temperings still apply, since they touch size rather than how many. **The fifty frozen cases go
+from 31 to 50, and to 25/25 in both languages** (English was 11/25). **The language gap was the
+English marker `"one "`** matching `one hundred twenty ... lines`, though **removing it saves
+nothing on its own** — 19 of the 19 belong to the exemption.
+The total density budget also stopped shrinking in proportion: the largest group is represented
+first and the budget rechecked before the next gives way (the old pass **raised a requested 120 to
+232**). **This gate calls no LLM and runs in two seconds.**
 
-v2.7.8 (Build 717) lands **render engine 15**: five changes to `renderer.py` as one version. **A mark's seed is built from an allowlist** (it hashed the whole instruction dump, so rewriting a colour note `coerce` wrote changed the drawing; across 49 fields, 30 move the output and 19 do not). **The ground's seed names the paper** (`material`, `grain`, performance seed — raising the opacity darkens the same sheet, which finally freed `ground.absorbency` to be retired). **`cloudform` joins the road every other closed contour takes** (it claimed `stroke-engine-touch` in its class while never entering `stroke_engine`). **The corner shapes and `pen` gain the material layer** (`_render_corner_shape` had no call at all, and `pen`, the most used tool in production, was bare). **Strength stops being distance**: each rung of the intensity ladder had multiplied the outline offset, to 2.8x with a 3.5px floor, leaving the strata 4.5–6.5x the band's own half-width out, reading as a second contour; the multiplier and floor are gone and the opacity gain is untouched. The corpus holds **350 cases of which 318 moved, and the 32 that did not — `computer` and `rotring` — are the point**. **`hair` was given the material layer and then had it removed**, the author having ruled that retiring the tool altogether is the right call; **that retirement is a separate contract**.
+v2.7.8 (Build 717) lands **render engine 15**: five changes to `renderer.py` as one version. **A
+mark's seed is built from an allowlist** (it hashed the whole instruction dump, so rewriting a
+colour note `coerce` wrote changed the drawing; across 49 fields, 30 move the output and 19 do
+not). **The ground's seed names the paper** (`material`, `grain`, performance seed — raising the
+opacity darkens the same sheet, which finally freed `ground.absorbency` to be retired).
+**`cloudform` joins the road every other closed contour takes** (it claimed `stroke-engine-touch`
+in its class while never entering `stroke_engine`). **The corner shapes and `pen` gain the material
+layer** (`_render_corner_shape` had no call at all, and `pen`, the most used tool in production,
+was bare). **Strength stops being distance**: each rung of the intensity ladder had multiplied the
+outline offset, to 2.8x with a 3.5px floor, leaving the strata 4.5–6.5x the band's own half-width
+out, reading as a second contour; the multiplier and floor are gone and the opacity gain is
+untouched.
+The corpus holds **350 cases of which 318 moved, and the 32 that did not — `computer` and `rotring`
+— are the point**. **`hair` was given the material layer and then had it removed**, the author
+having ruled that retiring the tool altogether is the right call; **that retirement is a separate
+contract**.
 
-v2.7.9 (Build 718) renames `hair` to **`silverpoint`**. Engine 15 had been told to retire it, but **`pencil`, the only place to retire it into, is three times as wide**, and 0.5px with stiffness 0.93 and energy_width 0.08 is not a brush at all — it is the physics of a **silverpoint**. The ruling changed to a rename on 2026-07-27. **The rename moves the picture**: `weight` is part of the material of the performance seed, so changing the tool's name makes the same Score a different performance (`A-hair-line` against `A-silverpoint-line` is 2299 → 2306 bytes, with 120 of 126 coordinates moved). The author looked at two comparison sheets and ruled that this is worth paying. **Only the sixteen cases that carry the name moved**: of the corpus's 350, the 334 in common have byte-identical manifest entries and all 302 shared SVG bodies are byte-identical. Ten of the 39 coerce goldens were retaken, and **replacing `hair` in the old expected reproduces the new expected exactly**. Stored works are rewritten on load by a `field_validator(mode="before")` on `Instruction.weight`; **all 445 affected works in the production database were replayed and 444 accepted** (the one rejection carries `rope`, a value never in the `Weight` enum, and was unreplayable before the rename). **Not one value in `GRAMMARS` or the width table changed** — the three changed lines match in every character but the key, and a new check pins the eight grammar values plus the three machine-pole attributes directly. **The one behavioural change is the vocabulary**: the saijiki entry left `_PRUNED`, touches went from ten words to eleven, and the material marker's first word changed from `鉛筆` to `銀筆` — a precondition for measuring H1, whether the silverpoint actually gets chosen. Sixteen pinned prompt digests were retaken, but **the Stage 1 golden fixtures are still the Build 591 originals**. **The engine version was not bumped** (still `"15"`). **Not started**: adding 銀筆 to the few-shot search keywords, a silverpoint row in `material_weight_hints`, the axis of thickness, and Android (its Kotlin implementation still says `hair`, as do 3 of its 36 frozen fixtures).
+v2.7.9 (Build 718) renames `hair` to **`silverpoint`**.
+Engine 15 had been told to retire it, but **`pencil`, the only place to retire it into, is three
+times as wide**, and 0.5px with stiffness 0.93 and energy_width 0.08 is not a brush at all — it is
+the physics of a **silverpoint**.
+The ruling changed to a rename on 2026-07-27. **The rename moves the picture**: `weight` is part of
+the material of the performance seed, so changing the tool's name makes the same Score a different
+performance (`A-hair-line` against `A-silverpoint-line` is 2299 → 2306 bytes, with 120 of 126
+coordinates moved).
+The author looked at two comparison sheets and ruled that this is worth paying. **Only the sixteen
+cases that carry the name moved**: of the corpus's 350, the 334 in common have byte-identical
+manifest entries and all 302 shared SVG bodies are byte-identical.
+Ten of the 39 coerce goldens were retaken, and **replacing `hair` in the old expected reproduces
+the new expected exactly**.
+Stored works are rewritten on load by a `field_validator(mode="before")` on `Instruction.weight`;
+**all 445 affected works in the production database were replayed and 444 accepted** (the one
+rejection carries `rope`, a value never in the `Weight` enum, and was unreplayable before the
+rename). **Not one value in `GRAMMARS` or the width table changed** — the three changed lines match
+in every character but the key, and a new check pins the eight grammar values plus the three
+machine-pole attributes directly. **The one behavioural change is the vocabulary**: the saijiki
+entry left `_PRUNED`, touches went from ten words to eleven, and the material marker's first word
+changed from `鉛筆` to `銀筆` — a precondition for measuring H1, whether the silverpoint actually gets
+chosen.
+Sixteen pinned prompt digests were retaken, but **the Stage 1 golden fixtures are still the Build
+591 originals**. **The engine version was not bumped** (still `"15"`). **Not started**: adding 銀筆
+to the few-shot search keywords, a silverpoint row in `material_weight_hints`, the axis of
+thickness, and Android (its Kotlin implementation still says `hair`, as do 3 of its 36 frozen
+fixtures).
 
-v2.7.10 (Build 719) makes **resvg the only way a PNG is made and removes cairosvg entirely**. cairosvg does not implement `feTurbulence` / `feDisplacementMap` / `feGaussianBlur`, and rather than failing it **drops them** — a PNG came back with the ground grain and the material filters gone and nothing to show for it but a cleaner-looking picture, **and that picture was used to decide things** (four times). A stderr warning in the CLI, a startup WARNING on the server, the module docstring, and a `png_rasterizer` record in every artifact: the caution had been laid down four ways since v2.2.1. **What misleads a reader is the picture, not the log line**, so the fallback was removed rather than documented further (author's instruction, 2026-07-27). `_cairosvg_renderer`, `BACKEND_CAIROSVG` and the `_BACKENDS` table are gone from `rasterizer.py`, and `svg_to_png` raises `RasterizerUnavailable` when resvg is absent. **This is the one behavioural change**: where resvg is missing, PNG output stops instead of degrading quietly (ruled acceptable by the author). The declaration was dropped from all three `pyproject.toml` files, taking 145 and 148 lines out of the two locks. **Three sentinels were put in**: ① no `cairosvg` in the three `pyproject.toml` files; ② no `import cairosvg` under `shared/src`, `server/src`, `cli/src` or `server/scripts` (**the pattern matches import statements at line start only, so the prose explaining why it is gone can stay**); ③ **it stays unreachable even where it is installed** (`pytest.importorskip` runs it only where cairosvg imports — **the one added skip is this**, because dropping the dependency took it out of the venv, and that is correct). A side effect: `pillow` left the `server` venv, having been a transitive dependency of cairosvg that neither `server` nor `shared` imports; `cli` declares it directly and keeps it, so **the tool for assembling contact sheets lives in the `cli` venv**. Four documents were brought back to the present tense: `SETUP.ja.md` / `SETUP.md` and `manual/{ja,en}/application-install.md`. **Not one byte of SVG changes**, so no reference corpus was refrozen and the render engine stays at `"15"`. **What was not removed**: `android/scripts/render_png_review.py` still calls `cairosvg.svg2png` (sentinel ② does not scan `android/`), and since **it is a script for reviewing renders by eye — exactly the path the removal was about** — its disposition goes to the author. `libcairo2` in `server/Dockerfile` also remains.
+v2.7.10 (Build 719) makes **resvg the only way a PNG is made and removes cairosvg entirely**.
+cairosvg does not implement `feTurbulence` / `feDisplacementMap` / `feGaussianBlur`, and rather
+than failing it **drops them** — a PNG came back with the ground grain and the material filters
+gone and nothing to show for it but a cleaner-looking picture, **and that picture was used to
+decide things** (four times).
+A stderr warning in the CLI, a startup WARNING on the server, the module docstring, and a
+`png_rasterizer` record in every artifact: the caution had been laid down four ways since v2.2.1.
+**What misleads a reader is the picture, not the log line**, so the fallback was removed rather
+than documented further (author's instruction, 2026-07-27).
+`_cairosvg_renderer`, `BACKEND_CAIROSVG` and the `_BACKENDS` table are gone from `rasterizer.py`,
+and `svg_to_png` raises `RasterizerUnavailable` when resvg is absent. **This is the one behavioural
+change**: where resvg is missing, PNG output stops instead of degrading quietly (ruled acceptable
+by the author).
+The declaration was dropped from all three `pyproject.toml` files, taking 145 and 148 lines out of
+the two locks. **Three sentinels were put in**: ① no `cairosvg` in the three `pyproject.toml` files;
+ ② no `import cairosvg` under `shared/src`, `server/src`, `cli/src` or `server/scripts` (**the
+pattern matches import statements at line start only, so the prose explaining why it is gone can
+stay**); ③ **it stays unreachable even where it is installed** (`pytest.importorskip` runs it only
+where cairosvg imports — **the one added skip is this**, because dropping the dependency took it
+out of the venv, and that is correct).
+A side effect: `pillow` left the `server` venv, having been a transitive dependency of cairosvg
+that neither `server` nor `shared` imports; `cli` declares it directly and keeps it, so **the tool
+for assembling contact sheets lives in the `cli` venv**.
+Four documents were brought back to the present tense: `SETUP.ja.md` / `SETUP.md` and
+`manual/{ja,en}/application-install.md`. **Not one byte of SVG changes**, so no reference corpus
+was refrozen and the render engine stays at `"15"`. **What was not removed**:
+`android/scripts/render_png_review.py` still calls `cairosvg.svg2png` (sentinel ② does not scan
+`android/`), and since **it is a script for reviewing renders by eye — exactly the path the removal
+was about** — its disposition goes to the author.
+`libcairo2` in `server/Dockerfile` also remains.
 
-v2.7.11 (Build 720) fixes the two things v2.7.10 missed and **puts the rule itself into SPEC** (author's ruling, 2026-07-27). **`android/scripts/render_png_review.py` now goes through resvg** — not a dormant script but the live review harness that `headless_render_compare.sh` and `headless_batch_compare.sh` call whenever `PNG_REVIEW=true`, **rasterizing the server's and Android's SVG, amplifying the difference and building a three-panel sheet**. **A rasterizer that drops filters makes it agree precisely where both sides have been flattened**: measured, two SVGs differing only in `feDisplacementMap` scale come out **9.5% mean / 27.4% rms apart**, where **cairosvg would report zero**. **Sentinel ②'s scope moved from a list of roots to the whole repository minus fourteen exclusions** — v2.7.10 named four roots and so never looked at `android/`, and **a named list can fail to be complete; what it cannot do is say so**. A check was added that the scan reaches outside the Python packages (`android`, `cli`, `server`, `shared` all appear in its results), and restoring `import cairosvg` was confirmed to fail it. Widening the scan turned up **three past measurement scripts under the untracked `no-git-sync/` that call cairosvg**; they are **a record of what was run**, so they were neither rewritten nor scanned (with cairosvg gone from the venvs, re-running them raises). **SPEC gains `SPEC.ja.md` §15.12 "A PNG is a copy of the performance" and `SPEC.md` §12.9**: ① no rasterizer that drops things in silence (**a rule about observation, not performance or fidelity**); ② **`cairosvg` is prohibited**; ③ an implementation that is wrong is worse than one that is missing (no fallback); ④ how it is held (one entrance, three sentinels, **and ②'s scope written as what it does not look at**). **`libcairo2` leaves `server/Dockerfile` at the next distribution** (author's ruling), filed as **A-1b** in the release runbook. **Not one byte of SVG changes.**
+v2.7.11 (Build 720) fixes the two things v2.7.10 missed and **puts the rule itself into SPEC**
+(author's ruling, 2026-07-27). **`android/scripts/render_png_review.py` now goes through resvg** —
+not a dormant script but the live review harness that `headless_render_compare.sh` and
+`headless_batch_compare.sh` call whenever `PNG_REVIEW=true`, **rasterizing the server's and
+Android's SVG, amplifying the difference and building a three-panel sheet**. **A rasterizer that
+drops filters makes it agree precisely where both sides have been flattened**: measured, two SVGs
+differing only in `feDisplacementMap` scale come out **9.5% mean / 27.4% rms apart**, where
+**cairosvg would report zero**. **Sentinel ②'s scope moved from a list of roots to the whole
+repository minus fourteen exclusions** — v2.7.10 named four roots and so never looked at
+`android/`, and **a named list can fail to be complete; what it cannot do is say so**.
+A check was added that the scan reaches outside the Python packages (`android`, `cli`, `server`,
+`shared` all appear in its results), and restoring `import cairosvg` was confirmed to fail it.
+Widening the scan turned up **three past measurement scripts under the untracked `no-git-sync/`
+that call cairosvg**; they are **a record of what was run**, so they were neither rewritten nor
+scanned (with cairosvg gone from the venvs, re-running them raises). **SPEC gains `SPEC.ja.md`
+§15.12 "A PNG is a copy of the performance" and `SPEC.md` §12.9**: ① no rasterizer that drops
+things in silence (**a rule about observation, not performance or fidelity**); ② **`cairosvg` is
+prohibited**; ③ an implementation that is wrong is worse than one that is missing (no fallback); ④
+how it is held (one entrance, three sentinels, **and ②'s scope written as what it does not look
+at**). **`libcairo2` leaves `server/Dockerfile` at the next distribution** (author's ruling), filed
+as **A-1b** in the release runbook. **Not one byte of SVG changes.**
 
-v2.7.12 (Build 721) **folds the material distinction into render engine 15** rather than raising the version (no production work carries engine 15, it is unpublished, engine 13 set the precedent; **the condition is that it happen before publication**). `plain`, `paper`, `washi` and `ink_wash` had been **one and the same in the ground layer**, only `mezzotint` and `charcoal_ground` branching. **The first version was a rejection**: drawing the fibres and the brush as elements took the ground from 2 to 40 elements, **46% of a picture whose DDL named two shapes**. **The direction that replaced it is that the support is the character of the noise, not something drawn** — in `display` the difference lives inside the filter (washi crosses two anisotropic turbulences with `feBlend`; ink_wash stretches one sideways and smears it with `feGaussianBlur`), and in `editable` it changes **the shape of the grains already being drawn**. **Not one element is added**, and the frozen corpus records it: `C-ground-washi` goes circle 20 → 0 and path 1 → 21 (twenty-one either way), `C-ground-ink_wash` circle 20 → 12 (fewer). **The author set the number by looking at the work** — the `tone=warm grain=coarse opacity=0.18` row of `material-sheet.png` is the one taken, so **washi is not strengthened further** (0.18 is already the ceiling on every path). The corpus was refrozen as engine 15 and **three of its 350 cases moved**; recomputing `changed_from_previous` was measured first and reproduced the same 318 entries, and a second run exits 0 byte-identical. **The Android expectations did not move** — all 36 regenerated fixtures are **byte-identical to `31ff75d`**, the engine-15 freeze, because **not one Android reference case carries a ground**, so **the assumption that folding would force them to be rebuilt is measured false**. **A test surface was added, the implementation having arrived without one** (five checks in `test_ground_seed.py` plus one rewritten). The point is **pinning the seed explicitly**: without it the layer moves by however much `material` contributes to the derived seed, and **killing the drawing branch with `if False` slips straight through**.
+v2.7.12 (Build 721) **folds the material distinction into render engine 15** rather than raising
+the version (no production work carries engine 15, it is unpublished, engine 13 set the precedent;
+**the condition is that it happen before publication**).
+`plain`, `paper`, `washi` and `ink_wash` had been **one and the same in the ground layer**, only
+`mezzotint` and `charcoal_ground` branching. **The first version was a rejection**: drawing the
+fibres and the brush as elements took the ground from 2 to 40 elements, **46% of a picture whose
+DDL named two shapes**. **The direction that replaced it is that the support is the character of
+the noise, not something drawn** — in `display` the difference lives inside the filter (washi
+crosses two anisotropic turbulences with `feBlend`; ink_wash stretches one sideways and smears it
+with `feGaussianBlur`), and in `editable` it changes **the shape of the grains already being
+drawn**. **Not one element is added**, and the frozen corpus records it: `C-ground-washi` goes
+circle 20 → 0 and path 1 → 21 (twenty-one either way), `C-ground-ink_wash` circle 20 → 12 (fewer).
+**The author set the number by looking at the work** — the `tone=warm grain=coarse opacity=0.18`
+row of `material-sheet.png` is the one taken, so **washi is not strengthened further** (0.18 is
+already the ceiling on every path).
+The corpus was refrozen as engine 15 and **three of its 350 cases moved**; recomputing
+`changed_from_previous` was measured first and reproduced the same 318 entries, and a second run
+exits 0 byte-identical. **The Android expectations did not move** — all 36 regenerated fixtures are
+**byte-identical to `31ff75d`**, the engine-15 freeze, because **not one Android reference case
+carries a ground**, so **the assumption that folding would force them to be rebuilt is measured
+false**. **A test surface was added, the implementation having arrived without one** (five checks
+in `test_ground_seed.py` plus one rewritten).
+The point is **pinning the seed explicitly**: without it the layer moves by however much `material`
+contributes to the derived seed, and **killing the drawing branch with `if False` slips straight
+through**.
 
-v2.8.0 (Build 722) **moves the colophon's CLI subcommand and API paths to `colophon`** (author's ruling, 2026-07-27; **no alias is kept, so compatibility breaks and the version is minor**). **The names you type are English terms of art** — `paint`, `refine` and `lineage` all match the dictionary, which says so explicitly of `/api/paint` — and **`okugaki` was the only romaji left in that column**. **Only the paths carried the word**: not one field of the `OkugakiItem` response is named after it. Moved: `GET|POST /api/lineage/{node_id}/okugaki` → `/colophon`, `DELETE /api/okugaki/{okugaki_id}` → `/api/colophon/{colophon_id}`, the CLI subcommand, and three `fetch` sites in the web client. **Not moved, being identifiers under the dictionary's §6**: the DB table and its index, `okugaki_model` in `model_settings` (**stored user settings**), the module `okugaki.py`, and the i18n keys `okugaki*`. **Romaji in key names is the norm, not the exception** — variation has the dictionary word `variation` and its web keys are still `hensou*`, because what the dictionary forbids is **words that reach the screen**, not keys. Two sentinels were added (no route path contains `okugaki`; the CLI raises `SystemExit` on `okugaki`), §6 of the dictionary gained a passage fixing the boundary, and SPEC and the CLI manual were followed in both languages. **Nothing in the drawing was touched** (render engine `"15"`, no SVG moves). The same v2.8.0 (Build 723) **carries the variation vocabulary too**: where the colophon was one romaji word, **variation was a collision running the wrong way** — the dictionary reserves `variation` for the variation alone (candidates are `option`), yet **the real variation was romaji `hensou` and four non-variations were `*_variation`**. The lineage kinds became `variation` (7 production rows), `touch_change` (25), `model_comparison` (11), `layout_change` (6) and `language_comparison` (1), and **`vary_seed` became `composition_seed`** across 186 sites — **it was never the variation's seed but Stage 1.5's composition seed**, the variation's own `variation_seed` and `variation_amplitude` being unchanged. The CLI flags and the web i18n keys followed. **Stored data is migrated rather than broken** (columns renamed, kinds updated at startup; measured against a copy of production, and idempotent on a second run). **What stayed frozen is the `vary_seed` key inside the rh2 payload and the `#hensou` / `#vary` salts** — material of an identity ID and of hashes, and renaming the first moved the rh2 of every stored work until a check caught it. **The mapping is recorded in `no-git-sync/opus5/name_convantion/RENAMES.md`**, and **the version stays v2.8.0 because it is unpublished**. Build 724 then **carries the description too**: the dictionary sets 記述 = `description` while **the main request field was a third word, `text`**, so `text` became `description` and `original_text` became `original_description`. **`dh1` hashes the value alone and carries no key name**, measured before starting. **The four `"text"` keys in LLM provider payloads stay** — someone else's contract. **Build 724 hung the word on the wrong string, though**: `description` held the augmented text — the description with context injected — and the author's own line was demoted to `original_description`. **Build 725 corrects it**: **`description` is the author's description** (required on interpret and paint), and **the string Stage 1 actually reads is `stage1_input`** (optional; omit it and the description itself goes to Stage 1). `/api/compose` loses `original_description` the same way (optional there; four web call sites use that path, one more than the contract estimated). **`input` stays, by the author's ruling** — of 1780 saved works four are DDL-shaped and 38 are empty, so the neutral word still fits. **Not one internal argument moved** (`composer.py` and `_call_compose_detail` already mean the author's original text, and **moving one side of that pair raises `TypeError` — which is how the first attempt went 42 tests red**). **Four discriminating tests were added, and the implementation was perturbed at two points to confirm each goes red before being restored.** **Build 726 then carries the last of the romaji**: counting every name you type — 46 CLI subcommands, 84 flags, 61 API paths — **exactly one more had the colophon's shape, the staffage flag `--tenkei`**. **The dictionary had already settled 添景 as `staffage` and the web client already displayed it**, so the romaji survived only where you type it; it becomes `--staffage` **with no alias**, and the help text drops its third word, `scenery`. **The request key `tenkei`, the DB column, the internal identifiers and the web i18n keys do not move** (romaji in key names is the norm), so **an outside script changes the spelling of the flag and nothing else**. **One of the two sentinels first read only the top-level parser and let an alias through**, the real flags hanging off the subparsers; it was fixed to walk them and perturbed again to watch both go red. **`/api/saijiki` and the nine Saijiki category keys are correct as romaji** (the dictionary sets 歳時記 = `Saijiki`, a proper noun; `renga` and `hacho` likewise), and **`sumi` and `washi` are DDL vocabulary rather than identifiers**. **Build 727 puts CI back green after eight red pushes**: the v2.7.9 rename re-froze the render corpus and the coerce golden **in place without raising a version**, and **missed the DDL corpus**. The re-freeze carries two renames only — one tool name in a coerced output, fifteen manifest inputs still recording `vary_seed` — and **`ddl_engine_version` stays 1**. **The mechanism the handoff recorded was wrong**: the frozen `hair` was not a stored value rewritten by a validator but **something coerce produced itself** (perturbing the validator changed nothing; the literal in `coerce/compose.py` did). **The guard now fires after writing**, since raising before it left no way to re-freeze a sanctioned rename. **SPEC §15.6 now states that renames do not raise a version** in both languages. **`check_frozen_corpora.py` runs what CI runs, locally** — **the test suite cannot stand in for it**, since `test_*_reference.py` never regenerates and **a corpus drifts while all 1423 tests stay green**. **CI is the backstop, not the detector**; the Linux re-run is the one thing it alone can prove. **Build 728 brings the description's name to the typing side**: `--original-text` **kept the retired word `text` in its spelling while the key it fills was already `description`**, so it becomes `--description` with no alias. **The same rename had quietly broken two commands** — **`inspect` and `refine generate` build payloads by hand rather than through `_paint_payload`, and kept posting `text` to `/api/paint` after Build 724**, producing 422s that **all 73 cli tests missed because they never reach a server**. **Classifying every `*-text` flag is what caught it.** **Four help strings on `paint` and `batch` called the description a prompt** and are fixed; `review evaluate --prompt` stays, where the word means the model's prompt. **Four sentinels, verified by three perturbations.**
+v2.8.0 (Build 722) **moves the colophon's CLI subcommand and API paths to `colophon`** (author's
+ruling, 2026-07-27; **no alias is kept, so compatibility breaks and the version is minor**). **The
+names you type are English terms of art** — `paint`, `refine` and `lineage` all match the
+dictionary, which says so explicitly of `/api/paint` — and **`okugaki` was the only romaji left in
+that column**. **Only the paths carried the word**: not one field of the `OkugakiItem` response is
+named after it.
+Moved: `GET|POST /api/lineage/{node_id}/okugaki` → `/colophon`, `DELETE /api/okugaki/{okugaki_id}`
+→ `/api/colophon/{colophon_id}`, the CLI subcommand, and three `fetch` sites in the web client.
+**Not moved, being identifiers under the dictionary's §6**: the DB table and its index,
+`okugaki_model` in `model_settings` (**stored user settings**), the module `okugaki.py`, and the
+i18n keys `okugaki*`. **Romaji in key names is the norm, not the exception** — variation has the
+dictionary word `variation` and its web keys are still `hensou*`, because what the dictionary
+forbids is **words that reach the screen**, not keys.
+Two sentinels were added (no route path contains `okugaki`; the CLI raises `SystemExit` on
+`okugaki`), §6 of the dictionary gained a passage fixing the boundary, and SPEC and the CLI manual
+were followed in both languages. **Nothing in the drawing was touched** (render engine `"15"`, no
+SVG moves).
+The same v2.8.0 (Build 723) **carries the variation vocabulary too**: where the colophon was one
+romaji word, **variation was a collision running the wrong way** — the dictionary reserves
+`variation` for the variation alone (candidates are `option`), yet **the real variation was romaji
+`hensou` and four non-variations were `*_variation`**.
+The lineage kinds became `variation` (7 production rows), `touch_change` (25), `model_comparison`
+(11), `layout_change` (6) and `language_comparison` (1), and **`vary_seed` became
+`composition_seed`** across 186 sites — **it was never the variation's seed but Stage 1.5's
+composition seed**, the variation's own `variation_seed` and `variation_amplitude` being unchanged.
+The CLI flags and the web i18n keys followed. **Stored data is migrated rather than broken**
+(columns renamed, kinds updated at startup; measured against a copy of production, and idempotent
+on a second run). **What stayed frozen is the `vary_seed` key inside the rh2 payload and the
+`#hensou` / `#vary` salts** — material of an identity ID and of hashes, and renaming the first
+moved the rh2 of every stored work until a check caught it. **The mapping is recorded in
+`no-git-sync/opus5/name_convantion/RENAMES.md`**, and **the version stays v2.8.0 because it is
+unpublished**.
+Build 724 then **carries the description too**: the dictionary sets 記述 = `description` while **the
+main request field was a third word, `text`**, so `text` became `description` and `original_text`
+became `original_description`. **`dh1` hashes the value alone and carries no key name**, measured
+before starting. **The four `"text"` keys in LLM provider payloads stay** — someone else's
+contract. **Build 724 hung the word on the wrong string, though**: `description` held the augmented
+text — the description with context injected — and the author's own line was demoted to
+`original_description`. **Build 725 corrects it**: **`description` is the author's description**
+(required on interpret and paint), and **the string Stage 1 actually reads is `stage1_input`**
+(optional; omit it and the description itself goes to Stage 1).
+`/api/compose` loses `original_description` the same way (optional there; four web call sites use
+that path, one more than the contract estimated). **`input` stays, by the author's ruling** — of
+1780 saved works four are DDL-shaped and 38 are empty, so the neutral word still fits. **Not one
+internal argument moved** (`composer.py` and `_call_compose_detail` already mean the author's
+original text, and **moving one side of that pair raises `TypeError` — which is how the first
+attempt went 42 tests red**). **Four discriminating tests were added, and the implementation was
+perturbed at two points to confirm each goes red before being restored.** **Build 726 then carries
+the last of the romaji**: counting every name you type — 46 CLI subcommands, 84 flags, 61 API paths
+— **exactly one more had the colophon's shape, the staffage flag `--tenkei`**. **The dictionary had
+already settled 添景 as `staffage` and the web client already displayed it**, so the romaji survived
+only where you type it; it becomes `--staffage` **with no alias**, and the help text drops its
+third word, `scenery`. **The request key `tenkei`, the DB column, the internal identifiers and the
+web i18n keys do not move** (romaji in key names is the norm), so **an outside script changes the
+spelling of the flag and nothing else**. **One of the two sentinels first read only the top-level
+parser and let an alias through**, the real flags hanging off the subparsers; it was fixed to walk
+them and perturbed again to watch both go red. **`/api/saijiki` and the nine Saijiki category keys
+are correct as romaji** (the dictionary sets 歳時記 = `Saijiki`, a proper noun; `renga` and `hacho`
+likewise), and **`sumi` and `washi` are DDL vocabulary rather than identifiers**. **Build 727 puts
+CI back green after eight red pushes**: the v2.7.9 rename re-froze the render corpus and the coerce
+golden **in place without raising a version**, and **missed the DDL corpus**.
+The re-freeze carries two renames only — one tool name in a coerced output, fifteen manifest inputs
+still recording `vary_seed` — and **`ddl_engine_version` stays 1**. **The mechanism the handoff
+recorded was wrong**: the frozen `hair` was not a stored value rewritten by a validator but
+**something coerce produced itself** (perturbing the validator changed nothing; the literal in
+`coerce/compose.py` did). **The guard now fires after writing**, since raising before it left no
+way to re-freeze a sanctioned rename. **SPEC §15.6 now states that renames do not raise a version**
+in both languages. **`check_frozen_corpora.py` runs what CI runs, locally** — **the test suite
+cannot stand in for it**, since `test_*_reference.py` never regenerates and **a corpus drifts while
+all 1423 tests stay green**. **CI is the backstop, not the detector**; the Linux re-run is the one
+thing it alone can prove. **Build 728 brings the description's name to the typing side**:
+`--original-text` **kept the retired word `text` in its spelling while the key it fills was already
+`description`**, so it becomes `--description` with no alias. **The same rename had quietly broken
+two commands** — **`inspect` and `refine generate` build payloads by hand rather than through
+`_paint_payload`, and kept posting `text` to `/api/paint` after Build 724**, producing 422s that
+**all 73 cli tests missed because they never reach a server**. **Classifying every `*-text` flag is
+what caught it.** **Four help strings on `paint` and `batch` called the description a prompt** and
+are fixed; `review evaluate --prompt` stays, where the word means the model's prompt. **Four
+sentinels, verified by three perturbations.**
 
-v2.9.0 (Build 730) reconciles **the six things the prompt both forbade and required**, found by **collecting every explicit prohibition and intersecting it mechanically with the rest of the same prompt** (two came from another session). **The Japanese background sentence moves to an allowed verb** — principle 2 listed 塗りつぶす among the forbidden verbs while the Background section ordered the model to write it and seven examples obeyed — so it now reads 「背景を○色で埋める。」. **The English side never collided**, having always said `Fill background with X.` with `fill` among the allowed verbs: **each contradiction exists on one side of the translation only**. **Every parser keeps accepting the old wording**, so saved works still perform, and **the remaining background detectors — the color test in `api.py`, the clause split in `compose.py`, the `explicit_surface` markers — key on `背景を` and never look at the verb**. **coerce is untouched, so the frozen corpora do not move.** **English `rise` / `fall` are now split as motion senses** (`rise (as motion), fall (as motion)`): **`scatter` on the very same line already carried that split**, and it had simply never been applied to the angle words `rising` / `falling`. **The touchless-line rule was broken by its own examples**, 20 Japanese sentences and 9 English ones — **the bad example the rule names, "draw radial lines", was present near-verbatim** — so sentences stating nothing but a relation, a proportion or an angle became a declared exception and the eleven drawing examples were given a touch. **Principle 5 ("Saijiki vocabulary only") was broken by thirteen words absent from the table**, and **principle 5 is what changed**, leaving the vocabulary table — and therefore reference §1, the web display, SPEC and README — untouched. **`polygon` leaves the unknown-object fallback**, being a hidden marker `saijiki.py` deliberately marks as *not* Saijiki vocabulary. **The allowed action verbs gain `敷き詰める` / `tile`** (the movements table had six, this list five), and **pen is stated to be the fallback default rather than the recommended choice**. One example used the forbidden verb 広げる with no later rule behind it. **The Stage 1 golden keeps its Build 591 fixture**, its fourteen diffs declared in `_REORDERED_JA` / `_REORDERED_EN`, so **undeclared drift still fails**. **Twenty pinned prompt values were re-frozen** (Stage 2 combined ja `261373d0123a740f` → **`b5b40bbc27885eb1`**). **Two side effects**: giving the English snow example a touch stopped the touch-backfill from firing and **pushed the sand example out of the five** (the test now pins that it remains in the pool), and **`SPEC.ja.md`'s Stage 1.5 example still showed a gray background** that `_avoid_gray_background` rewrites to white — the specification was older than the implementation. **README's DDL blocks are not rewritten**: they quote real saved output with its seed. **`埋める` already means "fill an area with elements"** (Stage 2's density rule reads 密集/埋める=120〜350), so while the deterministic layers cannot get it wrong, **the model may still read the sentence as a density cue**; both Stage 2 prompts now say the density and count rules do not apply, but **no model was run, so the mitigation is unverified**. Engine stays 15. pytest 1424/31.
+v2.9.0 (Build 730) reconciles **the six things the prompt both forbade and required**, found by
+**collecting every explicit prohibition and intersecting it mechanically with the rest of the same
+prompt** (two came from another session). **The Japanese background sentence moves to an allowed
+verb** — principle 2 listed 塗りつぶす among the forbidden verbs while the Background section ordered
+the model to write it and seven examples obeyed — so it now reads 「背景を○色で埋める。」. **The English side
+never collided**, having always said `Fill background with X.` with `fill` among the allowed verbs:
+**each contradiction exists on one side of the translation only**. **Every parser keeps accepting
+the old wording**, so saved works still perform, and **the remaining background detectors — the
+color test in `api.py`, the clause split in `compose.py`, the `explicit_surface` markers — key on
+`背景を` and never look at the verb**. **coerce is untouched, so the frozen corpora do not move.**
+**English `rise` / `fall` are now split as motion senses** (`rise (as motion), fall (as motion)`):
+**`scatter` on the very same line already carried that split**, and it had simply never been
+applied to the angle words `rising` / `falling`. **The touchless-line rule was broken by its own
+examples**, 20 Japanese sentences and 9 English ones — **the bad example the rule names, "draw
+radial lines", was present near-verbatim** — so sentences stating nothing but a relation, a
+proportion or an angle became a declared exception and the eleven drawing examples were given a
+touch. **Principle 5 ("Saijiki vocabulary only") was broken by thirteen words absent from the
+table**, and **principle 5 is what changed**, leaving the vocabulary table — and therefore
+reference §1, the web display, SPEC and README — untouched. **`polygon` leaves the unknown-object
+fallback**, being a hidden marker `saijiki.py` deliberately marks as *not* Saijiki vocabulary.
+**The allowed action verbs gain `敷き詰める` / `tile`** (the movements table had six, this list five),
+and **pen is stated to be the fallback default rather than the recommended choice**.
+One example used the forbidden verb 広げる with no later rule behind it. **The Stage 1 golden keeps
+its Build 591 fixture**, its fourteen diffs declared in `_REORDERED_JA` / `_REORDERED_EN`, so
+**undeclared drift still fails**. **Twenty pinned prompt values were re-frozen** (Stage 2 combined
+ja `261373d0123a740f` → **`b5b40bbc27885eb1`**). **Two side effects**: giving the English snow
+example a touch stopped the touch-backfill from firing and **pushed the sand example out of the
+five** (the test now pins that it remains in the pool), and **`SPEC.ja.md`'s Stage 1.5 example
+still showed a gray background** that `_avoid_gray_background` rewrites to white — the
+specification was older than the implementation. **README's DDL blocks are not rewritten**: they
+quote real saved output with its seed. **`埋める` already means "fill an area with elements"** (Stage
+2's density rule reads 密集/埋める=120〜350), so while the deterministic layers cannot get it wrong,
+**the model may still read the sentence as a density cue**; both Stage 2 prompts now say the
+density and count rules do not apply, but **no model was run, so the mitigation is unverified**.
+Engine stays 15. pytest 1424/31.
 
-v2.9.1 (Build 731) **takes every guess out of model reference resolution.** An unqualified string used to be guessed at — a slash meant NVIDIA, a `gemini-` prefix meant Gemini, everything else fell to OVMS — and **that is invisible while it happens to be right; now that the OVMS endpoint is stopped, the same path is a silent failure** (`/health` still answers 200). The new rule has three steps and no guessing branch: **an explicit prefix, then sole ownership (exactly one configured provider listing that model ID), then the stage's default.** **"Exactly one" is the point**: `gpt-oss:20b` is listed by both `ollama` and `ollama-cloud`, so it is deliberately not decided. **That ambiguity became a fact the moment Ollama Cloud was added as a provider.** **The split point is unambiguous because a provider ID cannot contain a colon**, so a model ID may carry any number of them (`qwen3.5:4b-q4_K_M`). **Of the four deleted branches, `anthropic:` was dead code** — the general prefix check caught it first, so it never ran. The web lost its **`gpt-oss:` special case and six hard-coded provider IDs**; **a rule that names a model as an exception is already broken.** **Ollama Cloud is now a provider of its own** (18 verified models), and because **the limit is concurrency rather than capacity** (eight simultaneous requests answer 429 with only 7.6% of the free allowance spent), a **per-provider concurrency ceiling** is read from the provider definition and **is not a setting the operator can raise**. **The stored `okugaki_model` and the demo's `prompt_model` became provider/model pairs**, with the old single string still accepted on read. **Exactly one behaviour changes**: a bare string no catalog lists goes to the stage's provider instead of OVMS. **The expectation table lives in one file** — `web/scripts/model-ref-expectations.json`, read by both the server's pytest and node's `npm run lint:models` — so agreement between the two implementations is a property of the arrangement, not a coincidence. **No test framework was added to the web**: Node reads `.ts` directly, so the checker is a plain node script like `i18n-lint.mjs`. **Measured but not fixed**: **step 3 never reaches the stored stage settings** (the dict handed in is the catalog, which carries no stage keys — a drift that predates this change), and **`normalize_model_settings` costs 5.0 ms per call at 2 calls per `/api/paint`, down from 4**, because the same decision had a second implementation normalizing all over again. Engine stays 15. pytest 1487/31.
+v2.9.1 (Build 731) **takes every guess out of model reference resolution.** An unqualified string
+used to be guessed at — a slash meant NVIDIA, a `gemini-` prefix meant Gemini, everything else fell
+to OVMS — and **that is invisible while it happens to be right; now that the OVMS endpoint is
+stopped, the same path is a silent failure** (`/health` still answers 200).
+The new rule has three steps and no guessing branch: **an explicit prefix, then sole ownership
+(exactly one configured provider listing that model ID), then the stage's default.** **"Exactly
+one" is the point**: `gpt-oss:20b` is listed by both `ollama` and `ollama-cloud`, so it is
+deliberately not decided. **That ambiguity became a fact the moment Ollama Cloud was added as a
+provider.** **The split point is unambiguous because a provider ID cannot contain a colon**, so a
+model ID may carry any number of them (`qwen3.5:4b-q4_K_M`). **Of the four deleted branches,
+`anthropic:` was dead code** — the general prefix check caught it first, so it never ran.
+The web lost its **`gpt-oss:` special case and six hard-coded provider IDs**; **a rule that names a
+model as an exception is already broken.** **Ollama Cloud is now a provider of its own** (18
+verified models), and because **the limit is concurrency rather than capacity** (eight simultaneous
+requests answer 429 with only 7.6% of the free allowance spent), a **per-provider concurrency
+ceiling** is read from the provider definition and **is not a setting the operator can raise**.
+**The stored `okugaki_model` and the demo's `prompt_model` became provider/model pairs**, with the
+old single string still accepted on read. **Exactly one behaviour changes**: a bare string no
+catalog lists goes to the stage's provider instead of OVMS. **The expectation table lives in one
+file** — `web/scripts/model-ref-expectations.json`, read by both the server's pytest and node's
+`npm run lint:models` — so agreement between the two implementations is a property of the
+arrangement, not a coincidence. **No test framework was added to the web**: Node reads `.ts`
+directly, so the checker is a plain node script like `i18n-lint.mjs`. **Measured but not fixed**:
+**step 3 never reaches the stored stage settings** (the dict handed in is the catalog, which
+carries no stage keys — a drift that predates this change), and **`normalize_model_settings` costs
+5.0 ms per call at 2 calls per `/api/paint`, down from 4**, because the same decision had a second
+implementation normalizing all over again.
+Engine stays 15. pytest 1487/31.
 
-v2.9.2 (Build 732) **names the provider wherever a model is named.** A model id on its own never said *where* it runs, and since v2.9.1 established that `gpt-oss:20b` is served by both `ollama` and `ollama-cloud`, **the name is not even unique**. The form is `<provider> / <model>` (author's ruling, 2026-07-27). `models.ts` gains `providerLabel()` and `modelDisplayName()`, and every display goes through them. **The model selection cards are out of scope** — they sit under a provider heading and already have their context. **The CLI already printed both.** Server, CLI and drawing are untouched, so pytest and the frozen corpora do not apply. **Found but not fixed**: the web's static fallback catalog lists only three `ollama-cloud` models where the server lists eighteen, so for the moment before the server catalog arrives `gpt-oss:20b` looks solely owned and displays as `Ollama`. That property dates from v2.9.1.
+v2.9.2 (Build 732) **names the provider wherever a model is named.** A model id on its own never
+said *where* it runs, and since v2.9.1 established that `gpt-oss:20b` is served by both `ollama`
+and `ollama-cloud`, **the name is not even unique**.
+The form is `<provider> / <model>` (author's ruling, 2026-07-27).
+`models.ts` gains `providerLabel()` and `modelDisplayName()`, and every display goes through them.
+**The model selection cards are out of scope** — they sit under a provider heading and already have
+their context. **The CLI already printed both.** Server, CLI and drawing are untouched, so pytest
+and the frozen corpora do not apply. **Found but not fixed**: the web's static fallback catalog
+lists only three `ollama-cloud` models where the server lists eighteen, so for the moment before
+the server catalog arrives `gpt-oss:20b` looks solely owned and displays as `Ollama`.
+That property dates from v2.9.1.
 
-v2.9.3 (Build 754) is **render engine 16**, three changes gathered into one version for engine 15's reason — they belong to the same layer, and raising it three times would make Android follow three times. **A surface is performed, not filled in**: six of the eight touch words scattered circles by a uniform random over the shape's bounding box and **never once saw the shape they belonged to** (46/90 = 51% of a triangle's grains and 43/90 = 48% of a cloudform's fell outside the shape; engine 16 puts both at zero). Positions are placed inside the contour and each grain is performed as one stroke, the scan using the same `_scanline_segments` as `_render_fill_strokes` so a concave shape needs no special case. **`bleed` had been one ellipse at the centre of the bounding box** — the same picture whatever the shape was — and becomes three bands pushed outward from the contour with **the innermost ring on the contour itself (offset zero)**, because a bleed happens on both sides of an edge. **`hatch` and `crosshatch` are not changed by a single byte**: in engine 15 they already sent their centre line through `synthesize_along` rather than scattering a surface, so **those eight unchanged cases are what shows the change stayed closed around the six words that scattered**. **The same word had become two unrelated pictures, one per profile** (display emitted a rectangle carrying `feTurbulence`, `feDisplacementMap` and `feGaussianBlur` while editable scattered circles), so both now draw by the same mechanism and **the display clipPath is gone** (`bleed` seeps outward, so the clip would erase what was drawn). **Speed is 1.44× slower** (119 production works with a surface, in display: 56.2 → 80.9 s), ninety circles replaced by ninety synthesized strokes. **A tiny fill is placed**: a fill too small for scan lines had degraded into a region fill, and **the degradation was preventing a failure rather than being right** — a small shape filled with a hand tool became a machine's fill in that one spot. It is now a single dab, carried along the longer axis with its width decided by the shorter one. **The boundary is a short side of about 3% of the canvas** (measured 2.9–3.2% across five tools and six seeds; **the switch happens once and does not go back and forth**). **The carry floor of 0.90 was chosen by measurement** — at 0.30, `_edge_window` takes the width to zero over 16% at each end so **a 10px filled circle becomes an outline with a hollow inside**, and at 1.10 the dab is darker than the shape (ink coverage 115%). **75.3% of production `filled` closed shapes drawn with a hand tool now take the dab.** **Thinness becomes an axis independent of the tool's name**: asking for a thin line was asking for a different tool, and "a thin pen" could not be written. `Instruction.thinness` (`fine` = 0.6, `extra_fine` = 0.35) carries it, and **the floor is not a new number but the thinnest tool itself** (`MIN_STROKE_WIDTH = WEIGHT_TO_STROKE_WIDTH["silverpoint"]`) — "no line is drawn thinner than silverpoint". **Silverpoint accepts no thinness; that is the specification, not an omission.** Three candidates were drawn and measured by ink coverage: **0.7/0.45 was rejected because the thick brush's `fine` came to 99% of its default** and changed nothing, and **0.5/0.25 was rejected because at `extra_fine` the eleven tools' distinct widths fall from 9 to 6 — the thinness axis eats the tool axis.** **Thinness was carried into the material contour too** (leaving `base_width` at the nominal value would **thin the ink alone and leave the material behind**; only the thick brush and the crayon carry a proportional term, so **a thinned pen line keeps a material band that does not thin**). **The offset was not touched.** **It was added to the performance seed's allowlist** (19 → 20), so **changing thinness also changes the path the line takes, and silverpoint's width does not change while its hand does**. **coerce does not put it on the lines it adds**, so **a written thinness lands only on the shapes the writer wrote**. **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29): Stage 1 reads thinness words into the normalized DDL, but they appear neither in the vocabulary table nor in the Saijiki display. **333 of the corpus's 365 cases moved and all 32 unchanged are `rotring` and `computer`**, which after engine 12's twelve and engine 15's thirty-two means **the same side has stood still for three versions running** — their grammar is zero throughout and consumes no seed, so **an axis that changes the hand cannot reach a tool that has no hand**. **`ddl_engine_version` 1 → 2**: the DDL layer behaves exactly as before while every instruction dump carries one more line, `"thinness": null`, so following the rule that a frozen directory is not rewritten, `ddl-engine-2/` (29 cases) was frozen anew. **`ddl_version` 1 → 2** (author's ruling, 2026-07-29) — **the DDL vocabulary grew**; "an extra fine black line" is a sentence DDL could not write before, and saved works keep `"1"`. **At acceptance the core of each of the three stages was perturbed**: returning the contour to the bounding box turns four S-3 cases red, making the thinness scale the identity turns thirteen T-1 cases red, and removing the branch into the dab turns fifteen F cases red. **Measured but not fixed**: **Stage 2 fills `thinness` in a measured 10%** of works where 96% was observed at design time, and since the deterministic layers are all green, **whether it is carried remains a question about the LLM layer**. **Android is still on engine 15.** pytest 1596/31.
+v2.9.3 (Build 754) is **render engine 16**, three changes gathered into one version for engine 15's
+reason — they belong to the same layer, and raising it three times would make Android follow three
+times. **A surface is performed, not filled in**: six of the eight touch words scattered circles by
+a uniform random over the shape's bounding box and **never once saw the shape they belonged to**
+(46/90 = 51% of a triangle's grains and 43/90 = 48% of a cloudform's fell outside the shape; engine
+16 puts both at zero).
+Positions are placed inside the contour and each grain is performed as one stroke, the scan using
+the same `_scanline_segments` as `_render_fill_strokes` so a concave shape needs no special case.
+**`bleed` had been one ellipse at the centre of the bounding box** — the same picture whatever the
+shape was — and becomes three bands pushed outward from the contour with **the innermost ring on
+the contour itself (offset zero)**, because a bleed happens on both sides of an edge. **`hatch` and
+`crosshatch` are not changed by a single byte**: in engine 15 they already sent their centre line
+through `synthesize_along` rather than scattering a surface, so **those eight unchanged cases are
+what shows the change stayed closed around the six words that scattered**. **The same word had
+become two unrelated pictures, one per profile** (display emitted a rectangle carrying
+`feTurbulence`, `feDisplacementMap` and `feGaussianBlur` while editable scattered circles), so both
+now draw by the same mechanism and **the display clipPath is gone** (`bleed` seeps outward, so the
+clip would erase what was drawn). **Speed is 1.44× slower** (119 production works with a surface,
+in display: 56.2 → 80.9 s), ninety circles replaced by ninety synthesized strokes. **A tiny fill is
+placed**: a fill too small for scan lines had degraded into a region fill, and **the degradation
+was preventing a failure rather than being right** — a small shape filled with a hand tool became a
+machine's fill in that one spot.
+It is now a single dab, carried along the longer axis with its width decided by the shorter one.
+**The boundary is a short side of about 3% of the canvas** (measured 2.9–3.2% across five tools and
+six seeds; **the switch happens once and does not go back and forth**). **The carry floor of 0.90
+was chosen by measurement** — at 0.30, `_edge_window` takes the width to zero over 16% at each end
+so **a 10px filled circle becomes an outline with a hollow inside**, and at 1.10 the dab is darker
+than the shape (ink coverage 115%). **75.3% of production `filled` closed shapes drawn with a hand
+tool now take the dab.** **Thinness becomes an axis independent of the tool's name**: asking for a
+thin line was asking for a different tool, and "a thin pen" could not be written.
+`Instruction.thinness` (`fine` = 0.6, `extra_fine` = 0.35) carries it, and **the floor is not a new
+number but the thinnest tool itself** (`MIN_STROKE_WIDTH = WEIGHT_TO_STROKE_WIDTH["silverpoint"]`)
+— "no line is drawn thinner than silverpoint". **Silverpoint accepts no thinness; that is the
+specification, not an omission.** Three candidates were drawn and measured by ink coverage:
+**0.7/0.45 was rejected because the thick brush's `fine` came to 99% of its default** and changed
+nothing, and **0.5/0.25 was rejected because at `extra_fine` the eleven tools' distinct widths fall
+from 9 to 6 — the thinness axis eats the tool axis.** **Thinness was carried into the material
+contour too** (leaving `base_width` at the nominal value would **thin the ink alone and leave the
+material behind**; only the thick brush and the crayon carry a proportional term, so **a thinned
+pen line keeps a material band that does not thin**). **The offset was not touched.** **It was
+added to the performance seed's allowlist** (19 → 20), so **changing thinness also changes the path
+the line takes, and silverpoint's width does not change while its hand does**. **coerce does not
+put it on the lines it adds**, so **a written thinness lands only on the shapes the writer wrote**.
+**`thinness` is not a Saijiki word** (author's ruling, 2026-07-29): Stage 1 reads thinness words
+into the normalized DDL, but they appear neither in the vocabulary table nor in the Saijiki
+display. **333 of the corpus's 365 cases moved and all 32 unchanged are `rotring` and `computer`**,
+which after engine 12's twelve and engine 15's thirty-two means **the same side has stood still for
+three versions running** — their grammar is zero throughout and consumes no seed, so **an axis that
+changes the hand cannot reach a tool that has no hand**. **`ddl_engine_version` 1 → 2**: the DDL
+layer behaves exactly as before while every instruction dump carries one more line,
+`"thinness": null`, so following the rule that a frozen directory is not rewritten, `ddl-engine-2/`
+(29 cases) was frozen anew. **`ddl_version` 1 → 2** (author's ruling, 2026-07-29) — **the DDL
+vocabulary grew**; "an extra fine black line" is a sentence DDL could not write before, and saved
+works keep `"1"`. **At acceptance the core of each of the three stages was perturbed**: returning
+the contour to the bounding box turns four S-3 cases red, making the thinness scale the identity
+turns thirteen T-1 cases red, and removing the branch into the dab turns fifteen F cases red.
+**Measured but not fixed**: **Stage 2 fills `thinness` in a measured 10%** of works where 96% was
+observed at design time, and since the deterministic layers are all green, **whether it is carried
+remains a question about the LLM layer**. **Android is still on engine 15.** pytest 1596/31.
 
-v2.9.4 (Build 755) is **the fourth round of UI adjustments**, thirty-two instructions from the author worked through in Builds 733 to 753 (**Build 749 is absent: `refactor/engine-16` drew it from the same counter first, so this round went 748 → 750**). **The provenance drawer's detail tab goes from 19 rows to 38** — every field of `HistoryItem` and `PaintResponse` was matched against the nineteen, and **the eighteen attributes it had never shown** (`seed_text` / `variation_amplitude` / `variation_seed` / `focus` / `interpret_fallback` / the three prompt digests / `instruction_lang_requested` / `note` / `lineage_generation` / `derivation_kind` / `batch_run_id` / `batch_line_number` / `ui_lang` / `render_color_catalog_sub` / `render_canvas_aspect_ratio` and the rest) were added, **all 38 headings carrying a tooltip under five subheadings** (Interpretation / Performance / Identity / Origin / Run). **`render_wild` is three-state**: `null` means a work saved before the column existed, is told apart from off, and displays as "not recorded". **The Origin group is omitted entirely for a work that has none of its four items.** Thirteen attributes were left out (the resolved color map, things already in the caption, things on the prompts tab, a server-internal path, the lineage ID group, and `starred`, which the star button already says). **`derivation.ts` is new**, taking the derivation-kind table out of `LineagePanel` so `CanvasPanel` shares it together with its type. **The instruction sheet is called by its name** — only the nine keys naming the thing the writer edits were renamed, and **the technical spellings stay** (the DDL version in provenance, "normalized DDL", "Stage 2 user input (normalized DDL)"). A **"paint from the instruction sheet" button** sits at the bottom right of the instruction box on the description tab, wiring up the existing `replay()` (`/api/compose`) with **no new drawing path and no new derivation kind**. **Dark became the release default** for new users' `ui_theme` and for the signed-out screen (**the author ruled against changing existing users**). **`AuthPanel` carried only one hard-coded light set**, so those literals became local tokens with a dark set under the dark attribute selector. **The background work is not inverted** — white paper with ink lines is a material, held to the same rule that keeps `--canvas-paper` paper in dark. **The lineage tab** can star and unstar from a card (**`updateHistoryStarState` was not looking at `lineageGraph`, so pressing it changed nothing**), **opens a work in the canvas on double click** (**a double click runs the single-click handler twice**, so a guard against re-fetching the selected work was added), and **draws the edges from the origin to a starred node in orange**. **The mascots are settled as two**, a cube named Incu and a crab named Yuragi (two checkboxes that did nothing became two radio buttons), with `KiwiMascot`, `CrabMascot`, three localStorage keys and three i18n keys deleted. **The choice is module state like the language pack rather than a prop** — `RunStatus` is called from ten places, and a prop would add the same argument to all ten. **Explaining the history manager began by counting the clipping boxes** — a `Tooltip` bubble is `position: absolute` and is cut by any ancestor with `overflow` (`.history-modal`, both `.settings-tabs`, the three lists). **Inside a clipping box the browser's own `title` is used** (it obeys the window and nothing else); **outside, `Tooltip`, all opening downward**. **Aligning the four tabs onto bubbles would mean removing `.settings-tabs`' `overflow: hidden`**, so it was left undecided. **The GLOSSARY gained exceptions** (author-approved: six keys for `prompt` and two for `generat`, added to §5-2 and `i18n-lint.mjs` in the same commit) — **a prompt digest is the fingerprint of the prompt itself**, so the glossary's substitution would change its meaning. **Fixed at acceptance, absent from the implementation report**: **`test_current_user_theme_can_be_updated` had lost its discriminating power** — when Build 744 made dark the default, the test's `"light"` strings were replaced mechanically with `"dark"`, leaving it **patching dark onto a default of dark**, so **commenting out `row.ui_theme = ui_theme` leaves it green** (measured). It now asks for the non-default side and reads it back, and was confirmed to fail under that perturbation. `npm run check` 0 errors / 2 warnings / **218 files**, `lint:i18n` **877 / 44 / 0 / 0**, `lint:models` 56. pytest 1596/31. **Drawing is untouched**, so the frozen corpora do not apply.
+v2.9.4 (Build 755) is **the fourth round of UI adjustments**, thirty-two instructions from the
+author worked through in Builds 733 to 753 (**Build 749 is absent: `refactor/engine-16` drew it
+from the same counter first, so this round went 748 → 750**). **The provenance drawer's detail tab
+goes from 19 rows to 38** — every field of `HistoryItem` and `PaintResponse` was matched against
+the nineteen, and **the eighteen attributes it had never shown** (`seed_text` /
+`variation_amplitude` / `variation_seed` / `focus` / `interpret_fallback` / the three prompt
+digests / `instruction_lang_requested` / `note` / `lineage_generation` / `derivation_kind` /
+`batch_run_id` / `batch_line_number` / `ui_lang` / `render_color_catalog_sub` /
+`render_canvas_aspect_ratio` and the rest) were added, **all 38 headings carrying a tooltip under
+five subheadings** (Interpretation / Performance / Identity / Origin / Run). **`render_wild` is
+three-state**: `null` means a work saved before the column existed, is told apart from off, and
+displays as "not recorded". **The Origin group is omitted entirely for a work that has none of its
+four items.** Thirteen attributes were left out (the resolved color map, things already in the
+caption, things on the prompts tab, a server-internal path, the lineage ID group, and `starred`,
+which the star button already says). **`derivation.ts` is new**, taking the derivation-kind table
+out of `LineagePanel` so `CanvasPanel` shares it together with its type. **The instruction sheet is
+called by its name** — only the nine keys naming the thing the writer edits were renamed, and **the
+technical spellings stay** (the DDL version in provenance, "normalized DDL", "Stage 2 user input
+(normalized DDL)").
+A **"paint from the instruction sheet" button** sits at the bottom right of the instruction box on
+the description tab, wiring up the existing `replay()` (`/api/compose`) with **no new drawing path
+and no new derivation kind**. **Dark became the release default** for new users' `ui_theme` and for
+the signed-out screen (**the author ruled against changing existing users**). **`AuthPanel` carried
+only one hard-coded light set**, so those literals became local tokens with a dark set under the
+dark attribute selector. **The background work is not inverted** — white paper with ink lines is a
+material, held to the same rule that keeps `--canvas-paper` paper in dark. **The lineage tab** can
+star and unstar from a card (**`updateHistoryStarState` was not looking at `lineageGraph`, so
+pressing it changed nothing**), **opens a work in the canvas on double click** (**a double click
+runs the single-click handler twice**, so a guard against re-fetching the selected work was added),
+and **draws the edges from the origin to a starred node in orange**. **The mascots are settled as
+two**, a cube named Incu and a crab named Yuragi (two checkboxes that did nothing became two radio
+buttons), with `KiwiMascot`, `CrabMascot`, three localStorage keys and three i18n keys deleted.
+**The choice is module state like the language pack rather than a prop** — `RunStatus` is called
+from ten places, and a prop would add the same argument to all ten. **Explaining the history
+manager began by counting the clipping boxes** — a `Tooltip` bubble is `position: absolute` and is
+cut by any ancestor with `overflow` (`.history-modal`, both `.settings-tabs`, the three lists).
+**Inside a clipping box the browser's own `title` is used** (it obeys the window and nothing else);
+**outside, `Tooltip`, all opening downward**. **Aligning the four tabs onto bubbles would mean
+removing `.settings-tabs`' `overflow: hidden`**, so it was left undecided. **The GLOSSARY gained
+exceptions** (author-approved: six keys for `prompt` and two for `generat`, added to §5-2 and
+`i18n-lint.mjs` in the same commit) — **a prompt digest is the fingerprint of the prompt itself**,
+so the glossary's substitution would change its meaning. **Fixed at acceptance, absent from the
+implementation report**: **`test_current_user_theme_can_be_updated` had lost its discriminating
+power** — when Build 744 made dark the default, the test's `"light"` strings were replaced
+mechanically with `"dark"`, leaving it **patching dark onto a default of dark**, so **commenting
+out `row.ui_theme = ui_theme` leaves it green** (measured).
+It now asks for the non-default side and reads it back, and was confirmed to fail under that
+perturbation.
+`npm run check` 0 errors / 2 warnings / **218 files**, `lint:i18n` **877 / 44 / 0 / 0**,
+`lint:models` 56. pytest 1596/31. **Drawing is untouched**, so the frozen corpora do not apply.
 
-v2.9.5 (Build 763) **moves the declaration of `Instruction.thinness` to the end** (from just after `weight`, position 14, to position 23). **The Stage 2 tool schema reaches the model with its property order intact, and an optional field is filled more often the further back it is declared** — the thinness axis added in engine 16 had barely been reaching the picture, because of where it stood. **Carry goes from 18% to 89%** (25 distinct inputs, `nvidia:google/gemma-4-31b-it`, 25 of 28 instructions across the 19 inputs containing a thinness word). **Not one character of the field changed. Only its position moved.** The same version **removes `sort_keys=True` from `_stage2_prompt_digest`** — **the fingerprint was blind to order, so a change that moves the picture had never once been recorded in `history.stage2_prompt_digest`** (Japanese `32e65db9dcb68e99` → `e11b7daa7c65a5fe`, English `31d357f591d4cf9b` → `e1eacdb0176f7f98`; **stored values are left alone**, since a past value points at a past schema order and that is simply true). **No gate caught this property** — the frozen corpora start from a Score and never pass through Stage 2, and **stage 1 applied alone left all 1596 tests green** (measured). Four discriminating tests are new, and **the accepting side re-applied a perturbation per stage**, confirming that reverting stage 1 turns P-1 and P-3 red and reverting stage 2 turns P-3 red. **`ddl_engine_version` 2 → 3** (`ddl_version` stays at `2` — no word was added; **render engine stays at `16`** — no performance moved by a byte). **All 29 cases of the reference corpus `ddl-engine-3/` are byte-identical to `ddl-engine-2/`, and `changed_from_previous` is empty** — **that emptiness is the description of the version**: a corpus that fixes the Score and watches the transform moves nothing when what changes is *which Scores get written*. **`gen_ddl_reference.py` had recorded every case as changed whenever a new version directory was cut** (invisible for engine 2, where every dump really did change), so it now decides against the previous manifest — which `gen_render_reference.py` already did and step 4 of `server/reference/README.md` already required. Five tests pinning `ddl_engine_version == "2"` were re-pinned. pytest 1600/31 (+4 new tests), cli 76, `npm run check` 0 errors / 2 warnings / 218 files, `check_frozen_corpora.py` byte-identical. **Build 762 had already been taken by another branch, so the number skipped to 763.**
+v2.9.5 (Build 763) **moves the declaration of `Instruction.thinness` to the end** (from just after
+`weight`, position 14, to position 23). **The Stage 2 tool schema reaches the model with its
+property order intact, and an optional field is filled more often the further back it is declared**
+— the thinness axis added in engine 16 had barely been reaching the picture, because of where it
+stood. **Carry goes from 18% to 89%** (25 distinct inputs, `nvidia:google/gemma-4-31b-it`, 25 of 28
+instructions across the 19 inputs containing a thinness word). **Not one character of the field
+changed.
+Only its position moved.** The same version **removes `sort_keys=True` from
+`_stage2_prompt_digest`** — **the fingerprint was blind to order, so a change that moves the
+picture had never once been recorded in `history.stage2_prompt_digest`** (Japanese
+`32e65db9dcb68e99` → `e11b7daa7c65a5fe`, English `31d357f591d4cf9b` → `e1eacdb0176f7f98`; **stored
+values are left alone**, since a past value points at a past schema order and that is simply true).
+**No gate caught this property** — the frozen corpora start from a Score and never pass through
+Stage 2, and **stage 1 applied alone left all 1596 tests green** (measured).
+Four discriminating tests are new, and **the accepting side re-applied a perturbation per stage**,
+confirming that reverting stage 1 turns P-1 and P-3 red and reverting stage 2 turns P-3 red.
+**`ddl_engine_version` 2 → 3** (`ddl_version` stays at `2` — no word was added; **render engine
+stays at `16`** — no performance moved by a byte). **All 29 cases of the reference corpus
+`ddl-engine-3/` are byte-identical to `ddl-engine-2/`, and `changed_from_previous` is empty** —
+**that emptiness is the description of the version**: a corpus that fixes the Score and watches the
+transform moves nothing when what changes is *which Scores get written*. **`gen_ddl_reference.py`
+had recorded every case as changed whenever a new version directory was cut** (invisible for engine
+2, where every dump really did change), so it now decides against the previous manifest — which
+`gen_render_reference.py` already did and step 4 of `server/reference/README.md` already required.
+Five tests pinning `ddl_engine_version == "2"` were re-pinned. pytest 1600/31 (+4 new tests), cli
+76, `npm run check` 0 errors / 2 warnings / 218 files, `check_frozen_corpora.py` byte-identical.
+**Build 762 had already been taken by another branch, so the number skipped to 763.**
 
-v2.9.6 (Build 765) **makes it possible to start without a single API key**: choose a local [Ollama](https://ollama.com) as the provider. **The measured recommendation is Stage 1 `qwen3.5:4b-q4_K_M` plus Stage 2 `ministral-3:8b-instruct-2512-q4_K_M`** (9.4GB together, 71% coverage, replacing the previously approved `qwen3.5:4b` plus `gemma4:e4b` at 13.0GB and 64%). Both SETUP files gain a section on running without a key, and `deploy/compose.yaml` passes `OLLAMA_BASE_URL` to `api` and maps `host.docker.internal` to the gateway via `extra_hosts` — **"local" seen from inside a container is not the host**. **The Ollama model list is replaced by the ten that were actually measured** (`MODEL_CONFIG_VERSION` 2.2.0 → 2.3.0), **with the quantization written into the tag** (a bare tag is a moving target upstream and would stop matching its measurement). **Stage 2 asks a local Ollama by schema rather than by tool** (`response_format`) — **a tool definition rides in the prompt, and the Score schema was large enough that Ollama was discarding 75% of it**. **Thinking is turned off** (`reasoning_effort="none"`) — **Ollama starts thinking by itself when nothing says otherwise, and that thinking shares the answer's budget**, so whatever ran past it came back as nothing (off, the same work ran 8× faster with coverage unmoved). **Speed left the release display for developer mode only** (`speed_developer_only`; numbers from one GPU-less machine are not a promise about anyone else's). **Re-importing a stored catalog widened from nvidia to every builtin provider** — a stored list belongs to the installation, but **must not outlive a catalog whose measurements changed**, so a version bump lays the builtin metadata back over the matching ids. **Fixed at acceptance**: the branch was cut at Build 730, before `e653f52` (Build 731) made every id in `PROVIDER_GROUPS` bare, so **three disagreements existed that neither branch could turn red alone** — the ten new entries were written qualified; `test_web_fallback_list_matches_the_catalog` read ids with `ollama:` baked into its pattern (loosening it meant starting the scan at `models: [`, since the looser pattern would otherwise read the group's own `id: 'ollama'`); and **`web/scripts/model-ref-expectations.json` described the catalog that was replaced** (`gpt-oss:20b` is now ollama-cloud's alone, `qwen3.5:4b-q4_K_M` is now ollama's alone, and `llama3.2`, gone from every catalog, carries the opposite lesson that a retired id stops being decided by rule 2). **Replacing the Ollama list also removed the last model two providers both listed**, and `test_sole_ownership_decides_and_ambiguity_does_not` **failed by name: "the ambiguity this rule exists for is gone"** — the second owner is now injected from the expectation table by the Python and node readers alike, leaving the three assertions unchanged. **Four perturbations, one per mechanism** (thinking off, the widened re-import, the hidden speed, the `response_format` branch). pytest 1628/31, cli 76, `npm run check` 0/2/218, `lint:models` **58**, `lint:i18n` 877/44/0/0. **The version is a patch** — the report argued for a minor, but the rule reserves minor for a milestone the author declares or a break in compatibility, and the shapes of the stored settings, the API and the edition ID all stayed where they were.
+v2.9.6 (Build 765) **makes it possible to start without a single API key**: choose a local
+[Ollama](https://ollama.com) as the provider. **The measured recommendation is Stage 1
+`qwen3.5:4b-q4_K_M` plus Stage 2 `ministral-3:8b-instruct-2512-q4_K_M`** (9.4GB together, 71%
+coverage, replacing the previously approved `qwen3.5:4b` plus `gemma4:e4b` at 13.0GB and 64%).
+Both SETUP files gain a section on running without a key, and `deploy/compose.yaml` passes
+`OLLAMA_BASE_URL` to `api` and maps `host.docker.internal` to the gateway via `extra_hosts` —
+**"local" seen from inside a container is not the host**. **The Ollama model list is replaced by
+the ten that were actually measured** (`MODEL_CONFIG_VERSION` 2.2.0 → 2.3.0), **with the
+quantization written into the tag** (a bare tag is a moving target upstream and would stop matching
+its measurement). **Stage 2 asks a local Ollama by schema rather than by tool** (`response_format`)
+— **a tool definition rides in the prompt, and the Score schema was large enough that Ollama was
+discarding 75% of it**. **Thinking is turned off** (`reasoning_effort="none"`) — **Ollama starts
+thinking by itself when nothing says otherwise, and that thinking shares the answer's budget**, so
+whatever ran past it came back as nothing (off, the same work ran 8× faster with coverage unmoved).
+**Speed left the release display for developer mode only** (`speed_developer_only`; numbers from
+one GPU-less machine are not a promise about anyone else's). **Re-importing a stored catalog
+widened from nvidia to every builtin provider** — a stored list belongs to the installation, but
+**must not outlive a catalog whose measurements changed**, so a version bump lays the builtin
+metadata back over the matching ids. **Fixed at acceptance**: the branch was cut at Build 730,
+before `e653f52` (Build 731) made every id in `PROVIDER_GROUPS` bare, so **three disagreements
+existed that neither branch could turn red alone** — the ten new entries were written qualified;
+`test_web_fallback_list_matches_the_catalog` read ids with `ollama:` baked into its pattern
+(loosening it meant starting the scan at `models: [`, since the looser pattern would otherwise read
+the group's own `id: 'ollama'`); and **`web/scripts/model-ref-expectations.json` described the
+catalog that was replaced** (`gpt-oss:20b` is now ollama-cloud's alone, `qwen3.5:4b-q4_K_M` is now
+ollama's alone, and `llama3.2`, gone from every catalog, carries the opposite lesson that a retired
+id stops being decided by rule 2). **Replacing the Ollama list also removed the last model two
+providers both listed**, and `test_sole_ownership_decides_and_ambiguity_does_not` **failed by name:
+"the ambiguity this rule exists for is gone"** — the second owner is now injected from the
+expectation table by the Python and node readers alike, leaving the three assertions unchanged.
+**Four perturbations, one per mechanism** (thinking off, the widened re-import, the hidden speed,
+the `response_format` branch). pytest 1628/31, cli 76, `npm run check` 0/2/218, `lint:models`
+**58**, `lint:i18n` 877/44/0/0. **The version is a patch** — the report argued for a minor, but the
+rule reserves minor for a milestone the author declares or a break in compatibility, and the shapes
+of the stored settings, the API and the edition ID all stayed where they were.
 
-v2.9.7 (Build 766) **leaves the work cards carrying only what tells them apart, and gives the DB backup a time of day**. This is the fifth round of UI adjustments ([I-044]): five instructions from the author, deployed in turn as Builds 756 through 760 and all accepted in the running UI. **The four history-manager tabs now carry the same bubble as every other button** ([I-042]) — `.settings-tabs` held `overflow: hidden` to cut its own corners, **which clipped any bubble inside it**, so those four had used a native `title`. **The verbs left the work panel of a card**: the delete actions aggregate into the toolbar and `Replay` was removed from **all three places it appeared in the modal** (fixing one would have left it visible in another view of the same modal; the feature itself remains in `CanvasPanel`). What is left is star / hash / **generation number** / **model name**. **DB backups gained a resident scheduler** — `ensure_scheduled_db_backup()` **had exactly one caller, the admin-only `GET /api/settings/status`**, so "every N days" meant **whenever an admin first opened the panel after N days had passed**. Adding a time of day on top of that would have made the field lie, so **the situation was put to the author before any of it was written**. `_lifespan` now asks once a minute whether a backup is due (`INKU_DB_BACKUP_SCHEDULER=0` removes it), and **the due time is derived from the last backup rather than from the loop's own period**, so a late wake-up delays a copy rather than skipping one. **`backup_hour` and `backup_minute` join the settings** (3:00 by default): **the interval decides which day and the time decides when on that day**. **What the database keeps** (generation / kind / timestamp / size) rides along on `/api/settings/status`, where **generation 1 is the newest and manual backups sit outside the numbering** (`—`) because they are never pruned, and **the payload stops at 50 rows while the totals cover every file**. **"Reload" had been writing a backup** — the call left in the status endpoint **had been the only trigger before the scheduler existed** and afterwards contributed nothing but the side effect (removed by the author's ruling). **The backup time field could not be read** (the author: "far too cryptic to understand"): **a third field pushed each track to about 108px, too narrow for `input[type="time"]`**, and **the hint sat below all three fields**, so **the hour and minute became two number fields matching their neighbours**. `Reload` became **`Refresh`** (one key shared by three tabs). **`SPEC.md` §22 said scheduled backups are created when the settings status endpoint is loaded — precisely the behaviour this version removed — and was corrected** (**the Japanese SPEC has no operational sections**, so only the English was touched). **Eight perturbations were applied by the implementing session and all eight went red.** **The accepting session did not measure them again** (the author ruled a second pass unnecessary). **The time test demands 22:45 rather than the default 3:00**, so as not to repeat the fourth round's lesson that changing a default can turn the test guarding it into a tautology. pytest 1635/31 (+7), cli 76, `npm run check` 0/2/218, **`lint:i18n` 897/47/0/0**, `lint:models` 58. **The version is a patch** — five UI changes and two server changes, but **none of the stored-data, API or edition-ID shapes moved** (the settings gained two keys and lost none).
+v2.9.7 (Build 766) **leaves the work cards carrying only what tells them apart, and gives the DB
+backup a time of day**.
+This is the fifth round of UI adjustments ([I-044]): five instructions from the author, deployed in
+turn as Builds 756 through 760 and all accepted in the running UI. **The four history-manager tabs
+now carry the same bubble as every other button** ([I-042]) — `.settings-tabs` held
+`overflow: hidden` to cut its own corners, **which clipped any bubble inside it**, so those four
+had used a native `title`. **The verbs left the work panel of a card**: the delete actions
+aggregate into the toolbar and `Replay` was removed from **all three places it appeared in the
+modal** (fixing one would have left it visible in another view of the same modal; the feature
+itself remains in `CanvasPanel`).
+What is left is star / hash / **generation number** / **model name**. **DB backups gained a
+resident scheduler** — `ensure_scheduled_db_backup()` **had exactly one caller, the admin-only
+`GET /api/settings/status`**, so "every N days" meant **whenever an admin first opened the panel
+after N days had passed**.
+Adding a time of day on top of that would have made the field lie, so **the situation was put to
+the author before any of it was written**.
+`_lifespan` now asks once a minute whether a backup is due (`INKU_DB_BACKUP_SCHEDULER=0` removes
+it), and **the due time is derived from the last backup rather than from the loop's own period**,
+so a late wake-up delays a copy rather than skipping one. **`backup_hour` and `backup_minute` join
+the settings** (3:00 by default): **the interval decides which day and the time decides when on
+that day**. **What the database keeps** (generation / kind / timestamp / size) rides along on
+`/api/settings/status`, where **generation 1 is the newest and manual backups sit outside the
+numbering** (`—`) because they are never pruned, and **the payload stops at 50 rows while the
+totals cover every file**. **"Reload" had been writing a backup** — the call left in the status
+endpoint **had been the only trigger before the scheduler existed** and afterwards contributed
+nothing but the side effect (removed by the author's ruling). **The backup time field could not be
+read** (the author: "far too cryptic to understand"): **a third field pushed each track to about
+108px, too narrow for `input[type="time"]`**, and **the hint sat below all three fields**, so **the
+hour and minute became two number fields matching their neighbours**.
+`Reload` became **`Refresh`** (one key shared by three tabs). **`SPEC.md` §22 said scheduled
+backups are created when the settings status endpoint is loaded — precisely the behaviour this
+version removed — and was corrected** (**the Japanese SPEC has no operational sections**, so only
+the English was touched). **Eight perturbations were applied by the implementing session and all
+eight went red.** **The accepting session did not measure them again** (the author ruled a second
+pass unnecessary). **The time test demands 22:45 rather than the default 3:00**, so as not to
+repeat the fourth round's lesson that changing a default can turn the test guarding it into a
+tautology. pytest 1635/31 (+7), cli 76, `npm run check` 0/2/218, **`lint:i18n` 897/47/0/0**,
+`lint:models` 58. **The version is a patch** — five UI changes and two server changes, but **none
+of the stored-data, API or edition-ID shapes moved** (the settings gained two keys and lost none).
 
-v2.9.8 (Build 776) **lets the writer choose how many tools are on screen, and marks the models that cannot be chosen.** There are three UI modes — **Simple UI** (only what is required), **Full UI** (everything, as before) and **Custom UI** (the required set plus any of seven groups) — **stored per logged-in user in the database, and a new account starts in Simple UI**. **A mode changes the display layer only**: feature paths, history and stored data are untouched, and a hidden tool works again the moment the mode is changed back. **The modes are not named after proficiency** — `GLOSSARY.md` rejects Beginner / Expert. The favicon is now the project icon. Ten of Ollama Cloud's eighteen models **answer 403 on the free tier**, so they carry `requires_subscription` and cannot be selected, and **a re-fetch does not clear that mark** — an EOL mark is cleared because the provider's listing carries it, a paid-plan mark is not, so **the difference is where the mark comes from: the listing, or a measurement**. The eight that can be reached were measured four runs each and given recommendation levels, but **no level 5 was awarded**: four runs cannot separate a shared host's luck from a model's ability (the median for `gemma4:31b` moved 11s → 105s → 35s on one day). **The two paid models were removed from the fallback list in `models.ts`** as well — the fallback carries no marks, so for a few hundred milliseconds they looked ordinary. **The rule is not "keep this list fresh" but "do not put something guarded by a mark where marks are not shown".** A model that writes its own `version` no longer costs the Score; the guess is dropped instead, and **that path runs through all five validation sites for every provider, making it the widest change in this version**. **`MODEL_CONFIG_VERSION` moved 2.3.0 → 2.4.0**, though **the reason the implementing session gave was wrong when measured**: the development host's stored catalog was at `2.2.0`, where the re-layer already runs. What the bump reaches is **an installation already stored at 2.3.0**. **There was an accident on the shared host**: a parallel branch ran `rsync -a server/src/inku_server/` and took the other branch's `ui_mode` and `ui_custom` off it. **A branch does not carry what the other added after they diverged, so sending the directory deletes it** — `AGENTS.md` said "do not rsync the whole `server/`" but never said the same happens one level down. Two repairs landed: **the front end checks the PATCH response against what it asked for** rather than trusting a 200 from an API that ignored the unknown fields, and **the deploy helper refuses, before rsync, a sync that would remove a feature the remote already has**. The permanent fix is ledger item **[I-053]**. **766 is followed by 776** (767–771 for the sixth UI round, 772 and 774 for Ollama Cloud, 773 and 775 for the deployment integration branch): **the counter is shared, not per branch, so your own +1 is not necessarily free**. **The check that mattered most in acceptance**: the merged tree was compared against the integration branch already measured green on the development host, and **the only differences were five documentation files and `BUILD_NUMBER` — not one byte of source**. pytest **1668/31**, cli 76, ruff clean, `npm run check` 219/0/2, **`lint:i18n` 918/47/0/0**, `lint:models` 58, `check_docs.py` green. **The version is a patch**: the two new columns are additions with defaulted migrations, and no stored-data, API or edition-ID shape moved.
+v2.9.8 (Build 776) **lets the writer choose how many tools are on screen, and marks the models that
+cannot be chosen.** There are three UI modes — **Simple UI** (only what is required), **Full UI**
+(everything, as before) and **Custom UI** (the required set plus any of seven groups) — **stored
+per logged-in user in the database, and a new account starts in Simple UI**. **A mode changes the
+display layer only**: feature paths, history and stored data are untouched, and a hidden tool works
+again the moment the mode is changed back. **The modes are not named after proficiency** —
+`GLOSSARY.md` rejects Beginner / Expert.
+The favicon is now the project icon.
+Ten of Ollama Cloud's eighteen models **answer 403 on the free tier**, so they carry
+`requires_subscription` and cannot be selected, and **a re-fetch does not clear that mark** — an
+EOL mark is cleared because the provider's listing carries it, a paid-plan mark is not, so **the
+difference is where the mark comes from: the listing, or a measurement**.
+The eight that can be reached were measured four runs each and given recommendation levels, but
+**no level 5 was awarded**: four runs cannot separate a shared host's luck from a model's ability
+(the median for `gemma4:31b` moved 11s → 105s → 35s on one day). **The two paid models were removed
+from the fallback list in `models.ts`** as well — the fallback carries no marks, so for a few
+hundred milliseconds they looked ordinary. **The rule is not "keep this list fresh" but "do not put
+something guarded by a mark where marks are not shown".** A model that writes its own `version` no
+longer costs the Score; the guess is dropped instead, and **that path runs through all five
+validation sites for every provider, making it the widest change in this version**.
+**`MODEL_CONFIG_VERSION` moved 2.3.0 → 2.4.0**, though **the reason the implementing session gave
+was wrong when measured**: the development host's stored catalog was at `2.2.0`, where the re-layer
+already runs.
+What the bump reaches is **an installation already stored at 2.3.0**. **There was an accident on
+the shared host**: a parallel branch ran `rsync -a server/src/inku_server/` and took the other
+branch's `ui_mode` and `ui_custom` off it. **A branch does not carry what the other added after
+they diverged, so sending the directory deletes it** — `AGENTS.md` said "do not rsync the whole
+`server/`" but never said the same happens one level down.
+Two repairs landed: **the front end checks the PATCH response against what it asked for** rather
+than trusting a 200 from an API that ignored the unknown fields, and **the deploy helper refuses,
+before rsync, a sync that would remove a feature the remote already has**.
+The permanent fix is ledger item **[I-053]**. **766 is followed by 776** (767–771 for the sixth UI
+round, 772 and 774 for Ollama Cloud, 773 and 775 for the deployment integration branch): **the
+counter is shared, not per branch, so your own +1 is not necessarily free**. **The check that
+mattered most in acceptance**: the merged tree was compared against the integration branch already
+measured green on the development host, and **the only differences were five documentation files
+and `BUILD_NUMBER` — not one byte of source**. pytest **1668/31**, cli 76, ruff clean,
+`npm run check` 219/0/2, **`lint:i18n` 918/47/0/0**, `lint:models` 58, `check_docs.py` green. **The
+version is a patch**: the two new columns are additions with defaulted migrations, and no
+stored-data, API or edition-ID shape moved.
 
-v2.9.9 (Build 780) **takes the machine's notes out of the color channel** (stage 1-A of the color catalog work). `color_hint` had been carrying **four roles** — a color description, coerce's idempotency guard, the renderer's own effect annotation, and a descriptive marker — so **only the diagnostics** move, into a new `Instruction.note`. **85 of the 92 write sites** moved (72 compose, 3 normalize, 10 API); **the 7 that stayed are descriptive markers**, which the renderer reads as the character of the drawing: **a field's roles are counted by its readers, not its writers**. **The 20 read-back guards followed** (a guard left behind stacks the same diagnostic twice on the second coerce). **`note` is declared second** — an optional field's fill rate follows its declaration position monotonically and **rises toward the tail** (0% at position 0, 89% at position 23), so **a field the model must not fill belongs at the front** (`thinness` stays last). **Instructions carrying `color_hint` in new work fell 74.7% → 7.6%**, which **equals the share that actually carries a color description**, and **the 2825 cases where a diagnostic misfired color resolution are now 0**. **Only the color moved**: across the 14 cases that traverse coerce, **the performance seed is unchanged in 14/14, the path geometry in 14/14, and the color attributes moved in 6** (of the 8 whose `color_hint` moved, 2 kept their color — nothing had misfired there). The **seed allowlist** from engine 15 is what makes this hold, so **strokes that move are an accident, not the effect of 1-A**. **Acceptance found one missing discriminator**: the implementation had added a projection to the DDL corpus generator that folded `note` back into `color_hint`, **keeping the frozen files byte-identical**. The contract's "byte-identical is correct" was true only of **the render corpus** (which never calls `coerce_score`); **the DDL corpus does traverse coerce** — without the projection all 14 cases and the manifest moved. **What settled it: each frozen file already pins `branch_report` with its 34 branch counters**, so machine diagnostics are part of this artifact by construction. **Regressing the write channel left `check_frozen_corpora.py` green while the projection stood**, and since **CI runs corpus regeneration and not one test**, CI was blind to the subject of this change; with the projection removed and the files refrozen, the same perturbation goes **red, naming 6 files**. `DDL_ENGINE_VERSION` **stays 3** — what moved is the recorded output. **777, 778 and 779 were taken by parallel branches, and 778 and 779 were each written by two of them**, so this version takes 780 (**the counter moves between measuring and claiming** — the documents already said 779 when a re-measurement just before deployment found the development host at 779). pytest **1695/31** (+27), cli 76, ruff clean, `npm run check` 219/0/2, `check_frozen_corpora.py` byte-identical, `check_docs.py` green. The implementing session's perturbations were **112/112**; the accepting session's own five were **5/5 red** (the fifth was not, so the corpus was refrozen on the spot). **The version is a patch.**
+v2.9.9 (Build 780) **takes the machine's notes out of the color channel** (stage 1-A of the color
+catalog work).
+`color_hint` had been carrying **four roles** — a color description, coerce's idempotency guard,
+the renderer's own effect annotation, and a descriptive marker — so **only the diagnostics** move,
+into a new `Instruction.note`. **85 of the 92 write sites** moved (72 compose, 3 normalize, 10 API);
+ **the 7 that stayed are descriptive markers**, which the renderer reads as the character of the
+drawing: **a field's roles are counted by its readers, not its writers**. **The 20 read-back guards
+followed** (a guard left behind stacks the same diagnostic twice on the second coerce). **`note` is
+declared second** — an optional field's fill rate follows its declaration position monotonically
+and **rises toward the tail** (0% at position 0, 89% at position 23), so **a field the model must
+not fill belongs at the front** (`thinness` stays last). **Instructions carrying `color_hint` in
+new work fell 74.7% → 7.6%**, which **equals the share that actually carries a color description**,
+and **the 2825 cases where a diagnostic misfired color resolution are now 0**. **Only the color
+moved**: across the 14 cases that traverse coerce, **the performance seed is unchanged in 14/14,
+the path geometry in 14/14, and the color attributes moved in 6** (of the 8 whose `color_hint`
+moved, 2 kept their color — nothing had misfired there).
+The **seed allowlist** from engine 15 is what makes this hold, so **strokes that move are an
+accident, not the effect of 1-A**. **Acceptance found one missing discriminator**: the
+implementation had added a projection to the DDL corpus generator that folded `note` back into
+`color_hint`, **keeping the frozen files byte-identical**.
+The contract's "byte-identical is correct" was true only of **the render corpus** (which never
+calls `coerce_score`); **the DDL corpus does traverse coerce** — without the projection all 14
+cases and the manifest moved. **What settled it: each frozen file already pins `branch_report` with
+its 34 branch counters**, so machine diagnostics are part of this artifact by construction.
+**Regressing the write channel left `check_frozen_corpora.py` green while the projection stood**,
+and since **CI runs corpus regeneration and not one test**, CI was blind to the subject of this
+change; with the projection removed and the files refrozen, the same perturbation goes **red,
+naming 6 files**.
+`DDL_ENGINE_VERSION` **stays 3** — what moved is the recorded output. **777, 778 and 779 were taken
+by parallel branches, and 778 and 779 were each written by two of them**, so this version takes 780
+(**the counter moves between measuring and claiming** — the documents already said 779 when a
+re-measurement just before deployment found the development host at 779). pytest **1695/31** (+27),
+cli 76, ruff clean, `npm run check` 219/0/2, `check_frozen_corpora.py` byte-identical,
+`check_docs.py` green.
+The implementing session's perturbations were **112/112**; the accepting session's own five were
+**5/5 red** (the fifth was not, so the corpus was refrozen on the spot). **The version is a
+patch.**
 
-v2.9.10 (Build 781) **lets the stopped machine go, and recommends a model for the stage it was measured at.** **OVMS (Intel OpenVINO Model Server) was retired as a provider** (ledger [I-056]): its endpoint had stopped serving models while still answering `/health`, and the models it offered are reachable through Ollama. **Removing it from the built-in list does not remove it from an installation** — an unknown id is preserved as a custom provider, and the `MODEL_CONFIG_VERSION` refresh sits inside `if builtin` — so a withdrawn id is named in **`RETIRED_PROVIDER_IDS` and dropped at the entry of `normalize_model_settings`**. But **a retired provider takes part in naming, not in routing**: it stays in reference splitting and label lookup. **Six works record an OVMS model, five of them with the qualified string `ovms:gemma3-4b-api`** (one bare), and dropping it from splitting would display "NVIDIA NIM / ovms:gemma3-4b-api", **worse than the id alone**. It is not in the ownership table, and `connection_for` raises `ValueError` for it. **Two live landing places the ledger did not know about were removed**: the literal `"qwen-api"` in the demo instruction generator in `api.py`, and `/no_think` in `interpreter.py` — both named OVMS models, so an unconfigured demo was asking a withdrawn provider for its instruction. **`OPENAI_MODEL` and `OPENAI_MODEL_STAGE1` lost their last reader** and were removed from both compose passthroughs and the development host's `.env`; **`INKU_LLM_BACKEND` stays**, because removing it makes the default anthropic, which falls onto a path with no key. **One number cannot say that the two stages disagree**: the local Ollama models were measured per stage, and the pair inku recommends is a Stage 1 model that covers 32% of Stage 2 and a Stage 2 model that breaks Stage 1 in English. `recommendation_stage1` and `recommendation_stage2` **narrow `recommendation_llm` rather than replacing it**, so **the 8 cloud and 32 NVIDIA models measured end to end are unchanged and no migration is needed**. **The settings UI already had Stage 1, Stage 2 and shared tabs yet folded both stages into the same `'llm'`.** **Three places listed the metadata keys**, and a key added to one and forgotten in another disappeared silently, so they were collapsed into one `MODEL_METADATA_KEYS`. The hover card shows **two lines only for models measured per stage** — two lines for an end-to-end model would print the same stars twice and imply a measurement nobody made. **One of the implementing session's perturbations missed**: removing the two stage keys from the constant left 22/22 green. There were two causes, and both are the shape where **the check supplies its own answer** — (1) `for key in A: assert key in B` **compared a list against itself** (delete from the constant and the loop stops running), and (2) the refresh check **had not given the stored settings the keys**, so the `{**builtin, **stored}` base merge supplied the answer and `metadata_keys` was never traversed. The fix was a sample where **the stored value is a stale 1 and the catalog says 5**. **This also found one error in the contract**: "a key not added to `metadata_keys` is not refreshed even when the version rises" is false — it bites **only when the stored settings hold an older value**. **A guard left by a predecessor was not deleted but replaced by one that points at where the method now lives.** **`MODEL_CONFIG_VERSION` moves 2.4.0 → 2.5.0** (two metadata keys were added, so this is not a change of values alone). **No deterministic layer was touched**, so both frozen corpora are byte-identical. pytest **1732/31** (+37), cli 76, ruff clean, `npm run check` 219/0/2, `lint:i18n` 918/47/0/0, `lint:models` 68, **`lint:recommendations` 37 (new; it joins the local checklist, CI is unchanged)**, `check_docs.py` green. The implementing session applied five perturbations; **the accepting session applied one per stage, independently, and all three went red** (`RETIRED_PROVIDER_IDS` emptied → 9; the two stage keys removed → 2; `modelStageRecommendations()` forced to `null` → 2). **The second is the perturbation that had missed; once fixed, it goes red.** **This branch used 777, 778 and 779, and main reached 780 while it was open, so this version takes 781** — the number did not skip. **The version is a patch**: retiring a provider is not a format change to stored data, and the stage keys are additions that need no migration.
-v2.9.11 (Build 782) **takes the abstract colors from six words to nine, and gives yellow a way out.** Score's `color` gains `yellow`, `orange` and `purple`. **Catalog palettes already held twelve yellows, a nominal 13.6%, yet the yellow actually drawn was 0.6%** — there was no word to leave by. The existing six keep their order and the three are appended; **`color` keeps declaration position 17 in a 25-field tool schema** (it is required, so position does not drive carry, but the prior measurement was taken there and the arms have to stay comparable). **Two rules were added to Stage 2's prompt** — **without them `orange` stays at 0.6%** (schema-only arm: `yellow` 7.6% / `orange` 0.6%; with the rules: 8.5% / 2.4%). Over a fixed 60 inputs the result is 13.7% / 6.0% in Japanese and 6.5% / 3.0% in English, new words together 19.7% (ja) and 10.1% (en) — past the thresholds in both languages — with **instruction totals at -0.8% (ja) and +5.7% (en)**, so the thinning seen with `thinness` did not recur. **`purple` is deliberately not an acceptance condition**: purple-leaning demand is 0.9% of 821 production inputs and only 3 of the 60 sampled inputs lean purple, so the rate carries no discriminating power. **The saijiki's colors gained the three words too**, which puts them in Stage 1's vocabulary listing — **the description language's own vocabulary grew** — so **`ddl_version` moves 2 → 3** (the contract said to hold it, but 1 → 2 happened because "the version rises when the vocabulary grows", and a change of the same shape cannot be held. **The contradiction came from `docs/spec/render-engine-history`, whose clause read "grammar is added, changed, or retired"**; that clause was corrected as well). **`COLOR_MARKERS` was widened by three entries per language** — **without it `ddl-engine-4` would be an exact copy of `ddl-engine-3`** (measured before handover: changing only the schema and the saijiki moved neither corpus by a byte, because **the work widens Stage 2's exit and the corpus never calls Stage 2**). **`COLOR_MAP` gained three defaults** (`#a18308`, `#a95a00`, `#583a84`; the first line of `_resolve_color` is `cmap[color]`, so without them a new word raises `KeyError`). The drafted "round back to six" was replaced because **Stage 2 emits `yellow` 8.5% of the time, so rounding means every yellow chosen becomes more red** — the opposite of this stage's purpose, which is to bring the 44.6% red down. **The eleven catalogs' `map` tables are untouched**, so every catalog draws the same yellow (stage 1-C's work). **`ddl_engine_version` moves 3 → 4, `ddl-engine-4` is frozen at 33 cases (A 15 / B 18), `changed_from_previous` is exactly the four new ones — the twenty-nine older cases did not move by a byte — and `render-engine-16` (365 / 333 SVG) is byte-identical.** **One frozen behavior did move**: H-01 in `coerce_golden.json`, whose DDL literally says "yellow crayon", went `with_color_delivery_repair` 0 → 1. That is what the work is for, but **the duplicated `red` in its `color_cycle` is not from this work** — `_with_color_cycle_delivery` inserts `base_color` at the head unconditionally while the lines two and four below it check for duplicates. **A perturbation applied during acceptance found a shape the implementing session's six had not**: make `_resolve_color` return `cmap["black"]` for the three new colors only and **all 1751 tests stay green**, because the new test **compared the keys of its own comprehension against the list they came from**. Pinning the values and requiring `_hue_from_hex()` to classify each new word back to itself turns the same perturbation **11 red**. **`render-engine-16` being byte-identical does not close that hole** (no case there uses a new color). **Staffage does not follow the new colors**: `ddl_expander` keeps its own six-word tuples, separate from `COLOR_MARKERS`, and over 60 seeds yellow, orange and purple get their own color **0/60** times and fall to black (red 48/60, green 46/60). But **the database shows 19 of 282 stored DDL strings already contained "黄色い" before this version**, so the hole is pre-existing; what changed is that the yellow now reaches coercion and survives into the Score. **The two Android copies are two versions behind** (`ServerScoreCoercer.kt` silently rewrites an unknown color to black; `ServerScoreSchemaJson.kt` has 24 fields, `thinness` at 14, no `note`), which is not this version's lag and is handed to ledger item [I-029]. pytest **1751/31** (+19), cli 76, ruff clean, `npm run check` 219/0/2, `lint:i18n` 918/47/0/0, `lint:models` 68, `lint:recommendations` 37, `check_docs.py` green, both frozen corpora byte-identical. **The version is a patch**: this is an enum widening, and a stored six-word Score still validates.
-v2.9.12 (Build 783) **makes the catalog's `palette` reach the drawing.** Each of the eleven catalogs holds eight named `palette` entries, yet **the only path by which they reached the drawing was substring matching on `color_hint`**: of 7463 stored instructions only **945 (12.7%)** carry a color word, and the other 87% ended at `cmap[color]`, the six-key `map`. **The assignment is now computed once per work from `(render_seed, catalog_id, abstract color)` and nothing else** (the full instruction dump would let an edit to `color_hint` change the color and confound any A/B; `performance_seed` is excluded too, because **color is a property of the work, not of the performance**). The six chromatic words are classified by **OKLCh** hue band (**CIELAB puts pure blue at 306° beside pure magenta at 328° and cannot separate blue from purple**). The three achromatic roles **first reserve the candidate whose hex equals their own `map` value** and take the rest by nearest L — the contract's naive "highest / lowest / middle L" **collapses white and black in the five catalogs with fewer than three achromatic entries** (`desert_mineral` has one). **`catalog_id` now reaches the renderer** (it appeared in `renderer.py` zero times before; four files, defaulting to the default catalog when omitted). **`_hint_hues` matches ASCII on word boundaries and five non-words were dropped** (`blu`, `ai`, `vert`, `tall`, `shu`), stopping 166 `vertical`, 20 `constraint` and 13 `blur` misfires (**genuine French `vert` becomes unreadable too**; stopping the misfires won). **Without extending the case table nothing would have moved**: the 365 cases of `render-engine-16` held zero `palette:` keys, zero `color_hint`, colors of only `black` (364) and `green` (1), and `white` backgrounds throughout — a shape where **the work traverses the layer and the output still does not move** (the fifth instance of this pattern). By the author's decision **110 group F cases** were added (99 catalog x color, six descriptions, five non-white backgrounds): **110 moved, 365 unchanged**. **The manifest's `color_map_digest` was built from the generator's own six-key copy and never moved when `renderer.COLOR_MAP` changed**, so it now covers the **set of `(case_id, catalog_id, color_map)` across all 475 cases**, and because **reading frozen SVG alone lets an identity-assignment perturbation pass**, group F is re-performed through the live renderer on every run. What it reaches: **`palette` entries never chosen 12 → 6 / 88**, **distinct hexes 76 → 82**, **misfire-driven decisions 148 → 0**, **achromatic share 57.9% → 61.4%** — **this version adds no color** (the band is set by the abstract color and 69.5% of stored abstract colors are achromatic; what moves is which `palette` entry gets used). **Roles that dissolve into the paper went from 0 / 88 to 8 / 88**: seven are yellow and orange because those bands are light, but **one is a regression** — `black` in `cool_material` moves from `#2c3e50` to `#e5e8e8` and its ΔL against the paper falls **0.635 → 0.062**, because **that catalog's black has chroma 0.039, just past the 0.035 achromatic floor, so it leaves the candidate set and the sole remaining candidate is taken by a nearest-L rule with no distance limit**. In production `cool_material` holds 102 works and 412 instructions, **205 of them (49.8%) `color=black`**; `yellow` in `desert_mineral` lands on the **same hex** as the paper (ΔL 0.000). **A check that compares hexes alone passes both**, since the three roles stay distinct. **The regression lives in the contract's design, not in a deviation by the implementation**, and by the author's decision it **ships unfixed, to be handled in stage 2** ([I-062]). **All four acceptance perturbations went red**, one of them (**removing `catalog_id` from the seed material**) covering a surface none of the implementation's three touched — the new `test_catalog_id_participates_in_multi_candidate_choice` passes on `palette` differences alone. pytest **1771/31**, cli 76, ruff clean, `npm run check` 219/0/2, both frozen corpora byte-identical. **Android stays at engine 16** ([I-029]). **The version is a patch.**
+v2.9.10 (Build 781) **lets the stopped machine go, and recommends a model for the stage it was
+measured at.** **OVMS (Intel OpenVINO Model Server) was retired as a provider** (ledger [I-056]):
+its endpoint had stopped serving models while still answering `/health`, and the models it offered
+are reachable through Ollama. **Removing it from the built-in list does not remove it from an
+installation** — an unknown id is preserved as a custom provider, and the `MODEL_CONFIG_VERSION`
+refresh sits inside `if builtin` — so a withdrawn id is named in **`RETIRED_PROVIDER_IDS` and
+dropped at the entry of `normalize_model_settings`**.
+But **a retired provider takes part in naming, not in routing**: it stays in reference splitting
+and label lookup. **Six works record an OVMS model, five of them with the qualified string
+`ovms:gemma3-4b-api`** (one bare), and dropping it from splitting would display "NVIDIA NIM / ovms:
+gemma3-4b-api", **worse than the id alone**.
+It is not in the ownership table, and `connection_for` raises `ValueError` for it. **Two live
+landing places the ledger did not know about were removed**: the literal `"qwen-api"` in the demo
+instruction generator in `api.py`, and `/no_think` in `interpreter.py` — both named OVMS models, so
+an unconfigured demo was asking a withdrawn provider for its instruction. **`OPENAI_MODEL` and
+`OPENAI_MODEL_STAGE1` lost their last reader** and were removed from both compose passthroughs and
+the development host's `.env`; **`INKU_LLM_BACKEND` stays**, because removing it makes the default
+anthropic, which falls onto a path with no key. **One number cannot say that the two stages
+disagree**: the local Ollama models were measured per stage, and the pair inku recommends is a
+Stage 1 model that covers 32% of Stage 2 and a Stage 2 model that breaks Stage 1 in English.
+`recommendation_stage1` and `recommendation_stage2` **narrow `recommendation_llm` rather than
+replacing it**, so **the 8 cloud and 32 NVIDIA models measured end to end are unchanged and no
+migration is needed**. **The settings UI already had Stage 1, Stage 2 and shared tabs yet folded
+both stages into the same `'llm'`.** **Three places listed the metadata keys**, and a key added to
+one and forgotten in another disappeared silently, so they were collapsed into one
+`MODEL_METADATA_KEYS`.
+The hover card shows **two lines only for models measured per stage** — two lines for an end-to-end
+model would print the same stars twice and imply a measurement nobody made. **One of the
+implementing session's perturbations missed**: removing the two stage keys from the constant left
+22/22 green.
+There were two causes, and both are the shape where **the check supplies its own answer** — (1)
+`for key in A: assert key in B` **compared a list against itself** (delete from the constant and
+the loop stops running), and (2) the refresh check **had not given the stored settings the keys**,
+so the `{**builtin, **stored}` base merge supplied the answer and `metadata_keys` was never
+traversed.
+The fix was a sample where **the stored value is a stale 1 and the catalog says 5**. **This also
+found one error in the contract**: "a key not added to `metadata_keys` is not refreshed even when
+the version rises" is false — it bites **only when the stored settings hold an older value**. **A
+guard left by a predecessor was not deleted but replaced by one that points at where the method now
+lives.** **`MODEL_CONFIG_VERSION` moves 2.4.0 → 2.5.0** (two metadata keys were added, so this is
+not a change of values alone). **No deterministic layer was touched**, so both frozen corpora are
+byte-identical. pytest **1732/31** (+37), cli 76, ruff clean, `npm run check` 219/0/2, `lint:i18n`
+918/47/0/0, `lint:models` 68, **`lint:recommendations` 37 (new; it joins the local checklist, CI is
+unchanged)**, `check_docs.py` green.
+The implementing session applied five perturbations; **the accepting session applied one per stage,
+independently, and all three went red** (`RETIRED_PROVIDER_IDS` emptied → 9; the two stage keys
+removed → 2; `modelStageRecommendations()` forced to `null` → 2). **The second is the perturbation
+that had missed; once fixed, it goes red.** **This branch used 777, 778 and 779, and main reached
+780 while it was open, so this version takes 781** — the number did not skip. **The version is a
+patch**: retiring a provider is not a format change to stored data, and the stage keys are
+additions that need no migration.
+v2.9.11 (Build 782) **takes the abstract colors from six words to nine, and gives yellow a way
+out.** Score's `color` gains `yellow`, `orange` and `purple`. **Catalog palettes already held
+twelve yellows, a nominal 13.6%, yet the yellow actually drawn was 0.6%** — there was no word to
+leave by.
+The existing six keep their order and the three are appended; **`color` keeps declaration position
+17 in a 25-field tool schema** (it is required, so position does not drive carry, but the prior
+measurement was taken there and the arms have to stay comparable). **Two rules were added to Stage
+2's prompt** — **without them `orange` stays at 0.6%** (schema-only arm: `yellow` 7.6% / `orange`
+0.6%; with the rules: 8.5% / 2.4%).
+Over a fixed 60 inputs the result is 13.7% / 6.0% in Japanese and 6.5% / 3.0% in English, new words
+together 19.7% (ja) and 10.1% (en) — past the thresholds in both languages — with **instruction
+totals at -0.8% (ja) and +5.7% (en)**, so the thinning seen with `thinness` did not recur.
+**`purple` is deliberately not an acceptance condition**: purple-leaning demand is 0.9% of 821
+production inputs and only 3 of the 60 sampled inputs lean purple, so the rate carries no
+discriminating power. **The saijiki's colors gained the three words too**, which puts them in Stage
+1's vocabulary listing — **the description language's own vocabulary grew** — so **`ddl_version`
+moves 2 → 3** (the contract said to hold it, but 1 → 2 happened because "the version rises when the
+vocabulary grows", and a change of the same shape cannot be held. **The contradiction came from
+`docs/spec/render-engine-history`, whose clause read "grammar is added, changed, or retired"**;
+that clause was corrected as well). **`COLOR_MARKERS` was widened by three entries per language** —
+**without it `ddl-engine-4` would be an exact copy of `ddl-engine-3`** (measured before handover:
+changing only the schema and the saijiki moved neither corpus by a byte, because **the work widens
+Stage 2's exit and the corpus never calls Stage 2**). **`COLOR_MAP` gained three defaults**
+(`#a18308`, `#a95a00`, `#583a84`; the first line of `_resolve_color` is `cmap[color]`, so without
+them a new word raises `KeyError`).
+The drafted "round back to six" was replaced because **Stage 2 emits `yellow` 8.5% of the time, so
+rounding means every yellow chosen becomes more red** — the opposite of this stage's purpose, which
+is to bring the 44.6% red down. **The eleven catalogs' `map` tables are untouched**, so every
+catalog draws the same yellow (stage 1-C's work). **`ddl_engine_version` moves 3 → 4,
+`ddl-engine-4` is frozen at 33 cases (A 15 / B 18), `changed_from_previous` is exactly the four new
+ones — the twenty-nine older cases did not move by a byte — and `render-engine-16` (365 / 333 SVG)
+is byte-identical.** **One frozen behavior did move**: H-01 in `coerce_golden.json`, whose DDL
+literally says "yellow crayon", went `with_color_delivery_repair` 0 → 1.
+That is what the work is for, but **the duplicated `red` in its `color_cycle` is not from this
+work** — `_with_color_cycle_delivery` inserts `base_color` at the head unconditionally while the
+lines two and four below it check for duplicates. **A perturbation applied during acceptance found
+a shape the implementing session's six had not**: make `_resolve_color` return `cmap["black"]` for
+the three new colors only and **all 1751 tests stay green**, because the new test **compared the
+keys of its own comprehension against the list they came from**.
+Pinning the values and requiring `_hue_from_hex()` to classify each new word back to itself turns
+the same perturbation **11 red**. **`render-engine-16` being byte-identical does not close that
+hole** (no case there uses a new color). **Staffage does not follow the new colors**:
+`ddl_expander` keeps its own six-word tuples, separate from `COLOR_MARKERS`, and over 60 seeds
+yellow, orange and purple get their own color **0/60** times and fall to black (red 48/60, green
+46/60).
+But **the database shows 19 of 282 stored DDL strings already contained "黄色い" before this
+version**, so the hole is pre-existing; what changed is that the yellow now reaches coercion and
+survives into the Score. **The two Android copies are two versions behind**
+(`ServerScoreCoercer.kt` silently rewrites an unknown color to black; `ServerScoreSchemaJson.kt`
+has 24 fields, `thinness` at 14, no `note`), which is not this version's lag and is handed to
+ledger item [I-029]. pytest **1751/31** (+19), cli 76, ruff clean, `npm run check` 219/0/2,
+`lint:i18n` 918/47/0/0, `lint:models` 68, `lint:recommendations` 37, `check_docs.py` green, both
+frozen corpora byte-identical. **The version is a patch**: this is an enum widening, and a stored
+six-word Score still validates.
+v2.9.12 (Build 783) **makes the catalog's `palette` reach the drawing.** Each of the eleven
+catalogs holds eight named `palette` entries, yet **the only path by which they reached the drawing
+was substring matching on `color_hint`**: of 7463 stored instructions only **945 (12.7%)** carry a
+color word, and the other 87% ended at `cmap[color]`, the six-key `map`. **The assignment is now
+computed once per work from `(render_seed, catalog_id, abstract color)` and nothing else** (the
+full instruction dump would let an edit to `color_hint` change the color and confound any A/B;
+`performance_seed` is excluded too, because **color is a property of the work, not of the
+performance**).
+The six chromatic words are classified by **OKLCh** hue band (**CIELAB puts pure blue at 306°
+beside pure magenta at 328° and cannot separate blue from purple**).
+The three achromatic roles **first reserve the candidate whose hex equals their own `map` value**
+and take the rest by nearest L — the contract's naive "highest / lowest / middle L" **collapses
+white and black in the five catalogs with fewer than three achromatic entries** (`desert_mineral`
+has one). **`catalog_id` now reaches the renderer** (it appeared in `renderer.py` zero times before;
+ four files, defaulting to the default catalog when omitted). **`_hint_hues` matches ASCII on word
+boundaries and five non-words were dropped** (`blu`, `ai`, `vert`, `tall`, `shu`), stopping 166
+`vertical`, 20 `constraint` and 13 `blur` misfires (**genuine French `vert` becomes unreadable
+too**; stopping the misfires won). **Without extending the case table nothing would have moved**:
+the 365 cases of `render-engine-16` held zero `palette:` keys, zero `color_hint`, colors of only
+`black` (364) and `green` (1), and `white` backgrounds throughout — a shape where **the work
+traverses the layer and the output still does not move** (the fifth instance of this pattern).
+By the author's decision **110 group F cases** were added (99 catalog x color, six descriptions,
+five non-white backgrounds): **110 moved, 365 unchanged**. **The manifest's `color_map_digest` was
+built from the generator's own six-key copy and never moved when `renderer.COLOR_MAP` changed**, so
+it now covers the **set of `(case_id, catalog_id, color_map)` across all 475 cases**, and because
+**reading frozen SVG alone lets an identity-assignment perturbation pass**, group F is re-performed
+through the live renderer on every run.
+What it reaches: **`palette` entries never chosen 12 → 6 / 88**, **distinct hexes 76 → 82**,
+**misfire-driven decisions 148 → 0**, **achromatic share 57.9% → 61.4%** — **this version adds no
+color** (the band is set by the abstract color and 69.5% of stored abstract colors are achromatic;
+what moves is which `palette` entry gets used). **Roles that dissolve into the paper went from 0 /
+88 to 8 / 88**: seven are yellow and orange because those bands are light, but **one is a
+regression** — `black` in `cool_material` moves from `#2c3e50` to `#e5e8e8` and its ΔL against the
+paper falls **0.635 → 0.062**, because **that catalog's black has chroma 0.039, just past the 0.035
+achromatic floor, so it leaves the candidate set and the sole remaining candidate is taken by a
+nearest-L rule with no distance limit**.
+In production `cool_material` holds 102 works and 412 instructions, **205 of them (49.8%)
+`color=black`**; `yellow` in `desert_mineral` lands on the **same hex** as the paper (ΔL 0.000).
+**A check that compares hexes alone passes both**, since the three roles stay distinct. **The
+regression lives in the contract's design, not in a deviation by the implementation**, and by the
+author's decision it **ships unfixed, to be handled in stage 2** ([I-062]). **All four acceptance
+perturbations went red**, one of them (**removing `catalog_id` from the seed material**) covering a
+surface none of the implementation's three touched — the new
+`test_catalog_id_participates_in_multi_candidate_choice` passes on `palette` differences alone.
+pytest **1771/31**, cli 76, ruff clean, `npm run check` 219/0/2, both frozen corpora
+byte-identical. **Android stays at engine 16** ([I-029]). **The version is a patch.**
 
-v2.9.13 (Build 789) **turns several works into one loop.** It integrates five independent branches (Builds 784-788) around `POST /api/history/export-animation`, which lays saved SVGs end to end and encodes one **APNG (lossless) or GIF (256 colors)**. **There are two call sites and they order the works differently**: history management takes the checked works by ascending `at` (ties by id), oldest first; lineage walks parents up from the selected work and reverses, running **from the origin to the selected work**. **The requested order survives on the server** — `db.get_items` fetches with `id.in_(ids)` and re-sorts by each id's position in the request, not by the database's return order, so the ordering is a property of the API rather than a courtesy of the caller. The transition is **cut, crossfade, fade through white or horizontal slide**; the hold runs 0.1-30 seconds; the resolution (y-axis) is 1K = 1080, 4K = 2160, 8K = 4320 px, and **the transition frame count falls as resolution rises** (6 / 4 / 2). Total encoded pixels are capped at **600,000,000**. **Rasterization still runs through the existing `svg_to_png` (resvg); the new dependency, Pillow 12.3, only composites, blends and encodes** what resvg produced (the four `cairosvg` guards are untouched). The same version carries **drag-to-pan on the lineage tree's empty space** (784), **a result log that remembers whether it was open** (785), **the removal of three history settings from Settings > Misc** (786 — the behavior is fixed at the former defaults: a re-edit always saves as a new version, and selecting from history overrides neither the canvas size nor the color catalog), and **an i mark that lists the eight things auto-repair does** (787). **Acceptance turned on SHA-256**: the nine web files in the merge result are identical to the composite the author approved by eye and pentala is running. **That check was available only because the 32 commits between the branch point `0505961` and main touch none of those nine files**, leaving every conflict between the five branches themselves (the one file they do touch, `server/scripts/gen_android_reference.py`, does not meet this version's server changes). **All three perturbations reddened exactly one test each**, one of them **shape-preserving and data-only** — the frame list reversed, same frame count and same format — caught by the pixel assertion. **The ungated surfaces were exercised by hand**: all eight combinations of four patterns and two formats produced output, and the cap fires at 8K across 40 works. **The unit tests cover only `cut` and `crossfade`; `fade_white`, `slide`, the cap, 4K / 8K and the 404 / 409 paths have no gate.** **Not fixed here**: that missing coverage; `get_items` not excluding trashed works (the UI cannot select them, but sending the ids directly will export them); and 8K holding about 2.4 GB of RGBA at the cap (measured: 8K across three works, crossfade, peaked at 1.37 GB RSS — pentala carries 64 GB with 59 GB free, so the cap stands). pytest **1775/31**, cli 76, ruff clean, `npm run check` **220/0/2**, `lint:i18n` **934/47/0/0**. **No decisive layer changed, so the frozen corpora were not re-baked. Android has no diff. The version is a patch.**
+v2.9.13 (Build 789) **turns several works into one loop.** It integrates five independent branches
+(Builds 784-788) around `POST /api/history/export-animation`, which lays saved SVGs end to end and
+encodes one **APNG (lossless) or GIF (256 colors)**. **There are two call sites and they order the
+works differently**: history management takes the checked works by ascending `at` (ties by id),
+oldest first; lineage walks parents up from the selected work and reverses, running **from the
+origin to the selected work**. **The requested order survives on the server** — `db.get_items`
+fetches with `id.in_(ids)` and re-sorts by each id's position in the request, not by the database's
+return order, so the ordering is a property of the API rather than a courtesy of the caller.
+The transition is **cut, crossfade, fade through white or horizontal slide**; the hold runs 0.1-30
+seconds; the resolution (y-axis) is 1K = 1080, 4K = 2160, 8K = 4320 px, and **the transition frame
+count falls as resolution rises** (6 / 4 / 2).
+Total encoded pixels are capped at **600,000,000**. **Rasterization still runs through the existing
+`svg_to_png` (resvg); the new dependency, Pillow 12.3, only composites, blends and encodes** what
+resvg produced (the four `cairosvg` guards are untouched).
+The same version carries **drag-to-pan on the lineage tree's empty space** (784), **a result log
+that remembers whether it was open** (785), **the removal of three history settings from Settings >
+Misc** (786 — the behavior is fixed at the former defaults: a re-edit always saves as a new
+version, and selecting from history overrides neither the canvas size nor the color catalog), and
+**an i mark that lists the eight things auto-repair does** (787). **Acceptance turned on SHA-256**:
+the nine web files in the merge result are identical to the composite the author approved by eye
+and pentala is running. **That check was available only because the 32 commits between the branch
+point `0505961` and main touch none of those nine files**, leaving every conflict between the five
+branches themselves (the one file they do touch, `server/scripts/gen_android_reference.py`, does
+not meet this version's server changes). **All three perturbations reddened exactly one test
+each**, one of them **shape-preserving and data-only** — the frame list reversed, same frame count
+and same format — caught by the pixel assertion. **The ungated surfaces were exercised by hand**:
+all eight combinations of four patterns and two formats produced output, and the cap fires at 8K
+across 40 works. **The unit tests cover only `cut` and `crossfade`; `fade_white`, `slide`, the cap,
+4K / 8K and the 404 / 409 paths have no gate.** **Not fixed here**: that missing coverage;
+`get_items` not excluding trashed works (the UI cannot select them, but sending the ids directly
+will export them); and 8K holding about 2.4 GB of RGBA at the cap (measured: 8K across three works,
+crossfade, peaked at 1.37 GB RSS — pentala carries 64 GB with 59 GB free, so the cap stands).
+pytest **1775/31**, cli 76, ruff clean, `npm run check` **220/0/2**, `lint:i18n` **934/47/0/0**.
+**No decisive layer changed, so the frozen corpora were not re-baked.
+Android has no diff.
+The version is a patch.**
 
-v2.9.14 (Build 790) **gives each of the thirteen catalogs all nine colors.** Engine 17 built the path that picks from a `palette`, but **the table it picked from was still engine 16's**, and many catalogs held no color in a band — ask for green where there is no green and the nearest hue, a yellow, stands in. **140 of the 7463 stored instructions asked for a band the catalog did not hold.** **This version replaces data and nothing else** (the resolution chain, band definitions, achromatic threshold and seed material are engine 17's; `renderer.py` has no diff). Each of the thirteen holds **ten palette colors, exactly three achromatic and exactly seven chromatic**, and the seven fill all six bands. **The `map` grows from six keys to nine, all nine drawn from that catalog's own palette** (before, `map` and `palette` could name different colors). **The swatch strip is derived from the `map`, six chromatic keys first** — Android draws `swatches.take(4)` and `take(8)` on two screens, so an achromatic-first order would spend those slots on black, gray and white. **No hex repeats across the 130.** **`desert_mineral` retired** (it held a single achromatic color, which is why engine 17's anti-collapse rule existed) **and `moss_bark`, `neon_plate` and `lantern_dew` joined**. **All ten retired ids answer `None`** rather than falling back to `default`; 117 stored works name that id and **no migration was written** (an unknown id draws with the default catalog). Reach: **missing bands 140 → 0**, **chromatic hits 89.0% → 100%**, **achromatic 98.2% → 100%**, **distinct hexes 79 → 91**, **palette colors never drawn (catalogs in use) 7 → 9**. **The never-drawn count rises**: the nine are eight purples plus `sea_stone/Coral Orange`, because **purple is 0.9% of real demand** (counting all thirteen gives 39, the extra 30 belonging to three catalogs no stored work names). **What moved is recovery from a wrong band** (`default` +106 yellow / -106 green, `sea_stone` +58 green / -58 yellow, `cool_material` +37 red / -37 orange and +35 green / -35 yellow); the band distribution holds at 67.2% achromatic, with **orange 0.8 → 0.3** and purple 0.0 → 0.03. **`sea_stone` keeps its purple band empty by the author's ruling**, so the nearest-band stand-in answers `Night Sea #191970` — **also this catalog's `blue`**, which draws blue and purple as the same navy (checked by eye; the forms stay legible). **Roles dissolving into the paper fall from eight to two and [I-062] closes**: `cool_material`'s `black` is `#26282a` again, and the survivors are `vivid_material #fff200` (ΔL 0.026) and `open_air_light #ffce00` (ΔL 0.127), both yellow's own nature (measured across 10 seeds × 13 catalogs, those two are the only ones). **Acceptance found a missing gate and added it there.** All four perturbations break product data only, yet **the one reproducing [I-062] — lightening the black back into the paper — reddened just the expected-assignment table and the frozen corpus**. **Both are regenerated wholesale when catalog data changes**, so **no test named the property "a role does not dissolve into the paper"** — the same shape that let this regression through engine 17 with all five metrics green. A test now counts 13 catalogs × 8 seeds by lightness distance and **pins the two survivors by hex** (red under the reproduction, green under a control that moves the same black while keeping it dark). **The reference corpus `render-engine-18` holds 493 cases** (A 88 / B 72 / C 58 / D 28 / E 119 / F 128), **70 changed / 423 unchanged**, with **none of the 365 in A-E moving and nothing outside the F group moving**. The 70 are **42 existing ids whose performance changed** plus **28 new ones**; ten disappeared. **58 further cases changed only in what was recorded** — `input.color_map` from six keys to nine with the digest unmoved. `color_map_digest` `bbb2f7be…` → **`96f28097…`**. **Android has not caught up** ([I-070]: `ColorCatalogs.kt` still holds eleven catalogs, a six-key `map` and `desert_mineral`. **What was never ported is the data, not the chain** — `oklchFromHex`, the bands and the chroma floor are in `ServerRendererStyle.kt`). pytest **1847/31** (+72), cli 76, ruff clean, `npm run check` 220/0/2, `lint:i18n` 934/47/0/0, frozen corpora byte-identical. **The version is a patch.**
+v2.9.14 (Build 790) **gives each of the thirteen catalogs all nine colors.** Engine 17 built the
+path that picks from a `palette`, but **the table it picked from was still engine 16's**, and many
+catalogs held no color in a band — ask for green where there is no green and the nearest hue, a
+yellow, stands in. **140 of the 7463 stored instructions asked for a band the catalog did not
+hold.** **This version replaces data and nothing else** (the resolution chain, band definitions,
+achromatic threshold and seed material are engine 17's; `renderer.py` has no diff).
+Each of the thirteen holds **ten palette colors, exactly three achromatic and exactly seven
+chromatic**, and the seven fill all six bands. **The `map` grows from six keys to nine, all nine
+drawn from that catalog's own palette** (before, `map` and `palette` could name different colors).
+**The swatch strip is derived from the `map`, six chromatic keys first** — Android draws
+`swatches.take(4)` and `take(8)` on two screens, so an achromatic-first order would spend those
+slots on black, gray and white. **No hex repeats across the 130.** **`desert_mineral` retired** (it
+held a single achromatic color, which is why engine 17's anti-collapse rule existed) **and
+`moss_bark`, `neon_plate` and `lantern_dew` joined**. **All ten retired ids answer `None`** rather
+than falling back to `default`; 117 stored works name that id and **no migration was written** (an
+unknown id draws with the default catalog).
+Reach: **missing bands 140 → 0**, **chromatic hits 89.0% → 100%**, **achromatic 98.2% → 100%**,
+**distinct hexes 79 → 91**, **palette colors never drawn (catalogs in use) 7 → 9**. **The
+never-drawn count rises**: the nine are eight purples plus `sea_stone/Coral Orange`, because
+**purple is 0.9% of real demand** (counting all thirteen gives 39, the extra 30 belonging to three
+catalogs no stored work names). **What moved is recovery from a wrong band** (`default` +106 yellow
+/ -106 green, `sea_stone` +58 green / -58 yellow, `cool_material` +37 red / -37 orange and +35
+green / -35 yellow); the band distribution holds at 67.2% achromatic, with **orange 0.8 → 0.3** and
+purple 0.0 → 0.03. **`sea_stone` keeps its purple band empty by the author's ruling**, so the
+nearest-band stand-in answers `Night Sea #191970` — **also this catalog's `blue`**, which draws
+blue and purple as the same navy (checked by eye; the forms stay legible). **Roles dissolving into
+the paper fall from eight to two and [I-062] closes**: `cool_material`'s `black` is `#26282a`
+again, and the survivors are `vivid_material #fff200` (ΔL 0.026) and `open_air_light #ffce00` (ΔL
+0.127), both yellow's own nature (measured across 10 seeds × 13 catalogs, those two are the only
+ones). **Acceptance found a missing gate and added it there.** All four perturbations break product
+data only, yet **the one reproducing [I-062] — lightening the black back into the paper — reddened
+just the expected-assignment table and the frozen corpus**. **Both are regenerated wholesale when
+catalog data changes**, so **no test named the property "a role does not dissolve into the paper"**
+— the same shape that let this regression through engine 17 with all five metrics green.
+A test now counts 13 catalogs × 8 seeds by lightness distance and **pins the two survivors by hex**
+(red under the reproduction, green under a control that moves the same black while keeping it
+dark). **The reference corpus `render-engine-18` holds 493 cases** (A 88 / B 72 / C 58 / D 28 / E
+119 / F 128), **70 changed / 423 unchanged**, with **none of the 365 in A-E moving and nothing
+outside the F group moving**.
+The 70 are **42 existing ids whose performance changed** plus **28 new ones**; ten disappeared.
+**58 further cases changed only in what was recorded** — `input.color_map` from six keys to nine
+with the digest unmoved.
+`color_map_digest` `bbb2f7be…` → **`96f28097…`**. **Android has not caught up** ([I-070]:
+`ColorCatalogs.kt` still holds eleven catalogs, a six-key `map` and `desert_mineral`. **What was
+never ported is the data, not the chain** — `oklchFromHex`, the bands and the chroma floor are in
+`ServerRendererStyle.kt`). pytest **1847/31** (+72), cli 76, ruff clean, `npm run check` 220/0/2,
+`lint:i18n` 934/47/0/0, frozen corpora byte-identical. **The version is a patch.**
 
-v2.9.15 (Build 801) **lets four characters find a work, and lines the surfaces up.** Seven independent branches (Builds 791-800) merged into one version, **closing four ledger items** ([I-049] / [I-050] / [I-058] / [I-071]). At its centre is **history search by the last four characters of the render hash**, across three routes (`/api/history` and the two lineage routes). The clause is added **only for exactly four ASCII alphanumerics**, matched case-insensitively, and ORs onto the existing five (description, DDL, Stage 1/2 model, catalog ID). **This shape alone bypasses FTS**: `_use_history_fts` takes over at three characters and the index does not hold the hash column, so without the bypass the query answers nothing. **The same five-clause OR was duplicated across the three routes** and is now one. **`lint:i18n` gained a fourth channel** ([I-058]) that extracts the English half of `Japanese / English` text nodes written straight into markup; **it carries 17 strings** (measured: removing it drops 949 to 932). Two `isJapanese ? '状態 / Status' : 'Status'` sites became unconditional, so **two more places show Japanese in the English UI** (the other fifteen on those cards already did). **Four settings fields got hand-built −/+ buttons** ([I-050] — **Firefox has no hook equivalent to `::-webkit-inner-spin-button`**, which is why the item said the native spinner would have to go). **`設定再読み込み` now reads `表示更新`** ([I-049]; key, handler and API unchanged, only the string moves). The Info modal is titled `inku`, carries an Incu icon, widened from 520 to 780px, and took author-specified copy in both languages. **The vocabulary table lost its headnote and reading rows**, so no English string glosses `kotobagaki` any more — **the exception held by `GLOSSARY.md` and `i18n-lint.mjs` was removed during acceptance**. A starred work read as unstarred in the dark theme because `:global(html[data-theme='dark']) .hash-row-star` outweighed `.hash-row-star.starred`; `:not(.starred)` resolves it. **SHA-256 decided the acceptance**: the seven branches conflicted only on `web/BUILD_NUMBER`, six times, while `SettingsModal.svelte`, `en.ts` / `ja.ts` and `i18n-lint.mjs` combined on their own, and that combination **matched the tree the author reviewed and pentala runs at Build 800 for 9 of 11 files exactly** (the two differences, one `APP_VERSION` line and the docs commit `407f536`, were accounted for). **One of three perturbations dug out a missing gate**: four → five characters reddened two tests, removing the FTS bypass reddened one (**which is what proves FTS is enabled under test**), and a **shape-preserving** perturbation (`ilike(f"%{search}")` → `ilike(f"%{search}%")`, suffix to substring) **left all 120 green**. **The item says last four characters; the tests only saw four characters find the work**, so a second row now carries the same four in the middle of its hash and pins the search to exactly one result (red under the perturbation, green unperturbed). pytest **1847/31** (**the count does not move** — assertions were added to two existing functions), cli 76, ruff clean, `npm run check` **221/0/2** (+1 file, `NumberStepper.svelte`), `lint:i18n` **949/47/0/0**, `lint:models` 68, `lint:recommendations` 37. **No deterministic layer changed, so the frozen corpora were not regenerated. Android has no diff. SPEC does not enumerate the searched fields and is unchanged. The version is a patch.**
+v2.9.15 (Build 801) **lets four characters find a work, and lines the surfaces up.** Seven
+independent branches (Builds 791-800) merged into one version, **closing four ledger items**
+([I-049] / [I-050] / [I-058] / [I-071]).
+At its centre is **history search by the last four characters of the render hash**, across three
+routes (`/api/history` and the two lineage routes).
+The clause is added **only for exactly four ASCII alphanumerics**, matched case-insensitively, and
+ORs onto the existing five (description, DDL, Stage 1/2 model, catalog ID). **This shape alone
+bypasses FTS**: `_use_history_fts` takes over at three characters and the index does not hold the
+hash column, so without the bypass the query answers nothing. **The same five-clause OR was
+duplicated across the three routes** and is now one. **`lint:i18n` gained a fourth channel**
+([I-058]) that extracts the English half of `Japanese / English` text nodes written straight into
+markup; **it carries 17 strings** (measured: removing it drops 949 to 932).
+Two `isJapanese ? '状態 / Status' : 'Status'` sites became unconditional, so **two more places show
+Japanese in the English UI** (the other fifteen on those cards already did). **Four settings fields
+got hand-built −/+ buttons** ([I-050] — **Firefox has no hook equivalent to
+`::-webkit-inner-spin-button`**, which is why the item said the native spinner would have to go).
+**`設定再読み込み` now reads `表示更新`** ([I-049]; key, handler and API unchanged, only the string moves).
+The Info modal is titled `inku`, carries an Incu icon, widened from 520 to 780px, and took
+author-specified copy in both languages. **The vocabulary table lost its headnote and reading
+rows**, so no English string glosses `kotobagaki` any more — **the exception held by `GLOSSARY.md`
+and `i18n-lint.mjs` was removed during acceptance**.
+A starred work read as unstarred in the dark theme because
+`:global(html[data-theme='dark']) .hash-row-star` outweighed `.hash-row-star.starred`;
+`:not(.starred)` resolves it. **SHA-256 decided the acceptance**: the seven branches conflicted
+only on `web/BUILD_NUMBER`, six times, while `SettingsModal.svelte`, `en.ts` / `ja.ts` and
+`i18n-lint.mjs` combined on their own, and that combination **matched the tree the author reviewed
+and pentala runs at Build 800 for 9 of 11 files exactly** (the two differences, one `APP_VERSION`
+line and the docs commit `407f536`, were accounted for). **One of three perturbations dug out a
+missing gate**: four → five characters reddened two tests, removing the FTS bypass reddened one
+(**which is what proves FTS is enabled under test**), and a **shape-preserving** perturbation
+(`ilike(f"%{search}")` → `ilike(f"%{search}%")`, suffix to substring) **left all 120 green**. **The
+item says last four characters; the tests only saw four characters find the work**, so a second row
+now carries the same four in the middle of its hash and pins the search to exactly one result (red
+under the perturbation, green unperturbed). pytest **1847/31** (**the count does not move** —
+assertions were added to two existing functions), cli 76, ruff clean, `npm run check` **221/0/2**
+(+1 file, `NumberStepper.svelte`), `lint:i18n` **949/47/0/0**, `lint:models` 68,
+`lint:recommendations` 37. **No deterministic layer changed, so the frozen corpora were not
+regenerated.
+Android has no diff.
+SPEC does not enumerate the searched fields and is unchanged.
+The version is a patch.**
 
-v2.9.16 (Build 804) **lets the ground resist the hand** (render engine 19). In painting the role of the ground is to resist the hand: an absorbent sheet lets the ink spread, a toothy one refuses the tool and leaves the paper bare. Until engine 18 the ground and the drawing were composited independently and never met, and the only place the drawing side read `canvas.ground` was the mezzotint test in `renderer.py`. **Only 31 of the 1847 stored works carry a `canvas.ground` (1.7%) and none of the frozen SVGs do**, so a condition placed on the ground side reaches nobody. Engine 19 puts a default support on the side with 99.7% reach: **the sheet is one constant, and which of its two quantities a tool meets is a property of the tool** (author, 2026-07-31). The support is a module-level table in `stroke_engine`, **not a `Score` field** (`absorbency` was retired in engine 15). Tools divide by whether they meet `absorb` or `tooth`: **a brush is drunk by the sheet and swells, a waxy or hard tool is refused and its ink is cut, and `rotring` and `computer` are zero** because a machine has no contact with paper. Four levels (g0 to g3) are implemented and **g2 is adopted**. **The cut is not made of width**: the tools that ought to be refused are exactly the thinnest ones (pencil 1.5px, chalk 3px, crayon 4px), so a 0.25x pinch is 0.20-0.52px on a 520px raster and sinks into the antialiasing. **No ink is laid down where the envelope passes 0.55**, and the stroke is cut there; one SVG `path` can hold several subpaths, so **cutting adds no element**, and a closed contour keeps its even-odd band. **Acceptance turned up one hole**: a straight line carrying a position `variation` takes a different path through the renderer, which rebuilds the outline around the varied centerline and **dropped the cuts**. The width response survived, so the bytes moved and the frozen corpus counted the case as changed — **the visible half went missing in silence** (measured: pencil, five lines, 10 subpaths without the variation and 5 with it; an arc is cut either way, so the hole belonged to straight lines alone). **The reach is 912 of 1858 stored works (49.1%)**, of which **242 (13.0%)** use a tool the sheet refuses. The cut mask now travels on `StrokeResult` into `outline_for_centerline`, splitting both banks at the same samples the straight branch does. **The arc was removed from the acceptance figure**: left in, it would have raised the subpath count with no cut on any line, and the test would have supplied its own answer. **`render-engine-19` is frozen (227 of 493 move, 266 do not, and no `rotring` or `computer` case is among them)**. Fixing the hole moved 7 of those 18 cases, all pencil, and **the total stayed at 227** — those seven had already moved on the width response alone, which is how the missing cut stayed out of sight. **The contract's full mark of 381/493 came out as 227/493**: the reference probe rebuilt straight-stroke outlines with per-vertex normals above g0, so **177/493 moved with every bias at zero**, meaning 46% of the 381 had nothing to do with the ground (accepted by the author). Four perturbations were applied on the receiving side: **shape-preserving** (pencil tooth 1.00 to 0.00) reddened 5, the **control** (g2 bleed 0.70 to 0.72) left all 37 green, the threshold 0.55 to 0.10 reddened 2, and dropping the carry-over of cuts reddened 3. pytest **1897/31**, cli 76, ruff clean, `check_frozen_corpora.py` green. **Android is out of scope for this contract.** **The material outline crossing the cut is left undecided.** **The version is a patch.**
+v2.9.16 (Build 804) **lets the ground resist the hand** (render engine 19).
+In painting the role of the ground is to resist the hand: an absorbent sheet lets the ink spread, a toothy one refuses the tool and leaves the paper bare.
+Until engine 18 the ground and the drawing were composited independently and never met, and the only place the drawing side read `canvas.ground` was the mezzotint test in `renderer.py`.
+**Only 31 of the 1847 stored works carry a `canvas.ground` (1.7%) and none of the frozen SVGs do**, so a condition placed on the ground side reaches nobody.
+Engine 19 puts a default support on the side with 99.7% reach:
+**the sheet is one constant, and which of its two quantities a tool meets is a property of the tool** (author, 2026-07-31).
+The support is a module-level table in `stroke_engine`, **not a `Score` field** (`absorbency` was retired in engine 15).
+Tools divide by whether they meet `absorb` or `tooth`:
+**a brush is drunk by the sheet and swells, a waxy or hard tool is refused and its ink is cut, and `rotring` and `computer` are zero** because a machine has no contact with paper.
+Four levels (g0 to g3) are implemented and **g2 is adopted**.
+**The cut is not made of width**: the tools that ought to be refused are exactly the thinnest ones (pencil 1.5px, chalk 3px, crayon 4px), so a 0.25x pinch is 0.20-0.52px on a 520px raster and sinks into the antialiasing.
+**No ink is laid down where the envelope passes 0.55**, and the stroke is cut there; one SVG `path` can hold several subpaths, so **cutting adds no element**, and a closed contour keeps its even-odd band.
+**Acceptance turned up one hole**: a straight line carrying a position `variation` takes a different path through the renderer, which rebuilds the outline around the varied centerline and **dropped the cuts**.
+The width response survived, so the bytes moved and the frozen corpus counted the case as changed — **the visible half went missing in silence** (measured: pencil, five lines, 10 subpaths without the variation and 5 with it; an arc is cut either way, so the hole belonged to straight lines alone).
+**The reach is 912 of 1858 stored works (49.1%)**, of which **242 (13.0%)** use a tool the sheet refuses.
+The cut mask now travels on `StrokeResult` into `outline_for_centerline`, splitting both banks at the same samples the straight branch does.
+**The arc was removed from the acceptance figure**: left in, it would have raised the subpath count with no cut on any line, and the test would have supplied its own answer.
+**`render-engine-19` is frozen (227 of 493 move, 266 do not, and no `rotring` or `computer` case is among them)**.
+Fixing the hole moved 7 of those 18 cases, all pencil, and **the total stayed at 227** — those seven had already moved on the width response alone, which is how the missing cut stayed out of sight.
+**The contract's full mark of 381/493 came out as 227/493**: the reference probe rebuilt straight-stroke outlines with per-vertex normals above g0, so **177/493 moved with every bias at zero**, meaning 46% of the 381 had nothing to do with the ground (accepted by the author).
+Four perturbations were applied on the receiving side:
+**shape-preserving** (pencil tooth 1.00 to 0.00) reddened 5, the **control** (g2 bleed 0.70 to 0.72) left all 37 green, the threshold 0.55 to 0.10 reddened 2, and dropping the carry-over of cuts reddened 3. pytest **1897/31**, cli 76, ruff clean, `check_frozen_corpora.py` green.
+**Android is out of scope for this contract.** **The material outline crossing the cut is left undecided.** **The version is a patch.**
 
-v2.9.17 (Build 807) **lets you choose whether you see the tooltips.** The Codex branch `fix/ui-mode-control-tooltip` (two commits, Builds 805-806) merged in; **the completion report covers only the second commit, the tooltip toggle, and the first, clarifying the UI mode control, has no report**. A show/hide button for the shared tooltips sits in the left rail between the UI mode button and settings, and the choice is stored per user account (`user_accounts.tooltips_enabled`; **both a new user and the migration default for an existing database are `true`**). `GET /api/auth/me` returns the value and `PATCH /api/auth/me/settings` stores it; **unset and legacy data count as shown** (`row.tooltips_enabled is not False`). Turning it off puts `tooltips-disabled` on the post-sign-in root, which **hides only the bubbles of the shared `Tooltip`** — no button or feature is disabled. The toggle is an optimistic update that reverts if the call fails. Two strings per language were added, and **the label and `aria-label` say what pressing it now would do**. The earlier commit **changed the UI mode icon from three lines to a panel-layout mark** (it was hard to tell apart from a generic menu and the settings gear) and gave `Tooltip` a `disabled` prop so **the button's own tooltip stays away while its menu is open** (its only caller). **Comparing the merge result against the running tree decided the acceptance**: the branch was cut from the engine 19 merge commit, there were no conflicts, and the merge **matched the tree pentala runs at Build 806 for 110 of 111 files by md5**, the last differing only by the `APP_VERSION` line. **One of four perturbations dug out a missing gate**: stopping the write reddened it, fixing the read reddened it, defaulting a new account to `False` reddened it, but a **shape-preserving** perturbation (the migration default from `DEFAULT 1` to `DEFAULT 0`) **left all 118 green**. **The existing migration test only checked that the columns arrived, and `user_accounts` held no rows**, so **nothing looked at the values existing accounts end up with**. An account older than every settings column is now inserted and `ui_theme`, `ui_mode` and `tooltips_enabled` are read back after the migration (red under the perturbation, red under a control that flips the `ui_theme` default, green unperturbed). pytest **1897/31** (**the count does not move** — assertions added to two existing functions), cli 76, ruff clean, `npm run check` **221/0/2**, `lint:i18n` **951/47/0/0** (+2 for the new strings), `lint:models` 68, `lint:recommendations` 37. **No deterministic layer changed, so the corpora were not regenerated. Android has no diff. SPEC does not enumerate display settings and is unchanged. The version is a patch.**
+v2.9.17 (Build 807) **lets you choose whether you see the tooltips.** The Codex branch `fix/ui-mode-control-tooltip` (two commits, Builds 805-806) merged in; **the completion report covers only the second commit, the tooltip toggle, and the first, clarifying the UI mode control, has no report**.
+A show/hide button for the shared tooltips sits in the left rail between the UI mode button and settings, and the choice is stored per user account (`user_accounts.tooltips_enabled`; **both a new user and the migration default for an existing database are `true`**).
+`GET /api/auth/me` returns the value and `PATCH /api/auth/me/settings` stores it; **unset and legacy data count as shown** (`row.tooltips_enabled is not False`).
+Turning it off puts `tooltips-disabled` on the post-sign-in root, which **hides only the bubbles of the shared `Tooltip`** — no button or feature is disabled.
+The toggle is an optimistic update that reverts if the call fails.
+Two strings per language were added, and **the label and `aria-label` say what pressing it now would do**.
+The earlier commit **changed the UI mode icon from three lines to a panel-layout mark** (it was hard to tell apart from a generic menu and the settings gear) and gave `Tooltip` a `disabled` prop so **the button's own tooltip stays away while its menu is open** (its only caller).
+**Comparing the merge result against the running tree decided the acceptance**: the branch was cut from the engine 19 merge commit, there were no conflicts, and the merge **matched the tree pentala runs at Build 806 for 110 of 111 files by md5**, the last differing only by the `APP_VERSION` line.
+**One of four perturbations dug out a missing gate**: stopping the write reddened it, fixing the read reddened it, defaulting a new account to `False` reddened it, but a **shape-preserving** perturbation (the migration default from `DEFAULT 1` to `DEFAULT 0`) **left all 118 green**.
+**The existing migration test only checked that the columns arrived, and `user_accounts` held no rows**, so **nothing looked at the values existing accounts end up with**.
+An account older than every settings column is now inserted and `ui_theme`, `ui_mode` and `tooltips_enabled` are read back after the migration (red under the perturbation, red under a control that flips the `ui_theme` default, green unperturbed). pytest **1897/31** (**the count does not move** — assertions added to two existing functions), cli 76, ruff clean, `npm run check` **221/0/2**, `lint:i18n` **951/47/0/0** (+2 for the new strings), `lint:models` 68, `lint:recommendations` 37.
+**No deterministic layer changed, so the corpora were not regenerated.
+Android has no diff.
+SPEC does not enumerate display settings and is unchanged.
+The version is a patch.**
 
-v2.4.7 (Build 697) freezes the deterministic DDL layers. `server/reference/ddl-engine-1/` holds 29 cases (A = 15 expansion, B = 14 coercion), and `ddl_version` and `ddl_engine_version` are introduced at **1** (source of truth: `layer_versions.py`). **A and B are unchained** — B's input Scores are literals inside the generator, never A's output, because chaining them would let a defect in expansion mask a defect in coercion. **The deterministic layers are not adjacent**: Stage 2's LLM sits between Stage 1.5 and coercion, so they cannot share one baseline (SPEC §12.2). The discriminating axes are the presence of the `ddl` argument (the same Score goes from 0 fired branches to 6, and 1 instruction to 3) and the three `tenkei` levels (6 / 4 / 3 fired, 3 / 2 / 1 instructions); cases that fire nothing are frozen too. The `branch_report` check fixes fired keys per case, never the global key set. Both versions travel with newly generated works, history rows, and saved artifacts, but **existing rows are not backfilled** — inferring a version a work never recorded would be fabricating provenance. **The `ddl_*` fields stay out of the rh3 payload**, so edition identity is unchanged. CI gained an independent `ddl-engine` job, and **the gate was shown to fail from both the A and B sides**. Engine 10, the renderer, stroke_engine, the schema, and coerce are untouched; the render corpus regenerates byte-identical across all 220 cases. pytest 1043/30. **Known gap**: the saijiki is not read by any deterministic layer (it feeds the Stage 1 prompt, which carries no version), so **adding vocabulary does not move this corpus**. New words are a `ddl_version` event with no mechanical detection yet (Phase 4's `stage1_prompt_digest` covers half). Phases 4–5 (prompt digests, version-difference display) are not started.
+v2.4.7 (Build 697) freezes the deterministic DDL layers.
+`server/reference/ddl-engine-1/` holds 29 cases (A = 15 expansion, B = 14 coercion), and
+`ddl_version` and `ddl_engine_version` are introduced at **1** (source of truth:
+`layer_versions.py`). **A and B are unchained** — B's input Scores are literals inside the
+generator, never A's output, because chaining them would let a defect in expansion mask a defect in
+coercion. **The deterministic layers are not adjacent**: Stage 2's LLM sits between Stage 1.5 and
+coercion, so they cannot share one baseline (SPEC §12.2).
+The discriminating axes are the presence of the `ddl` argument (the same Score goes from 0 fired
+branches to 6, and 1 instruction to 3) and the three `tenkei` levels (6 / 4 / 3 fired, 3 / 2 / 1
+instructions); cases that fire nothing are frozen too.
+The `branch_report` check fixes fired keys per case, never the global key set.
+Both versions travel with newly generated works, history rows, and saved artifacts, but **existing
+rows are not backfilled** — inferring a version a work never recorded would be fabricating
+provenance. **The `ddl_*` fields stay out of the rh3 payload**, so edition identity is unchanged.
+CI gained an independent `ddl-engine` job, and **the gate was shown to fail from both the A and B
+sides**.
+Engine 10, the renderer, stroke_engine, the schema, and coerce are untouched; the render corpus
+regenerates byte-identical across all 220 cases. pytest 1043/30. **Known gap**: the saijiki is not
+read by any deterministic layer (it feeds the Stage 1 prompt, which carries no version), so
+**adding vocabulary does not move this corpus**.
+New words are a `ddl_version` event with no mechanical detection yet (Phase 4's
+`stage1_prompt_digest` covers half).
+Phases 4–5 (prompt digests, version-difference display) are not started.
 
-v2.4.5 (Build 695) moves the work-edition ID to `rh3`: the payload is `score`, `render_seed`, the render engine's ID and version, and `render_color_catalog_id`, with **`render_build_number` and `vary_seed` removed**. The build number is stamped for UI-only changes, so it gave a new edition ID to a drawing that had not changed by a single byte (it entered the hash in v1.60 as insurance from before the engine had a versioning discipline; `render_engine_version` has carried that role since v1.99). The build number stays as provenance. **`rh2` is retained as legacy and never recalculated; `rh2` and `rh3` are separate hash spaces** (the startup backfill writes rh3 only for empty rows). No server path compares `render_hash` for equality, so nothing behaves differently. SPEC §7 / §11.2. Engine 10, the renderer, the schema, and coerce are untouched, and the reference corpus regenerates with no diff. pytest 1038/30.
+v2.4.5 (Build 695) moves the work-edition ID to `rh3`: the payload is `score`, `render_seed`, the
+render engine's ID and version, and `render_color_catalog_id`, with **`render_build_number` and
+`vary_seed` removed**.
+The build number is stamped for UI-only changes, so it gave a new edition ID to a drawing that had
+not changed by a single byte (it entered the hash in v1.60 as insurance from before the engine had
+a versioning discipline; `render_engine_version` has carried that role since v1.99).
+The build number stays as provenance. **`rh2` is retained as legacy and never recalculated; `rh2`
+and `rh3` are separate hash spaces** (the startup backfill writes rh3 only for empty rows).
+No server path compares `render_hash` for equality, so nothing behaves differently.
+SPEC §7 / §11.2.
+Engine 10, the renderer, the schema, and coerce are untouched, and the reference corpus regenerates
+with no diff. pytest 1038/30.
 
-v2.4.4 (Build 694) freezes what engine 10 draws. `server/reference/render-engine-10/` records 220 cases (80 base, 72 variation, 40 fill/surface/ground, 28 discriminators) with their full inputs, digests, element counts, and class strings, and **CI (`.github/workflows/reference-corpus.yml`) enforces byte-identical regeneration**. The goal is to let an AI judge what changed in the output when a given thing changed: **a version number carries one bit, so the actual output is frozen instead**. Engines 1–9 cannot be recovered, so the corpus starts at 10. Inputs are literals inside the generator (color map, every Score field), never read from `COLOR_MAP` or the schema defaults, which leaves only `renderer.py` and `stroke_engine.py` able to move it. As a by-product it **confirmed that `ground.absorbency` is a dead field** (its digest does not move; not fixed here). The procedure sits beside the artifacts in `server/reference/README.md`; the contract is SPEC §12.2. `.gitattributes` keeps it out of distributions. **Not one byte of drawing output changed** — engine 10, renderer, stroke_engine, schema, coerce, and rh2 are untouched. Phases 2–5 (rh3, ddl corpus, prompt digests, version-gap display) are not started.
+v2.4.4 (Build 694) freezes what engine 10 draws.
+`server/reference/render-engine-10/` records 220 cases (80 base, 72 variation, 40
+fill/surface/ground, 28 discriminators) with their full inputs, digests, element counts, and class
+strings, and **CI (`.github/workflows/reference-corpus.yml`) enforces byte-identical
+regeneration**.
+The goal is to let an AI judge what changed in the output when a given thing changed: **a version
+number carries one bit, so the actual output is frozen instead**.
+Engines 1–9 cannot be recovered, so the corpus starts at 10.
+Inputs are literals inside the generator (color map, every Score field), never read from
+`COLOR_MAP` or the schema defaults, which leaves only `renderer.py` and `stroke_engine.py` able to
+move it.
+As a by-product it **confirmed that `ground.absorbency` is a dead field** (its digest does not move;
+ not fixed here).
+The procedure sits beside the artifacts in `server/reference/README.md`; the contract is SPEC §12.2.
+`.gitattributes` keeps it out of distributions. **Not one byte of drawing output changed** — engine
+10, renderer, stroke_engine, schema, coerce, and rh2 are untouched.
+Phases 2–5 (rh3, ddl corpus, prompt digests, version-gap display) are not started.
 
-The Android app (`android/`; Kotlin + Compose + Room, running the whole pipeline on the device) **completed Phase 2 at `2.0.0-android.1` / Build 148080** (2026-07-24), so every stage of the render engine 10 port is now in place; the engine itself was reached in 2f at Build 148077. It has its own version namespace, with `android/VERSION` and `android/BUILD_NUMBER` as the canonical files. The port follows the server, which stays canonical — **server-side design is not bent to suit Android**. **Phase 3a (the core of the Stage 1.5 expansion layer) was followed by Phase 2h — which moved the Android `render_engine_version` to `"11"` by following the master grid, touching no geometry and only fixing every emitted number to six decimals — and then by Phase 3b (variation)** (android Build 148082, 2026-07-24). Phase 3b transforms the DDL body and the `variation_report` deterministically, but only when `variation_amplitude` and `variation_seed` are both present; focus belongs here too. Acceptance checked exact output equality on 16 cases plus the `variation_report` (`moved_axes` and `resolved_focus`) that **all 16 carry**, and confirmed by perturbation that the unsigned-seed handling and the report check each bite. **Phase 3d (built-in nature plugin expansion) has since been merged, completing the Stage 1.5 expander port** (android Build 148083, 2026-07-25; staffage — 3c — had come along with the 3a port, and its 13 corpus cases were already byte-identical on arrival, so by the author's ruling no separate phase was run). Acceptance re-computed the three corpus expectations against the current server implementation and confirmed that perturbing a macro sentence makes the 3d test fail. **The drawing layer has since followed engine 12 as well** (`2.1.0-android.1`, android Build 148089, 2026-07-25): de-regularization (`gesture` and the four functions), the material outline layer, the "unleashed" wiring (**which reaches the `line` primitive only, because that is what the server does**), and `rh2` to `rh3` with Room v4 and the UI toggle. **The material layer was remanded once**: the first attempt was a lookalike whose `points` matched **0 of 234 coordinates, up to 16.4px out**, yet passed at 100% because **the existing tests compared only path `d`, class strings and element counts**. Widening the check to all 16 reference SVGs during acceptance also surfaced the texture dash being emitted as a raw literal (`1,3` against `1.000000,3.000000`), **a defect dating from phase 2b′**, which was fixed; a test comparing all 16 cases on path `d`, `points` and `stroke-dasharray` is now permanent. Tests went from 64 to **68**. **On 2026-07-26, engine 13 and 14 were caught up under a single contract at `2.1.1-android.1` / Build 148090, so Android now reported render engine 14 as well** (the computer tool, one canvas-wide lattice, wild reaching every contour, and the touch vocabulary corrected to the server's ten words). Tests numbered **71**. **On 2026-07-27, `2.1.2-android.1` followed render engine 15 and, in the same contract, renamed `hair` to `silverpoint`, synced the duplicated server prompts behind a fingerprint guard, and exempted explicitly requested counts from the governor** (tests went from 71 with 20 failures to **89 with none**). **Of engine 15's five changes only the ground seed has nowhere to go** — Kotlin has no canvas-ground drawing path. **The real obstacle in the count phase was none of the three functions the contract named: it was the reach of `temperQuietSymbolicShape`**, which also caught circles, ellipses and arcs and had no `color_hint` gate, so explicit counts were cut to eight before the governor saw them; narrowing it to match the server moved 42/50 to 50/50. **Two holes turned out to be in the checks** — deleting the corner-shape material layer left the suite green (no triangle or polygon among the 25 reference cases), and the powder was pinned by count alone, so every speck could move; the first is closed by a new discriminating test, the second by a digest of the positions. **The reference corpus did not move by a single byte.** Still outstanding: the embedded Stage 2 tool schema is 237 lines from the server's, `surfaceSeed` reads the allowlisted payload, `renderHash` carries a default the server lacks, and the UI still shows render engine `1`. **On 2026-07-29, `2.1.3-android.1` followed render engine 16**: the thinness axis runs through the schema, the coercer, the stroke width and the material outline; a fill too small for three scanlines is placed as a dab on a single path; and the version is declared in two places (tests went from 89 with 15 failures to **99 with none**). **Kotlin carries the seed material in two places**, so doing one leaves the surface check red, and **the thinness floor is derived from the smallest entry of the tool table — silverpoint's 0.5 — rather than from a new constant**. **The six surface textures are not implemented**: by the author's ruling `D-20260729-android-declares-the-shared-part` the port declares the version while implementing part of it. Acceptance applied one perturbation per phase, confirming each reddens the assertion the contract named, and **verified by recomputing the digests that the `CornerShapeMaterialLayerTest` expectations come from the frozen reference SVGs rather than from the port's own output**. The discriminating pair is **`01_circle_pen` moving while `05_circle_rotring` stays still** — the machine pole has now held still for three versions running. **On 2026-07-31, `2.1.4-android.1` followed render engine 17**: the catalog palette is assigned deterministically, the abstract colors grow to nine, the full dump seed gains `note` and moves `thinness` to the end, and the four prompt constants are resynchronised (tests went from 110 with 12 failures to **112 with none**). **The gap was four changes, not one** — the thinness declaration position, the new `note` field, the nine abstract colors and engine 17 had all landed since the corpus was frozen. **The catalog contents are out of scope** (engine 18 replaces them; the premise recorded when the item was filed, that the server had nine keys, was wrong — **the server's eleven catalog maps are six keys too**). **The test surface was baked before the contract went out**: all 32 existing cases carry no `color_hint`, only the word `black` and no `palette:` key, so **declaring `"17"` without writing a line of the mechanism would have stayed green** — and **nothing in the suite compared a color at all**. **Acceptance found two defects that had no gate**: two OKLab coefficients came from a different published variant (moving no assignment with today's eleven catalogs, but one twenty-thousandth of the discriminating margin, and engine 18 replaces every color), and **`render_color_map` in the metadata carried the assigned colors** rather than the catalog's own map, breaking a parity that had held through engine 16. **A pre-existing defect surfaced as a by-product**: `pen` had no material layer on the line primitive, because `usesMaterialOutline` and the line path's tool set disagreed and **no corpus case was a pen line**. See the Android entry in the changelog and `android/ANDROID_SPEC.md` (**which has not followed engine 15 either**). **The first step of the UI catch-up landed in `2.1.4-android.2`** (2026-07-31, android Build 148090 unchanged): a provenance tooltip, the display mode (simple / full), the two mascots (Incu / Yuragi), the staffage level, the model recommendations, and Room v5 for lineage (`lineage_nodes`, `lineage_edges`). **Two implementation passes were sent back and the git session fixed the branch before merging** — the first left six composables with no caller and added three features the contract never asked for; the second implemented none of the six revision items and added five more. The fixes included **staffage being a level (`none` / `sparse` / `auto`) rather than a list of motifs**, and **`lineage_nodes.history_id` being INTEGER, which could never join against `history_items.id` (TEXT)**. **The colophon, the unread words, the refinement flow, and any caller for the lineage data layer are still unimplemented.**
+The Android app (`android/`; Kotlin + Compose + Room, running the whole pipeline on the device)
+**completed Phase 2 at `2.0.0-android.1` / Build 148080** (2026-07-24), so every stage of the
+render engine 10 port is now in place; the engine itself was reached in 2f at Build 148077.
+It has its own version namespace, with `android/VERSION` and `android/BUILD_NUMBER` as the
+canonical files.
+The port follows the server, which stays canonical — **server-side design is not bent to suit
+Android**. **Phase 3a (the core of the Stage 1.5 expansion layer) was followed by Phase 2h — which
+moved the Android `render_engine_version` to `"11"` by following the master grid, touching no
+geometry and only fixing every emitted number to six decimals — and then by Phase 3b (variation)**
+(android Build 148082, 2026-07-24).
+Phase 3b transforms the DDL body and the `variation_report` deterministically, but only when
+`variation_amplitude` and `variation_seed` are both present; focus belongs here too.
+Acceptance checked exact output equality on 16 cases plus the `variation_report` (`moved_axes` and
+`resolved_focus`) that **all 16 carry**, and confirmed by perturbation that the unsigned-seed
+handling and the report check each bite. **Phase 3d (built-in nature plugin expansion) has since
+been merged, completing the Stage 1.5 expander port** (android Build 148083, 2026-07-25; staffage —
+3c — had come along with the 3a port, and its 13 corpus cases were already byte-identical on
+arrival, so by the author's ruling no separate phase was run).
+Acceptance re-computed the three corpus expectations against the current server implementation and
+confirmed that perturbing a macro sentence makes the 3d test fail. **The drawing layer has since
+followed engine 12 as well** (`2.1.0-android.1`, android Build 148089, 2026-07-25):
+de-regularization (`gesture` and the four functions), the material outline layer, the "unleashed"
+wiring (**which reaches the `line` primitive only, because that is what the server does**), and
+`rh2` to `rh3` with Room v4 and the UI toggle. **The material layer was remanded once**: the first
+attempt was a lookalike whose `points` matched **0 of 234 coordinates, up to 16.4px out**, yet
+passed at 100% because **the existing tests compared only path `d`, class strings and element
+counts**.
+Widening the check to all 16 reference SVGs during acceptance also surfaced the texture dash being
+emitted as a raw literal (`1,3` against `1.000000,3.000000`), **a defect dating from phase 2b′**,
+which was fixed; a test comparing all 16 cases on path `d`, `points` and `stroke-dasharray` is now
+permanent.
+Tests went from 64 to **68**. **On 2026-07-26, engine 13 and 14 were caught up under a single
+contract at `2.1.1-android.1` / Build 148090, so Android now reported render engine 14 as well**
+(the computer tool, one canvas-wide lattice, wild reaching every contour, and the touch vocabulary
+corrected to the server's ten words).
+Tests numbered **71**. **On 2026-07-27, `2.1.2-android.1` followed render engine 15 and, in the
+same contract, renamed `hair` to `silverpoint`, synced the duplicated server prompts behind a
+fingerprint guard, and exempted explicitly requested counts from the governor** (tests went from 71
+with 20 failures to **89 with none**). **Of engine 15's five changes only the ground seed has
+nowhere to go** — Kotlin has no canvas-ground drawing path. **The real obstacle in the count phase
+was none of the three functions the contract named: it was the reach of
+`temperQuietSymbolicShape`**, which also caught circles, ellipses and arcs and had no `color_hint`
+gate, so explicit counts were cut to eight before the governor saw them; narrowing it to match the
+server moved 42/50 to 50/50. **Two holes turned out to be in the checks** — deleting the
+corner-shape material layer left the suite green (no triangle or polygon among the 25 reference
+cases), and the powder was pinned by count alone, so every speck could move; the first is closed by
+a new discriminating test, the second by a digest of the positions. **The reference corpus did not
+move by a single byte.** Still outstanding: the embedded Stage 2 tool schema is 237 lines from the
+server's, `surfaceSeed` reads the allowlisted payload, `renderHash` carries a default the server
+lacks, and the UI still shows render engine `1`. **On 2026-07-29, `2.1.3-android.1` followed render
+engine 16**: the thinness axis runs through the schema, the coercer, the stroke width and the
+material outline; a fill too small for three scanlines is placed as a dab on a single path; and the
+version is declared in two places (tests went from 89 with 15 failures to **99 with none**).
+**Kotlin carries the seed material in two places**, so doing one leaves the surface check red, and
+**the thinness floor is derived from the smallest entry of the tool table — silverpoint's 0.5 —
+rather than from a new constant**. **The six surface textures are not implemented**: by the
+author's ruling `D-20260729-android-declares-the-shared-part` the port declares the version while
+implementing part of it.
+Acceptance applied one perturbation per phase, confirming each reddens the assertion the contract
+named, and **verified by recomputing the digests that the `CornerShapeMaterialLayerTest`
+expectations come from the frozen reference SVGs rather than from the port's own output**.
+The discriminating pair is **`01_circle_pen` moving while `05_circle_rotring` stays still** — the
+machine pole has now held still for three versions running. **On 2026-07-31, `2.1.4-android.1`
+followed render engine 17**: the catalog palette is assigned deterministically, the abstract colors
+grow to nine, the full dump seed gains `note` and moves `thinness` to the end, and the four prompt
+constants are resynchronised (tests went from 110 with 12 failures to **112 with none**). **The gap
+was four changes, not one** — the thinness declaration position, the new `note` field, the nine
+abstract colors and engine 17 had all landed since the corpus was frozen. **The catalog contents
+are out of scope** (engine 18 replaces them; the premise recorded when the item was filed, that the
+server had nine keys, was wrong — **the server's eleven catalog maps are six keys too**). **The
+test surface was baked before the contract went out**: all 32 existing cases carry no `color_hint`,
+only the word `black` and no `palette:` key, so **declaring `"17"` without writing a line of the
+mechanism would have stayed green** — and **nothing in the suite compared a color at all**.
+**Acceptance found two defects that had no gate**: two OKLab coefficients came from a different
+published variant (moving no assignment with today's eleven catalogs, but one twenty-thousandth of
+the discriminating margin, and engine 18 replaces every color), and **`render_color_map` in the
+metadata carried the assigned colors** rather than the catalog's own map, breaking a parity that
+had held through engine 16. **A pre-existing defect surfaced as a by-product**: `pen` had no
+material layer on the line primitive, because `usesMaterialOutline` and the line path's tool set
+disagreed and **no corpus case was a pen line**.
+See the Android entry in the changelog and `android/ANDROID_SPEC.md` (**which has not followed
+engine 15 either**). **The first step of the UI catch-up landed in `2.1.4-android.2`** (2026-07-31,
+android Build 148090 unchanged): a provenance tooltip, the display mode (simple / full), the two
+mascots (Incu / Yuragi), the staffage level, the model recommendations, and Room v5 for lineage
+(`lineage_nodes`, `lineage_edges`). **Two implementation passes were sent back and the git session
+fixed the branch before merging** — the first left six composables with no caller and added three
+features the contract never asked for; the second implemented none of the six revision items and
+added five more.
+The fixes included **staffage being a level (`none` / `sparse` / `auto`) rather than a list of
+motifs**, and **`lineage_nodes.history_id` being INTEGER, which could never join against
+`history_items.id` (TEXT)**. **The colophon, the unread words, the refinement flow, and any caller
+for the lineage data layer are still unimplemented.**
 
 ## Where to Look for a Change
 
@@ -217,4 +1775,5 @@ The Android app (`android/`; Kotlin + Compose + Room, running the whole pipeline
 - When current architecture or a major contract changes, update both project-context files.
 - Update `CHANGELOG.ja.md` first for release/Build history, then reflect publicly relevant content in `CHANGELOG.md`.
 - Keep current contracts in the specification and chronological implementation detail in the changelog.
-- For Web behavior or UI changes, increment `web/BUILD_NUMBER`. When the application generation changes, also update the Web `APP_VERSION`.
+- For Web behavior or UI changes, increment `web/BUILD_NUMBER`.
+When the application generation changes, also update the Web `APP_VERSION`.

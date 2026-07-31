@@ -106,13 +106,13 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `18` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `19` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `4` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.15 | per release |
-| `web/BUILD_NUMBER` | build serial | 801 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.16 | per release |
+| `web/BUILD_NUMBER` | build serial | 804 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -187,7 +187,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-18/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 493 (70 SVG) |
+| Drawing | `server/reference/render-engine-19/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 493 (227 SVG) |
 | Deterministic DDL layers | `server/reference/ddl-engine-4/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -376,6 +376,92 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 19 — the ground resists the hand (v2.9.16)
+
+**In painting the role of the ground is to resist the hand.** An absorbent sheet lets the ink spread; a
+toothy one refuses the tool and leaves the paper bare. Until engine 18 the ground and the drawing were
+composited independently and never met, and the only place the drawing side read `canvas.ground` was the
+mezzotint test in `renderer.py`.
+
+**A condition placed on the ground side reaches nobody**: only **31 of the 1847 stored works (1.7%)**
+carry a `canvas.ground`, and **none** of the frozen SVGs do. This version puts a default support on the
+side with **99.7% reach**. **The sheet is one constant; which of its two quantities a tool meets is a
+property of the tool** (author, 2026-07-31).
+
+### The support, and which tools meet it
+
+The support is a module-level constant (`Support`) in `stroke_engine`. **It is not a `Score` field** —
+`absorbency` was retired in engine 15 and its absence is pinned by a test. The per-`material` table is
+deferred; only the swap-in point is open.
+
+| weight | absorb | tooth |
+|---|---:|---:|
+| brush_thin / brush_thick | 1.00 | 0.15 |
+| crayon / pencil / chalk | 0.10 | 1.00 |
+| pen | 0.15 | 0.15 |
+| silverpoint | 0.05 | 0.25 |
+| drypoint | 0.00 | 0.35 |
+| burin | 0.00 | 0.10 |
+| **rotring / computer** | **0.00** | **0.00** |
+
+**A machine has no contact with paper.** The two machines are unchanged for different reasons, though:
+`computer` goes through `stroke_engine` and is held still by its zero bias, while **`rotring` never
+enters stroke synthesis at all** (`_uses_hand_stroke` has excluded it since engine 8). **The zero in the
+table is a description, not a mechanism.**
+
+Four levels (g0 to g3) are implemented and **g2 is adopted** (bleed amp 0.70 / span 0.16 / rate 1.5;
+skip depth 0.88 / span 0.07 / rate 1.5; the ink is cut where the envelope passes 0.55). The other levels
+stay so that **the monotonic ordering remains checkable**.
+
+### The cut removes ink rather than narrowing it
+
+**Narrowing is invisible.** The tools that ought to be refused are exactly the thinnest ones (pencil
+1.5px, chalk 3px, crayon 4px), so a 0.25x pinch is 0.20-0.52px on a 520px raster and sinks into the
+antialiasing. **Being refused means bare paper, not a thin line.**
+
+Where the envelope passes the threshold no ink is laid down and the stroke is cut. **One SVG `path` can
+hold several subpaths** (`ring_path` already relies on this), so **cutting adds no element**. This is the
+permanent brake against the engine 15 precedent, where 38 fibres made the ground 46% of the drawing:
+**one extra element is a failure**. **A closed contour keeps its even-odd band and is never cut.**
+
+### A wavering line meets the same sheet
+
+A straight line carrying a position `variation` takes a different path through the renderer, which
+**rebuilds the outline around the varied centerline** (`outline_for_centerline`). **Without carrying the
+cuts into that rebuild, only the width response survives and the ink is never cut** — the bytes still
+move, so the frozen corpus counts the case as changed and **the visible half goes missing in silence**.
+
+- Measured (pencil, seed 20260731, five lines) without the carry-over: **10 subpaths without the
+  variation, 5 with it** (no cuts at all)
+- **An arc is cut whether or not it is varied.** The difference belongs to straight lines alone
+- The reach is **912 of the 1858 stored works (49.1%)**, of which **242 (13.0%)** use a refused tool
+
+The cut mask travels on `StrokeResult` into `outline_for_centerline`, which **splits both banks at the
+same samples the straight branch does**.
+
+> **Never mix an arc into the figure that tests this path.** An arc is cut either way, so **the subpath
+> count rises even when no line was cut, and the test supplies its own answer.**
+
+### Version and corpus
+
+- **`render_engine_version` 18 to 19**
+- **`ddl_engine_version` stays 4 and `ddl_version` stays 3** — neither DDL vocabulary nor grammar moves
+- **Reference corpus `render-engine-19/`** — **493 cases**, **227 moved / 266 unchanged**. The stored
+  SVGs are the 227 that moved
+- **No `rotring` or `computer` case appears in `changed_from_previous`**
+- **A forced order**: the corpus output directory comes from `current_render_engine().version`, so
+  **raising the version removes the comparison target from the generator's view**. Implement with the
+  version still at 18, measure the delta, then raise it to 19 and bake
+
+**The contract's full mark of 381/493 came out as 227/493.** The reference probe rebuilt straight-stroke
+outlines with per-vertex normals at every level above g0, so **177/493 moved with each resistance bias
+set to zero** — **46% of the 381 had nothing to do with the ground**. This implementation keeps the fixed
+normal.
+
+**Undecided**: the material outline still runs across the cut, so its dashes cross the bare paper where
+the ink stopped. Cutting it would mean turning the polyline into a path and would move every material
+outline in the corpus.
 
 ## engine 18 — the thirteen catalogs each carry all nine colors (v2.9.14)
 

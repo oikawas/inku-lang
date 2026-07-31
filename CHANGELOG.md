@@ -1411,3 +1411,86 @@ functions), cli 76, ruff clean, `npm run check` **221/0/2** (+1 file, `NumberSte
 `lint:i18n` **949/47/0/0**, `lint:models` 68, `lint:recommendations` 37.
 **No deterministic layer changed, so the frozen corpora were not regenerated. Android has no diff.
 SPEC does not enumerate the searched fields and is unchanged. The version is a patch.**
+
+### v2.9.16 — the ground resists the hand (render engine 19, Build 804, 2026-08-01)
+
+In painting the role of the ground is to resist the hand: an absorbent sheet lets the ink spread, a
+toothy one refuses the tool and leaves the paper bare. Until engine 18 the ground and the drawing were
+composited independently and never met; the only place the drawing side read `canvas.ground` was the
+mezzotint test in `renderer.py`. **Only 31 of the 1847 stored works carry a `canvas.ground` (1.7%), and
+none of the frozen SVGs do**, so a condition placed on the ground side reaches nobody.
+
+Engine 19 puts a default support on the side with 99.7% reach. **The sheet is one constant; which of its
+two quantities a tool meets is a property of the tool** (author, 2026-07-31).
+
+#### The support, and which tools meet it
+
+- Held in `stroke_engine` as a module-level table. **It is not a `Score` field** — `absorbency` was
+  retired in engine 15 and its absence is pinned. The per-`material` table is deferred; only the
+  swap-in point (the `Support` argument) is open
+- Tools divide by which of the two quantities (`absorb` / `tooth`) they meet. **A brush is drunk by the
+  sheet and swells; a waxy or hard tool is refused and its ink is cut. `rotring` and `computer` are
+  zero** — a machine has no contact with paper
+- Four levels (g0 to g3) are implemented and **g2 is adopted**. The others stay so the monotonic
+  ordering remains checkable
+
+#### The cut removes ink rather than narrowing it
+
+**Narrowing is invisible.** The tools that ought to be refused are exactly the thinnest ones (pencil
+1.5px, chalk 3px, crayon 4px), so a 0.25x pinch is 0.20-0.52px on a 520px raster and sinks into the
+antialiasing. Being refused means bare paper, not a thin line.
+
+So **no ink is laid down where the envelope passes 0.55**, and the stroke is cut there. One SVG `path`
+can hold several subpaths (`ring_path` already relies on this), so **cutting the ink adds no element**.
+A closed contour keeps its even-odd band and is never cut.
+
+#### What acceptance found: a wavering line was never refused
+
+A straight line that carries a position `variation` takes a different path through the renderer, which
+**rebuilds the outline around the varied centerline** (`outline_for_centerline`). That rebuild dropped
+the cuts. The width response survived, so the bytes moved and the frozen corpus counted the case as
+changed — **the visible half went missing in silence**.
+
+- Measured (pencil, seed 20260731, five lines): **10 subpaths without the variation, 5 with it** (no
+  cuts at all). An arc is cut whether or not it is varied, so the hole belonged to straight lines alone
+- The reach is not small. **912 of the 1858 stored works (49.1%)** contain a straight line with a
+  position variation, and **242 (13.0%)** draw one with a tool the sheet refuses
+- The cut mask now travels on `StrokeResult` and is carried into `outline_for_centerline`, which splits
+  both banks at the same samples the straight branch does
+- **The arc was removed from the acceptance figure.** Left in, it would have raised the subpath count
+  even with no cut on any line — the test would have supplied its own answer
+
+#### Version and corpus
+
+**`render-engine-19` is frozen: 227 of the 493 cases move and 266 do not.** The order is forced:
+implement with the version still at 18 and measure against `render-engine-18`, then raise it to 19 and
+bake, then commit the baked corpus before running `check_frozen_corpora.py`. The output directory comes
+from `current_render_engine().version`, so **raising the version removes the comparison target from the
+generator's view**.
+
+- **No `rotring` or `computer` case appears in `changed_from_previous`**
+- Fixing the wavering-line hole moved **7 of those 18 cases**, all pencil. `brush_thick` is drunk rather
+  than refused, so nothing was cut in it. **The total stayed at 227** — those seven had already moved on
+  the width response alone, which is how the missing cut stayed out of sight
+
+#### Acceptance
+
+**The contract's full mark of 381/493 came out as 227/493.** The implementation session measured where
+the difference went: the reference probe rebuilt every straight stroke's outline with per-vertex normals
+at levels above g0, so **177/493 moved with every resistance bias set to zero** — **46% of the 381 had
+nothing to do with the ground**. This implementation keeps the fixed normal. **The author accepted this
+on 2026-08-01.**
+
+Four perturbations were applied on the receiving side, on top of the nine in the implementation report.
+
+1. **Shape-preserving** — `TOOL_SUPPORT_BIAS["pencil"]` tooth 1.00 to 0.00, data only: **5 red**
+2. **Control** — g2 bleed amplitude 0.70 to 0.72, same mechanism, property intact: **all 37 green**
+3. Cut threshold 0.55 to 0.10: **2 red**
+4. Drop the carry-over of cuts onto the varied centerline: **3 red**, element-count control still green
+
+pytest **1897/31** (baseline 1847 + 37 new + 1 attribution + 12 added during acceptance), cli 76, ruff
+clean, `check_frozen_corpora.py` green. **Android is out of scope for this contract.**
+
+**Left undecided**: the material outline still runs across the cut, so its dashes cross the bare paper
+where the ink stopped. Cutting it would mean turning the polyline into a path and would move every
+material outline in the corpus.

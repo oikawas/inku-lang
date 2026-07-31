@@ -1906,6 +1906,9 @@ order holds. Because a full repetition is itself the writer's intent for a grid,
 the bias, fade, cluster, preserve-space and count-representation treatments meant
 for scatter are not applied to it.
 
+**The support resists (v2.9.16 / render engine 19):** sway does not live on the tool's side alone. **In painting the role of the ground is to resist the hand** — an absorbent sheet lets the ink spread, a toothy one refuses the tool and leaves the paper bare. Until engine 18 the ground and the drawing were composited independently and never met, and since `canvas.ground` appears in 1.7% of stored works and 0% of the frozen SVGs, a condition placed on the ground side reaches nobody. Engine 19 gives **every work a default support**. **The sheet is one constant; whether a tool is drunk (`absorb`) or refused (`tooth`) is a property of the tool** (a brush is drunk and swells; crayon, pencil and chalk are refused; `rotring` and `computer` are machines and never touch paper). **Where the sheet refuses, no ink is laid down** — narrowing sinks into the antialiasing on exactly the thinnest tools, so being refused is bare paper rather than a thinner line. **The breaks become subpaths of the same `path`, so no element is added** (the three layers in §13.4 are material, motion vocabulary and phenomenon; the support is none of them, but **the thing the tool meets last, at performance time**).
+
+
 ### 13.9 The `variation` Schema in the JSON Score
 
 The JSON Score's `variation` field is structured by dimension.

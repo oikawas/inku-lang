@@ -76,7 +76,7 @@
 	const ANIMATION_EXPORT_SETTINGS_KEY = 'inku-animation-export-settings';
 	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 	const RESULT_LOG_OPEN_KEY = 'inku-result-log-open';
-	const APP_VERSION = 'v2.9.15';
+	const APP_VERSION = 'v2.9.16';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
 	const buildDateLabel = $derived.by(() => {

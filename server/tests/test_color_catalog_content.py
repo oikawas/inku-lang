@@ -22,6 +22,7 @@ from inku_server.color_catalogs import (
 from inku_server.renderer import (
     _OKLCH_CHROMA_FLOOR,
     _oklch_from_hex,
+    _resolve_color,
     _work_color_assignment,
     COLOR_MAP,
 )
@@ -152,6 +153,45 @@ def test_sea_stone_purple_stands_in_with_night_sea() -> None:
 
     assert assignment["purple"] == "#191970"
     assert assignment["blue"] == "#191970"
+
+
+# The ground is painted with whatever the score's background word resolves to
+# through the same work assignment (renderer.py: `bg = work_assignment.get(
+# score.background, ...)`), so a role within this much lightness of the
+# catalog's own white is drawn on paper as bright as itself.
+PAPER_DISSOLVE_LIMIT = 0.15
+ROLES_THAT_DISSOLVE = {
+    ("open_air_light", "yellow"): "#ffce00",
+    ("vivid_material", "yellow"): "#fff200",
+}
+ASSIGNMENT_SEEDS = (0, 1, 7, 99, 555, 4242, 12345, 31337)
+
+
+def test_only_the_two_bright_yellows_dissolve_into_the_paper() -> None:
+    # I-062: engine 17 handed cool_material's black `#e5e8e8`, 0.062 in
+    # lightness from its own paper, and every test stayed green because they all
+    # compared hexes. The expected-assignment table cannot stand in for this --
+    # a later catalog edit regenerates that table and takes the property with
+    # it. A bright yellow band is thin by nature, so those two are named here by
+    # value instead of being silently tolerated.
+    found: dict[tuple[str, str], str] = {}
+    for catalog in COLOR_CATALOGS:
+        catalog_id = str(catalog["id"])
+        cmap = {**COLOR_MAP, **(render_color_map_for_catalog(catalog_id) or {})}
+        for seed in ASSIGNMENT_SEEDS:
+            assignment = _work_color_assignment(cmap, seed, catalog_id)
+            resolved = {
+                key: _resolve_color(key, None, cmap, work_assignment=assignment)
+                for key in COLOR_KEYS
+            }
+            paper = _oklch_from_hex(resolved["white"])[0]
+            for key, value in resolved.items():
+                if key == "white":
+                    continue
+                if abs(_oklch_from_hex(value)[0] - paper) < PAPER_DISSOLVE_LIMIT:
+                    found[(catalog_id, key)] = value
+
+    assert found == ROLES_THAT_DISSOLVE
 
 
 @pytest.mark.parametrize("catalog_id", RETIRED_CATALOG_IDS)

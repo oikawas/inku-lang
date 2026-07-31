@@ -48,8 +48,13 @@ from inku_server.ddl_expander import (
 )
 from inku_server import cloudform as cf
 from inku_server import renderer
+from inku_server.color_catalogs import (
+    DEFAULT_COLOR_CATALOG_ID,
+    color_catalog_ids,
+    render_color_map_for_catalog,
+)
 from inku_server import stroke_engine as se
-from inku_server.schema import Score, Variation
+from inku_server.schema import Instruction, Score, Variation
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "android/app/src/test/resources/server_reference"
 RENDER_SEED = 12345
@@ -428,16 +433,71 @@ WILD_SCORES: dict[str, str] = {
     "25_line_computer_wild": "17_line_computer",
 }
 
+# engine 17. Every case above renders through the default catalog with `black`
+# and no `color_hint`, so none of them reaches the palette assignment at all —
+# a port that declares "17" without implementing it stays green on all of them.
+# These six are the ones that reach it, one per branch of the assignment:
+#
+#   33  band holds exactly one palette color            dye_earth.purple
+#   34  achromatic runs out and falls to the nearest    cool_material.black
+#       lightness (this is [I-062]: the ink lands on
+#       #e5e8e8, 0.062 away from the paper in OKLCH L)
+#   35  band holds three, so the seed picks             sea_stone.blue
+#   36  band is empty, so the nearest hue answers       default.yellow -> green
+#   37  a hint of "brown" resolves to the orange slot   ink_season
+#   38  the background is assigned, not looked up       ink_porcelain.blue
+CATALOG_SCORES: dict[str, tuple[str, dict]] = {
+    "33_circle_pen_dye_earth_purple": (
+        "dye_earth",
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "pen", "color": "purple"}]},
+    ),
+    "34_circle_pen_cool_material_black": (
+        "cool_material",
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "pen", "color": "black"}]},
+    ),
+    "35_square_filled_sea_stone_blue": (
+        "sea_stone",
+        {"instructions": [{"primitive": "square", "position": [0.3, 0.3], "size": [0.4, 0.4], "weight": "pencil", "filled": True, "color": "blue"}]},
+    ),
+    "36_circle_pen_default_yellow": (
+        "default",
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "pen", "color": "yellow"}]},
+    ),
+    "37_circle_pen_ink_season_brown_hint": (
+        "ink_season",
+        {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2, "weight": "pen", "color": "black", "color_hint": "brown"}]},
+    ),
+    "38_line_pen_ink_porcelain_background": (
+        "ink_porcelain",
+        {"background": "blue", "instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "weight": "pen", "color": "white"}]},
+    ),
+}
+
 TAGS = ("path", "polyline", "polygon", "circle", "ellipse", "line", "rect", "g")
 
 
 def svg_fixtures() -> None:
     index: dict[str, dict] = {}
-    cases = [(name, raw, False, None) for name, raw in SCORES.items()]
-    cases += [(name, SCORES[source], True, source) for name, source in WILD_SCORES.items()]
-    for name, raw, wild, source in cases:
+    cases = [
+        (name, raw, False, None, DEFAULT_COLOR_CATALOG_ID)
+        for name, raw in SCORES.items()
+    ]
+    cases += [
+        (name, SCORES[source], True, source, DEFAULT_COLOR_CATALOG_ID)
+        for name, source in WILD_SCORES.items()
+    ]
+    cases += [
+        (name, raw, False, None, catalog_id)
+        for name, (catalog_id, raw) in CATALOG_SCORES.items()
+    ]
+    for name, raw, wild, source, catalog_id in cases:
         svg = renderer.render(
-            Score.model_validate(raw), render_seed=RENDER_SEED, svg_profile=SVG_PROFILE, wild=wild
+            Score.model_validate(raw),
+            color_map=render_color_map_for_catalog(catalog_id),
+            catalog_id=catalog_id,
+            render_seed=RENDER_SEED,
+            svg_profile=SVG_PROFILE,
+            wild=wild,
         )
         (OUT / f"{name}.svg").write_text(svg)
         index[name] = {
@@ -445,9 +505,12 @@ def svg_fixtures() -> None:
             "render_seed": RENDER_SEED,
             "svg_profile": SVG_PROFILE,
             "wild": wild,
+            "color_catalog_id": catalog_id,
             "bytes": len(svg),
             "counts": {tag: len(re.findall(f"<{tag}[ />]", svg)) for tag in TAGS},
             "classes": sorted(set(re.findall(r'class="([^"]+)"', svg))),
+            "stroke_colors": sorted(set(re.findall(r'stroke="(#[0-9a-fA-F]{6})"', svg))),
+            "fill_colors": sorted(set(re.findall(r'fill="(#[0-9a-fA-F]{6})"', svg))),
         }
         if source is not None:
             index[name]["wild_off_twin"] = source
@@ -1455,6 +1518,195 @@ def count_preservation_fixtures() -> None:
     (OUT / "count_preservation.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
+COLOR_ASSIGNMENT_SEEDS = (RENDER_SEED, 999)
+
+# Hints chosen for what they discriminate, not for coverage of the word lists.
+# engine 17 matches ASCII tokens as whole words, so a token buried inside a
+# longer word no longer fires; before, `"ink" in normalized` did. The Japanese
+# tokens are still matched as substrings, because the text has no word breaks.
+HINT_CASES: tuple[tuple[str, str, str], ...] = (
+    # (catalog_id, color written in the Score, color_hint)
+    ("ink_season", "black", "brown"),            # brown alone -> the orange slot
+    ("ink_season", "black", "brown and blue"),   # brown is discarded, blue wins
+    ("ink_season", "black", "赤と青"),            # priority order: red before blue
+    ("ink_season", "black", "青と赤"),            # word order must not matter
+    # `red` is the written color in this pair so the hint changes the answer:
+    # with `black` both rows land on #111111 and the pair proves nothing.
+    ("ink_season", "red", "ink"),                # ASCII token as its own word
+    ("ink_season", "red", "inkstone"),           # embedded: no longer a match
+    ("ink_season", "black", "sky blue"),         # multi-word hint
+    ("ink_season", "black", "blueprint"),        # embedded: no longer a match
+    ("cool_material", "red", "moss"),            # no hue in the hint -> fallback
+    ("cool_material", "red", ""),                # empty hint -> fallback
+    ("default", "black", "purple"),              # empty band reached through a hint
+    ("sea_stone", "white", "yellow"),            # band with three, through a hint
+    ("dye_earth", "black", "紫"),                # Japanese token, substring match
+    ("vivid_material", "black", "gold"),         # yellow through a synonym
+    ("open_air_light", "black", "terracotta"),   # orange through a synonym
+)
+
+
+def color_assignment_fixtures() -> None:
+    """The palette assignment engine 17 put between the catalog and the ink.
+
+    The SVG corpus cannot carry this on its own: `_work_color_assignment` only
+    does anything when the color map holds `palette:` keys, and every case in
+    SCORES renders through the bare default map. So the table is pinned here
+    directly, together with the OKLCH conversion and the band split it rests on,
+    so that a wrong band boundary is a separate failure from a wrong assignment.
+    """
+    catalog_ids = color_catalog_ids()
+    palette_bands: dict[str, dict] = {}
+    for catalog_id in catalog_ids:
+        cmap = render_color_map_for_catalog(catalog_id)
+        achromatic: list[list] = []
+        chromatic: dict[str, list[str]] = {c: [] for c in renderer._CHROMATIC_COLORS}
+        seen: set[str] = set()
+        for key, hex_value in cmap.items():
+            if not key.startswith("palette:") or hex_value in seen:
+                continue
+            oklch = renderer._oklch_from_hex(hex_value)
+            if oklch is None:
+                continue
+            seen.add(hex_value)
+            lightness, chroma, hue = oklch
+            if chroma < renderer._OKLCH_CHROMA_FLOOR:
+                achromatic.append([round(lightness, 12), hex_value])
+            else:
+                chromatic[renderer._chromatic_band(hue)].append(hex_value)
+        palette_bands[catalog_id] = {
+            "achromatic": sorted(achromatic),
+            "chromatic": {band: sorted(v) for band, v in chromatic.items()},
+        }
+
+    assignment: dict[str, dict[str, dict[str, str]]] = {}
+    for catalog_id in catalog_ids:
+        cmap = render_color_map_for_catalog(catalog_id)
+        assignment[catalog_id] = {
+            str(seed): renderer._work_color_assignment(cmap, seed, catalog_id)
+            for seed in COLOR_ASSIGNMENT_SEEDS
+        }
+
+    # The seed only reaches a band that holds more than one color. Naming the
+    # pairs that move keeps "the seed is wired in" from being provable by a port
+    # that ignores the seed entirely — most of the table is the same either way.
+    first, second = (str(s) for s in COLOR_ASSIGNMENT_SEEDS[:2])
+    seed_sensitive = sorted(
+        f"{catalog_id}.{color}"
+        for catalog_id in catalog_ids
+        for color in renderer._ACHROMATIC_COLORS + renderer._CHROMATIC_COLORS
+        if assignment[catalog_id][first][color] != assignment[catalog_id][second][color]
+    )
+
+    hints = []
+    for catalog_id, color, hint in HINT_CASES:
+        cmap = render_color_map_for_catalog(catalog_id)
+        work = renderer._work_color_assignment(cmap, RENDER_SEED, catalog_id)
+        hints.append(
+            {
+                "catalog_id": catalog_id,
+                "render_seed": RENDER_SEED,
+                "color": color,
+                "color_hint": hint,
+                "hues": sorted(renderer._hint_hues(hint)),
+                "expected": renderer._resolve_color(
+                    color, hint or None, cmap, work_assignment=work
+                ),
+            }
+        )
+
+    oklch = {}
+    for catalog_id in catalog_ids:
+        for hex_value in render_color_map_for_catalog(catalog_id).values():
+            if hex_value in oklch:
+                continue
+            lightness, chroma, hue = renderer._oklch_from_hex(hex_value)
+            oklch[hex_value] = {
+                "lightness": round(lightness, 12),
+                "chroma": round(chroma, 12),
+                "hue": round(hue, 12),
+            }
+    for hex_value in renderer.COLOR_MAP.values():
+        if hex_value not in oklch:
+            lightness, chroma, hue = renderer._oklch_from_hex(hex_value)
+            oklch[hex_value] = {
+                "lightness": round(lightness, 12),
+                "chroma": round(chroma, 12),
+                "hue": round(hue, 12),
+            }
+
+    out = {
+        "note": (
+            "engine 17: the catalog palette reaches the drawing. `assignment` is "
+            "the whole answer; `palette_bands` and `oklch` are the two steps under "
+            "it, pinned separately so a wrong band boundary does not read as a "
+            "wrong assignment."
+        ),
+        "constants": {
+            "default_color_map": dict(renderer.COLOR_MAP),
+            "achromatic_colors": list(renderer._ACHROMATIC_COLORS),
+            "chromatic_colors": list(renderer._CHROMATIC_COLORS),
+            "chromatic_bands": {k: list(v) for k, v in renderer._CHROMATIC_BANDS.items()},
+            "chromatic_band_centers": dict(renderer._CHROMATIC_BAND_CENTERS),
+            "oklch_chroma_floor": renderer._OKLCH_CHROMA_FLOOR,
+            "hint_hue_priority": list(renderer._HINT_HUE_PRIORITY),
+            "work_color_seed_fields": list(renderer._WORK_COLOR_SEED_FIELDS),
+            "default_catalog_id": DEFAULT_COLOR_CATALOG_ID,
+        },
+        "oklch": dict(sorted(oklch.items())),
+        "palette_bands": palette_bands,
+        "assignment": assignment,
+        "seeds": [str(s) for s in COLOR_ASSIGNMENT_SEEDS],
+        "seed_sensitive": seed_sensitive,
+        "hint_resolution": hints,
+    }
+    (OUT / "renderer_color_assignment.json").write_text(
+        json.dumps(out, ensure_ascii=False, indent=2)
+    )
+
+
+def score_schema_contract_fixture() -> None:
+    """The parts of the Score schema the port must not diverge from.
+
+    The port declares a deliberately smaller schema than the server ([I-008]):
+    it must not offer Stage 2 a ground it cannot draw. So this pins the two
+    things that are shared rather than the whole document — the color
+    vocabulary, and the order the fields are declared in, which the tool schema
+    carries to the model and `model_dump_json` carries to the seed.
+    """
+    schema = Score.model_json_schema()
+    instruction = schema["$defs"]["Instruction"]["properties"]
+    out = {
+        "note": (
+            "The port's schema is a subset by design. `instruction_property_order` "
+            "is the server's order; the port's own fields must appear in the same "
+            "relative order, which is what puts `thinness` at the end."
+        ),
+        "instruction_property_order": list(instruction),
+        "dump_property_order": list(
+            json.loads(
+                Instruction.model_validate({"primitive": "line"}).model_dump_json(
+                    by_alias=True
+                )
+            )
+        ),
+        "enums": {
+            "color": instruction["color"]["enum"],
+            "background": schema["properties"]["background"]["enum"],
+            "color_cycle": schema["$defs"]["Arrangement"]["properties"]["color_cycle"][
+                "items"
+            ]["enum"],
+        },
+        "descriptions": {
+            "note": instruction["note"]["description"],
+            "color": instruction["color"]["description"],
+        },
+    }
+    (OUT / "score_schema_contract.json").write_text(
+        json.dumps(out, ensure_ascii=False, indent=2)
+    )
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
@@ -1468,6 +1720,8 @@ def main() -> None:
     ddl_expand_fixtures()
     count_preservation_fixtures()
     prompt_fixtures()
+    color_assignment_fixtures()
+    score_schema_contract_fixture()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

@@ -411,6 +411,7 @@
       "name": "line_plain",
       "instruction": {
         "primitive": "line",
+        "note": null,
         "from_": [
           0.1,
           0.5
@@ -430,7 +431,6 @@
         "filled": false,
         "style": "solid",
         "weight": "brush_thick",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -439,7 +439,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": null,
       "seed": 10822395006982551220,
@@ -449,6 +450,7 @@
       "name": "line_plain_render_seed",
       "instruction": {
         "primitive": "line",
+        "note": null,
         "from_": [
           0.1,
           0.5
@@ -468,7 +470,6 @@
         "filled": false,
         "style": "solid",
         "weight": "brush_thick",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -477,7 +478,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": 12345,
       "seed": 13031316310122858979,
@@ -487,6 +489,7 @@
       "name": "line_variation_white",
       "instruction": {
         "primitive": "line",
+        "note": null,
         "from_": [
           0.1,
           0.5
@@ -506,7 +509,6 @@
         "filled": false,
         "style": "solid",
         "weight": "pencil",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -522,7 +524,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": 12345,
       "seed": 5511971836730225760,
@@ -537,6 +540,7 @@
       "name": "circle_plain",
       "instruction": {
         "primitive": "circle",
+        "note": null,
         "from_": null,
         "to": null,
         "center": [
@@ -553,7 +557,6 @@
         "filled": false,
         "style": "solid",
         "weight": "pen",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -562,7 +565,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": 12345,
       "seed": 11528463854510909083,
@@ -572,6 +576,7 @@
       "name": "circle_variation_wave",
       "instruction": {
         "primitive": "circle",
+        "note": null,
         "from_": null,
         "to": null,
         "center": [
@@ -588,7 +593,6 @@
         "filled": false,
         "style": "solid",
         "weight": "pen",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -605,7 +609,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": 12345,
       "seed": 7236431248481473474,
@@ -620,6 +625,7 @@
       "name": "circle_variation_pink",
       "instruction": {
         "primitive": "circle",
+        "note": null,
         "from_": null,
         "to": null,
         "center": [
@@ -636,7 +642,6 @@
         "filled": false,
         "style": "solid",
         "weight": "pen",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -652,7 +657,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": 12345,
       "seed": 4172103606578839547,
@@ -665,6 +671,7 @@
       "name": "square_filled",
       "instruction": {
         "primitive": "square",
+        "note": null,
         "from_": null,
         "to": null,
         "center": null,
@@ -684,7 +691,6 @@
         "filled": true,
         "style": "solid",
         "weight": "pencil",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -693,7 +699,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": 12345,
       "seed": 14545965189036574497,
@@ -703,6 +710,7 @@
       "name": "arc_crayon",
       "instruction": {
         "primitive": "arc",
+        "note": null,
         "from_": null,
         "to": null,
         "center": [
@@ -719,7 +727,6 @@
         "filled": false,
         "style": "solid",
         "weight": "crayon",
-        "thinness": null,
         "mode": "additive",
         "carve_depth": null,
         "color": "black",
@@ -728,7 +735,8 @@
         "arrangement": null,
         "at": null,
         "relation": null,
-        "surface": null
+        "surface": null,
+        "thinness": null
       },
       "performance_seed": 12345,
       "seed": 2285881073873778754,

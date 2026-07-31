@@ -8,10 +8,10 @@ import org.json.JSONObject
 private val HUE_HINTS = mapOf(
     "white" to listOf("white", "ivory", "paper", "linen", "blanc", "bianco", "aspro", "白", "胡粉", "象牙", "生成"),
     "black" to listOf("black", "ink", "sumi", "obsidian", "basalt", "skotadi", "黒", "墨", "玄", "暗"),
-    "blue" to listOf("blue", "cyan", "azure", "ultramarine", "cobalt", "lapis", "bleu", "blu", "ai", "azul", "青", "藍", "水色", "空色", "瑠璃"),
-    "green" to listOf("green", "verd", "vert", "jade", "olive", "cactus", "tall", "緑", "青緑", "翡翠", "常磐", "玉", "草"),
+    "blue" to listOf("blue", "cyan", "azure", "ultramarine", "cobalt", "lapis", "bleu", "azul", "青", "藍", "水色", "空色", "瑠璃"),
+    "green" to listOf("green", "verd", "jade", "olive", "cactus", "緑", "青緑", "翡翠", "常磐", "玉", "草"),
     "gray" to listOf("gray", "grey", "silver", "ash", "stone", "granit", "petra", "灰", "鼠", "銀", "石"),
-    "red" to listOf("red", "rose", "pink", "carmine", "cinnabar", "terra", "rosa", "shu", "vermilion", "赤", "朱", "紅", "桜", "桃", "薔薇"),
+    "red" to listOf("red", "rose", "pink", "carmine", "cinnabar", "terra", "rosa", "vermilion", "赤", "朱", "紅", "桜", "桃", "薔薇"),
     "yellow" to listOf("yellow", "gold", "ochre", "ocra", "giallo", "jaune", "napoli", "kesar", "haldi", "sun", "ilios", "山吹", "金", "黄", "琉璃金"),
     "orange" to listOf("orange", "apricot", "terracotta", "cempasuchil", "ff4d00", "橙", "蜜柑"),
     "purple" to listOf("purple", "violet", "lilac", "murasaki", "宮廷紫", "藤", "紫"),
@@ -205,76 +205,221 @@ internal object ServerRendererStyle {
         return "blur-$amp-$stdInt"
     }
 
-    private fun resolveColor(colorKey: String, colorHint: String?, colorMap: Map<String, String>): String {
-        val fallback = colorMap[colorKey] ?: "#111111"
+    val DEFAULT_COLOR_MAP = mapOf(
+        "white" to "#ffffff",
+        "black" to "#111111",
+        "blue" to "#2c3e91",
+        "red" to "#a2342a",
+        "green" to "#2f6b3a",
+        "gray" to "#888888",
+        "yellow" to "#a18308",
+        "orange" to "#a95a00",
+        "purple" to "#583a84",
+    )
+
+    fun computeColorAssignment(
+        catalogMap: Map<String, String>,
+        renderSeed: Long?,
+        catalogId: String = "default"
+    ): Map<String, String> {
+        val cmap = DEFAULT_COLOR_MAP + catalogMap
+
+        val seenHex = mutableSetOf<String>()
+        val paletteHexes = mutableListOf<String>()
+        for ((key, hex) in catalogMap) {
+            if (key.startsWith("palette:")) {
+                val normalized = hex.lowercase()
+                if (seenHex.add(normalized)) {
+                    paletteHexes.add(normalized)
+                }
+            }
+        }
+
+        data class AchromaticItem(val L: Double, val hex: String)
+        val achromaticStock = mutableListOf<AchromaticItem>()
+        val chromaticBands = mapOf(
+            "red" to mutableListOf<String>(),
+            "orange" to mutableListOf<String>(),
+            "yellow" to mutableListOf<String>(),
+            "green" to mutableListOf<String>(),
+            "blue" to mutableListOf<String>(),
+            "purple" to mutableListOf<String>(),
+        )
+        data class ChromaticHueItem(val hue: Double, val hex: String)
+        val chromaticHues = mutableListOf<ChromaticHueItem>()
+
+        for (hex in paletteHexes) {
+            val oklch = oklchFromHex(hex)
+            if (oklch.c < 0.035) {
+                achromaticStock.add(AchromaticItem(oklch.l, hex))
+            } else {
+                val band = when {
+                    oklch.h >= 345.0 || oklch.h < 50.0 -> "red"
+                    oklch.h >= 50.0 && oklch.h < 80.0 -> "orange"
+                    oklch.h >= 80.0 && oklch.h < 137.0 -> "yellow"
+                    oklch.h >= 137.0 && oklch.h < 200.0 -> "green"
+                    oklch.h >= 200.0 && oklch.h < 280.0 -> "blue"
+                    oklch.h >= 280.0 && oklch.h < 345.0 -> "purple"
+                    else -> "red"
+                }
+                chromaticBands.getValue(band).add(hex)
+                chromaticHues.add(ChromaticHueItem(oklch.h, hex))
+            }
+        }
+
+        achromaticStock.sortBy { it.L }
+
+        val assignment = mutableMapOf<String, String>()
+
+        val achromaticColors = listOf("black", "gray", "white")
+        for (color in achromaticColors) {
+            val targetHex = (cmap[color] ?: DEFAULT_COLOR_MAP.getValue(color)).lowercase()
+            val exactIndex = achromaticStock.indexOfFirst { it.hex.equals(targetHex, ignoreCase = true) }
+            if (exactIndex != -1) {
+                assignment[color] = achromaticStock.removeAt(exactIndex).hex
+            }
+        }
+
+        for (color in achromaticColors) {
+            if (color in assignment) continue
+            val targetHex = (cmap[color] ?: DEFAULT_COLOR_MAP.getValue(color)).lowercase()
+            val targetL = oklchFromHex(targetHex).l
+
+            if (achromaticStock.isNotEmpty()) {
+                val bestItem = achromaticStock.minWithOrNull(
+                    Comparator { a, b ->
+                        val diffA = Math.abs(a.L - targetL)
+                        val diffB = Math.abs(b.L - targetL)
+                        val cmp = diffA.compareTo(diffB)
+                        if (cmp != 0) cmp else a.hex.compareTo(b.hex)
+                    }
+                )!!
+                assignment[color] = bestItem.hex
+                achromaticStock.remove(bestItem)
+            } else {
+                assignment[color] = cmap[color] ?: DEFAULT_COLOR_MAP.getValue(color)
+            }
+        }
+
+        val bandCenters = mapOf(
+            "red" to 27.5,
+            "orange" to 65.0,
+            "yellow" to 108.5,
+            "green" to 168.5,
+            "blue" to 240.0,
+            "purple" to 312.5
+        )
+
+        fun selectBySeed(candidates: List<String>, abstractColor: String): String {
+            val sortedCandidates = candidates.distinct().sorted()
+            if (sortedCandidates.size == 1) return sortedCandidates[0]
+            val seedStr = renderSeed?.toString() ?: "None"
+            val payload = "$seedStr|$catalogId|$abstractColor"
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            val digest = md.digest(payload.toByteArray(Charsets.UTF_8))
+            val buffer = java.nio.ByteBuffer.wrap(digest, 0, 8).order(java.nio.ByteOrder.BIG_ENDIAN)
+            val u64Val = buffer.long
+            val index = java.lang.Long.remainderUnsigned(u64Val, sortedCandidates.size.toLong()).toInt()
+            return sortedCandidates[index]
+        }
+
+        fun angularDistance(h1: Double, h2: Double): Double {
+            val diff = Math.abs(h1 - h2) % 360.0
+            return Math.min(diff, 360.0 - diff)
+        }
+
+        val chromaticColors = listOf("red", "orange", "yellow", "green", "blue", "purple")
+        for (color in chromaticColors) {
+            val candidates = chromaticBands.getValue(color)
+            if (candidates.isNotEmpty()) {
+                assignment[color] = selectBySeed(candidates, color)
+            } else if (chromaticHues.isNotEmpty()) {
+                val center = bandCenters.getValue(color)
+                val bestItem = chromaticHues.minWithOrNull(
+                    Comparator { a, b ->
+                        val distA = angularDistance(a.hue, center)
+                        val distB = angularDistance(b.hue, center)
+                        val cmp = distA.compareTo(distB)
+                        if (cmp != 0) cmp else a.hex.compareTo(b.hex)
+                    }
+                )!!
+                assignment[color] = bestItem.hex
+            } else {
+                assignment[color] = cmap[color] ?: DEFAULT_COLOR_MAP.getValue(color)
+            }
+        }
+
+        return assignment
+    }
+
+    private val HUE_ORDER = listOf("red", "orange", "yellow", "green", "blue", "purple", "white", "black", "gray")
+
+    fun resolveColor(colorKey: String, colorHint: String?, colors: Map<String, String>): String {
+        val fallback = colors[colorKey] ?: DEFAULT_COLOR_MAP[colorKey] ?: "#111111"
         if (colorHint.isNullOrBlank()) return fallback
-        val hint = normLabel(colorHint)
-        val desiredHues = hintHues(colorHint)
-        if (hint.isBlank() && desiredHues.isEmpty()) return fallback
 
-        var bestScore = 0
-        var bestHex = fallback
-        for ((key, hexValue) in colorMap) {
-            if (!hexValue.startsWith("#")) continue
-            val isPalette = key.startsWith("palette:")
-            val label = normLabel(key.removePrefix("palette:"))
-            var score = 0
-            if (label.isNotBlank() && label in hint) score += 6
-            for (part in label.split(" ")) {
-                if (part.length >= 3 && part in hint) score += 3
-            }
-            val candidateHue = hueFromHex(hexValue)
-            if (candidateHue in desiredHues) score += 4
-            for (hue in desiredHues) {
-                val tokens = HUE_HINTS[hue].orEmpty()
-                if (isPalette && tokens.any { it.lowercase() in label }) score += 2
-            }
-            if (isPalette && score > 0) score += 1
-            if (key == colorKey) score += 1
-            if (score > bestScore) {
-                bestScore = score
-                bestHex = hexValue
+        val hintTrimmed = colorHint.trim()
+        val asciiWords = Regex("[0-9a-z]+").findAll(hintTrimmed.lowercase()).map { it.value }.toSet()
+
+        val matchedHues = mutableSetOf<String>()
+        for ((hue, hints) in HUE_HINTS) {
+            for (pattern in hints) {
+                val patLower = pattern.lowercase()
+                val matches = if (patLower.matches(Regex("^[a-z]+$"))) {
+                    patLower in asciiWords
+                } else {
+                    hintTrimmed.contains(pattern, ignoreCase = true)
+                }
+                if (matches) {
+                    matchedHues.add(hue)
+                    break
+                }
             }
         }
-        return bestHex
-    }
 
-    private fun hintHues(hint: String): Set<String> {
-        val normalized = normLabel(hint)
-        return HUE_HINTS
-            .filterValues { tokens -> tokens.any { token -> token.lowercase() in normalized || token in hint } }
-            .keys
-    }
-
-    private fun normLabel(value: String): String {
-        return value.lowercase().replace(Regex("""[\s:_()'".,/-]+"""), " ").trim()
-    }
-
-    private fun hueFromHex(value: String): String? {
-        val match = Regex("""#?([0-9a-fA-F]{6})""").matchEntire(value.trim()) ?: return null
-        val raw = match.groupValues[1]
-        val r = raw.substring(0, 2).toInt(16) / 255.0
-        val g = raw.substring(2, 4).toInt(16) / 255.0
-        val b = raw.substring(4, 6).toInt(16) / 255.0
-        val mx = maxOf(r, g, b)
-        val mn = minOf(r, g, b)
-        val lightness = (mx + mn) / 2.0
-        if (mx - mn < 0.08) {
-            if (lightness > 0.82) return "white"
-            if (lightness < 0.2) return "black"
-            return "gray"
+        if (matchedHues.size == 1 && "brown" in matchedHues) {
+            return colors["orange"] ?: DEFAULT_COLOR_MAP.getValue("orange")
         }
-        val hue = when (mx) {
-            r -> (60.0 * ((g - b) / (mx - mn)) + 360.0) % 360.0
-            g -> 60.0 * ((b - r) / (mx - mn)) + 120.0
-            else -> 60.0 * ((r - g) / (mx - mn)) + 240.0
+
+        for (hue in HUE_ORDER) {
+            if (hue in matchedHues && hue != "brown") {
+                return colors[hue] ?: fallback
+            }
         }
-        if (hue >= 15.0 && hue < 45.0) return "orange"
-        if (hue >= 45.0 && hue < 75.0) return "yellow"
-        if (hue >= 75.0 && hue < 165.0) return "green"
-        if (hue >= 165.0 && hue < 255.0) return "blue"
-        if (hue >= 255.0 && hue < 315.0) return "purple"
-        return "red"
+
+        return fallback
+    }
+
+    internal data class Oklch(val l: Double, val c: Double, val h: Double)
+
+    internal fun oklchFromHex(hex: String): Oklch {
+        val trimmed = hex.trim().removePrefix("#")
+        if (trimmed.length != 6) return Oklch(0.0, 0.0, 0.0)
+        val rRaw = trimmed.substring(0, 2).toInt(16) / 255.0
+        val gRaw = trimmed.substring(2, 4).toInt(16) / 255.0
+        val bRaw = trimmed.substring(4, 6).toInt(16) / 255.0
+
+        val r = if (rRaw > 0.04045) Math.pow((rRaw + 0.055) / 1.055, 2.4) else rRaw / 12.92
+        val g = if (gRaw > 0.04045) Math.pow((gRaw + 0.055) / 1.055, 2.4) else gRaw / 12.92
+        val b = if (bRaw > 0.04045) Math.pow((bRaw + 0.055) / 1.055, 2.4) else bRaw / 12.92
+
+        val l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+        val m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+        val s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+
+        val lCbrt = Math.cbrt(l)
+        val mCbrt = Math.cbrt(m)
+        val sCbrt = Math.cbrt(s)
+
+        val L = 0.2104542553 * lCbrt + 0.7936177850 * mCbrt - 0.0040720468 * sCbrt
+        val a = 1.9779984951 * lCbrt - 2.4285922050 * mCbrt + 0.4505937099 * sCbrt
+        val bVal = 0.0259040371 * lCbrt + 0.7827717662 * mCbrt - 0.8086757660 * sCbrt
+
+        val C = Math.hypot(a, bVal)
+        val Hdeg = Math.toDegrees(Math.atan2(bVal, a))
+        val H = (Hdeg % 360.0 + 360.0) % 360.0
+
+        return Oklch(L, C, H)
     }
 
     private fun String.containsAny(vararg markers: String): Boolean = markers.any { contains(it) }

@@ -77,17 +77,15 @@ class ServerRendererThinnessTest {
     }
 
     @Test
-    fun testSchemaDeclaresThinnessImmediatelyAfterWeight() {
+    fun testSchemaDeclaresThinnessAtTheEndOfInstruction() {
         val schema = ServerScoreSchemaJson.parameters
-        val weight = schema.indexOf("\"weight\":")
+        val surface = schema.indexOf("\"surface\":")
         val thinness = schema.indexOf("\"thinness\":")
-        val mode = schema.indexOf("\"mode\":")
-        assertTrue("weight must exist before thinness", weight >= 0 && weight < thinness)
-        assertTrue("thinness must be immediately before mode", thinness < mode)
-        val between = schema.substring(weight, mode)
-        assertTrue(between.contains("\"enum\":[\"fine\",\"extra_fine\"]"))
-        assertTrue(between.contains("\"default\":null"))
-        assertFalse("there is no thick thinness value", between.contains("\"thick\""))
+        assertTrue("surface must exist before thinness", surface >= 0 && surface < thinness)
+        val afterSurface = schema.substring(thinness)
+        assertTrue(afterSurface.contains("\"enum\":[\"fine\",\"extra_fine\"]"))
+        assertTrue(afterSurface.contains("\"default\":null"))
+        assertFalse("there is no thick thinness value", afterSurface.contains("\"thick\""))
     }
 
     @Test

@@ -24,10 +24,17 @@ class DefaultSvgRenderer : SvgRenderer {
         val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = ColorCatalogs.get(request.colorCatalogId)
-        val colors = catalog.renderMap
-        val background = colors[score.optString("background", "white")] ?: "#ffffff"
-        val instructions = score.optJSONArray("instructions") ?: JSONArray()
         val renderSeed = if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
+        val cmap = ServerRendererStyle.DEFAULT_COLOR_MAP + catalog.renderMap
+        val assignment = ServerRendererStyle.computeColorAssignment(
+            catalogMap = catalog.renderMap,
+            renderSeed = renderSeed,
+            catalogId = catalog.id
+        )
+        val colors = cmap + assignment
+        val bgKey = score.optString("background", "white")
+        val background = assignment[bgKey] ?: colors[bgKey] ?: "#ffffff"
+        val instructions = score.optJSONArray("instructions") ?: JSONArray()
         val wild = score.optBoolean("render_wild", score.optBoolean("wild", false))
         val width = canvas.width.toDouble()
         val height = canvas.height.toDouble()
@@ -90,7 +97,7 @@ class DefaultSvgRenderer : SvgRenderer {
             .put("render_color_catalog_name", catalog.name)
             .put("render_color_catalog_sub", catalog.sub)
             .put("render_color_profile", JSONObject().put("id", "srgb").put("name", "sRGB IEC61966-2.1").put("standard", "IEC 61966-2-1:1999"))
-            .put("render_color_map", JSONObject(colors))
+            .put("render_color_map", JSONObject(catalog.renderMap))
         val hash = sha256(svg + metadata.toString())
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }
@@ -939,7 +946,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val fillOpacityStr = fmt(opacity)
         sb.append("""<path d="$pathD" fill="$color" fill-opacity="$fillOpacityStr" stroke="none"/>""")
 
-        if (weight in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) {
+        if (weight in setOf("pencil", "pen", "crayon", "chalk", "brush_thin", "brush_thick")) {
             val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false, renderSeed = renderSeed, centerline = materialCenterline, instructionSeed = seedLong)
             if (mat != null) {
                 sb.append(mat)
@@ -1441,6 +1448,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val dumpJson = buildString {
             append("{")
             append("\"primitive\":"); append(jsonString(ins.optString("primitive", "line")))
+            append(",\"note\":"); append(stringOrNull(ins, "note"))
             append(",\"from\":"); append(coordJson(ins.optJSONArray("from_") ?: ins.optJSONArray("from")))
             append(",\"to\":"); append(coordJson(ins.optJSONArray("to")))
             append(",\"center\":"); append(coordJson(ins.optJSONArray("center")))
@@ -1454,7 +1462,6 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"filled\":"); append(ins.optBoolean("filled", false))
             append(",\"style\":"); append(jsonString(ins.optString("style", "solid")))
             append(",\"weight\":"); append(jsonString(ins.optString("weight", "pen")))
-            append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
             append(",\"mode\":"); append(jsonString(ins.optString("mode", "additive")))
             append(",\"carve_depth\":"); append(stringOrNull(ins, "carve_depth"))
             append(",\"color\":"); append(jsonString(ins.optString("color", "black")))
@@ -1464,6 +1471,7 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"at\":null")
             append(",\"relation\":null")
             append(",\"surface\":"); append(dumpSurfaceJson(ins.optJSONObject("surface")))
+            append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
             append("}")
         }
         val key = "$dumpJson:surface:$insIdx:$markIdx:${renderSeed ?: "None"}"

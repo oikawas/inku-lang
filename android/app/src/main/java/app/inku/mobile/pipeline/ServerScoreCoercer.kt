@@ -61,7 +61,7 @@ internal object ServerScoreCoercer {
     ): JSONObject {
         val primitive = source.optString("primitive", "line").takeIf { it in supportedPrimitives } ?: "line"
         val data = ServerScoreCompat.migrateInstruction(JSONObject(source.toString())).put("primitive", primitive)
-        data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray") } ?: "black")
+        data.put("color", data.optString("color", "black").takeIf { it in setOf("white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple") } ?: "black")
         data.put("weight", data.optString("weight", "pen").takeIf { it in setOf("silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin", "brush_thick", "burin", "drypoint", "computer") } ?: "pen")
         if (data.has("thinness")) {
             val thinness = data.optString("thinness").takeIf { it in setOf("fine", "extra_fine") }

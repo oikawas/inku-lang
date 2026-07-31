@@ -2979,6 +2979,11 @@ def test_history_is_scoped_to_authenticated_user():
         session.query(db.HistoryRow).filter(db.HistoryRow.id == item_a_second["id"]).update(
             {db.HistoryRow.render_hash: "rh3:" + "a" * 60 + "Ab12"}
         )
+        # The same four characters, but in the middle of the hash. The search reads the
+        # last four, so this row must stay out of the result -- a substring match finds it.
+        session.query(db.HistoryRow).filter(db.HistoryRow.id == item_a["id"]).update(
+            {db.HistoryRow.render_hash: "rh3:" + "ab12" + "c" * 60}
+        )
         session.commit()
 
     list_a = client.get("/api/history", headers=headers_a)

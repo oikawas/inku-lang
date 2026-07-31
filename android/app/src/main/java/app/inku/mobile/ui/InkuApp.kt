@@ -5082,3 +5082,52 @@ internal fun TenkeiSelect(
         }
     }
 }
+
+@Composable
+internal fun LineagePanel(
+    nodeId: String?,
+    rootNodeId: String?,
+    onSelectNode: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("lineage_panel")
+            .padding(12.dp),
+    ) {
+        Text(
+            text = "作品系譜 (Lineage)",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = androidx.compose.ui.graphics.Color(0xFFFFF3E0),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                )
+                .border(
+                    width = 1.dp,
+                    color = androidx.compose.ui.graphics.Color(0xFFFF9800),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                )
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "★ 原点ノード: ${rootNodeId ?: "起点"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = androidx.compose.ui.graphics.Color(0xFFE65100),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "➔ 現在ノード: ${nodeId ?: "未割り当て"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}

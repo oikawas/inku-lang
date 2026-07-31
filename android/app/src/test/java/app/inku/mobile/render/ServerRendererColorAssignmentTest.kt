@@ -204,6 +204,41 @@ class ServerRendererColorAssignmentTest {
         assertEquals(failures.joinToString("\n"), 0, failures.size)
     }
 
+    /**
+     * The metadata reports the catalog, not the resolution.
+     *
+     * The server's `render_color_map` is `render_color_map_for_catalog(id)` —
+     * the catalog's own map plus its palette, untouched by the assignment. The
+     * assignment is what the drawing used, and it is already visible in the
+     * drawing. Folding it back into the metadata makes the record of which
+     * catalog was chosen unreadable: `cool_material` would report its black as
+     * the paper-colored ink the assignment picked rather than as #2c3e50.
+     */
+    @Test
+    fun testTheMetadataReportsTheCatalogMapNotTheAssignment() {
+        val failures = mutableListOf<String>()
+        for (catalogId in fixture.getJSONObject("assignment").keys()) {
+            val catalog = app.inku.mobile.data.model.ColorCatalogs.get(catalogId)
+            val metadata = JSONObject(
+                DefaultSvgRenderer().render(
+                    RenderRequest(
+                        scoreJson = """{"render_seed":12345,"instructions":[]}""",
+                        colorCatalogId = catalogId,
+                        canvasAspect = "square",
+                        svgProfile = "editable",
+                    )
+                ).metadataJson
+            ).getJSONObject("render_color_map")
+            val reported = metadata.keys().asSequence().associateWith { metadata.getString(it) }
+            if (reported != catalog.renderMap) {
+                val extra = reported.keys - catalog.renderMap.keys
+                val moved = catalog.renderMap.filter { reported[it.key] != it.value }
+                failures.add("$catalogId extra=$extra moved=$moved")
+            }
+        }
+        assertEquals(failures.joinToString("\n"), 0, failures.size)
+    }
+
     /** The background is assigned too, not looked up in the raw map. */
     @Test
     fun testBackgroundsAreAssignedNotLookedUp() {

@@ -1640,7 +1640,11 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # engine 16 段 3 (太さの軸) で再採取。`thinness` が演奏 seed の allowlist に
     # 入った (C-7) ので、値が既定の None でも seed 鍵が変わる。幅そのものは
     # 動いていない (thinness=None の倍率は 1.0)。
-    assert digest == "3caad55448f0a0a3f4c97b3f084b55dad143783a37e934f6283b58597d7ecc8c"
+    # engine 19 (地の抵抗) で再採取。既定 weight の pen は紙に弱く触れる
+    # (吸う 0.15 / 弾く 0.15) ので幅が動く。書き出される数値は 1444 個から
+    # 1724 個へ増えたが、これは墨が切れて subpath が増えたぶんであり、
+    # 要素は 1 つも増えていない (`test_ground_resistance.py` が留めている)。
+    assert digest == "a81beef258f526fc7066b09b17e77dff1d01a0888c8eca8ccc1db8a293c23a8d"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

@@ -151,11 +151,15 @@ def _points_of(value: str) -> list[tuple[float, float]]:
     return list(zip(numbers[0::2], numbers[1::2]))
 
 
-def _band_centerline(root) -> list[tuple[float, float]]:
+def _band_centerlines(root, *, closed: bool) -> list[list[tuple[float, float]]]:
     """The performed centreline, read back out of the drawn stroke band.
 
     The band is the two banks of the stroke: one subpath per bank when the
-    contour is closed, one there-and-back subpath when it is open.
+    contour is closed, one there-and-back subpath when it is open. Since render
+    engine 19 an open stroke the ground refused is cut into runs, one
+    there-and-back subpath each, so the centreline comes back in pieces. They
+    are kept apart rather than joined: a straight chord across a gap is not
+    somewhere the tool ever went.
     """
     candidates = [
         node.attrib["d"]
@@ -166,32 +170,60 @@ def _band_centerline(root) -> list[tuple[float, float]]:
     ]
     band = max(candidates, key=len)
     subpaths = [part for part in band.split("M") if part.strip()]
-    if len(subpaths) >= 2:
+    if closed:
         left, right = _points_of(subpaths[0]), _points_of(subpaths[1])
-    else:
-        walk = _points_of(subpaths[0])
+        return [[((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) for a, b in zip(left, right)]]
+    runs: list[list[tuple[float, float]]] = []
+    for subpath in subpaths:
+        walk = _points_of(subpath)
         half = len(walk) // 2
         left, right = walk[:half], walk[::-1][:half]
-    return [((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) for a, b in zip(left, right)]
+        runs.append([((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) for a, b in zip(left, right)])
+    return runs
 
 
 def _distance_to_polyline(
     point: tuple[float, float], polyline: list[tuple[float, float]]
-) -> float:
+) -> tuple[float, str]:
+    """Distance to the run, and where on it the nearest point landed.
+
+    "before" / "after" mean the nearest point is a terminus the vertex has
+    overshot; "inside" means there is ink directly beside it.
+    """
     px, py = point
-    best = math.inf
-    for (ax, ay), (bx, by) in zip(polyline, polyline[1:]):
+    best, landed = math.inf, "inside"
+    final = len(polyline) - 2
+    for index, ((ax, ay), (bx, by)) in enumerate(zip(polyline, polyline[1:])):
         dx, dy = bx - ax, by - ay
         span = dx * dx + dy * dy
-        t = 0.0 if span <= 1e-12 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / span))
-        best = min(best, math.hypot(px - (ax + dx * t), py - (ay + dy * t)))
-    return best
+        raw = 0.0 if span <= 1e-12 else ((px - ax) * dx + (py - ay) * dy) / span
+        t = max(0.0, min(1.0, raw))
+        distance = math.hypot(px - (ax + dx * t), py - (ay + dy * t))
+        if distance < best:
+            best = distance
+            if index == 0 and raw < 0.0:
+                landed = "before"
+            elif index == final and raw > 1.0:
+                landed = "after"
+            else:
+                landed = "inside"
+    return best, landed
 
 
-def _outline_distance_to_ink(instruction: dict, *, wild: bool) -> float:
+def _outline_distances_to_ink(instruction: dict, *, wild: bool) -> list[float]:
+    """One distance per material-outline vertex that has ink beside it.
+
+    Since render engine 19 the ground cuts an open stroke into runs, and the
+    material outline still spans the bare paper between them (SPEC: the cut is
+    made in the ink body, not in the texture strata). A vertex over a gap has
+    no ink beside it, so it is left out rather than measured against the
+    nearest run's terminus.
+    """
     root = ElementTree.fromstring(_svg(instruction, wild=wild))
-    ink = _band_centerline(root)
-    worst = 0.0
+    closed = instruction["primitive"] != "arc"
+    runs = _band_centerlines(root, closed=closed)
+    distances: list[float] = []
+    over_a_gap = 0
     for node in root.iter():
         if node.attrib.get("class") != "material-outline":
             continue
@@ -210,8 +242,23 @@ def _outline_distance_to_ink(instruction: dict, *, wild: bool) -> float:
             w, h = float(node.attrib["width"]), float(node.attrib["height"])
             vertices = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
         for vertex in vertices:
-            worst = max(worst, _distance_to_polyline(vertex, ink))
-    return worst
+            index, (distance, landed) = min(
+                enumerate(_distance_to_polyline(vertex, run) for run in runs),
+                key=lambda pair: pair[1][0],
+            )
+            # A loop has no cut ends, and neither has the start of the first
+            # run nor the end of the last: those are where the stroke itself
+            # begins and ends.
+            if not closed and (
+                (landed == "before" and index > 0)
+                or (landed == "after" and index < len(runs) - 1)
+            ):
+                over_a_gap += 1
+                continue
+            distances.append(distance)
+    # A reader that dropped most of the layer would pass wherever it was drawn.
+    assert len(distances) > over_a_gap, (len(distances), over_a_gap)
+    return distances
 
 
 def _frozen_outline_layers(case_id: str) -> list[tuple[str, tuple]]:
@@ -254,7 +301,7 @@ def test_material_outline_follows_the_ink_when_wild_and_stays_put_when_not() -> 
                 )
                 + LAYER_DISTANCE_SLACK_PX
             )
-            assert _outline_distance_to_ink(instruction, wild=True) < bound, (
+            assert max(_outline_distances_to_ink(instruction, wild=True)) < bound, (
                 primitive,
                 tool,
             )

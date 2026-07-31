@@ -112,12 +112,16 @@ def test_unfilled_shape_has_no_fill_strokes(name: str):
 
 @pytest.mark.parametrize("name", sorted(SHAPES))
 def test_fill_strokes_are_one_path_per_stroke(name: str):
-    """1 パス = 1 筆。走査線の区間ごとに独立した筆になっている。"""
+    """1 パス = 1 筆。走査線の区間ごとに独立した筆になっている。
+
+    地に弾かれた筆は墨の切れ目を持つので subpath は 1 つとは限らない
+    (render engine 19)。要素は 1 筆 1 つのままで、増えるのは subpath だけ。
+    """
     svg = _render(SHAPES[name], weight="pencil", filled=True)
     paths = _fill_paths(svg)
     assert len(paths) == len(set(paths))
     for path_d in paths:
-        assert path_d.count("M ") == 1
+        assert path_d.count("M ") >= 1
 
 
 def test_fill_strokes_stay_inside_the_circle():

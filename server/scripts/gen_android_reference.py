@@ -54,7 +54,7 @@ from inku_server.color_catalogs import (
     render_color_map_for_catalog,
 )
 from inku_server import stroke_engine as se
-from inku_server.schema import Score, Variation
+from inku_server.schema import Instruction, Score, Variation
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "android/app/src/test/resources/server_reference"
 RENDER_SEED = 12345
@@ -1665,6 +1665,48 @@ def color_assignment_fixtures() -> None:
     )
 
 
+def score_schema_contract_fixture() -> None:
+    """The parts of the Score schema the port must not diverge from.
+
+    The port declares a deliberately smaller schema than the server ([I-008]):
+    it must not offer Stage 2 a ground it cannot draw. So this pins the two
+    things that are shared rather than the whole document — the color
+    vocabulary, and the order the fields are declared in, which the tool schema
+    carries to the model and `model_dump_json` carries to the seed.
+    """
+    schema = Score.model_json_schema()
+    instruction = schema["$defs"]["Instruction"]["properties"]
+    out = {
+        "note": (
+            "The port's schema is a subset by design. `instruction_property_order` "
+            "is the server's order; the port's own fields must appear in the same "
+            "relative order, which is what puts `thinness` at the end."
+        ),
+        "instruction_property_order": list(instruction),
+        "dump_property_order": list(
+            json.loads(
+                Instruction.model_validate({"primitive": "line"}).model_dump_json(
+                    by_alias=True
+                )
+            )
+        ),
+        "enums": {
+            "color": instruction["color"]["enum"],
+            "background": schema["properties"]["background"]["enum"],
+            "color_cycle": schema["$defs"]["Arrangement"]["properties"]["color_cycle"][
+                "items"
+            ]["enum"],
+        },
+        "descriptions": {
+            "note": instruction["note"]["description"],
+            "color": instruction["color"]["description"],
+        },
+    }
+    (OUT / "score_schema_contract.json").write_text(
+        json.dumps(out, ensure_ascii=False, indent=2)
+    )
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
@@ -1679,6 +1721,7 @@ def main() -> None:
     count_preservation_fixtures()
     prompt_fixtures()
     color_assignment_fixtures()
+    score_schema_contract_fixture()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

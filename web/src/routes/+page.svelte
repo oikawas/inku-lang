@@ -6671,7 +6671,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	<div class="modal-backdrop app-info-backdrop" onclick={() => (appInfoOpen = false)} aria-hidden="true"></div>
 	<div class="app-info-modal" role="dialog" aria-modal="true" aria-labelledby="app-info-title">
 		<div class="app-info-head">
-			<div id="app-info-title" class="app-info-title">{t().appInfoTitle}</div>
+			<div class="app-info-brand">
+				<img class="app-info-icon" src="/favicon-192.png" alt="" aria-hidden="true" />
+				<div id="app-info-title" class="app-info-title">{t().appInfoTitle}</div>
+			</div>
 			<button class="app-info-close" onclick={() => (appInfoOpen = false)} aria-label={t().appInfoClose}>×</button>
 		</div>
 		<div class="app-info-body">
@@ -7160,7 +7163,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		top: 50%;
 		left: 50%;
 		z-index: 701;
-		width: min(520px, calc(100vw - 32px));
+		width: min(780px, calc(100vw - 32px));
 		max-height: min(720px, calc(100vh - 32px));
 		transform: translate(-50%, -50%);
 		display: flex;
@@ -7179,8 +7182,20 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		padding: 14px 16px;
 		border-bottom: 1px solid var(--border);
 	}
+	.app-info-brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+	}
+	.app-info-icon {
+		width: 32px;
+		height: 32px;
+		object-fit: contain;
+		flex: 0 0 auto;
+	}
 	.app-info-title {
-		font-size: 18px;
+		font-size: 24px;
 		font-weight: 300;
 		letter-spacing: 0;
 	}

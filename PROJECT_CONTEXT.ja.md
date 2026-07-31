@@ -2,7 +2,8 @@
 
 **対象バージョン: v2.9.15 / Build 801**
 
-この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
+この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
+設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
 
 ## 最初に読むもの
 
@@ -18,7 +19,8 @@
 
 ## プロジェクトの目的
 
-`inku` は DDL（Drawing Description Language）の参照実装である。DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言語」を目指す。
+`inku` は DDL（Drawing Description Language）の参照実装である。
+DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言語」を目指す。
 
 - 記述そのものを持続する作品として扱い、SVGは一回の演奏として扱う。
 - 感情的な評価語ではなく、物理素材、配置、運動、観察可能な関係を書く。
@@ -39,28 +41,41 @@
   -> 履歴・作品系譜
 ```
 
-- `server/`: FastAPIバックエンド。API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
+- `server/`: FastAPIバックエンド。
+API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
 - `web/`: SvelteKit 2 / Svelte 5フロントエンド。
 - `cli/`: 公開HTTP APIだけを使う `inku-cli`。
-- `android/`: Kotlin / Jetpack Composeによる別実装。詳細正本は `android/ANDROID_SPEC.ja.md`。
+- `android/`: Kotlin / Jetpack Composeによる別実装。
+詳細正本は `android/ANDROID_SPEC.ja.md`。
 - `SPEC.ja.md`: 設計思想と現行契約の日本語正本。
 - `SPEC.md`: 英語公開仕様。
 - `CHANGELOG.ja.md` / `CHANGELOG.md`: 実装・設計変更の履歴。
 
 ## 守るべき設計契約
 
-- DDLテキストは母語で書ける。JSON Scoreのキーは英語で統一する。
+- DDLテキストは母語で書ける。
+JSON Scoreのキーは英語で統一する。
 - Stage 1の解釈とStage 2の構造化を分離する。
 - Stage 1.5は入力の意味を上書きせず、固定レシピの大量注入を避ける。
-- coerceは長期的に縮小する。新しい様式を自動注入せず、不正値は可能な限りdrop-onlyで扱う。
-- 同一Scoreと同一seedは同じ作品を再現する。暗黙の時刻seedや自動varyを導入しない。
-- `dh1`（記述同一性）、`rh3`（作品エディション。旧 `rh2` は legacy として保持）、履歴ID、系譜node IDを混同しない。
+- coerceは長期的に縮小する。
+新しい様式を自動注入せず、不正値は可能な限りdrop-onlyで扱う。
+- 同一Scoreと同一seedは同じ作品を再現する。
+暗黙の時刻seedや自動varyを導入しない。
+- `dh1`（記述同一性）、`rh3`（作品エディション。
+旧 `rh2` は legacy として保持）、履歴ID、系譜node IDを混同しない。
 - 系譜は明示された派生操作だけを記録し、類似度、時刻、hash一致から親子関係を推測しない。
 - 品質指標、類似度、Vision所見は監査の鏡であり、生成ゲートや「最良枝」の自動選択に接続しない。
-- プラグインはコードではなく検証済みの宣言的文書であり、Stage 1直後にコアDDLへ展開する。Stage 1.5 / coerce / Score / rh2はプラグインに依存しない。
-- 語彙の正は saijiki テーブル（`server/src/inku_server/saijiki.py`、v1.92）であり、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・web歳時記表示・reference §1はそこから導出する。語彙の変更はテーブルとgolden testを経由する。
+- プラグインはコードではなく検証済みの宣言的文書であり、Stage 1直後にコアDDLへ展開する。
+Stage 1.5 / coerce / Score / rh2はプラグインに依存しない。
+- 語彙の正は saijiki テーブル（`server/src/inku_server/saijiki.py`、v1.92）であり、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・web歳時記表示・reference §1はそこから導出する。
+語彙の変更はテーブルとgolden testを経由する。
 - 日本語と英語の挙動を揃え、英語だけの要件を追加しない。
-- **エンジンは後戻りしない**（SPEC.ja §15.8）。過去の描画エンジンをシステムとして保持せず、版を選び直す機構も作らない。Replay は常に最新で行い、当時のエディションの再現は**保存済み SVG の返却で担保する**。版画と同じで、彫りは進み刷りは残るが版木は戻せない。**だから現役のうちに参照コーパス（＝校正刷り）を取る。**
+- **エンジンは後戻りしない**（SPEC.ja §15.8）。
+過去の描画エンジンをシステムとして保持せず、版を選び直す機構も作らない。
+Replay は常に最新で行い、当時のエディションの再現は**保存済み SVG の返却で担保する**。
+版画と同じで、彫りは進み刷りは残るが版木は戻せない。
+**だから現役のうちに参照コーパス（＝校正刷り）を取る。
+**
 
 ## 現在の製品状態
 
@@ -74,129 +89,1243 @@ v1.89では、認証付きWebアプリとして以下が利用できる。
 - HTTP APIを操作するCLI、管理コマンド、ベンチマーク補助
 - `default` Render Engineと、将来のEngine Packに備えた内部境界
 
-直近のv1.90.0では、Build 586で「あいだ」の第5語「触れる」を正式化し、Build 587でrelation全種の参照座標をSVG transform合成後のキャンバス座標へ統一した。Build 588は`touching`の二重関係付与を除去した。Build 589では、検証済み `.inku-plugin.md` をStage 1直後にコアDDLへ展開する宣言的プラグイン層を追加した。名前空間明示または指示対象として明示された`fires_on`だけが発火し、比喩・未知対象へは広げない。展開は決定的かつ48 instruction以内で、再帰、固定座標スタンプ、URL／ファイル参照、namespace衝突はロード拒否する。provenanceは履歴メタデータへ記録するが、Score・DB正本・rh2・Replayはプラグイン本文に依存しない。Build 590では、プラグイン展開等で数値regionが確定済みのコアDDLへStage 1.5が別の補助図形を追加せず、Scoreも明示region数を超えるinstructionを残さない一般境界を加えた。この境界はinstruction数を対象とし、arrangementによる可視要素数にはMistral／Qwen間のモデル差が残る。Build 591では宣言的プラグイン形式をv2へ拡張し、`member`複合形、`注:／note:`コメント行、`下端の帯`と展開層計算による斜めの帯、未知領域キーのロード拒否（silent fallback廃止）、en反復単位と単位保存の単数形、`anchor … N〜M箇所`の入れ子反復、`fires_on`の同一位置最長一致を受け入れる。Score・coerce・rh2は不変で、Nature.leaves v0.3.0が `plugin validate` を通過する。
+直近のv1.90.0では、Build 586で「あいだ」の第5語「触れる」を正式化し、Build 587でrelation全種の参照座標をSVG transform合成後のキャンバス座標へ統一した。
+Build 588は`touching`の二重関係付与を除去した。
+Build 589では、検証済み `.inku-plugin.md` をStage 1直後にコアDDLへ展開する宣言的プラグイン層を追加した。
+名前空間明示または指示対象として明示された`fires_on`だけが発火し、比喩・未知対象へは広げない。
+展開は決定的かつ48 instruction以内で、再帰、固定座標スタンプ、URL／ファイル参照、namespace衝突はロード拒否する。
+provenanceは履歴メタデータへ記録するが、Score・DB正本・rh2・Replayはプラグイン本文に依存しない。
+Build 590では、プラグイン展開等で数値regionが確定済みのコアDDLへStage 1.5が別の補助図形を追加せず、
+Scoreも明示region数を超えるinstructionを残さない一般境界を加えた。
+この境界はinstruction数を対象とし、arrangementによる可視要素数にはMistral／Qwen間のモデル差が残る。
+Build 591では宣言的プラグイン形式をv2へ拡張し、`member`複合形、`注:／note:`コメント行、`下端の帯`と展開層計算による斜めの帯、未知領域キーのロード拒否（silent
+fallback廃止）、en反復単位と単位保存の単数形、`anchor … N〜M箇所`の入れ子反復、`fires_on`の同一位置最長一致を受け入れる。
+Score・coerce・rh2は不変で、Nature.leaves v0.3.0が `plugin validate` を通過する。
 
-v1.92.0（Build 592）では歳時記を構造化した。`saijiki.py` の単一テーブルから、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・reference §1・web歳時記表示（`GET /api/saijiki` + スナップショット同期ストア）を導出する。構造化前プロンプトを golden fixture として凍結し、許可差分以外の組み立て差異をテストで検出する。作者裁定により語彙から「描く」「髪」を削剪した（Weight enum の hair は Replay 互換のため残置）。web 表示から「彫る」を削除し、Nature.風/うねり/無風 の静的表示は宣言的移行まで凍結した。
+v1.92.0（Build 592）では歳時記を構造化した。
+`saijiki.py` の単一テーブルから、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・reference §1・
+web歳時記表示（`GET /api/saijiki` + スナップショット同期ストア）を導出する。
+構造化前プロンプトを golden fixture として凍結し、許可差分以外の組み立て差異をテストで検出する。
+作者裁定により語彙から「描く」「髪」を削剪した（Weight enum の hair は Replay 互換のため残置）。
+web 表示から「彫る」を削除し、Nature.風/うねり/無風 の静的表示は宣言的移行まで凍結した。
 
-v1.93（Build 593）では RAW trace オプションを追加した。`/api/paint`・`/api/compose` の `include_trace`（既定 false）で各層の中間生成物を 1 応答に持ち帰る観測のみの機能で、Score・render・分岐・回数を変えず DB へも保存しない（利き目監査ハーネスの入口）。 なお本番配布用のベンチ専用コンテナ環境（api 8101／web 5174・専用DB・版固定）をpentala上でbare metalと併走させて確立した（運用詳細はローカルの `AGENTS.md`）。
+v1.93（Build 593）では RAW trace オプションを追加した。
+`/api/paint`・`/api/compose` の `include_trace`（既定 false）で各層の中間生成物を 1 応答に持ち帰る観測のみの機能で、Score・render・分岐・
+回数を変えず DB へも保存しない（利き目監査ハーネスの入口）。 なお本番配布用のベンチ専用コンテナ環境（api 8101／web 5174・専用DB・版固定）をpentala上でbare
+metalと併走させて確立した（運用詳細はローカルの `AGENTS.md`）。
 
-v1.94.0（Build 594–599）は web UI のみの整理で、描画機構と server には触れていない。記述タブの指示・ボタンの下へ「現在選択中」（モデル・色カタログ・キャンバス、Stage 1／2 差異はラベル付き・モデルはフル名称）を移設し、キャンバス下ステータスバーはモデル等を除いて render hash（下四桁）＋クリックで full hash コピーへ置換した。記述・バッチ・デモの左パネルを左へ折りたためるようにし、キャンバス作品のマウスホイールズームを追加した。Vision モデルは用途別に整理し、AI 自律推敲で選ぶモデルを `vision_model` へ、奥書のモデルを `okugaki_model` へそれぞれ永続化して、記述から開くモデルダイアログからは Vision タブを外した（Vision は生成では使わず所見・推敲観察のみ）。下部履歴サムネイルは Stage 1 短縮名を表示し tooltip は Stage 1／2 をフル名称で分離、状態バッジは除去（tooltip には残置）、英語表記は「Gen.」へ短縮した。ボタン意匠と配置（起点＝新規作成と同意匠、ハッシュ＝他ステータスバーボタンと同意匠、最新ボタンを左、指示タブはモデル→色カタログ順）を整え、推敲・奥書のモデル選択 tooltip を `position: fixed` 化してスクロール容器の見切れを解消した。系譜の作品カードメニューからは「ゴミ箱へ移動」を除いた（ヘッダの一括ゴミ箱は残置）。
+v1.94.0（Build 594–599）は web UI のみの整理で、描画機構と server には触れていない。
+記述タブの指示・ボタンの下へ「現在選択中」（モデル・色カタログ・キャンバス、Stage 1／2 差異はラベル付き・モデルはフル名称）を移設し、キャンバス下ステータスバーはモデル等を除いて
+render hash（下四桁）＋クリックで full hash コピーへ置換した。
+記述・バッチ・デモの左パネルを左へ折りたためるようにし、キャンバス作品のマウスホイールズームを追加した。
+Vision モデルは用途別に整理し、AI 自律推敲で選ぶモデルを `vision_model` へ、奥書のモデルを `okugaki_model` へそれぞれ永続化して、
+記述から開くモデルダイアログからは Vision タブを外した（Vision は生成では使わず所見・推敲観察のみ）。
+下部履歴サムネイルは Stage 1 短縮名を表示し tooltip は Stage 1／2 をフル名称で分離、状態バッジは除去（tooltip には残置）、英語表記は「Gen.」へ短縮した。
+ボタン意匠と配置（起点＝新規作成と同意匠、ハッシュ＝他ステータスバーボタンと同意匠、最新ボタンを左、指示タブはモデル→色カタログ順）を整え、推敲・奥書のモデル選択 tooltip を
+`position: fixed` 化してスクロール容器の見切れを解消した。
+系譜の作品カードメニューからは「ゴミ箱へ移動」を除いた（ヘッダの一括ゴミ箱は残置）。
 
-Build 600 では、region（`at`）とrelationを両方持つinstructionがregion配置時にrelationを無言破棄しtouchingに到達しなかった不具合を修正した。region配置を先に・relation解決を後に実行し、プラグインmember由来の双弧（葉形）が設計どおり端点固定の対向劣弧として演奏される（利き目監査F-1）。演奏時のみ解決不能なrelationは§14.4に従い警告記録付きでdropする。rh2契約とScore schemaは不変。
+Build 600 では、region（`at`）とrelationを両方持つinstructionがregion配置時にrelationを無言破棄しtouchingに到達しなかった不具合を修正した。
+region配置を先に・relation解決を後に実行し、プラグインmember由来の双弧（葉形）が設計どおり端点固定の対向劣弧として演奏される（利き目監査F-1）。
+演奏時のみ解決不能なrelationは§14.4に従い警告記録付きでdropする。
+rh2契約とScore schemaは不変。
 
-v1.95（Build 601–604）は web UI 第 2 期の整理で、server・Score・rh2 は不変。比較ダイアログの単一タブ化と推敲タブの削除、記述タブの指示主体化（正規化DDLは閲覧専用、DDL 作成・編集は共有エディタへ集約、DDL 由来作品は `display_label='DDL'` で識別し指示文前提の操作を非表示）、作品タブ改称・世代表示・AI 自律推敲の UX 整理を行った。また Build 600 で、展開層の対 member 文を LLM を通さず Score instruction へ決定的に転写する層（様式文消費・coerce 迂回合流）と、明示語彙の搬送を検査する鏡 `carriage_warnings`（検査のみ）を追加した。語彙の搬送契約はモデル非依存となり、モデル選択は表現の幅へ純化される。
+v1.95（Build 601–604）は web UI 第 2 期の整理で、server・Score・rh2 は不変。
+比較ダイアログの単一タブ化と推敲タブの削除、記述タブの指示主体化（正規化DDLは閲覧専用、DDL 作成・編集は共有エディタへ集約、DDL 由来作品は `display_label='DDL'`
+で識別し指示文前提の操作を非表示）、作品タブ改称・世代表示・AI 自律推敲の UX 整理を行った。
+また Build 600 で、展開層の対 member 文を LLM を通さず Score instruction へ決定的に転写する層（様式文消費・coerce 迂回合流）と、
+明示語彙の搬送を検査する鏡 `carriage_warnings`（検査のみ）を追加した。
+語彙の搬送契約はモデル非依存となり、モデル選択は表現の幅へ純化される。
 
-v1.96（Build 605–606）では、添景の量を生成時にユーザーが選べる水準 `tenkei`（none／sparse／auto、既定 auto）を導入し、三層（Stage 1 規範文＋純明示バイパス／Stage 1.5 候補プール縮約／coerce 挿入予算）へ決定的に写像した。事後の間引き governor はなく、tenkei は rh2 の材料に含まれない。あわせて Build 600 の対転写が素通しにしていた Stage 1.5 追加抑止（§4.6）を回復し、ユーザープラグインの管理 API（本文取得・作成・上書き・削除・有効/無効、`.plugin-state.json` 永続化）と設定 UI を実装、系譜応答へ `lineage_generation` を付与した。UI 第 3 期はマスコットの inku キューブ化、生成ステータス要素の全ダイアログ統一（中止可能）、言語比較の Stage 1×Stage 2 直接選択への再設計、モデルメタデータの単一ソース化を行った。
+v1.96（Build 605–606）では、添景の量を生成時にユーザーが選べる水準 `tenkei`（none／sparse／auto、既定 auto）を導入し、三層（Stage 1
+規範文＋純明示バイパス／Stage 1.5 候補プール縮約／coerce 挿入予算）へ決定的に写像した。
+事後の間引き governor はなく、tenkei は rh2 の材料に含まれない。
+あわせて Build 600 の対転写が素通しにしていた Stage 1.5 追加抑止（§4.6）を回復し、ユーザープラグインの管理 API（本文取得・作成・上書き・削除・有効/無効、
+`.plugin-state.json` 永続化）と設定 UI を実装、系譜応答へ `lineage_generation` を付与した。
+UI 第 3 期はマスコットの inku キューブ化、生成ステータス要素の全ダイアログ統一（中止可能）、言語比較の Stage 1×Stage 2 直接選択への再設計、
+モデルメタデータの単一ソース化を行った。
 
-v1.97（Build 607–608）では添景水準を作品ごとに保存する形へ改めた。history の `tenkei` 列と「明示値 > 派生元作品からの継承 > auto」のサーバー側解決により、推敲・AI 自律推敲・CLI を通じて系統の水準が無指定のまま維持される（タッチ変化など Renderer 専用派生でも保存時解決で途切れない）。UI は記述タブのセレクタ（localStorage 永続）と推敲 6 ダイアログの継承既定 3 択（変更で系統の分岐点）を結線し、生成情報・履歴 tooltip に水準を表示する。
+v1.97（Build 607–608）では添景水準を作品ごとに保存する形へ改めた。
+history の `tenkei` 列と「明示値 > 派生元作品からの継承 > auto」のサーバー側解決により、推敲・AI 自律推敲・CLI
+を通じて系統の水準が無指定のまま維持される（タッチ変化など Renderer 専用派生でも保存時解決で途切れない）。
+UI は記述タブのセレクタ（localStorage 永続）と推敲 6 ダイアログの継承既定 3 択（変更で系統の分岐点）を結線し、生成情報・履歴 tooltip に水準を表示する。
 
-v1.98（Build 609）では単発描画を `POST /api/paint/stream`（NDJSON）へ移行し、解釈完了時点で正規化DDLを先に表示する（`/api/paint` は同一ロジックのラッパで応答形状不変）。history は入力側 DDL（`ddl`）と展開後 DDL（`expanded_ddl`）を分離保存し（一度きりバックフィルで旧作品は展開後のみ）、`focus` の明示指定と `interpret_fallback`（空の Stage 1 出力の失敗化・フォールバック印）を導入した。検証済みモデルカタログは実測 2 回に基づき v2 へ再構築（29→43 エントリ、用途別推奨度 `recommendation_llm`/`recommendation_vision`、EOL 印つき残置、表示順の単一経路化）、プロバイダ失敗は種別分類で説明表示する。歳時記ドロワーは閲覧専用となり、語の挿入は DDL エディタダイアログのインライン歳時記（プラグイン語彙含む）に集約した。
+v1.98（Build 609）では単発描画を `POST /api/paint/stream`（NDJSON）へ移行し、解釈完了時点で正規化DDLを先に表示する（`/api/paint`
+は同一ロジックのラッパで応答形状不変）。
+history は入力側 DDL（`ddl`）と展開後 DDL（`expanded_ddl`）を分離保存し（一度きりバックフィルで旧作品は展開後のみ）、`focus` の明示指定と
+`interpret_fallback`（空の Stage 1 出力の失敗化・フォールバック印）を導入した。
+検証済みモデルカタログは実測 2 回に基づき v2 へ再構築（29→43 エントリ、用途別推奨度 `recommendation_llm`/`recommendation_vision`、EOL
+印つき残置、表示順の単一経路化）、プロバイダ失敗は種別分類で説明表示する。
+歳時記ドロワーは閲覧専用となり、語の挿入は DDL エディタダイアログのインライン歳時記（プラグイン語彙含む）に集約した。
 
-v1.99（Build 610）では揺らぎ（variation）の演奏対象を line のみから弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した（F-4）。ゲートは line と対称（quality ∈ {perlin, wave, white} かつ dims に position_x/position_y/radius）。閉図形は継ぎ目連続の周期ノイズ、多角形系は角固定、弧は両端点固定で touching 接点契約を維持する。演奏結果が変わるため render engine version を 5 へ更新（保存済み SVG・Score・rh2 は不変）。作者の実演奏目視確認と材質輪郭（Phase 2）の要否判断が残る。
+v1.99（Build 610）では揺らぎ（variation）の演奏対象を line のみから弧・閉図形（円・楕円・三角・四角・多角形）へ拡張した（F-4）。
+ゲートは line と対称（quality ∈ {perlin, wave, white} かつ dims に position_x/position_y/radius）。
+閉図形は継ぎ目連続の周期ノイズ、多角形系は角固定、弧は両端点固定で touching 接点契約を維持する。
+演奏結果が変わるため render engine version を 5 へ更新（保存済み SVG・Score・rh2 は不変）。
+作者の実演奏目視確認と材質輪郭（Phase 2）の要否判断が残る。
 
-v2.0（Build 611）では Stage 1.5 に「変奏」を実装した（SPEC §12.13）。展開層をまとめて振る明示操作で、強度は小中大の 3 段、7 軸（型の差し替え・採用本数・タッチ材質・焦点・主色対比色・構図族・型の系統）を重み付き段階解放で動かし、`(強度, seed)` で完全再現・系譜非継承・tenkei の cap 内。候補は 4 案（seed はサーバー採番 `/api/variation/seeds`）で、各カードに「何が動いたか」を公式語彙で表示する。動かすと決めた軸は実差分を保証（可視性保証）。あわせて focus の外部入力（`PaintRequest.focus` 等）と推敲要素「焦点を変える」を撤去し、推敲は 4 種へ回帰。展開層の解決焦点を render_metadata へ結線したため `history.focus` は記録され続ける。history に `variation_amplitude` / `variation_seed` の 2 列を追加。残件: 変奏セクションの UI 配置手直し（作者イメージと相違）、`loadIterationItem` の変奏フィールド未復元、`api_history_neighbors` の既存バグ。
+v2.0（Build 611）では Stage 1.5 に「変奏」を実装した（SPEC §12.13）。
+展開層をまとめて振る明示操作で、強度は小中大の 3 段、7 軸（型の差し替え・採用本数・タッチ材質・焦点・主色対比色・構図族・型の系統）を重み付き段階解放で動かし、`(強度, seed)`
+で完全再現・系譜非継承・tenkei の cap 内。
+候補は 4 案（seed はサーバー採番 `/api/variation/seeds`）で、各カードに「何が動いたか」を公式語彙で表示する。
+動かすと決めた軸は実差分を保証（可視性保証）。
+あわせて focus の外部入力（`PaintRequest.focus` 等）と推敲要素「焦点を変える」を撤去し、推敲は 4 種へ回帰。
+展開層の解決焦点を render_metadata へ結線したため `history.focus` は記録され続ける。
+history に `variation_amplitude` / `variation_seed` の 2 列を追加。
+残件: 変奏セクションの UI 配置手直し（作者イメージと相違）、`loadIterationItem` の変奏フィールド未復元、`api_history_neighbors` の既存バグ。
 
-v2.0.1〜v2.0.3（Build 612〜630）では、モデルカタログを実測 3 回合算の v2.1 へ更新し（44 エントリ、時間帯検証は打ち止め）、v2.0 の残件を解消した。`api_history_neighbors` の 500（score 文字列）修正と `loadIterationItem` の変奏フィールド復元（v2.0.2）、変奏 UI の配置（v2.0.3、作者裁定により第 5 の推敲要素へ統合。選択時のみ強度小・中・大を表示し、実行は 1案/4案 に統合、独立セクションは撤去）。あわせて AI 自律推敲の有効要素に変奏を追加（上限 5）、作品カードメニューと各ダイアログの見出し・並びを整理し、候補グリッドのウインドウ内表示と保存の 3 状態化、ボタン寸法トークン（`--btn-sm-*`）の導入と漸進移行規約を定めた。v2.0.4（Build 634）では自律推敲の変奏に強度選択（小・中・大、既定 中、実行中の全変奏世代へ適用）を追加し、小型ボタンの寸法トークン移行を完了した（部分一致 6 ブロックも作者裁定で統一）。
+v2.0.1〜v2.0.3（Build 612〜630）では、モデルカタログを実測 3 回合算の v2.1 へ更新し（44 エントリ、時間帯検証は打ち止め）、v2.0 の残件を解消した。
+`api_history_neighbors` の 500（score 文字列）修正と `loadIterationItem` の変奏フィールド復元（v2.0.2）、変奏 UI の配置（v2.0.3、
+作者裁定により第 5 の推敲要素へ統合。
+選択時のみ強度小・中・大を表示し、実行は 1案/4案 に統合、独立セクションは撤去）。
+あわせて AI 自律推敲の有効要素に変奏を追加（上限 5）、作品カードメニューと各ダイアログの見出し・並びを整理し、候補グリッドのウインドウ内表示と保存の 3 状態化、
+ボタン寸法トークン（`--btn-sm-*`）の導入と漸進移行規約を定めた。
+v2.0.4（Build 634）では自律推敲の変奏に強度選択（小・中・大、既定 中、実行中の全変奏世代へ適用）を追加し、小型ボタンの寸法トークン移行を完了した（部分一致 6
+ブロックも作者裁定で統一）。
 
-v2.0.5（Build 636）では作者の F-4 目視確認で発覚した wave 揺らぎの seed 非依存バグ（位相固定の正弦波）を修正し、演奏 seed 由来の位相を導入。材質輪郭も演奏 seed に追随させた（F-4 Phase 2）。render engine version は 6。
+v2.0.5（Build 636）では作者の F-4 目視確認で発覚した wave 揺らぎの seed 非依存バグ（位相固定の正弦波）を修正し、演奏 seed 由来の位相を導入。
+材質輪郭も演奏 seed に追随させた（F-4 Phase 2）。
+render engine version は 6。
 
-v2.1.0（Build 638）ではレンダリングの px 絶対値を比例系へ全面改修した。揺らぎ振幅と滲みは図形の代表寸法比（fine / medium / broad = 0.025 / 0.08 / 0.18、滲み 0.009 / 0.03 / 0.07）、分割数・標本数は長さ比例、材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対（`unit=1000` でほぼバイト一致、speck 個数は周長比例化）。作者キャリブレーション 2 巡で材質強度 s1（輪郭 offset / opacity・speck opacity / 個数の下限方式、質感 filter は据え置き）を採用。材質輪郭に `class="material-outline"` を付与。render engine version は 7。
+v2.1.0（Build 638）ではレンダリングの px 絶対値を比例系へ全面改修した。
+揺らぎ振幅と滲みは図形の代表寸法比（fine / medium / broad = 0.025 / 0.08 / 0.18、滲み 0.009 / 0.03 / 0.07）、分割数・標本数は長さ比例、
+材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対（`unit=1000` でほぼバイト一致、
+speck 個数は周長比例化）。
+作者キャリブレーション 2 巡で材質強度 s1（輪郭 offset / opacity・speck opacity / 個数の下限方式、質感 filter は据え置き）を採用。
+材質輪郭に `class="material-outline"` を付与。
+render engine version は 7。
 
-v2.2.0（Build 640）では閉図形（円・楕円・四角・三角・多角形）の輪郭を手描きストローク（筆致エンジン）で描くようにした。`stroke_engine` に任意中心線への合成 `synthesize_along` を追加し（歩幅フィードフォワード積分器で曲率歪みを排除）、輪郭を外周・内周 2 サブパスの塗り帯（`class="contour-stroke-v1"`）として描く。角は理想位置固定の筆の継ぎ目、角なし閉輪郭は線形ランプで閉合。rotring は幾何輪郭のまま、帯は変奏演奏後の輪郭に合成、材質輪郭・speck と併存、本体要素は幾何のまま（bbox・touching 不変）。line・弧は v2.1 とバイト一致（弧のストローク化は touching 弧抽出器の再設計込みで次契約）。render engine version は 8。作者判断待ち: `filled` が閉図形で死にフィールド（常に塗りつぶし）である件と、「塗り = 細かいストロークで内側を埋める」案（試作 3 回記録済み、engine 9 相当、pending 消化後）。後続契約として PNG ラスタライザの filter 対応（`opus-png-filter-rasterizer.md`、cairosvg は feTurbulence / feDisplacementMap / feGaussianBlur を非描画）が起票済み。
+v2.2.0（Build 640）では閉図形（円・楕円・四角・三角・多角形）の輪郭を手描きストローク（筆致エンジン）で描くようにした。
+`stroke_engine` に任意中心線への合成 `synthesize_along` を追加し（歩幅フィードフォワード積分器で曲率歪みを排除）、輪郭を外周・内周 2
+サブパスの塗り帯（`class="contour-stroke-v1"`）として描く。
+角は理想位置固定の筆の継ぎ目、角なし閉輪郭は線形ランプで閉合。
+rotring は幾何輪郭のまま、帯は変奏演奏後の輪郭に合成、材質輪郭・speck と併存、本体要素は幾何のまま（bbox・touching 不変）。
+line・弧は v2.1 とバイト一致（弧のストローク化は touching 弧抽出器の再設計込みで次契約）。
+render engine version は 8。
+作者判断待ち: `filled` が閉図形で死にフィールド（常に塗りつぶし）である件と、「塗り = 細かいストロークで内側を埋める」案（試作 3 回記録済み、engine 9 相当、pending
+消化後）。
+後続契約として PNG ラスタライザの filter 対応（`opus-png-filter-rasterizer.md`、cairosvg は feTurbulence /
+feDisplacementMap / feGaussianBlur を非描画）が起票済み。
 
-v2.2.1（Build 643）では PNG ラスタライザを resvg-py へ置換し、質感 filter・滲みが全 PNG 経路（ダウンロード・AI Vision 入力・奥書サムネイル・CLI 5 箇所）で描画されるようになった。共通ヘルパー `shared/src/inku_analysis/rasterizer.py`（resvg 優先・cairosvg フォールバック・不在時警告 + skip 維持）。API に PNG エンドポイントは無く CLI は応答 `svg` を自プロセスでラスタライズする構造のため、CLI 側も同ヘルパーへ寄せた。cairosvg フォールバック時は CLI 警告 + サーバー WARNING + 成果物へ `png_rasterizer`（backend/version）を記録。Python は server / cli / shared とも 3.12 へ統一（resvg-py の wheel 都合）。`inku-analysis` を editable 依存化し「shared を rsync しても uv sync まで反映されない」罠を解消。SVG・rh2・engine（8）は不変。生成 PNG は旧 PNG と画素非互換（過去ランとの直接画素比較は不成立）。lock 一本化（uv workspace 化）は別契約。
+v2.2.1（Build 643）では PNG ラスタライザを resvg-py へ置換し、質感 filter・滲みが全 PNG 経路（ダウンロード・AI Vision 入力・奥書サムネイル・CLI
+5 箇所）で描画されるようになった。
+共通ヘルパー `shared/src/inku_analysis/rasterizer.py`（resvg 優先・cairosvg フォールバック・不在時警告 + skip 維持）。
+API に PNG エンドポイントは無く CLI は応答 `svg` を自プロセスでラスタライズする構造のため、CLI 側も同ヘルパーへ寄せた。
+cairosvg フォールバック時は CLI 警告 + サーバー WARNING + 成果物へ `png_rasterizer`（backend/version）を記録。
+Python は server / cli / shared とも 3.12 へ統一（resvg-py の wheel 都合）。
+`inku-analysis` を editable 依存化し「shared を rsync しても uv sync まで反映されない」罠を解消。
+SVG・rh2・engine（8）は不変。
+生成 PNG は旧 PNG と画素非互換（過去ランとの直接画素比較は不成立）。
+lock 一本化（uv workspace 化）は別契約。
 
-v2.3.0（Build 645）では閉図形の塗りを領域 fill から素材の筆致で内側を埋めるストローク塗り（`class="fill-stroke-v1"`）へ変更し、`filled` の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。従来は死にフィールドで常に塗りつぶし）。走査線と閉輪郭の交点で 1 区間 = 1 筆を `synthesize_along` に通す（clipPath 不要・凹形可・端点は輪郭に揃う）。走査角は演奏 seed 由来 0〜180°、間隔 `max(線幅 × 1.5, canvas.unit × 0.012)` + ±12% ジッタで紙目を残す。rotring は領域 fill 維持、走査線 3 本未満は領域 fill に縮退。`surface` 指定時は素材塗りを抑制し、surface の hatch / crosshatch は筆致の帯（`class="surface-stroke-v1"`）へ差し替え。演奏されない variation は seed key から除外（primitive 別不活性判定）。render engine version は 9。サイズは 1 図形 11〜123KB・10 instruction で 422KB（上限規則は分布を見て後付け、最大要因は surface crosshatch の帯化）。残: 実 UI 目視（塗り間隔の粗密）・粒系 / 滲み系の筆致化。次契約 = arc のストローク化（engine 10、裁定済み仕様はレポート付録）。
+v2.3.0（Build 645）では閉図形の塗りを領域 fill から素材の筆致で内側を埋めるストローク塗り（`class="fill-stroke-v1"`）へ変更し、`filled`
+の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。
+従来は死にフィールドで常に塗りつぶし）。
+走査線と閉輪郭の交点で 1 区間 = 1 筆を `synthesize_along` に通す（clipPath 不要・凹形可・端点は輪郭に揃う）。
+走査角は演奏 seed 由来 0〜180°、間隔 `max(線幅 × 1.5, canvas.unit × 0.012)` + ±12% ジッタで紙目を残す。
+rotring は領域 fill 維持、走査線 3 本未満は領域 fill に縮退。
+`surface` 指定時は素材塗りを抑制し、surface の hatch / crosshatch は筆致の帯（`class="surface-stroke-v1"`）へ差し替え。
+演奏されない variation は seed key から除外（primitive 別不活性判定）。
+render engine version は 9。
+サイズは 1 図形 11〜123KB・10 instruction で 422KB（上限規則は分布を見て後付け、最大要因は surface crosshatch の帯化）。
+残: 実 UI 目視（塗り間隔の粗密）・粒系 / 滲み系の筆致化。
+次契約 = arc のストローク化（engine 10、裁定済み仕様はレポート付録）。
 
-v2.3.1（Build 647）では弧（arc）も手描きストロークの帯（`class="arc-stroke-v1"`）で演奏するようにし、v2.2.0 で残されていた最後のストローク化対象外を解消した。幾何の弧は不可視の意図要素（`stroke="none"`）として残り、touching（接点契約）は意図弧を読み戻して座標で担保（弧抽出器は無改変、`test_touching.py` 全通過）。接点端も taper のまま（幅の下限なし、葉の先端は柔らかく消える）。破線・点線は意図弧を細く可視化、drypoint は中心線沿い burr、材質輪郭・speck は帯と併存、rotring は幾何のまま。render engine version は 10。塗り間隔の粗密は実 UI 目視 OK で確定済み。残: 弧の実 UI 目視（Stage 3 葉の再目視も候補）・サイズ上限・粒系 / 滲み系の筆致化。**バージョン採番の作者裁定（2026-07-21）: 小改修は patch（+0.0.1）とする。**
+v2.3.1（Build 647）では弧（arc）も手描きストロークの帯（`class="arc-stroke-v1"`）で演奏するようにし、v2.2.0
+で残されていた最後のストローク化対象外を解消した。
+幾何の弧は不可視の意図要素（`stroke="none"`）として残り、touching（接点契約）は意図弧を読み戻して座標で担保（弧抽出器は無改変、`test_touching.py` 全通過）。
+接点端も taper のまま（幅の下限なし、葉の先端は柔らかく消える）。
+破線・点線は意図弧を細く可視化、drypoint は中心線沿い burr、材質輪郭・speck は帯と併存、rotring は幾何のまま。
+render engine version は 10。
+塗り間隔の粗密は実 UI 目視 OK で確定済み。
+残: 弧の実 UI 目視（Stage 3 葉の再目視も候補）・サイズ上限・粒系 / 滲み系の筆致化。
+**バージョン採番の作者裁定（2026-07-21）: 小改修は patch（+0.0.1）とする。
+**
 
-v2.3.2（Build 683）では v2.3.1 機能群に UI を追随させる対話型調整 35 件（Build 648〜682）を実施した。歳時記ハイライトの英語対応、指示書エディタの拡充、PNG EXIF 撮影日、入力 3 タブの整理（設定状況帯の共通化・字数メーター単位）、コンタクトシート（人用 7×4 / AI 用 3×4 + md ノート）、ダークモードのコントラスト是正（`--accent-fg` トークン新設）、バッチ追従性の改善。サーバー変更は描画並列度の管理者設定のみ（`_RenderCapacity`、`render_concurrency_settings`、`PUT /api/settings/render-concurrency`、`GET /api/client-config`。`INKU_RENDER_CONCURRENCY` は DB 未設定時の初期値へ）。あわせて用語を層別に統一（**Sol LeWitt の指示書 = 正規化DDL。作者の書く記述はその一段上の詩歌的な層**。Stage 1 の生成物は「指示書」、詞書 = 記述の再掲）し、SPEC.ja §5 の改訂（4 段パイプライン図 + §5.3 用語対応表）・SPEC.md §2・README 日英に反映、UI の App Info に語彙ダイアログを常設した。engine は 10 のまま。UI 調整は新セッションで継続予定。
+v2.3.2（Build 683）では v2.3.1 機能群に UI を追随させる対話型調整 35 件（Build 648〜682）を実施した。
+歳時記ハイライトの英語対応、指示書エディタの拡充、PNG EXIF 撮影日、入力 3 タブの整理（設定状況帯の共通化・字数メーター単位）、コンタクトシート（人用 7×4 / AI 用 3×4 +
+md ノート）、ダークモードのコントラスト是正（`--accent-fg` トークン新設）、バッチ追従性の改善。
+サーバー変更は描画並列度の管理者設定のみ（`_RenderCapacity`、`render_concurrency_settings`、
+`PUT /api/settings/render-concurrency`、`GET /api/client-config`。
+`INKU_RENDER_CONCURRENCY` は DB 未設定時の初期値へ）。
+あわせて用語を層別に統一（**Sol LeWitt の指示書 = 正規化DDL。
+作者の書く記述はその一段上の詩歌的な層**。
+Stage 1 の生成物は「指示書」、詞書 = 記述の再掲）し、SPEC.ja §5 の改訂（4 段パイプライン図 + §5.3 用語対応表）・SPEC.md §2・README 日英に反映、UI
+の App Info に語彙ダイアログを常設した。
+engine は 10 のまま。
+UI 調整は新セッションで継続予定。
 
-v2.4.0（Build 684）ではリリース配布パイプラインを確立した。git タグ `vX.Y.Z` の push で GitHub Actions が `ghcr.io/oikawas/inku-api` / `inku-web` を multi-arch（amd64 / arm64）build & push し、利用者は `deploy/` の compose + `.env.example` で起動する（SPEC.ja §15.4）。`server/Dockerfile` に BUILD_NUMBER を焼き込み（コンテナの `/api/info` と `render_build_number` の null を解消）、`/api/info` の `version` を `server/pyproject.toml` 由来の単一情報源にしてリリースごとに採番（本リリースで 2.4.0）、nature-leaves プラグイン v0.3.0 を git 管理化してイメージ同梱、bootstrap admin の空文字を「未設定」扱いに是正して compose 側を `:?` で必須化した（セルフサインアップ不在の前提を manual / SETUP / SPEC に明記）。engine 10・Score schema・web UI は不変。
+v2.4.0（Build 684）ではリリース配布パイプラインを確立した。
+git タグ `vX.Y.Z` の push で GitHub Actions が `ghcr.io/oikawas/inku-api` / `inku-web` を
+multi-arch（amd64 / arm64）build & push し、利用者は `deploy/` の compose + `.env.example` で起動する（SPEC.ja
+§15.4）。
+`server/Dockerfile` に BUILD_NUMBER を焼き込み（コンテナの `/api/info` と `render_build_number` の null を解消）、
+`/api/info` の `version` を `server/pyproject.toml` 由来の単一情報源にしてリリースごとに採番（本リリースで 2.4.0）、nature-leaves
+プラグイン v0.3.0 を git 管理化してイメージ同梱、bootstrap admin の空文字を「未設定」扱いに是正して compose 側を `:?`
+で必須化した（セルフサインアップ不在の前提を manual / SETUP / SPEC に明記）。
+engine 10・Score schema・web UI は不変。
 
-README 整備（2026-07-22、docs のみ・採番なし）では README 日英に作品ギャラリー 6 点（`docs/assets/gallery/`。作者のスター付き履歴から選定、絵 + 詞書 + `<details>` の指示書・SVG・seed）と UI スクリーンショット 6 点（`docs/assets/ui/`、日英各 3。`*.ja/.en.png` で各 README が自言語のみ参照）を追加し、構成を「作品 — 記述が絵になる → しくみ（実 Score の層解説）→ 画面 → … → ドキュメント（末尾へ）」に改訂した。GitHub のサニタイザ下で唯一残る枠線手段として単一セル `<table>` を採用し、`.gitignore` を `docs/*` + `!docs/assets/` に変更。白背景に溶けていた 2 点目は公開後に silver-shoal（B962）へ差し替え済み。コード・engine・採番は不変。
+README 整備（2026-07-22、docs のみ・採番なし）では README 日英に作品ギャラリー 6 点（`docs/assets/gallery/`。
+作者のスター付き履歴から選定、絵 + 詞書 + `<details>` の指示書・SVG・seed）と UI スクリーンショット 6 点（`docs/assets/ui/`、日英各 3。
+`*.ja/.en.png` で各 README が自言語のみ参照）を追加し、構成を「作品 — 記述が絵になる → しくみ（実 Score の層解説）→ 画面 → … →
+ドキュメント（末尾へ）」に改訂した。
+GitHub のサニタイザ下で唯一残る枠線手段として単一セル `<table>` を採用し、`.gitignore` を `docs/*` + `!docs/assets/` に変更。
+白背景に溶けていた 2 点目は公開後に silver-shoal（B962）へ差し替え済み。
+コード・engine・採番は不変。
 
-v2.4.2（Build 689）は歳時記語彙の日英ペアリングを構造で担保する改修。`SaijikiCategory` の `words_ja` / `words_en` という 2 本の並行タプルを廃し、`surface_ja` / `surface_en` を 1 エントリに持つ `SaijikiWord` の単一語列へ統合した（フラグは言語間で共有、`surface_en=None` で墓標語を表現）。あわせて てざわり・いろ の各語へ `score_value` を持たせ、語列と Score enum 値を `zip` していた `_surface_value_map` を削除（**てざわりの並べ替えが Score weight 値の取り違えに直結する**状態の解消）。あいだの `RelationWord` が元から採っていた形へ他カテゴリを揃えたもの。出力は日英 15 項目すべて変更前後で SHA-256 一致、生成 TS もバイト一致、`_EXPECTED_PAIRING` 68 ペアは無改変で通過。engine 10 のまま、語彙の増減・改称なし。pytest 1028/30（+2 構造テスト）。
+v2.4.2（Build 689）は歳時記語彙の日英ペアリングを構造で担保する改修。
+`SaijikiCategory` の `words_ja` / `words_en` という 2 本の並行タプルを廃し、`surface_ja` / `surface_en` を 1
+エントリに持つ `SaijikiWord` の単一語列へ統合した（フラグは言語間で共有、`surface_en=None` で墓標語を表現）。
+あわせて てざわり・いろ の各語へ `score_value` を持たせ、語列と Score enum 値を `zip` していた `_surface_value_map`
+を削除（**てざわりの並べ替えが Score weight 値の取り違えに直結する**状態の解消）。
+あいだの `RelationWord` が元から採っていた形へ他カテゴリを揃えたもの。
+出力は日英 15 項目すべて変更前後で SHA-256 一致、生成 TS もバイト一致、`_EXPECTED_PAIRING` 68 ペアは無改変で通過。
+engine 10 のまま、語彙の増減・改称なし。
+pytest 1028/30（+2 構造テスト）。
 
-v2.4.1（Build 687）は UI 調整 2 巡目。DDL エディタの語プレビュー全 69 エントリを日英化し、作業中に発見した歳時記語彙の日英対応バグ 2 件（削剪済み `髪`/`hair` の i18n 残置による 1 ずれ、`words_en` の並び非対応による解説の交差）を是正した。原因だった i18n の手書き複製 `saijikiWords` を廃止し、表示語はハイドレート済み `SAIJIKI` / `SAIJIKI_EN` から直接取得。全 68 語の日英対応を明示テーブルで固定するテストを追加。副作用として英語版 Stage 1 プロンプトの `motions:` 語順が変わる（集合不変、ベンチ未確認）。記述タブは短歌の目安をヒント文からカウンタへ移動。engine 10 のまま。UI 調整は対話で継続中。
+v2.4.1（Build 687）は UI 調整 2 巡目。
+DDL エディタの語プレビュー全 69 エントリを日英化し、作業中に発見した歳時記語彙の日英対応バグ 2 件（削剪済み `髪`/`hair` の i18n 残置による 1 ずれ、`words_en`
+の並び非対応による解説の交差）を是正した。
+原因だった i18n の手書き複製 `saijikiWords` を廃止し、表示語はハイドレート済み `SAIJIKI` / `SAIJIKI_EN` から直接取得。
+全 68 語の日英対応を明示テーブルで固定するテストを追加。
+副作用として英語版 Stage 1 プロンプトの `motions:` 語順が変わる（集合不変、ベンチ未確認）。
+記述タブは短歌の目安をヒント文からカウンタへ移動。
+engine 10 のまま。
+UI 調整は対話で継続中。
 
-v2.4.3（Build 693）は UI 調整 3 巡目。環境変数 `INKU_DEVELOPER_MODE` を新設し、NVIDIA NIM と常時表示の Build 番号を開発環境限定にした（**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・`render_build_number` は無効時も不変**。配布 compose は既定で無効、開発・ベンチ compose は既定で有効。SPEC.ja §15.4）。系譜と系譜全体図に共有の「縦／横」切替を追加（横は左から右へ世代が進み同世代は縦積み。矢印とスクロールも方向に追随し、選択はブラウザへ保存。系譜 API・スキーマ・保存データは不変）。デモに 1〜1,440 分（最大 24 時間）のタイムアウトを追加（既定 60 分。締切を越えても進行中の 1 件は完了・反映してから停止し、残り時間を `HH:MM:SS` で表示）。engine 10 のまま、Score schema / coerce / rh2 / renderer / stroke_engine は無変更。pytest 1029/30。あわせて SETUP 日英のコンテナ節新設と 3 件是正（**Python 要件が 3.10 以上と誤記、実際は 3.12 以上**ほか）、README 日英の再生成節を「推敲による作品の追求」へ全面改稿した分を本版へ畳んでいる。UI 調整は対話で継続中。
+v2.4.3（Build 693）は UI 調整 3 巡目。
+環境変数 `INKU_DEVELOPER_MODE` を新設し、NVIDIA NIM と常時表示の Build 番号を開発環境限定にした（**隠すのは表示だけで、実行経路・保存済みモデル設定・
+履歴のモデル情報・`render_build_number` は無効時も不変**。
+配布 compose は既定で無効、開発・ベンチ compose は既定で有効。
+SPEC.ja §15.4）。
+系譜と系譜全体図に共有の「縦／横」切替を追加（横は左から右へ世代が進み同世代は縦積み。
+矢印とスクロールも方向に追随し、選択はブラウザへ保存。
+系譜 API・スキーマ・保存データは不変）。
+デモに 1〜1,440 分（最大 24 時間）のタイムアウトを追加（既定 60 分。
+締切を越えても進行中の 1 件は完了・反映してから停止し、残り時間を `HH:MM:SS` で表示）。
+engine 10 のまま、Score schema / coerce / rh2 / renderer / stroke_engine は無変更。
+pytest 1029/30。
+あわせて SETUP 日英のコンテナ節新設と 3 件是正（**Python 要件が 3.10 以上と誤記、実際は 3.12 以上**ほか）、README
+日英の再生成節を「推敲による作品の追求」へ全面改稿した分を本版へ畳んでいる。
+UI 調整は対話で継続中。
 
-v2.4.8（Build 698）では演奏出力にマスターグリッドを宣言し、**render engine 11** とした。発端は `reference-corpus` ワークフローの 8 連続失敗で、原因は**凍結コーパスが macOS で焼かれ CI は Linux で再生成すること**だった（`math.sin` が 1 ulp 違い、`points` / `cx` / `cy` が svgwrite へ素の float のまま渡って 17 桁で出るため文字列差になる。220 件中 81 件・構造差 0 件・最大相対差 2e-16。pentala で再現して確定）。測ると **プラットフォーム雑音の床は小数 10〜11 桁**、**座標グリッドは `.1f`〜`.3f` と 17 桁の混在**、**形の忠実度はキャンバス比 2.2e-4**（ストロークは直線の連なりで出ており `L` 77,666 に対し `C` は 490）だった。つまり**桁は必要量の 200 倍あり、実効解像度を決めているのは標本化のほう**なので、これは解像度を削る変更ではなく**バラバラの桁を一つの宣言へ寄せる**変更である（描画幾何はむしろ 3 桁から 6 桁へ上がった）。`master_grid.py` が唯一の正本で、小数 6 桁固定＝キャンバス比 1e-9（雑音床より 4 桁上、100m の壁で 100nm）。**末尾ゼロは詰めない**（作者裁定。理由は容量でなく検査可能性で、桁が固定なら `-?\d+\.\d{6}` の 1 本で成果物から機械検査できる）。強制は `render()` の単一地点で行う（svgwrite の呼び出しは 48 箇所あり、一つずつ直す方式は漏れが黙って残る）。**描画は変わっていない** — 220 件すべてで数値の個数が一致し、どの数値も 5e-4（旧 `.3f` の半幅）を超えて動いていない。**engine 10 のコーパスは残す**（10 → 11 の差分が「桁だけが変わり形は変わっていない」ことの実物の証明になる。ただし macOS でしか再現できないため CI の対象外。README に明記）＝**参照コーパスの初めての実用**。CI の検査対象は `server/reference/` 全体へ広げた。検査は 2 本（新規演奏 3 プロファイル / 凍結 220 件）で、どちらも摂動で落ちることを確認済み。macOS arm64 と Ubuntu x86_64 で 220 件 + manifest がバイト一致。あわせて**参照コーパス Phase 4**（プロンプト来歴の digest）をマージした。歳時記は決定的な層から参照されず流入先が版を持たない Stage 1 プロンプトであるため、`stage1_prompt_base_digest` が唯一の検出手段になる（`stage2_prompt_base_digest` は作らない）。既存行は backfill しない。pytest 1062/30、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。**積み残しは Phase 2h で解消した**（下記 Android の段。engine 11 で `path d` が 6 桁固定になり Android の parity fixture は全滅していた）。
+v2.4.8（Build 698）では演奏出力にマスターグリッドを宣言し、**render engine 11** とした。
+発端は `reference-corpus` ワークフローの 8 連続失敗で、原因は**凍結コーパスが macOS で焼かれ CI は Linux で再生成すること**だった（`math.sin`
+が 1 ulp 違い、`points` / `cx` / `cy` が svgwrite へ素の float のまま渡って 17 桁で出るため文字列差になる。
+220 件中 81 件・構造差 0 件・最大相対差 2e-16。
+pentala で再現して確定）。
+測ると **プラットフォーム雑音の床は小数 10〜11 桁**、**座標グリッドは `.1f`〜`.3f` と 17 桁の混在**、**形の忠実度はキャンバス比
+2.2e-4**（ストロークは直線の連なりで出ており `L` 77,666 に対し `C` は 490）だった。
+つまり**桁は必要量の 200 倍あり、実効解像度を決めているのは標本化のほう**なので、これは解像度を削る変更ではなく**バラバラの桁を一つの宣言へ寄せる**変更である（描画幾何はむしろ 3
+桁から 6 桁へ上がった）。
+`master_grid.py` が唯一の正本で、小数 6 桁固定＝キャンバス比 1e-9（雑音床より 4 桁上、100m の壁で 100nm）。
+**末尾ゼロは詰めない**（作者裁定。
+理由は容量でなく検査可能性で、桁が固定なら `-?\d+\.\d{6}` の 1 本で成果物から機械検査できる）。
+強制は `render()` の単一地点で行う（svgwrite の呼び出しは 48 箇所あり、一つずつ直す方式は漏れが黙って残る）。
+**描画は変わっていない** — 220 件すべてで数値の個数が一致し、どの数値も 5e-4（旧 `.3f` の半幅）を超えて動いていない。
+**engine 10 のコーパスは残す**（10 → 11 の差分が「桁だけが変わり形は変わっていない」ことの実物の証明になる。
+ただし macOS でしか再現できないため CI の対象外。
+README に明記）＝**参照コーパスの初めての実用**。
+CI の検査対象は `server/reference/` 全体へ広げた。
+検査は 2 本（新規演奏 3 プロファイル / 凍結 220 件）で、どちらも摂動で落ちることを確認済み。
+macOS arm64 と Ubuntu x86_64 で 220 件 + manifest がバイト一致。
+あわせて**参照コーパス Phase 4**（プロンプト来歴の digest）をマージした。
+歳時記は決定的な層から参照されず流入先が版を持たない Stage 1 プロンプトであるため、`stage1_prompt_base_digest`
+が唯一の検出手段になる（`stage2_prompt_base_digest` は作らない）。
+既存行は backfill しない。
+pytest 1062/30、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。
+**積み残しは Phase 2h で解消した**（下記 Android の段。
+engine 11 で `path d` が 6 桁固定になり Android の parity fixture は全滅していた）。
 
-v2.4.9（Build 705）では再描画時に版差を利用者の画面へ言葉で見せるようにし、**参照コーパスとレイヤー版数の親契約（全 5 段）を完結させた**（Phase 5、SPEC.ja §15.8 の実装）。engine 10 → 11 の「桁だけが変わり形は変わっていない」を実物で示せる凍結コーパスを取ったのに続き、**その版の違いを画面上の言葉にする**段である。描画コア・stroke engine・Score schema・`server/reference/`・各版数（`render_engine_version="11"` / `ddl_version="1"` / `ddl_engine_version="1"`）はいずれも据え置きで、足したのは表示だけ。認証不要の `GET /api/info` へ `render_engine_id` / `render_engine_version` / `ddl_version` / `ddl_engine_version` の 4 フィールドを追加し（定数直書きでなく `current_render_engine()` と `DDL_VERSION` / `DDL_ENGINE_VERSION` から取得。テストは engine 実体を monkeypatch すると `/api/info` が追随することまで固定）、生成情報ドロワーへ「DDL 仕様 / 変換層」を出す（欠損時は**「記録なし」と表示し値を推測しない**。DB 1704 行のうち 590（35%）が engine 版の記録なしで、「記録が無い」と「版 1」を画面上で区別するための表示）。新規 `ReplayComparisonModal.svelte` は保存済み Score を `/api/render-svg` で現行 Renderer へ描き直し、**保存済み SVG（オリジナル）と描き直し SVG（現行）を左右に並べる**。版が違えば「この作品は engine 10 で描かれました。いま画面にあるのは engine 11 による描き直しです。」（英語併記）を作品の外・比較グリッドの上に置き（SVG へ重ねない）、記録版と現行版が同じ・`/api/info` 失敗・履歴を開くだけ、のときは通知しない。呼び出し元（履歴管理／作品タブ／系譜タブ）へ閉じたら戻り、キャンバス下部バーへ再現ボタンを足して `CanvasPanel` / `HistoryManager` の該当ボタンを `--btn-sm-*` トークンへ揃えた。作者追加指示で **seed 欠損作品の暫定比較**も入れ、`render_seed` と `seed_text` の双方がない履歴も比較可能にした（DB は書き戻さず比較の間だけ固定 seed `0` を補完。API が NULL 列を省くため**完全性の判定は `render_seed` フィールドの有無でなく保存済み `score` と `svg` の有無で行う**——この取り違えで Build 703 は下部バーの再現ボタンが無効だった。作者提供スクリーンショットで確認し Build 704 で修正）。**過去 Renderer の保持・選択・呼び戻し、保存済み SVG の差し替え、既存版数・`render_seed` の backfill、`/api/render-svg` 本文の変更、web テスト基盤の新設は行っていない**。仕様は動いていないため SPEC は触っていない。pytest 1063/30（+1 = `/api/info` の版フィールド）、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings（新規モーダルを含む 217 files）、`npm run build` 成功。変更範囲は server 1 ファイル + test + web のみ。
+v2.4.9（Build 705）では再描画時に版差を利用者の画面へ言葉で見せるようにし、**参照コーパスとレイヤー版数の親契約（全 5 段）を完結させた**（Phase 5、SPEC.ja
+§15.8 の実装）。
+engine 10 → 11 の「桁だけが変わり形は変わっていない」を実物で示せる凍結コーパスを取ったのに続き、**その版の違いを画面上の言葉にする**段である。
+描画コア・stroke engine・Score schema・`server/reference/`・各版数（`render_engine_version="11"` /
+`ddl_version="1"` / `ddl_engine_version="1"`）はいずれも据え置きで、足したのは表示だけ。
+認証不要の `GET /api/info` へ `render_engine_id` / `render_engine_version` / `ddl_version` /
+`ddl_engine_version` の 4 フィールドを追加し（定数直書きでなく `current_render_engine()` と `DDL_VERSION` /
+`DDL_ENGINE_VERSION` から取得。
+テストは engine 実体を monkeypatch すると `/api/info` が追随することまで固定）、生成情報ドロワーへ「DDL 仕様 /
+変換層」を出す（欠損時は**「記録なし」と表示し値を推測しない**。
+DB 1704 行のうち 590（35%）が engine 版の記録なしで、「記録が無い」と「版 1」を画面上で区別するための表示）。
+新規 `ReplayComparisonModal.svelte` は保存済み Score を `/api/render-svg` で現行 Renderer へ描き直し、**保存済み
+SVG（オリジナル）と描き直し SVG（現行）を左右に並べる**。
+版が違えば「この作品は engine 10 で描かれました。
+いま画面にあるのは engine 11 による描き直しです。
+」（英語併記）を作品の外・比較グリッドの上に置き（SVG へ重ねない）、記録版と現行版が同じ・`/api/info` 失敗・履歴を開くだけ、のときは通知しない。
+呼び出し元（履歴管理／作品タブ／系譜タブ）へ閉じたら戻り、キャンバス下部バーへ再現ボタンを足して `CanvasPanel` / `HistoryManager` の該当ボタンを
+`--btn-sm-*` トークンへ揃えた。
+作者追加指示で **seed 欠損作品の暫定比較**も入れ、`render_seed` と `seed_text` の双方がない履歴も比較可能にした（DB は書き戻さず比較の間だけ固定 seed
+`0` を補完。
+API が NULL 列を省くため**完全性の判定は `render_seed` フィールドの有無でなく保存済み `score` と `svg` の有無で行う**——この取り違えで Build
+703 は下部バーの再現ボタンが無効だった。
+作者提供スクリーンショットで確認し Build 704 で修正）。
+**過去 Renderer の保持・選択・呼び戻し、保存済み SVG の差し替え、既存版数・`render_seed` の backfill、`/api/render-svg` 本文の変更、web
+テスト基盤の新設は行っていない**。
+仕様は動いていないため SPEC は触っていない。
+pytest 1063/30（+1 = `/api/info` の版フィールド）、cli 68、ruff clean、`npm run check` 0 errors / 2
+warnings（新規モーダルを含む 217 files）、`npm run build` 成功。
+変更範囲は server 1 ファイル + test + web のみ。
 
-v2.5.0（Build 706）では演奏を脱・規則化し、**render engine 12** とした。engine 11 までの演奏は揺らいで見えて周期的で、幅のエンベロープは `max(0, sin(pi t))` の固定した山（**どのストロークも中点でいちばん太く左右対称**）、補正イベントは `i % 5` の**周期 5 の反復**、閉輪郭は継ぎ目やせ／中央太りの定型、材質アウトラインは等間隔の破線と粒だった。この 4 つを seed 由来の低周波雑音（`_edge_window` × `_swell`）へ置き換え、`ToolGrammar` に 10 番目のフィールド `gesture` を足して**中心線そのものを長さ基準で振る**（曲がり・丸まり・自己の重なり。端点は窓で固定、決定性は seed が担保）。あわせて**「暴れる」（wild）トグル**を作品全体に一つ置いた（`WILD_GAIN = 3.5`）。**外すのは振幅の上限と自己交差の禁止だけで、端点の固定と決定性は ON でも保つ。** 生成時のパラメータとして記録し（`history.render_wild`、NULL = 記録前で OFF と区別）、再現に使い、**エディション ID `rh3` の材料に含める**。材料が変わったが `render_engine_version` が同じ payload に入っているため旧値は必ず `"11"` 以下・新値は必ず `"12"` 以上を含み衝突しないので形式名は据え置いた（**engine 版を同時に上げたから成り立つ論法**であり、材料の追加だけを単独で行ってはならない）。参照コーパス `render-engine-12/` を凍結し、**220 件中 199 件が変化・21 件が不変**。不変の内訳がそのまま engine 12 の説明で、`rotring` の 12 件は揺れ項がすべて 0 なので脱・規則化が届かず（**道具語彙の機械の極は同じ位置にある**）、`cloudform` の 9 件は Catmull-Rom パスとして書かれ `stroke_engine` を通らないため（**engine 12 が作った穴ではなく露わにした穴**）。これに伴い「動いた分だけ保存する」規律を生成器へ実装した（README と SPEC は以前からそう定めていたが、engine 11 は全件が動いたので**区別がつかなかった**）。版を上げる条件に**「演奏できる語彙が増えたとき」**を足した（作者裁定。道具を足しても既存ケースは出力が動かず CI が落ちないため、結果だけを条件にすると版数の意味が入力の集合のほうで崩れる）。SPEC は §13.4 に「暴れる」、§15.6 に条件拡張と `rh3` の注記、§15.7 に engine 12 の実測を追記。**Android の追随、てざわりへの「コンピュータ」追加、`cloudform` のストローク化、既存履歴の `render_wild` backfill は行っていない**。pytest 1066/30（+7）、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。再ベースラインした golden 6 件は `_swell` の 1e-6 摂動で全件落ちることを確認済み。
+v2.5.0（Build 706）では演奏を脱・規則化し、**render engine 12** とした。
+engine 11 までの演奏は揺らいで見えて周期的で、幅のエンベロープは `max(0, sin(pi t))` の固定した山（**どのストロークも中点でいちばん太く左右対称**）、補正イベントは
+`i % 5` の**周期 5 の反復**、閉輪郭は継ぎ目やせ／中央太りの定型、材質アウトラインは等間隔の破線と粒だった。
+この 4 つを seed 由来の低周波雑音（`_edge_window` × `_swell`）へ置き換え、`ToolGrammar` に 10 番目のフィールド `gesture`
+を足して**中心線そのものを長さ基準で振る**（曲がり・丸まり・自己の重なり。
+端点は窓で固定、決定性は seed が担保）。
+あわせて**「暴れる」（wild）トグル**を作品全体に一つ置いた（`WILD_GAIN = 3.5`）。
+**外すのは振幅の上限と自己交差の禁止だけで、端点の固定と決定性は ON でも保つ。
+** 生成時のパラメータとして記録し（`history.render_wild`、NULL = 記録前で OFF と区別）、再現に使い、**エディション ID `rh3` の材料に含める**。
+材料が変わったが `render_engine_version` が同じ payload に入っているため旧値は必ず `"11"` 以下・新値は必ず `"12"`
+以上を含み衝突しないので形式名は据え置いた（**engine 版を同時に上げたから成り立つ論法**であり、材料の追加だけを単独で行ってはならない）。
+参照コーパス `render-engine-12/` を凍結し、**220 件中 199 件が変化・21 件が不変**。
+不変の内訳がそのまま engine 12 の説明で、`rotring` の 12 件は揺れ項がすべて 0 なので脱・規則化が届かず（**道具語彙の機械の極は同じ位置にある**）、
+`cloudform` の 9 件は Catmull-Rom パスとして書かれ `stroke_engine` を通らないため（**engine 12 が作った穴ではなく露わにした穴**）。
+これに伴い「動いた分だけ保存する」規律を生成器へ実装した（README と SPEC は以前からそう定めていたが、engine 11 は全件が動いたので**区別がつかなかった**）。
+版を上げる条件に**「演奏できる語彙が増えたとき」**を足した（作者裁定。
+道具を足しても既存ケースは出力が動かず CI が落ちないため、結果だけを条件にすると版数の意味が入力の集合のほうで崩れる）。
+SPEC は §13.4 に「暴れる」、§15.6 に条件拡張と `rh3` の注記、§15.7 に engine 12 の実測を追記。
+**Android の追随、てざわりへの「コンピュータ」追加、`cloudform` のストローク化、既存履歴の `render_wild` backfill は行っていない**。
+pytest 1066/30（+7）、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。
+再ベースラインした golden 6 件は `_swell` の 1e-6 摂動で全件落ちることを確認済み。
 
-v2.6.0（Build 707）ではてざわりに 11 番目の道具**「コンピュータ」**を足し、**render engine 13** とした。核は「手が震えない」ではなく**「誤差なく反復する」** — 手は同じ値を二度出せず、計算機は同じ値しか出せない。**周期＝線に沿った方向の反復／格子＝空間方向の反復**で同じ性質の 2 軸である。`rotring` との区別はここで立つ（**rotring は反復すべき揺れを持たない**が、**コンピュータは揺れを持ち正確に繰り返す**）。engine 11 の対称エンベロープへの後戻りではない（engine 11 のそれは**選べない既定**、engine 13 のこれは**選べる語彙**）。実装は `ToolGrammar` に `periodic` / `quantize` / `width_steps` を足し（既存 10 道具はすべて 0 で無改変）、`periodic` のとき雑音源を整数周期の正弦へ差し替え（**seed を引数に取らない**）、中心線を `ストローク長 × 0.018` の格子へ丸め、幅を 4 段に落とす。`wild` は効かない。**材質は「標本化の残り」である** — 手の道具の材質層は道具が線の脇に落とすもの（黒鉛の粉、筆の毛）だが、計算機にあるのは**格子へ丸めるときに捨てた差**だけである。標本ごとの残差が 0 でないところにだけ格子 1 セルの正方形（`raster-bleed`）を敷き、**格子に丸めた座標**へ置いて残差に比例した濃さにする（上限 0.45）。**幾何が「誤差なく反復する」／材質が「誤差を捨てた跡」を見せる。** 端点と多角形の角は意図へ戻されるので残差を持たずセルも出ない（直線 41 標本中 39）。**この材質は第 1 版を作者目視で捨てた結果である** — 最初の「まっすぐな定規の線 + 全数同一の等間隔 dash」は、演奏された中心線が意図から最大 55.4px 離れるため点線が線から切り離されて独立した罫線に見え、**「絵画上の意味がない」**と裁定された（代案の「格子ハロー」も、丸めの大小と無関係に一様に付くので退けた）。数値（格子 0.018・濃さ 0.45・セルは格子に乗せる）は 9 面 + 2 面の比較画像を描いて作者が選んだ。参照コーパス `render-engine-13/` は 228 件で、新規は `A-computer-*` の 8 件のみ・**既存 220 件の digest は 1 件も動かない**（**版木を足しても前の刷りは変わっていない**ことの校正刷りであり、SPEC §15.6 の「演奏できる語彙が増えたとき」で版を上げた最初の例）。材質の作り直しで再生成したとき生成器のガード（凍結済みを同じ版で書き換えるな）が発火したので、**未リリースの engine 13 は版を上げず凍結し直した**。SPEC は §15.9 を新設（英語は §12.6）。**Android の追随、閉輪郭専用の半径変調、走査線・ディザ・面のテクスチャ、既存 10 道具の演奏値の変更は行っていない**。**格子が絶対座標に効き目盛が長さに比例する点（同じ長さの線 30 本で異なる図が 9 種）は未裁定のまま据え置いた。**pytest 1091/30（+2）、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。摂動 3 件で判別力を実測し、**格子への丸めの摂動は開いたストロークでは素通りしたので閉輪郭の検査を足した**。
+v2.6.0（Build 707）ではてざわりに 11 番目の道具**「コンピュータ」**を足し、**render engine 13** とした。
+核は「手が震えない」ではなく**「誤差なく反復する」** — 手は同じ値を二度出せず、計算機は同じ値しか出せない。
+**周期＝線に沿った方向の反復／格子＝空間方向の反復**で同じ性質の 2 軸である。
+`rotring` との区別はここで立つ（**rotring は反復すべき揺れを持たない**が、**コンピュータは揺れを持ち正確に繰り返す**）。
+engine 11 の対称エンベロープへの後戻りではない（engine 11 のそれは**選べない既定**、engine 13 のこれは**選べる語彙**）。
+実装は `ToolGrammar` に `periodic` / `quantize` / `width_steps` を足し（既存 10 道具はすべて 0 で無改変）、`periodic`
+のとき雑音源を整数周期の正弦へ差し替え（**seed を引数に取らない**）、中心線を `ストローク長 × 0.018` の格子へ丸め、幅を 4 段に落とす。
+`wild` は効かない。
+**材質は「標本化の残り」である** — 手の道具の材質層は道具が線の脇に落とすもの（黒鉛の粉、筆の毛）だが、計算機にあるのは**格子へ丸めるときに捨てた差**だけである。
+標本ごとの残差が 0 でないところにだけ格子 1 セルの正方形（`raster-bleed`）を敷き、**格子に丸めた座標**へ置いて残差に比例した濃さにする（上限 0.45）。
+**幾何が「誤差なく反復する」／材質が「誤差を捨てた跡」を見せる。
+** 端点と多角形の角は意図へ戻されるので残差を持たずセルも出ない（直線 41 標本中 39）。
+**この材質は第 1 版を作者目視で捨てた結果である** — 最初の「まっすぐな定規の線 + 全数同一の等間隔 dash」は、演奏された中心線が意図から最大 55.4px
+離れるため点線が線から切り離されて独立した罫線に見え、**「絵画上の意味がない」**と裁定された（代案の「格子ハロー」も、丸めの大小と無関係に一様に付くので退けた）。
+数値（格子 0.018・濃さ 0.45・セルは格子に乗せる）は 9 面 + 2 面の比較画像を描いて作者が選んだ。
+参照コーパス `render-engine-13/` は 228 件で、新規は `A-computer-*` の 8 件のみ・**既存 220 件の digest は 1
+件も動かない**（**版木を足しても前の刷りは変わっていない**ことの校正刷りであり、SPEC §15.6 の「演奏できる語彙が増えたとき」で版を上げた最初の例）。
+材質の作り直しで再生成したとき生成器のガード（凍結済みを同じ版で書き換えるな）が発火したので、**未リリースの engine 13 は版を上げず凍結し直した**。
+SPEC は §15.9 を新設（英語は §12.6）。
+**Android の追随、閉輪郭専用の半径変調、走査線・ディザ・面のテクスチャ、既存 10 道具の演奏値の変更は行っていない**。
+**格子が絶対座標に効き目盛が長さに比例する点（同じ長さの線 30 本で異なる図が 9 種）は未裁定のまま据え置いた。
+**pytest 1091/30（+2）、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。
+摂動 3 件で判別力を実測し、**格子への丸めの摂動は開いたストロークでは素通りしたので閉輪郭の検査を足した**。
 
-v2.6.1（Build 708）では**英語 UI の用語**を版画・音楽・短歌の語彙へ揃えた。**英語表示だけの改修で、日本語は 1 文字も変えていない。** inku は「楽譜と演奏」（音楽）「版木と刷り」（版画）「詞書と歳時記」（短歌・俳句）の三系統のメタファーで出来ているので、英語も各系統の英語圏での正統な術語を使い、生成 AI 業界語（prompt / generate）でなく工房の語（write / paint / perform）を優先する。**英語表示は 3 系統あった** — i18n パック `en.ts` の 641 項目、コンポーネント内の `isJapanese ? … : …` 三項式 132 箇所（12 ファイル）、`getLang() === 'ja'` 分岐 15 箇所。**i18n パックだけ直すと 147 箇所が旧語彙で残る**ので 3 系統を棚卸ししてから当てた（書き換え 236 項目）。五つの推敲操作は **`Another performance` / `Another composition` / `Another reading` / `Another catalog` + `Variation`** とし、「何を引き直し、何が保たれるか」が名前だけで対比できるようにした（ボタン幅が厳しくても名詞を省略せず折り返す）。変奏の強度は **`Subtle` / `Moderate` / `Sweeping`**（音楽の変奏に Large は使わない）で、**同時に配置推敲のコスト表示の `Moderate` を `Medium` へ直した**（一語二義を作らないため）。一語一義は `interpretation` / `reading` / `performance` / `variation` / `sway` / `color catalog` の 6 語に敷き、**`palette` は 0 件**（色カタログは inku 独自概念）、**UI 文中の `rendering` も 0 件**。ローマ字残しは **`Saijiki` と `inku` だけ**にし、`Okugaki` → **`Colophon`**、`Kotobagaki (caption)` → **`Headnote`** とした（ローマ字を増やすとエキゾチシズムに寄り道具としての信頼を損なう）。`Generation Info` → **`Provenance`**、`artwork` → **`work`**（残存 0）、`Unleashed` → **`Wild`**、主動作ボタン `Generate` → **`Paint`**。マイクロコピーは文単位で書き直し、段階表示は **`Interpreting your words…` / `Writing the score, then performing…`**、版差の通知は **`This work was performed by engine N. What you see now is a new impression by engine M.`**（版画の刷りの語）にした。**歳時記のカテゴリ名は 1 語も触っていない** — 英語カテゴリ名は web の文字列ではなく `saijiki.py` の `name_en` で、**`prompt_block("en")` を通って英語 Stage 1 プロンプトへ流入している**（golden fixture が固定）。**これは UI 表示ではなく英語版 DDL の語彙仕様**なので辞書の推奨を適用せず作者へ報告した。**辞書と実装が食い違った 2 点は実測を採った** — 五操作の根拠とされた「日本語の『別の◯◯』」は実際には「◯◯を変える」の動詞形であり（作者裁定で英語だけ名詞形）、`settingsGenerationLabel` は「世代」でなく `'生成'`（行為）だった。**日本語が動いていないことは md5 指紋 3 つ**（`ja.ts` / 三項式の日本語側 132 箇所 / `getLang()` 分岐の日本語側 14 箇所）**で機械的に担保**した（`LC_ALL=C sort` でロケールを固定しないと内容が動かなくても値が変わる）。`npm run check` 0 errors / 2 warnings（217 files）、i18n の鍵は 641 のまま日英一致、`server` / `cli` / `android` と `saijiki.ts` の差分ゼロ。摂動 4 件で判別力を実測。**英語ドキュメント（README.md / SPEC.md / `manual/en/`）は未追随で、UI 側だけが新語彙になっている**（`artwork` が SPEC 25 / manual 26、`palette` が SPEC 12 など。別作業）。
+v2.6.1（Build 708）では**英語 UI の用語**を版画・音楽・短歌の語彙へ揃えた。
+**英語表示だけの改修で、日本語は 1 文字も変えていない。
+** inku は「楽譜と演奏」（音楽）「版木と刷り」（版画）「詞書と歳時記」（短歌・俳句）の三系統のメタファーで出来ているので、英語も各系統の英語圏での正統な術語を使い、生成 AI
+業界語（prompt / generate）でなく工房の語（write / paint / perform）を優先する。
+**英語表示は 3 系統あった** — i18n パック `en.ts` の 641 項目、コンポーネント内の `isJapanese ? … : …` 三項式 132 箇所（12 ファイル）、
+`getLang() === 'ja'` 分岐 15 箇所。
+**i18n パックだけ直すと 147 箇所が旧語彙で残る**ので 3 系統を棚卸ししてから当てた（書き換え 236 項目）。
+五つの推敲操作は **`Another performance` / `Another composition` / `Another reading` / `Another catalog` +
+`Variation`** とし、「何を引き直し、何が保たれるか」が名前だけで対比できるようにした（ボタン幅が厳しくても名詞を省略せず折り返す）。
+変奏の強度は **`Subtle` / `Moderate` / `Sweeping`**（音楽の変奏に Large は使わない）で、**同時に配置推敲のコスト表示の `Moderate` を
+`Medium` へ直した**（一語二義を作らないため）。
+一語一義は `interpretation` / `reading` / `performance` / `variation` / `sway` / `color catalog` の 6
+語に敷き、**`palette` は 0 件**（色カタログは inku 独自概念）、**UI 文中の `rendering` も 0 件**。
+ローマ字残しは **`Saijiki` と `inku` だけ**にし、`Okugaki` → **`Colophon`**、`Kotobagaki (caption)` →
+**`Headnote`** とした（ローマ字を増やすとエキゾチシズムに寄り道具としての信頼を損なう）。
+`Generation Info` → **`Provenance`**、`artwork` → **`work`**（残存 0）、`Unleashed` → **`Wild`**、主動作ボタン
+`Generate` → **`Paint`**。
+マイクロコピーは文単位で書き直し、段階表示は **`Interpreting your words…` / `Writing the score, then performing…`**、
+版差の通知は
+**`This work was performed by engine N. What you see now is a new impression by engine M.`**（版画の刷りの語）にした。
+**歳時記のカテゴリ名は 1 語も触っていない** — 英語カテゴリ名は web の文字列ではなく `saijiki.py` の `name_en` で、**`prompt_block("en")`
+を通って英語 Stage 1 プロンプトへ流入している**（golden fixture が固定）。
+**これは UI 表示ではなく英語版 DDL の語彙仕様**なので辞書の推奨を適用せず作者へ報告した。
+**辞書と実装が食い違った 2 点は実測を採った** — 五操作の根拠とされた「日本語の『別の◯◯』」は実際には「◯◯を変える」の動詞形であり（作者裁定で英語だけ名詞形）、
+`settingsGenerationLabel` は「世代」でなく `'生成'`（行為）だった。
+**日本語が動いていないことは md5 指紋 3 つ**（`ja.ts` / 三項式の日本語側 132 箇所 / `getLang()` 分岐の日本語側 14
+箇所）**で機械的に担保**した（`LC_ALL=C sort` でロケールを固定しないと内容が動かなくても値が変わる）。
+`npm run check` 0 errors / 2 warnings（217 files）、i18n の鍵は 641 のまま日英一致、`server` / `cli` / `android`
+と `saijiki.ts` の差分ゼロ。
+摂動 4 件で判別力を実測。
+**英語ドキュメント（README.md / SPEC.md / `manual/en/`）は未追随で、UI 側だけが新語彙になっている**（`artwork` が SPEC 25 / manual
+26、`palette` が SPEC 12 など。
+別作業）。
 
-v2.7.0（Build 709）では**一枚の方眼**と**暴れるの到達**をまとめ、**render engine 14** とした。engine 13 が残した 2 つの穴で、どちらも演奏結果が動くので 1 つの版にすればコーパスの再凍結が 1 回で済む。**方眼は紙の性質であって、置かれた対象の性質ではない** — engine 13 の目盛は**ストローク長に比例**しており（`step = 長さ × 0.018`）、長さが違えば目盛も違い（100px→1.8 / 800px→14.4px）、**同じ長さでも位置で位相が変わる**（同一長の線 30 本で 30 種の図）ため、1 枚の絵に**大きさの数だけ方眼**が同居していた。engine 14 は **`キャンバス短辺 × quantize`** で決める（値は 0.018 のままだが**意味が変わった**）。`stroke_engine` はキャンバスを知らないので **renderer が px へ直して渡し、長さ相対の経路は 4 箇所とも削除**した。正方 1000px で 18.000000px、短辺基準なのでアスペクトで変わる（pillar 3.600px）。**同じ絵のすべてのストロークが同じセルへ落ちる**（大小 3 対象の同居で格子外れが 188/194 → 0/194）。**暴れるは `line` にしか届いていなかった** — 88 組中 63 組が ON/OFF でバイト一致しており「作品全体に一つ」という位置づけとずれていた。`synthesize_along`（円・楕円・三角・四角・多角形・弧・塗り・ハッチ）へ届かせ、**OFF は 1 バイトも変えない**。**一致してよいのは 25 組ちょうど**（`cloudform` 全 11 = `stroke_engine` を通らない既知の穴・未修正、`rotring` 7 = `gesture` 0、`computer` 7 = `periodic`）。**素朴な移植は 3 点で壊れる**（弧長で振幅を決めると閉輪郭が破綻／平均が 0 でないと図形が伸縮＝**大きさは楽譜が決めるもので演奏が変えてよいものではない**／角の隣にジェスチャが乗るとトゲ）。**材質が墨から離れる問題も直した** — 輪郭と弧の材質アウトラインは幾何から引かれていて、暴れると 9 組すべてで墨だけが動き材質が取り残された（engine 12 が線について直したのと同じ型）。**ON のときだけ演奏後の中心線から作る**。参照コーパス `render-engine-14/` は **347 件**（`corpus_format_version` `"1"`→`"2"`）で `changed_from_previous` **126 件**＝既存 7 件（`A-computer-*` から cloudform を除く）+ 新規 E 群 119 件、**不変 221 件**。**手の 10 道具は 1 件も動かない。** 契約の赤（セル数・座標・25 組・9 組）は**起票時に実測して先出ししてあり、実装も受け入れの測り直しも 1 桁違わず一致**した。**摂動で「検査が 1 段少ない」ことが分かった** — 長さ相対への差し戻しを `synthesize_stroke` 内だけに当てると格子の検査 2 本が落ちない（`_add_raster_bleed` がセルを渡された目盛へ**再スナップ**するため）。**同じ性質を 2 箇所で強制していると片側の摂動は下流に吸収される。** 受け入れ側でも材質の摂動を弧側・閉輪郭側に分けて当て、どちらでも落ちることを確認した。SPEC は §15.10 を新設（英語 §12.7）し、**英語版の「Unleashed」を UI の「Wild」へ揃えた**（README と `manual/en/` の食い違いは残っている）。pytest 1100/30（+9）、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。**`android/` に差分が無いので Android のテストは回していない。Android は engine 12 のままで遅れが 2 版に広がった。**
+v2.7.0（Build 709）では**一枚の方眼**と**暴れるの到達**をまとめ、**render engine 14** とした。
+engine 13 が残した 2 つの穴で、どちらも演奏結果が動くので 1 つの版にすればコーパスの再凍結が 1 回で済む。
+**方眼は紙の性質であって、置かれた対象の性質ではない** — engine 13 の目盛は**ストローク長に比例**しており（`step = 長さ × 0.018`）、
+長さが違えば目盛も違い（100px→1.8 / 800px→14.4px）、**同じ長さでも位置で位相が変わる**（同一長の線 30 本で 30 種の図）ため、1
+枚の絵に**大きさの数だけ方眼**が同居していた。
+engine 14 は **`キャンバス短辺 × quantize`** で決める（値は 0.018 のままだが**意味が変わった**）。
+`stroke_engine` はキャンバスを知らないので **renderer が px へ直して渡し、長さ相対の経路は 4 箇所とも削除**した。
+正方 1000px で 18.000000px、短辺基準なのでアスペクトで変わる（pillar 3.600px）。
+**同じ絵のすべてのストロークが同じセルへ落ちる**（大小 3 対象の同居で格子外れが 188/194 → 0/194）。
+**暴れるは `line` にしか届いていなかった** — 88 組中 63 組が ON/OFF でバイト一致しており「作品全体に一つ」という位置づけとずれていた。
+`synthesize_along`（円・楕円・三角・四角・多角形・弧・塗り・ハッチ）へ届かせ、**OFF は 1 バイトも変えない**。
+**一致してよいのは 25 組ちょうど**（`cloudform` 全 11 = `stroke_engine` を通らない既知の穴・未修正、`rotring` 7 = `gesture` 0、
+`computer` 7 = `periodic`）。
+**素朴な移植は 3 点で壊れる**（弧長で振幅を決めると閉輪郭が破綻／平均が 0
+でないと図形が伸縮＝**大きさは楽譜が決めるもので演奏が変えてよいものではない**／角の隣にジェスチャが乗るとトゲ）。
+**材質が墨から離れる問題も直した** — 輪郭と弧の材質アウトラインは幾何から引かれていて、暴れると 9 組すべてで墨だけが動き材質が取り残された（engine 12
+が線について直したのと同じ型）。
+**ON のときだけ演奏後の中心線から作る**。
+参照コーパス `render-engine-14/` は **347 件**（`corpus_format_version` `"1"`→`"2"`）で
+`changed_from_previous` **126 件**＝既存 7 件（`A-computer-*` から cloudform を除く）+ 新規 E 群 119 件、**不変 221
+件**。
+**手の 10 道具は 1 件も動かない。
+** 契約の赤（セル数・座標・25 組・9 組）は**起票時に実測して先出ししてあり、実装も受け入れの測り直しも 1 桁違わず一致**した。
+**摂動で「検査が 1 段少ない」ことが分かった** — 長さ相対への差し戻しを `synthesize_stroke` 内だけに当てると格子の検査 2
+本が落ちない（`_add_raster_bleed` がセルを渡された目盛へ**再スナップ**するため）。
+**同じ性質を 2 箇所で強制していると片側の摂動は下流に吸収される。
+** 受け入れ側でも材質の摂動を弧側・閉輪郭側に分けて当て、どちらでも落ちることを確認した。
+SPEC は §15.10 を新設（英語 §12.7）し、**英語版の「Unleashed」を UI の「Wild」へ揃えた**（README と `manual/en/` の食い違いは残っている）。
+pytest 1100/30（+9）、cli 68、ruff clean、`npm run check` 0 errors / 2 warnings。
+**`android/` に差分が無いので Android のテストは回していない。
+Android は engine 12 のままで遅れが 2 版に広がった。
+**
 
-v2.7.1（Build 710）では**英語用語の正本と、それを強制する lint** を足した。v2.6.1 は英語 UI を辞書へ揃えたが、**揃った状態を保つものを残していなかった** — 文字列を 1 つ足すだけで禁止語が戻り、同じ概念に 2 つ目の英語が当たる。`web/src/lib/i18n/GLOSSARY.md`（200 行）が正本で、英語表示が 3 系統あること（`en.ts` 641 / 三項式 132 / `getLang()` 15）、コア用語、五つの推敲操作と変奏の強度の固定値、文体規則、禁止語と**許容される例外**、触ってはいけない経路、新しい文字列を足す手順、検査が見ているもの、まだ残る食い違いまでを書いてある。`web/scripts/i18n-lint.mjs`（221 行、`npm run lint:i18n`）が**英語表示 788 文字列を走査し、許容例外 36 件を名前で通す**。**文面と検査は一対**で、片方を変えたら同じ commit でもう片方も変える。**「残存ゼロ」を条件にしない** — `generation`（世代）・`prompt`（LLM プロンプトの表示）・`created`（完了・日時）・`image`（Vision が見る画像）・`render`（サーバー技術設定）には正当な用法があるので、**どこにも書いてはいけない語**と**決められた場所にだけ許される語**を分けてある。判別力は受け入れ側で実測した（`colorCatalogTitle` を `Color palette` にすると 1 件落ち、戻すと 0 に戻る）。あわせて `en.ts` の 1 項目を Sentence case へ是正（lint が見つけた取りこぼし）。`npm run check` 0 errors / 2 warnings、`lint:i18n` 788 / 36 例外 / 0 errors、pytest 1100/30、cli 68、ruff clean。**英語ドキュメント（`README.md` / `manual/en/` / `SPEC.md` の残り）の追随は未実施で、lint は `web/` の表示文字列しか見ていない。**
+v2.7.1（Build 710）では**英語用語の正本と、それを強制する lint** を足した。
+v2.6.1 は英語 UI を辞書へ揃えたが、**揃った状態を保つものを残していなかった** — 文字列を 1 つ足すだけで禁止語が戻り、同じ概念に 2 つ目の英語が当たる。
+`web/src/lib/i18n/GLOSSARY.md`（200 行）が正本で、英語表示が 3 系統あること（`en.ts` 641 / 三項式 132 / `getLang()` 15）、
+コア用語、五つの推敲操作と変奏の強度の固定値、文体規則、禁止語と**許容される例外**、触ってはいけない経路、新しい文字列を足す手順、検査が見ているもの、まだ残る食い違いまでを書いてある。
+`web/scripts/i18n-lint.mjs`（221 行、`npm run lint:i18n`）が**英語表示 788 文字列を走査し、許容例外 36 件を名前で通す**。
+**文面と検査は一対**で、片方を変えたら同じ commit でもう片方も変える。
+**「残存ゼロ」を条件にしない** — `generation`（世代）・`prompt`（LLM プロンプトの表示）・`created`（完了・日時）・`image`（Vision が見る画像）・
+`render`（サーバー技術設定）には正当な用法があるので、**どこにも書いてはいけない語**と**決められた場所にだけ許される語**を分けてある。
+判別力は受け入れ側で実測した（`colorCatalogTitle` を `Color palette` にすると 1 件落ち、戻すと 0 に戻る）。
+あわせて `en.ts` の 1 項目を Sentence case へ是正（lint が見つけた取りこぼし）。
+`npm run check` 0 errors / 2 warnings、`lint:i18n` 788 / 36 例外 / 0 errors、pytest 1100/30、cli 68、ruff
+clean。
+**英語ドキュメント（`README.md` / `manual/en/` / `SPEC.md` の残り）の追随は未実施で、lint は `web/` の表示文字列しか見ていない。
+**
 
-v2.7.2（Build 711）では**誰も読まない 2 つのフィールドを退役させた**（`absorbency` と `contact`）。**読まれていないだけでは無害と言えない** — 地の texture seed は Score 全体の dump のハッシュなので、値を使わないフィールドでも消せば粒の配置が動く（保存済み 23 件のうち 18 件）。退役キーは検証前に落とす（`extra="forbid"` があるため）。
+v2.7.2（Build 711）では**誰も読まない 2 つのフィールドを退役させた**（`absorbency` と `contact`）。
+**読まれていないだけでは無害と言えない** — 地の texture seed は Score 全体の dump のハッシュなので、値を使わないフィールドでも消せば粒の配置が動く（保存済み 23
+件のうち 18 件）。
+退役キーは検証前に落とす（`extra="forbid"` があるため）。
 
-v2.7.3（Build 712）では **CLI の英語表示を用語辞書へ揃えた**（`artwork` ほか 3 箇所とマニュアルの引用）。`npm run lint:i18n` は `web/` の表示文字列しか見ないので、**CLI とドキュメントは手で追う**。サブコマンド名 `okugaki` は識別子なので裁定待ちのまま残した。
+v2.7.3（Build 712）では **CLI の英語表示を用語辞書へ揃えた**（`artwork` ほか 3 箇所とマニュアルの引用）。
+`npm run lint:i18n` は `web/` の表示文字列しか見ないので、**CLI とドキュメントは手で追う**。
+サブコマンド名 `okugaki` は識別子なので裁定待ちのまま残した。
 
-v2.7.4（Build 713）では **coerce を `normalize` と `compose` に割った**。**構図を決めているのは Stage 2 でも Renderer でもなくここである**（本番 60 作品で instruction の 27% は DDL でなく coerce 製）にもかかわらず、34 分岐が一列に混ざっていた。分割の判定基準は「`ddl` を引数に取るか」— 主観を避け機械検査できる基準にするため。振り分けは normalize 6 / compose 28 で、**呼び出し順は 1 行も動かしていない**（両者は交互に並んでおり、まとめると結果が変わる）。同一性はゴールデン 39 ケースのバイト差 0 と、分岐ごとの恒等関数差し替えで動くケース数の完全一致で確かめた。**凍結コーパスは coerce を守っていなかった** — `render-engine-14` の 347 件は `coerce_score` を呼ばず、34 分岐を全部殺しても緑になる。そのためのゴールデン 39 ケース（`server/tests/golden/coerce_golden.json`）を同時に作った。
+v2.7.4（Build 713）では **coerce を `normalize` と `compose` に割った**。
+**構図を決めているのは Stage 2 でも Renderer でもなくここである**（本番 60 作品で instruction の 27% は DDL でなく coerce 製）にもかかわらず、
+34 分岐が一列に混ざっていた。
+分割の判定基準は「`ddl` を引数に取るか」— 主観を避け機械検査できる基準にするため。
+振り分けは normalize 6 / compose 28 で、**呼び出し順は 1 行も動かしていない**（両者は交互に並んでおり、まとめると結果が変わる）。
+同一性はゴールデン 39 ケースのバイト差 0 と、分岐ごとの恒等関数差し替えで動くケース数の完全一致で確かめた。
+**凍結コーパスは coerce を守っていなかった** — `render-engine-14` の 347 件は `coerce_score` を呼ばず、34 分岐を全部殺しても緑になる。
+そのためのゴールデン 39 ケース（`server/tests/golden/coerce_golden.json`）を同時に作った。
 
-v2.7.5（Build 714）では**明示された個数を 240 未満なら literal**とした。**「二百三十三本」と書いて 2 本しか描かれない**状態の原因はプロンプトの自己矛盾で、①「120 個を超えたら代表化」と「代表化は 300 以上」が 120〜299 帯で競合、②「複数 instruction 生成は絶対禁止」が個数の違う群まで畳ませる、③**作例 4 件が要求 137 に対し `"count":96` を出して見せていた**、の 3 つが重なっていた。閾値 240 は `MAX_EXPANDED_PER_INSTRUCTION` に合わせた値である。**プロンプトが効く層（coerce の手前）では最低だった 120〜239 帯が日本語 33%→55% / 英語 37%→92% に動いたが、final Score は動かない。** 完全に遵守した Score を coerce へ通すと単群 25 文のうち通るのは日本語 20 / 英語 11 で、`_with_context_density_governor` が 64 / 48 / 16 へ置き換える。**受入条件 90〜95% は、契約が禁じた coerce と compose に触れない限り到達できない値だった。** 日英差も同じ層にあり、静けさ密度マーカーの発火は日本語 36/87 に対し英語 72/87。**個数の忠実さは、次に compose 側の決定的な強制として扱う。**
+v2.7.5（Build 714）では**明示された個数を 240 未満なら literal**とした。
+**「二百三十三本」と書いて 2 本しか描かれない**状態の原因はプロンプトの自己矛盾で、①「120 個を超えたら代表化」と「代表化は 300 以上」が 120〜299 帯で競合、②「複数
+instruction 生成は絶対禁止」が個数の違う群まで畳ませる、③**作例 4 件が要求 137 に対し `"count":96` を出して見せていた**、の 3 つが重なっていた。
+閾値 240 は `MAX_EXPANDED_PER_INSTRUCTION` に合わせた値である。
+**プロンプトが効く層（coerce の手前）では最低だった 120〜239 帯が日本語 33%→55% / 英語 37%→92% に動いたが、final Score は動かない。
+** 完全に遵守した Score を coerce へ通すと単群 25 文のうち通るのは日本語 20 / 英語 11 で、`_with_context_density_governor` が 64
+/ 48 / 16 へ置き換える。
+**受入条件 90〜95% は、契約が禁じた coerce と compose に触れない限り到達できない値だった。
+** 日英差も同じ層にあり、静けさ密度マーカーの発火は日本語 36/87 に対し英語 72/87。
+**個数の忠実さは、次に compose 側の決定的な強制として扱う。
+**
 
-v2.7.6（Build 715）では**書かれた個数を、後からの読みより強くした**。v2.7.5 でプロンプトの矛盾を消したのに final Score が動かなかったのは、`_with_context_density_governor` が静けさ・膜・記憶系の文脈を読み取って**見つけた反復を残らず間引いていた**からで、書かれた個数の群も対象にしていた。**静けさは場面の読みであり、「二百三十三本」は読みではない。** 明示個数の群は 3 つの個数上限を素通りする（大きさを整える処理はそのまま働く。いくつを触るものではないため）。**凍結 50 ケースが 31/50 → 50/50、日英とも 25/25**（着手時は英語 11/25）。**日英差の正体は英語マーカー `"one "`** が `one hundred twenty ... lines` に当たっていたことだが、**単独では 1 件も救わない**（帰属は免除が 19 件）。あわせて合計予算の比例縮小をやめ、**大きい群から順に代表化して予算を下回った時点で止める**ようにした（旧実装は**要求 120 の群を 232 へ増やしていた**）。**この検査面は LLM を 1 回も呼ばずに 2 秒で回る。**
+v2.7.6（Build 715）では**書かれた個数を、後からの読みより強くした**。
+v2.7.5 でプロンプトの矛盾を消したのに final Score が動かなかったのは、`_with_context_density_governor` が静けさ・膜・
+記憶系の文脈を読み取って**見つけた反復を残らず間引いていた**からで、書かれた個数の群も対象にしていた。
+**静けさは場面の読みであり、「二百三十三本」は読みではない。
+** 明示個数の群は 3 つの個数上限を素通りする（大きさを整える処理はそのまま働く。
+いくつを触るものではないため）。
+**凍結 50 ケースが 31/50 → 50/50、日英とも 25/25**（着手時は英語 11/25）。
+**日英差の正体は英語マーカー `"one "`** が `one hundred twenty ... lines` に当たっていたことだが、**単独では 1 件も救わない**（帰属は免除が 19
+件）。
+あわせて合計予算の比例縮小をやめ、**大きい群から順に代表化して予算を下回った時点で止める**ようにした（旧実装は**要求 120 の群を 232 へ増やしていた**）。
+**この検査面は LLM を 1 回も呼ばずに 2 秒で回る。
+**
 
-v2.7.8（Build 717）では **render engine 15** として `renderer.py` への 5 つの変更を 1 つの版にまとめた。**印の種を allowlist にした**（dump 全体のハッシュだったので、coerce が書いた色の注記を書き換えるだけで絵が変わっていた。全 49 フィールドの感度は 30 動く / 19 動かない）。**地の種は支持体の名前にした**（`material` + `grain` + 演奏 seed。濃さを上げても同じ紙が濃くなる。これで `ground.absorbency` の退役が解けた）。**`cloudform` をほかの閉輪郭と同じ道に載せた**（class に `stroke-engine-touch` を名乗りながら一度も `stroke_engine` を通っていなかった）。**角のある図形と `pen` に材質層を与えた**（`_render_corner_shape` には呼び出しがそもそも無く、本番最多の `pen` も裸だった）。**強さは距離ではない**と直した（梯子が対処のたびに `outline_offset` の倍率を上げて 2.8 倍・下限 3.5px になり、痕跡が帯の実測半幅の 4.5〜6.5 倍離れて第 2 の輪郭に見えていた。倍率 1.0・下限 0 へ。濃さの梃子は不変）。コーパスは **350 件で 318 件が動き、動かない 32 件（`computer` / `rotring`）が版の説明になる**。**`hair` は材質層を与えたうえで撤去した** — 全面廃止が妥当という作者裁定を受けたためで、**廃止本体は別契約**。
+v2.7.8（Build 717）では **render engine 15** として `renderer.py` への 5 つの変更を 1 つの版にまとめた。
+**印の種を allowlist にした**（dump 全体のハッシュだったので、coerce が書いた色の注記を書き換えるだけで絵が変わっていた。
+全 49 フィールドの感度は 30 動く / 19 動かない）。
+**地の種は支持体の名前にした**（`material` + `grain` + 演奏 seed。
+濃さを上げても同じ紙が濃くなる。
+これで `ground.absorbency` の退役が解けた）。
+**`cloudform` をほかの閉輪郭と同じ道に載せた**（class に `stroke-engine-touch` を名乗りながら一度も `stroke_engine` を通っていなかった）。
+**角のある図形と `pen` に材質層を与えた**（`_render_corner_shape` には呼び出しがそもそも無く、本番最多の `pen` も裸だった）。
+**強さは距離ではない**と直した（梯子が対処のたびに `outline_offset` の倍率を上げて 2.8 倍・下限 3.5px になり、痕跡が帯の実測半幅の 4.5〜6.5 倍離れて第 2
+の輪郭に見えていた。
+倍率 1.0・下限 0 へ。
+濃さの梃子は不変）。
+コーパスは **350 件で 318 件が動き、動かない 32 件（`computer` / `rotring`）が版の説明になる**。
+**`hair` は材質層を与えたうえで撤去した** — 全面廃止が妥当という作者裁定を受けたためで、**廃止本体は別契約**。
 
-v2.7.9（Build 718）では `hair` を **`silverpoint`（銀筆）へ改名した**。engine 15 の時点では「全面廃止」の裁定だったが、**廃止先の `pencil` は 3 倍太く**、0.5px・stiffness 0.93・energy_width 0.08 という値は筆ではなく**銀筆の物理**だったため、2026-07-27 に改名へ変わった。**改名は絵を動かす** — 演奏 seed の材料に `weight` が入っているので、道具名の文字列が変われば同じ Score が別の演奏になる（`A-hair-line` と `A-silverpoint-line` は 2299 → 2306 バイト、座標 126 個中 120 個が移動）。作者は比較シート 2 枚を見たうえでこれを払うと裁定した。動いたのは**名前を持つ 16 件だけ**で、コーパス 350 件のうち共通の 334 件はマニフェスト entry がバイト差 0・SVG 実体 302 本が全部バイト一致。coerce ゴールデンは 39 件中 10 件を採り直し、**旧 expected の `hair` を置換すると新 expected に完全一致する**。保存済み作品は `Instruction.weight` の `field_validator(mode="before")` が読み込み時に置換し、**本番 DB の該当 445 件を全部 replay して 444 件が受理**（残り 1 件は `Weight` enum に一度も無い `rope` を持ち、改名前から replay 不能）。**`GRAMMARS` と幅の値は 1 つも変えていない**（変更 3 行はキー文字列以外が一致。8 値 + 機械の極の 3 値を直接ピンする検査を新設）。**唯一の振る舞いの変更は語彙復帰**で、歳時記の `_PRUNED` を外しててざわりが 10 語から 11 語になり、材質マーカーの先頭が `鉛筆` → `銀筆` に変わった（H1「銀筆が実際に選ばれるか」を測るには語彙に無ければならないため）。プロンプト digest の固定値 16 個を採り直したが、**Stage 1 の golden fixture は Build 591 の実物のまま**。**engine の版は上げていない**（`"15"` のまま）。**未着手**: few-shot 検索キーワード `"髪"` への銀筆追加、`material_weight_hints` の銀筆行、太さの軸、Android（Kotlin と、凍結 fixture 36 件のうち `hair` を含む 3 件はそのまま）。
+v2.7.9（Build 718）では `hair` を **`silverpoint`（銀筆）へ改名した**。
+engine 15 の時点では「全面廃止」の裁定だったが、**廃止先の `pencil` は 3 倍太く**、0.5px・stiffness 0.93・energy_width 0.08
+という値は筆ではなく**銀筆の物理**だったため、2026-07-27 に改名へ変わった。
+**改名は絵を動かす** — 演奏 seed の材料に `weight` が入っているので、道具名の文字列が変われば同じ Score が別の演奏になる（`A-hair-line` と
+`A-silverpoint-line` は 2299 → 2306 バイト、座標 126 個中 120 個が移動）。
+作者は比較シート 2 枚を見たうえでこれを払うと裁定した。
+動いたのは**名前を持つ 16 件だけ**で、コーパス 350 件のうち共通の 334 件はマニフェスト entry がバイト差 0・SVG 実体 302 本が全部バイト一致。
+coerce ゴールデンは 39 件中 10 件を採り直し、**旧 expected の `hair` を置換すると新 expected に完全一致する**。
+保存済み作品は `Instruction.weight` の `field_validator(mode="before")` が読み込み時に置換し、**本番 DB の該当 445 件を全部
+replay して 444 件が受理**（残り 1 件は `Weight` enum に一度も無い `rope` を持ち、改名前から replay 不能）。
+**`GRAMMARS` と幅の値は 1 つも変えていない**（変更 3 行はキー文字列以外が一致。
+8 値 + 機械の極の 3 値を直接ピンする検査を新設）。
+**唯一の振る舞いの変更は語彙復帰**で、歳時記の `_PRUNED` を外しててざわりが 10 語から 11 語になり、材質マーカーの先頭が `鉛筆` → `銀筆`
+に変わった（H1「銀筆が実際に選ばれるか」を測るには語彙に無ければならないため）。
+プロンプト digest の固定値 16 個を採り直したが、**Stage 1 の golden fixture は Build 591 の実物のまま**。
+**engine の版は上げていない**（`"15"` のまま）。
+**未着手**: few-shot 検索キーワード `"髪"` への銀筆追加、`material_weight_hints` の銀筆行、太さの軸、Android（Kotlin と、凍結
+fixture 36 件のうち `hair` を含む 3 件はそのまま）。
 
-v2.7.10（Build 719）では **PNG を resvg だけで焼くようにし、cairosvg を全撤去した**。cairosvg は `feTurbulence` / `feDisplacementMap` / `feGaussianBlur` を実装しておらず、**失敗もせずに落とす** — 地の粒も材質フィルタも消えた「きれいに見える PNG」が返り、**その絵が判断の材料に使われていた**（4 回）。CLI の stderr 警告・サーバー起動時の WARNING・docstring・成果物へ記録する `png_rasterizer` と、注意書きは v2.2.1 から四重に置いてあったが、**人を誤らせるのはログ行ではなく絵である**ため、文書化ではなく撤去を選んだ（作者指示 2026-07-27）。`rasterizer.py` から `_cairosvg_renderer` と `BACKEND_CAIROSVG` と `_BACKENDS` 表が消え、`svg_to_png` は resvg が無ければ `RasterizerUnavailable` を上げる。**これが唯一の振る舞いの変更**であり、resvg の入っていない環境では PNG 出力が静かに劣化するのではなく停止する（作者裁定済み）。依存宣言は `shared` / `server` / `cli` の 3 本から落とし、lock 2 本から 145 行・148 行が消えた。**番人を 3 つ置いた** — ① 3 つの `pyproject.toml` に `cairosvg` が無いこと、② `shared/src` / `server/src` / `cli/src` / `server/scripts` に `import cairosvg` が無いこと（**行頭の import 文だけを見るので、なぜ消えたかを述べる散文は残せる**）、③ **入っていても到達不能であること**（`pytest.importorskip` で cairosvg のある環境だけ走る。**増えた skip 1 はこれ**で、依存を落とした結果 venv から消えたためであり正しい）。副次として `server` の venv から `pillow` が消えた（cairosvg の推移依存で、`server` と `shared` は `PIL` を import していない。`cli` は明示依存なので残り、**コンタクトシートを組む道具は `cli` の venv にある**）。文書は `SETUP.ja.md` / `SETUP.md` と `manual/{ja,en}/application-install.md` の 4 本を現在形に直した。**SVG は 1 バイトも変わらない**ので参照コーパスは再凍結しておらず、render engine は `"15"` のまま。**撤去しなかったもの**: `android/scripts/render_png_review.py` は `cairosvg.svg2png` を呼んだままで（番人 ② の走査範囲は `android/` を含まない）、**目視レビュー用スクリプトという、今回の撤去理由がそのまま当たる経路**なので扱いは作者裁定を仰ぐ。`server/Dockerfile` の `libcairo2` も残っている。
+v2.7.10（Build 719）では **PNG を resvg だけで焼くようにし、cairosvg を全撤去した**。
+cairosvg は `feTurbulence` / `feDisplacementMap` / `feGaussianBlur` を実装しておらず、**失敗もせずに落とす** —
+地の粒も材質フィルタも消えた「きれいに見える PNG」が返り、**その絵が判断の材料に使われていた**（4 回）。
+CLI の stderr 警告・サーバー起動時の WARNING・docstring・成果物へ記録する `png_rasterizer` と、注意書きは v2.2.1 から四重に置いてあったが、
+**人を誤らせるのはログ行ではなく絵である**ため、文書化ではなく撤去を選んだ（作者指示 2026-07-27）。
+`rasterizer.py` から `_cairosvg_renderer` と `BACKEND_CAIROSVG` と `_BACKENDS` 表が消え、`svg_to_png` は
+resvg が無ければ `RasterizerUnavailable` を上げる。
+**これが唯一の振る舞いの変更**であり、resvg の入っていない環境では PNG 出力が静かに劣化するのではなく停止する（作者裁定済み）。
+依存宣言は `shared` / `server` / `cli` の 3 本から落とし、lock 2 本から 145 行・148 行が消えた。
+**番人を 3 つ置いた** — ① 3 つの `pyproject.toml` に `cairosvg` が無いこと、② `shared/src` / `server/src` /
+`cli/src` / `server/scripts` に `import cairosvg` が無いこと（**行頭の import 文だけを見るので、なぜ消えたかを述べる散文は残せる**）、③
+**入っていても到達不能であること**（`pytest.importorskip` で cairosvg のある環境だけ走る。
+**増えた skip 1 はこれ**で、依存を落とした結果 venv から消えたためであり正しい）。
+副次として `server` の venv から `pillow` が消えた（cairosvg の推移依存で、`server` と `shared` は `PIL` を import していない。
+`cli` は明示依存なので残り、**コンタクトシートを組む道具は `cli` の venv にある**）。
+文書は `SETUP.ja.md` / `SETUP.md` と `manual/{ja,en}/application-install.md` の 4 本を現在形に直した。
+**SVG は 1 バイトも変わらない**ので参照コーパスは再凍結しておらず、render engine は `"15"` のまま。
+**撤去しなかったもの**: `android/scripts/render_png_review.py` は `cairosvg.svg2png` を呼んだままで（番人 ② の走査範囲は
+`android/` を含まない）、**目視レビュー用スクリプトという、今回の撤去理由がそのまま当たる経路**なので扱いは作者裁定を仰ぐ。
+`server/Dockerfile` の `libcairo2` も残っている。
 
-v2.7.11（Build 720）では v2.7.10 の取りこぼし 2 件を直し、**規則そのものを SPEC へ書いた**（作者裁定 2026-07-27）。**`android/scripts/render_png_review.py` を resvg へ替えた** — 休眠スクリプトではなく、`headless_render_compare.sh` と `headless_batch_compare.sh` が `PNG_REVIEW=true` のときに呼ぶ**現役の目視ハーネス**で、**server と Android の SVG を PNG 化して差分を増幅し 3 枚並べたシートを作る道具**である。**フィルタを落とすラスタライザを挟むと「両方とも平らに潰れた場所で一致する」**。実測では `feDisplacementMap` の scale だけが違う 2 枚で **mean 9.5% / rms 27.4%** の差を出す（**cairosvg なら差 0**）。**番人②の走査範囲を「名指し」から「リポジトリ全体 − 除外 14 個」へ変えた** — v2.7.10 は 4 根を名指ししたので `android/` を見ておらず、**名指しの一覧は不完全になりうるが、不完全だと言うことはできない**。**走査が実際に外へ届いていることを見る検査**（`android` / `cli` / `server` / `shared` が結果に含まれること）を足し、`import cairosvg` を戻す摂動で落ちることを確かめた。走査を広げた結果、**追跡外の `no-git-sync/` に cairosvg を呼ぶ過去の測定スクリプトが 3 本**見つかったが、**何を回したかの記録**なので書き換えず走査からも外した（venv に cairosvg が無いので再実行すれば ImportError で止まる）。**SPEC には `SPEC.ja.md` §15.12「PNG は演奏を写す」/ `SPEC.md` §12.9 を新設した** — ①黙って落とすラスタライザを使わない（**性能や画質ではなく観測の話**）②`cairosvg` は使用を禁じる③無い実装より誤る実装のほうが悪い（フォールバックを置かない）④守り方（唯一の入口と番人 3 つ、**②の走査範囲は見ない場所で書く**）。**`server/Dockerfile` の `libcairo2` は次回の配布で落とす**（作者裁定）ので、リリース runbook に **A-1b** として起票した。**SVG は 1 バイトも変わらない。**
+v2.7.11（Build 720）では v2.7.10 の取りこぼし 2 件を直し、**規則そのものを SPEC へ書いた**（作者裁定 2026-07-27）。
+**`android/scripts/render_png_review.py` を resvg へ替えた** — 休眠スクリプトではなく、`headless_render_compare.sh`
+と `headless_batch_compare.sh` が `PNG_REVIEW=true` のときに呼ぶ**現役の目視ハーネス**で、**server と Android の SVG を
+PNG 化して差分を増幅し 3 枚並べたシートを作る道具**である。
+**フィルタを落とすラスタライザを挟むと「両方とも平らに潰れた場所で一致する」**。
+実測では `feDisplacementMap` の scale だけが違う 2 枚で **mean 9.5% / rms 27.4%** の差を出す（**cairosvg なら差 0**）。
+**番人②の走査範囲を「名指し」から「リポジトリ全体 − 除外 14 個」へ変えた** — v2.7.10 は 4 根を名指ししたので `android/` を見ておらず、
+**名指しの一覧は不完全になりうるが、不完全だと言うことはできない**。
+**走査が実際に外へ届いていることを見る検査**（`android` / `cli` / `server` / `shared` が結果に含まれること）を足し、`import cairosvg`
+を戻す摂動で落ちることを確かめた。
+走査を広げた結果、**追跡外の `no-git-sync/` に cairosvg を呼ぶ過去の測定スクリプトが 3 本**見つかったが、
+**何を回したかの記録**なので書き換えず走査からも外した（venv に cairosvg が無いので再実行すれば ImportError で止まる）。
+**SPEC には `SPEC.ja.md` §15.12「PNG は演奏を写す」/ `SPEC.md` §12.9 を新設した** —
+①黙って落とすラスタライザを使わない（**性能や画質ではなく観測の話**）②`cairosvg`
+は使用を禁じる③無い実装より誤る実装のほうが悪い（フォールバックを置かない）④守り方（唯一の入口と番人 3 つ、**②の走査範囲は見ない場所で書く**）。
+**`server/Dockerfile` の `libcairo2` は次回の配布で落とす**（作者裁定）ので、リリース runbook に **A-1b** として起票した。
+**SVG は 1 バイトも変わらない。
+**
 
-v2.7.12（Build 721）では**支持体の描き分けを render engine 15 へ畳んだ**（版を上げない。本番 DB に engine 15 の作品が 0 件・未公開・engine 13 の前例。**条件は公開前に済ませること**）。`plain` / `paper` / `washi` / `ink_wash` は**地の層で完全に同一**で、分岐は `mezzotint` と `charcoal_ground` だけだった。**最初の実装は却下相当** — 繊維と刷毛を描画要素として積んだところ地が 2 → 40 要素になり**絵全体の 46%** を占めた（**DDL が明示した図形は 2 つ**）。**直した方針は「支持体は雑音の性格であって描くものではない」**で、`display` はフィルタの中（washi = 異方性乱流を直交 2 枚で `feBlend`／ink_wash = 横へ伸ばして `feGaussianBlur`）、`editable` は**既に描いている粒の形**を変える。**要素は 1 つも増えず**、凍結物が `C-ground-washi` = circle 20 → 0 / path 1 → 21（総数不変）、`C-ground-ink_wash` = circle 20 → 12（減る）と記録している。**数値は作者が実物を見て決めた** — `material-sheet.png` の `tone=warm grain=coarse opacity=0.18` の行を採り、**washi をこれ以上強めない**（0.18 は既に全経路の上限 `min(0.18, ground.opacity)`）。コーパスは engine 15 のまま再凍結し、**動いたのは 350 件中 3 件**。`changed_from_previous` の再計算が 318 件で完全一致することを先に実測し、2 回目の生成が exit 0 でバイト一致することを確かめた。**Android の期待値は動かなかった** — 再生成した 36 件が engine 15 の凍結 `31ff75d` と**バイト一致**する（**Android の参照ケースは地を 1 件も持たない**）ので、**「畳むと期待値が作り直しになる」という前提は実測で外れた**。**検査面は実装に付いていなかったので新設した**（`test_ground_seed.py` に 5 件 + 既存 1 件の書き直し）。要点は**seed を明示して固定すること**で、固定しないと `material` が導出 seed に入っているぶんで層が動き、**描き分けの分岐を `if False` にしても素通りする**（実測）。
+v2.7.12（Build 721）では**支持体の描き分けを render engine 15 へ畳んだ**（版を上げない。
+本番 DB に engine 15 の作品が 0 件・未公開・engine 13 の前例。
+**条件は公開前に済ませること**）。
+`plain` / `paper` / `washi` / `ink_wash` は**地の層で完全に同一**で、分岐は `mezzotint` と `charcoal_ground` だけだった。
+**最初の実装は却下相当** — 繊維と刷毛を描画要素として積んだところ地が 2 → 40 要素になり**絵全体の 46%** を占めた（**DDL が明示した図形は 2 つ**）。
+**直した方針は「支持体は雑音の性格であって描くものではない」**で、`display` はフィルタの中（washi = 異方性乱流を直交 2 枚で `feBlend`／ink_wash =
+横へ伸ばして `feGaussianBlur`）、`editable` は**既に描いている粒の形**を変える。
+**要素は 1 つも増えず**、凍結物が `C-ground-washi` = circle 20 → 0 / path 1 → 21（総数不変）、`C-ground-ink_wash` =
+circle 20 → 12（減る）と記録している。
+**数値は作者が実物を見て決めた** — `material-sheet.png` の `tone=warm grain=coarse opacity=0.18` の行を採り、**washi
+をこれ以上強めない**（0.18 は既に全経路の上限 `min(0.18, ground.opacity)`）。
+コーパスは engine 15 のまま再凍結し、**動いたのは 350 件中 3 件**。
+`changed_from_previous` の再計算が 318 件で完全一致することを先に実測し、2 回目の生成が exit 0 でバイト一致することを確かめた。
+**Android の期待値は動かなかった** — 再生成した 36 件が engine 15 の凍結 `31ff75d` と**バイト一致**する（**Android の参照ケースは地を 1
+件も持たない**）ので、**「畳むと期待値が作り直しになる」という前提は実測で外れた**。
+**検査面は実装に付いていなかったので新設した**（`test_ground_seed.py` に 5 件 + 既存 1 件の書き直し）。
+要点は**seed を明示して固定すること**で、固定しないと `material` が導出 seed に入っているぶんで層が動き、**描き分けの分岐を `if False`
+にしても素通りする**（実測）。
 
-v2.8.0（Build 722）では**奥書の CLI サブコマンド名と API パスを `colophon` へ移した**（作者裁定 2026-07-27。**エイリアスは残さない＝互換が切れるので minor 採番**）。**打鍵する名前は英語の術語で付いている**という先例（`paint` / `refine` / `lineage` が辞書と一致し、辞書は「API `/api/paint` と一致」と明記）に対し、**その欄でローマ字だったのは `okugaki` だけ**だった。**語を運んでいたのはパスだけ**で、応答モデル `OkugakiItem` に `okugaki` という名前のフィールドは一つも無い。動かしたのは `GET|POST /api/lineage/{node_id}/okugaki` → `/colophon`、`DELETE /api/okugaki/{okugaki_id}` → `/api/colophon/{colophon_id}`、CLI サブコマンド、web の fetch 3 か所。**動かしていないのは辞書 §6 の識別子** — DB のテーブル名と索引、`model_settings` の `okugaki_model`（**保存済みユーザー設定**）、モジュール名 `okugaki.py`、i18n の鍵 `okugaki*`。**鍵名のローマ字は例外ではなく通例である** — 変奏は `variation` という辞書語を持ちながら web の鍵は `hensou*` のままで、辞書が禁じているのは**表示に出る語**であって鍵ではない。番人を 2 つ置いた（`app.routes` に `okugaki` を含むパスが無いこと／CLI が `okugaki` で `SystemExit` になること）。辞書 §6 に「例外が 1 つある」節を足して境界を明文化し、SPEC 日英と manual 日英の 4 本を追随させた。**描画には触れていない**（render engine は `"15"`・SVG 不変）。
+v2.8.0（Build 722）では**奥書の CLI サブコマンド名と API パスを `colophon` へ移した**（作者裁定 2026-07-27。
+**エイリアスは残さない＝互換が切れるので minor 採番**）。
+**打鍵する名前は英語の術語で付いている**という先例（`paint` / `refine` / `lineage` が辞書と一致し、辞書は「API `/api/paint` と一致」と明記）に対し、
+**その欄でローマ字だったのは `okugaki` だけ**だった。
+**語を運んでいたのはパスだけ**で、応答モデル `OkugakiItem` に `okugaki` という名前のフィールドは一つも無い。
+動かしたのは `GET|POST /api/lineage/{node_id}/okugaki` → `/colophon`、`DELETE /api/okugaki/{okugaki_id}` →
+`/api/colophon/{colophon_id}`、CLI サブコマンド、web の fetch 3 か所。
+**動かしていないのは辞書 §6 の識別子** — DB のテーブル名と索引、`model_settings` の `okugaki_model`（**保存済みユーザー設定**）、モジュール名
+`okugaki.py`、i18n の鍵 `okugaki*`。
+**鍵名のローマ字は例外ではなく通例である** — 変奏は `variation` という辞書語を持ちながら web の鍵は `hensou*` のままで、
+辞書が禁じているのは**表示に出る語**であって鍵ではない。
+番人を 2 つ置いた（`app.routes` に `okugaki` を含むパスが無いこと／CLI が `okugaki` で `SystemExit` になること）。
+辞書 §6 に「例外が 1 つある」節を足して境界を明文化し、SPEC 日英と manual 日英の 4 本を追随させた。
+**描画には触れていない**（render engine は `"15"`・SVG 不変）。
 
-同じ v2.8.0（Build 723）で**変奏の語も通した**。奥書は「1 語がローマ字」だったが、**変奏は衝突が逆向き**で、辞書が `variation` を変奏だけに予約している（候補は `option`）のに、**本物の変奏がローマ字 `hensou`、変奏でない 4 種が `*_variation`** を名乗っていた。系譜の derivation kind を `hensou` → `variation`（本番 7 行）、`touch_variation` → `touch_change`（25）、`model_variation` → `model_comparison`（11）、`layout_variation` → `layout_change`（6）、`language_variation` → `language_comparison`（1）へ入れ替え、**`vary_seed` → `composition_seed`**（186 箇所）とした。**`vary_seed` は変奏ですらなく Stage 1.5 の構図 seed** で、**変奏の `variation_seed` / `variation_amplitude` は不変**である。CLI の旗（`--composition-seed` / `--composition-count`）と web の i18n 鍵（`hensou*` → `variation*`）も揃えた。**保存済みデータは migration で移す** — 起動時に列を RENAME し kind を UPDATE する。**本番 DB の複製で実測し（件数保存・`composition_seed` 9 件）、2 回目は 0 行＝冪等**。**凍結したのは rh2 payload の鍵 `vary_seed` と `ddl_expander` の salt `#hensou` / `#vary`** で、**どちらも同一性・hash の材料**である（改名したら保存済み全作品の rh2 が動き、検査が捕まえた）。**新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md`**（作者指示）。**採番は v2.8.0 のまま＝未公開なので畳んだ**。さらに Build 724 で**記述の語も通した** — 辞書が 記述 = `description` と定めるのに**要求の主フィールドだけが `text` という第三の語**だったので、`text` → `description`、`original_text` → `original_description` とした。**`dh1` は値だけを hash しており鍵名を含まないので影響しない**（`rh2` の直後だったため着手前に実測した）。**LLM プロバイダへ送る payload の `"text"` 4 件は外部 API の契約なので不変**。**ただし Build 724 は付け先を間違えていた** — **`description` を「作者が書いた記述」ではなく「文脈を注入したあとの、Stage 1 へ渡す文字列」に与え**、作者の本文を `original_description` へ降格させていた。**Build 725 で訂正した**: **`description` = 作者が書いた記述**（interpret / paint では必須）、**Stage 1 が実際に読む文字列は `stage1_input`**（省略可。省略すれば記述そのものが Stage 1 へ渡る）。`/api/compose` の `original_description` も `description` へ（省略可。web の該当は実測 4 箇所で、契約の見積もり 3 箇所より 1 つ多かった）。**`input` は据え置きが作者裁定** — 本番 1780 件のうち **DDL 風 4 件・空 38 件**で散文とは限らず、中立な語のほうが筋が通る。**内部の関数引数は 1 つも動かしていない**（`composer.py` と `_call_compose_detail` の `original_description` は初めから意味が正しく、**片側だけ動かすと `TypeError` になる＝1 回目の着手が 42 件赤になった原因**）。**判別テスト 4 本を足し、実装を 2 点摂動して実際に赤くなることを確かめてから戻した**。 **さらに Build 726 で、残っていたローマ字も同じ版で通した** — 打鍵する名前を全数（CLI サブコマンド 46・オプション 84・API パス 61）調べると、**奥書と同じ形はあと 1 つ＝添景の旗 `--tenkei` だけ**だった。**辞書は 添景 = `staffage` と既に定めており web はその語で表示していた**ので、ローマ字が残っていたのは打鍵する側だけである。`--staffage` へ移し**エイリアスは残さない**（奥書と同じ方針）。help の文言も第三の語 `scenery` から揃えた。**API の鍵 `tenkei`・DB 列・内部識別子・web の i18n 鍵は不動**（鍵名のローマ字は通例）で、**外部スクリプトが直すのは旗の綴りだけ**。**番人 2 つのうち 1 つは最初 上位パーサしか見ておらずエイリアスの摂動を素通りさせた**ため、サブパーサまで降りるよう直してから 2 本とも赤くなることを確かめた。**`/api/saijiki` と歳時記のカテゴリ鍵 9 個はローマ字が正しい英語表記**（辞書が 歳時記 = `Saijiki` = 固有名詞と定める。`renga` / `hacho` も同じ）で、**`sumi` / `washi` は識別子ではなく DDL の語彙値**である。 **Build 727 で CI を 8 回ぶりに緑へ戻した** — v2.7.9 の改名が render コーパスと coerce ゴールデンを**版を上げずにその場で再凍結**した一方、**DDL コーパスだけ取りこぼされていた**。再凍結が運んだのは改名 2 種（coerce 出力の道具名 1 件と、`vary_seed` を記録したままの manifest 入力 15 件）だけで、**`ddl_engine_version` は 1 のまま**。**引き継ぎが書いていた仕組みは誤りで**、凍結物の `hair` は validator が書き換える保存値ではなく **coerce 自身の生産物**だった（摂動を validator に当てて空振りし、`coerce/compose.py` の literal で初めて動いた）。**ガードは書き込みの後に発火する順へ改めた**（手前で止めると裁定済みの改名を再凍結する道が無い）。**SPEC §15.6 に「改名では版を上げない」を条文化**（日英）。**`check_frozen_corpora.py` で CI と同じものを手元で回す** — **テストは代替にならない**（`test_*_reference.py` は再生成しないので **1423 件が緑のままコーパスがずれる**）。**CI は最後の砦であって検出器ではない**（別 OS での再現性だけが CI にしかできない）。 **Build 728 で記述の語を打鍵する側でも揃えた** — `--original-text` は**埋める先の鍵が `description` なのに綴りに退役語 `text` を残していた**ので `--description` へ（エイリアス無し）。**同じ改名が 2 つのコマンドを黙って壊していた** — **`inspect` と `refine generate` は `_paint_payload` を通らず自前で payload を組んでおり、Build 724 以降も旧鍵 `text` を `/api/paint` へ送って 422 になっていた**（cli テストは実サーバを叩かないので 73 件が緑のままだった）。**捕まえたのは `*-text` 系の旗を全数分類したから**である。**`paint` / `batch` の help が記述を `prompt` と呼んでいた 4 箇所も直した**（`review evaluate --prompt` は LLM のプロンプトという別の指示対象なので不変）。**番人 4 つを 3 点の摂動で確認済み**。
+同じ v2.8.0（Build 723）で**変奏の語も通した**。
+奥書は「1 語がローマ字」だったが、**変奏は衝突が逆向き**で、辞書が `variation` を変奏だけに予約している（候補は `option`）のに、**本物の変奏がローマ字 `hensou`、
+変奏でない 4 種が `*_variation`** を名乗っていた。
+系譜の derivation kind を `hensou` → `variation`（本番 7 行）、`touch_variation` → `touch_change`（25）、
+`model_variation` → `model_comparison`（11）、`layout_variation` → `layout_change`（6）、
+`language_variation` → `language_comparison`（1）へ入れ替え、**`vary_seed` → `composition_seed`**（186
+箇所）とした。
+**`vary_seed` は変奏ですらなく Stage 1.5 の構図 seed** で、**変奏の `variation_seed` / `variation_amplitude`
+は不変**である。
+CLI の旗（`--composition-seed` / `--composition-count`）と web の i18n 鍵（`hensou*` → `variation*`）も揃えた。
+**保存済みデータは migration で移す** — 起動時に列を RENAME し kind を UPDATE する。
+**本番 DB の複製で実測し（件数保存・`composition_seed` 9 件）、2 回目は 0 行＝冪等**。
+**凍結したのは rh2 payload の鍵 `vary_seed` と `ddl_expander` の salt `#hensou` / `#vary`** で、**どちらも同一性・hash
+の材料**である（改名したら保存済み全作品の rh2 が動き、検査が捕まえた）。
+**新旧の対応は `no-git-sync/opus5/name_convantion/RENAMES.md`**（作者指示）。
+**採番は v2.8.0 のまま＝未公開なので畳んだ**。
+さらに Build 724 で**記述の語も通した** — 辞書が 記述 = `description` と定めるのに**要求の主フィールドだけが `text` という第三の語**だったので、
+`text` → `description`、`original_text` → `original_description` とした。
+**`dh1` は値だけを hash しており鍵名を含まないので影響しない**（`rh2` の直後だったため着手前に実測した）。
+**LLM プロバイダへ送る payload の `"text"` 4 件は外部 API の契約なので不変**。
+**ただし Build 724 は付け先を間違えていた** — **`description` を「作者が書いた記述」ではなく「文脈を注入したあとの、Stage 1 へ渡す文字列」に与え**、
+作者の本文を `original_description` へ降格させていた。
+**Build 725 で訂正した**: **`description` = 作者が書いた記述**（interpret / paint では必須）、**Stage 1 が実際に読む文字列は
+`stage1_input`**（省略可。
+省略すれば記述そのものが Stage 1 へ渡る）。
+`/api/compose` の `original_description` も `description` へ（省略可。
+web の該当は実測 4 箇所で、契約の見積もり 3 箇所より 1 つ多かった）。
+**`input` は据え置きが作者裁定** — 本番 1780 件のうち **DDL 風 4 件・空 38 件**で散文とは限らず、中立な語のほうが筋が通る。
+**内部の関数引数は 1 つも動かしていない**（`composer.py` と `_call_compose_detail` の `original_description`
+は初めから意味が正しく、**片側だけ動かすと `TypeError` になる＝1 回目の着手が 42 件赤になった原因**）。
+**判別テスト 4 本を足し、実装を 2 点摂動して実際に赤くなることを確かめてから戻した**。 **さらに Build 726 で、残っていたローマ字も同じ版で通した** —
+打鍵する名前を全数（CLI サブコマンド 46・オプション 84・API パス 61）調べると、**奥書と同じ形はあと 1 つ＝添景の旗 `--tenkei` だけ**だった。
+**辞書は 添景 = `staffage` と既に定めており web はその語で表示していた**ので、ローマ字が残っていたのは打鍵する側だけである。
+`--staffage` へ移し**エイリアスは残さない**（奥書と同じ方針）。
+help の文言も第三の語 `scenery` から揃えた。
+**API の鍵 `tenkei`・DB 列・内部識別子・web の i18n 鍵は不動**（鍵名のローマ字は通例）で、**外部スクリプトが直すのは旗の綴りだけ**。
+**番人 2 つのうち 1 つは最初 上位パーサしか見ておらずエイリアスの摂動を素通りさせた**ため、サブパーサまで降りるよう直してから 2 本とも赤くなることを確かめた。
+**`/api/saijiki` と歳時記のカテゴリ鍵 9 個はローマ字が正しい英語表記**（辞書が 歳時記 = `Saijiki` = 固有名詞と定める。
+`renga` / `hacho` も同じ）で、**`sumi` / `washi` は識別子ではなく DDL の語彙値**である。 **Build 727 で CI を 8 回ぶりに緑へ戻した**
+— v2.7.9 の改名が render コーパスと coerce ゴールデンを**版を上げずにその場で再凍結**した一方、**DDL コーパスだけ取りこぼされていた**。
+再凍結が運んだのは改名 2 種（coerce 出力の道具名 1 件と、`vary_seed` を記録したままの manifest 入力 15 件）だけで、**`ddl_engine_version`
+は 1 のまま**。
+**引き継ぎが書いていた仕組みは誤りで**、凍結物の `hair` は validator が書き換える保存値ではなく **coerce 自身の生産物**だった（摂動を validator
+に当てて空振りし、`coerce/compose.py` の literal で初めて動いた）。
+**ガードは書き込みの後に発火する順へ改めた**（手前で止めると裁定済みの改名を再凍結する道が無い）。
+**SPEC §15.6 に「改名では版を上げない」を条文化**（日英）。
+**`check_frozen_corpora.py` で CI と同じものを手元で回す** — **テストは代替にならない**（`test_*_reference.py` は再生成しないので
+**1423 件が緑のままコーパスがずれる**）。
+**CI は最後の砦であって検出器ではない**（別 OS での再現性だけが CI にしかできない）。 **Build 728 で記述の語を打鍵する側でも揃えた** —
+`--original-text` は**埋める先の鍵が `description` なのに綴りに退役語 `text` を残していた**ので `--description` へ（エイリアス無し）。
+**同じ改名が 2 つのコマンドを黙って壊していた** — **`inspect` と `refine generate` は `_paint_payload` を通らず自前で payload
+を組んでおり、Build 724 以降も旧鍵 `text` を `/api/paint` へ送って 422 になっていた**（cli テストは実サーバを叩かないので 73 件が緑のままだった）。
+**捕まえたのは `*-text` 系の旗を全数分類したから**である。
+**`paint` / `batch` の help が記述を `prompt` と呼んでいた 4 箇所も直した**（`review evaluate --prompt` は LLM
+のプロンプトという別の指示対象なので不変）。
+**番人 4 つを 3 点の摂動で確認済み**。
 
-v2.9.0（Build 730）では**プロンプトが禁じて、かつ要求していた六つ**を整合させた。**明文の禁止をすべて拾い、同じプロンプトの残り全部と機械的に突き合わせた**結果である（二件は別セッションの発見）。**日本語の背景の定型を許可動詞へ移した** — 原則2 が `塗りつぶす` を禁止動詞に挙げながら §背景色 がその語で書けと命じ、作例 7 件が従っていたので、「背景を○色で埋める。」とした。**英語側は最初から `Fill background with X.` で衝突していない**（`fill` は許可動詞）ように、**どちらの矛盾も翻訳で片側にだけ生じている**。**解析側はすべて旧表現を受け続ける**ので保存済み作品はそのまま演奏でき、**残る背景検出（`api.py` の色判定・`compose.py` の節分割・`explicit_surface` マーカー）は `背景を` で判定していて動詞を見ない**。**coerce に触っていないので凍結コーパスが動かない**。**英語の `rise` / `fall` は運動語として書き分けた**（`rise (as motion), fall (as motion)`）— **同じ行の `scatter` は既に `(as motion)` / `(as arrangement)` と書き分けてあった**のに、かたむきの `rising` / `falling` に適用されていなかった。**「てざわりのない線・弧の文を出力してはいけない」は、自分の作例が日 20 文 / 英 9 文で破っていた** — **規則が悪例として名指しした「放射状に線を引く」が作例にほぼ原文で実在した**ので、関係・わりあい・かたむきだけを示す最小文を例外として明記し、実作例 11 文にてざわりを補った。**原則5「使えるのは Saijiki の語彙のみ」は語彙表に無い 13 語が破っていた**ので、**原則5 のほうを実態へ書き換えた**（語彙表は不変なので reference §1・web 表示・SPEC / README へ波及しない）。**未知対象の近似先から `多角形` を削った** — `saijiki.py` が「歳時記語彙ではない」と明記した隠しマーカーを本文が出力させていた。**許可動詞に `敷き詰める` / `tile` を追加**（うごき の語彙表は 6 語、許可動詞は 5 語だった）。**`ペン(既定)` は既定値であって推奨値ではない**と明記した。作例 1 件の禁止語 `広げる` だけは、後段のどの規則も正当化していない素の違反だった。**Stage 1 の golden は Build 591 の fixture のまま**にし、差分 14 件を `_REORDERED_JA` / `_REORDERED_EN` へ**宣言**として足した（**宣言のない差分は今も失敗する**）。**プロンプトの固定値 20 個を再凍結**（Stage 2 combined 日 `261373d0123a740f` → **`b5b40bbc27885eb1`**）。**副作用が 2 つ** — 英語の雪の例にてざわりを補ったらてざわり補充の fallback が発火しなくなり、**砂の例が k=5 の枠から外れた**（テストは「プールから消えていないこと」へ置き換え）。**`SPEC.ja.md` の Stage 1.5 の作例は灰背景のままで、仕様の例のほうが実装より古かった**（`_avoid_gray_background` が白へ書き換える）。**README の DDL は書き換えない** — あれは seed 付きで保存された実出力の引用である。**`埋める` は既に「面を要素で埋める」の意味を持つ**（Stage 2 の密度規則に「密集/埋める=120〜350」がある）ので、決定的な層は誤らないが **LLM が密度指示と読む余地は残る**。Stage 2 の背景規則へ「密度・数量の規則を当てない」を日英とも明記したが、**LLM を一度も回していないので効いているかは未確認**。engine は 15 のまま。pytest 1424/31。
+v2.9.0（Build 730）では**プロンプトが禁じて、かつ要求していた六つ**を整合させた。
+**明文の禁止をすべて拾い、同じプロンプトの残り全部と機械的に突き合わせた**結果である（二件は別セッションの発見）。
+**日本語の背景の定型を許可動詞へ移した** — 原則2 が `塗りつぶす` を禁止動詞に挙げながら §背景色 がその語で書けと命じ、作例 7 件が従っていたので、「背景を○色で埋める。
+」とした。
+**英語側は最初から `Fill background with X.` で衝突していない**（`fill` は許可動詞）ように、**どちらの矛盾も翻訳で片側にだけ生じている**。
+**解析側はすべて旧表現を受け続ける**ので保存済み作品はそのまま演奏でき、**残る背景検出（`api.py` の色判定・`compose.py` の節分割・`explicit_surface`
+マーカー）は `背景を` で判定していて動詞を見ない**。
+**coerce に触っていないので凍結コーパスが動かない**。
+**英語の `rise` / `fall` は運動語として書き分けた**（`rise (as motion), fall (as motion)`）— **同じ行の `scatter` は既に
+`(as motion)` / `(as arrangement)` と書き分けてあった**のに、かたむきの `rising` / `falling` に適用されていなかった。
+**「てざわりのない線・弧の文を出力してはいけない」は、自分の作例が日 20 文 / 英 9 文で破っていた** —
+**規則が悪例として名指しした「放射状に線を引く」が作例にほぼ原文で実在した**ので、関係・わりあい・かたむきだけを示す最小文を例外として明記し、実作例 11 文にてざわりを補った。
+**原則5「使えるのは Saijiki の語彙のみ」は語彙表に無い 13 語が破っていた**ので、**原則5 のほうを実態へ書き換えた**（語彙表は不変なので reference §1・web 表示・
+SPEC / README へ波及しない）。
+**未知対象の近似先から `多角形` を削った** — `saijiki.py` が「歳時記語彙ではない」と明記した隠しマーカーを本文が出力させていた。
+**許可動詞に `敷き詰める` / `tile` を追加**（うごき の語彙表は 6 語、許可動詞は 5 語だった）。
+**`ペン(既定)` は既定値であって推奨値ではない**と明記した。
+作例 1 件の禁止語 `広げる` だけは、後段のどの規則も正当化していない素の違反だった。
+**Stage 1 の golden は Build 591 の fixture のまま**にし、差分 14 件を `_REORDERED_JA` / `_REORDERED_EN`
+へ**宣言**として足した（**宣言のない差分は今も失敗する**）。
+**プロンプトの固定値 20 個を再凍結**（Stage 2 combined 日 `261373d0123a740f` → **`b5b40bbc27885eb1`**）。
+**副作用が 2 つ** — 英語の雪の例にてざわりを補ったらてざわり補充の fallback が発火しなくなり、**砂の例が k=5
+の枠から外れた**（テストは「プールから消えていないこと」へ置き換え）。
+**`SPEC.ja.md` の Stage 1.5 の作例は灰背景のままで、仕様の例のほうが実装より古かった**（`_avoid_gray_background` が白へ書き換える）。
+**README の DDL は書き換えない** — あれは seed 付きで保存された実出力の引用である。
+**`埋める` は既に「面を要素で埋める」の意味を持つ**（Stage 2 の密度規則に「密集/埋める=120〜350」がある）ので、決定的な層は誤らないが **LLM
+が密度指示と読む余地は残る**。
+Stage 2 の背景規則へ「密度・数量の規則を当てない」を日英とも明記したが、**LLM を一度も回していないので効いているかは未確認**。
+engine は 15 のまま。
+pytest 1424/31。
 
-v2.9.1（Build 731）では**モデル参照の解決から推測を全部外した**。修飾のない文字列は「`/` があれば NVIDIA」「`gemini-` で始まれば Gemini」「それ以外は OVMS」で当てていたが、**当たっているうちは見えないだけで、OVMS の接続先が止まった今、同じ経路は静かな失敗になる**（`/health` は 200 を返すので描画するまで気付かない）。新しい規則は **①明示修飾 → ②一意所有（設定済み provider のうちその model ID を持つものが**ちょうど 1 つ**ならそれ）→ ③段の既定** の 3 段で、推測の枝が無い。**②が「ちょうど 1 つ」であることが肝で、`gpt-oss:20b` は `ollama` と `ollama-cloud` の両方に在るので決めない**。**この曖昧性は Ollama Cloud を provider として足した時点で原理的に生じた**もので、それ以前は「修飾なしでも大体当たる」で済んでいた。**分割点が一意である根拠は provider ID が `:` を含み得ないこと**で、モデル ID 側は `qwen3.5:4b-q4_K_M` のように何個持ってもよい。**削除した 4 枝のうち `anthropic:` は前段で拾われるため一度も実行されない死んだ枝だった**。web 側からも **`gpt-oss:` の名指し特例と provider ID の直書き 6 行**を消した（**規則がモデル名を名指しで例外にしている時点で破綻の印**である）。あわせて **Ollama Cloud を別 provider として設定に載せ**（検証済み 18 本）、**律速が容量でなく同時実行である**ため（同時 8 で 429・その時点で無料枠は 7.6%）**provider 単位の同時実行上限**を provider 定義から読む形で新設した（**利用者が上げられる設定にはしない**）。**保存済みの `okugaki_model` とデモの `prompt_model` を対へ一本化**し、旧い単一修飾文字列は読み取りで割る。**挙動が変わるのはカタログに無い素の文字列だけ**で、`my-model` は `ovms` でなく段の provider へ行く。**期待値表は `web/scripts/model-ref-expectations.json` が唯一の正本で、server の pytest と node の `npm run lint:models` が同じファイルを読む**（日英 2 実装の一致が偶然でなく仕組みの性質になる）。**web にテストランナーは足していない** — Node が `.ts` を直接読めるので `i18n-lint.mjs` と同じ素の node スクリプトにした。**測って分かったが直していないこと**: **規則③は保存済みの段設定に届いていない**（渡る settings がカタログ側の dict で段の鍵を持たない。本改修より前からのずれ）、**`normalize_model_settings` は 1 回 5.0ms で `/api/paint` あたり 2 回**（**変更前は 4 回**。同じ判定の別実装が二重に正規化していた）。engine は 15 のまま。pytest 1487/31。
+v2.9.1（Build 731）では**モデル参照の解決から推測を全部外した**。
+修飾のない文字列は「`/` があれば NVIDIA」「`gemini-` で始まれば Gemini」「それ以外は OVMS」で当てていたが、**当たっているうちは見えないだけで、OVMS
+の接続先が止まった今、同じ経路は静かな失敗になる**（`/health` は 200 を返すので描画するまで気付かない）。
+新しい規則は **①明示修飾 → ②一意所有（設定済み provider のうちその model ID を持つものが**ちょうど 1 つ**ならそれ）→ ③段の既定** の 3 段で、推測の枝が無い。
+**②が「ちょうど 1 つ」であることが肝で、`gpt-oss:20b` は `ollama` と `ollama-cloud` の両方に在るので決めない**。
+**この曖昧性は Ollama Cloud を provider として足した時点で原理的に生じた**もので、それ以前は「修飾なしでも大体当たる」で済んでいた。
+**分割点が一意である根拠は provider ID が `:` を含み得ないこと**で、モデル ID 側は `qwen3.5:4b-q4_K_M` のように何個持ってもよい。
+**削除した 4 枝のうち `anthropic:` は前段で拾われるため一度も実行されない死んだ枝だった**。
+web 側からも **`gpt-oss:` の名指し特例と provider ID の直書き 6 行**を消した（**規則がモデル名を名指しで例外にしている時点で破綻の印**である）。
+あわせて **Ollama Cloud を別 provider として設定に載せ**（検証済み 18 本）、**律速が容量でなく同時実行である**ため（同時 8 で 429・その時点で無料枠は
+7.6%）**provider 単位の同時実行上限**を provider 定義から読む形で新設した（**利用者が上げられる設定にはしない**）。
+**保存済みの `okugaki_model` とデモの `prompt_model` を対へ一本化**し、旧い単一修飾文字列は読み取りで割る。
+**挙動が変わるのはカタログに無い素の文字列だけ**で、`my-model` は `ovms` でなく段の provider へ行く。
+**期待値表は `web/scripts/model-ref-expectations.json` が唯一の正本で、server の pytest と node の
+`npm run lint:models` が同じファイルを読む**（日英 2 実装の一致が偶然でなく仕組みの性質になる）。
+**web にテストランナーは足していない** — Node が `.ts` を直接読めるので `i18n-lint.mjs` と同じ素の node スクリプトにした。
+**測って分かったが直していないこと**: **規則③は保存済みの段設定に届いていない**（渡る settings がカタログ側の dict で段の鍵を持たない。
+本改修より前からのずれ）、**`normalize_model_settings` は 1 回 5.0ms で `/api/paint` あたり 2 回**（**変更前は 4 回**。
+同じ判定の別実装が二重に正規化していた）。
+engine は 15 のまま。
+pytest 1487/31。
 
-v2.9.2（Build 732）では**モデル名を出すところで必ずプロバイダ名を併記する**ようにした。モデル ID だけでは「どこで走るのか」を言っておらず、v2.9.1 で `gpt-oss:20b` が `ollama` と `ollama-cloud` の両方に在ることが確定したので**名前は一意ですらない**。表示は `プロバイダ名 / モデル名`（作者裁定 2026-07-27）。`models.ts` に `providerLabel()` と `modelDisplayName()` を足し、表示はすべてここを通す。**モデル選択カードは対象外**（カードはプロバイダ見出しの下に並んでいて文脈がある）。**CLI は元から併記していた**。server・cli・描画には触れていないので pytest と凍結コーパスは対象外。**判ったが直していないこと**: web の静的フォールバックカタログは `ollama-cloud` を 3 本しか持たない（server は 18 本）ため、カタログが届く前の一瞬だけ `gpt-oss:20b` が一意所有と見えて `Ollama` と表示される。v2.9.1 からある性質である。
+v2.9.2（Build 732）では**モデル名を出すところで必ずプロバイダ名を併記する**ようにした。
+モデル ID だけでは「どこで走るのか」を言っておらず、v2.9.1 で `gpt-oss:20b` が `ollama` と `ollama-cloud`
+の両方に在ることが確定したので**名前は一意ですらない**。
+表示は `プロバイダ名 / モデル名`（作者裁定 2026-07-27）。
+`models.ts` に `providerLabel()` と `modelDisplayName()` を足し、表示はすべてここを通す。
+**モデル選択カードは対象外**（カードはプロバイダ見出しの下に並んでいて文脈がある）。
+**CLI は元から併記していた**。
+server・cli・描画には触れていないので pytest と凍結コーパスは対象外。
+**判ったが直していないこと**: web の静的フォールバックカタログは `ollama-cloud` を 3 本しか持たない（server は 18 本）ため、カタログが届く前の一瞬だけ
+`gpt-oss:20b` が一意所有と見えて `Ollama` と表示される。
+v2.9.1 からある性質である。
 
-v2.9.3（Build 754）では **render engine 16** として 3 つの変更を 1 つの版にまとめた（engine 15 と同じ理由 — 同じ層に属し、版を 3 回上げれば Android の追随が 3 回要る）。**面は塗るのでなく演奏する** — 8 つのてざわり語のうち 6 つは図形の外接矩形に一様乱数で円を撒いており、**図形そのものを一度も見ていなかった**（三角で 46/90 = 51%、雲形で 43/90 = 48% の粒が図形の外に落ちていた。engine 16 はいずれも 0）。輪郭の内側へ位置を決めて粒 1 つを 1 筆として演奏し、走査は `_render_fill_strokes` と同じ `_scanline_segments` を使うので凹形もそのまま扱える。**`bleed` は bbox 中心の楕円 1 個**だったので図形が何であれ同じ絵で、輪郭を外へ押し出した帯 3 重にし**最内輪は輪郭の上（オフセット 0）**に置いた（滲みは縁の両側に起こる）。**`hatch` / `crosshatch` は 1 バイトも変えていない** — engine 15 の時点で中心線を `synthesize_along` へ通しており面を撒いていなかったので、**この 8 件が不変であることが「撒いていた 6 語だけ」に閉じている担保になる**。**同じ語がプロファイルごとに無関係な 2 つの絵になっていた**（display は `feTurbulence` + `feDisplacementMap` + `feGaussianBlur` の矩形、editable は円の散布）ので両者を同じ機構へ揃え、**display の clipPath も廃止した**（`bleed` は外へ染み出すので clip はむしろ描いたものを消す）。**速度は 1.44 倍**（面を持つ本番 119 件・display で 56.2 → 80.9 s）で、90 個の円を 90 本の合成ストロークに置き換えたぶんである。**微小な塗りは置く** — 走査線が引けない小ささの塗りは領域 fill へ縮退しており、**縮退は失敗を防いでいたのであって正しかったわけではない**（手の道具で塗った小さな図形がそこだけ機械の塗りになる）。1 筆の打点として置き、長い軸に沿って運んで幅は短い軸が決める。**境界は短辺がキャンバスの約 3%**（実測 2.9〜3.2%・道具 5 種 × seed 6 種で、**切り替わりは 1 度きりで行きつ戻りつしない**）。**運びの下限 0.90 は実測で選んだ** — 0.30 では `_edge_window` が両端の 16% ずつで幅を 0 まで落とすため **10px の塗り円が輪郭だけになって内部が空き**、1.10 では打点が図形より濃くなる（墨量 115%）。本番の手の道具の `filled` 閉図形のうち **75.3% が打点へ回る**。**太さは道具名から独立した軸になる** — 細い線を求めることは別の道具を求めることであり「細いペン」は書けなかった。`Instruction.thinness`（`fine` = 0.6 / `extra_fine` = 0.35）を置き、**下限は新しい数ではなく最も細い道具そのもの**（`MIN_STROKE_WIDTH = WEIGHT_TO_STROKE_WIDTH["silverpoint"]`）にした＝「銀筆より細い線は引けない」。**銀筆は太さの指定を受け付けない。これは仕様であって欠落ではない。** 倍率は 3 案を実際に描いて墨の被覆率で選んだ — **退けた 0.7/0.45 は太筆の `fine` が既定の 99%** で描いても変わらず、**退けた 0.5/0.25 は `extra_fine` で 11 道具の相異なる幅が 9 → 6 に落ちて太さの軸が道具の軸を食う**。**材質輪郭にも太さを通した**（`base_width` を公称幅に据え置くと**墨だけが細って材質が取り残される**。比例項を持つのは太筆とクレヨンだけで、**細いペンの線には太さの変わらない材質の帯が付く**）。**距離（offset）は動かしていない**。**演奏 seed の allowlist に入れた**（19 → 20）ので**太さを変えると線の通り道も変わり、銀筆は幅が変わらないのに手だけ変わる**。**coerce が添える線には付けない**ので、**記述された細さは記述者が書いた図形にだけ乗る**。**`thinness` は歳時記の語ではない**（作者裁定 2026-07-29。Stage 1 は太さ語を読んで正規化DDL へ書くが、語彙表と歳時記の表示には出ない）。**コーパス 365 件のうち 333 件が動き、不変 32 件は全部 `rotring` と `computer`** で、engine 12 の 12 件・engine 15 の 32 件に続いて **3 版連続で同じ側に立っている**（文法がすべてゼロで種を消費しない＝**手を変える軸は手を持たない道具に届かない**）。**`ddl_engine_version` 1 → 2** — DDL 層の振る舞いは変わらないまま instruction の dump に `"thinness": null` の 1 行が増えたので、凍結済みディレクトリを書き換えない規約に従い `ddl-engine-2/`（29 件）を新規に焼いた。**`ddl_version` 1 → 2**（作者裁定 2026-07-29。**DDL の語彙が増えた** — 「極細の黒い線」はそれまで書けなかった文である。保存済みの作品は `"1"` のまま残る）。**受け入れで 3 段それぞれの核へ摂動を当て**、輪郭を bbox へ戻すと S-3 が 4 件、太さの倍率を恒等にすると T-1 系が 13 件、打点への分岐を削ると F 系が 15 件、それぞれ赤になることを確かめた。**測って分かったが直していないこと**: **Stage 2 が `thinness` を埋める率は実測 10%** で設計時の観測 96% は再現しなかった（決定的な層はすべて緑なので**運ばれるかどうかは LLM の層の問題として残る**）。**Android はまだ engine 15 のままである**。pytest 1596/31。
+v2.9.3（Build 754）では **render engine 16** として 3 つの変更を 1 つの版にまとめた（engine 15 と同じ理由 — 同じ層に属し、版を 3 回上げれば
+Android の追随が 3 回要る）。
+**面は塗るのでなく演奏する** — 8 つのてざわり語のうち 6 つは図形の外接矩形に一様乱数で円を撒いており、**図形そのものを一度も見ていなかった**（三角で 46/90 = 51%、雲形で
+43/90 = 48% の粒が図形の外に落ちていた。
+engine 16 はいずれも 0）。
+輪郭の内側へ位置を決めて粒 1 つを 1 筆として演奏し、走査は `_render_fill_strokes` と同じ `_scanline_segments` を使うので凹形もそのまま扱える。
+**`bleed` は bbox 中心の楕円 1 個**だったので図形が何であれ同じ絵で、輪郭を外へ押し出した帯 3 重にし**最内輪は輪郭の上（オフセット
+0）**に置いた（滲みは縁の両側に起こる）。
+**`hatch` / `crosshatch` は 1 バイトも変えていない** — engine 15 の時点で中心線を `synthesize_along`
+へ通しており面を撒いていなかったので、**この 8 件が不変であることが「撒いていた 6 語だけ」に閉じている担保になる**。
+**同じ語がプロファイルごとに無関係な 2 つの絵になっていた**（display は `feTurbulence` + `feDisplacementMap` + `feGaussianBlur`
+の矩形、editable は円の散布）ので両者を同じ機構へ揃え、**display の clipPath も廃止した**（`bleed` は外へ染み出すので clip はむしろ描いたものを消す）。
+**速度は 1.44 倍**（面を持つ本番 119 件・display で 56.2 → 80.9 s）で、90 個の円を 90 本の合成ストロークに置き換えたぶんである。
+**微小な塗りは置く** — 走査線が引けない小ささの塗りは領域 fill へ縮退しており、
+**縮退は失敗を防いでいたのであって正しかったわけではない**（手の道具で塗った小さな図形がそこだけ機械の塗りになる）。
+1 筆の打点として置き、長い軸に沿って運んで幅は短い軸が決める。
+**境界は短辺がキャンバスの約 3%**（実測 2.9〜3.2%・道具 5 種 × seed 6 種で、**切り替わりは 1 度きりで行きつ戻りつしない**）。
+**運びの下限 0.90 は実測で選んだ** — 0.30 では `_edge_window` が両端の 16% ずつで幅を 0 まで落とすため **10px
+の塗り円が輪郭だけになって内部が空き**、1.10 では打点が図形より濃くなる（墨量 115%）。
+本番の手の道具の `filled` 閉図形のうち **75.3% が打点へ回る**。
+**太さは道具名から独立した軸になる** — 細い線を求めることは別の道具を求めることであり「細いペン」は書けなかった。
+`Instruction.thinness`（`fine` = 0.6 / `extra_fine` = 0.35）を置き、
+**下限は新しい数ではなく最も細い道具そのもの**（`MIN_STROKE_WIDTH = WEIGHT_TO_STROKE_WIDTH["silverpoint"]`）にした＝「銀筆より細い線は引けない」。
+**銀筆は太さの指定を受け付けない。
+これは仕様であって欠落ではない。
+** 倍率は 3 案を実際に描いて墨の被覆率で選んだ — **退けた 0.7/0.45 は太筆の `fine` が既定の 99%** で描いても変わらず、**退けた 0.5/0.25 は
+`extra_fine` で 11 道具の相異なる幅が 9 → 6 に落ちて太さの軸が道具の軸を食う**。
+**材質輪郭にも太さを通した**（`base_width` を公称幅に据え置くと**墨だけが細って材質が取り残される**。
+比例項を持つのは太筆とクレヨンだけで、**細いペンの線には太さの変わらない材質の帯が付く**）。
+**距離（offset）は動かしていない**。
+**演奏 seed の allowlist に入れた**（19 → 20）ので**太さを変えると線の通り道も変わり、銀筆は幅が変わらないのに手だけ変わる**。
+**coerce が添える線には付けない**ので、**記述された細さは記述者が書いた図形にだけ乗る**。
+**`thinness` は歳時記の語ではない**（作者裁定 2026-07-29。
+Stage 1 は太さ語を読んで正規化DDL へ書くが、語彙表と歳時記の表示には出ない）。
+**コーパス 365 件のうち 333 件が動き、不変 32 件は全部 `rotring` と `computer`** で、engine 12 の 12 件・engine 15 の 32
+件に続いて **3 版連続で同じ側に立っている**（文法がすべてゼロで種を消費しない＝**手を変える軸は手を持たない道具に届かない**）。
+**`ddl_engine_version` 1 → 2** — DDL 層の振る舞いは変わらないまま instruction の dump に `"thinness": null` の 1
+行が増えたので、凍結済みディレクトリを書き換えない規約に従い `ddl-engine-2/`（29 件）を新規に焼いた。
+**`ddl_version` 1 → 2**（作者裁定 2026-07-29。
+**DDL の語彙が増えた** — 「極細の黒い線」はそれまで書けなかった文である。
+保存済みの作品は `"1"` のまま残る）。
+**受け入れで 3 段それぞれの核へ摂動を当て**、輪郭を bbox へ戻すと S-3 が 4 件、太さの倍率を恒等にすると T-1 系が 13 件、打点への分岐を削ると F 系が 15 件、
+それぞれ赤になることを確かめた。
+**測って分かったが直していないこと**: **Stage 2 が `thinness` を埋める率は実測 10%** で設計時の観測 96%
+は再現しなかった（決定的な層はすべて緑なので**運ばれるかどうかは LLM の層の問題として残る**）。
+**Android はまだ engine 15 のままである**。
+pytest 1596/31。
 
-v2.9.4（Build 755）では **UI 調整 4 巡目**として作者の指示 32 件を消化した（Build 733〜753。**Build 749 は engine 16 が同じ採番器から先に取ったので 748 → 750 と飛んでいる**）。**生成情報ドロワーの詳細タブを 19 行 → 38 行にした** — `HistoryItem` と `PaintResponse` の全フィールドを 19 行と突き合わせ、**表示していなかった 18 属性**（`seed_text` / `variation_amplitude` / `variation_seed` / `focus` / `interpret_fallback` / プロンプト digest 3 種 / `instruction_lang_requested` / `note` / `lineage_generation` / `derivation_kind` / `batch_run_id` / `batch_line_number` / `ui_lang` / `render_color_catalog_sub` / `render_canvas_aspect_ratio` ほか）を足し、**全 38 行の見出しに tooltip を付け、5 つの小見出しで区切った**（解釈 / 演奏 / 同一性 / 由来 / 実行）。**`render_wild` は 3 状態**で、`null` =「この列を持つ前に保存された作品」を OFF と区別して `記録なし` と出す。**由来の群は 4 項目とも無い作品では群ごと出さない**。見送った属性は 13（色の実マップ・キャプションで既出・プロンプトタブ・サーバー内部パス・系譜タブの ID 群・★ボタンで表す `starred`）。**`derivation.ts` を新設**して派生種別の対応表を `LineagePanel` から出し、`CanvasPanel` と型ごと共有した。**指示書という名前へ統一した** — 利用者が編集する対象を指す 9 キーだけを改称し（`DDLを編集` → `指示書を編集`）、**技術的な表記（来歴の `DDL 仕様`・`正規化DDL`・`Stage 2 ユーザー入力 (正規化DDL)`）はそのまま**。記述タブの指示書ボックスの右下に**「指示書から描画」ボタン**を置いた（既存の `replay()` = `/api/compose` を結線しただけで、**新しい描画経路も新しい派生種別も作っていない**）。**ダークがリリース既定になった** — 新規ユーザーの `ui_theme` と未ログイン画面の初期値（**既存ユーザーの一斉変更はしないのが作者裁定**）。**`AuthPanel` はライトの値を直書きした 1 組しか持っていなかった**ので、直書きをローカルトークンにしてダークの属性セレクタに暗い 1 組を置いた。**背景の作品は反転していない** — 白い紙に墨の線という素材で、`--canvas-paper` がダークでも紙のままなのと同じ規律である。**系譜タブ**はカードから星を付け外しでき（**`updateHistoryStarState` が `lineageGraph` を見ていなかったので押しても画面が変わらなかった**）、**ダブルクリックで作品タブへ遷移**し（**ダブルクリックはシングルのハンドラを 2 回通す**ので「選択中なら取り直さない」ガードを足した）、**起点からスター付きノードへ至る辺をオレンジで描く**。**マスコットは立方体の Incu と蟹の Yuragi の 2 つに決着**し（死んでいたチェックボックス 2 つ → ラジオ 2 つ）、`KiwiMascot` / `CrabMascot` と localStorage 3 キー・i18n 3 キーを削除した。**選択は prop で貫かず言語パックと同じモジュール状態にした** — `RunStatus` は 10 箇所から呼ばれるので prop にすると 10 経路に同じ引数が増える。**履歴管理モーダルの説明は「切る箱」を先に数えて 2 種を使い分けた** — `Tooltip` の吹き出しは `position: absolute` なので祖先の `overflow` で切られる（`.history-modal` / `.settings-tabs` ×2 / 一覧 3 つ）。**切る箱の中は native `title`**（ブラウザ自身の tooltip はウインドウにだけ従う）、**外は `Tooltip` ですべて下向き**。**タブ 4 つを吹き出しへ揃えるには `.settings-tabs` の `overflow: hidden` を外す必要がある**ので未裁定として残した。**用語辞書の例外を増やした**（作者承認。`prompt` 6 キー・`generat` 2 キーを `GLOSSARY.md` §5-2 と `i18n-lint.mjs` へ同一 commit で）— **プロンプト digest はプロンプトそのものの指紋**なので辞書の言い換えでは意味が変わる。**受け入れで直したもの（実装セッションの報告に無い）**: **`test_current_user_theme_can_be_updated` が判別力を失っていた** — Build 744 が既定を dark にしたとき `"light"` を機械的に `"dark"` へ置換したため**既定 dark に dark を PATCH する形**になり、**`row.ui_theme = ui_theme` を潰しても緑のまま通る**（実測）。既定でない側を要求して読み戻す形へ直し、摂動で赤くなることを確かめた。`npm run check` 0 errors / 2 warnings / **218 files**、`lint:i18n` **877 / 44 / 0 / 0**、`lint:models` 56。pytest 1596/31。**描画には触れていない**ので凍結コーパスは対象外。
+v2.9.4（Build 755）では **UI 調整 4 巡目**として作者の指示 32 件を消化した（Build 733〜753。
+**Build 749 は engine 16 が同じ採番器から先に取ったので 748 → 750 と飛んでいる**）。
+**生成情報ドロワーの詳細タブを 19 行 → 38 行にした** — `HistoryItem` と `PaintResponse` の全フィールドを 19 行と突き合わせ、**表示していなかった
+18 属性**（`seed_text` / `variation_amplitude` / `variation_seed` / `focus` / `interpret_fallback` /
+プロンプト digest 3 種 / `instruction_lang_requested` / `note` / `lineage_generation` / `derivation_kind`
+/ `batch_run_id` / `batch_line_number` / `ui_lang` / `render_color_catalog_sub` /
+`render_canvas_aspect_ratio` ほか）を足し、**全 38 行の見出しに tooltip を付け、5 つの小見出しで区切った**（解釈 / 演奏 / 同一性 / 由来 /
+実行）。
+**`render_wild` は 3 状態**で、`null` =「この列を持つ前に保存された作品」を OFF と区別して `記録なし` と出す。
+**由来の群は 4 項目とも無い作品では群ごと出さない**。
+見送った属性は 13（色の実マップ・キャプションで既出・プロンプトタブ・サーバー内部パス・系譜タブの ID 群・★ボタンで表す `starred`）。
+**`derivation.ts` を新設**して派生種別の対応表を `LineagePanel` から出し、`CanvasPanel` と型ごと共有した。
+**指示書という名前へ統一した** — 利用者が編集する対象を指す 9 キーだけを改称し（`DDLを編集` → `指示書を編集`）、**技術的な表記（来歴の `DDL 仕様`・`正規化DDL`・
+`Stage 2 ユーザー入力 (正規化DDL)`）はそのまま**。
+記述タブの指示書ボックスの右下に**「指示書から描画」ボタン**を置いた（既存の `replay()` = `/api/compose` を結線しただけで、
+**新しい描画経路も新しい派生種別も作っていない**）。
+**ダークがリリース既定になった** — 新規ユーザーの `ui_theme` と未ログイン画面の初期値（**既存ユーザーの一斉変更はしないのが作者裁定**）。
+**`AuthPanel` はライトの値を直書きした 1 組しか持っていなかった**ので、直書きをローカルトークンにしてダークの属性セレクタに暗い 1 組を置いた。
+**背景の作品は反転していない** — 白い紙に墨の線という素材で、`--canvas-paper` がダークでも紙のままなのと同じ規律である。
+**系譜タブ**はカードから星を付け外しでき（**`updateHistoryStarState` が `lineageGraph` を見ていなかったので押しても画面が変わらなかった**）、
+**ダブルクリックで作品タブへ遷移**し（**ダブルクリックはシングルのハンドラを 2 回通す**ので「選択中なら取り直さない」ガードを足した）、
+**起点からスター付きノードへ至る辺をオレンジで描く**。
+**マスコットは立方体の Incu と蟹の Yuragi の 2 つに決着**し（死んでいたチェックボックス 2 つ → ラジオ 2 つ）、`KiwiMascot` / `CrabMascot` と
+localStorage 3 キー・i18n 3 キーを削除した。
+**選択は prop で貫かず言語パックと同じモジュール状態にした** — `RunStatus` は 10 箇所から呼ばれるので prop にすると 10 経路に同じ引数が増える。
+**履歴管理モーダルの説明は「切る箱」を先に数えて 2 種を使い分けた** — `Tooltip` の吹き出しは `position: absolute` なので祖先の `overflow`
+で切られる（`.history-modal` / `.settings-tabs` ×2 / 一覧 3 つ）。
+**切る箱の中は native `title`**（ブラウザ自身の tooltip はウインドウにだけ従う）、**外は `Tooltip` ですべて下向き**。
+**タブ 4 つを吹き出しへ揃えるには `.settings-tabs` の `overflow: hidden` を外す必要がある**ので未裁定として残した。
+**用語辞書の例外を増やした**（作者承認。
+`prompt` 6 キー・`generat` 2 キーを `GLOSSARY.md` §5-2 と `i18n-lint.mjs` へ同一 commit で）— **プロンプト digest
+はプロンプトそのものの指紋**なので辞書の言い換えでは意味が変わる。
+**受け入れで直したもの（実装セッションの報告に無い）**: **`test_current_user_theme_can_be_updated` が判別力を失っていた** — Build 744
+が既定を dark にしたとき `"light"` を機械的に `"dark"` へ置換したため**既定 dark に dark を PATCH する形**になり、
+**`row.ui_theme = ui_theme` を潰しても緑のまま通る**（実測）。
+既定でない側を要求して読み戻す形へ直し、摂動で赤くなることを確かめた。
+`npm run check` 0 errors / 2 warnings / **218 files**、`lint:i18n` **877 / 44 / 0 / 0**、
+`lint:models` 56。
+pytest 1596/31。
+**描画には触れていない**ので凍結コーパスは対象外。
 
-v2.9.5（Build 763）では **`Instruction.thinness` の宣言を末尾へ移した**（`weight` の直後 = 14 番目 → 23 番目）。**Stage 2 の tool schema はプロパティの並び順ごと LLM へ渡り、任意フィールドは後ろにあるほど埋まる** — engine 16 で入れた太さの軸は、宣言位置のせいでほとんど絵に出ていなかった。**搬送は 18% → 89%**（異なり入力 25 件・`nvidia:google/gemma-4-31b-it`・太さ語を含む 19 件で 25/28 instruction）。**フィールドの中身は 1 文字も変えていない。移したのは位置だけである。** 同じ版で **`_stage2_prompt_digest` の `sort_keys=True` を外した** — **指紋が並び順に対して盲目だったので、絵を動かす変更が `history.stage2_prompt_digest` に 1 度も残っていなかった**（日 `32e65db9dcb68e99` → `e11b7daa7c65a5fe`、英 `31d357f591d4cf9b` → `e1eacdb0176f7f98`。**保存済みの値は書き換えない** — 過去の値は過去のスキーマ順を指す値としてそのまま残る）。**この性質を捕まえるゲートは他に無かった** — 凍結コーパスは Score から始まるので Stage 2 を通らず、**段 1 だけを当てた状態では 1596 件が緑のまま**だった（実測）。判別テスト 4 件を新設し、**受け入れ側でも段ごとに摂動を当てて**、段 1 を戻すと P-1 と P-3 が、段 2 を戻すと P-3 が赤くなることを確かめた。**`ddl_engine_version` 2 → 3**（`ddl_version` は `2` 据え置き＝語彙は増えていない。**render engine も `16` 据え置き＝演奏は 1 バイトも動かない**）。**参照コーパス `ddl-engine-3/` の 29 ケースは `ddl-engine-2/` とバイト一致で、`changed_from_previous` は空である** — **その空白がこの版の説明であり**、コーパスが Score を固定して変換を見る検査である以上、**書かれる Score そのものが変わる変化を 1 件も動かさない**。**`gen_ddl_reference.py` は新しい版を切るたび全ケースを「動いた」と記録していた**ので（engine 2 では全 dump が実際に変わったため見えなかった）、前の版の manifest と突き合わせて決めるよう直した — `gen_render_reference.py` と `server/reference/README.md` の手順 4 が既に定めていたものである。`ddl_engine_version == "2"` を固定していたテスト 5 件は採り直した。pytest 1600/31（+4 = 新規テスト）、cli 76、`npm run check` 0 errors / 2 warnings / 218 files、`check_frozen_corpora.py` バイト一致。**Build 762 は別ブランチが先に採っていたので 763 へ飛んでいる。**
+v2.9.5（Build 763）では **`Instruction.thinness` の宣言を末尾へ移した**（`weight` の直後 = 14 番目 → 23 番目）。
+**Stage 2 の tool schema はプロパティの並び順ごと LLM へ渡り、任意フィールドは後ろにあるほど埋まる** — engine 16 で入れた太さの軸は、
+宣言位置のせいでほとんど絵に出ていなかった。
+**搬送は 18% → 89%**（異なり入力 25 件・`nvidia:google/gemma-4-31b-it`・太さ語を含む 19 件で 25/28 instruction）。
+**フィールドの中身は 1 文字も変えていない。
+移したのは位置だけである。
+** 同じ版で **`_stage2_prompt_digest` の `sort_keys=True` を外した** — **指紋が並び順に対して盲目だったので、絵を動かす変更が
+`history.stage2_prompt_digest` に 1 度も残っていなかった**（日 `32e65db9dcb68e99` → `e11b7daa7c65a5fe`、英
+`31d357f591d4cf9b` → `e1eacdb0176f7f98`。
+**保存済みの値は書き換えない** — 過去の値は過去のスキーマ順を指す値としてそのまま残る）。
+**この性質を捕まえるゲートは他に無かった** — 凍結コーパスは Score から始まるので Stage 2 を通らず、**段 1 だけを当てた状態では 1596 件が緑のまま**だった（実測）。
+判別テスト 4 件を新設し、**受け入れ側でも段ごとに摂動を当てて**、段 1 を戻すと P-1 と P-3 が、段 2 を戻すと P-3 が赤くなることを確かめた。
+**`ddl_engine_version` 2 → 3**（`ddl_version` は `2` 据え置き＝語彙は増えていない。
+**render engine も `16` 据え置き＝演奏は 1 バイトも動かない**）。
+**参照コーパス `ddl-engine-3/` の 29 ケースは `ddl-engine-2/` とバイト一致で、`changed_from_previous` は空である** —
+**その空白がこの版の説明であり**、コーパスが Score を固定して変換を見る検査である以上、**書かれる Score そのものが変わる変化を 1 件も動かさない**。
+**`gen_ddl_reference.py` は新しい版を切るたび全ケースを「動いた」と記録していた**ので（engine 2 では全 dump が実際に変わったため見えなかった）、前の版の
+manifest と突き合わせて決めるよう直した — `gen_render_reference.py` と `server/reference/README.md` の手順 4
+が既に定めていたものである。
+`ddl_engine_version == "2"` を固定していたテスト 5 件は採り直した。
+pytest 1600/31（+4 = 新規テスト）、cli 76、`npm run check` 0 errors / 2 warnings / 218 files、
+`check_frozen_corpora.py` バイト一致。
+**Build 762 は別ブランチが先に採っていたので 763 へ飛んでいる。
+**
 
-v2.9.6（Build 765）では **API キーを 1 つも用意せずに始められるようになった**。手元の [Ollama](https://ollama.com) を provider に選ぶ道で、**実測に基づく推奨は Stage 1 `qwen3.5:4b-q4_K_M` + Stage 2 `ministral-3:8b-instruct-2512-q4_K_M`**（合計 9.4GB・被覆 71%。旧・承認済みの `qwen3.5:4b` + `gemma4:e4b` = 13.0GB・64% から乗り換えた）。`SETUP` 日英へ「API キーなしで動かす」を新設し、`deploy/compose.yaml` は `api` へ `OLLAMA_BASE_URL` を渡して `extra_hosts` で `host.docker.internal` を gateway へ写す（**コンテナから見た「手元」はホストではない**）。**Ollama のモデル一覧は実際に計測した 10 本へ差し替え**（`MODEL_CONFIG_VERSION` 2.2.0 → 2.3.0）、**タグに量子化まで書く**（素タグは上流で中身が差し替わり、計測と結びつかなくなる）。**Stage 2 はローカル Ollama へ tool ではなくスキーマで訊く**（`response_format`）— **tool 定義はプロンプトに乗り、Score スキーマが大きすぎて Ollama がプロンプトの 75% を捨てていた**。**思考は止める**（`reasoning_effort="none"`）— **Ollama は指定が無いと自分で思考を始め、その思考は答えと同じ予算を食う**ので、超えた分だけ何も返らなくなっていた（止めると 8 倍速く、被覆は不変）。**速度はリリース表示から外してデベロッパーモード限定にした**（`speed_developer_only`。GPU の無い 1 台で測った数字は他人の環境への約束にならない）。**保存済みカタログの再取り込みを nvidia 限定から全 builtin provider へ広げた** — 保存された一覧は設置環境自身のものだが、**計測が変わったカタログより長生きしてはならない**ので、版が上がったら builtin のメタデータを同じ id へ貼り直す。**受け入れで直したもの**: 分岐点が Build 730 で、その後 main の `e653f52`（Build 731）が `PROVIDER_GROUPS` の id を修飾なしへ揃えていたため、**片方のブランチだけでは 1 つも赤くならない食い違いが 3 つ出た** — 追加 10 本が `ollama:` 付きだった／`test_web_fallback_list_matches_the_catalog` が `ollama:` 前提の正規表現で読んでいた（緩めると群自身の `id: 'ollama'` を拾うので走査開始を `models: [` へ移した）／**期待値表 `web/scripts/model-ref-expectations.json` が差し替え前のカタログを記述していた**（`gpt-oss:20b` は ollama-cloud の単独所有へ、`qwen3.5:4b-q4_K_M` は ollama の単独所有へ、`llama3.2` はどこにも無くなり「退役した id は規則 2 で決まらなくなる」を担う）。さらに **Ollama 一覧の差し替えで、2 つの provider が共に載せるモデルが出荷カタログから消え**、`test_sole_ownership_decides_and_ambiguity_does_not` が**「the ambiguity this rule exists for is gone」と名指しで失敗した** — 第 2 の所有者を期待値表で明示的に注入し、Python と node の両方が組み立て前に足す形にした（3 つの assertion は不変）。**摂動 4 件を機構ごとに当て直した**（思考抑止／再取り込みの拡大／速度の隠蔽／`response_format` の分岐）。pytest 1628/31、cli 76、`npm run check` 0/2/218、`lint:models` **58**、`lint:i18n` 877/44/0/0。**版数は patch** — レポートは minor を推したが、規則の minor は「作者が節目と明示」か「互換が切れるとき」に限られ、保存データ・API・エディション ID の形式はどれも動いていない。
+v2.9.6（Build 765）では **API キーを 1 つも用意せずに始められるようになった**。
+手元の [Ollama](https://ollama.com) を provider に選ぶ道で、**実測に基づく推奨は Stage 1 `qwen3.5:4b-q4_K_M` + Stage 2
+`ministral-3:8b-instruct-2512-q4_K_M`**（合計 9.4GB・被覆 71%。
+旧・承認済みの `qwen3.5:4b` + `gemma4:e4b` = 13.0GB・64% から乗り換えた）。
+`SETUP` 日英へ「API キーなしで動かす」を新設し、`deploy/compose.yaml` は `api` へ `OLLAMA_BASE_URL` を渡して `extra_hosts`
+で `host.docker.internal` を gateway へ写す（**コンテナから見た「手元」はホストではない**）。
+**Ollama のモデル一覧は実際に計測した 10 本へ差し替え**（`MODEL_CONFIG_VERSION` 2.2.0 → 2.3.0）、
+**タグに量子化まで書く**（素タグは上流で中身が差し替わり、計測と結びつかなくなる）。
+**Stage 2 はローカル Ollama へ tool ではなくスキーマで訊く**（`response_format`）— **tool 定義はプロンプトに乗り、Score スキーマが大きすぎて
+Ollama がプロンプトの 75% を捨てていた**。
+**思考は止める**（`reasoning_effort="none"`）— **Ollama は指定が無いと自分で思考を始め、その思考は答えと同じ予算を食う**ので、
+超えた分だけ何も返らなくなっていた（止めると 8 倍速く、被覆は不変）。
+**速度はリリース表示から外してデベロッパーモード限定にした**（`speed_developer_only`。
+GPU の無い 1 台で測った数字は他人の環境への約束にならない）。
+**保存済みカタログの再取り込みを nvidia 限定から全 builtin provider へ広げた** — 保存された一覧は設置環境自身のものだが、
+**計測が変わったカタログより長生きしてはならない**ので、版が上がったら builtin のメタデータを同じ id へ貼り直す。
+**受け入れで直したもの**: 分岐点が Build 730 で、その後 main の `e653f52`（Build 731）が `PROVIDER_GROUPS` の id
+を修飾なしへ揃えていたため、**片方のブランチだけでは 1 つも赤くならない食い違いが 3 つ出た** — 追加 10 本が `ollama:`
+付きだった／`test_web_fallback_list_matches_the_catalog` が `ollama:` 前提の正規表現で読んでいた（緩めると群自身の
+`id: 'ollama'` を拾うので走査開始を `models: [` へ移した）／**期待値表 `web/scripts/model-ref-expectations.json`
+が差し替え前のカタログを記述していた**（`gpt-oss:20b` は ollama-cloud の単独所有へ、`qwen3.5:4b-q4_K_M` は ollama の単独所有へ、
+`llama3.2` はどこにも無くなり「退役した id は規則 2 で決まらなくなる」を担う）。
+さらに **Ollama 一覧の差し替えで、2 つの provider が共に載せるモデルが出荷カタログから消え**、
+`test_sole_ownership_decides_and_ambiguity_does_not` が**「the ambiguity this rule exists for is
+gone」と名指しで失敗した** — 第 2 の所有者を期待値表で明示的に注入し、Python と node の両方が組み立て前に足す形にした（3 つの assertion は不変）。
+**摂動 4 件を機構ごとに当て直した**（思考抑止／再取り込みの拡大／速度の隠蔽／`response_format` の分岐）。
+pytest 1628/31、cli 76、`npm run check` 0/2/218、`lint:models` **58**、`lint:i18n` 877/44/0/0。
+**版数は patch** — レポートは minor を推したが、規則の minor は「作者が節目と明示」か「互換が切れるとき」に限られ、保存データ・API・エディション ID
+の形式はどれも動いていない。
 
-v2.9.7（Build 766）では **作品カードが見分けるためのものだけを載せるようになり、DB バックアップが実施時刻を持つようになった**。UI 調整 5 巡目（[I-044]）で、作者の 5 つの指示を Build 756〜760 として順に配備し、全部を実 UI で受け入れた。**履歴管理モーダルのタブ 4 つが他のボタンと同じ吹き出しを持つ**（[I-042]）— `.settings-tabs` は角丸を切るために `overflow: hidden` を持ち、**中の吹き出しを箱がクリップしていた**ので native `title` を使っていた。**作品カードの操作行から動詞が消えた** — 削除系はツールバーへ集約し、`再現` は**モーダル内 3 箇所すべて**から外した（1 箇所だけ直すと同じモーダルの別の見え方に残る。機能そのものは `CanvasPanel` に残る）。残るのは 星 / ハッシュ / **世代番号** / **モデル名**。**DB バックアップに常駐スケジューラを新設した** — `ensure_scheduled_db_backup()` の**呼び出し元は管理者専用の `GET /api/settings/status` 1 箇所だけ**で、「N 日ごと」は**管理者が画面を開いた最初のときに実施される**遅延実行だった。ここへ「何時何分」を足すと設定欄が嘘をつくので、**着手前に作者へ示して裁定を得た**。`_lifespan` が 1 分ごとに期限を問い（`INKU_DB_BACKUP_SCHEDULER=0` で外せる）、**予定は前回バックアップの時刻から導くので、起床が遅れてもコピーが遅れるだけで飛ばされない**。**設定に `backup_hour` / `backup_minute` を足し**（既定 3:00）、**間隔が「日」を、時刻が「その日のいつ」を決める**。**保持しているデータの一覧**（世代 / 種別 / 日時 / 容量）が `/api/settings/status` に相乗りし、**世代 1 が最新・手動は間引かれないので番号の外**（`—`）、**payload は 50 件で打ち切るが合計件数と合計容量は全ファイルぶんを返す**。**「再読み込み」がバックアップを 1 本書くことがあった** — 残っていた呼び出しは**スケジューラを足す前は唯一の引き金**で、足した後は副作用だけが残っていた（作者裁定で削除）。**バックアップ時刻の欄は読めなかった**（作者「謎すぎて理解できない」）— **欄が 3 つに増えて 1 トラックが約 108px しかなく `input[type="time"]` が入りきらない**ことと、**説明を 3 欄まとめて下に置いたこと**が重なっていたので、**時・分を隣と同じ数値欄 2 つへ置き換えた**。`再読み込み` は **`表示更新`** へ（3 タブが共有する 1 キー）。**`SPEC.md` §22 の「予定されたバックアップは設定 status endpoint が読まれたときに作られる」は、この版が撤去した挙動そのものなので直した**（**日本語 SPEC に運用節は無い**ので英語だけ）。**摂動 8 件はすべて実装セッションが当て、すべて赤くなった**。**受け入れ側は再測定していない**（作者裁定「二重のテストは不要」）。**時刻のテストが既定の 3:00 でなく 22:45 を要求している**のは、4 巡目の「既定値を変えるとその既定を確かめていたテストが恒真になる」を踏まないためである。pytest 1635/31（+7）、cli 76、`npm run check` 0/2/218、**`lint:i18n` 897/47/0/0**、`lint:models` 58。**版数は patch** — UI 5 件とサーバー 2 件だが、**保存データ・API・エディション ID のどの形式も動いていない**（設定への鍵 2 つは追加のみ）。
+v2.9.7（Build 766）では **作品カードが見分けるためのものだけを載せるようになり、DB バックアップが実施時刻を持つようになった**。
+UI 調整 5 巡目（[I-044]）で、作者の 5 つの指示を Build 756〜760 として順に配備し、全部を実 UI で受け入れた。
+**履歴管理モーダルのタブ 4 つが他のボタンと同じ吹き出しを持つ**（[I-042]）— `.settings-tabs` は角丸を切るために `overflow: hidden` を持ち、
+**中の吹き出しを箱がクリップしていた**ので native `title` を使っていた。
+**作品カードの操作行から動詞が消えた** — 削除系はツールバーへ集約し、`再現` は**モーダル内 3 箇所すべて**から外した（1 箇所だけ直すと同じモーダルの別の見え方に残る。
+機能そのものは `CanvasPanel` に残る）。
+残るのは 星 / ハッシュ / **世代番号** / **モデル名**。
+**DB バックアップに常駐スケジューラを新設した** — `ensure_scheduled_db_backup()` の**呼び出し元は管理者専用の
+`GET /api/settings/status` 1 箇所だけ**で、「N 日ごと」は**管理者が画面を開いた最初のときに実施される**遅延実行だった。
+ここへ「何時何分」を足すと設定欄が嘘をつくので、**着手前に作者へ示して裁定を得た**。
+`_lifespan` が 1 分ごとに期限を問い（`INKU_DB_BACKUP_SCHEDULER=0` で外せる）、**予定は前回バックアップの時刻から導くので、
+起床が遅れてもコピーが遅れるだけで飛ばされない**。
+**設定に `backup_hour` / `backup_minute` を足し**（既定 3:00）、**間隔が「日」を、時刻が「その日のいつ」を決める**。
+**保持しているデータの一覧**（世代 / 種別 / 日時 / 容量）が `/api/settings/status` に相乗りし、**世代 1 が最新・手動は間引かれないので番号の外**（`—`）、
+**payload は 50 件で打ち切るが合計件数と合計容量は全ファイルぶんを返す**。
+**「再読み込み」がバックアップを 1 本書くことがあった** — 残っていた呼び出しは**スケジューラを足す前は唯一の引き金**で、足した後は副作用だけが残っていた（作者裁定で削除）。
+**バックアップ時刻の欄は読めなかった**（作者「謎すぎて理解できない」）— **欄が 3 つに増えて 1 トラックが約 108px しかなく `input[type="time"]`
+が入りきらない**ことと、**説明を 3 欄まとめて下に置いたこと**が重なっていたので、**時・分を隣と同じ数値欄 2 つへ置き換えた**。
+`再読み込み` は **`表示更新`** へ（3 タブが共有する 1 キー）。
+**`SPEC.md` §22 の「予定されたバックアップは設定 status endpoint が読まれたときに作られる」は、この版が撤去した挙動そのものなので直した**（**日本語 SPEC
+に運用節は無い**ので英語だけ）。
+**摂動 8 件はすべて実装セッションが当て、すべて赤くなった**。
+**受け入れ側は再測定していない**（作者裁定「二重のテストは不要」）。
+**時刻のテストが既定の 3:00 でなく 22:45 を要求している**のは、4 巡目の「既定値を変えるとその既定を確かめていたテストが恒真になる」を踏まないためである。
+pytest 1635/31（+7）、cli 76、`npm run check` 0/2/218、**`lint:i18n` 897/47/0/0**、`lint:models` 58。
+**版数は patch** — UI 5 件とサーバー 2 件だが、**保存データ・API・エディション ID のどの形式も動いていない**（設定への鍵 2 つは追加のみ）。
 
-v2.9.8（Build 776）では **画面に出す道具の量を書き手が選べるようになり、選べないモデルに印が付いた**。UI モードを 3 つ持ち（**シンプル** = 必須のみ ／ **フル** = 従来どおり ／ **カスタム** = 必須に 7 群を個別に足す）、**ログインユーザーごとに DB へ保存する。新しいアカウントはシンプルから始まる**。**変えるのは表示層だけ**で機能経路・履歴・保存データは動かず、隠れている道具もモードを戻せば動く。**習熟度の呼び名（Beginner / Expert）は `GLOSSARY.md` で退けた**。favicon をプロジェクトのアイコンにした。Ollama Cloud は **18 本のうち 10 本が無料枠で 403 を返す**ので `requires_subscription` で選択不可にし、**この印は一覧を取り直しても外さない**（EOL は一覧が反映するので外れる＝**印の出所が一覧か実測かの違い**）。叩ける 8 本は 4 実行ずつ測って推奨度を与えたが、**推奨度 5 は出していない**（4 試行では共有基盤の当たり外れと実力を分けられない。同じ `gemma4:31b` の中央値が同日に 11s → 105s → 35s と動いた）。**起動直後の控えの一覧（`models.ts`）からも有料の 2 本を外した** — 控えには印が付かないので数百ミリ秒だけ普通に見えてしまう。**規則は「一覧を新しく保て」ではなく「印で守るものを、印が出ない場所に置くな」**である。モデルが書いた `version` の推測で Score を捨てず、推測のほうを捨てる（**全 provider の 5 経路を通る、本版で最も広い変更**）。**`MODEL_CONFIG_VERSION` を 2.3.0 → 2.4.0 へ上げた**。ただし**実装セッションが挙げた理由は実測と違っていた** — pentala の保存済みは `2.2.0` で、**上げなくても貼り直しは走る状態だった**。効き先は「**すでに 2.3.0 で保存されている設置**」である。**共有機で事故が起きた** — 並行ブランチの `rsync -a server/src/inku_server/` が相手のブランチの `ui_mode` / `ui_custom` を pentala から消した。**分岐後に相手が足したものを自分のブランチは持たないので、ディレクトリごと送れば消える**（`AGENTS.md` は「`server/` を全体 rsync しない」と書いていたが、**一段下でも同じことが起きる**とは書いていなかった）。手当ては **フロントが PATCH 応答を要求値と照合し、未知フィールドを無視した 200 を成功扱いしない**ことと、**deploy helper が「リモートにある機能がローカルに無い同期」を rsync の前に拒否する**ことの 2 つで、恒久対策は台帳 **[I-053]** に預けた。**`BUILD_NUMBER` は 766 の次が 776 である**（767〜771 = UI 6 巡目、772 と 774 = Ollama Cloud、773 と 775 = 配備専用の統合ブランチ）＝ **採番器はブランチごとの値ではなく共有の連番で、自分の +1 が空いているとは限らない**。**受け入れで最も効いた検査**: マージ結果と、pentala で全緑が確認された統合ブランチのツリーを突き合わせたところ、**差はドキュメント 5 ファイルと `BUILD_NUMBER` だけで、ソースは 1 バイトも違わなかった**。pytest **1668/31**、cli 76、ruff clean、`npm run check` 219/0/2、**`lint:i18n` 918/47/0/0**、`lint:models` 58、`check_docs.py` 緑。**版数は patch** — DB の列 2 本は既定値つきの migration を伴う追加のみで、保存データ・API・エディション ID のどの形式も動いていない。
+v2.9.8（Build 776）では **画面に出す道具の量を書き手が選べるようになり、選べないモデルに印が付いた**。
+UI モードを 3 つ持ち（**シンプル** = 必須のみ ／ **フル** = 従来どおり ／ **カスタム** = 必須に 7 群を個別に足す）、**ログインユーザーごとに DB へ保存する。
+新しいアカウントはシンプルから始まる**。
+**変えるのは表示層だけ**で機能経路・履歴・保存データは動かず、隠れている道具もモードを戻せば動く。
+**習熟度の呼び名（Beginner / Expert）は `GLOSSARY.md` で退けた**。
+favicon をプロジェクトのアイコンにした。
+Ollama Cloud は **18 本のうち 10 本が無料枠で 403 を返す**ので `requires_subscription` で選択不可にし、
+**この印は一覧を取り直しても外さない**（EOL は一覧が反映するので外れる＝**印の出所が一覧か実測かの違い**）。
+叩ける 8 本は 4 実行ずつ測って推奨度を与えたが、**推奨度 5 は出していない**（4 試行では共有基盤の当たり外れと実力を分けられない。
+同じ `gemma4:31b` の中央値が同日に 11s → 105s → 35s と動いた）。
+**起動直後の控えの一覧（`models.ts`）からも有料の 2 本を外した** — 控えには印が付かないので数百ミリ秒だけ普通に見えてしまう。
+**規則は「一覧を新しく保て」ではなく「印で守るものを、印が出ない場所に置くな」**である。
+モデルが書いた `version` の推測で Score を捨てず、推測のほうを捨てる（**全 provider の 5 経路を通る、本版で最も広い変更**）。
+**`MODEL_CONFIG_VERSION` を 2.3.0 → 2.4.0 へ上げた**。
+ただし**実装セッションが挙げた理由は実測と違っていた** — pentala の保存済みは `2.2.0` で、**上げなくても貼り直しは走る状態だった**。
+効き先は「**すでに 2.3.0 で保存されている設置**」である。
+**共有機で事故が起きた** — 並行ブランチの `rsync -a server/src/inku_server/` が相手のブランチの `ui_mode` / `ui_custom` を
+pentala から消した。
+**分岐後に相手が足したものを自分のブランチは持たないので、ディレクトリごと送れば消える**（`AGENTS.md` は「`server/` を全体 rsync しない」と書いていたが、
+**一段下でも同じことが起きる**とは書いていなかった）。
+手当ては **フロントが PATCH 応答を要求値と照合し、未知フィールドを無視した 200 を成功扱いしない**ことと、**deploy helper
+が「リモートにある機能がローカルに無い同期」を rsync の前に拒否する**ことの 2 つで、恒久対策は台帳 **[I-053]** に預けた。
+**`BUILD_NUMBER` は 766 の次が 776 である**（767〜771 = UI 6 巡目、772 と 774 = Ollama Cloud、773 と 775 =
+配備専用の統合ブランチ）＝ **採番器はブランチごとの値ではなく共有の連番で、自分の +1 が空いているとは限らない**。
+**受け入れで最も効いた検査**: マージ結果と、pentala で全緑が確認された統合ブランチのツリーを突き合わせたところ、**差はドキュメント 5 ファイルと `BUILD_NUMBER`
+だけで、ソースは 1 バイトも違わなかった**。
+pytest **1668/31**、cli 76、ruff clean、`npm run check` 219/0/2、**`lint:i18n` 918/47/0/0**、
+`lint:models` 58、`check_docs.py` 緑。
+**版数は patch** — DB の列 2 本は既定値つきの migration を伴う追加のみで、保存データ・API・エディション ID のどの形式も動いていない。
 
-v2.9.9（Build 780）では **機械が書く注記が色の通り道から出た**（色カタログ改修の段 1-A）。`color_hint` は **色記述 / coerce の冪等ガード / renderer の効果注記 / 描写マーカーの 4 役**を兼ねていたので、**診断文だけ**を新しい `Instruction.note` へ移した。**書き込み 92 箇所のうち 85 箇所**（compose 72・normalize 3・API 10）が移り、**残した 7 箇所は描写マーカー**（renderer が絵の性格として読む語で、診断文ではない）＝ **役割は書き手でなく読み手で数える**。**読み戻しガード 20 箇所を追随**させた（移した先を読まないと 2 回目の coerce が診断文を二重に積む）。**`note` は宣言の 2 番目**に置いた — 任意フィールドの充填率は宣言位置に単調に従属して**後ろほど埋まる**（位置 0 で 0% / 位置 23 で 89%）ので、**埋めさせたくないフィールドは前へ置く**という逆用である（`thinness` は末尾のまま）。**本番の新規描画で `color_hint` を持つ instruction は 74.7% → 7.6%** へ落ち、これは**色記述を実際に持つ割合と一致する**。**診断文が色解決を誤起動させていた 2825 件は 0**。**動いたのは色だけである** — coerce を通る 14 ケースで**演奏 seed 14/14 不変・経路の幾何 14/14 不変・色属性が動いたのは 6 件**（`color_hint` が動いた 8 件のうち 2 件は色が変わらない＝そこでは誤起動していなかった）。これは engine 15 段 1 の **seed allowlist 化**が効いており、**筆致が動いたら 1-A の効果ではなく事故**という判別が成立する。**受け入れで判別力の欠落が 1 つ見つかった** — 実装は DDL コーパスの生成器に射影を入れ、`note` を `color_hint` へ再結合して**凍結ファイルをバイト一致に保っていた**。契約の「コーパスはバイト一致が正解」は **render コーパスだけの話**で（あれは `coerce_score` を 1 度も呼ばない）、**DDL コーパスは coerce を通っている**（射影を外すと 14 件 + manifest の全部が動いた）。**決め手は、凍結ファイルが既に `branch_report` の 34 個の分岐カウンタを持っていたこと** — 機械診断はこの成果物の構成要素である。**書き込み先を退行させる摂動は、射影があるうちは `check_frozen_corpora.py` が緑のまま**で、**CI はコーパス再生成しか走らせない**ので CI がこの改修の主題を見られない状態だった。射影を撤去して 14 件 + manifest を焼き直し、同じ摂動で**赤（6 ファイル検出）**になった。`DDL_ENGINE_VERSION` は **3 のまま**（動いたのは記録された出力だけ）。**Build 777 / 778 / 779 は並行ブランチが取っており 778 と 779 はどちらも 2 本が同じ番号を書いた**ので 780 を採った （**採番器は測ってから採るまでの間に動く** — 779 で docs まで書いた後、配備直前の測り直しで開発サーバーが 779 になっているのを見つけた）。pytest **1695/31**（+27）、cli 76、ruff clean、`npm run check` 219/0/2、`check_frozen_corpora.py` バイト一致、`check_docs.py` 緑。摂動は実装側 **112/112**、受け入れ側は独立に **5/5 が赤**（5 件目が赤にならなかったのでその場で焼き直した）。**版数は patch**。
+v2.9.9（Build 780）では **機械が書く注記が色の通り道から出た**（色カタログ改修の段 1-A）。
+`color_hint` は **色記述 / coerce の冪等ガード / renderer の効果注記 / 描写マーカーの 4 役**を兼ねていたので、**診断文だけ**を新しい
+`Instruction.note` へ移した。
+**書き込み 92 箇所のうち 85 箇所**（compose 72・normalize 3・API 10）が移り、**残した 7 箇所は描写マーカー**（renderer が絵の性格として読む語で、
+診断文ではない）＝ **役割は書き手でなく読み手で数える**。
+**読み戻しガード 20 箇所を追随**させた（移した先を読まないと 2 回目の coerce が診断文を二重に積む）。
+**`note` は宣言の 2 番目**に置いた — 任意フィールドの充填率は宣言位置に単調に従属して**後ろほど埋まる**（位置 0 で 0% / 位置 23 で 89%）ので、
+**埋めさせたくないフィールドは前へ置く**という逆用である（`thinness` は末尾のまま）。
+**本番の新規描画で `color_hint` を持つ instruction は 74.7% → 7.6%** へ落ち、これは**色記述を実際に持つ割合と一致する**。
+**診断文が色解決を誤起動させていた 2825 件は 0**。
+**動いたのは色だけである** — coerce を通る 14 ケースで**演奏 seed 14/14 不変・経路の幾何 14/14 不変・色属性が動いたのは 6 件**（`color_hint`
+が動いた 8 件のうち 2 件は色が変わらない＝そこでは誤起動していなかった）。
+これは engine 15 段 1 の **seed allowlist 化**が効いており、**筆致が動いたら 1-A の効果ではなく事故**という判別が成立する。
+**受け入れで判別力の欠落が 1 つ見つかった** — 実装は DDL コーパスの生成器に射影を入れ、`note` を `color_hint`
+へ再結合して**凍結ファイルをバイト一致に保っていた**。
+契約の「コーパスはバイト一致が正解」は **render コーパスだけの話**で（あれは `coerce_score` を 1 度も呼ばない）、**DDL コーパスは coerce
+を通っている**（射影を外すと 14 件 + manifest の全部が動いた）。
+**決め手は、凍結ファイルが既に `branch_report` の 34 個の分岐カウンタを持っていたこと** — 機械診断はこの成果物の構成要素である。
+**書き込み先を退行させる摂動は、射影があるうちは `check_frozen_corpora.py` が緑のまま**で、**CI はコーパス再生成しか走らせない**ので CI
+がこの改修の主題を見られない状態だった。
+射影を撤去して 14 件 + manifest を焼き直し、同じ摂動で**赤（6 ファイル検出）**になった。
+`DDL_ENGINE_VERSION` は **3 のまま**（動いたのは記録された出力だけ）。
+**Build 777 / 778 / 779 は並行ブランチが取っており 778 と 779 はどちらも 2 本が同じ番号を書いた**ので 780 を採った
+（**採番器は測ってから採るまでの間に動く** — 779 で docs まで書いた後、配備直前の測り直しで開発サーバーが 779 になっているのを見つけた）。
+pytest **1695/31**（+27）、cli 76、ruff clean、`npm run check` 219/0/2、`check_frozen_corpora.py` バイト一致、
+`check_docs.py` 緑。
+摂動は実装側 **112/112**、受け入れ側は独立に **5/5 が赤**（5 件目が赤にならなかったのでその場で焼き直した）。
+**版数は patch**。
 
-v2.9.10（Build 781）では **止まった機械を手放し、モデルは測った段で薦められるようになった**。**OVMS（Intel OpenVINO Model Server）を provider から退役させた**（台帳 [I-056]）— `/health` は答えるのにモデルを出さなくなっており、同じモデルは Ollama から届く。**組み込みから消すだけでは設置済みからは消えない**（未知 id はカスタム provider として温存され、`MODEL_CONFIG_VERSION` の貼り直しは `if builtin` の内側なので届かない）ので、**`RETIRED_PROVIDER_IDS` を `normalize_model_settings` の入口に置いて落とす**。ただし**退役は「名づけ」に参加し「経路」には参加しない** — 参照の分割とラベル引きには残す。**作品 6 件が OVMS のモデルを記録しており、うち 5 件は `ovms:gemma3-4b-api` と修飾済み**（裸が 1 件）で、分割から外すと「NVIDIA NIM / ovms:gemma3-4b-api」と出て **id だけより悪くなる**。所有表には載せず `connection_for` は `ValueError` を上げる。**台帳に無かった生きた落とし先を 2 つ消した** — `api.py` のデモ指示文生成の直書き `"qwen-api"` と `interpreter.py` の `/no_think`（どちらも OVMS のモデルを名指ししていた＝設定していない環境のデモが退役済み provider を叩いていた）。**`OPENAI_MODEL` / `OPENAI_MODEL_STAGE1` は読み手が 0 になった**ので compose 2 本と開発サーバーの `.env` から削除し、**`INKU_LLM_BACKEND` は残した**（消すと既定が anthropic になり鍵の無い経路へ落ちる）。**一つの数字では二つの段の食い違いを言えない** — ローカル Ollama のモデルは段ごとに測ってあり、inku が薦める組み合わせは「Stage 2 を 32% しかこなせない Stage 1 モデル」と「英語の Stage 1 を壊す Stage 2 モデル」である。`recommendation_stage1` / `recommendation_stage2` は **`recommendation_llm` を置き換えず狭める**ので、**通しで測った cloud 8 本・NVIDIA 32 本は不変・migration 不要**。**設定 UI は既に Stage 1 / Stage 2 / 共有のタブを持ちながら両段を同じ `'llm'` へ畳んでいた**。**メタキーの一覧が 3 箇所にあり足し忘れた経路で黙って消える構造だった**ので `MODEL_METADATA_KEYS` 1 本にまとめた。ホバーカードは**段ごとに測ったモデルだけ 2 行**にする（通しのモデルを 2 行にすると同じ星を 2 度書いて誰も測っていない計測があるように見える）。**実装セッションの摂動が 1 回空振りした** — 段の 2 鍵を定数から削って 22/22 緑。原因は 2 つで、どちらも**検査が自分の言い分を自分で供給していた**型である: ①`for key in A: assert key in B` が**一覧を一覧自身と比べていた**（定数から消せばループが回らない）②貼り直しの検査で**保存済みに鍵を持たせておらず**、`{**builtin, **stored}` の土台合成が答えを供給して `metadata_keys` を一度も通っていなかった。**保存済みが古い値 1 を持ちカタログが 5 を言う標本**へ差し替えて直した。**これで契約の記述が 1 つ誤りだったことも分かった** — 「`metadata_keys` に足さないと版を上げても貼り直されない」は誤りで、**効くのは保存済みが古い値を持っているときだけ**である。**前任が置いた番人は消さず、方法がどこにあるかを指す形へ置き換えた**。**`MODEL_CONFIG_VERSION` は 2.4.0 → 2.5.0**（メタの鍵が 2 つ増えた＝値だけの変更ではない）。**決定的な層には触れていない**ので凍結コーパスは両方ともバイト不変。pytest **1732/31**（+37）、cli 76、ruff clean、`npm run check` 219/0/2、`lint:i18n` 918/47/0/0、`lint:models` 68、**`lint:recommendations` 37（新設・手元の確認手順に加わる。CI は変わらない）**、`check_docs.py` 緑。摂動は実装側 5 件、**受け入れ側は 3 段に 1 件ずつ独立に当てて 3/3 が赤**（`RETIRED_PROVIDER_IDS` を空集合に → 9 本・段の 2 鍵を削る → 2 本・`modelStageRecommendations()` を常に `null` に → 2 件）。**2 番目は実装セッションが空振りさせた摂動そのもので、直した後は赤くなる**。**このブランチは 777 / 778 / 779 を使ったが、その間に main が 780 に達したので本版は 781 を採った**（番号は飛んでいない）。**版数は patch** — provider の撤去は保存データの形式変更ではなく、段の鍵は追加のみで migration を要さない。
-v2.9.11（Build 782）では **抽象色が六語から九語になり、黄に出口ができた**。Score の `color` に `yellow` / `orange` / `purple` を足した。**カタログの `palette` には黄が 12 色あって公称 13.6% なのに、実際に描かれた黄は 0.6% だった** — 出口となる語が無かったからである。既存 6 語の順序は動かさず末尾へ足し、**tool schema の `color` は宣言位置 17・フィールド数 25 のまま**にした（`color` は必須なので位置は搬送に効かないが、先行実測をこの位置で測っているので比較可能性のために動かさない）。**Stage 2 のプロンプトへ規則を 2 行足した** — **これが無いと `orange` は 0.6% のままである**（schema だけのアームが `yellow` 7.6% / `orange` 0.6%、規則ありが 8.5% / 2.4%）。固定 60 入力の実測は日 13.7% / 6.0%、英 6.5% / 3.0%、新語合計 日 19.7% / 英 10.1% で受入閾値を日英とも越え、**instruction 総数は日 -0.8% / 英 +5.7%**（`thinness` のときの痩せは起きない）。**`purple` は受入条件に載せていない** — 本番 821 入力で紫系の需要は 0.9% しかなく、標本 60 件のうち紫向きは 3 件で率が判定力を持たない。**歳時記の いろ にも 3 語を足した**ので Stage 1 の語彙表にも出る＝**記述言語の語彙そのものが増えた**ので **`ddl_version` を 2 → 3** へ上げた（契約は据え置きと書いていたが、1 → 2 の理由が「語彙が増えたら版を上げる」だったので同型の変更を据え置けない。**食い違いの出どころは `docs/spec/render-engine-history` の条文が「文法の追加・変更・廃止」だったこと**で、その条文も改めた）。**`COLOR_MARKERS` を日英 3 語ずつ広げた** — **これが無いと `ddl-engine-4` は `ddl-engine-3` の完全な複製になる**（渡す前の実測で、schema と歳時記だけ変えても両コーパスが 1 バイトも動かなかった。**改修は Stage 2 の出口を広げるが、コーパスは Stage 2 を呼ばない**）。**`COLOR_MAP` へ 3 既定色を足した**（`#a18308` / `#a95a00` / `#583a84`。`_resolve_color` の 1 行目が `cmap[color]` なので足さないと `KeyError`）。起草案の「6 語へ丸める」は、**Stage 2 が `yellow` を 8.5% 出すので「黄を選んだ分だけ赤が増える」** ＝ 実描画の赤 44.6% を下げるという段 1 の目的の逆を向くため差し替えた。**11 カタログの `map` は触っていない**ので全カタログが同じ黄を描く（段 1-C の仕事）。**`ddl_engine_version` 3 → 4、`ddl-engine-4` を 33 ケース（A 15 / B 18）で焼き、`changed_from_previous` は新設 4 件ちょうど＝既存 29 件は 1 バイトも動かない。`render-engine-16`（365 / SVG 333）はバイト不変**。**既存の凍結挙動が 1 件動いた** — `coerce_golden.json` の H-01（DDL が文字通り「黄色いクレヨン」）で `with_color_delivery_repair` が 0 → 1 になった。これは改修の目的そのものだが、**`color_cycle` の `red` の重複は 1-B 起因ではない**（`_with_color_cycle_delivery` は `base_color` を無条件に先頭へ挿し、2 行下と 4 行下は重複を見ている）。**受け入れの摂動が、実装側 6 件では出なかった型を掘り出した** — `_resolve_color` が新 3 色だけ `cmap["black"]` を返すようにすると、**1751 件すべてが緑のままだった**。新設テストが**自分で作った内包の鍵をその一覧と比べる恒真形**だったためで、値を固定し `_hue_from_hex()` の自己分類を足すと同じ摂動で **11 件が赤**になる。**`render-engine-16` のバイト不変はこの穴を塞がない**（新色はどのケースにも現れない）。**添景は新色を追いかけない** — `ddl_expander` が `COLOR_MARKERS` とは別に 6 語のタプルを持ち、60 seed で黄・橙・紫は **0/60** で自色を得られず全部黒になる（赤 48/60・緑 46/60）。ただし **DB を読むと 1-B 以前から DDL 282 件のうち 19 件が「黄色い」を含んでいた**ので、これは既存の穴であって本版が開けたものではない（本版が変えたのは、その黄が coerce に読まれて Score まで届くようになったこと）。**Android の 2 箇所は 2 版ぶん古い**（`ServerScoreCoercer.kt` が未知色を黙って black へ、`ServerScoreSchemaJson.kt` は 24 フィールド・`thinness` 14・`note` なし）が本版の遅れではないので台帳 [I-029] へ渡した。pytest **1751/31**（+19）、cli 76、ruff clean、`npm run check` 219/0/2、`lint:i18n` 918/47/0/0、`lint:models` 68、`lint:recommendations` 37、`check_docs.py` 緑、凍結コーパス両方バイト一致。**版数は patch** — enum の拡大であり、保存済み Score は 6 語のままで検証を通る。
-v2.9.12（Build 783）では **カタログの palette が絵へ届くようになった**。11 のカタログはそれぞれ 8 色の名前つき palette を持つのに、**それが描画へ届く経路は `color_hint` の文字列照合しか無かった** — 保存済み 7463 instruction のうち色語を含むのは **945 件（12.7%）** で、残る 87% は `cmap[color]` ＝ `map` の 6 色で終わっていた。**割当は作品ごとに 1 回だけ計算し、材料は `(render_seed, catalog_id, 抽象色)` の 3 つだけ**にした（instruction の全 dump を使うと `color_hint` を書き換えるだけで色が変わって A/B が交絡する。`performance_seed` も使わない — **色は演奏ではなく作品の性質**）。有彩 6 語は **OKLCh** の色相帯へ分類する（**CIELAB は純青 306° と純マゼンタ 328° が隣り合うので青と紫を分離できない**）。無彩 3 役は **`map` 値と同じ hex の候補を先に予約してから** 残りを L の近い順に取る — 契約の素朴な「L 最大 / 最小 / 中間」は**無彩の palette 色が 3 つ未満のカタログ 5 つで白と黒を潰す**（`desert_mineral` は 1 色）。**`catalog_id` を renderer へ通した**（それまで `renderer.py` に 0 件。4 ファイル・省略時は既定カタログ）。**`_hint_hues` は ASCII を単語境界で照合するようにし、語として成立しない 5 トークン（`blu` / `ai` / `vert` / `tall` / `shu`）を落とした** — `vertical` 166 件・`constraint` 20 件・`blur` 13 件の誤起動が止まる（**真正なフランス語 `vert` も読めなくなる**が誤起動を止める側を採った）。**ケース表を拡張しなければ 1 件も動かなかった** — `render-engine-16` の 365 ケースは `palette:` キー 0・`color_hint` 0 件・色は `black` 364 と `green` 1 の 2 語・背景は全件 `white` で、**改修が層を通っても出力が動かない**形だった（[[gate_must_traverse_the_layer]] の 5 例目）。作者裁定で **F 群 110 件**（11 カタログ × 9 抽象色 99・記述 6・非白背景 5）を足し、**動いた 110 / 不変 365**。**manifest の `color_map_digest` は生成器が自前で持つ 6 キーの複製から作られていて `renderer.COLOR_MAP` を変えても動かなかった**ので、**475 ケースすべての `(case_id, catalog_id, color_map)` 集合の digest** へ意味を改めた。**凍結 SVG を読むだけでは恒等割当の摂動が素通りする**ので F 群を毎回再演奏する検査も足した。到達指標は **未選択 palette 色 12 → 6 / 88**、**distinct hex 76 → 82**、**誤起動由来の色決定 148 → 0**、**実描画の無彩 57.9% → 61.4%** で、**本版は彩りを増やさない**（帯を決めるのは抽象色で、保存済み作品の抽象色は 69.5% が無彩。動くのは「どの palette 色が使われるか」）。**紙に溶ける役が 0 / 88 から 8 / 88 になった** — 7 件は黄と橙で palette のその 2 帯が明るいことによるが、**1 件は退行である**: `cool_material` の `black` が `#2c3e50` から `#e5e8e8` へ移り紙との ΔL が **0.635 → 0.062** になる（**このカタログの黒は彩度 0.039 で無彩しきい値 0.035 をわずかに超えて候補から外れ、残った唯一の候補を「L が最も近い未使用候補」規則が距離の上限なしに取る**）。本番の `cool_material` は 102 作品 / 412 instruction・**うち 205 件（49.8%）が `color=black`**。`desert_mineral` の `yellow` は紙と**同一 hex**（ΔL 0.000）。**hex の一致だけを見る検査はどちらも通す**（3 役が互いに異なることは満たされる）。**退行は実装の逸脱ではなく契約の設計にあり**、作者裁定で**修正せずに配備して段 2 で扱う**（[I-062]）。**受け入れの摂動 4 件は 4/4 が赤**で、うち 1 件（`catalog_id` を seed 材料から外す）は**実装側の 3 件がどれも見ていなかった面**である（新設の `test_catalog_id_participates_in_multi_candidate_choice` は palette の違いだけでも通る）。pytest **1771/31**、cli 76、ruff clean、`npm run check` 219/0/2、凍結コーパス両方バイト一致。**Android は engine 16 のまま**（[I-029]）。**版数は patch**。
+v2.9.10（Build 781）では **止まった機械を手放し、モデルは測った段で薦められるようになった**。
+**OVMS（Intel OpenVINO Model Server）を provider から退役させた**（台帳 [I-056]）— `/health` は答えるのにモデルを出さなくなっており、
+同じモデルは Ollama から届く。
+**組み込みから消すだけでは設置済みからは消えない**（未知 id はカスタム provider として温存され、`MODEL_CONFIG_VERSION` の貼り直しは `if builtin`
+の内側なので届かない）ので、**`RETIRED_PROVIDER_IDS` を `normalize_model_settings` の入口に置いて落とす**。
+ただし**退役は「名づけ」に参加し「経路」には参加しない** — 参照の分割とラベル引きには残す。
+**作品 6 件が OVMS のモデルを記録しており、うち 5 件は `ovms:gemma3-4b-api` と修飾済み**（裸が 1 件）で、分割から外すと「NVIDIA NIM / ovms:
+gemma3-4b-api」と出て **id だけより悪くなる**。
+所有表には載せず `connection_for` は `ValueError` を上げる。
+**台帳に無かった生きた落とし先を 2 つ消した** — `api.py` のデモ指示文生成の直書き `"qwen-api"` と `interpreter.py` の
+`/no_think`（どちらも OVMS のモデルを名指ししていた＝設定していない環境のデモが退役済み provider を叩いていた）。
+**`OPENAI_MODEL` / `OPENAI_MODEL_STAGE1` は読み手が 0 になった**ので compose 2 本と開発サーバーの `.env` から削除し、
+**`INKU_LLM_BACKEND` は残した**（消すと既定が anthropic になり鍵の無い経路へ落ちる）。
+**一つの数字では二つの段の食い違いを言えない** — ローカル Ollama のモデルは段ごとに測ってあり、inku が薦める組み合わせは「Stage 2 を 32% しかこなせない Stage
+1 モデル」と「英語の Stage 1 を壊す Stage 2 モデル」である。
+`recommendation_stage1` / `recommendation_stage2` は **`recommendation_llm` を置き換えず狭める**ので、**通しで測った
+cloud 8 本・NVIDIA 32 本は不変・migration 不要**。
+**設定 UI は既に Stage 1 / Stage 2 / 共有のタブを持ちながら両段を同じ `'llm'` へ畳んでいた**。
+**メタキーの一覧が 3 箇所にあり足し忘れた経路で黙って消える構造だった**ので `MODEL_METADATA_KEYS` 1 本にまとめた。
+ホバーカードは**段ごとに測ったモデルだけ 2 行**にする（通しのモデルを 2 行にすると同じ星を 2 度書いて誰も測っていない計測があるように見える）。
+**実装セッションの摂動が 1 回空振りした** — 段の 2 鍵を定数から削って 22/22 緑。
+原因は 2 つで、どちらも**検査が自分の言い分を自分で供給していた**型である: ①`for key in A: assert key in B`
+が**一覧を一覧自身と比べていた**（定数から消せばループが回らない）②貼り直しの検査で**保存済みに鍵を持たせておらず**、`{**builtin, **stored}`
+の土台合成が答えを供給して `metadata_keys` を一度も通っていなかった。
+**保存済みが古い値 1 を持ちカタログが 5 を言う標本**へ差し替えて直した。
+**これで契約の記述が 1 つ誤りだったことも分かった** — 「`metadata_keys` に足さないと版を上げても貼り直されない」は誤りで、
+**効くのは保存済みが古い値を持っているときだけ**である。
+**前任が置いた番人は消さず、方法がどこにあるかを指す形へ置き換えた**。
+**`MODEL_CONFIG_VERSION` は 2.4.0 → 2.5.0**（メタの鍵が 2 つ増えた＝値だけの変更ではない）。
+**決定的な層には触れていない**ので凍結コーパスは両方ともバイト不変。
+pytest **1732/31**（+37）、cli 76、ruff clean、`npm run check` 219/0/2、`lint:i18n` 918/47/0/0、
+`lint:models` 68、**`lint:recommendations` 37（新設・手元の確認手順に加わる。
+CI は変わらない）**、`check_docs.py` 緑。
+摂動は実装側 5 件、**受け入れ側は 3 段に 1 件ずつ独立に当てて 3/3 が赤**（`RETIRED_PROVIDER_IDS` を空集合に → 9 本・段の 2 鍵を削る → 2 本・
+`modelStageRecommendations()` を常に `null` に → 2 件）。
+**2 番目は実装セッションが空振りさせた摂動そのもので、直した後は赤くなる**。
+**このブランチは 777 / 778 / 779 を使ったが、その間に main が 780 に達したので本版は 781 を採った**（番号は飛んでいない）。
+**版数は patch** — provider の撤去は保存データの形式変更ではなく、段の鍵は追加のみで migration を要さない。
+v2.9.11（Build 782）では **抽象色が六語から九語になり、黄に出口ができた**。
+Score の `color` に `yellow` / `orange` / `purple` を足した。
+**カタログの `palette` には黄が 12 色あって公称 13.6% なのに、実際に描かれた黄は 0.6% だった** — 出口となる語が無かったからである。
+既存 6 語の順序は動かさず末尾へ足し、**tool schema の `color` は宣言位置 17・フィールド数 25 のまま**にした（`color` は必須なので位置は搬送に効かないが、
+先行実測をこの位置で測っているので比較可能性のために動かさない）。
+**Stage 2 のプロンプトへ規則を 2 行足した** — **これが無いと `orange` は 0.6% のままである**（schema だけのアームが `yellow` 7.6% /
+`orange` 0.6%、規則ありが 8.5% / 2.4%）。
+固定 60 入力の実測は日 13.7% / 6.0%、英 6.5% / 3.0%、新語合計 日 19.7% / 英 10.1% で受入閾値を日英とも越え、**instruction 総数は日
+-0.8% / 英 +5.7%**（`thinness` のときの痩せは起きない）。
+**`purple` は受入条件に載せていない** — 本番 821 入力で紫系の需要は 0.9% しかなく、標本 60 件のうち紫向きは 3 件で率が判定力を持たない。
+**歳時記の いろ にも 3 語を足した**ので Stage 1 の語彙表にも出る＝**記述言語の語彙そのものが増えた**ので **`ddl_version` を 2 → 3**
+へ上げた（契約は据え置きと書いていたが、1 → 2 の理由が「語彙が増えたら版を上げる」だったので同型の変更を据え置けない。
+**食い違いの出どころは `docs/spec/render-engine-history` の条文が「文法の追加・変更・廃止」だったこと**で、その条文も改めた）。
+**`COLOR_MARKERS` を日英 3 語ずつ広げた** — **これが無いと `ddl-engine-4` は `ddl-engine-3` の完全な複製になる**（渡す前の実測で、
+schema と歳時記だけ変えても両コーパスが 1 バイトも動かなかった。
+**改修は Stage 2 の出口を広げるが、コーパスは Stage 2 を呼ばない**）。
+**`COLOR_MAP` へ 3 既定色を足した**（`#a18308` / `#a95a00` / `#583a84`。
+`_resolve_color` の 1 行目が `cmap[color]` なので足さないと `KeyError`）。
+起草案の「6 語へ丸める」は、**Stage 2 が `yellow` を 8.5% 出すので「黄を選んだ分だけ赤が増える」** ＝ 実描画の赤 44.6% を下げるという段 1
+の目的の逆を向くため差し替えた。
+**11 カタログの `map` は触っていない**ので全カタログが同じ黄を描く（段 1-C の仕事）。
+**`ddl_engine_version` 3 → 4、`ddl-engine-4` を 33 ケース（A 15 / B 18）で焼き、`changed_from_previous` は新設 4
+件ちょうど＝既存 29 件は 1 バイトも動かない。
+`render-engine-16`（365 / SVG 333）はバイト不変**。
+**既存の凍結挙動が 1 件動いた** — `coerce_golden.json` の H-01（DDL が文字通り「黄色いクレヨン」）で `with_color_delivery_repair`
+が 0 → 1 になった。
+これは改修の目的そのものだが、**`color_cycle` の `red` の重複は 1-B 起因ではない**（`_with_color_cycle_delivery` は
+`base_color` を無条件に先頭へ挿し、2 行下と 4 行下は重複を見ている）。
+**受け入れの摂動が、実装側 6 件では出なかった型を掘り出した** — `_resolve_color` が新 3 色だけ `cmap["black"]` を返すようにすると、**1751
+件すべてが緑のままだった**。
+新設テストが**自分で作った内包の鍵をその一覧と比べる恒真形**だったためで、値を固定し `_hue_from_hex()` の自己分類を足すと同じ摂動で **11 件が赤**になる。
+**`render-engine-16` のバイト不変はこの穴を塞がない**（新色はどのケースにも現れない）。
+**添景は新色を追いかけない** — `ddl_expander` が `COLOR_MARKERS` とは別に 6 語のタプルを持ち、60 seed で黄・橙・紫は **0/60**
+で自色を得られず全部黒になる（赤 48/60・緑 46/60）。
+ただし **DB を読むと 1-B 以前から DDL 282 件のうち 19 件が「黄色い」を含んでいた**ので、これは既存の穴であって本版が開けたものではない（本版が変えたのは、その黄が
+coerce に読まれて Score まで届くようになったこと）。
+**Android の 2 箇所は 2 版ぶん古い**（`ServerScoreCoercer.kt` が未知色を黙って black へ、`ServerScoreSchemaJson.kt` は
+24 フィールド・`thinness` 14・`note` なし）が本版の遅れではないので台帳 [I-029] へ渡した。
+pytest **1751/31**（+19）、cli 76、ruff clean、`npm run check` 219/0/2、`lint:i18n` 918/47/0/0、
+`lint:models` 68、`lint:recommendations` 37、`check_docs.py` 緑、凍結コーパス両方バイト一致。
+**版数は patch** — enum の拡大であり、保存済み Score は 6 語のままで検証を通る。
+v2.9.12（Build 783）では **カタログの palette が絵へ届くようになった**。
+11 のカタログはそれぞれ 8 色の名前つき palette を持つのに、**それが描画へ届く経路は `color_hint` の文字列照合しか無かった** — 保存済み 7463
+instruction のうち色語を含むのは **945 件（12.7%）** で、残る 87% は `cmap[color]` ＝ `map` の 6 色で終わっていた。
+**割当は作品ごとに 1 回だけ計算し、材料は `(render_seed, catalog_id, 抽象色)` の 3 つだけ**にした（instruction の全 dump を使うと
+`color_hint` を書き換えるだけで色が変わって A/B が交絡する。
+`performance_seed` も使わない — **色は演奏ではなく作品の性質**）。
+有彩 6 語は **OKLCh** の色相帯へ分類する（**CIELAB は純青 306° と純マゼンタ 328° が隣り合うので青と紫を分離できない**）。
+無彩 3 役は **`map` 値と同じ hex の候補を先に予約してから** 残りを L の近い順に取る — 契約の素朴な「L 最大 / 最小 / 中間」は**無彩の palette 色が 3
+つ未満のカタログ 5 つで白と黒を潰す**（`desert_mineral` は 1 色）。
+**`catalog_id` を renderer へ通した**（それまで `renderer.py` に 0 件。
+4 ファイル・省略時は既定カタログ）。
+**`_hint_hues` は ASCII を単語境界で照合するようにし、語として成立しない 5 トークン（`blu` / `ai` / `vert` / `tall` /
+`shu`）を落とした** — `vertical` 166 件・`constraint` 20 件・`blur` 13 件の誤起動が止まる（**真正なフランス語 `vert`
+も読めなくなる**が誤起動を止める側を採った）。
+**ケース表を拡張しなければ 1 件も動かなかった** — `render-engine-16` の 365 ケースは `palette:` キー 0・`color_hint` 0 件・色は
+`black` 364 と `green` 1 の 2 語・背景は全件 `white` で、
+**改修が層を通っても出力が動かない**形だった（[[gate_must_traverse_the_layer]] の 5 例目）。
+作者裁定で **F 群 110 件**（11 カタログ × 9 抽象色 99・記述 6・非白背景 5）を足し、**動いた 110 / 不変 365**。
+**manifest の `color_map_digest` は生成器が自前で持つ 6 キーの複製から作られていて `renderer.COLOR_MAP` を変えても動かなかった**ので、
+**475 ケースすべての `(case_id, catalog_id, color_map)` 集合の digest** へ意味を改めた。
+**凍結 SVG を読むだけでは恒等割当の摂動が素通りする**ので F 群を毎回再演奏する検査も足した。
+到達指標は **未選択 palette 色 12 → 6 / 88**、**distinct hex 76 → 82**、**誤起動由来の色決定 148 → 0**、**実描画の無彩 57.9% →
+61.4%** で、**本版は彩りを増やさない**（帯を決めるのは抽象色で、保存済み作品の抽象色は 69.5% が無彩。
+動くのは「どの palette 色が使われるか」）。
+**紙に溶ける役が 0 / 88 から 8 / 88 になった** — 7 件は黄と橙で palette のその 2 帯が明るいことによるが、**1 件は退行である**:
+`cool_material` の `black` が `#2c3e50` から `#e5e8e8` へ移り紙との ΔL が **0.635 → 0.062** になる（**このカタログの黒は彩度
+0.039 で無彩しきい値 0.035 をわずかに超えて候補から外れ、残った唯一の候補を「L が最も近い未使用候補」規則が距離の上限なしに取る**）。
+本番の `cool_material` は 102 作品 / 412 instruction・**うち 205 件（49.8%）が `color=black`**。
+`desert_mineral` の `yellow` は紙と**同一 hex**（ΔL 0.000）。
+**hex の一致だけを見る検査はどちらも通す**（3 役が互いに異なることは満たされる）。
+**退行は実装の逸脱ではなく契約の設計にあり**、作者裁定で**修正せずに配備して段 2 で扱う**（[I-062]）。
+**受け入れの摂動 4 件は 4/4 が赤**で、うち 1 件（`catalog_id` を seed 材料から外す）は**実装側の 3 件がどれも見ていなかった面**である（新設の
+`test_catalog_id_participates_in_multi_candidate_choice` は palette の違いだけでも通る）。
+pytest **1771/31**、cli 76、ruff clean、`npm run check` 219/0/2、凍結コーパス両方バイト一致。
+**Android は engine 16 のまま**（[I-029]）。
+**版数は patch**。
 
-v2.9.13（Build 789）では **複数の作品がひとつのループになった**。独立した 5 枝（Build 784〜788）を統合した版で、中核は `POST /api/history/export-animation` — 保存済み SVG を並べて 1 本の **APNG（可逆）または GIF（256 色）**にする。**呼び出し元は 2 つで並び順の決め方が違う**: 履歴管理はチェックした作品を `at` 昇順（同時刻は id 順）で古い順に、系譜は選択作品から親を辿って**起点から選択作品の順**へ反転する。**要求順はサーバー側で保たれる** — `db.get_items` は `id.in_(ids)` で引いた行を要求 `ids` の位置で並べ直す（DB の返却順ではない）ので、この順序は API の性質であって呼び出し元の親切ではない。切り替えは **カット / クロスフェード / 白を介したフェード / 横スライド**、表示ウェイト 0.1〜30 秒、解像度（Y 軸）1K=1080 / 4K=2160 / 8K=4320 px で、**遷移フレーム数は解像度で下げる**（6 / 4 / 2）。符号化ピクセル総量の上限は **600,000,000**。**ラスタライズは既存の `svg_to_png`（resvg）のままで、新規依存 Pillow 12.3 が担うのは合成・遷移・符号化だけ**である（`cairosvg` の番人 4 件は無傷）。同じ版に **系譜の空白部ドラッグによるパン**（784）・**結果ログの開閉状態の継承**（785）・**設定 > その他からの履歴設定 3 つの削除**（786。挙動は従来の既定へ固定＝再編集は常に新バージョン・履歴選択はキャンバスも色カタログも上書きしない）・**自動補正を 8 項目で説明する i 印**（787）が入った。**受け入れの決め手は SHA-256 だった** — マージ結果の web 9 ファイルが、作者が目視裁定し pentala が稼働させている合成物と全件一致した。**これが成立したのは分岐点 `0505961` から main までの 32 commit がその 9 ファイルに 1 行も触れていないから**で、衝突は 5 枝の相互のみだった（重なった 1 件 `server/scripts/gen_android_reference.py` は本版の server 変更と交わらない）。**摂動 3 件は 3/3 が狙った 1 件だけを赤くし**、うち 1 件は**形を変えずデータだけ壊す**フレーム順の反転（フレーム数も形式も不変）で、pixel 検査が捕らえた。**検査の無い面は手で叩いた** — 4 パターン × 2 形式の 8 通りはすべて出力を返し、上限は 8K × 40 件で発火する。**単体テストが通るのは `cut` と `crossfade` だけで、`fade_white` / `slide` / 上限 / 4K・8K / 404・409 には検査が無い**。**直していないこと**: その検査の欠落、`get_items` がゴミ箱を除外しないこと（UI からは選べないが id を直送すれば書き出せる）、8K の上限が RGBA 約 2.4 GB になること（実測 8K × 3 件クロスフェードでピーク RSS 1.37 GB。pentala は 64 GB 搭載 59 GB 空きのため下げていない）。pytest **1775/31**、cli 76、ruff clean、`npm run check` **220/0/2**、`lint:i18n` **934/47/0/0**。**決定的な層に差分が無く凍結コーパスは焼き直していない。Android にも差分は無い。版数は patch**。
+v2.9.13（Build 789）では **複数の作品がひとつのループになった**。
+独立した 5 枝（Build 784〜788）を統合した版で、中核は `POST /api/history/export-animation` — 保存済み SVG を並べて 1 本の
+**APNG（可逆）または GIF（256 色）**にする。
+**呼び出し元は 2 つで並び順の決め方が違う**: 履歴管理はチェックした作品を `at` 昇順（同時刻は id 順）で古い順に、系譜は選択作品から親を辿って**起点から選択作品の順**へ反転する。
+**要求順はサーバー側で保たれる** — `db.get_items` は `id.in_(ids)` で引いた行を要求 `ids` の位置で並べ直す（DB の返却順ではない）ので、この順序は
+API の性質であって呼び出し元の親切ではない。
+切り替えは **カット / クロスフェード / 白を介したフェード / 横スライド**、表示ウェイト 0.1〜30 秒、解像度（Y 軸）1K=1080 / 4K=2160 / 8K=4320 px
+で、**遷移フレーム数は解像度で下げる**（6 / 4 / 2）。
+符号化ピクセル総量の上限は **600,000,000**。
+**ラスタライズは既存の `svg_to_png`（resvg）のままで、新規依存 Pillow 12.3 が担うのは合成・遷移・符号化だけ**である（`cairosvg` の番人 4 件は無傷）。
+同じ版に **系譜の空白部ドラッグによるパン**（784）・**結果ログの開閉状態の継承**（785）・**設定 > その他からの履歴設定 3 つの削除**（786。
+挙動は従来の既定へ固定＝再編集は常に新バージョン・履歴選択はキャンバスも色カタログも上書きしない）・**自動補正を 8 項目で説明する i 印**（787）が入った。
+**受け入れの決め手は SHA-256 だった** — マージ結果の web 9 ファイルが、作者が目視裁定し pentala が稼働させている合成物と全件一致した。
+**これが成立したのは分岐点 `0505961` から main までの 32 commit がその 9 ファイルに 1 行も触れていないから**で、衝突は 5 枝の相互のみだった（重なった 1 件
+`server/scripts/gen_android_reference.py` は本版の server 変更と交わらない）。
+**摂動 3 件は 3/3 が狙った 1 件だけを赤くし**、うち 1 件は**形を変えずデータだけ壊す**フレーム順の反転（フレーム数も形式も不変）で、pixel 検査が捕らえた。
+**検査の無い面は手で叩いた** — 4 パターン × 2 形式の 8 通りはすべて出力を返し、上限は 8K × 40 件で発火する。
+**単体テストが通るのは `cut` と `crossfade` だけで、`fade_white` / `slide` / 上限 / 4K・8K / 404・409 には検査が無い**。
+**直していないこと**: その検査の欠落、`get_items` がゴミ箱を除外しないこと（UI からは選べないが id を直送すれば書き出せる）、8K の上限が RGBA 約 2.4 GB
+になること（実測 8K × 3 件クロスフェードでピーク RSS 1.37 GB。
+pentala は 64 GB 搭載 59 GB 空きのため下げていない）。
+pytest **1775/31**、cli 76、ruff clean、`npm run check` **220/0/2**、`lint:i18n` **934/47/0/0**。
+**決定的な層に差分が無く凍結コーパスは焼き直していない。
+Android にも差分は無い。
+版数は patch**。
 
-v2.9.14（Build 790）では **十三のカタログが九色ぜんぶを持つようになった**。engine 17 は palette から選ぶ経路を作ったが、**選ばれる先の表そのものは engine 16 のまま**で、帯を持たないカタログが多かった — 記述が緑を求めても緑が無ければ最近傍の黄が代役に立つ。保存済み 7463 instruction のうち **140 件が「カタログの持たない帯」を求めていた**。**本版が入れ替えるのはデータだけである**（解決連鎖・帯の定義・無彩しきい値・seed の材料は engine 17 のままで `renderer.py` に差分は無い）。13 本がそれぞれ **palette 10 色 = 無彩ちょうど 3・有彩ちょうど 7** を持ち、有彩は 6 帯すべてを埋める。**`map` は 6 キー → 9 キーになり、9 キーすべてがその本の palette から選ばれる**（従来は `map` と palette が別の色を持てた）。**色見本は `map` の派生で有彩 6 キーが先頭**である — Android が `swatches.take(4)` と `take(8)` で 2 画面に描くので、無彩が先頭だと黒・灰・白がその枠を占める。**130 色は全カタログ横断で 1 つも重複しない。** **`desert_mineral` を退役**（無彩 1 色のカタログで、engine 17 の潰れ防止規則はこれのために在った）**し、`moss_bark` / `neon_plate` / `lantern_dew` を足した**。**退役 10 id は `None` を返す**（`default` へ落とさない）。本番 117 作品がこの id を記録しているが **migration は書いていない**（未知 id は既定カタログで描かれる）。到達は **帯欠落 140 → 0**、**有彩の的中 89.0% → 100%**、**無彩 98.2% → 100%**、**distinct hex 79 → 91**、**未選択 palette 色（使用中カタログ）7 → 9**。**未選択は増える** — 使用中の 9 は紫 8 と `sea_stone/Coral Orange` で**本番の紫の需要が 0.9% しかない**ことによる（全体 39 の差 30 は本番に 1 作品も無い新設 3 本ぶん）。**動いたのは間違った帯からの回収だけ**（`default` 黄 +106 / 緑 −106、`sea_stone` 緑 +58 / 黄 −58、`cool_material` 赤 +37 / 橙 −37 と 緑 +35 / 黄 −35）で、帯分布は無彩 67.2% 不動・**橙 0.8 → 0.3**・紫 0.0 → 0.03。**`sea_stone` の紫だけは作者裁定で空のまま**にし、最近傍の代役 `Night Sea #191970` が立つ ＝ **このカタログの `blue` と同じ hex**なので青と紫を並べると 2 図形が同じ紺になる（目視で確認済み・形は分かれて読める）。**紙に溶ける役は 8 → 2 になり [I-062] が閉じた** — `cool_material` の `black` は `#26282a` へ戻り、残る 2 件は `vivid_material #fff200`（ΔL 0.026）と `open_air_light #ffce00`（ΔL 0.127）でどちらも黄の性質である（10 seed × 13 カタログで測ってもこの 2 つだけ）。**受け入れで検査の欠落が出たのでその場で足した** — 摂動 4 件はすべて製品データだけを壊す形にしたが、**[I-062] を再現する摂動（黒を紙の明るさへ戻す）で赤くなったのは期待値表と凍結コーパスの 2 件だけ**だった。**どちらもカタログのデータを変えれば丸ごと焼き直されるもの**で、**「役が紙に溶けない」を名指しする検査は 1 つも無かった**（engine 17 でこの退行が 5 指標すべて緑のまま通ったのと同じ形）。13 カタログ × 8 seed の割当を明度差で数え **溶ける 2 件を hex で名指しする検査**を足した（再現摂動で赤・同じ黒を暗いまま動かす対照で緑）。**参照コーパス `render-engine-18` は 493 件**（A 88 / B 72 / C 58 / D 28 / E 119 / F 128）で **動いた 70 / 不変 423**、**A〜E の 365 件は 1 件も動かず F 群の外は 0 件**。70 の内訳は**既存 id のまま演奏が変わった 42 件**と**新設 28 件**、消えたのは 10 件。**演奏が変わらないまま `input.color_map` の記録だけ 6 → 9 キーになったケースが 58 件ある**。`color_map_digest` は `bbb2f7be…` → **`96f28097…`**。**Android は追随していない**（[I-070]。`ColorCatalogs.kt` は 11 本・`map` 6 キー・`desert_mineral` 在り。**移植されていないのは連鎖ではなくデータ**で、`oklchFromHex`・帯・彩度しきい値は `ServerRendererStyle.kt` に在る）。pytest **1847/31**（+72）、cli 76、ruff clean、`npm run check` 220/0/2、`lint:i18n` 934/47/0/0、凍結コーパスは再生成バイト一致。**版数は patch**。
+v2.9.14（Build 790）では **十三のカタログが九色ぜんぶを持つようになった**。
+engine 17 は palette から選ぶ経路を作ったが、**選ばれる先の表そのものは engine 16 のまま**で、帯を持たないカタログが多かった —
+記述が緑を求めても緑が無ければ最近傍の黄が代役に立つ。
+保存済み 7463 instruction のうち **140 件が「カタログの持たない帯」を求めていた**。
+**本版が入れ替えるのはデータだけである**（解決連鎖・帯の定義・無彩しきい値・seed の材料は engine 17 のままで `renderer.py` に差分は無い）。
+13 本がそれぞれ **palette 10 色 = 無彩ちょうど 3・有彩ちょうど 7** を持ち、有彩は 6 帯すべてを埋める。
+**`map` は 6 キー → 9 キーになり、9 キーすべてがその本の palette から選ばれる**（従来は `map` と palette が別の色を持てた）。
+**色見本は `map` の派生で有彩 6 キーが先頭**である — Android が `swatches.take(4)` と `take(8)` で 2 画面に描くので、無彩が先頭だと黒・灰・
+白がその枠を占める。
+**130 色は全カタログ横断で 1 つも重複しない。
+** **`desert_mineral` を退役**（無彩 1 色のカタログで、engine 17 の潰れ防止規則はこれのために在った）**し、`moss_bark` / `neon_plate`
+/ `lantern_dew` を足した**。
+**退役 10 id は `None` を返す**（`default` へ落とさない）。
+本番 117 作品がこの id を記録しているが **migration は書いていない**（未知 id は既定カタログで描かれる）。
+到達は **帯欠落 140 → 0**、**有彩の的中 89.0% → 100%**、**無彩 98.2% → 100%**、**distinct hex 79 → 91**、**未選択
+palette 色（使用中カタログ）7 → 9**。
+**未選択は増える** — 使用中の 9 は紫 8 と `sea_stone/Coral Orange` で**本番の紫の需要が 0.9% しかない**ことによる（全体 39 の差 30 は本番に
+1 作品も無い新設 3 本ぶん）。
+**動いたのは間違った帯からの回収だけ**（`default` 黄 +106 / 緑 −106、`sea_stone` 緑 +58 / 黄 −58、`cool_material` 赤 +37 / 橙
+−37 と 緑 +35 / 黄 −35）で、帯分布は無彩 67.2% 不動・**橙 0.8 → 0.3**・紫 0.0 → 0.03。
+**`sea_stone` の紫だけは作者裁定で空のまま**にし、最近傍の代役 `Night Sea #191970` が立つ ＝ **このカタログの `blue` と同じ
+hex**なので青と紫を並べると 2 図形が同じ紺になる（目視で確認済み・形は分かれて読める）。
+**紙に溶ける役は 8 → 2 になり [I-062] が閉じた** — `cool_material` の `black` は `#26282a` へ戻り、残る 2 件は
+`vivid_material #fff200`（ΔL 0.026）と `open_air_light #ffce00`（ΔL 0.127）でどちらも黄の性質である（10 seed × 13
+カタログで測ってもこの 2 つだけ）。
+**受け入れで検査の欠落が出たのでその場で足した** — 摂動 4 件はすべて製品データだけを壊す形にしたが、**[I-062]
+を再現する摂動（黒を紙の明るさへ戻す）で赤くなったのは期待値表と凍結コーパスの 2 件だけ**だった。
+**どちらもカタログのデータを変えれば丸ごと焼き直されるもの**で、**「役が紙に溶けない」を名指しする検査は 1 つも無かった**（engine 17 でこの退行が 5
+指標すべて緑のまま通ったのと同じ形）。
+13 カタログ × 8 seed の割当を明度差で数え **溶ける 2 件を hex で名指しする検査**を足した（再現摂動で赤・同じ黒を暗いまま動かす対照で緑）。
+**参照コーパス `render-engine-18` は 493 件**（A 88 / B 72 / C 58 / D 28 / E 119 / F 128）で **動いた 70 / 不変
+423**、**A〜E の 365 件は 1 件も動かず F 群の外は 0 件**。
+70 の内訳は**既存 id のまま演奏が変わった 42 件**と**新設 28 件**、消えたのは 10 件。
+**演奏が変わらないまま `input.color_map` の記録だけ 6 → 9 キーになったケースが 58 件ある**。
+`color_map_digest` は `bbb2f7be…` → **`96f28097…`**。
+**Android は追随していない**（[I-070]。
+`ColorCatalogs.kt` は 11 本・`map` 6 キー・`desert_mineral` 在り。
+**移植されていないのは連鎖ではなくデータ**で、`oklchFromHex`・帯・彩度しきい値は `ServerRendererStyle.kt` に在る）。
+pytest **1847/31**（+72）、cli 76、ruff clean、`npm run check` 220/0/2、`lint:i18n` 934/47/0/0、
+凍結コーパスは再生成バイト一致。
+**版数は patch**。
 
-v2.9.15（Build 801）では **四桁で作品を引けるようになり、画面の手触りが揃った**。独立した 7 枝（Build 791〜800）を統合した版で、**台帳の 4 項目が閉じた**（[I-049] / [I-050] / [I-058] / [I-071]）。中核は **render hash の下位 4 桁による履歴検索**で、`/api/history` と系譜の 2 経路の計 3 経路に効く。**ASCII 英数字ちょうど 4 文字のときだけ**照合を足し、大文字小文字は区別せず、従来の 5 条件（記述・DDL・Stage 1/2 model・catalog ID）へ OR で乗る。**この形のときだけ FTS を迂回する** — `_use_history_fts` は 3 文字以上で FTS へ入るが索引は hash 列を持たないので、迂回しないと 0 件になる。**同じ 5 条件の OR が 3 箇所に複製されていた**ので 1 本へ畳んだ。**`lint:i18n` に第 4 経路が入った**（[I-058]）— マークアップへ直接書かれた `日本語 / English` 形のテキストノードから英語側を抽出するもので、**運ぶのは 17 件**（実測: 外すと 949 → 932）。同時に `isJapanese ? '状態 / Status' : 'Status'` の 2 箇所を無条件併記へ揃えた ＝ **英語 UI に日本語が出る箇所が 2 つ増えた**（同じカードの他の 15 箇所は前からそうだった）。**設定の数値 4 欄へ自前の −/+ ボタン**を置いた（[I-050]。**Firefox には `::-webkit-inner-spin-button` に当たるフックが無い**ので native spinner をやめる、という起票時の前提どおりの解）。**`設定再読み込み` は `表示更新` へ**（[I-049]。キーも処理も API も不変で動くのは表示文字列だけ）。Info モーダルは題が `inku` になり、Incu アイコンがつき、横幅が 520 → 780px になり、本文が作者指定の日英文へ替わった。**語彙表から詞書と読み取りの 2 行が消えた**ので、英語表示に `kotobagaki` は 1 件も残らない — **`GLOSSARY.md` と `i18n-lint.mjs` が持っていたその例外を受け入れ側で外した**。ダークテーマでスターが常に消灯して見えたのは `:global(html[data-theme='dark']) .hash-row-star` が `.hash-row-star.starred` に詳細度で勝っていたためで、`:not(.starred)` で解いた。**受け入れの決め手は SHA-256** — 7 枝の衝突は `web/BUILD_NUMBER` の 6 回だけで、`SettingsModal.svelte`・`en.ts` / `ja.ts`・`i18n-lint.mjs` は自動合成され、その結果が **作者が目視し pentala が Build 800 で稼働させている木と 11 ファイル中 9 件で完全一致**した（差の 2 件は `APP_VERSION` 1 行と docs commit `407f536` ぶんで帰属を確認）。**摂動 3 件のうち 1 件が検査の欠落を掘り出した** — 桁数を 4 → 5 で 2 件赤、FTS 迂回ガードを外して 1 件赤（**FTS がテストでも有効であることの証拠になった**）、そして**形を変えない摂動**（`ilike(f"%{search}")` → `ilike(f"%{search}%")` ＝ 末尾一致をどこかに含むへ）で **120 件すべてが緑のまま**だった。**契約は「下位 4 桁」なのに検査は「4 文字で引ける」しか見ていない**ので、同じ 4 文字を hash の途中に持つ行を足して 1 件だけ返ることを固定した（摂動で赤・無改変で緑）。pytest **1847/31**（**件数は増えない** — 既存の 2 関数へ assertion を足す形）、cli 76、ruff clean、`npm run check` **221/0/2**（+1 ファイル = `NumberStepper.svelte`）、`lint:i18n` **949/47/0/0**、`lint:models` 68、`lint:recommendations` 37。**決定的な層に差分が無いので凍結コーパスは焼き直していない。Android にも差分は無い。SPEC は検索対象のフィールドを列挙していないので不変更。版数は patch。**
+v2.9.15（Build 801）では **四桁で作品を引けるようになり、画面の手触りが揃った**。
+独立した 7 枝（Build 791〜800）を統合した版で、**台帳の 4 項目が閉じた**（[I-049] / [I-050] / [I-058] / [I-071]）。
+中核は **render hash の下位 4 桁による履歴検索**で、`/api/history` と系譜の 2 経路の計 3 経路に効く。
+**ASCII 英数字ちょうど 4 文字のときだけ**照合を足し、大文字小文字は区別せず、従来の 5 条件（記述・DDL・Stage 1/2 model・catalog ID）へ OR で乗る。
+**この形のときだけ FTS を迂回する** — `_use_history_fts` は 3 文字以上で FTS へ入るが索引は hash 列を持たないので、迂回しないと 0 件になる。
+**同じ 5 条件の OR が 3 箇所に複製されていた**ので 1 本へ畳んだ。
+**`lint:i18n` に第 4 経路が入った**（[I-058]）— マークアップへ直接書かれた `日本語 / English` 形のテキストノードから英語側を抽出するもので、**運ぶのは
+17 件**（実測: 外すと 949 → 932）。
+同時に `isJapanese ? '状態 / Status' : 'Status'` の 2 箇所を無条件併記へ揃えた ＝ **英語 UI に日本語が出る箇所が 2 つ増えた**（同じカードの他の
+15 箇所は前からそうだった）。
+**設定の数値 4 欄へ自前の −/+ ボタン**を置いた（[I-050]。
+**Firefox には `::-webkit-inner-spin-button` に当たるフックが無い**ので native spinner をやめる、という起票時の前提どおりの解）。
+**`設定再読み込み` は `表示更新` へ**（[I-049]。
+キーも処理も API も不変で動くのは表示文字列だけ）。
+Info モーダルは題が `inku` になり、Incu アイコンがつき、横幅が 520 → 780px になり、本文が作者指定の日英文へ替わった。
+**語彙表から詞書と読み取りの 2 行が消えた**ので、英語表示に `kotobagaki` は 1 件も残らない — **`GLOSSARY.md` と `i18n-lint.mjs`
+が持っていたその例外を受け入れ側で外した**。
+ダークテーマでスターが常に消灯して見えたのは `:global(html[data-theme='dark']) .hash-row-star` が `.hash-row-star.starred`
+に詳細度で勝っていたためで、`:not(.starred)` で解いた。
+**受け入れの決め手は SHA-256** — 7 枝の衝突は `web/BUILD_NUMBER` の 6 回だけで、`SettingsModal.svelte`・`en.ts` /
+`ja.ts`・`i18n-lint.mjs` は自動合成され、その結果が **作者が目視し pentala が Build 800 で稼働させている木と 11 ファイル中 9
+件で完全一致**した（差の 2 件は `APP_VERSION` 1 行と docs commit `407f536` ぶんで帰属を確認）。
+**摂動 3 件のうち 1 件が検査の欠落を掘り出した** — 桁数を 4 → 5 で 2 件赤、FTS 迂回ガードを外して 1 件赤（**FTS がテストでも有効であることの証拠になった**）、
+そして**形を変えない摂動**（`ilike(f"%{search}")` → `ilike(f"%{search}%")` ＝ 末尾一致をどこかに含むへ）で **120
+件すべてが緑のまま**だった。
+**契約は「下位 4 桁」なのに検査は「4 文字で引ける」しか見ていない**ので、同じ 4 文字を hash の途中に持つ行を足して 1 件だけ返ることを固定した（摂動で赤・無改変で緑）。
+pytest **1847/31**（**件数は増えない** — 既存の 2 関数へ assertion を足す形）、cli 76、ruff clean、`npm run check`
+**221/0/2**（+1 ファイル = `NumberStepper.svelte`）、`lint:i18n` **949/47/0/0**、`lint:models` 68、
+`lint:recommendations` 37。
+**決定的な層に差分が無いので凍結コーパスは焼き直していない。
+Android にも差分は無い。
+SPEC は検索対象のフィールドを列挙していないので不変更。
+版数は patch。
+**
 
-v2.4.7（Build 697）では決定的な DDL 層を凍結した。`server/reference/ddl-engine-1/` に 29 ケース（A = 展開 15 / B = 補正 14）を焼き、`ddl_version` と `ddl_engine_version` を **1** から導入した（正本 `layer_versions.py`）。**A と B は連結していない** — B の入力 Score は生成器内の literal で、A の出力を渡していない（連結すると展開側の欠陥が補正側の欠陥を覆い隠す）。**決定的な層は隣り合っておらず**、Stage 1.5 と coerce のあいだに Stage 2 の LLM が挟まるため、1 本の基準線にできないことがこの分割の理由である（SPEC §15.5）。判別の中心は `ddl` 引数の有無（同じ Score が発火 0 → 6・instruction 1 → 3）と `tenkei` 三段（発火 6 / 4 / 3・instruction 3 / 2 / 1）で、発火しないケースも固定した。`branch_report` は全体のキー集合を固定せずケースごとの対応だけを固定する。両版は新規作品の応答・履歴・保存 artifact に乗るが、**既存行は backfill しない**（記録の無い版数を推測して埋めることは来歴の捏造にあたる）。**`ddl_*` は rh3 の payload に入れていない**ので作品エディションID は不変。CI は `ddl-engine` job を独立させ、**A 側・B 側の両方から摂動して実際に落ちることを確認した**。engine 10・renderer・stroke_engine・schema・coerce は不変で、render corpus は再生成で 220 件すべて差分ゼロ。pytest 1043/30。**積み残し**: 歳時記は決定的な層から参照されておらず（流入先は Stage 1 のプロンプト＝版を持たない層）、**語が増えてもこのコーパスは動かない**。語彙の追加は `ddl_version` を上げる事象だが検出機構はまだ無い（Phase 4 の `stage1_prompt_digest` が半分を担う）。Phase 4〜5（prompt digest・版差表示）は未着手。
+v2.4.7（Build 697）では決定的な DDL 層を凍結した。
+`server/reference/ddl-engine-1/` に 29 ケース（A = 展開 15 / B = 補正 14）を焼き、`ddl_version` と
+`ddl_engine_version` を **1** から導入した（正本 `layer_versions.py`）。
+**A と B は連結していない** — B の入力 Score は生成器内の literal で、A の出力を渡していない（連結すると展開側の欠陥が補正側の欠陥を覆い隠す）。
+**決定的な層は隣り合っておらず**、Stage 1.5 と coerce のあいだに Stage 2 の LLM が挟まるため、1 本の基準線にできないことがこの分割の理由である（SPEC
+§15.5）。
+判別の中心は `ddl` 引数の有無（同じ Score が発火 0 → 6・instruction 1 → 3）と `tenkei` 三段（発火 6 / 4 / 3・instruction 3 /
+2 / 1）で、発火しないケースも固定した。
+`branch_report` は全体のキー集合を固定せずケースごとの対応だけを固定する。
+両版は新規作品の応答・履歴・保存 artifact に乗るが、**既存行は backfill しない**（記録の無い版数を推測して埋めることは来歴の捏造にあたる）。
+**`ddl_*` は rh3 の payload に入れていない**ので作品エディションID は不変。
+CI は `ddl-engine` job を独立させ、**A 側・B 側の両方から摂動して実際に落ちることを確認した**。
+engine 10・renderer・stroke_engine・schema・coerce は不変で、render corpus は再生成で 220 件すべて差分ゼロ。
+pytest 1043/30。
+**積み残し**: 歳時記は決定的な層から参照されておらず（流入先は Stage 1 のプロンプト＝版を持たない層）、**語が増えてもこのコーパスは動かない**。
+語彙の追加は `ddl_version` を上げる事象だが検出機構はまだ無い（Phase 4 の `stage1_prompt_digest` が半分を担う）。
+Phase 4〜5（prompt digest・版差表示）は未着手。
 
-v2.4.5（Build 695）では作品エディションID を `rh3` へ移した。payload は `score` + `render_seed` + render engine の ID と版 + `render_color_catalog_id` の 5 つで、**`render_build_number` と `vary_seed` を外した**。build 番号は UI だけの変更でも採番されるため、**描画が 1 バイトも変わらないのにエディションIDが変わる**偽の差分を生んでいた（v1.60 で engine 版の採番規律が無い時代の保険として入ったもので、その役割は v1.99 以降 `render_engine_version` が引き継いでいる）。build 番号は来歴として保持する。**`rh2` は legacy として再計算せず保持し、`rh2` と `rh3` は別の hash 空間**（起動時 backfill は空の行にだけ rh3 を書く）。`render_hash` を等値比較する経路は server に無いため挙動は変わらない。SPEC §7 / §11.2。engine 10・renderer・schema・coerce は不変で、参照コーパスも再生成で差分ゼロ。pytest 1038/30。
+v2.4.5（Build 695）では作品エディションID を `rh3` へ移した。
+payload は `score` + `render_seed` + render engine の ID と版 + `render_color_catalog_id` の 5 つで、
+**`render_build_number` と `vary_seed` を外した**。
+build 番号は UI だけの変更でも採番されるため、**描画が 1 バイトも変わらないのにエディションIDが変わる**偽の差分を生んでいた（v1.60 で engine
+版の採番規律が無い時代の保険として入ったもので、その役割は v1.99 以降 `render_engine_version` が引き継いでいる）。
+build 番号は来歴として保持する。
+**`rh2` は legacy として再計算せず保持し、`rh2` と `rh3` は別の hash 空間**（起動時 backfill は空の行にだけ rh3 を書く）。
+`render_hash` を等値比較する経路は server に無いため挙動は変わらない。
+SPEC §7 / §11.2。
+engine 10・renderer・schema・coerce は不変で、参照コーパスも再生成で差分ゼロ。
+pytest 1038/30。
 
-v2.4.4（Build 694）では engine 10 の描画出力を凍結した。`server/reference/render-engine-10/` に 220 ケース（基盤 80 / 変奏 72 / 塗り・面・地 40 / 判別 28）の入力全文・digest・要素数・class を記録し、**再生成のバイト一致を CI（`.github/workflows/reference-corpus.yml`）が強制する**。目的は「どこが変わったとき描画結果がどう変わったか」を AI が判定できるようにすることで、**版数は 1 ビットしか運ばないため出力の実物を凍結する**。engine 1〜9 の出力は復元不能なので engine 10 から始める。入力は生成器側に literal で固定し（色表・Score 全フィールド）、`COLOR_MAP` も schema 既定値も参照しないため、コーパスを動かせるのは `renderer.py` と `stroke_engine.py` だけになる。副産物として **`ground.absorbency` が死にフィールドである確証**を得た（digest が動かない。本改修では直さない）。手順は成果物の隣 `server/reference/README.md`、契約は SPEC §15.5。`.gitattributes` で配布物からは除外。**描画結果は 1 バイトも変わらず**、engine 10・renderer・stroke_engine・schema・coerce・rh2 は不変。Phase 2〜5（rh3・ddl corpus・prompt digest・版差表示）は未着手。
+v2.4.4（Build 694）では engine 10 の描画出力を凍結した。
+`server/reference/render-engine-10/` に 220 ケース（基盤 80 / 変奏 72 / 塗り・面・地 40 / 判別 28）の入力全文・digest・要素数・
+class を記録し、**再生成のバイト一致を CI（`.github/workflows/reference-corpus.yml`）が強制する**。
+目的は「どこが変わったとき描画結果がどう変わったか」を AI が判定できるようにすることで、**版数は 1 ビットしか運ばないため出力の実物を凍結する**。
+engine 1〜9 の出力は復元不能なので engine 10 から始める。
+入力は生成器側に literal で固定し（色表・Score 全フィールド）、`COLOR_MAP` も schema 既定値も参照しないため、コーパスを動かせるのは `renderer.py` と
+`stroke_engine.py` だけになる。
+副産物として **`ground.absorbency` が死にフィールドである確証**を得た（digest が動かない。
+本改修では直さない）。
+手順は成果物の隣 `server/reference/README.md`、契約は SPEC §15.5。
+`.gitattributes` で配布物からは除外。
+**描画結果は 1 バイトも変わらず**、engine 10・renderer・stroke_engine・schema・coerce・rh2 は不変。
+Phase 2〜5（rh3・ddl corpus・prompt digest・版差表示）は未着手。
 
-Android 版（`android/`、Kotlin + Compose + Room、端末内で全パイプライン）は **`2.0.0-android.1` / Build 148080 で Phase 2 完了＝ render engine 10 の移植が全段そろった**（2026-07-24。engine 10 への到達自体は 2f / Build 148077）。版の名前空間は web/server と別で、`android/VERSION` と `android/BUILD_NUMBER` が正本。移植は server を正本として後から追随する形であり、**server 側の設計を Android に合わせて曲げない**。**Phase 3a（Stage 1.5 展開層の中核）に続き、Phase 2h でマスターグリッドへ追随して Android の `render_engine_version` は `"11"` になり（幾何は 1 行も変えず数値を文字列にする箇所だけを 6 桁固定へ）、さらに Phase 3b（変奏）までマージ済み**（android Build 148082、2026-07-24）。Phase 3b は `variation_amplitude` と `variation_seed` が揃ったときだけ DDL 本文と `variation_report` を決定的に変換する層で、焦点 `focus` もここに入る。受け入れでは 16 ケースの出力完全一致に加え、**16 件すべてが持つ `variation_report`（`moved_axes` と `resolved_focus`）を照合**し、符号なし seed 化と report 照合の判別力を摂動で確認した。**Phase 3d（組み込み Nature プラグイン展開）をマージして Stage 1.5 展開層の移植は完了した**（android Build 148083、2026-07-25。3c の添景は 3a 移植時に含まれており、コーパス 13 件が着手時点でバイト一致していたため作者裁定で独立段を立てずに完了扱い）。受け入れではコーパス 3 件の期待値を現行 server 実装で再計算して一致を確認し、マクロ文言の摂動で 3d テストが落ちることまで見た。**engine 12 への描画層追随も完了した**（`2.1.0-android.1` / android Build 148089、2026-07-25）。脱・規則化（`gesture` と 4 関数）・材質アウトライン層・「暴れる」の結線（**`line` にだけ届く。server がそうなっているため**）・`rh2` → `rh3`（Room v4 と UI トグル込み）。**材質層は 1 度差し戻した** — 初回は移植ではなく別実装で、`points` が **0/234 点一致・最大 16.4px ずれ**だったが、**既存テストが `path d`・class・要素数しか見ていなかったため 100% PASS で通っていた**。受け入れで検査を全 16 件へ広げると `11_cloudform_pencil` の texture dash が**素のリテラル**（`1,3` 対 `1.000000,3.000000`）で、**Phase 2b′ 以来の欠陥**が見つかったので直し、**全 16 件を `path d` / `points` / `stroke-dasharray` で比べるテストを恒久化**した。テストは 64 → **68 件**。**2026-07-26 に `2.1.1-android.1` / Build 148090 で engine 13 と 14 を 1 契約でまとめて追随し、Android も render engine 14 を名乗るようになった**（コンピュータの道具・キャンバス短辺基準の一枚の方眼・暴れるが輪郭へ届くこと・てざわり語彙を server の 10 語へ是正）。テストは **71 件**。**2026-07-27 に `2.1.2-android.1` で render engine 15 へ追随し、あわせて `hair` → `silverpoint` の改名・server プロンプト複製の同期と指紋の番人・明示個数の免除まで 1 契約で入れた**（テストは 71 件 / 失敗 20 → **89 件 / 失敗 0**）。**engine 15 の 5 変更のうち「地の種」だけは移す先が無い** — Kotlin に canvas ground の描画経路が存在しないため。**段 5 の真の障害物は契約が名指しした 3 関数のどれでもなく `temperQuietSymbolicShape` の範囲だった**（円・楕円・弧まで含み `color_hint` のゲートが無く、明示された個数が governor に届く前に 8 個へ切られていた。server どおりに絞って 42/50 → 50/50）。**検査の穴も 2 つ出た** — 角のある図形の材質層は実装ごと消しても緑（参照 25 件に triangle も polygon も 0 件）、粒は個数だけを固定していたので全部動いても緑。前者は新しい判別テスト、後者は位置の digest で閉じた。**参照コーパスは 1 バイトも動いていない**。未対応として、埋め込み Stage 2 tool スキーマの 237 行の乖離・`surfaceSeed` の材料・`renderHash` の既定値・UI の版表示 `1` が残る。**2026-07-29 に `2.1.3-android.1` で render engine 16 へ追随した**（太さの軸を schema・coercer・線幅・材質輪郭へ通し、走査線が 3 本に満たない微小な塗りを 1 本の path の打点として置き、版を 2 箇所で宣言。テストは 89 件 / 失敗 15 → **99 件 / 失敗 0**）。**seed の材料は Kotlin に 2 箇所ある**ので片方だけでは面の検査が赤で残り、**太さの下限は新しい定数ではなく道具表の最小値（銀筆の 0.5）から導く**。**面の質感 6 つは実装しておらず、作者裁定 `D-20260729-android-declares-the-shared-part` により部分実装のまま版を宣言する**。受け入れでは段の数だけ 5 つの摂動を当てて契約が名指しした assertion が赤くなることを確かめ、**`CornerShapeMaterialLayerTest` の期待値が実装の出力ではなく凍結参照 SVG 由来であることを digest の再計算で検証した**。判別点は **`01_circle_pen` 可動 × `05_circle_rotring` 不変**で、機械の極が動かないのは 3 版連続である。**2026-07-31 に `2.1.4-android.1` で render engine 17 へ追随した**（カタログ palette の決定的割当・抽象色 9 語・全 dump seed への `note` と `thinness` 末尾・プロンプト 4 定数。テストは 110 件 / 失敗 12 → **112 件 / 失敗 0**）。**遅れは engine 17 だけではなく 4 系統**で、`thinness` の宣言位置・`note` の新設・抽象色 9 語・engine 17 がコーパスを焼いて以降に重なっていた。**カタログの中身は範囲外**（engine 18 が入れ替える。起票時の「server は 9 キー」は誤りで、**server の 11 カタログの `map` も 6 キー**である）。**契約を渡す前に検査面を焼いた** — 既存 32 ケースは `color_hint` 0 件・色語は `black` のみ・`palette:` キー 0 で、**割当を 1 行も書かずに `"17"` を宣言すれば全緑**になり、しかも**色を見ている assertion が 1 つも無かった**。**受け入れでゲートの無い欠陥を 2 件見つけた** — OKLab の係数 2 つが別の版（今日の 11 カタログでは割当を 1 件も変えないが、判別幅の 2 万分の 1 の差であり engine 18 が全色を入れ替える）と、**`render_color_map`（metadata）が割当済みの色を載せていた**（server は割当に触れない。engine 16 まであった parity が壊れていた）。**副産物として `pen` の線に材質層が出ていない既存欠陥**も出た（`usesMaterialOutline` と線の経路の集合が食い違っており、**コーパスに `pen` の線が 1 件も無かったので誰も見ていなかった**）。詳細は CHANGELOG の Android entry と `android/ANDROID_SPEC.ja.md`（**`ANDROID_SPEC` は engine 15 にも未追随**）。 **UI の web への追随は `2.1.4-android.2` で第 1 段が入った**（2026-07-31、android Build 148090 据え置き）— 来歴ハッシュのツールチップ・表示モード（simple / full）・マスコット（Incu / Yuragi）・添景水準・モデル推奨と、系譜の Room v5（`lineage_nodes` / `lineage_edges`）。**実装セッションの 2 巡を差し戻し、git 管理セッションが直してマージした** — 1 巡目は呼び出し元の無い Composable を 6 個作って契約外の 3 機能を足し、2 巡目は改訂の指示 6 項目をすべて実施せずに 5 個増やした。**添景は水準（`none` / `sparse` / `auto`）であってモチーフの一覧ではない**点と、**`lineage_nodes.history_id` が INTEGER で `history_items.id`（TEXT）と結合できなかった**点を直した。**colophon・読まれなかった語・推敲の中核と、系譜のデータ層の使い手は未実装のまま**。
+Android 版（`android/`、Kotlin + Compose + Room、端末内で全パイプライン）は **`2.0.0-android.1` / Build 148080 で
+Phase 2 完了＝ render engine 10 の移植が全段そろった**（2026-07-24。
+engine 10 への到達自体は 2f / Build 148077）。
+版の名前空間は web/server と別で、`android/VERSION` と `android/BUILD_NUMBER` が正本。
+移植は server を正本として後から追随する形であり、**server 側の設計を Android に合わせて曲げない**。
+**Phase 3a（Stage 1.5 展開層の中核）に続き、Phase 2h でマスターグリッドへ追随して Android の `render_engine_version` は `"11"`
+になり（幾何は 1 行も変えず数値を文字列にする箇所だけを 6 桁固定へ）、さらに Phase 3b（変奏）までマージ済み**（android Build 148082、2026-07-24）。
+Phase 3b は `variation_amplitude` と `variation_seed` が揃ったときだけ DDL 本文と `variation_report` を決定的に変換する層で、
+焦点 `focus` もここに入る。
+受け入れでは 16 ケースの出力完全一致に加え、**16 件すべてが持つ `variation_report`（`moved_axes` と `resolved_focus`）を照合**し、符号なし
+seed 化と report 照合の判別力を摂動で確認した。
+**Phase 3d（組み込み Nature プラグイン展開）をマージして Stage 1.5 展開層の移植は完了した**（android Build 148083、2026-07-25。
+3c の添景は 3a 移植時に含まれており、コーパス 13 件が着手時点でバイト一致していたため作者裁定で独立段を立てずに完了扱い）。
+受け入れではコーパス 3 件の期待値を現行 server 実装で再計算して一致を確認し、マクロ文言の摂動で 3d テストが落ちることまで見た。
+**engine 12 への描画層追随も完了した**（`2.1.0-android.1` / android Build 148089、2026-07-25）。
+脱・規則化（`gesture` と 4 関数）・材質アウトライン層・「暴れる」の結線（**`line` にだけ届く。
+server がそうなっているため**）・`rh2` → `rh3`（Room v4 と UI トグル込み）。
+**材質層は 1 度差し戻した** — 初回は移植ではなく別実装で、`points` が **0/234 点一致・最大 16.4px ずれ**だったが、**既存テストが `path d`・class・
+要素数しか見ていなかったため 100% PASS で通っていた**。
+受け入れで検査を全 16 件へ広げると `11_cloudform_pencil` の texture dash が**素のリテラル**（`1,3` 対 `1.000000,3.000000`）で、
+**Phase 2b′ 以来の欠陥**が見つかったので直し、**全 16 件を `path d` / `points` / `stroke-dasharray` で比べるテストを恒久化**した。
+テストは 64 → **68 件**。
+**2026-07-26 に `2.1.1-android.1` / Build 148090 で engine 13 と 14 を 1 契約でまとめて追随し、Android も render
+engine 14 を名乗るようになった**（コンピュータの道具・キャンバス短辺基準の一枚の方眼・暴れるが輪郭へ届くこと・てざわり語彙を server の 10 語へ是正）。
+テストは **71 件**。
+**2026-07-27 に `2.1.2-android.1` で render engine 15 へ追随し、あわせて `hair` → `silverpoint` の改名・server
+プロンプト複製の同期と指紋の番人・明示個数の免除まで 1 契約で入れた**（テストは 71 件 / 失敗 20 → **89 件 / 失敗 0**）。
+**engine 15 の 5 変更のうち「地の種」だけは移す先が無い** — Kotlin に canvas ground の描画経路が存在しないため。
+**段 5 の真の障害物は契約が名指しした 3 関数のどれでもなく `temperQuietSymbolicShape` の範囲だった**（円・楕円・弧まで含み `color_hint`
+のゲートが無く、明示された個数が governor に届く前に 8 個へ切られていた。
+server どおりに絞って 42/50 → 50/50）。
+**検査の穴も 2 つ出た** — 角のある図形の材質層は実装ごと消しても緑（参照 25 件に triangle も polygon も 0 件）、粒は個数だけを固定していたので全部動いても緑。
+前者は新しい判別テスト、後者は位置の digest で閉じた。
+**参照コーパスは 1 バイトも動いていない**。
+未対応として、埋め込み Stage 2 tool スキーマの 237 行の乖離・`surfaceSeed` の材料・`renderHash` の既定値・UI の版表示 `1` が残る。
+**2026-07-29 に `2.1.3-android.1` で render engine 16 へ追随した**（太さの軸を schema・coercer・線幅・材質輪郭へ通し、走査線が 3
+本に満たない微小な塗りを 1 本の path の打点として置き、版を 2 箇所で宣言。
+テストは 89 件 / 失敗 15 → **99 件 / 失敗 0**）。
+**seed の材料は Kotlin に 2 箇所ある**ので片方だけでは面の検査が赤で残り、**太さの下限は新しい定数ではなく道具表の最小値（銀筆の 0.5）から導く**。
+**面の質感 6 つは実装しておらず、作者裁定 `D-20260729-android-declares-the-shared-part` により部分実装のまま版を宣言する**。
+受け入れでは段の数だけ 5 つの摂動を当てて契約が名指しした assertion が赤くなることを確かめ、**`CornerShapeMaterialLayerTest`
+の期待値が実装の出力ではなく凍結参照 SVG 由来であることを digest の再計算で検証した**。
+判別点は **`01_circle_pen` 可動 × `05_circle_rotring` 不変**で、機械の極が動かないのは 3 版連続である。
+**2026-07-31 に `2.1.4-android.1` で render engine 17 へ追随した**（カタログ palette の決定的割当・抽象色 9 語・全 dump seed
+への `note` と `thinness` 末尾・プロンプト 4 定数。
+テストは 110 件 / 失敗 12 → **112 件 / 失敗 0**）。
+**遅れは engine 17 だけではなく 4 系統**で、`thinness` の宣言位置・`note` の新設・抽象色 9 語・engine 17 がコーパスを焼いて以降に重なっていた。
+**カタログの中身は範囲外**（engine 18 が入れ替える。
+起票時の「server は 9 キー」は誤りで、**server の 11 カタログの `map` も 6 キー**である）。
+**契約を渡す前に検査面を焼いた** — 既存 32 ケースは `color_hint` 0 件・色語は `black` のみ・`palette:` キー 0 で、**割当を 1 行も書かずに
+`"17"` を宣言すれば全緑**になり、しかも**色を見ている assertion が 1 つも無かった**。
+**受け入れでゲートの無い欠陥を 2 件見つけた** — OKLab の係数 2 つが別の版（今日の 11 カタログでは割当を 1 件も変えないが、判別幅の 2 万分の 1 の差であり engine
+18 が全色を入れ替える）と、**`render_color_map`（metadata）が割当済みの色を載せていた**（server は割当に触れない。
+engine 16 まであった parity が壊れていた）。
+**副産物として `pen` の線に材質層が出ていない既存欠陥**も出た（`usesMaterialOutline` と線の経路の集合が食い違っており、**コーパスに `pen` の線が 1
+件も無かったので誰も見ていなかった**）。
+詳細は CHANGELOG の Android entry と `android/ANDROID_SPEC.ja.md`（**`ANDROID_SPEC` は engine 15 にも未追随**）。
+**UI の web への追随は `2.1.4-android.2` で第 1 段が入った**（2026-07-31、android Build 148090 据え置き）—
+来歴ハッシュのツールチップ・表示モード（simple / full）・マスコット（Incu / Yuragi）・添景水準・モデル推奨と、系譜の Room v5（`lineage_nodes` /
+`lineage_edges`）。
+**実装セッションの 2 巡を差し戻し、git 管理セッションが直してマージした** — 1 巡目は呼び出し元の無い Composable を 6 個作って契約外の 3 機能を足し、2
+巡目は改訂の指示 6 項目をすべて実施せずに 5 個増やした。
+**添景は水準（`none` / `sparse` / `auto`）であってモチーフの一覧ではない**点と、**`lineage_nodes.history_id` が INTEGER で
+`history_items.id`（TEXT）と結合できなかった**点を直した。
+**colophon・読まれなかった語・推敲の中核と、系譜のデータ層の使い手は未実装のまま**。
 
 ## 変更時の確認先
 
@@ -214,5 +1343,7 @@ Android 版（`android/`、Kotlin + Compose + Room、端末内で全パイプラ
 - 仕様変更は `SPEC.ja.md` を先に更新し、同じ意図を `SPEC.md` に反映する。
 - 現行の構造や重要契約が変わる場合は、本書と `PROJECT_CONTEXT.md` も更新する。
 - リリース／Buildの履歴は `CHANGELOG.ja.md` を先に更新し、公開上必要な内容を `CHANGELOG.md` に反映する。
-- 実装だけの細部を仕様本文へ無制限に積み増さない。現行契約は仕様、時系列の記録は変更履歴へ置く。
-- Webの挙動またはUI変更では `web/BUILD_NUMBER` を更新する。アプリ世代変更時はWebの `APP_VERSION` も揃える。
+- 実装だけの細部を仕様本文へ無制限に積み増さない。
+現行契約は仕様、時系列の記録は変更履歴へ置く。
+- Webの挙動またはUI変更では `web/BUILD_NUMBER` を更新する。
+アプリ世代変更時はWebの `APP_VERSION` も揃える。

@@ -36,7 +36,7 @@
 	{/if}
 	<span><strong>速度 / Speed</strong>{modelSpeed(model)}</span>
 	<span><strong>評価 / Comment</strong>{modelComment(model, isJapanese)}</span>
-	{#if extra}<span><strong>{isJapanese ? '状態 / Status' : 'Status'}</strong>{extra}</span>{/if}
+	{#if extra}<span><strong>状態 / Status</strong>{extra}</span>{/if}
 </span>
 
 <style>

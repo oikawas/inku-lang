@@ -97,7 +97,7 @@ class DefaultSvgRenderer : SvgRenderer {
             .put("render_color_catalog_name", catalog.name)
             .put("render_color_catalog_sub", catalog.sub)
             .put("render_color_profile", JSONObject().put("id", "srgb").put("name", "sRGB IEC61966-2.1").put("standard", "IEC 61966-2-1:1999"))
-            .put("render_color_map", JSONObject(colors))
+            .put("render_color_map", JSONObject(catalog.renderMap))
         val hash = sha256(svg + metadata.toString())
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }

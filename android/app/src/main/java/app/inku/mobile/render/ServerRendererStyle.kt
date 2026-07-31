@@ -411,9 +411,9 @@ internal object ServerRendererStyle {
         val mCbrt = Math.cbrt(m)
         val sCbrt = Math.cbrt(s)
 
-        val L = 0.2104542553 * lCbrt + 0.7936177850 * mCbrt - 0.0040720403 * sCbrt
+        val L = 0.2104542553 * lCbrt + 0.7936177850 * mCbrt - 0.0040720468 * sCbrt
         val a = 1.9779984951 * lCbrt - 2.4285922050 * mCbrt + 0.4505937099 * sCbrt
-        val bVal = 0.0259040371 * lCbrt + 0.7827717662 * mCbrt - 0.8086758033 * sCbrt
+        val bVal = 0.0259040371 * lCbrt + 0.7827717662 * mCbrt - 0.8086757660 * sCbrt
 
         val C = Math.hypot(a, bVal)
         val Hdeg = Math.toDegrees(Math.atan2(bVal, a))

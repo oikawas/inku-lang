@@ -6,9 +6,9 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class Engine16VersionTest {
+class Engine17VersionTest {
     @Test
-    fun testRendererMetadataDeclaresEngine16() {
+    fun testRendererMetadataDeclaresEngine17() {
         val result = DefaultSvgRenderer().render(
             app.inku.mobile.pipeline.RenderRequest(
                 scoreJson = """{"instructions":[]}""",
@@ -17,11 +17,11 @@ class Engine16VersionTest {
                 svgProfile = "editable",
             )
         )
-        assertEquals("16", JSONObject(result.metadataJson).getString("render_engine_version"))
+        assertEquals("17", JSONObject(result.metadataJson).getString("render_engine_version"))
     }
 
     @Test
-    fun testRenderHashDefaultsMissingAndBlankMetadataToEngine16() {
+    fun testRenderHashDefaultsMissingAndBlankMetadataToEngine17() {
         val pipeline = LocalFallbackPipeline()
         val method = LocalFallbackPipeline::class.java.getDeclaredMethod(
             "renderHash",
@@ -44,15 +44,15 @@ class Engine16VersionTest {
                 "default",
             ) as String
 
-        val explicit16 = hash(JSONObject().put("render_engine_version", "16"))
-        assertEquals(explicit16, hash(JSONObject()))
-        assertEquals(explicit16, hash(JSONObject().put("render_engine_version", "")))
+        val explicit17 = hash(JSONObject().put("render_engine_version", "17"))
+        assertEquals(explicit17, hash(JSONObject()))
+        assertEquals(explicit17, hash(JSONObject().put("render_engine_version", "")))
     }
 
     // The version the UI shows is pinned to a literal so that leaving it stale fails here.
     @Test
-    fun testCompatibilityConstantsDeclareEngine16() {
-        assertEquals("16", CompatibilityConstants.renderEngineVersion)
+    fun testCompatibilityConstantsDeclareEngine17() {
+        assertEquals("17", CompatibilityConstants.renderEngineVersion)
         assertEquals("default", CompatibilityConstants.renderEngineId)
     }
 
@@ -73,4 +73,3 @@ class Engine16VersionTest {
         assertEquals(metadata.getString("render_engine_id"), CompatibilityConstants.renderEngineId)
     }
 }
-

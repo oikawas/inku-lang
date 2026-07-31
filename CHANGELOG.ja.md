@@ -1308,3 +1308,33 @@ Android 単体テスト **101 / failures 0 / errors 0 / skipped 0**（起点 99 
 - **採番は `android/VERSION` だけ。** `APP_VERSION`（`v2.9.12`）・`web/BUILD_NUMBER`（783）・`android/BUILD_NUMBER`（148090）はいずれも不動で、**pentala 反映も不要**
 - **検証:** Android **112 件 / failures 0 / errors 0 / skipped 0**（25 XML）。マージ後の主 checkout で server **1771 passed / 31 skipped**、cli **76**、ruff（`src tests scripts`）緑、`npm run check` **0 errors / 2 warnings / 219 files**
 - **残り:** `ANDROID_SPEC.ja.md` / `.md` は **engine 15 にも未追随**（[I-013]）。本契約の範囲外
+
+### Android `2.1.4-android.2` — 画面が呼ぶものだけを残す（ツールチップ・表示モード・マスコット・添景水準・系譜表）（android Build 148090 据え置き、2026-07-31）
+
+**実装セッションの 2 巡を差し戻したのち、git 管理セッションが直してマージした**（作者裁定）。
+
+- **呼び出し元の無い Composable 11 個を整理した。** 4 個（`ProvenanceTooltipTarget` / `UiModeContainer` / `MascotWidget` / `TenkeiSelect`）は画面から呼ぶようにし、7 個（`CustomModalContainer` / `ToastQueueWidget` / `ConditionChipsContainer` / `LineagePanel` / `UnreadWordsPanel` / `AIRefineModal` / `ManualRefineModal`）は削除した。**契約に無い 3 機能**（モーダルの scrim・Toast キュー・条件チップの折りたたみ）も落とした
+- **表示モードとマスコットが表示を変えるようになった。** 設定は既に Room へ保存・復元されていたが、読む側が製品に無く「選べるが何も変わらない」状態だった。`ComposeScreen` が `UiModeContainer` で simple / full を切り替え、full のときだけマスコットと条件の帯を出す
+- **添景は水準であってモチーフではない。** `TenkeiOptions` を `web/src/lib/tenkei.ts` の 3 水準（`none` なし / `sparse` 控えめ / `auto` おまかせ）へ直した（実装は `moon` / `cloud` / `bird` / `mountain` / `water` というモチーフの一覧を発明していた）。**選んだ水準が `PaintRequest.tenkei` を通って `WebDdlExpander` へ届く**ようにした（それまで `LocalFallbackPipeline` の 2 箇所が既定値 `auto` を渡していた）
+- **カタログに存在しないモデルの推奨を 1 行落とした**（`qwen/qwen-2.5-coder-32b-instruct` は server・web・Android のどこにも無かった）。残る 3 行は実在の ID
+- **`lineage_nodes.history_id` を TEXT にした。** `Long?` / INTEGER で焼かれており、`history_items.id`（TEXT）と結合できなかった
+- **migration の検査が実際にデータベースを開くようになった。** それまでの 2 本は `startVersion` / `endVersion` を読むだけで SQL に触れず、制約の検査は data class を 2 つ作って等値を見るだけだった（`uq_lineage_primary_parent` は一度も働かなかった）
+- **`androidx.room:room-testing` を入れた。** `kotlinx-serialization-core` が推移的な BOM に `strictly 1.7.3` で固定され、room-testing の 1.8.1 生成コードと食い違って実機で `AbstractMethodError` になるため、**androidTest の configuration だけ 1.8.1 へ force した**
+- **採番は `android/VERSION` だけ**（`2.1.4-android.1` → `2.1.4-android.2`。実装セッションは段ごとに `.11` まで上げていた）。`APP_VERSION`（`v2.9.12`）・`web/BUILD_NUMBER`（783）・`android/BUILD_NUMBER`（148090）はいずれも不動で、**pentala 反映も不要**
+
+#### 摂動（製品側に当てた）
+
+前 2 巡の摂動はすべてテストの期待値の書き換えだったので、**製品のコードを 4 回摂動して狙った検査が赤くなることを見た**。
+
+- `TenkeiOptions` へ `moon` を戻す → `tenkeiOptions_areExactlyTheThreeWebLevels` が赤（単体）
+- `history_id` を `Long?` / INTEGER へ戻す → migration 3 件が赤・他 7 件は緑
+- `uq_lineage_primary_parent` から `UNIQUE` を外す → migration 3 件が赤
+- **スキーマを変えずに** migration へ `DELETE FROM history_items` を足す → **既存行を読む 2 件だけが赤**（制約の検査は緑）＝ 検査本体が効いている
+
+#### 直していないこと
+
+- **段 6 の中核は未実装のまま。** colophon（奥書）は Android に 1 件も無く、`unread_words` に相当するテーブルも、推敲が `lineage_edges` へ派生を積む結線も無い。残るのは 11 種別の表（`DerivationKind.kt`）とその検査だけ
+- **系譜のデータ層は誰も使わない。** `LineageDao` と `HistoryItemEntity.lineageNodeId` は宣言だけで、リポジトリからも ViewModel からも呼ばれない。表と migration は正しく焼けているが、行は 1 つも書かれない
+- **`TooltipTest` は製品の呼び出し箇所の引数を読まない。** `ProvenanceTooltipTarget` は `CanvasHeroCard` から呼ばれるようになったが、テストは自前の文字列で直接呼ぶ
+- **`state.selectedTenkei` が展開へ届くことを見る検査が無い**（型としては通したが、経路を通す検査は置いていない）
+- **マスコット設定の二重**（既存の Kiwi / Crab と新しい Incu / Yuragi）は [I-066] の裁定待ちなので触っていない

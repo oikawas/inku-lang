@@ -1196,3 +1196,33 @@ recorded this as "not caught up to engine 15"; **the actual distance is larger.*
 - **Only `android/VERSION` was raised.** `APP_VERSION` (`v2.9.12`), `web/BUILD_NUMBER` (783) and `android/BUILD_NUMBER` (148090) are all unchanged, and **no pentala deployment is needed**.
 - **Verification:** Android **112 tests / 0 failures / 0 errors / 0 skipped** (25 XML). In the merged main checkout: server **1771 passed / 31 skipped**, cli **76**, ruff (`src tests scripts`) clean, `npm run check` **0 errors / 2 warnings / 219 files**.
 - **Left:** `ANDROID_SPEC.ja.md` / `.md` have **not caught up even to engine 15** ([I-013]). Out of scope here.
+
+### Android `2.1.4-android.2` — only what a screen calls survives (tooltip, display mode, mascot, staffage level, lineage tables) (android Build 148090 unchanged, 2026-07-31)
+
+**Two implementation passes were sent back; the git session then fixed the branch and merged it** (author's call).
+
+- **Eleven composables had no caller.** Four (`ProvenanceTooltipTarget`, `UiModeContainer`, `MascotWidget`, `TenkeiSelect`) are now called from the screens; seven (`CustomModalContainer`, `ToastQueueWidget`, `ConditionChipsContainer`, `LineagePanel`, `UnreadWordsPanel`, `AIRefineModal`, `ManualRefineModal`) were deleted, along with the **three features the contract never asked for** (modal scrim dismissal, a toast queue, collapsible condition chips)
+- **The display mode and the mascot now change what is drawn.** Both settings already persisted to Room and were restored on launch, but nothing in the product read them, so they could be chosen and nothing happened. `ComposeScreen` switches on `UiModeContainer`, and the mascot and the condition strip appear only in the full mode
+- **Staffage is a level, not a motif.** `TenkeiOptions` now mirrors the three levels in `web/src/lib/tenkei.ts` (`none`, `sparse`, `auto`); the implementation had invented a list of motifs (`moon`, `cloud`, `bird`, `mountain`, `water`). **The chosen level now travels through `PaintRequest.tenkei` to `WebDdlExpander`** — two call sites in `LocalFallbackPipeline` were passing the default
+- **Dropped a recommended model that exists in no catalog** (`qwen/qwen-2.5-coder-32b-instruct` appears in neither server, web, nor the Android catalog). The remaining three ids are real
+- **`lineage_nodes.history_id` is TEXT.** It had been baked as `Long?` / INTEGER and could never join against `history_items.id`, which is TEXT
+- **The migration test opens a real database now.** The two it replaces read `startVersion` / `endVersion` off the Migration object without touching the SQL, and the constraint test built two data classes and compared them, so `uq_lineage_primary_parent` never ran
+- **Added `androidx.room:room-testing`.** A transitive BOM pins `kotlinx-serialization-core` to `strictly 1.7.3`, which fails at runtime against room-testing's 1.8.1 generated serializers (`AbstractMethodError`), so **the androidTest configurations force 1.8.1**
+- **Only `android/VERSION` moved** (`2.1.4-android.1` to `2.1.4-android.2`; the implementation had raised it once per stage, to `.11`). `APP_VERSION` (`v2.9.12`), `web/BUILD_NUMBER` (783) and `android/BUILD_NUMBER` (148090) are unchanged, and **no pentala deployment was needed**
+
+#### Perturbations (aimed at the product)
+
+The previous two passes only rewrote test expectations, so **the product code was perturbed four times** to watch the intended gate turn red.
+
+- put `moon` back into `TenkeiOptions` — `tenkeiOptions_areExactlyTheThreeWebLevels` red (unit)
+- return `history_id` to `Long?` / INTEGER — three migration tests red, the other seven green
+- drop `UNIQUE` from `uq_lineage_primary_parent` — three migration tests red
+- **without changing the schema**, add `DELETE FROM history_items` to the migration — **only the two tests that read history rows go red**, the constraint test stays green, so the bodies are what catch data loss
+
+#### Not fixed here
+
+- **The core of stage 6 is still missing.** There is no colophon anywhere in Android, no table matching `unread_words`, and no wiring that records a refinement as an edge in `lineage_edges`. What remains is the eleven-kind table (`DerivationKind.kt`) and its test
+- **Nothing uses the lineage data layer.** `LineageDao` and `HistoryItemEntity.lineageNodeId` are declared but never called from the repository or the view model; the tables and the migration are correct, but no row is ever written
+- **`TooltipTest` does not read the arguments at the product's call site.** `CanvasHeroCard` calls `ProvenanceTooltipTarget` now, but the test calls it directly with its own strings
+- **No test watches `state.selectedTenkei` arrive at the expander** — the type threads through, but the path is not gated
+- **The duplicate mascot settings** (the existing Kiwi / Crab beside the new Incu / Yuragi) are left alone, pending [I-066]

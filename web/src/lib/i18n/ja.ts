@@ -10,7 +10,7 @@ export const ja: LangPack = {
 	appInfoConceptTitle: 'コンセプト',
 	appInfoConceptBody: 'inku（インク）は、短い記述から抽象的なベクターグラフィックを生み出す描画言語 DDL（Drawing Description Language）のリファレンスとなるアプリケーションです。\n\n絵画の経験や道具が無くても、自分のイメージを形に出来ます。心に残った光景をひとつ、短く書くことが始まりで、そこから作品を作っていくことが出来ます。',
 	appInfoCreatorTitle: '制作者',
-	appInfoCreatorName: 'Shinichiro Oikawa',
+	appInfoCreatorName: '及川 信一郎 (Shinichiro Oikawa)',
 	appInfoCreatorBody: 'DDLの日本語と英語の仕様、inkuアプリケーションの設計・実装しています。',
 	appInfoVersionLabel: 'バージョン',
 	appInfoBuildLabel: 'ビルド',

@@ -1494,3 +1494,58 @@ clean, `check_frozen_corpora.py` green. **Android is out of scope for this contr
 **Left undecided**: the material outline still runs across the cut, so its dashes cross the bare paper
 where the ink stopped. Cutting it would mean turning the polyline into a path and would move every
 material outline in the corpus.
+
+### v2.9.17 — whether you see the tooltips is yours to choose (Build 807, 2026-08-01)
+
+The Codex branch `fix/ui-mode-control-tooltip` (two commits, Builds 805-806) merged in. **The completion
+report covers only the second commit (the tooltip toggle); the first (clarifying the UI mode control)
+has no report.** This section records both.
+
+#### The tooltip toggle (Build 806)
+
+A show/hide button for the shared tooltips sits in the left rail, between the UI mode button and
+settings.
+
+- The choice is stored per user account (`user_accounts.tooltips_enabled`). **Both a new user and the
+  migration default for an existing database are `true`** (shown)
+- `GET /api/auth/me` returns `tooltips_enabled` and `PATCH /api/auth/me/settings` stores it. **Unset and
+  legacy data count as shown** (`row.tooltips_enabled is not False`)
+- Turning it off puts `tooltips-disabled` on the post-sign-in root, which **hides only the bubbles of the
+  shared `Tooltip` component**. No button or feature is disabled
+- The toggle is an optimistic update and reverts to the previous state if the API call fails
+- Two strings in each language (`tooltipsShow` / `tooltipsHide`). **The label and `aria-label` say what
+  pressing it now would do**
+
+#### Clarifying the UI mode control (Build 805, no report)
+
+- **The UI mode icon changed from three lines to a panel-layout mark** — it was hard to tell apart from a
+  generic menu and the settings gear
+- `Tooltip` gained a `disabled` prop so that **while the UI mode menu is open, that button's own tooltip
+  stays away** (its only caller)
+
+#### Acceptance
+
+**Comparing the merge result against the running tree decided it.** The Codex branch was cut from the
+engine 19 merge commit, so there were no conflicts, and the merge result **matched the tree pentala runs
+at Build 806 for 110 of 111 files by md5** — the one remaining file differing by the single
+`APP_VERSION` line.
+
+**One of four perturbations dug out a missing gate.**
+
+1. `update_user_settings` never writes `tooltips_enabled`: **red**
+2. **Shape-preserving** — the migration default from `DEFAULT 1` to `DEFAULT 0`, data only: **all 118
+   stayed green**
+3. `_user_to_dict` returns `True` without reading the row: **red**
+4. A new account defaults to `False`: **red**
+
+A gate for 2 was added during acceptance. **The existing migration test only checked that the columns
+arrived, and `user_accounts` held no rows at all**, so **nothing looked at the values existing accounts
+end up with**. One account older than every settings column is now inserted, and `ui_theme`, `ui_mode`
+and `tooltips_enabled` are read back after the migration (red under perturbation 2, red under the
+control that flips the `ui_theme` default from `light` to `dark`, green unperturbed).
+
+pytest **1897/31** (**the count does not move** — assertions were added to two existing functions), cli
+76, ruff clean, `npm run check` **221/0/2**, `lint:i18n` **951/47/0/0** (+2 for the new strings),
+`lint:models` 68, `lint:recommendations` 37, `check_frozen_corpora.py` green. **No deterministic layer
+changed, so the corpora were not regenerated. Android has no diff. SPEC does not enumerate display
+settings and is unchanged. The version is a patch.**

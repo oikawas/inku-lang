@@ -1586,3 +1586,56 @@ fixture の再生成は別契約。台帳 [I-072]）。
 
 **未裁定として残るもの**: 材質輪郭は切れ目をまたいで描かれ続ける。墨が切れた白地の上を材質輪郭の破線が渡る。
 切るなら polyline を path へ変える必要があり、コーパスの材質輪郭が全件動く（台帳 [I-073]）。
+
+### v2.9.17 — ツールチップを、見るかどうかを選べる（Build 807、2026-08-01）
+
+Codex の枝 `fix/ui-mode-control-tooltip`（2 commit / Build 805〜806）を統合した版。
+**完了レポートは 2 commit のうち後半（ツールチップ表示切替）だけを扱っており、
+前半（UI モード操作の明確化）にレポートは無い。** 本節は両方を記録する。
+
+#### ツールチップの表示切替（Build 806）
+
+左レールの UI モードボタンと設定ボタンのあいだに、共通ツールチップの表示 / 非表示ボタンを置いた。
+
+- 選択はユーザーアカウント単位で DB へ持つ（`user_accounts.tooltips_enabled`）。
+  **新規ユーザーも既存 DB の migration 既定値も `true`（表示）**
+- `GET /api/auth/me` が `tooltips_enabled` を返し、`PATCH /api/auth/me/settings` で保存する。
+  **未設定と旧データは表示として扱う**（`row.tooltips_enabled is not False`）
+- 非表示にすると、ログイン後の root に `tooltips-disabled` が付き、
+  **共通 `Tooltip` コンポーネントの bubble だけが一括で消える**。
+  ボタンや機能そのものは無効化しない
+- 切替は optimistic update で、API 保存に失敗したら以前の状態へ戻す
+- 日英の文言を 2 つ足した（`tooltipsShow` / `tooltipsHide`。
+  **ラベルと `aria-label` は「いま押したらどうなるか」を示す**）
+
+#### UI モード操作の明確化（Build 805・レポート無し）
+
+- **UI モードボタンのアイコンを、3 本線からパネル配置の印へ替えた** —
+  汎用メニューや設定の歯車と見分けがつかなかった
+- `Tooltip` に `disabled` 属性を足し、**UI モードのメニューを開いているあいだは
+  そのボタン自身のツールチップを出さない**（唯一の呼び出し元がここ）
+
+#### 受け入れ
+
+**決め手はマージ結果と稼働木の突き合わせだった** — Codex の枝は engine 19 のマージ commit から
+切られており衝突は 0。マージ結果は **pentala が Build 806 で稼働させている木と 111 ファイル中
+110 件で md5 完全一致**し、残る 1 件も `+page.svelte` の `APP_VERSION` 1 行だけだった（差分 2 行）。
+
+**摂動 4 件のうち 1 件が検査の欠落を掘り出した。**
+
+1. `update_user_settings` が `tooltips_enabled` を書かない → **赤**
+2. **形を変えない摂動** — migration の既定値を `DEFAULT 1` から `DEFAULT 0` へ（データだけを壊す）
+   → **118 件すべてが緑のまま**
+3. `_user_to_dict` が行を読まず `True` を返す → **赤**
+4. 新規アカウントの既定を `False` へ → **赤**
+
+2 を捕らえる検査を受け入れ側で足した。**既存の migration テストは列が増えたことしか見ておらず、
+`user_accounts` に行が 1 つも無かった** ので、**既存アカウントが受け取る値は誰も見ていなかった**。
+列より前から在るアカウントを 1 行入れ、migration 後の `ui_theme` / `ui_mode` / `tooltips_enabled` を
+読む形にした（摂動 2 で赤・対照として `ui_theme` の既定を `light` から `dark` へ替えても赤・無改変で緑）。
+
+pytest **1897/31**（**件数は増えない** — 既存の 2 つのテスト関数へ assertion を足す形なので）、
+cli 76、ruff clean、`npm run check` **221/0/2**、`lint:i18n` **951/47/0/0**（+2 = 新しい 2 文言）、
+`lint:models` 68、`lint:recommendations` 37、`check_frozen_corpora.py` 緑。
+**決定的な層に差分が無いのでコーパスは焼き直していない。Android にも差分は無い。
+SPEC は表示設定を列挙していないので不変更。版数は patch。**

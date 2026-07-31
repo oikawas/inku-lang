@@ -363,6 +363,13 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
                 at BIGINT NOT NULL
             )
         """))
+        # One account that predates every settings column. Without a row here the
+        # migrations below are only checked for the columns they add, not for the
+        # values existing accounts end up carrying.
+        conn.execute(text("""
+            INSERT INTO user_accounts (id, username, email, password_hash, role, group_id, at)
+            VALUES ('u-legacy', 'legacy', 'legacy@example.com', 'x', 'user', NULL, 0)
+        """))
 
     monkeypatch.setattr(db, "engine", legacy_engine)
     db._migrate_columns()
@@ -390,6 +397,17 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
     } <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
     assert {"ui_theme", "ui_mode", "ui_custom", "tooltips_enabled", "model_settings", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
+    # An account that existed before the column keeps the visible side of every
+    # setting the migration backfills. Asserting only that the column arrived
+    # leaves the default free to flip: turning tooltips off for every existing
+    # account passed all 118 tests before this line was added.
+    with legacy_engine.connect() as conn:
+        migrated = conn.execute(text(
+            "SELECT ui_theme, ui_mode, tooltips_enabled FROM user_accounts WHERE id = 'u-legacy'"
+        )).one()
+    assert migrated.ui_theme == "light"
+    assert migrated.ui_mode == "simple"
+    assert bool(migrated.tooltips_enabled) is True
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
     with legacy_engine.connect() as conn:

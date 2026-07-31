@@ -27,6 +27,8 @@ export interface LangPack {
 	settingsButton: string;
 	themeLight: string;
 	themeDark: string;
+	tooltipsShow: string;
+	tooltipsHide: string;
 	railExpandLabel: string;
 	railCollapseLabel: string;
 

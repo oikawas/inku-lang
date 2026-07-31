@@ -305,6 +305,7 @@
 		ui_theme?: 'light' | 'dark';
 		ui_mode?: UiMode;
 		ui_custom?: UiCustomVisibility;
+		tooltips_enabled?: boolean;
 		settings_tab?: SettingsTab;
 		model_settings?: UserModelSettings;
 		image_generation_count: number;
@@ -757,6 +758,7 @@
 	let userSettingsRequestId = 0;
 	let authToken = $state<string | null>(null);
 	let currentUser = $state<UserItem | null>(null);
+	const tooltipsEnabled = $derived(currentUser?.tooltips_enabled !== false);
 	let uiModeSaving = $state(false);
 	let uiModeSaveError = $state(false);
 	const uiMode = $derived(normalizeUiMode(currentUser?.ui_mode));
@@ -1286,6 +1288,31 @@
 			console.warn('failed to update UI mode', e);
 		} finally {
 			uiModeSaving = false;
+		}
+	}
+
+	async function updateTooltipsEnabled(enabled: boolean) {
+		if (!currentUser) return;
+		const previousUser = currentUser;
+		currentUser = { ...currentUser, tooltips_enabled: enabled };
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ tooltips_enabled: enabled })
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
+			}
+			const updatedUser = await r.json() as UserItem;
+			if (updatedUser.tooltips_enabled !== enabled) {
+				throw new Error('Tooltip settings were not persisted by the server');
+			}
+			currentUser = updatedUser;
+		} catch (e) {
+			currentUser = previousUser;
+			console.warn('failed to update tooltip settings', e);
 		}
 	}
 
@@ -6108,6 +6135,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {:else}
 <div
 	class="root"
+	class:tooltips-disabled={!tooltipsEnabled}
 	class:ui-hide-input-modes={!uiVisibility.input_modes}
 	class:ui-hide-drawing-settings={!uiVisibility.drawing_settings}
 	class:ui-hide-ddl-tools={!uiVisibility.ddl_tools}
@@ -6125,7 +6153,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{developerMode}
 		showAuxiliary={uiVisibility.auxiliary}
 		{uiMode}
+		{tooltipsEnabled}
 		onSetUiMode={(mode) => void updateUiMode(mode)}
+		onToggleTooltips={() => void updateTooltipsEnabled(!tooltipsEnabled)}
 		onToggleUserMenu={() => (userMenuOpen = !userMenuOpen)}
 		onOpenProfile={openProfile}
 		onLogout={logout}
@@ -6953,6 +6983,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-history :global(.nav-right),
 	.ui-hide-history :global(.nearby-mirror),
 	.ui-hide-detail-status.ui-hide-work-tools :global(.status-bar) {
+		display: none;
+	}
+	.tooltips-disabled :global(.tooltip-bubble) {
 		display: none;
 	}
 

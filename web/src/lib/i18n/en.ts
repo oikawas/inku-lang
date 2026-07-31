@@ -31,6 +31,8 @@ export const en: LangPack = {
 	settingsButton: 'Settings',
 	themeLight: 'Light mode',
 	themeDark: 'Dark mode',
+	tooltipsShow: 'Show tooltips',
+	tooltipsHide: 'Hide tooltips',
 	railExpandLabel: 'expand sidebar',
 	railCollapseLabel: 'collapse sidebar',
 

@@ -18,7 +18,9 @@
 		developerMode: boolean;
 		showAuxiliary: boolean;
 		uiMode: UiMode;
+		tooltipsEnabled: boolean;
 		onSetUiMode: (mode: UiMode) => void | Promise<void>;
+		onToggleTooltips: () => void | Promise<void>;
 		onToggleUserMenu: () => void;
 		onOpenProfile: () => void;
 		onLogout: () => void | Promise<void>;
@@ -37,7 +39,9 @@
 		developerMode,
 		showAuxiliary,
 		uiMode,
+		tooltipsEnabled,
 		onSetUiMode,
+		onToggleTooltips,
 		onToggleUserMenu,
 		onOpenProfile,
 		onLogout,
@@ -118,9 +122,9 @@
 		</div>
 
 		<div class="rail-menu-wrap" bind:this={uiModeWrapEl}>
-			<Tooltip placement="right" text={t().uiModeLabel}>
+			<Tooltip placement="right" text={t().uiModeLabel} disabled={uiModeOpen}>
 				<button class="rail-action" class:active={uiModeOpen} type="button" aria-haspopup="menu" aria-expanded={uiModeOpen} onclick={() => (uiModeOpen = !uiModeOpen)}>
-					<span class="rail-icon ui-mode-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+					<span class="rail-icon ui-mode-icon" aria-hidden="true"></span>
 					{#if expanded}<span class="rail-label">{uiModeLabel}</span>{/if}
 				</button>
 			</Tooltip>
@@ -132,6 +136,20 @@
 				</div>
 			{/if}
 		</div>
+
+		<Tooltip placement="right" text={tooltipsEnabled ? t().tooltipsHide : t().tooltipsShow}>
+			<button
+				class="rail-action"
+				class:on={tooltipsEnabled}
+				type="button"
+				aria-pressed={tooltipsEnabled}
+				aria-label={tooltipsEnabled ? t().tooltipsHide : t().tooltipsShow}
+				onclick={onToggleTooltips}
+			>
+				<span class="rail-icon tooltip-icon" aria-hidden="true">?</span>
+				{#if expanded}<span class="rail-label">{tooltipsEnabled ? t().tooltipsHide : t().tooltipsShow}</span>{/if}
+			</button>
+		</Tooltip>
 
 		<Tooltip placement="right" text={t().tooltipAppRailSettings}>
 			<button class="rail-action" class:active={settingsOpen} onclick={onOpenSettings}>
@@ -309,8 +327,25 @@
 		border-color: var(--border2);
 		color: var(--fg);
 	}
-	.ui-mode-icon { flex-direction: column; gap: 2px; }
-	.ui-mode-icon i { display: block; width: 11px; height: 1px; background: currentColor; }
+	/* A panel-layout mark distinguishes UI mode from a generic menu and the settings gear. */
+	.ui-mode-icon::before {
+		content: "";
+		width: 12px;
+		height: 10px;
+		border: 1.5px solid currentColor;
+		border-radius: 2px;
+		background: linear-gradient(90deg, transparent 35%, currentColor 35% 47%, transparent 47%);
+	}
+	.ui-mode-icon::after {
+		content: "";
+		position: absolute;
+		right: 4px;
+		bottom: 4px;
+		width: 4px;
+		height: 2px;
+		border-radius: 1px;
+		background: currentColor;
+	}
 	.ui-mode-menu button.selected { color: var(--fg); font-weight: 600; }
 	.ui-mode-menu button.selected::before { content: '✓'; margin-right: 6px; }
 
@@ -384,6 +419,23 @@
 		border-radius: 50%;
 		background: currentColor;
 		box-shadow: 4px -3px 0 0 var(--panel);
+	}
+	.tooltip-icon {
+		font-size: 13px;
+		font-weight: 600;
+	}
+	.tooltip-icon::after {
+		content: "";
+		position: absolute;
+		width: 16px;
+		height: 1.5px;
+		border-radius: 1px;
+		background: currentColor;
+		transform: rotate(-45deg);
+		opacity: 0.9;
+	}
+	.rail-action.on .tooltip-icon::after {
+		display: none;
 	}
 	.theme-icon.dark::before {
 		inset: 4px;

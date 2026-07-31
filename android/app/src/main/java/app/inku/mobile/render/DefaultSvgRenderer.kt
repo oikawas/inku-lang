@@ -946,7 +946,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val fillOpacityStr = fmt(opacity)
         sb.append("""<path d="$pathD" fill="$color" fill-opacity="$fillOpacityStr" stroke="none"/>""")
 
-        if (weight in setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick")) {
+        if (weight in setOf("pencil", "pen", "crayon", "chalk", "brush_thin", "brush_thick")) {
             val mat = ServerRendererMaterial.lineGroup(ins, attrs, x1, y1, x2, y2, unit, includeBase = false, renderSeed = renderSeed, centerline = materialCenterline, instructionSeed = seedLong)
             if (mat != null) {
                 sb.append(mat)

@@ -23,10 +23,5 @@ object ModelRecommendations {
             recommendedStage = 2,
             reasonJa = "Stage 2 既定推奨。DDL展開の精度が高い",
         ),
-        ModelRecommendation(
-            modelId = "qwen/qwen-2.5-coder-32b-instruct",
-            recommendedStage = 2,
-            reasonJa = "Stage 2 コード系推奨。文脈保持能力に優れる",
-        ),
     )
 }

@@ -687,6 +687,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
+                        current.selectedTenkei,
                     )
                 }
                 if (!isCurrentDrawingRun(runId)) return@launch
@@ -705,6 +706,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
+                        current.selectedTenkei,
                     )
                 }
             }.onSuccess { item ->
@@ -739,7 +741,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
+                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, current.selectedTenkei)
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -820,6 +822,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                             autoRepair = current.ddlAutoRepairEnabled,
                             historyInput = "#$lineNumber $prompt",
                             litertStage1PromptOptimization = current.litertStage1PromptOptimization,
+                            tenkei = current.selectedTenkei,
                         )
                     }
                 }.onSuccess { item ->
@@ -937,6 +940,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                                 autoRepair = cycle.ddlAutoRepairEnabled,
                                 historyInput = "[demo] $prompt",
                                 litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
+                                tenkei = cycle.selectedTenkei,
                             )
                         }
                     }.onSuccess { item ->

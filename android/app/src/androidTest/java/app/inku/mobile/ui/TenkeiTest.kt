@@ -30,9 +30,9 @@ class TenkeiTest {
             )
         }
 
-        composeTestRule.onNodeWithTag("tenkei_chip_moon").performClick()
+        composeTestRule.onNodeWithTag("tenkei_chip_sparse").performClick()
         composeTestRule.waitForIdle()
 
-        assertEquals("moon", selectedTenkei)
+        assertEquals("sparse", selectedTenkei)
     }
 }

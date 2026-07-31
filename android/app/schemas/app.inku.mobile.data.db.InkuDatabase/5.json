@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "5fa5356c98dc7dae8fa45c4bd303aed2",
+    "identityHash": "82699b96c200f22996c96763248d9553",
     "entities": [
       {
         "tableName": "history_items",
@@ -572,7 +572,7 @@
       },
       {
         "tableName": "lineage_nodes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `history_id` INTEGER, `state` TEXT NOT NULL, `description_hash` TEXT, `render_hash` TEXT, `at` INTEGER NOT NULL, `deleted_at` INTEGER, `root_node_id` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `history_id` TEXT, `state` TEXT NOT NULL, `description_hash` TEXT, `render_hash` TEXT, `at` INTEGER NOT NULL, `deleted_at` INTEGER, `root_node_id` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -583,7 +583,7 @@
           {
             "fieldPath": "historyId",
             "columnName": "history_id",
-            "affinity": "INTEGER"
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "state",
@@ -688,7 +688,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5fa5356c98dc7dae8fa45c4bd303aed2')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '82699b96c200f22996c96763248d9553')"
     ]
   }
 }

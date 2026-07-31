@@ -70,7 +70,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `lineage_nodes` (
                         `id` TEXT NOT NULL PRIMARY KEY,
-                        `history_id` INTEGER,
+                        `history_id` TEXT,
                         `state` TEXT NOT NULL,
                         `description_hash` TEXT,
                         `render_hash` TEXT,

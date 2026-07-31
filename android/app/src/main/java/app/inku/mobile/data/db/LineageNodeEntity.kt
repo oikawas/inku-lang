@@ -8,8 +8,9 @@ import androidx.room.PrimaryKey
 data class LineageNodeEntity(
     @PrimaryKey
     val id: String,
+    // history_items.id is a String, so the join key has to be a String too.
     @ColumnInfo(name = "history_id")
-    val historyId: Long? = null,
+    val historyId: String? = null,
     val state: String = "active",
     @ColumnInfo(name = "description_hash")
     val descriptionHash: String? = null,

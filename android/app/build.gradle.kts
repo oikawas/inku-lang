@@ -62,6 +62,11 @@ android {
     kotlin {
         jvmToolchain(21)
     }
+
+    // MigrationTestHelper reads the exported schemas from the test APK's assets.
+    sourceSets.getByName("androidTest") {
+        assets.srcDir("$projectDir/schemas")
+    }
 }
 
 room {
@@ -99,6 +104,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.espresso:espresso-idling-resource:3.6.1")
+    androidTestImplementation("androidx.room:room-testing:$roomVersion")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
@@ -106,4 +112,16 @@ dependencies {
 
 configurations.all {
     exclude(group = "androidx.test.espresso", module = "espresso-core")
+}
+
+// room-testing's schema bundles are generated against kotlinx-serialization 1.8.1,
+// but a transitive BOM pins core to "strictly 1.7.3". The mismatch surfaces only at
+// runtime, as AbstractMethodError on GeneratedSerializer.typeParametersSerializers().
+configurations.configureEach {
+    if (name.contains("AndroidTest")) {
+        resolutionStrategy.force(
+            "org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1",
+            "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.8.1",
+        )
+    }
 }

@@ -16,15 +16,15 @@ class WebDdlExpanderTenkeiTest {
             variationAmplitude = "medium",
             variationSeed = 42L,
         )
-        val resultAuto = WebDdlExpander.expandIntermediateDdl(
+        val resultSparse = WebDdlExpander.expandIntermediateDdl(
             inputDdl,
-            tenkei = "auto",
+            tenkei = "sparse",
             variationAmplitude = "medium",
             variationSeed = 42L,
         )
 
-        assertNotEquals(resultNone, resultAuto)
+        assertNotEquals(resultNone, resultSparse)
         assertTrue(resultNone.isNotEmpty())
-        assertTrue(resultAuto.isNotEmpty())
+        assertTrue(resultSparse.isNotEmpty())
     }
 }

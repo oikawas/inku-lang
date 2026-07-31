@@ -68,6 +68,8 @@ data class PaintRequest(
     val canvasAspect: String,
     val autoRepair: Boolean,
     val litertStage1PromptOptimization: Boolean = false,
+    // Staffage level chosen by the writer; see data/model/Tenkei.kt.
+    val tenkei: String = "auto",
 )
 
 data class PaintResult(

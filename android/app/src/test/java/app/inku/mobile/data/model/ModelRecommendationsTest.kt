@@ -9,7 +9,9 @@ class ModelRecommendationsTest {
     fun modelRecommendations_containsExactExpectedEntries() {
         val items = ModelRecommendations.items
 
-        assertEquals(4, items.size)
+        // Every id below must exist in the shipped catalog; a recommendation for a
+        // model nobody can select is worse than no recommendation.
+        assertEquals(3, items.size)
 
         val entry0 = items[0]
         assertEquals("google/gemma-4-31b-it", entry0.modelId)
@@ -25,10 +27,5 @@ class ModelRecommendationsTest {
         assertEquals("google/gemma-4-31b-it", entry2.modelId)
         assertEquals(2, entry2.recommendedStage)
         assertEquals("Stage 2 既定推奨。DDL展開の精度が高い", entry2.reasonJa)
-
-        val entry3 = items[3]
-        assertEquals("qwen/qwen-2.5-coder-32b-instruct", entry3.modelId)
-        assertEquals(2, entry3.recommendedStage)
-        assertEquals("Stage 2 コード系推奨。文脈保持能力に優れる", entry3.reasonJa)
     }
 }

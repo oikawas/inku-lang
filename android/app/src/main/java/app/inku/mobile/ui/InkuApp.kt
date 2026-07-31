@@ -1106,8 +1106,25 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             BatchPanel(state, viewModel)
             CanvasHeroCard(state, viewModel)
         } else {
-            CanvasHeroCard(state, viewModel)
-            DrawPanel(state, viewModel)
+            // The display mode decides how much surrounds the canvas; the mascot
+            // and the condition strip only appear in the full mode.
+            UiModeContainer(
+                uiMode = state.uiMode,
+                simpleContent = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CanvasHeroCard(state, viewModel)
+                        DrawPanel(state, viewModel)
+                    }
+                },
+                fullContent = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MascotWidget(mascotKind = state.mascotKind)
+                        ConditionChips(state, viewModel)
+                        CanvasHeroCard(state, viewModel)
+                        DrawPanel(state, viewModel)
+                    }
+                },
+            )
         }
         Spacer(Modifier.height(96.dp))
     }
@@ -1182,24 +1199,14 @@ private fun CanvasHeroCard(
                     ) {
                         item?.let {
                             MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
-                            @OptIn(ExperimentalMaterial3Api::class)
-                            TooltipBox(
-                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                                tooltip = {
-                                    PlainTooltip {
-                                        Text("作品の来歴ハッシュ")
-                                    }
+                            ProvenanceTooltipTarget(
+                                tooltipText = "作品の来歴ハッシュ",
+                                contentLabel = "F${it.renderHashShort}",
+                                onContentClick = {
+                                    clipboard.setText(AnnotatedString(it.renderHashShort))
+                                    canvasMessage = "Hash copied."
                                 },
-                                state = rememberTooltipState(),
-                            ) {
-                                MiniPill(
-                                    text = "F${it.renderHashShort}",
-                                    onClick = {
-                                        clipboard.setText(AnnotatedString(it.renderHashShort))
-                                        canvasMessage = "Hash copied."
-                                    },
-                                )
-                            }
+                            )
                         }
                     }
                     Row(
@@ -1571,6 +1578,10 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             modifier = Modifier.fillMaxWidth(),
             minLines = 5,
             maxLines = 8,
+        )
+        TenkeiSelect(
+            selected = state.selectedTenkei,
+            onSelect = viewModel::setSelectedTenkei,
         )
         DrawingActionButton(
             idleText = "▶  描画する",
@@ -4913,147 +4924,6 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun CustomModalContainer(
-    visible: Boolean,
-    onDismissRequest: () -> Unit,
-    content: @Composable () -> Unit = { Text("モーダルコンテンツ") },
-) {
-    if (visible) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
-            )
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .testTag("modal_scrim")
-                        .clickable(onClick = onDismissRequest),
-                )
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp,
-                ) {
-                    Box(modifier = Modifier.padding(24.dp)) {
-                        content()
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clickable(onClick = onDismissRequest),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ToastQueueWidget(
-    messages: List<ToastMessage>,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        messages.forEach { toast ->
-            Surface(
-                color = MaterialTheme.colorScheme.inverseSurface,
-                shape = RoundedCornerShape(8.dp),
-                tonalElevation = 6.dp,
-            ) {
-                Text(
-                    text = toast.text,
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ConditionChipsContainer(
-    expanded: Boolean = true,
-    onToggleExpand: () -> Unit = {},
-    aspectRatio: String = "1:1",
-    colorCatalog: String = "標準",
-    uiMode: String = "simple",
-    mascotKind: String = "incu",
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-    ) {
-        TextButton(
-            onClick = onToggleExpand,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("condition_chips_toggle"),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "生成条件チップ",
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Text(
-                    text = if (expanded) "▲ 折りたたむ" else "▼ 展開する",
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-        }
-
-        if (expanded) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("condition_chips_content")
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                ConditionChip(label = "比率: $aspectRatio")
-                ConditionChip(label = "配色: $colorCatalog")
-                ConditionChip(label = "モード: $uiMode")
-                ConditionChip(label = "マスコット: $mascotKind")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConditionChip(label: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-        )
-    }
-}
-
-@Composable
 internal fun TenkeiSelect(
     selected: String,
     onSelect: (String) -> Unit,
@@ -5079,150 +4949,6 @@ internal fun TenkeiSelect(
                     label = { Text(item.labelJa) },
                     modifier = Modifier.testTag("tenkei_chip_${item.id}"),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun LineagePanel(
-    nodeId: String?,
-    rootNodeId: String?,
-    onSelectNode: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("lineage_panel")
-            .padding(12.dp),
-    ) {
-        Text(
-            text = "作品系譜 (Lineage)",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = androidx.compose.ui.graphics.Color(0xFFFFF3E0),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                )
-                .border(
-                    width = 1.dp,
-                    color = androidx.compose.ui.graphics.Color(0xFFFF9800),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                )
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "★ 原点ノード: ${rootNodeId ?: "起点"}",
-                style = MaterialTheme.typography.labelSmall,
-                color = androidx.compose.ui.graphics.Color(0xFFE65100),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "➔ 現在ノード: ${nodeId ?: "未割り当て"}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun UnreadWordsPanel(
-    words: List<String>,
-    onClear: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("unread_words_panel")
-            .padding(8.dp),
-    ) {
-        Text(
-            text = "読まれなかった語 (${words.size})",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.secondary,
-        )
-        if (words.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                words.forEach { word ->
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(word, style = MaterialTheme.typography.labelSmall) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun AIRefineModal(
-    visible: Boolean,
-    onDismissRequest: () -> Unit,
-    onApplyRefine: (derivationKind: String) -> Unit,
-) {
-    CustomModalContainer(visible = visible, onDismissRequest = onDismissRequest) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("ai_refine_modal")
-                .padding(16.dp),
-        ) {
-            Text(
-                text = "AI 推敲・派生作成",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            app.inku.mobile.data.model.DerivationKindRegistry.ALL_INFOS.take(6).forEach { info ->
-                OutlinedButton(
-                    onClick = { onApplyRefine(info.kind) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("推敲: ${info.labelJa} (${info.kind})")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ManualRefineModal(
-    visible: Boolean,
-    onDismissRequest: () -> Unit,
-    onApplyRefine: (derivationKind: String) -> Unit,
-) {
-    CustomModalContainer(visible = visible, onDismissRequest = onDismissRequest) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("manual_refine_modal")
-                .padding(16.dp),
-        ) {
-            Text(
-                text = "手動推敲・派生作成",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            app.inku.mobile.data.model.DerivationKindRegistry.ALL_INFOS.drop(6).forEach { info ->
-                OutlinedButton(
-                    onClick = { onApplyRefine(info.kind) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("手動派生: ${info.labelJa} (${info.kind})")
-                }
             }
         }
     }

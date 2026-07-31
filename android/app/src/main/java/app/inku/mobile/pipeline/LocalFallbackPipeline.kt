@@ -310,8 +310,8 @@ class LocalFallbackPipeline(
         return ensurePlacement(cleaned)
     }
 
-    private fun expandIntermediateDdl(ddl: String, originalText: String): String {
-        return WebDdlExpander.expandIntermediateDdl(ddl, contextText = originalText)
+    private fun expandIntermediateDdl(ddl: String, originalText: String, tenkei: String = "auto"): String {
+        return WebDdlExpander.expandIntermediateDdl(ddl, contextText = originalText, tenkei = tenkei)
     }
 
     private fun fallbackDdlFromText(text: String): String {

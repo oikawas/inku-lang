@@ -54,6 +54,7 @@ data class InkuUiState(
     val batchElapsedMs: Long = 0L,
     val batchLatestHashShort: String? = null,
     val demoSeed: String = DefaultDemoSeedPhrase,
+    val selectedTenkei: String = "auto",
     val demoIntervalSeconds: Int = 30,
     val demoRandomColorCatalog: Boolean = true,
     val demoGeneratedPrompt: String = "",
@@ -533,6 +534,10 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun setLiteRtStage1PromptOptimization(enabled: Boolean) {
         localState.value = localState.value.copy(litertStage1PromptOptimization = enabled, message = null)
         persistSetting("litert_stage1_prompt_optimization", JSONObject().put("enabled", enabled).toString())
+    }
+
+    fun setSelectedTenkei(tenkei: String) {
+        localState.value = localState.value.copy(selectedTenkei = tenkei)
     }
 
     fun setUiMode(mode: String) {

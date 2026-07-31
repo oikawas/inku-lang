@@ -61,6 +61,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -5044,5 +5045,36 @@ private fun ConditionChip(label: String) {
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
         )
+    }
+}
+
+@Composable
+internal fun TenkeiSelect(
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "添景選択",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("tenkei_select_row"),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            app.inku.mobile.data.model.TenkeiOptions.forEach { item ->
+                val isSelected = item.id == selected
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelect(item.id) },
+                    label = { Text(item.labelJa) },
+                    modifier = Modifier.testTag("tenkei_chip_${item.id}"),
+                )
+            }
+        }
     }
 }

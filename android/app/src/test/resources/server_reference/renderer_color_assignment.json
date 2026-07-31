@@ -1,0 +1,1323 @@
+{
+  "note": "engine 17: the catalog palette reaches the drawing. `assignment` is the whole answer; `palette_bands` and `oklch` are the two steps under it, pinned separately so a wrong band boundary does not read as a wrong assignment.",
+  "constants": {
+    "default_color_map": {
+      "white": "#ffffff",
+      "black": "#111111",
+      "blue": "#2c3e91",
+      "red": "#a2342a",
+      "green": "#2f6b3a",
+      "gray": "#888888",
+      "yellow": "#a18308",
+      "orange": "#a95a00",
+      "purple": "#583a84"
+    },
+    "achromatic_colors": [
+      "black",
+      "gray",
+      "white"
+    ],
+    "chromatic_colors": [
+      "red",
+      "orange",
+      "yellow",
+      "green",
+      "blue",
+      "purple"
+    ],
+    "chromatic_bands": {
+      "red": [
+        345.0,
+        50.0
+      ],
+      "orange": [
+        50.0,
+        80.0
+      ],
+      "yellow": [
+        80.0,
+        137.0
+      ],
+      "green": [
+        137.0,
+        200.0
+      ],
+      "blue": [
+        200.0,
+        280.0
+      ],
+      "purple": [
+        280.0,
+        345.0
+      ]
+    },
+    "chromatic_band_centers": {
+      "red": 27.5,
+      "orange": 65.0,
+      "yellow": 108.5,
+      "green": 168.5,
+      "blue": 240.0,
+      "purple": 312.5
+    },
+    "oklch_chroma_floor": 0.035,
+    "hint_hue_priority": [
+      "red",
+      "orange",
+      "yellow",
+      "green",
+      "blue",
+      "purple",
+      "white",
+      "black",
+      "gray"
+    ],
+    "work_color_seed_fields": [
+      "render_seed",
+      "catalog_id",
+      "abstract_color"
+    ],
+    "default_catalog_id": "default"
+  },
+  "oklch": {
+    "#004225": {
+      "lightness": 0.333592700936,
+      "chroma": 0.079456220889,
+      "hue": 156.981447789529
+    },
+    "#0057a8": {
+      "lightness": 0.461292730949,
+      "chroma": 0.148209507638,
+      "hue": 254.279305937322
+    },
+    "#005bae": {
+      "lightness": 0.474952523532,
+      "chroma": 0.151302917314,
+      "hue": 254.021961914633
+    },
+    "#006c8f": {
+      "lightness": 0.497088838183,
+      "chroma": 0.098413043605,
+      "hue": 229.412756325583
+    },
+    "#007b43": {
+      "lightness": 0.511656275553,
+      "chroma": 0.128327885277,
+      "hue": 154.272223868019
+    },
+    "#00896c": {
+      "lightness": 0.560865692546,
+      "chroma": 0.109842705133,
+      "hue": 171.015574565883
+    },
+    "#008f39": {
+      "lightness": 0.567101433972,
+      "chroma": 0.162857168268,
+      "hue": 148.304409551863
+    },
+    "#111111": {
+      "lightness": 0.177637771917,
+      "chroma": 6.621e-09,
+      "hue": 89.87556330485
+    },
+    "#165e83": {
+      "lightness": 0.457608692807,
+      "chroma": 0.090231628003,
+      "hue": 236.844519882483
+    },
+    "#191970": {
+      "lightness": 0.288118867574,
+      "chroma": 0.143625913504,
+      "hue": 272.764651596219
+    },
+    "#1a1a1b": {
+      "lightness": 0.21819989285,
+      "chroma": 0.00192768193,
+      "hue": 286.238880308263
+    },
+    "#1c1b18": {
+      "lightness": 0.222096131652,
+      "chroma": 0.005906199437,
+      "hue": 91.62046442706
+    },
+    "#1c1c1c": {
+      "lightness": 0.226449863274,
+      "chroma": 8.441e-09,
+      "hue": 89.87556250692
+    },
+    "#1c8a68": {
+      "lightness": 0.565672109363,
+      "chroma": 0.108594649781,
+      "hue": 166.63001734958
+    },
+    "#1f2933": {
+      "lightness": 0.276013046586,
+      "chroma": 0.023283053714,
+      "hue": 248.681643241243
+    },
+    "#1f4b8f": {
+      "lightness": 0.421261655723,
+      "chroma": 0.122735115779,
+      "hue": 259.037020562972
+    },
+    "#1f4e8c": {
+      "lightness": 0.42613940667,
+      "chroma": 0.114804540617,
+      "hue": 256.591933727706
+    },
+    "#2b2736": {
+      "lightness": 0.283679735548,
+      "chroma": 0.02765661991,
+      "hue": 296.828016449076
+    },
+    "#2c3e50": {
+      "lightness": 0.356412765759,
+      "chroma": 0.039097448644,
+      "hue": 248.974505843877
+    },
+    "#2c3e91": {
+      "lightness": 0.400355867001,
+      "chroma": 0.13834658125,
+      "hue": 269.814155106385
+    },
+    "#2f6b3a": {
+      "lightness": 0.474583270579,
+      "chroma": 0.099784002226,
+      "hue": 147.70297024761
+    },
+    "#4169e1": {
+      "lightness": 0.559848184851,
+      "chroma": 0.188233527064,
+      "hue": 266.399594567699
+    },
+    "#4a342e": {
+      "lightness": 0.348461816742,
+      "chroma": 0.033711590067,
+      "hue": 35.82136809735
+    },
+    "#4b4a78": {
+      "lightness": 0.431129840729,
+      "chroma": 0.075265732131,
+      "hue": 283.767138937868
+    },
+    "#4b4b4f": {
+      "lightness": 0.414260697771,
+      "chroma": 0.006579725006,
+      "hue": 286.109018139629
+    },
+    "#4b5d43": {
+      "lightness": 0.455513283443,
+      "chroma": 0.046675065847,
+      "hue": 136.199823948421
+    },
+    "#4e8372": {
+      "lightness": 0.567600721262,
+      "chroma": 0.06305031716,
+      "hue": 171.484161843151
+    },
+    "#4f7942": {
+      "lightness": 0.53085363184,
+      "chroma": 0.094552678888,
+      "hue": 138.594168623733
+    },
+    "#4f8fb8": {
+      "lightness": 0.624237068894,
+      "chroma": 0.090523565301,
+      "hue": 238.618529225967
+    },
+    "#555555": {
+      "lightness": 0.44953319396,
+      "chroma": 1.6756e-08,
+      "hue": 89.875563457221
+    },
+    "#583a84": {
+      "lightness": 0.42001115116,
+      "chroma": 0.120506916952,
+      "hue": 299.952085008655
+    },
+    "#595857": {
+      "lightness": 0.460984697605,
+      "chroma": 0.002062070798,
+      "hue": 67.77271981913
+    },
+    "#6a4c8c": {
+      "lightness": 0.476791694099,
+      "chroma": 0.104695086404,
+      "hue": 304.347342688387
+    },
+    "#6b7d3a": {
+      "lightness": 0.559498214263,
+      "chroma": 0.094799160893,
+      "hue": 121.964401386745
+    },
+    "#708090": {
+      "lightness": 0.592504148202,
+      "chroma": 0.030924660583,
+      "hue": 248.348254213602
+    },
+    "#73c2fb": {
+      "lightness": 0.785445849797,
+      "chroma": 0.112944472634,
+      "hue": 241.527107993716
+    },
+    "#7d6f66": {
+      "lightness": 0.552034771913,
+      "chroma": 0.02234698027,
+      "hue": 54.876669190063
+    },
+    "#808000": {
+      "lightness": 0.580664574271,
+      "chroma": 0.126576283858,
+      "hue": 109.769232076521
+    },
+    "#82c7de": {
+      "lightness": 0.791994240006,
+      "chroma": 0.076628198567,
+      "hue": 221.024032302287
+    },
+    "#888888": {
+      "lightness": 0.626753536916,
+      "chroma": 2.3362e-08,
+      "hue": 89.875562869747
+    },
+    "#89cff0": {
+      "lightness": 0.819906377118,
+      "chroma": 0.084179292484,
+      "hue": 229.327917691502
+    },
+    "#8a8178": {
+      "lightness": 0.608545586549,
+      "chroma": 0.0172800168,
+      "hue": 67.494341029204
+    },
+    "#8b8589": {
+      "lightness": 0.623187240686,
+      "chroma": 0.009248777181,
+      "hue": 337.562203954339
+    },
+    "#8d7f73": {
+      "lightness": 0.605649880152,
+      "chroma": 0.024717884072,
+      "hue": 62.958404656212
+    },
+    "#8f8878": {
+      "lightness": 0.628260925326,
+      "chroma": 0.024759314663,
+      "hue": 87.183818674035
+    },
+    "#95a5a6": {
+      "lightness": 0.709677609681,
+      "chroma": 0.018115685794,
+      "hue": 201.309113673637
+    },
+    "#a0522d": {
+      "lightness": 0.526482172188,
+      "chroma": 0.115119034972,
+      "hue": 44.604427950522
+    },
+    "#a18308": {
+      "lightness": 0.620385593522,
+      "chroma": 0.125125568172,
+      "hue": 92.332613360129
+    },
+    "#a2342a": {
+      "lightness": 0.486009191328,
+      "chroma": 0.147080149544,
+      "hue": 28.801847759903
+    },
+    "#a591c5": {
+      "lightness": 0.692878524818,
+      "chroma": 0.077986132288,
+      "hue": 302.0095384245
+    },
+    "#a95a00": {
+      "lightness": 0.550191886951,
+      "chroma": 0.132024407354,
+      "hue": 57.766087384947
+    },
+    "#a98467": {
+      "lightness": 0.641384221482,
+      "chroma": 0.061387493631,
+      "hue": 59.478337349577
+    },
+    "#afa6bd": {
+      "lightness": 0.74005813476,
+      "chroma": 0.034122021651,
+      "hue": 303.30591031011
+    },
+    "#b2beb5": {
+      "lightness": 0.789560758249,
+      "chroma": 0.018236903697,
+      "hue": 153.479503799069
+    },
+    "#b31b1b": {
+      "lightness": 0.493373200212,
+      "chroma": 0.185709659663,
+      "hue": 27.494572001339
+    },
+    "#b7285f": {
+      "lightness": 0.522566929901,
+      "chroma": 0.181779395383,
+      "hue": 3.233875348345
+    },
+    "#b93a32": {
+      "lightness": 0.533310137693,
+      "chroma": 0.164660577799,
+      "hue": 27.690721479227
+    },
+    "#bd6f2c": {
+      "lightness": 0.616560546616,
+      "chroma": 0.126727541934,
+      "hue": 57.345817488715
+    },
+    "#c7432f": {
+      "lightness": 0.566613596491,
+      "chroma": 0.171518035009,
+      "hue": 31.364214396721
+    },
+    "#c91f24": {
+      "lightness": 0.537865430052,
+      "chroma": 0.202398742455,
+      "hue": 26.444205906611
+    },
+    "#c9ad57": {
+      "lightness": 0.754713880769,
+      "chroma": 0.110670906158,
+      "hue": 91.56950589803
+    },
+    "#d3381c": {
+      "lightness": 0.57396803888,
+      "chroma": 0.195873543797,
+      "hue": 32.423086286899
+    },
+    "#d6a01d": {
+      "lightness": 0.737355341313,
+      "chroma": 0.145122114142,
+      "hue": 82.957449309164
+    },
+    "#d6b72a": {
+      "lightness": 0.784013433092,
+      "chroma": 0.150513017735,
+      "hue": 95.64888283917
+    },
+    "#d83fb1": {
+      "lightness": 0.626712544067,
+      "chroma": 0.220957257069,
+      "hue": 339.983596720445
+    },
+    "#dcdcdc": {
+      "lightness": 0.894490408904,
+      "chroma": 3.3341e-08,
+      "hue": 89.87556324633
+    },
+    "#e2725b": {
+      "lightness": 0.677380752603,
+      "chroma": 0.144436964437,
+      "hue": 32.936985879327
+    },
+    "#e5e8e8": {
+      "lightness": 0.928700635839,
+      "chroma": 0.003229406159,
+      "hue": 197.101131767884
+    },
+    "#e8862e": {
+      "lightness": 0.712333807491,
+      "chroma": 0.153503172765,
+      "hue": 57.415538418464
+    },
+    "#e8e4c9": {
+      "lightness": 0.914904736734,
+      "chroma": 0.036021523502,
+      "hue": 100.151758747544
+    },
+    "#ee8fa2": {
+      "lightness": 0.75421682432,
+      "chroma": 0.116675245182,
+      "hue": 7.332508853877
+    },
+    "#eeeeee": {
+      "lightness": 0.949119254399,
+      "chroma": 3.5377e-08,
+      "hue": 89.875562714212
+    },
+    "#f1e4c8": {
+      "lightness": 0.921957683178,
+      "chroma": 0.03959195427,
+      "hue": 86.058316469476
+    },
+    "#f4d03f": {
+      "lightness": 0.864427149735,
+      "chroma": 0.158801124782,
+      "hue": 94.467974068715
+    },
+    "#f4f4f4": {
+      "lightness": 0.967153292184,
+      "chroma": 3.605e-08,
+      "hue": 89.875563104629
+    },
+    "#f50087": {
+      "lightness": 0.629840112187,
+      "chroma": 0.256206489638,
+      "hue": 358.501509350663
+    },
+    "#f5f1e8": {
+      "lightness": 0.958772264452,
+      "chroma": 0.012695677305,
+      "hue": 86.829797044449
+    },
+    "#f7e89f": {
+      "lightness": 0.926477087243,
+      "chroma": 0.093392157272,
+      "hue": 97.972103461829
+    },
+    "#f9d71c": {
+      "lightness": 0.881564094349,
+      "chroma": 0.177511599888,
+      "hue": 97.163680881512
+    },
+    "#fbceb1": {
+      "lightness": 0.883067582299,
+      "chroma": 0.064114793842,
+      "hue": 54.494625674799
+    },
+    "#fcfcfc": {
+      "lightness": 0.991068896634,
+      "chroma": 3.6941e-08,
+      "hue": 89.875563494324
+    },
+    "#ff4d00": {
+      "lightness": 0.667662165271,
+      "chroma": 0.223545007317,
+      "hue": 36.986230853916
+    },
+    "#ff9800": {
+      "lightness": 0.770263647173,
+      "chroma": 0.174142304396,
+      "hue": 64.053877687388
+    },
+    "#ffb61e": {
+      "lightness": 0.82403618751,
+      "chroma": 0.165911181278,
+      "hue": 78.414936965188
+    },
+    "#ffce00": {
+      "lightness": 0.869099025519,
+      "chroma": 0.177696464274,
+      "hue": 91.31023417295
+    },
+    "#fff200": {
+      "lightness": 0.941183392286,
+      "chroma": 0.200377224492,
+      "hue": 105.68885930219
+    },
+    "#fffaf0": {
+      "lightness": 0.986232753493,
+      "chroma": 0.014219978709,
+      "hue": 84.582603055217
+    },
+    "#fffdd0": {
+      "lightness": 0.984402658392,
+      "chroma": 0.057994376273,
+      "hue": 105.314165166179
+    },
+    "#fffdfa": {
+      "lightness": 0.99474278951,
+      "chroma": 0.004502826912,
+      "hue": 78.298552274571
+    },
+    "#fffffb": {
+      "lightness": 0.998898332253,
+      "chroma": 0.005251490233,
+      "hue": 106.494171549251
+    },
+    "#ffffff": {
+      "lightness": 0.999999993474,
+      "chroma": 3.7274e-08,
+      "hue": 89.875563095902
+    }
+  },
+  "palette_bands": {
+    "default": {
+      "achromatic": [
+        [
+          0.177637771917,
+          "#111111"
+        ],
+        [
+          0.44953319396,
+          "#555555"
+        ],
+        [
+          0.626753536916,
+          "#888888"
+        ],
+        [
+          0.949119254399,
+          "#eeeeee"
+        ],
+        [
+          0.999999993474,
+          "#ffffff"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#a2342a"
+        ],
+        "orange": [],
+        "yellow": [],
+        "green": [
+          "#2f6b3a"
+        ],
+        "blue": [
+          "#2c3e91"
+        ],
+        "purple": []
+      }
+    },
+    "ink_season": {
+      "achromatic": [
+        [
+          0.177637771917,
+          "#111111"
+        ],
+        [
+          0.460984697605,
+          "#595857"
+        ],
+        [
+          0.998898332253,
+          "#fffffb"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#d3381c"
+        ],
+        "orange": [
+          "#ffb61e"
+        ],
+        "yellow": [],
+        "green": [
+          "#007b43"
+        ],
+        "blue": [
+          "#165e83"
+        ],
+        "purple": [
+          "#a591c5"
+        ]
+      }
+    },
+    "fresco_study": {
+      "achromatic": [
+        [
+          0.348461816742,
+          "#4a342e"
+        ],
+        [
+          0.608545586549,
+          "#8a8178"
+        ],
+        [
+          0.958772264452,
+          "#f5f1e8"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#a0522d",
+          "#c7432f"
+        ],
+        "orange": [],
+        "yellow": [
+          "#f7e89f"
+        ],
+        "green": [
+          "#4f7942"
+        ],
+        "blue": [
+          "#1f4e8c"
+        ],
+        "purple": []
+      }
+    },
+    "open_air_light": {
+      "achromatic": [
+        [
+          0.74005813476,
+          "#afa6bd"
+        ],
+        [
+          0.999999993474,
+          "#ffffff"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#ee8fa2"
+        ],
+        "orange": [
+          "#fbceb1"
+        ],
+        "yellow": [
+          "#ffce00"
+        ],
+        "green": [
+          "#4e8372"
+        ],
+        "blue": [
+          "#82c7de"
+        ],
+        "purple": [
+          "#4b4a78"
+        ]
+      }
+    },
+    "ink_porcelain": {
+      "achromatic": [
+        [
+          0.21819989285,
+          "#1a1a1b"
+        ],
+        [
+          0.99474278951,
+          "#fffdfa"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#c91f24",
+          "#ff4d00"
+        ],
+        "orange": [],
+        "yellow": [
+          "#d6a01d"
+        ],
+        "green": [
+          "#00896c"
+        ],
+        "blue": [
+          "#0057a8"
+        ],
+        "purple": [
+          "#6a4c8c"
+        ]
+      }
+    },
+    "cool_material": {
+      "achromatic": [
+        [
+          0.709677609681,
+          "#95a5a6"
+        ],
+        [
+          0.928700635839,
+          "#e5e8e8"
+        ],
+        [
+          0.991068896634,
+          "#fcfcfc"
+        ]
+      ],
+      "chromatic": {
+        "red": [],
+        "orange": [
+          "#a98467"
+        ],
+        "yellow": [
+          "#4b5d43",
+          "#f4d03f"
+        ],
+        "green": [],
+        "blue": [
+          "#2c3e50",
+          "#4f8fb8"
+        ],
+        "purple": []
+      }
+    },
+    "dye_earth": {
+      "achromatic": [
+        [
+          0.605649880152,
+          "#8d7f73"
+        ],
+        [
+          0.986232753493,
+          "#fffaf0"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#b7285f"
+        ],
+        "orange": [
+          "#e8862e"
+        ],
+        "yellow": [
+          "#6b7d3a",
+          "#d6b72a"
+        ],
+        "green": [],
+        "blue": [
+          "#006c8f"
+        ],
+        "purple": [
+          "#d83fb1"
+        ]
+      }
+    },
+    "desert_mineral": {
+      "achromatic": [
+        [
+          0.222096131652,
+          "#1c1b18"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#b31b1b"
+        ],
+        "orange": [
+          "#bd6f2c"
+        ],
+        "yellow": [
+          "#c9ad57",
+          "#e8e4c9",
+          "#f1e4c8"
+        ],
+        "green": [
+          "#1c8a68"
+        ],
+        "blue": [
+          "#1f4b8f"
+        ],
+        "purple": []
+      }
+    },
+    "vivid_material": {
+      "achromatic": [
+        [
+          0.226449863274,
+          "#1c1c1c"
+        ],
+        [
+          0.552034771913,
+          "#7d6f66"
+        ],
+        [
+          0.967153292184,
+          "#f4f4f4"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#f50087"
+        ],
+        "orange": [
+          "#ff9800"
+        ],
+        "yellow": [
+          "#fff200"
+        ],
+        "green": [
+          "#008f39"
+        ],
+        "blue": [
+          "#73c2fb"
+        ],
+        "purple": []
+      }
+    },
+    "weathered_heritage": {
+      "achromatic": [
+        [
+          0.276013046586,
+          "#1f2933"
+        ],
+        [
+          0.592504148202,
+          "#708090"
+        ],
+        [
+          0.623187240686,
+          "#8b8589"
+        ],
+        [
+          0.894490408904,
+          "#dcdcdc"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#b93a32"
+        ],
+        "orange": [],
+        "yellow": [
+          "#fffdd0"
+        ],
+        "green": [
+          "#004225"
+        ],
+        "blue": [
+          "#4169e1"
+        ],
+        "purple": []
+      }
+    },
+    "sea_stone": {
+      "achromatic": [
+        [
+          0.789560758249,
+          "#b2beb5"
+        ],
+        [
+          0.999999993474,
+          "#ffffff"
+        ]
+      ],
+      "chromatic": {
+        "red": [
+          "#e2725b"
+        ],
+        "orange": [],
+        "yellow": [
+          "#808000",
+          "#f9d71c"
+        ],
+        "green": [],
+        "blue": [
+          "#005bae",
+          "#191970",
+          "#89cff0"
+        ],
+        "purple": []
+      }
+    }
+  },
+  "assignment": {
+    "default": {
+      "12345": {
+        "black": "#111111",
+        "gray": "#888888",
+        "white": "#ffffff",
+        "red": "#a2342a",
+        "orange": "#a2342a",
+        "yellow": "#2f6b3a",
+        "green": "#2f6b3a",
+        "blue": "#2c3e91",
+        "purple": "#2c3e91"
+      },
+      "999": {
+        "black": "#111111",
+        "gray": "#888888",
+        "white": "#ffffff",
+        "red": "#a2342a",
+        "orange": "#a2342a",
+        "yellow": "#2f6b3a",
+        "green": "#2f6b3a",
+        "blue": "#2c3e91",
+        "purple": "#2c3e91"
+      }
+    },
+    "ink_season": {
+      "12345": {
+        "black": "#111111",
+        "gray": "#595857",
+        "white": "#fffffb",
+        "red": "#d3381c",
+        "orange": "#ffb61e",
+        "yellow": "#ffb61e",
+        "green": "#007b43",
+        "blue": "#165e83",
+        "purple": "#a591c5"
+      },
+      "999": {
+        "black": "#111111",
+        "gray": "#595857",
+        "white": "#fffffb",
+        "red": "#d3381c",
+        "orange": "#ffb61e",
+        "yellow": "#ffb61e",
+        "green": "#007b43",
+        "blue": "#165e83",
+        "purple": "#a591c5"
+      }
+    },
+    "fresco_study": {
+      "12345": {
+        "black": "#4a342e",
+        "gray": "#8a8178",
+        "white": "#f5f1e8",
+        "red": "#a0522d",
+        "orange": "#a0522d",
+        "yellow": "#f7e89f",
+        "green": "#4f7942",
+        "blue": "#1f4e8c",
+        "purple": "#1f4e8c"
+      },
+      "999": {
+        "black": "#4a342e",
+        "gray": "#8a8178",
+        "white": "#f5f1e8",
+        "red": "#c7432f",
+        "orange": "#a0522d",
+        "yellow": "#f7e89f",
+        "green": "#4f7942",
+        "blue": "#1f4e8c",
+        "purple": "#1f4e8c"
+      }
+    },
+    "open_air_light": {
+      "12345": {
+        "gray": "#afa6bd",
+        "white": "#ffffff",
+        "black": "#4b4a78",
+        "red": "#ee8fa2",
+        "orange": "#fbceb1",
+        "yellow": "#ffce00",
+        "green": "#4e8372",
+        "blue": "#82c7de",
+        "purple": "#4b4a78"
+      },
+      "999": {
+        "gray": "#afa6bd",
+        "white": "#ffffff",
+        "black": "#4b4a78",
+        "red": "#ee8fa2",
+        "orange": "#fbceb1",
+        "yellow": "#ffce00",
+        "green": "#4e8372",
+        "blue": "#82c7de",
+        "purple": "#4b4a78"
+      }
+    },
+    "ink_porcelain": {
+      "12345": {
+        "black": "#1a1a1b",
+        "white": "#fffdfa",
+        "gray": "#4b4b4f",
+        "red": "#c91f24",
+        "orange": "#d6a01d",
+        "yellow": "#d6a01d",
+        "green": "#00896c",
+        "blue": "#0057a8",
+        "purple": "#6a4c8c"
+      },
+      "999": {
+        "black": "#1a1a1b",
+        "white": "#fffdfa",
+        "gray": "#4b4b4f",
+        "red": "#ff4d00",
+        "orange": "#d6a01d",
+        "yellow": "#d6a01d",
+        "green": "#00896c",
+        "blue": "#0057a8",
+        "purple": "#6a4c8c"
+      }
+    },
+    "cool_material": {
+      "12345": {
+        "gray": "#95a5a6",
+        "white": "#fcfcfc",
+        "black": "#e5e8e8",
+        "red": "#a98467",
+        "orange": "#a98467",
+        "yellow": "#4b5d43",
+        "green": "#4b5d43",
+        "blue": "#4f8fb8",
+        "purple": "#2c3e50"
+      },
+      "999": {
+        "gray": "#95a5a6",
+        "white": "#fcfcfc",
+        "black": "#e5e8e8",
+        "red": "#a98467",
+        "orange": "#a98467",
+        "yellow": "#f4d03f",
+        "green": "#4b5d43",
+        "blue": "#4f8fb8",
+        "purple": "#2c3e50"
+      }
+    },
+    "dye_earth": {
+      "12345": {
+        "gray": "#8d7f73",
+        "white": "#fffaf0",
+        "black": "#2b2736",
+        "red": "#b7285f",
+        "orange": "#e8862e",
+        "yellow": "#d6b72a",
+        "green": "#6b7d3a",
+        "blue": "#006c8f",
+        "purple": "#d83fb1"
+      },
+      "999": {
+        "gray": "#8d7f73",
+        "white": "#fffaf0",
+        "black": "#2b2736",
+        "red": "#b7285f",
+        "orange": "#e8862e",
+        "yellow": "#6b7d3a",
+        "green": "#6b7d3a",
+        "blue": "#006c8f",
+        "purple": "#d83fb1"
+      }
+    },
+    "desert_mineral": {
+      "12345": {
+        "black": "#1c1b18",
+        "gray": "#8f8878",
+        "white": "#f1e4c8",
+        "red": "#b31b1b",
+        "orange": "#bd6f2c",
+        "yellow": "#f1e4c8",
+        "green": "#1c8a68",
+        "blue": "#1f4b8f",
+        "purple": "#1f4b8f"
+      },
+      "999": {
+        "black": "#1c1b18",
+        "gray": "#8f8878",
+        "white": "#f1e4c8",
+        "red": "#b31b1b",
+        "orange": "#bd6f2c",
+        "yellow": "#f1e4c8",
+        "green": "#1c8a68",
+        "blue": "#1f4b8f",
+        "purple": "#1f4b8f"
+      }
+    },
+    "vivid_material": {
+      "12345": {
+        "black": "#1c1c1c",
+        "gray": "#7d6f66",
+        "white": "#f4f4f4",
+        "red": "#f50087",
+        "orange": "#ff9800",
+        "yellow": "#fff200",
+        "green": "#008f39",
+        "blue": "#73c2fb",
+        "purple": "#f50087"
+      },
+      "999": {
+        "black": "#1c1c1c",
+        "gray": "#7d6f66",
+        "white": "#f4f4f4",
+        "red": "#f50087",
+        "orange": "#ff9800",
+        "yellow": "#fff200",
+        "green": "#008f39",
+        "blue": "#73c2fb",
+        "purple": "#f50087"
+      }
+    },
+    "weathered_heritage": {
+      "12345": {
+        "black": "#1f2933",
+        "gray": "#708090",
+        "white": "#dcdcdc",
+        "red": "#b93a32",
+        "orange": "#b93a32",
+        "yellow": "#fffdd0",
+        "green": "#004225",
+        "blue": "#4169e1",
+        "purple": "#4169e1"
+      },
+      "999": {
+        "black": "#1f2933",
+        "gray": "#708090",
+        "white": "#dcdcdc",
+        "red": "#b93a32",
+        "orange": "#b93a32",
+        "yellow": "#fffdd0",
+        "green": "#004225",
+        "blue": "#4169e1",
+        "purple": "#4169e1"
+      }
+    },
+    "sea_stone": {
+      "12345": {
+        "gray": "#b2beb5",
+        "white": "#ffffff",
+        "black": "#191970",
+        "red": "#e2725b",
+        "orange": "#e2725b",
+        "yellow": "#f9d71c",
+        "green": "#808000",
+        "blue": "#191970",
+        "purple": "#191970"
+      },
+      "999": {
+        "gray": "#b2beb5",
+        "white": "#ffffff",
+        "black": "#191970",
+        "red": "#e2725b",
+        "orange": "#e2725b",
+        "yellow": "#808000",
+        "green": "#808000",
+        "blue": "#005bae",
+        "purple": "#191970"
+      }
+    }
+  },
+  "seeds": [
+    "12345",
+    "999"
+  ],
+  "seed_sensitive": [
+    "cool_material.yellow",
+    "dye_earth.yellow",
+    "fresco_study.red",
+    "ink_porcelain.red",
+    "sea_stone.blue",
+    "sea_stone.yellow"
+  ],
+  "hint_resolution": [
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "brown",
+      "hues": [
+        "brown"
+      ],
+      "expected": "#ffb61e"
+    },
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "brown and blue",
+      "hues": [
+        "blue",
+        "brown"
+      ],
+      "expected": "#165e83"
+    },
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "赤と青",
+      "hues": [
+        "blue",
+        "red"
+      ],
+      "expected": "#d3381c"
+    },
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "青と赤",
+      "hues": [
+        "blue",
+        "red"
+      ],
+      "expected": "#d3381c"
+    },
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "red",
+      "color_hint": "ink",
+      "hues": [
+        "black"
+      ],
+      "expected": "#111111"
+    },
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "red",
+      "color_hint": "inkstone",
+      "hues": [],
+      "expected": "#d3381c"
+    },
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "sky blue",
+      "hues": [
+        "blue"
+      ],
+      "expected": "#165e83"
+    },
+    {
+      "catalog_id": "ink_season",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "blueprint",
+      "hues": [],
+      "expected": "#111111"
+    },
+    {
+      "catalog_id": "cool_material",
+      "render_seed": 12345,
+      "color": "red",
+      "color_hint": "moss",
+      "hues": [],
+      "expected": "#a98467"
+    },
+    {
+      "catalog_id": "cool_material",
+      "render_seed": 12345,
+      "color": "red",
+      "color_hint": "",
+      "hues": [],
+      "expected": "#a98467"
+    },
+    {
+      "catalog_id": "default",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "purple",
+      "hues": [
+        "purple"
+      ],
+      "expected": "#2c3e91"
+    },
+    {
+      "catalog_id": "sea_stone",
+      "render_seed": 12345,
+      "color": "white",
+      "color_hint": "yellow",
+      "hues": [
+        "yellow"
+      ],
+      "expected": "#f9d71c"
+    },
+    {
+      "catalog_id": "dye_earth",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "紫",
+      "hues": [
+        "purple"
+      ],
+      "expected": "#d83fb1"
+    },
+    {
+      "catalog_id": "vivid_material",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "gold",
+      "hues": [
+        "yellow"
+      ],
+      "expected": "#fff200"
+    },
+    {
+      "catalog_id": "open_air_light",
+      "render_seed": 12345,
+      "color": "black",
+      "color_hint": "terracotta",
+      "hues": [
+        "orange"
+      ],
+      "expected": "#fbceb1"
+    }
+  ]
+}

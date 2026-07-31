@@ -3675,6 +3675,7 @@
         "instructions": [
           {
             "primitive": "arc",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -3691,7 +3692,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pen",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -3700,10 +3700,12 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           },
           {
             "primitive": "arc",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -3720,7 +3722,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pen",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -3729,7 +3730,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           }
         ]
       }
@@ -3783,6 +3785,7 @@
         "instructions": [
           {
             "primitive": "arc",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -3799,7 +3802,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pencil",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -3808,10 +3810,12 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           },
           {
             "primitive": "arc",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -3828,7 +3832,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pencil",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -3837,7 +3840,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           }
         ]
       }
@@ -3879,6 +3883,7 @@
         "instructions": [
           {
             "primitive": "circle",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -3895,7 +3900,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pen",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -3904,10 +3908,12 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           },
           {
             "primitive": "circle",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -3924,7 +3930,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pen",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -3933,7 +3938,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           }
         ]
       }
@@ -3981,6 +3987,7 @@
         "instructions": [
           {
             "primitive": "circle",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -3997,7 +4004,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pen",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -4006,10 +4012,12 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           },
           {
             "primitive": "circle",
+            "note": null,
             "from": null,
             "to": null,
             "center": [
@@ -4026,7 +4034,6 @@
             "filled": false,
             "style": "solid",
             "weight": "pen",
-            "thinness": null,
             "mode": "additive",
             "carve_depth": null,
             "color": "black",
@@ -4051,7 +4058,8 @@
             },
             "at": null,
             "relation": null,
-            "surface": null
+            "surface": null,
+            "thinness": null
           }
         ]
       }

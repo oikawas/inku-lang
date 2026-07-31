@@ -132,6 +132,7 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.testTag
 import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -4902,5 +4903,52 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
     ) {
         Text("🦀", style = MaterialTheme.typography.bodyMedium)
         Text("Yuragi (蟹)", style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+internal fun CustomModalContainer(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    content: @Composable () -> Unit = { Text("モーダルコンテンツ") },
+) {
+    if (visible) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+            )
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .testTag("modal_scrim")
+                        .clickable(onClick = onDismissRequest),
+                )
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                ) {
+                    Box(modifier = Modifier.padding(24.dp)) {
+                        content()
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clickable(onClick = onDismissRequest),
+                )
+            }
+        }
     }
 }

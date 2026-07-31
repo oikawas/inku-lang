@@ -686,7 +686,7 @@ export const ja: LangPack = {
 	historyMoveToTrash: '選択削除',
 	historyRestoreSelected: '選択復元',
 	historyPermanentDelete: '完全削除',
-	historySearchLabel: '検索:',
+	historySearchLabel: '検索（記述 / ハッシュ値下位4桁）:',
 	historyPrev: '← 前',
 	historyNext: '次 →',
 	historyFirst: '最初',

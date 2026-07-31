@@ -248,7 +248,16 @@ grep -rhE -o "getLang\(\) === 'ja' \? '[^']*'" web/src | LC_ALL=C sort | md5
 
 ## 9. まだ揃っていないもの（既知の食い違い）
 
-- **README.md（英語）・SPEC.md・`manual/en/` は旧語彙のまま**（`artwork` 53 件、`palette` 12 件、
-  `Vary …` 系、`Okugaki` 9 件、`Unleashed` 7 件、`Generation Info` 8 件ほか）。ドキュメント側の追随は別作業。
+- **README.md（英語）・SPEC.md・`manual/en/` は旧語彙のまま。** ただし**禁止語はもう残っていない**
+  （2026-07-31 実測: `artwork` / `Okugaki` / `Unleashed` / `Generation Info` は 3 文書とも **0 件**。
+  旧記載の「`artwork` 53 件」等は古い）。残るのは **`SPEC.md` の `palette` 10 件**で、
+  これはカタログのフィールド名＝コード識別子である。**動いていないのは概念語のほう**で、
+  `manual/en/` は generate 13 / generation 25 / create 14 / image 9 に対し perform 7。
+  ドキュメント側の追随は別作業。
+- **本辞書は英語表示文字列の正本であって、日本語の正本ではない**（`lint:i18n` が見るのは `en.ts` だけ）。
+  **日本語 UI は旧語彙のまま**である（2026-07-31 実測: `ja.ts` に 生成 29 / 画像 7。
+  `manualRefineGenerateButton` は ja「生成する」/ en "Refine"、`historyImageHeader` は ja「画像」/ en "Work"）。
+  **`README.ja.md` と `manual/ja/` が 生成・画像 を使うのは、その日本語画面を正しく書き写しているから**である
+  （台帳 [I-004]・2026-07-31 作者裁定で据え置き）。**日本語側を先に動かすなら UI から**。
 - **履歴ゼロの空状態文言**（原典 §5 の "Nothing here yet. …"）に対応する鍵が UI に無い。足すなら鍵ごと新設する。
 - `stage1Label` / `stage2Label` はどのコンポーネントからも参照されていない（死に鍵）。

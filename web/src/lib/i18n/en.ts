@@ -502,7 +502,7 @@ export const en: LangPack = {
 	settingsLogRetentionSystemdPreview: 'systemd drop-in preview',
 	settingsLogRetentionNote: 'The log retention policy is stored in the application DB. Applying systemd / logrotate files requires server OS privileges.',
 	settingsLogRetentionSaved: 'Log retention policy saved.',
-	settingsReloadSettings: 'Reload settings',
+	settingsReloadSettings: 'Refresh',
 	settingsLoading: 'Loading settings status.',
 	settingsLoadFailed: 'Could not load settings status.',
 	settingsReload: 'Refresh',

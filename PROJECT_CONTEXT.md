@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.17 / Build 807**
+**Target version: v2.9.18 / Build 808**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -1609,6 +1609,23 @@ An account older than every settings column is now inserted and `ui_theme`, `ui_
 Android has no diff.
 SPEC does not enumerate display settings and is unchanged.
 The version is a patch.**
+
+v2.9.18 (Build 808) **makes the typed name `perform` and aligns the fallback catalog with the source.**
+Two Codex branches that had been left behind: **neither had a completion report, neither reached `main`, and pentala had moved ahead of both** — the ledger disagreed with the repository in both directions, **[I-023] decided but unmerged, [I-025] undecided but implemented**.
+[I-023] renames the public subcommand to **`refine perform`** and **keeps the old `refine generate` as a hidden alias** (`argparse.SUPPRESS` keeps it out of the help, and it is removed from `_choices_actions` too).
+One function defines the arguments for both spellings, so **the same input posts the same body under either name**.
+The CLI README and the four CLI reference documents follow, and cli tests go from 76 to **77**.
+[I-025] widens the static `ollama-cloud` fallback in `web/src/lib/models.ts` **from three models to eighteen**, with **`requires_subscription: true` on the ten** a free tier cannot reach.
+That fallback is what the picker shows for the few hundred milliseconds before the API catalog lands, so it closes the hole where **`gpt-oss:20b` looks uniquely owned right after startup** (true since v2.9.1).
+**This changes the premise of the 2026-07-29 ruling**: the fallback used to carry no marker, so it held only the eight free models, but **it can carry the marker now and the marker works from startup** (`isModelUnselectable()` reads whichever model is rendered, and `PROVIDER_GROUPS` is the initial value of `modelCatalog` and `availableModelCatalog`).
+**The first full server run on the merged tree failed one test**: `test_the_web_fallback_offers_only_models_that_can_be_used` pinned "no `SUBSCRIPTION_ONLY` model in the fallback", which collides head-on with the change.
+**The branch satisfies the intent of the ruling — do not let anyone pick what they cannot use — by marking rather than omitting**, so the test moved to the new premise: the fallback carries the same id set as the source, its marked set equals `SUBSCRIPTION_ONLY`, and its unmarked set equals `FREE_TIER_REACHABLE`.
+**Two of four perturbations showed a gate that simply did not exist**: stopping `refine perform` from reaching the code path reddened it, putting `generate` back into the help reddened it, but the **shape-preserving** ones (drop the marker from `glm-5.2`; drop `gemma4:31b` from the fallback) were **green everywhere before the rewrite**.
+Neither reddens `lint:models`, `lint:recommendations` or `npm run check`, so **nothing guarded the fifteen models and ten markers the branch added**.
+The rewritten test reddens under both and passes unperturbed.
+pytest **1897/31** (**the count does not move** — one function replaced), cli **77**, ruff clean, `npm run check` **221/0/2**, `lint:i18n` **951/47/0/0**, `lint:models` 68, `lint:recommendations` 37.
+**Found while deploying**: `models.ts` **had reached pentala at Build 802 and was gone again** (the md5 comparison showed pentala's copy identical to main's) — **one real instance of [I-053]**, which this release puts back.
+**No deterministic layer changed, so the corpora were not regenerated. Android has no diff. The version is a patch.**
 
 v2.4.7 (Build 697) freezes the deterministic DDL layers.
 `server/reference/ddl-engine-1/` holds 29 cases (A = 15 expansion, B = 14 coercion), and

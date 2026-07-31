@@ -1549,3 +1549,62 @@ pytest **1897/31** (**the count does not move** — assertions were added to two
 `lint:models` 68, `lint:recommendations` 37, `check_frozen_corpora.py` green. **No deterministic layer
 changed, so the corpora were not regenerated. Android has no diff. SPEC does not enumerate display
 settings and is unchanged. The version is a patch.**
+
+### v2.9.18 — the typed name becomes `perform`, and the fallback catalog matches the source (Build 808, 2026-08-01)
+
+**Two Codex branches that had been left behind.** Neither had a completion report, neither reached
+`main`, and pentala had moved ahead of both. The ledger disagreed with the repository in both
+directions: **[I-023] was decided but unmerged, [I-025] was undecided but implemented.**
+
+#### Retiring `refine generate` ([I-023], Build 801)
+
+- The public subcommand is now **`refine perform`**. **The old `refine generate` survives as a hidden
+  alias** — `argparse.SUPPRESS` keeps it out of the help text and it is removed from `_choices_actions`
+  so it does not appear in the subcommand list either
+- One function defines the arguments for both spellings. **The same input posts the same body under
+  either name**
+- The CLI README and the four CLI reference documents follow `perform`
+- cli tests: **76 to 77**
+
+#### Aligning the fallback catalog ([I-025], Build 802)
+
+The static `ollama-cloud` fallback in `web/src/lib/models.ts` held **three** models where the server's
+source of truth holds **eighteen**. For the few hundred milliseconds before the API catalog lands, that
+fallback is what the picker shows, so **`gpt-oss:20b` looks uniquely owned right after startup** (true
+since v2.9.1).
+
+- The fallback now lists **eighteen**, with **`requires_subscription: true` on the ten** that a free tier
+  cannot reach
+- **This changes the premise of the 2026-07-29 ruling.** The fallback used to carry no marker, so it held
+  only the eight free models. **It can carry the marker now, and the marker works from startup**:
+  `isModelUnselectable()` reads whichever model is being rendered, and `PROVIDER_GROUPS` is the initial
+  value of `modelCatalog` and `availableModelCatalog`
+
+#### Acceptance
+
+**The first full server run on the merged tree failed one test.**
+`test_the_web_fallback_offers_only_models_that_can_be_used` pinned "no `SUBSCRIPTION_ONLY` model in the
+fallback", which collides head-on with the change above. **The branch satisfies the intent of the ruling —
+do not let anyone pick what they cannot use — by marking rather than omitting**, so the test moved to the
+new premise: **the fallback carries the same id set as the source, its marked set equals
+`SUBSCRIPTION_ONLY`, and its unmarked set equals `FREE_TIER_REACHABLE`.**
+
+**Two of four perturbations showed a gate that simply did not exist.**
+
+1. Stop `refine perform` from reaching the code path: **red**
+2. Put `generate` back into the help by dropping the `_choices_actions` filter: **red**
+3. **Shape-preserving** — drop `requires_subscription` from `glm-5.2`: **green everywhere, before the rewrite**
+4. **Shape-preserving** — drop `gemma4:31b` from the fallback: **green everywhere, before the rewrite**
+
+Neither 3 nor 4 reddens `lint:models`, `lint:recommendations` or `npm run check`. **Nothing guarded the
+fifteen models and ten markers the branch added.** The rewritten test reddens under both and passes
+unperturbed.
+
+pytest **1897/31** (**the count does not move** — one function replaced), cli **77** (+1), ruff clean,
+`npm run check` **221/0/2**, `lint:i18n` **951/47/0/0**, `lint:models` 68, `lint:recommendations` 37,
+`check_frozen_corpora.py` green. **No deterministic layer changed, so the corpora were not regenerated.
+Android has no diff. The version is a patch.**
+
+> **Found while deploying**: `models.ts` **had reached pentala at Build 802 and was gone again** — today's
+> md5 comparison showed pentala's copy identical to main's, without the branch's change. **One real
+> instance of [I-053], a parallel rsync erasing someone else's work.** This release puts it back.

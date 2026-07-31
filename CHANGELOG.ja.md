@@ -1639,3 +1639,59 @@ cli 76、ruff clean、`npm run check` **221/0/2**、`lint:i18n` **951/47/0/0**�
 `lint:models` 68、`lint:recommendations` 37、`check_frozen_corpora.py` 緑。
 **決定的な層に差分が無いのでコーパスは焼き直していない。Android にも差分は無い。
 SPEC は表示設定を列挙していないので不変更。版数は patch。**
+
+### v2.9.18 — 打鍵名が `perform` になり、控えのカタログが正本に揃う（Build 808、2026-08-01）
+
+**取り残されていた Codex の 2 枝を回収した版。** どちらも完了レポートが無く、`main` へ入らないまま
+pentala の配備だけが先に進んでいた。台帳では **[I-023] が既決なのに未反映**、
+**[I-025] が未決なのに実装済み**という食い違いになっていた。
+
+#### `refine generate` の退役（[I-023]・Build 801）
+
+- 公開サブコマンドを **`refine perform`** へ改めた。**旧 `refine generate` は隠し互換として残る** —
+  `argparse.SUPPRESS` でヘルプから外し、`_choices_actions` から取り除いて一覧にも出さない
+- 引数の定義は 1 つの関数から両方へ配る。**同じ入力なら 2 つの綴りは同じ POST を投げる**
+- CLI README と日英の CLI リファレンス 4 本も `perform` へ揃えた
+- cli のテストは **76 → 77**
+
+#### 控えのカタログを正本へ揃える（[I-025]・Build 802）
+
+`web/src/lib/models.ts` の `ollama-cloud` の静的控えは **3 本**しか持たず、server の正本は **18 本**だった。
+サーバのカタログが届くまでの数百ミリ秒はこの控えがそのまま出るので、
+**起動直後だけ `gpt-oss:20b` が一意所有に見える**（v2.9.1 からの性質）。
+
+- 控えを **18 本**にし、**無料枠で叩けない 10 本へ `requires_subscription: true`** を付けた
+- **これは 2026-07-29 の裁定の前提を変える。** 従来は「控えには印が付かないので、
+  印で守る前提のものを置かない」として無料の 8 本だけを置いていた。
+  **控え自身が印を持てるようになったので、印は起動直後から効く** —
+  `isModelUnselectable()` は描画される model をそのまま読み、
+  `PROVIDER_GROUPS` は `modelCatalog` / `availableModelCatalog` の初期値である
+
+#### 受け入れ
+
+**マージした木で初めて回した server の全テストが 1 件落ちた。**
+`test_the_web_fallback_offers_only_models_that_can_be_used` は
+「控えに `SUBSCRIPTION_ONLY` を置かない」を固定しており、上の設計変更と正面から衝突する。
+**枝は裁定の意図（選べないものを選ばせない）を、消すのではなく印で満たしている**ので、
+検査を新しい前提へ移した — **`models.ts` の控えが正本と同じ id 集合を持ち、
+印の集合が `SUBSCRIPTION_ONLY` と一致し、印の無い集合が `FREE_TIER_REACHABLE` と一致すること**。
+
+**摂動 4 件のうち 2 件が、検査の不在をそのまま示していた。**
+
+1. `refine perform` が処理へ届かないようにする → **赤**
+2. `_choices_actions` の除去を外して `generate` をヘルプへ戻す → **赤**
+3. **形を変えない摂動** — `glm-5.2` から `requires_subscription` を落とす → **書き換え前は全部緑**
+4. **形を変えない摂動** — 控えから `gemma4:31b` を 1 本落とす → **書き換え前は全部緑**
+
+3 と 4 は `lint:models`・`lint:recommendations`・`npm run check` のどれも赤にしない。
+**枝が足した 15 本と 10 個の印を守る検査は 1 つも無かった。**
+書き換えた検査は 3 と 4 の両方で赤になり、無改変で緑になる。
+
+pytest **1897/31**（**件数は増えない** — 既存の 1 関数を差し替える形）、cli **77**（+1）、
+ruff clean、`npm run check` **221/0/2**、`lint:i18n` **951/47/0/0**、`lint:models` 68、
+`lint:recommendations` 37、`check_frozen_corpora.py` 緑。
+**決定的な層に差分が無いのでコーパスは焼き直していない。Android にも差分は無い。版数は patch。**
+
+> **配備で分かったこと**: `models.ts` は **Build 802 で pentala へ入っていたが、その後の配備で
+> 消えていた**（本日の md5 突き合わせで、pentala の `models.ts` が main と同一＝枝の変更が無い状態だった）。
+> **[I-053]（並行 rsync が相手の機能を消す）が実際に起きた 1 件。** 本版の配備で戻る。

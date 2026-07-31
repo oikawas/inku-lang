@@ -1166,3 +1166,33 @@ the change is Android-only, and no packaging task ran, so Gradle's automatic inc
 **`ANDROID_SPEC` has not followed.** Its opening status still reads `2.0.0-android.1` / engine
 `11`, five versions behind what the tree holds (`2.1.3-android.1` / engine 16). Ledger item [I-013]
 recorded this as "not caught up to engine 15"; **the actual distance is larger.**
+
+---
+
+### Android `2.1.4-android.1` — the drawing layer catches up to render engine 17 (catalog palette assignment, nine abstract colors) (android Build 148090 unchanged, 2026-07-31)
+
+**The part of engine 17 the port shares with the server is ported, and Android now names render engine 17.** Tests went from **110 / 12 failures to 112 / 0**.
+
+- **The gap was not engine 17 alone.** Four deterministic-layer changes landed after the reference corpus was frozen on 2026-07-29: `thinness` moved to the end of the declaration (`2125b82`), `note` was added (`b484f3f`), the abstract colors grew to nine (`74bf869`), and engine 17 arrived (`9090973`). **The contract split those four into stages.**
+- **Stage 1, seed:** the full dump (`surfaceSeed`) gains `note` and moves `thinness` to the end. **The allowlist dump (`serverInstructionJson`) keeps neither** — the server's `_SEED_INSTRUCTION_FIELDS` has no `note` and keeps `thinness` next to `weight`. **Aligning both would move all 30 reference SVGs.**
+- **Stage 2, vocabulary:** the three schema enums (`color`, `background`, `color_cycle`) and the coercer's allowlist go to nine words, and the DDL markers gain yellow, orange and purple.
+- **Stage 3, assignment:** the OKLCH conversion, the six hue bands, the achromatic contest and the **big-endian unsigned 64-bit** SHA-256 choice are ported, and the old scoring `resolveColor` is gone. ASCII hint tokens now match as **whole words**, and five tokens leave `HUE_HINTS` (`blu`, `ai`, `vert`, `tall`, `shu`).
+- **Stage 4, material layer:** `pen` had no material layer on the **line** primitive. `usesMaterialOutline("pen")` returns true, but the line path's tool set omitted it — **two places read the same property and disagreed**. **No corpus case was a pen line, so nobody saw it through engine 16.**
+- **Stage 5, prompts:** the server's four constants are synchronised whole (`STAGE1_*` at 18,963 / 17,956 bytes, `STAGE2_*` at 44,116 / 42,191). The `*_LITERT` pair stays out.
+- **Stage 6, version:** one place (`CompatibilityConstants`, consolidated on 2026-07-30). **Zero** occurrences of `"16"` remain as an engine version.
+- **The catalog contents (`ColorCatalogs.kt`) are out of scope.** The premise recorded when the item was filed — "the server has nine keys, Android six" — **was wrong: the server's eleven catalog maps are six keys too** (the nine belong to `renderer.COLOR_MAP`, the default the catalogs override). **The engine 17 catch-up touches no catalog table**, so it does not collide with the engine 18 replacement.
+- **The six surface textures (`stipple`, `grain`, `paper_grain`, `wash`, `aquatint`, `bleed`) are not implemented** ([I-043]). **Declaring the version on a partial implementation** is the same treatment engine 16 got.
+
+**The test surface was baked before the contract went out.** All 32 existing cases carry **no `color_hint`, only the word `black`, and no `palette:` key**, because the generator called `renderer.render` without a `color_map` or a `catalog_id`. **A port could declare `"17"` without writing a line of the mechanism and stay green.** Worse, **the existing tests compare paths, points and dashes — nothing compared a color** — so adding cases would not have been enough. What was baked: `renderer_color_assignment.json` (11 catalogs x 9 colors x 2 seeds, plus 91 OKLCH conversions, the bands, and 15 hint resolutions), `score_schema_contract.json`, six SVG cases (one per branch of the assignment), and the nine tests that read them.
+
+**Acceptance re-ran and perturbed rather than copying the report's numbers.** All 110 cases were run to confirm 0 failures, and **six perturbations — one per stage** — each turned the intended assertion red (reverting the dump → `test06SurfaceHatchExactParity` and the reference walk; the coercer back to six words → `ServerScoreVocabularyTest`; the version back to `"16"` → three in `Engine17VersionTest`; unsigned remainder to signed → five assignment tests; removing `pen` → case `38` in the walk; one character in a prompt → `PromptFingerprintTest`). **Only the report's account of stage 1 disagreed with measurement** — it says reverting the dump reddens `ServerRendererThinnessTest`, but that test reads the schema, not the dump.
+
+**Acceptance found two defects, neither of which had a gate; both gates were added first, then the defects fixed** (author's decision).
+
+- **Two OKLab coefficients came from a different published variant** (`0.0040720403` / `0.8086758033` → `0.0040720468` / `0.8086757660`). **No test opened the `oklch` block the corpus already carried**, so it passed. Once one did, 233 values disagreed. **No assignment moves with today's eleven catalogs** — the difference is 6.5e-9 in L, one twenty-thousandth of the smallest margin to a decision boundary (8.8e-4 to the chroma floor, 0.80 degrees to a band edge). **engine 18 replaces every catalog color, so what needed pinning was the constants, not their consequences.**
+- **`render_color_map` in the metadata carried the assigned colors.** The drawing's map, with the assignment folded in, went straight into the metadata: **three keys were added to all eleven catalogs and a value was overwritten in four** (`cool_material.black` `#2c3e50` → `#e5e8e8`, `sea_stone.blue` `#005bae` → `#191970`, plus `fresco_study.red` and `weathered_heritage.white`). **The server's `render_color_map` stays the catalog's own map plus its palette, fourteen keys, untouched by the assignment.** **This parity held through engine 16 and was broken by the change.**
+
+- **[I-062] (`cool_material`'s black sitting 0.062 from the paper) is not fixed.** It is the server's current engine 17 behavior, and the port reproduces the server faithfully.
+- **Only `android/VERSION` was raised.** `APP_VERSION` (`v2.9.12`), `web/BUILD_NUMBER` (783) and `android/BUILD_NUMBER` (148090) are all unchanged, and **no pentala deployment is needed**.
+- **Verification:** Android **112 tests / 0 failures / 0 errors / 0 skipped** (25 XML). In the merged main checkout: server **1771 passed / 31 skipped**, cli **76**, ruff (`src tests scripts`) clean, `npm run check` **0 errors / 2 warnings / 219 files**.
+- **Left:** `ANDROID_SPEC.ja.md` / `.md` have **not caught up even to engine 15** ([I-013]). Out of scope here.

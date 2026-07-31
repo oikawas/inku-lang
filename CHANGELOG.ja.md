@@ -1278,3 +1278,33 @@ pytest **1771/31**（+20）、cli 76、ruff clean、`npm run check` 219/0/2、�
 Android 単体テスト **101 / failures 0 / errors 0 / skipped 0**（起点 99 + 新規 2）。**`APP_VERSION`・`web/BUILD_NUMBER`・`android/VERSION`・`android/BUILD_NUMBER` はいずれも不動**（Android のみの変更で、パッケージングタスクを走らせていないため Gradle の自動採番も起きない）。**pentala 反映は無し**（`android/` は全経路から恒久除外）。`server/` `web/` `cli/` `shared/` の差分はゼロ。
 
 **`ANDROID_SPEC` は追随していない。** 冒頭の「追随状況」は `2.0.0-android.1` / engine `11` のままで、実体（`2.1.3-android.1` / engine 16）と 5 版ずれている。台帳 [I-013] は「engine 15 に未追随」と記録していたが、**実際の遅れはそれより大きい**。
+
+---
+
+### Android `2.1.4-android.1` — 描画層が render engine 17 へ追随（カタログ palette の割当・抽象色 9 語）（android Build 148090 据え置き、2026-07-31）
+
+**engine 17 のうち server と共有している部分を移植し、Android も render engine 17 を名乗る。** テストは **110 件 / 失敗 12 → 112 件 / 失敗 0**。
+
+- **遅れは engine 17 だけではなかった。** 参照コーパスを焼いた 2026-07-29 以降に決定的な層が 4 回動いており、`thinness` の宣言が末尾へ（`2125b82`）、`note` が新設（`b484f3f`）、抽象色が 9 語へ（`74bf869`）、そして engine 17（`9090973`）が入っていた。**契約はこの 4 系統を段に割った**
+- **段 1 seed:** 全 dump（`surfaceSeed`）へ `note` を足し `thinness` を末尾へ移した。**allowlist 側（`serverInstructionJson`）は `note` を持たず `thinness` は `weight` の直後のまま** — server の `_SEED_INSTRUCTION_FIELDS` がそうなっている。**両方を「揃える」と 30 件の参照 SVG が全部ずれる**
+- **段 2 語彙:** schema の 3 つの enum（`color` / `background` / `color_cycle`）と coercer の allowlist を 9 語へ、DDL マーカーへ 黄・橙・紫を足した
+- **段 3 割当:** OKLCH 変換・6 つの色相帯・無彩の取り合い・SHA-256 の**ビッグエンディアン符号なし 64bit** による選択を移植し、`resolveColor` の採点方式を廃止した。ヒントの ASCII 語は**単語一致**へ変わり、`HUE_HINTS` から 5 語（`blu` / `ai` / `vert` / `tall` / `shu`）を削った
+- **段 4 材質層:** `pen` の**線**にだけ材質層が出ていなかった。`usesMaterialOutline("pen")` は `true` を返すのに線の経路の集合に `pen` が無く、**同じ性質を 2 箇所が読んで食い違っていた**。**コーパスに `pen` の線が 1 件も無かったので engine 16 まで誰も見ていなかった**
+- **段 5 プロンプト:** server の 4 定数を丸ごと同期した（`STAGE1_*` が 18,963 / 17,956 バイト、`STAGE2_*` が 44,116 / 42,191 バイト）。`*_LITERT` は対象外
+- **段 6 版:** `CompatibilityConstants` の 1 箇所（2026-07-30 に集約済み）。engine version としての `"16"` は **0 件**
+- **カタログの中身（`ColorCatalogs.kt`）は範囲外。** 起票時の前提「server は 9 キー / Android は 6 キー」は**誤りで、server の 11 カタログの `map` も 6 キー**である（9 キーなのは `renderer.COLOR_MAP` の既定値）。**engine 17 の追随はカタログ表を 1 行も触らない**ので、engine 18 の入れ替えと衝突しない
+- **面の質感 6 つ（`stipple` / `grain` / `paper_grain` / `wash` / `aquatint` / `bleed`）は実装していない**（[I-043]）。**部分実装のまま版を宣言する**のは engine 16 と同じ扱いである
+
+**契約を渡す前に検査面を焼いた。** 既存コーパスは **32 ケースとも `color_hint` 0 件・色語は `black` のみ・`palette:` キー 0** で、`renderer.render` を `color_map` も `catalog_id` も渡さずに呼んでいた。**割当機構を 1 行も書かずに `"17"` を宣言すれば全緑になる状態**だった。さらに**既存テストは経路（path / points / dash）しか比べておらず、色を見ている assertion が 1 つも無かった**ので、ケースを足すだけでは足りなかった。焼いたのは `renderer_color_assignment.json`（11 カタログ × 9 色 × 2 seed ＋ OKLCH 91 hex ＋ 帯 ＋ ヒント 15）・`score_schema_contract.json`・SVG 6 ケース（割当の分岐 1 つずつ）と、それを読む 9 件のテストである。
+
+**受け入れでレポートの数値を引き写さず、再現と摂動を行った。** 全 110 件を回して 0 failures を確認し、**段の数だけ 6 つの摂動**を当てて狙った assertion が赤くなることを見た（dump を戻す → `test06SurfaceHatchExactParity` と参照 SVG 走査、coercer を 6 語へ → `ServerScoreVocabularyTest`、版を `"16"` へ → `Engine17VersionTest` 3 件、符号なし剰余を符号つきへ → 割当 5 件、`pen` を外す → 参照 SVG 走査の `38`、プロンプトへ 1 文字 → `PromptFingerprintTest`）。**レポートの段 1 の記述だけは実測と違った** — 「dump を戻すと `ServerRendererThinnessTest` が赤」とあるが、あのテストはスキーマを見ており dump を見ていない。
+
+**受け入れで欠陥を 2 件見つけ、どちらもゲートが無かったのでその場で足してから直した**（作者裁定）。
+
+- **OKLab の係数 2 つが別の版だった**（`0.0040720403` / `0.8086758033` → `0.0040720468` / `0.8086757660`）。**焼いてあった `oklch` 91 色を読むテストが存在せず**、通っていた。追加したら 233 件が不一致。**今日の 11 カタログでは 1 件も割当を変えない** — 差は ΔL 6.5e-9 で、判定境界への最短距離（chroma 8.8e-4 / 帯 0.80 度）の **2 万分の 1** である。**engine 18 が全カタログ色を入れ替えるので、留めるべきは結果ではなく定数のほうだった**
+- **`render_color_map`（metadata）が割当済みの色を載せていた。** 描画用の map に割当を畳んだものをそのまま metadata へ入れており、**11 カタログ全部で 3 鍵（`yellow` / `orange` / `purple`）が増え、4 本では既存の値が上書き**されていた（`cool_material.black` が `#2c3e50` → `#e5e8e8`、`sea_stone.blue` が `#005bae` → `#191970`、`fresco_study.red`、`weathered_heritage.white`）。**server の `render_color_map` はカタログの map + palette の 14 鍵のまま**で、割当は触れない。**engine 16 まで一致していた parity が今回の変更で壊れていた**
+
+- **[I-062]（`cool_material` の `black` が紙との明度差 0.062）は直していない。** server の engine 17 の現在の振る舞いであり、移植は忠実に再現する
+- **採番は `android/VERSION` だけ。** `APP_VERSION`（`v2.9.12`）・`web/BUILD_NUMBER`（783）・`android/BUILD_NUMBER`（148090）はいずれも不動で、**pentala 反映も不要**
+- **検証:** Android **112 件 / failures 0 / errors 0 / skipped 0**（25 XML）。マージ後の主 checkout で server **1771 passed / 31 skipped**、cli **76**、ruff（`src tests scripts`）緑、`npm run check` **0 errors / 2 warnings / 219 files**
+- **残り:** `ANDROID_SPEC.ja.md` / `.md` は **engine 15 にも未追随**（[I-013]）。本契約の範囲外

@@ -20,6 +20,7 @@ engine 19 は到達 99.7% の側に既定の支持体を置く。紙は 1 種の
 from __future__ import annotations
 
 import contextlib
+import math
 import re
 
 import pytest
@@ -31,6 +32,7 @@ from inku_server.stroke_engine import (
     DEFAULT_SUPPORT,
     RESISTANCE_LEVELS,
     Support,
+    synthesize_along,
     synthesize_stroke,
 )
 
@@ -114,10 +116,29 @@ def test_the_machines_are_byte_identical_at_every_level(weight: str) -> None:
 
     抵抗を最強の段まで上げても 1 バイトも動かないこと。ここが動くなら、
     抵抗が道具の性質でなく全体にかかる効果になっている。
+
+    ただし 2 つの機械が不変である理由は同じではない。`computer` は
+    `stroke_engine` を通ったうえで bias 0 が守っており (下の摂動で実測)、
+    `rotring` はそもそも合成へ入らない。次の 2 件がその違いを留める。
     """
     baseline = _svg(weight, "g0")
     for level in ("g1", "g2", "g3"):
         assert _svg(weight, level) == baseline, (weight, level)
+
+
+def test_the_drafting_pen_never_reaches_the_stroke_synthesizer() -> None:
+    """rotring の不変を守っているのは地の表ではなく上流のゲートである。
+
+    `_uses_hand_stroke` が rotring だけを幾何のまま残すので (engine 8)、
+    `TOOL_SUPPORT_BIAS["rotring"]` に何を書いても出力は動かない — 実測で確認済み。
+    表の 0 は記述であって機構ではない。ここが変わったら、機械の極が本当に
+    守られているかを測り直すこと。
+    """
+    from inku_server.renderer import _uses_hand_stroke
+
+    assert _uses_hand_stroke("rotring") is False
+    assert _uses_hand_stroke("computer") is True
+    assert stroke_engine.TOOL_SUPPORT_BIAS["rotring"] == (0.0, 0.0)
 
 
 @pytest.mark.parametrize("weight", ABSORBED + REFUSED)
@@ -129,9 +150,9 @@ def test_the_hand_tools_do_move(weight: str) -> None:
 def test_the_machines_would_move_if_they_were_given_a_bias(monkeypatch) -> None:
     """判別力の実測。
 
-    機械が不変なのは紙を受けないからであって、機械がそもそも
-    `stroke_engine` を通らないからではない — 通らないなら bias を与えても
-    動かないので、この検査は恒真だったことになる。
+    `computer` が不変なのは紙を受けないからであって、層を通らないからでは
+    ないこと。通らないなら bias を与えても動かず、上の検査は恒真になる。
+    rotring はまさにそちら側なので、ここでは使えない。
     """
     biased = dict(stroke_engine.TOOL_SUPPORT_BIAS)
     biased["computer"] = (1.0, 1.0)
@@ -183,6 +204,83 @@ def _widest_ratio(weight: str, level: str, seeds: int = 200) -> tuple[float, flo
             ratio = a.width / b.width
             low, high = min(low, ratio), max(high, ratio)
     return low, high
+
+
+def test_the_span_does_not_decide_where_the_sheet_touches() -> None:
+    """§5 の罠 2 の直接の検査。
+
+    最初の実装は到着点を `range(span, n - span)` で舐めていたので、span の
+    大きい強い段ほど発火の機会が減った。到着の判定は span を一切見ないので、
+    span をどう変えても発火するストロークの数は「増減しない」のではなく
+    「1 件も変わらない」。不等式でなく等式で留めるのは、そのため。
+    """
+    counts = [
+        sum(
+            1
+            for seed in range(200)
+            if any(
+                value > 0.0
+                for value in stroke_engine._support_envelope(
+                    49, seed, "bleed", 1.0, 1.5, span
+                )
+            )
+        )
+        for span in (0.05, 0.16, 0.30)
+    ]
+    assert len(set(counts)) == 1, counts
+    # 全部 0 でも全部 200 でも等式は成り立つ。判別力があることを併せて留める。
+    assert 0 < counts[0] < 200, counts
+
+
+def test_two_arrivals_that_meet_make_one_wider_drop_not_a_blob() -> None:
+    """重なりは積でも和でもなく最大を取る。
+
+    足し合わせると 2 つの滲みが重なったところで最大 4.5 倍になり、滲みではなく
+    塊になった (実測)。1 回の到着の大きさは 0.6〜1.0 なので、包絡は 1.0 を
+    超えてはならない。
+    """
+    seeds = range(400)
+    highest = 0.0
+    overlapping = 0
+    for seed in seeds:
+        envelope = stroke_engine._support_envelope(49, seed, "bleed", 1.0, 2.2, 0.24)
+        highest = max(highest, max(envelope))
+        peaks = sum(
+            1
+            for i in range(1, len(envelope) - 1)
+            if envelope[i] > envelope[i - 1]
+            and envelope[i] >= envelope[i + 1]
+            and envelope[i] > 0.0
+        )
+        if peaks >= 2:
+            overlapping += 1
+    assert highest <= 1.0, highest
+    # 重なりが 1 度も起きていなければ、上の上限は何も言っていない。
+    assert overlapping > 0, overlapping
+
+
+def test_a_closed_band_is_never_cut() -> None:
+    """閉じた輪郭は even-odd の帯を保つ。
+
+    切ると図形が開いてしまい、地が残した白ではなく「輪郭の欠け」になる。
+    契約 §3.5 のとおり、切るのは開いた run だけ。
+    """
+    circle = [
+        (500 + 240 * math.cos(i * math.tau / 240), 500 + 240 * math.sin(i * math.tau / 240))
+        for i in range(240)
+    ]
+    cut_closed = cut_open = 0
+    for seed in range(60):
+        with _at("g3"):
+            closed = synthesize_along(circle, 3.0, "chalk", seed, closed=True)
+            opened = synthesize_along(circle, 3.0, "chalk", seed, closed=False)
+        if any(point[0] != point[0] for point in closed.left + closed.right):
+            cut_closed += 1
+        if any(point[0] != point[0] for point in opened.left + opened.right):
+            cut_open += 1
+    assert cut_closed == 0, cut_closed
+    # 対照。同じ中心線でも開いていれば切れる。切れないなら上は恒真である。
+    assert cut_open > 0, cut_open
 
 
 def test_a_stronger_sheet_swells_the_absorbed_tool_further() -> None:

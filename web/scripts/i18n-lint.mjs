@@ -82,7 +82,7 @@ const RESTRICTED = [
 	},
 	{
 		word: 'image', re: /\bimages?\b/i, instead: 'use "work" or "picture"',
-		keys: ['modelSelectionVisionHint', 'aiRefineVisionModeHint', 'aiRefineVisionReading', 'aiRefineVisionSourceError'],
+		keys: ['appInfoConceptBody', 'modelSelectionVisionHint', 'aiRefineVisionModeHint', 'aiRefineVisionReading', 'aiRefineVisionSourceError'],
 		texts: [],
 	},
 	{

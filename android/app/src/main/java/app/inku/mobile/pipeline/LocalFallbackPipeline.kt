@@ -1688,6 +1688,9 @@ class LocalFallbackPipeline(
             "red" to listOf("赤", "red"),
             "green" to listOf("緑", "green"),
             "gray" to listOf("灰", "グレー", "gray", "grey"),
+            "yellow" to listOf("黄", "金", "yellow", "gold"),
+            "orange" to listOf("橙", "蜜柑", "灯火", "orange"),
+            "purple" to listOf("紫", "菫", "藤", "purple", "violet"),
         )
     }
 }

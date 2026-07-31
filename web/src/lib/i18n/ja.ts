@@ -6,7 +6,7 @@ export const ja: LangPack = {
 
 	subtitle: '視覚的な短歌を書く',
 	appInfoOpenLabel: 'inku-langについて',
-	appInfoTitle: 'inku-lang',
+	appInfoTitle: 'inku',
 	appInfoConceptTitle: 'コンセプト',
 	appInfoConceptBody: 'inku（インク）は、短い記述から抽象的なベクターグラフィックを生み出す描画言語 DDL（Drawing Description Language）のリファレンスとなるアプリケーションです。\n\n絵画の経験や道具が無くても、自分のイメージを形に出来ます。心に残った光景をひとつ、短く書くことが始まりで、そこから作品を作っていくことが出来ます。',
 	appInfoCreatorTitle: '制作者',

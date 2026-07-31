@@ -6,7 +6,7 @@ export const en: LangPack = {
 
 	subtitle: 'write visual tanka',
 	appInfoOpenLabel: 'About inku-lang',
-	appInfoTitle: 'inku-lang',
+	appInfoTitle: 'inku',
 	appInfoConceptTitle: 'Concept',
 	appInfoConceptBody: 'inku is the reference application for DDL (Drawing Description Language) — a description-based drawing language that turns a short written line into an abstract vector graphic.\n\nNo experience with drawing and no tools are required to give your image a form. Writing down one scene that stayed with you, briefly, is the beginning — and from there you build the work up.',
 	appInfoCreatorTitle: 'Creator',

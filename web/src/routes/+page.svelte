@@ -21,6 +21,7 @@
 	import DdlEditorDialog from '$lib/components/DdlEditorDialog.svelte';
 	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
+	import IncuMascot from '$lib/components/IncuMascot.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import ProfileModal from '$lib/components/ProfileModal.svelte';
@@ -6671,7 +6672,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	<div class="modal-backdrop app-info-backdrop" onclick={() => (appInfoOpen = false)} aria-hidden="true"></div>
 	<div class="app-info-modal" role="dialog" aria-modal="true" aria-labelledby="app-info-title">
 		<div class="app-info-head">
-			<div id="app-info-title" class="app-info-title">{t().appInfoTitle}</div>
+			<div class="app-info-brand">
+				<IncuMascot />
+				<div id="app-info-title" class="app-info-title">{t().appInfoTitle}</div>
+			</div>
 			<button class="app-info-close" onclick={() => (appInfoOpen = false)} aria-label={t().appInfoClose}>×</button>
 		</div>
 		<div class="app-info-body">
@@ -7160,7 +7164,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		top: 50%;
 		left: 50%;
 		z-index: 701;
-		width: min(520px, calc(100vw - 32px));
+		width: min(780px, calc(100vw - 32px));
 		max-height: min(720px, calc(100vh - 32px));
 		transform: translate(-50%, -50%);
 		display: flex;
@@ -7179,8 +7183,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		padding: 14px 16px;
 		border-bottom: 1px solid var(--border);
 	}
+	.app-info-brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+	}
 	.app-info-title {
-		font-size: 18px;
+		font-size: 24px;
 		font-weight: 300;
 		letter-spacing: 0;
 	}

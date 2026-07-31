@@ -1264,3 +1264,58 @@ The previous two passes only rewrote test expectations, so **the product code wa
 - **SPEC is untouched** — it carries neither an endpoint list nor an output-format section, and the render engine, DDL and coerce layers did not move
 
 pytest **1775/31** (+4), cli 76, ruff clean, `npm run check` **220/0/2** (+1 file, `animationExport.ts`), `lint:i18n` **934/47/0/0** (+22, -6), `lint:models` 68, `lint:recommendations` 37. **No decisive layer changed, so the frozen corpora were not re-baked.** **Android has no diff** (`android/VERSION` unchanged). **The version is a patch** — what was added is an optional endpoint and UI, and neither the stored format nor the API's compatibility broke.
+
+---
+
+### v2.9.14 — the thirteen catalogs each carry all nine colors (Build 790, 2026-07-31)
+
+**Engine 17 built the path that picks from a `palette`, but the table it picks from was still engine 16's.** Each catalog held eight palette colors and a six-key `map`, and **many catalogs held no color in a band at all** — ask for green where there is no green and the nearest hue, a yellow, stands in. Across the 7463 stored instructions, **140 asked for a band the catalog did not hold**. **This version replaces data and nothing else**: the resolution chain, the band definitions, the achromatic threshold and the seed material are all engine 17's, and `renderer.py` has no diff.
+
+**Thirteen catalogs now hold ten palette colors each, fixed at exactly three achromatic and exactly seven chromatic.** The seven fill all six bands, one band holding two. The `map` grows **from six keys to nine**, and **all nine are drawn from that catalog's own palette** (before, `map` and `palette` could name different colors). The UI's swatch strip is derived from the `map` with **the six chromatic keys first** — Android draws `swatches.take(4)` and `take(8)` on two screens, so an achromatic-first order would spend those slots on black, gray and white and leave the bands off screen. **No hex repeats across the 130.**
+
+**`desert_mineral` retired; `moss_bark`, `neon_plate` and `lantern_dew` joined.** The retired one held a single achromatic color, which is why engine 17's anti-collapse rule existed. **All ten retired ids answer `None` from both `get_color_catalog` and `render_color_map_for_catalog`** rather than falling back to `default`. 117 stored works name that id; **no migration was written** — an unknown id is drawn with the default catalog, as before.
+
+#### Reach (this recovers wrong bands; it does not add color)
+
+Measured by running the 7463 stored instructions through both engines.
+
+| Metric | engine 17 | engine 18 |
+|---|---|---|
+| Band the description asked for, absent from the catalog | 140 | **0** |
+| Chromatic hits | 2184 / 2455 (89.0%) | **2455 / 2455 (100%)** |
+| Achromatic hits | 4917 / 5008 (98.2%) | **5008 / 5008 (100%)** |
+| Distinct hexes resolved | 79 | **91** |
+| Palette colors never drawn (catalogs in use) | 7 | **9** |
+
+**The never-drawn count rises rather than falls.** The nine in catalogs actually in use are eight purples plus `sea_stone/Coral Orange`, because **purple is 0.9% of real demand**. Counting all thirteen gives 39; the extra 30 belong to **the three new catalogs**, which no stored work names and which therefore cannot be reached at all. **What moved is recovery from a wrong band**: `default` gains 106 yellows and loses 106 greens, `sea_stone` gains 58 greens and loses 58 yellows, `cool_material` gains 37 reds against 37 oranges and 35 greens against 35 yellows. Across all bands: achromatic 67.2% (unmoved), red 11.4 → 11.8, blue 10.0 (unmoved), green 8.4 (unmoved), yellow 2.3 (unmoved), **orange 0.8 → 0.3**, purple 0.0 → 0.03.
+
+#### `sea_stone` keeps its purple band empty
+
+**One catalog deliberately does not fill a band.** By the author's ruling `sea_stone` holds no purple, and the nearest-band stand-in engine 17 provides answers with `Night Sea #191970`. **That is also this catalog's `blue`**, so a work placing blue beside purple draws two shapes in the same navy. **Checked by eye**: the forms stay legible where they overlap, so the picture does not break — it reads as the same color used twice.
+
+#### Roles dissolving into the paper fall from eight to two, and [I-062] closes
+
+**Engine 17's regression** — `cool_material`'s `black` landing on `#e5e8e8`, 0.062 in lightness from the paper — **is gone** (that catalog's black is now `#26282a`). **The two that remain are both yellows**: `vivid_material`'s `#fff200` (ΔL 0.026) and `open_air_light`'s `#ffce00` (ΔL 0.127). A bright yellow band is yellow's own nature, so neither was changed. **Measured across 10 seeds × 13 catalogs, those two are the only ones.**
+
+#### A missing gate, found during acceptance and added there
+
+**All four acceptance perturbations break product data only** — no test file, no type, no signature. (1) nudge one chromatic hex by a step; (2) push `cool_material`'s `Spruce` under the chroma floor, emptying a band; (3) **lighten its black back into the paper, reproducing [I-062]**; (4) as a control, move that same black to a different but still dark hex.
+
+**(3) reddened exactly two things: the expected-assignment table and the frozen corpus.** Both are regenerated wholesale whenever catalog data changes, so **no test named the property "a role does not dissolve into the paper"** — the same shape that let this regression through engine 17 with all five acceptance metrics green. **One test was therefore added during acceptance**: it counts the assignment for 13 catalogs × 8 seeds by lightness distance to the paper and **pins the two survivors by hex**. It reddens under (3) and stays green under (4), so it fires on the property rather than on any edit.
+
+#### Corpus and versions
+
+- **`render_engine_version` 17 → 18. `ddl_engine_version` stays 4 and `ddl_version` stays 3** — neither DDL's vocabulary nor its grammar moved
+- **Reference corpus `render-engine-18/`** — **493 cases** (A 88 / B 72 / C 58 / D 28 / E 119 / **F 128**), **70 changed / 423 unchanged**
+- **None of the 365 cases in A-E moved, and nothing outside the F group moved**
+- The 70 are **42 existing ids whose performance changed** plus **28 new ones** (27 for the new catalogs, plus `F-hint-missing-purple-sea-stone`). Ten disappeared (`desert_mineral`'s nine plus `F-hint-missing-purple`)
+- **58 further cases changed only in what was recorded** — `input.color_map` went from six keys to nine while the digest did not move a byte
+- `color_map_digest` `bbb2f7be3cab3d70c7330520728ac4b0` → **`96f2809778344689d8fc1dbab03827b0`**
+
+#### Not done here
+
+- **The Android catch-up** (ledger [I-070]). `ColorCatalogs.kt` still holds **eleven catalogs, a six-key `map`, `desert_mineral`, and eight hand-written swatches**, with none of engine 18's data. **What was never ported is the data, not the chain** — `oklchFromHex`, the bands and the chroma floor are already in `ServerRendererStyle.kt`
+- **Migration of stored `history`** (a retired id draws with the default catalog)
+- **`renderer.py`**, `_oklch_from_hex`, and the decided colors, names and order
+
+pytest **1847/31** (+72 = 68 in the new `test_color_catalog_content.py`, plus 2 each in `test_abstract_color_vocabulary.py` and `test_palette_color_assignment.py` where the parametrization went from 11 catalogs to 13), cli 76, ruff clean, `npm run check` **220/0/2**, `lint:i18n` **934/47/0/0**, frozen corpora byte-identical on regeneration. **The version is a patch** — an engine version rises, and no stored format changes.

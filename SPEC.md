@@ -103,14 +103,21 @@ The default catalog is a neutral baseline, not a cultural default.  Additional
 catalog ids use material-, light-, and technique-based names to avoid presenting
 a country, ethnicity, food, festival, empire, or tourism marker as a complete
 palette identity: `ink_season`, `fresco_study`, `open_air_light`,
-`ink_porcelain`, `cool_material`, `dye_earth`, `desert_mineral`,
-`vivid_material`, `weathered_heritage`, and `sea_stone`.
-Catalog `map` values must preserve the meaning of the abstract colors
-`white / black / blue / red / green / gray`; stronger identity colors belong in
-`palette` rather than replacing structural colors.  The three colors added in
-v2.9.11 carry no catalog `map` entry yet and resolve through shared neutral
-defaults, so every catalog draws the same yellow, orange and purple.  The Build 265 review leaves
-`open_air_light`, `dye_earth`, and `desert_mineral` as known tuning targets:
+`ink_porcelain`, `cool_material`, `dye_earth`, `vivid_material`,
+`weathered_heritage`, `sea_stone`, `moss_bark`, `neon_plate`, and
+`lantern_dew`.
+Catalog `map` values must preserve the meaning of the nine abstract colors;
+stronger identity colors belong in `palette` rather than replacing structural
+colors.  Since v2.9.14 (render engine 18) every catalog carries a nine-key
+`map`, and each of those nine names a color from that catalog's own `palette`.
+A catalog holds exactly three achromatic and seven chromatic palette colors, so
+a description that asks for a band is answered from that band rather than from
+the nearest hue the catalog happened to hold.  One band is left empty on
+purpose: `sea_stone` holds no purple and answers with its `Night Sea`, which is
+also its blue.  A retired catalog id resolves to nothing rather than to the
+default, and a stored work naming one is drawn with the default catalog.  The Build 265 review leaves
+`open_air_light`, `dye_earth`, and `desert_mineral` (retired in v2.9.14) as
+known tuning targets:
 their dark backgrounds, high-chroma accents, or paper/sand tones can dominate
 quiet prompts, so future tuning should adjust core brightness and saturation
 instead of branching into prompt-specific exceptions.

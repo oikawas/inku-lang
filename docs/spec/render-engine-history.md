@@ -48,6 +48,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **18** | v2.9.14 | 790 | 2026-07-31 | 493 | **70** | **423** |
 | **17** | v2.9.12 | 783 | 2026-07-30 | 475 | **110** | **365** |
 | **16** | v2.9.3 | 749 / 754 | 2026-07-28 | 365 | **333** | **32** |
 | **15** | v2.7.8 (v2.7.12 folded in) | 717 / 721 | 2026-07-27 | 350 | **318** | **32** |
@@ -105,13 +106,13 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `17` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `18` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `4` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.13 | per release |
-| `web/BUILD_NUMBER` | build serial | 789 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.14 | per release |
+| `web/BUILD_NUMBER` | build serial | 790 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -186,7 +187,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-17/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 475 (110 SVG) |
+| Drawing | `server/reference/render-engine-18/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 493 (70 SVG) |
 | Deterministic DDL layers | `server/reference/ddl-engine-4/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -375,6 +376,88 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 18 — the thirteen catalogs each carry all nine colors (v2.9.14)
+
+**Engine 17 built the path that picks from a `palette`. This version replaces the table it picks
+from.** **Only data moved** — the resolution chain, the band definitions, the achromatic threshold
+and the seed material are all engine 17's, and `renderer.py` has no diff.
+
+**Engine 17's table left many catalogs with no color in a band.** Ask for green where there is no
+green and the nearest hue, a yellow, stands in. Across the 7463 stored instructions, **140 asked for
+a band the catalog did not hold**.
+
+- **Thirteen catalogs hold ten palette colors each**, fixed at **exactly three achromatic and
+  exactly seven chromatic**. The seven fill all six bands, one band holding two
+- **The `map` grows from six keys to nine**, and **all nine are drawn from that catalog's own
+  palette** (before, `map` and `palette` could name different colors)
+- **The swatch strip is derived from the `map`, six chromatic keys first** — Android draws
+  `swatches.take(4)` and `take(8)` on two screens, so an achromatic-first order would spend those
+  slots on black, gray and white
+- **No hex repeats across the 130**
+- **`desert_mineral` retired; `moss_bark`, `neon_plate` and `lantern_dew` joined.** The retired one
+  held a single achromatic color, which is why engine 17's anti-collapse rule existed
+- **All ten retired ids answer `None` from both `get_color_catalog` and
+  `render_color_map_for_catalog`** rather than falling back to `default`. 117 stored works name that
+  id, and **no migration was written** — an unknown id is drawn with the default catalog, as before
+
+### Reach (this recovers wrong bands; it does not add color)
+
+| Metric | engine 17 | engine 18 |
+|---|---|---|
+| Band the description asked for, absent from the catalog | 140 | **0** |
+| Chromatic hits | 2184 / 2455 (89.0%) | **2455 / 2455 (100%)** |
+| Achromatic hits | 4917 / 5008 (98.2%) | **5008 / 5008 (100%)** |
+| Distinct hexes resolved | 79 | **91** |
+| Palette colors never drawn (catalogs in use) | 7 | **9** |
+
+**The never-drawn count rises rather than falls.** The nine in catalogs actually in use are eight
+purples plus `sea_stone/Coral Orange`, because **purple is 0.9% of real demand**. Counting all
+thirteen gives 39; the extra 30 belong to **the three new catalogs**, which no stored work names and
+which therefore cannot be reached at all. **What moved is recovery from a wrong band**: `default`
+gains 106 yellows and loses 106 greens, `sea_stone` gains 58 greens and loses 58 yellows,
+`cool_material` gains 37 reds against 37 oranges and 35 greens against 35 yellows. The band
+distribution holds at 67.2% achromatic, with **orange 0.8 → 0.3** and purple 0.0 → 0.03.
+
+### `sea_stone` keeps its purple band empty
+
+**One catalog deliberately does not fill a band.** By the author's ruling `sea_stone` holds no
+purple, and the nearest-band stand-in engine 17 provides answers with `Night Sea #191970`. **That is
+also this catalog's `blue`**, so a work placing blue beside purple draws two shapes in the same
+navy. **Checked by eye**: the forms stay legible where they overlap, so the picture does not break —
+it reads as the same color used twice.
+
+### Roles dissolving into the paper fall from eight to two ([I-062] closes)
+
+**Engine 17's regression** — `cool_material`'s `black` landing on `#e5e8e8`, 0.062 in lightness from
+the paper — **is gone** (that catalog's black is now `#26282a`). **The two that remain are both
+yellows**: `vivid_material`'s `#fff200` (ΔL 0.026) and `open_air_light`'s `#ffce00` (ΔL 0.127). A
+bright yellow band is yellow's own nature, so neither was changed. **Measured across 10 seeds × 13
+catalogs, those two are the only ones.**
+
+**Neither engine 17 nor this version's implementation named that property in a test.** During
+acceptance, the perturbation that reproduces [I-062] — lightening the black back into the paper —
+reddened **only the expected-assignment table and the frozen corpus**. **Both are regenerated
+wholesale whenever catalog data changes**, so nothing was guarding the property itself. **One test
+was added during acceptance**: it counts the assignment for 13 catalogs × 8 seeds by lightness
+distance to the paper and **pins the two survivors by hex**. It reddens under the reproduction and
+stays green under a control that moves the same black to a different but still dark hex.
+
+### Versions and corpus
+
+- **`render_engine_version` 17 → 18**
+- **`ddl_engine_version` stays 4 and `ddl_version` stays 3** — neither DDL's vocabulary nor its
+  grammar moved
+- **Reference corpus `render-engine-18/`** — **493 cases** (A 88 / B 72 / C 58 / D 28 / E 119 /
+  **F 128**), **70 changed / 423 unchanged**. The stored SVGs are the 70 that changed
+- **None of the 365 cases in A-E moved, and nothing outside the F group moved**
+- The 70 are **42 existing ids whose performance changed** plus **28 new ones** (27 for the new
+  catalogs, plus `F-hint-missing-purple-sea-stone`). Ten disappeared (`desert_mineral`'s nine plus
+  `F-hint-missing-purple`)
+- **58 further cases changed only in what was recorded** — `input.color_map` went from six keys to
+  nine while the digest did not move a byte. **"Changed" is counted from the manifest's
+  `changed_from_previous`, not from a difference in the record**
+- `color_map_digest` `bbb2f7be3cab3d70c7330520728ac4b0` → **`96f2809778344689d8fc1dbab03827b0`**
 
 ## engine 17 — the catalog's `palette` reaches the drawing (v2.9.12)
 

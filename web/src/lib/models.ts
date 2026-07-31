@@ -104,14 +104,27 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 	{
 		id: 'ollama-cloud',
 		label: 'Ollama Cloud (ollama.com)',
-		// サーバのカタログが届くまでの控え。**無料枠で叩ける 3 本を推奨度の高い順に置く。**
-		// 以前はここに qwen3.5:397b と glm-5.2 を並べていたが、どちらも提供元の有料プランが
-		// 要る (2026-07-29 実測・403)。控えには印が付かないので、起動直後だけ選べてしまい、
-		// 描こうとして初めて壁に気づくことになる。
+		// Fallback while the API catalog is loading. Keep this list aligned with
+		// VERIFIED_OLLAMA_CLOUD_MODELS so ownership resolution is stable from startup.
 		models: [
 			{ id: 'nemotron-3-ultra', label: 'nemotron-3-ultra' },
 			{ id: 'minimax-m2.5', label: 'minimax-m2.5' },
-			{ id: 'nemotron-3-super', label: 'nemotron-3-super' }
+			{ id: 'nemotron-3-super', label: 'nemotron-3-super' },
+			{ id: 'gemma4:31b', label: 'gemma4:31b' },
+			{ id: 'nemotron-3-nano:30b', label: 'nemotron-3-nano:30b' },
+			{ id: 'gpt-oss:120b', label: 'gpt-oss:120b' },
+			{ id: 'gpt-oss:20b', label: 'gpt-oss:20b' },
+			{ id: 'minimax-m3', label: 'minimax-m3' },
+			{ id: 'deepseek-v4-flash', label: 'deepseek-v4-flash', requires_subscription: true },
+			{ id: 'deepseek-v4-pro', label: 'deepseek-v4-pro', requires_subscription: true },
+			{ id: 'glm-5.1', label: 'glm-5.1', requires_subscription: true },
+			{ id: 'glm-5.2', label: 'glm-5.2', requires_subscription: true },
+			{ id: 'kimi-k2.5', label: 'kimi-k2.5', requires_subscription: true },
+			{ id: 'kimi-k2.6', label: 'kimi-k2.6', requires_subscription: true },
+			{ id: 'kimi-k2.7-code', label: 'kimi-k2.7-code', requires_subscription: true },
+			{ id: 'minimax-m2.7', label: 'minimax-m2.7', requires_subscription: true },
+			{ id: 'mistral-large-3:675b', label: 'mistral-large-3:675b', requires_subscription: true },
+			{ id: 'qwen3.5:397b', label: 'qwen3.5:397b', requires_subscription: true }
 		]
 	}
 ];

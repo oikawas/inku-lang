@@ -389,7 +389,7 @@ def test_migrate_columns_adds_missing_history_columns(tmp_path, monkeypatch):
         "starred",
     } <= columns
     user_columns = {col["name"] for col in inspect(legacy_engine).get_columns("user_accounts")}
-    assert {"ui_theme", "ui_mode", "ui_custom", "model_settings", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
+    assert {"ui_theme", "ui_mode", "ui_custom", "tooltips_enabled", "model_settings", "batch_prompt_history", "demo_settings", "export_templates"} <= user_columns
     indexes = {idx["name"] for idx in inspect(legacy_engine).get_indexes("history")}
     assert {"ix_history_user_id", "ix_history_user_trashed_at", "ix_history_user_starred_trashed_at"} <= indexes
     with legacy_engine.connect() as conn:
@@ -445,6 +445,12 @@ def test_current_user_ui_mode_and_custom_visibility_are_persisted(auth_context):
     assert initial.status_code == 200
     assert initial.json()["ui_mode"] == "simple"
     assert initial.json()["ui_custom"] == {}
+    assert initial.json()["tooltips_enabled"] is True
+
+    tooltips_off = client.patch("/api/auth/me/settings", headers=headers, json={"tooltips_enabled": False})
+    assert tooltips_off.status_code == 200
+    assert tooltips_off.json()["tooltips_enabled"] is False
+
 
     custom = {
         "input_modes": True,

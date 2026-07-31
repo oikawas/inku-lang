@@ -1401,6 +1401,7 @@ class UserAccountItem(BaseModel):
     ui_theme: str = "dark"
     ui_mode: str = "simple"
     ui_custom: dict[str, bool] = Field(default_factory=dict)
+    tooltips_enabled: bool = True
     settings_tab: str = "db"
     model_settings: dict = Field(default_factory=dict)
     image_generation_count: int = 0
@@ -1442,6 +1443,7 @@ class UserSettingsBody(BaseModel):
     ui_theme: str | None = None
     ui_mode: str | None = None
     ui_custom: dict[str, bool] | None = None
+    tooltips_enabled: bool | None = None
     settings_tab: str | None = None
     model_settings: dict | None = None
 
@@ -1814,6 +1816,7 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
             ui_theme=body.ui_theme,
             ui_mode=body.ui_mode,
             ui_custom=body.ui_custom,
+            tooltips_enabled=body.tooltips_enabled,
             settings_tab=body.settings_tab,
             model_settings=body.model_settings,
         )

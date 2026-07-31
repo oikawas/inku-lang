@@ -16,7 +16,7 @@ from datetime import datetime, time as clock_time, timedelta
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -230,6 +230,7 @@ class UserAccountRow(Base):
     ui_theme      = Column(String, nullable=False, default="dark")
     ui_mode       = Column(String, nullable=False, default="simple")
     ui_custom     = Column(Text, nullable=False, default="{}")
+    tooltips_enabled = Column(Boolean, nullable=False, default=True)
     settings_tab  = Column(String, nullable=False, default="db")
     model_settings = Column(Text, nullable=False, default="{}")
     image_generation_count = Column(Integer, nullable=False, default=0)
@@ -334,6 +335,7 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_theme": "ALTER TABLE user_accounts ADD COLUMN ui_theme VARCHAR NOT NULL DEFAULT 'light'",
     "ui_mode": "ALTER TABLE user_accounts ADD COLUMN ui_mode VARCHAR NOT NULL DEFAULT 'simple'",
     "ui_custom": "ALTER TABLE user_accounts ADD COLUMN ui_custom TEXT NOT NULL DEFAULT '{}'",
+    "tooltips_enabled": "ALTER TABLE user_accounts ADD COLUMN tooltips_enabled BOOLEAN NOT NULL DEFAULT 1",
     "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
     "model_settings": "ALTER TABLE user_accounts ADD COLUMN model_settings TEXT NOT NULL DEFAULT '{}'",
     "image_generation_count": (
@@ -1960,6 +1962,7 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
         "ui_mode": row.ui_mode if row.ui_mode in _UI_MODES else "simple",
         "ui_custom": ui_custom,
+        "tooltips_enabled": row.tooltips_enabled is not False,
         "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
         "model_settings": normalize_user_model_settings(model_settings),
         "image_generation_count": row.image_generation_count or 0,
@@ -2492,6 +2495,7 @@ def update_user_settings(
     ui_theme: str | None = None,
     ui_mode: str | None = None,
     ui_custom: dict | None = None,
+    tooltips_enabled: bool | None = None,
     settings_tab: str | None = None,
     model_settings: dict | None = None,
 ) -> dict | None:
@@ -2506,6 +2510,8 @@ def update_user_settings(
         or any(key not in _UI_CUSTOM_KEYS or not isinstance(value, bool) for key, value in ui_custom.items())
     ):
         raise ValueError("invalid custom ui settings")
+    if tooltips_enabled is not None and not isinstance(tooltips_enabled, bool):
+        raise ValueError("invalid tooltips enabled setting")
     if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
         raise ValueError("invalid settings tab")
     with SessionLocal() as session:
@@ -2518,6 +2524,8 @@ def update_user_settings(
             row.ui_mode = ui_mode
         if ui_custom is not None:
             row.ui_custom = json.dumps(ui_custom, ensure_ascii=False, sort_keys=True)
+        if tooltips_enabled is not None:
+            row.tooltips_enabled = tooltips_enabled
         if settings_tab is not None:
             row.settings_tab = settings_tab
         if model_settings is not None:

@@ -24,10 +24,17 @@ class DefaultSvgRenderer : SvgRenderer {
         val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = ColorCatalogs.get(request.colorCatalogId)
-        val colors = catalog.renderMap
-        val background = colors[score.optString("background", "white")] ?: "#ffffff"
-        val instructions = score.optJSONArray("instructions") ?: JSONArray()
         val renderSeed = if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
+        val cmap = ServerRendererStyle.DEFAULT_COLOR_MAP + catalog.renderMap
+        val assignment = ServerRendererStyle.computeColorAssignment(
+            catalogMap = catalog.renderMap,
+            renderSeed = renderSeed,
+            catalogId = catalog.id
+        )
+        val colors = cmap + assignment
+        val bgKey = score.optString("background", "white")
+        val background = assignment[bgKey] ?: colors[bgKey] ?: "#ffffff"
+        val instructions = score.optJSONArray("instructions") ?: JSONArray()
         val wild = score.optBoolean("render_wild", score.optBoolean("wild", false))
         val width = canvas.width.toDouble()
         val height = canvas.height.toDouble()

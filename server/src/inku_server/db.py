@@ -2827,8 +2827,31 @@ def _fts_match_query(search: str) -> str:
     return '"' + search.replace('"', '""') + '"'
 
 
+def _is_render_hash_suffix_search(search: str) -> bool:
+    return len(search) == 4 and search.isascii() and search.isalnum()
+
+
+def _history_search_clause(search: str):
+    pattern = f"%{search}%"
+    clauses = [
+        HistoryRow.input.ilike(pattern),
+        HistoryRow.ddl.ilike(pattern),
+        HistoryRow.stage1_model.ilike(pattern),
+        HistoryRow.stage2_model.ilike(pattern),
+        HistoryRow.catalog_id.ilike(pattern),
+    ]
+    if _is_render_hash_suffix_search(search):
+        clauses.append(HistoryRow.render_hash.ilike(f"%{search}"))
+    return or_(*clauses)
+
+
 def _use_history_fts(search: str) -> bool:
-    return _HISTORY_FTS_ENABLED and engine.dialect.name == "sqlite" and len(search) >= 3
+    return (
+        _HISTORY_FTS_ENABLED
+        and engine.dialect.name == "sqlite"
+        and len(search) >= 3
+        and not _is_render_hash_suffix_search(search)
+    )
 
 
 def _list_items_with_fts(
@@ -2911,14 +2934,7 @@ def list_items(
         if search and _use_history_fts(search):
             return _list_items_with_fts(session, user_id, offset, limit, trashed, search, starred)
         if search:
-            pattern = f"%{search}%"
-            query = query.filter(or_(
-                HistoryRow.input.ilike(pattern),
-                HistoryRow.ddl.ilike(pattern),
-                HistoryRow.stage1_model.ilike(pattern),
-                HistoryRow.stage2_model.ilike(pattern),
-                HistoryRow.catalog_id.ilike(pattern),
-            ))
+            query = query.filter(_history_search_clause(search))
         total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
         rows = (
             query
@@ -2954,14 +2970,7 @@ def list_lineage_groups(
             query = query.filter(HistoryRow.starred == 1)
         search = query_text.strip()
         if search:
-            pattern = f"%{search}%"
-            query = query.filter(or_(
-                HistoryRow.input.ilike(pattern),
-                HistoryRow.ddl.ilike(pattern),
-                HistoryRow.stage1_model.ilike(pattern),
-                HistoryRow.stage2_model.ilike(pattern),
-                HistoryRow.catalog_id.ilike(pattern),
-            ))
+            query = query.filter(_history_search_clause(search))
         root_id = func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)
         aggregates = (
             query.with_entities(
@@ -3055,14 +3064,7 @@ def list_lineage_group_items(
             query = query.filter(HistoryRow.starred == 1)
         search = query_text.strip()
         if search:
-            pattern = f"%{search}%"
-            query = query.filter(or_(
-                HistoryRow.input.ilike(pattern),
-                HistoryRow.ddl.ilike(pattern),
-                HistoryRow.stage1_model.ilike(pattern),
-                HistoryRow.stage2_model.ilike(pattern),
-                HistoryRow.catalog_id.ilike(pattern),
-            ))
+            query = query.filter(_history_search_clause(search))
         total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
         rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit).all()
         return _rows_to_dicts_with_lineage(session, rows), total

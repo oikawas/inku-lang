@@ -67,6 +67,11 @@ def test_history_groups_page_by_lineage_and_exclude_hidden_items():
             derivation_kind="layout_change",
         ))
         independent = db.add_item(_item(user["id"], 2000, "independent"))
+        with db.SessionLocal() as session:
+            session.query(db.HistoryRow).filter(db.HistoryRow.id == child["id"]).update(
+                {db.HistoryRow.render_hash: "rh3:" + "b" * 60 + "Cd34"}
+            )
+            session.commit()
 
         response = client.get("/api/history/lineage-groups?limit=1", headers=headers)
         assert response.status_code == 200
@@ -89,6 +94,20 @@ def test_history_groups_page_by_lineage_and_exclude_hidden_items():
         assert members.status_code == 200
         assert [item["id"] for item in members.json()["items"]] == [child["id"], root["id"]]
         assert all(item["lineage_root_node_id"] == root["lineage_node_id"] for item in members.json()["items"])
+
+        searched_groups = client.get(
+            "/api/history/lineage-groups?q=cd34",
+            headers=headers,
+        ).json()
+        assert searched_groups["total"] == 1
+        assert searched_groups["groups"][0]["representative"]["id"] == child["id"]
+
+        searched_members = client.get(
+            f"/api/history/lineage-groups/{root['lineage_node_id']}/items?q=CD34",
+            headers=headers,
+        ).json()
+        assert searched_members["total"] == 1
+        assert searched_members["items"][0]["id"] == child["id"]
     finally:
         _cleanup(user, token, group_id)
 

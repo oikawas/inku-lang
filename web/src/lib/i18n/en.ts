@@ -684,7 +684,7 @@ export const en: LangPack = {
 	historyMoveToTrash: 'Move to trash',
 	historyRestoreSelected: 'Restore selected',
 	historyPermanentDelete: 'Permanently delete',
-	historySearchLabel: 'Search:',
+	historySearchLabel: 'Search (description / last 4 hash characters):',
 	historyPrev: '← prev',
 	historyNext: 'Next →',
 	historyFirst: 'First',

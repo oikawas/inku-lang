@@ -2975,6 +2975,11 @@ def test_history_is_scoped_to_authenticated_user():
     )
     assert post_a_second.status_code == 200
     item_a_second = post_a_second.json()
+    with db.SessionLocal() as session:
+        session.query(db.HistoryRow).filter(db.HistoryRow.id == item_a_second["id"]).update(
+            {db.HistoryRow.render_hash: "rh3:" + "a" * 60 + "Ab12"}
+        )
+        session.commit()
 
     list_a = client.get("/api/history", headers=headers_a)
     assert list_a.status_code == 200
@@ -3000,6 +3005,28 @@ def test_history_is_scoped_to_authenticated_user():
     assert search_a.status_code == 200
     assert search_a.json()["total"] == 1
     assert search_a.json()["items"][0]["id"] == item_a_second["id"]
+
+    hash_search_a = client.get("/api/history?q=ab12", headers=headers_a)
+    assert hash_search_a.status_code == 200
+    assert hash_search_a.json()["total"] == 1
+    assert hash_search_a.json()["items"][0]["id"] == item_a_second["id"]
+
+    four_character_description_search_a = client.get("/api/history?q=blue", headers=headers_a)
+    assert four_character_description_search_a.status_code == 200
+    assert four_character_description_search_a.json()["total"] == 1
+    assert four_character_description_search_a.json()["items"][0]["id"] == item_a_second["id"]
+
+    short_hash_search_a = client.get("/api/history?q=b12", headers=headers_a)
+    assert short_hash_search_a.status_code == 200
+    assert short_hash_search_a.json()["total"] == 0
+
+    long_hash_search_a = client.get("/api/history?q=aab12", headers=headers_a)
+    assert long_hash_search_a.status_code == 200
+    assert long_hash_search_a.json()["total"] == 0
+
+    punctuated_hash_search_a = client.get("/api/history?q=ab-2", headers=headers_a)
+    assert punctuated_hash_search_a.status_code == 200
+    assert punctuated_hash_search_a.json()["total"] == 0
 
     star_a = client.patch(
         "/api/history/{}/star".format(item_a_second["id"]),

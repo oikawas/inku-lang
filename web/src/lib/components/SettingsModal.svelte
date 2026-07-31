@@ -1247,6 +1247,13 @@
 								{#if plugin.reasons?.length}<div class="db-test-result">{plugin.reasons.join(" / ")}</div>{/if}
 							</div>
 							<div class="user-plugin-controls">
+								<button class="ghost-btn user-plugin-btn" onclick={() => void openPluginEditor(plugin)} disabled={!isAdmin || pluginBusy}>{t().settingsPluginViewEdit}</button>
+								{#if pluginDeleteConfirmId === pluginId(plugin)}
+									<button class="ghost-btn user-plugin-btn danger" onclick={() => void confirmDeletePlugin(plugin)} disabled={pluginBusy}>{t().settingsPluginDeleteConfirm}</button>
+									<button class="ghost-btn user-plugin-btn" onclick={() => (pluginDeleteConfirmId = null)} disabled={pluginBusy}>{t().confirmCancel}</button>
+								{:else}
+									<button class="ghost-btn user-plugin-btn danger" onclick={() => (pluginDeleteConfirmId = pluginId(plugin))} disabled={!isAdmin || pluginBusy}>{t().settingsPluginDelete}</button>
+								{/if}
 								{#if plugin.status !== "rejected"}
 									<button
 										type="button"
@@ -1260,13 +1267,6 @@
 										<span class="switch-track"><span class="switch-knob"></span></span>
 										<span class="switch-label">{pluginIsEnabled(plugin) ? t().settingsPluginEnabled : t().settingsPluginDisabled}</span>
 									</button>
-								{/if}
-								<button class="ghost-btn user-plugin-btn" onclick={() => void openPluginEditor(plugin)} disabled={!isAdmin || pluginBusy}>{t().settingsPluginViewEdit}</button>
-								{#if pluginDeleteConfirmId === pluginId(plugin)}
-									<button class="ghost-btn user-plugin-btn danger" onclick={() => void confirmDeletePlugin(plugin)} disabled={pluginBusy}>{t().settingsPluginDeleteConfirm}</button>
-									<button class="ghost-btn user-plugin-btn" onclick={() => (pluginDeleteConfirmId = null)} disabled={pluginBusy}>{t().confirmCancel}</button>
-								{:else}
-									<button class="ghost-btn user-plugin-btn danger" onclick={() => (pluginDeleteConfirmId = pluginId(plugin))} disabled={!isAdmin || pluginBusy}>{t().settingsPluginDelete}</button>
 								{/if}
 							</div>
 						</div>

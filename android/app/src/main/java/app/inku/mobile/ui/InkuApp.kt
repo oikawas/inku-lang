@@ -2162,7 +2162,7 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
 }
 
 @Composable
-private fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())

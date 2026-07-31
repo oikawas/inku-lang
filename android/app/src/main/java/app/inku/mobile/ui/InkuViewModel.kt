@@ -145,7 +145,7 @@ enum class HistorySelectionBehavior {
 }
 
 class InkuViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = InkuRepository(application.applicationContext, (application as InkuApplication).database)
+    private val repository = InkuRepository(application.applicationContext, (application as? InkuApplication)?.database ?: app.inku.mobile.data.db.InkuDatabase.open(application))
     private val localState = MutableStateFlow(InkuUiState())
     private val history = repository.history()
     private val modelAssets = repository.modelAssets()

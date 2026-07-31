@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 import hashlib
 import math
@@ -156,6 +157,10 @@ class StrokeResult:
     burr_opacity: float
     # Side of one lattice cell, in px. Zero unless the tool quantizes.
     grid_step: float = 0.0
+    # Samples where the sheet refused the tool and no ink is laid down. The
+    # outline above already carries the breaks; a caller that rebuilds the
+    # outline around its own centerline needs the mask to keep them.
+    cuts: tuple[bool, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -528,6 +533,7 @@ def synthesize_stroke(
         side,
         min(0.35, burr_opacity),
         grid_step,
+        tuple(cuts),
     )
 
 
@@ -630,13 +636,28 @@ def _arc_length_parameters(
 
 
 def outline_for_centerline(
-    points: list[tuple[float, float]], widths: list[float]
+    points: list[tuple[float, float]],
+    widths: list[float],
+    cuts: Sequence[bool] = (),
 ) -> tuple[tuple[float, float], ...]:
-    """Build one variable-width polygon around an arbitrary intended centerline."""
+    """Build one variable-width polygon around an arbitrary intended centerline.
+
+    `cuts` marks the samples where the sheet refused the tool. Rebuilding the
+    outline around a centerline the caller varied would otherwise drop those
+    breaks and leave the ink whole, so the runs are carried over here too.
+    """
     if len(points) < 2:
         return tuple(points)
     left, right = _banks_for_centerline(points, widths, closed=False)
-    return tuple(list(left) + list(reversed(right)))
+    if not any(cuts):
+        return tuple(list(left) + list(reversed(right)))
+    outline: list[tuple[float, float]] = []
+    for run in _cut_runs(list(cuts)[: len(left)], minimum=2):
+        if outline:
+            outline.append(_BREAK)
+        outline.extend(left[index] for index in run)
+        outline.extend(right[index] for index in reversed(run))
+    return tuple(outline)
 
 
 def _banks_for_centerline(

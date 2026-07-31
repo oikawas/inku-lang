@@ -99,6 +99,38 @@ def _svg(weight: str, level: str) -> str:
         return render(_score(weight), render_seed=SEED)
 
 
+def _varied_score(weight: str) -> Score:
+    """揺らいだ直線だけの図柄。
+
+    renderer は位置にかかる `variation` を持つ直線だけ、揺らいだ中心線の
+    まわりに outline を作り直す別の経路を通る。上の図柄はその経路を
+    1 度も通らない。
+
+    弧は外す。弧は `variation` の有無に関わらず切れるので、同じ図柄に
+    残したままだと、直線の切れ目が 1 つも無くても subpath が増え、
+    検査が自分の言い分を自分で供給することになる (実測で踏んだ)。
+    """
+    score = _score(weight).model_dump(mode="json")
+    score["instructions"] = [
+        instruction
+        for instruction in score["instructions"]
+        if instruction["primitive"] == "line"
+    ]
+    for instruction in score["instructions"]:
+        instruction["variation"] = {
+            "quality": "wave",
+            "amplitude": "medium",
+            "frequency": "medium",
+            "dimensions": ["position_y"],
+        }
+    return Score.model_validate(score)
+
+
+def _varied_svg(weight: str, level: str) -> str:
+    with _at(level):
+        return render(_varied_score(weight), render_seed=SEED)
+
+
 def _elements(svg: str) -> int:
     return len(ELEMENT.findall(svg))
 
@@ -187,6 +219,34 @@ def test_the_refused_tools_gain_subpaths(weight: str) -> None:
 def test_the_tools_the_sheet_does_not_refuse_keep_their_subpaths(weight: str) -> None:
     """吸われる道具と機械では墨が切れない。切れているなら閾値が緩すぎる。"""
     assert _subpaths(_svg(weight, "g2")) == _subpaths(_svg(weight, "g0")), weight
+
+
+@pytest.mark.parametrize("weight", REFUSED + ABSORBED)
+def test_a_wavering_line_meets_the_same_sheet_as_a_straight_one(weight: str) -> None:
+    """揺らいだ直線も同じ地に出会う。
+
+    `variation` が位置にかかる直線では、renderer が揺らいだ中心線のまわりに
+    outline を作り直す。切れ目を持ち越さないと、幅の応答だけが残って墨が
+    切れない — バイトは動くので凍結コーパスでは「動いた」と数えられ、
+    見える側の半分だけが黙って落ちる。本番 1858 作品のうち 912 件 (49.1%) が
+    この経路を通る。
+
+    上の 2 件と同じ性質を、同じ道具の分かれ方で留める。
+    """
+    straight = _subpaths(_svg(weight, "g2")) - _subpaths(_svg(weight, "g0"))
+    wavering = _subpaths(_varied_svg(weight, "g2")) - _subpaths(
+        _varied_svg(weight, "g0")
+    )
+    if weight in REFUSED:
+        assert straight > 0 and wavering > 0, (weight, straight, wavering)
+    else:
+        assert straight == 0 and wavering == 0, (weight, straight, wavering)
+
+
+@pytest.mark.parametrize("weight", REFUSED + ABSORBED + MACHINES)
+def test_a_wavering_line_adds_no_element_either(weight: str) -> None:
+    """揺らいだ経路でも歯止めは同じ。切っても要素は増えない。"""
+    assert _elements(_varied_svg(weight, "g2")) == _elements(_varied_svg(weight, "g0"))
 
 
 # --- 3. 強い段ほど発火が増える -------------------------------------------- #

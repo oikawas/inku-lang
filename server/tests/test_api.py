@@ -27,8 +27,6 @@ from sqlalchemy import create_engine, inspect, text
 
 from inku_server import db
 from inku_server import api as api_module
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
 from inku_server.api_core import common as api_common
 from inku_server.api_core import rendering as api_rendering
 from inku_server.api_core import state as api_state
@@ -80,6 +78,8 @@ EXPANSION_MARKERS = (
     "右下の焦点から放射状に",
     "右下の焦点から三つ",
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_resolved_stage_models_qualify_current_user_provider():

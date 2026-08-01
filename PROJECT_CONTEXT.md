@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.19 / Build 812**
+**Target version: v2.9.20 / Build 813**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -1646,6 +1646,29 @@ The new height test had been written with `pattern="cut"`, a condition under whi
 **Two tests were added — a round trip at the preset heights (the frame count must match with and without `height_px`) and the ladder's boundaries (64 / 1080 / 1081 / 2160 / 2161 / 4320)** — after which all three perturbations go red and the unmodified tree is green.
 pytest **1901/31** (+4: two from the branch, two added during acceptance), cli **77**, ruff clean, `npm run check` **221/0/2**, `lint:i18n` **956/47/0/0** (five new English strings), `lint:models` 68, `lint:recommendations` 37.
 **No deterministic layer changed, so the corpora were not regenerated. Android has no diff. SPEC does not enumerate animation export, so it is unchanged. The version is a patch.**
+
+v2.9.20 (Build 813) **returns a group's position to the description** (render engine 20).
+What decided where a group went was the seed, not the description.
+**77.8% of the 137673 expanded marks never consulted a declared coordinate**, and **93.3% of the ink on screen** was placed by the renderer's arrangement rules rather than by the coordinates in the Score.
+**Moving every stated coordinate down by 0.2 moved the ink's centroid by a median of 0.0000**, while **changing `render_seed` alone moved 4.06% of the pixels**.
+This version splits placement into two stages.
+The stage that decides **the shape of the scatter** (the existing layout branches, now `_expand_arrangement_layout`) is separated from the stage that decides **where the group sits** (the new `_fit_group_to_anchor`).
+The second stage moves the centroid of the expanded group onto the declared anchor, and **no layout branch was rewritten** — shape, density, rhythm, wobble and stroke are outside this version's remit.
+**`radial`'s hardcoded `(0.5, 0.5)` is gone**: a stated `center` is still the rotation centre, and with none stated the ring turns around the declared anchor.
+Moving a group onto its anchor pushes marks outside the frame **[0.02, 0.98]** for descriptions near an edge (23 of the 32 G cases), so **each axis, and each direction along it, is shrunk by only what overflows there**.
+The spread away from the frame is kept and the **worst spread ratio is 0.660** (a similarity shrink collapses to 0.315, and clamping onto the frame piles 8 marks onto shared coordinates in the `scatter` edge case).
+**An anchor that is itself outside the frame cannot be saved** — with an `at.region` reaching the edge and a group of `count=1`, shrinking around the anchor has no spread to work on (one case out of 100 production works, ledger [I-079]).
+**A `grid` with an `at.region` does not go through the second stage**: a grid tiles that region, so `at` survives performance resolution, and passing it through would drive the group out of the region the description stated and onto the shape's own centre, which nobody stated.
+The reference corpus is **`render-engine-20/` with 525 cases** (the 493 of A–F plus **32 in group G**), and **the existing 493 are byte-identical**.
+**The manifest's "32 moved" counts every new case and is not the mechanism's effect** — the effect was measured by drawing the same 32 cases under both engines, which gives **30 / 32**.
+Over 100 production works the distance from a group's centroid to its anchor falls from a median of **0.0719 to 0.0000**, marks outside the frame from **18 / 3890 to 1 / 3890**, and `relation` survival is unchanged (10 / 10).
+**Acceptance surfaced that T-2 imported the very bound it was checking** — loosening `FRAME_LO` / `FRAME_HI` to 0.005 / 0.995 moved the expectation with the product and left the test green, and the only red was the G digest.
+**A digest is rebaked whenever the corpus is regenerated** and is not a property test, so the test now states 0.02 / 0.98 itself and a separate test holds the product's constants to those values.
+After the fix the same perturbation reddens two tests, and **the control that tightens the frame instead leaves T-2 green**.
+**The production measurements do not agree to one digit with the contract's section 2.4** — the direction and size of the effect reproduce, but the definitions of "pixel difference" and "ink centroid" were not carried in the contract, and **the engine 19 side also differs from the contract's figures**, which places the discrepancy in the metric rather than in the implementation.
+`Arrangement.center`'s description still reads "omitted = 0.5,0.5" and is wrong after the second stage, but it is a string that reaches the Stage 2 tool schema and was left alone (ledger [I-080]).
+pytest **1910/31** (+9: eight from the implementation, one added during acceptance), cli **77**, ruff clean, `npm run check` **221/0/2**, `check_frozen_corpora.py` byte-identical.
+**The version is a patch.**
 
 v2.4.7 (Build 697) freezes the deterministic DDL layers.
 `server/reference/ddl-engine-1/` holds 29 cases (A = 15 expansion, B = 14 coercion), and

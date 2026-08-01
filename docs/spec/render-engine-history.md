@@ -48,6 +48,8 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **20** | v2.9.20 | 813 | 2026-08-01 | 525 | **32** | **493** |
+| **19** | v2.9.16 | 804 | 2026-08-01 | 493 | **227** | **266** |
 | **18** | v2.9.14 | 790 | 2026-07-31 | 493 | **70** | **423** |
 | **17** | v2.9.12 | 783 | 2026-07-30 | 475 | **110** | **365** |
 | **16** | v2.9.3 | 749 / 754 | 2026-07-28 | 365 | **333** | **32** |
@@ -106,13 +108,13 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `19` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `20` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `4` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.19 | per release |
-| `web/BUILD_NUMBER` | build serial | 812 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
+| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.20 | per release |
+| `web/BUILD_NUMBER` | build serial | 813 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped** |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -187,7 +189,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-19/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 493 (227 SVG) |
+| Drawing | `server/reference/render-engine-20/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 525 (32 SVG) |
 | Deterministic DDL layers | `server/reference/ddl-engine-4/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -376,6 +378,66 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 20 — a group's position returns to the description (v2.9.20)
+
+**What decided where a group went was the seed, not the description.**
+
+**77.8% of the 137673 expanded marks never consulted a declared coordinate** (measured over 7463
+production instructions). `scatter` scattered from the seed and `margin` alone, `cluster` only
+widened the margin at the centre, `vertical` / `horizontal` with a `path` **wrote 0.5 into the
+crossing axis**, and `radial` turned around **(0.5, 0.5)** whenever no `center` was stated. So
+**moving every stated coordinate down by 0.2 moved the ink's centroid by a median of 0.0000**, while
+**changing `render_seed` alone moved 4.06% of the pixels**. **93.3% of the ink on screen** was placed
+by the renderer's arrangement rules rather than by the coordinates in the Score, and so was the
+principal subject in 76 of 100 works.
+
+### Placement became a second stage
+
+**The stage that decides the shape of the scatter is separated from the stage that decides where the
+group sits.** The existing layout branches keep the first (`_expand_arrangement_layout`). The second
+is new: **the centroid of the expanded group is moved onto the declared anchor**
+(`_fit_group_to_anchor`). **No layout branch was rewritten** — the shape, density, rhythm, wobble and
+stroke of a scatter are outside this version's remit.
+
+`radial` needs both mechanisms. The rotation centre is radial's own word, so **it is used when the
+description states it, and the ring turns around the declared anchor when it does not**. The middle
+of the canvas is no longer a default.
+
+### The frame is shrunk one direction at a time
+
+Moving a group onto its anchor pushes marks outside the frame **[0.02, 0.98]** for descriptions near
+an edge (23 of the 32 G cases). **A similarity shrink collapses the whole group for the sake of the
+one mark that overflows** (worst spread ratio 0.315). This version **shrinks each axis, and each
+direction along it, by only what overflows there**. The spread away from the frame is kept and the
+**worst spread ratio is 0.660**. **Clamping onto the frame was rejected** — it piles edge marks onto
+shared coordinates, 8 of them in the `scatter` edge case.
+
+**An anchor that is itself outside the frame cannot be saved** (an `at.region` reaching the edge with
+a group of `count=1`): the correction shrinks around the anchor, and a group with no spread has
+nothing to shrink. **One case out of 100 production works remains** ([I-079]).
+
+### One thing does not pass through — a grid that stated its region
+
+**A `grid` with an `at.region` does not go through the second stage.** A grid tiles that region, so
+`at` survives performance resolution instead of being folded into the anchor; passing it through
+would **drive the group out of the region the description stated and onto the shape's own centre,
+which nobody stated**. That is the opposite of what this version is for. A `grid` without an
+`at.region` passes through as everything else does.
+
+### Version and corpus
+
+- **`render_engine_version` 19 to 20**
+- **`ddl_engine_version` stays 4 and `ddl_version` stays 3** — neither DDL vocabulary nor grammar moves
+- **Reference corpus `render-engine-20/`** — **525 cases** (the 493 of A–F plus **32 in group G**).
+  **The existing 493 are byte-identical**; group G was created for this version and covers placement.
+  **The manifest's "32 moved" counts every new case and is not the mechanism's effect** — the effect
+  was measured by drawing the same 32 cases under engine 19 and engine 20 and comparing, which gives
+  **30 / 32** (the two that hold still are `G-vertical-nopath-center` and `G-horizontal-nopath-center`,
+  which already took one axis from the declaration)
+- **Measured over 100 production works**: the distance from a group's centroid to its anchor falls
+  from a median of **0.0719 to 0.0000**, marks outside the frame from **18 / 3890 to 1 / 3890**, and
+  `relation` survival is unchanged (10 / 10)
 
 ## engine 19 — the ground resists the hand (v2.9.16)
 

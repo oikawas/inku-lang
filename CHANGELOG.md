@@ -1669,3 +1669,79 @@ red and the unmodified tree is green.
 pytest **1901/31** (+4: two from the branch, two added during acceptance), cli **77**, ruff clean,
 `npm run check` **221/0/2**, `lint:i18n` **956/47/0/0** (five new English strings),
 `lint:models` 68, `lint:recommendations` 37, `npm run build` succeeds. **The version step is a patch.**
+
+### v2.9.20 — a group's position returns to the description (render engine 20, Build 813, 2026-08-01)
+
+**What decided where a group went was the seed, not the description.**
+**77.8% of the 137673 expanded marks never consulted a declared coordinate**, and **93.3% of the ink
+on screen** was placed by the renderer's arrangement rules rather than by the coordinates in the
+Score. **Moving every stated coordinate down by 0.2 moved the ink's centroid by a median of 0.0000**,
+while **changing `render_seed` alone moved 4.06% of the pixels**.
+
+#### Placement is a second stage
+
+- The stage that decides **the shape of the scatter** (the existing layout branches, now
+  `_expand_arrangement_layout`) is separated from the stage that decides **where the group sits**
+  (the new `_fit_group_to_anchor`). **No layout branch was rewritten** — shape, density, rhythm,
+  wobble and stroke are outside this version's remit
+- The second stage **moves the centroid of the expanded group onto the declared anchor**
+- **`radial`'s hardcoded `(0.5, 0.5)` is gone.** A stated `center` is still the rotation centre; with
+  none stated, the ring turns around the declared anchor
+
+#### The frame is shrunk one direction at a time
+
+- Moving a group onto its anchor pushes marks outside the frame **[0.02, 0.98]** for descriptions
+  near an edge (23 of the 32 G cases)
+- **Each axis, and each direction along it, is shrunk by only what overflows there.** The spread away
+  from the frame is kept and the **worst spread ratio is 0.660**. A similarity shrink collapses to
+  **0.315** and was rejected
+- Clamping onto the frame was rejected too — it piles 8 marks onto shared coordinates in the
+  `scatter` edge case
+- **An anchor that is itself outside the frame cannot be saved** (an `at.region` reaching the edge
+  with a group of `count=1`). One case out of 100 production works remains; **filed as [I-079]**
+
+#### One thing does not pass through
+
+- **A `grid` with an `at.region` does not go through the second stage.** A grid tiles that region, so
+  `at` survives performance resolution; passing it through would drive the group out of the region
+  the description stated and onto the shape's own centre, which nobody stated. A `grid` without an
+  `at.region` passes through
+- The existing `test_grid_uses_at_region_instead_of_margin` failed and surfaced it; the implementation
+  wrote it down as `test_a_grid_keeps_the_region_the_description_gave_it`
+
+#### Version and corpus
+
+- **`render_engine_version` 19 to 20**; `ddl_engine_version` stays 4 and `ddl_version` stays 3
+- **Reference corpus `render-engine-20/`** — **525 cases** (the 493 of A–F plus **32 in group G**).
+  **The existing 493 are byte-identical**
+- **The manifest's "32 moved" counts every new case and is not the mechanism's effect.** The effect
+  was measured by drawing the same 32 cases under both engines: **30 / 32** (the two that hold still,
+  `G-{vertical,horizontal}-nopath-center`, already took one axis from the declaration)
+- **Over 100 production works**: the distance from a group's centroid to its anchor falls from a
+  median of **0.0719 to 0.0000**, marks outside the frame from **18 / 3890 to 1 / 3890**, and
+  `relation` survival is unchanged (10 / 10)
+
+#### Found and fixed during acceptance
+
+- **T-2 (no placed mark leaves the frame) imported the very bound it was checking.** Loosening
+  `FRAME_LO` / `FRAME_HI` to 0.005 / 0.995 moved the expectation with the product and **left the test
+  green**; the only red was the G digest, and **a digest is rebaked whenever the corpus is
+  regenerated**. The test now **states 0.02 / 0.98 itself**, and a separate test holds the product's
+  constants to those values. After the fix the same perturbation reddens two tests, and the control
+  that tightens the frame instead leaves T-2 green
+- Three perturbations were applied during acceptance: the frame constants (data only, no shape
+  change), replacing the centroid with the group's first point, and removing the `grid` + `at.region`
+  bypass. The latter two reddened three and two tests respectively
+
+#### Where the contract's numbers were not met
+
+- **The production measurements do not agree to one digit with the contract's section 2.4.** The
+  direction and size of the effect reproduce, but **the definitions of "pixel difference" and "ink
+  centroid" were not carried in the contract** (its harness was not shipped). **The engine 19 side
+  also differs from the contract's figures**, which places the discrepancy in the metric rather than
+  in the implementation
+- `Arrangement.center`'s description still reads "omitted = 0.5,0.5", which is wrong after the second
+  stage. It is a string that reaches the Stage 2 tool schema and was left alone; **filed as [I-080]**
+
+pytest **1910/31** (+9 = 8 from the implementation, 1 added during acceptance), cli **77**, ruff
+clean, `npm run check` **221/0/2**, `check_frozen_corpora.py` byte-identical. **The version is a patch.**

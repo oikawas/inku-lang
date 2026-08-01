@@ -1987,6 +1987,20 @@ Correspondences:
 - "radial", "concentric" → `layout="radial"`
 - "tile it", "lay it out in a lattice" → `layout="grid"` (only when those words are explicit. The ceiling on count is a flat 2000 regardless of layout)
 
+#### Where a group is placed (render engine 20)
+
+**A layout decides the shape of the scatter, not where the group sits.**
+An expanded group is placed with **its centroid on the coordinate the instruction
+stated (its anchor)**, and whatever overflows the frame **[0.02, 0.98]** is shrunk
+back **one axis and one direction at a time, by only what overflows there** — the
+group is not scaled down as a whole, and marks are not clamped onto the frame.
+`radial`'s `center` is its rotation centre, and **with none stated the ring turns
+around the anchor**, not around the middle of the canvas.
+**The one exception is a `grid` with an `at.region`**: a grid tiles the region the
+description stated, so it stays there instead of moving onto the anchor.
+Up to engine 19 every layout decided placement from the seed, and **77.8% of the
+expanded marks never consulted a declared coordinate**.
+
 #### How a stated count is treated (v2.7.6)
 
 A count written in plain words in the description is stronger than anything

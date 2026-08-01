@@ -2034,3 +2034,43 @@ two lines holding `APP_VERSION` and `BUILD_NUMBER`, with no display string and n
 corpus generator does not import `inku_server.api` (measured). **The render engine stays at 20, and
 `ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` and `macos_swift/` were not
 touched. The version is a patch.**
+
+### 2026-08-01 — The project context stops being a second changelog (**no version bump**, documentation only)
+
+`PROJECT_CONTEXT.ja.md` had grown longer than `SPEC.ja.md` (**93,165 characters against 75,721**), so
+its role was measured again and it was returned to a present-tense entry point.
+
+**What was measured.** The single `Current Product State` section held **1,434 lines, 93% of the
+file**, and its content was **77 per-version paragraphs** running from v1.89 to v2.9.24. The
+paragraphs had doubled in size — 14 lines each across v1.89–v2.4, 19 across v2.5–v2.8, and **27
+across the v2.9 series** — so **the v2.9 series alone accounted for 698 lines, half the document**.
+The part that actually works as an entry point (purpose, architecture, contracts, where to look,
+update rules) was **99 lines, 6.5%**.
+
+**That it was a duplicate.** Each version paragraph opened with the same sentence as the
+corresponding changelog heading, word for word (v2.9.24: "the eighty endpoints leave the shared
+thoroughfare"), at 20 lines against the changelog's 82 — **the same record at a different
+compression ratio**. The document's own update rules already said to keep current contracts in the
+specification and chronological detail in the changelog, so **it was breaking its own rule**.
+
+**That it had gone stale.** The body carried **53 statements** of the "not yet done / not yet
+followed" kind. Two were sampled and checked against the code, and **both were already false** (the
+thinness axis shipped in v2.9.3; `artwork` appears zero times in `SPEC.md`). A paragraph freezes when
+it is written, so the claim outlives its own fix.
+
+**What was done.** The 77 version paragraphs were deleted and `Current Product State` was rewritten
+in the present tense (versions, vocabulary, pipeline layers, web, server, cli, android, verification
+surfaces). **Japanese 1,533 → 213 lines, English 1,913 → 253 lines.** Every statement was measured
+again from the code (11 tools, 9 colors, 8 primitives, 13 color catalogs, `render-engine-20` with 525
+cases and `ddl-engine-4` with 33, 80 endpoints). Two rules were added: **do not stack per-version
+paragraphs**, and **do not record open issues here**.
+
+**Side effects.** The `Target version` line had been left at `v2.9.23 / Build 820` in both languages
+during v2.9.24, and was corrected. Two undecided items that existed only inside the deleted
+paragraphs were **recovered and filed** (whether the master grid should quantize against absolute
+coordinates, and `db.get_items` not excluding trashed works).
+
+`check_docs.py` is green (internal references 56 → 54, because some published documents were named
+only by the deleted paragraphs; **no published document lost its last inbound reference** — all seven
+lost targets are still named from elsewhere). No code, specification, or drawing behavior was
+touched, so pytest, ruff, `npm run check`, and the frozen corpora do not apply.

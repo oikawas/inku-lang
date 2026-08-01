@@ -7,7 +7,6 @@
 	import { onMount, untrack } from 'svelte';
 	import { annotate, highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
-	import { withPngCaptureDate } from '$lib/pngMetadata';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -49,6 +48,7 @@
 	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
+	import { createExportActions } from '$lib/features/export/download';
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
 	import {
 		batchFailureReportStore,
@@ -140,7 +140,6 @@
 	type DerivationKind = 'touch_change' | 'layout_change' | 'catalog_change' | 'reinterpretation' | 'model_comparison' | 'language_comparison' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'variation';
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
 	type VariationAmplitude = 'small' | 'medium' | 'large';
-	type SvgProfile = 'display' | 'editable' | 'compat';
 
 	type Iteration = HistoryItem;
 	type ReplaySource = 'history-manager' | 'canvas' | 'refine' | 'lineage';
@@ -5487,77 +5486,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	// ── Download ────────────────────────────────────────────
-	function escapeXml(s: string): string {
-		return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-	}
-	function triggerDownload(blob: Blob, filename: string) {
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-		URL.revokeObjectURL(url);
-	}
-	async function downloadSVG(profile: SvgProfile = 'display') {
-		if (!result) return;
-		let svg = result.svg;
-		if (profile === 'display') {
-			const desc = `<desc>${escapeXml(input)}</desc>`;
-			svg = result.svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
-		} else if (displayedHistoryItem?.id) {
-			const r = await apiFetch(`/api/history/${displayedHistoryItem.id}/svg?profile=${profile}`);
-			if (!r.ok) throw await apiError(r);
-			svg = await r.text();
-		} else {
-			const r = await apiFetch('/api/render-svg', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					score: result.score,
-					catalog_id: refinementCatalogId(),
-					canvas_aspect: refinementCanvasAspectId(),
-					svg_profile: profile
-				})
-			});
-			if (!r.ok) throw await apiError(r);
-			svg = await r.text();
-		}
-		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), exportFilename(profile === 'display' ? 'svg' : `${profile}.svg`));
-	}
-
-	async function downloadPNG(size: number) {
-		if (!result) return;
-		const aspect = getCanvasAspectOption(effectiveCanvasAspectId());
-		const pngHeight = Math.max(64, Math.round(size));
-		const pngWidth = Math.max(64, Math.round(pngHeight * aspect.ratioW / aspect.ratioH));
-		let svg = result.svg.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
-			const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
-			return `${tag}${a} width="${pngWidth}" height="${pngHeight}"`;
-		});
-		const blob = new Blob([svg], { type: 'image/svg+xml' });
-		const url  = URL.createObjectURL(blob);
-		try {
-			await new Promise<void>((resolve, reject) => {
-				const canvas = document.createElement('canvas');
-				canvas.width = pngWidth; canvas.height = pngHeight;
-				const ctx = canvas.getContext('2d')!;
-				if (!exportSettings.pngAlphaWhite) {
-					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pngWidth, pngHeight);
-				}
-				const img = new Image();
-				img.onload = () => {
-					ctx.drawImage(img, 0, 0, pngWidth, pngHeight);
-					canvas.toBlob((b) => {
-						if (!b) { reject(new Error('canvas error')); return; }
-						// Stamp the artwork's own generation time, not the download time.
-						const generatedAt = displayedHistoryItem?.at ?? result?.history_at ?? Date.now();
-						withPngCaptureDate(b, new Date(generatedAt))
-							.then((stamped) => { triggerDownload(stamped, exportFilename('png', size)); resolve(); })
-							.catch(reject);
-					}, 'image/png');
-				};
-				img.onerror = () => reject(new Error('svg load error'));
-				img.src = url;
-			});
-		} finally { URL.revokeObjectURL(url); }
-	}
+	// Exporting owns the profile round trip, the canvas rasterisation and the
+	// capture-date stamp; the page only lends it the artwork and the fetch wrapper.
+	const { downloadSVG, downloadPNG } = createExportActions({
+		result: () => result,
+		input: () => input,
+		displayedHistoryItem: () => displayedHistoryItem,
+		apiFetch,
+		apiError,
+		exportFilename,
+		refinementCatalogId,
+		refinementCanvasAspectId,
+		effectiveCanvasAspectId,
+	});
 
 	// ── Prompts ─────────────────────────────────────────────
 	async function fetchPrompts(): Promise<void> {

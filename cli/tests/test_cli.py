@@ -1410,3 +1410,54 @@ def test_refine_perform_replaces_generate_but_keeps_the_legacy_spelling(monkeypa
     help_text = refine.format_help()
     assert "perform" in help_text
     assert "generate" not in help_text
+
+
+def test_refine_color_asks_the_server_to_draw_a_different_catalog(monkeypatch):
+    """The payload key is the whole feature here.
+
+    `/api/paint` ignores fields it does not declare, so a stale key name is
+    accepted with a 200 and silently leaves `catalog_mode` at "fixed" -- the
+    refinement then redraws the same catalog it started from. Asserting the exit
+    code or the response cannot see that, so read the key the CLI actually sent.
+    """
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            if method == "GET":
+                return {
+                    "items": [
+                        {
+                            "id": "work-1",
+                            "lineage_node_id": "node-1",
+                            "source_text": "a small black circle",
+                            "render_seed": 1,
+                            "composition_seed": 2,
+                            "interpretation_seed": "seed",
+                            "render_color_catalog_id": "ink_season",
+                        }
+                    ]
+                }, None
+            return {"svg": "<svg />", "render_hash_short": "ABCD"}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    parser = cli.build_parser()
+    assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "color"])) == 0
+
+    posted = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
+    assert len(posted) == 1
+    assert posted[0].get("catalog_mode") == "random"
+    # The name the server dropped on 2026-08-01. Sending it again is a no-op.
+    assert "random_color_catalog" not in posted[0]
+
+    # The other three kinds must not ask for a draw.
+    for kind in ("touch", "layout", "reading"):
+        calls.clear()
+        assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", kind])) == 0
+        other = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
+        assert other[0].get("catalog_mode") is None

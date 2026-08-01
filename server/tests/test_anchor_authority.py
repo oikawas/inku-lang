@@ -153,6 +153,19 @@ def test_moving_the_declared_coordinate_moves_the_group():
         assert was_low[1] - was_high[1] < 0.01, arrangement
 
 
+# The frame the contract states, written out here instead of imported. T-2 used
+# to read FRAME_LO/FRAME_HI from the renderer, which let the bound itself drift:
+# widening it to 0.005/0.995 left T-2 green and reddened only the frozen G
+# digest, and a digest is rebaked whenever the corpus is regenerated. The bound
+# is part of what engine 20 promises, so the test has to say it.
+CONTRACT_FRAME_LO = 0.02
+CONTRACT_FRAME_HI = 0.98
+
+
+def test_the_frame_is_the_one_the_contract_states():
+    assert (FRAME_LO, FRAME_HI) == (CONTRACT_FRAME_LO, CONTRACT_FRAME_HI)
+
+
 # T-2 --------------------------------------------------------------------
 # Moving the group without shrinking it puts marks outside the frame in 23 of
 # the 32 G cases (measured). Every case is checked, not only the edge scatter,
@@ -162,8 +175,8 @@ def test_no_placed_mark_leaves_the_frame():
         case_id: [
             (x, y)
             for x, y in _placed(instruction)
-            if not (FRAME_LO - 1e-9 <= x <= FRAME_HI + 1e-9)
-            or not (FRAME_LO - 1e-9 <= y <= FRAME_HI + 1e-9)
+            if not (CONTRACT_FRAME_LO - 1e-9 <= x <= CONTRACT_FRAME_HI + 1e-9)
+            or not (CONTRACT_FRAME_LO - 1e-9 <= y <= CONTRACT_FRAME_HI + 1e-9)
         ]
         for case_id, instruction in _g_instructions().items()
     }
@@ -179,8 +192,8 @@ def test_no_placed_mark_leaves_the_frame():
         cx, cy = _centroid(points)
         ax, ay = _anchor(instruction)
         if any(
-            not (FRAME_LO <= x - cx + ax <= FRAME_HI)
-            or not (FRAME_LO <= y - cy + ay <= FRAME_HI)
+            not (CONTRACT_FRAME_LO <= x - cx + ax <= CONTRACT_FRAME_HI)
+            or not (CONTRACT_FRAME_LO <= y - cy + ay <= CONTRACT_FRAME_HI)
             for x, y in points
         ):
             shifted_out += 1

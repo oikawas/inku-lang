@@ -17,6 +17,8 @@
 		tokens_in?: number | null;
 		tokens_out?: number | null;
 		catalog_id?: string | null;
+		render_engine_id?: string | null;
+		render_engine_version?: string | null;
 		history_visibility?: 'normal' | 'lineage_only';
 		lineage_generation?: number | null;
 		tenkei?: string | null;
@@ -153,6 +155,7 @@
 							{#if normalizeTenkei(it.tenkei)}<div class="tooltip-row"><span>{isJapanese ? '添景' : 'Staffage'}</span><strong>{tenkeiLabel(normalizeTenkei(it.tenkei)!, isJapanese)}</strong></div>{/if}
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
+							<div class="tooltip-row"><span>render engine</span><strong>{it.render_engine_id || it.render_engine_version ? [it.render_engine_id, it.render_engine_version].filter(Boolean).join(" / ") : t().historyVersionNotRecorded}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 						</div>
 						<HistoryThumbnail item={it} scope="strip" size="strip" />

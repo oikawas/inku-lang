@@ -49,7 +49,7 @@
 		generationDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
-		batchRandomColorCatalog: boolean;
+		batchAutoColorCatalog: boolean;
 		demoSettings: DemoSettings;
 		demoModelProviderGroups: ProviderGroup[];
 		demoRunning: boolean;
@@ -124,7 +124,7 @@
 		generationDisabled,
 		error,
 		batchPromptHistory,
-		batchRandomColorCatalog = $bindable(false),
+		batchAutoColorCatalog = $bindable(false),
 		demoSettings = $bindable(),
 		demoModelProviderGroups,
 		demoRunning,
@@ -174,9 +174,9 @@
 	}: Props = $props();
 
 	const isJapanese = $derived(t().code === 'ja');
-	const randomCatalogActive = $derived(
-		(inputMode === 'batch' && batchRandomColorCatalog)
-		|| (inputMode === 'demo' && demoSettings.random_color_catalog)
+	const autoCatalogActive = $derived(
+		(inputMode === 'batch' && batchAutoColorCatalog)
+		|| (inputMode === 'demo' && demoSettings.catalog_mode === 'auto')
 	);
 
 	const tabItems = $derived([
@@ -291,10 +291,10 @@
 		<span class="cs-divider"></span>
 		<span class="cs-group">
 			<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
-			<!-- Batch and demo can randomise the catalog per line / per loop, in which
+			<!-- Batch and demo can let the server read each description, in which
 			     case the picked catalog is not knowable in advance. -->
-			{#if randomCatalogActive}
-				<span class="cs-value">{t().batchRandomColorCatalog}</span>
+			{#if autoCatalogActive}
+				<span class="cs-value">{t().batchAutoColorCatalog}</span>
 			{:else}
 				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
 			{/if}
@@ -372,7 +372,7 @@
 			actionDisabled={singleRunning || generationDisabled}
 			{error}
 			{batchPromptHistory}
-			bind:randomColorCatalog={batchRandomColorCatalog}
+			bind:autoColorCatalog={batchAutoColorCatalog}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}

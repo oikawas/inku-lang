@@ -337,7 +337,7 @@
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchFailureReport = $state<BatchFailureReport | null>(null);
 	let batchPromptHistory = $state<string[]>([]);
-	let batchRandomColorCatalog = $state(false);
+	let batchAutoColorCatalog = $state(false);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
 	let batchActiveTokensIn = $state<number | null>(null);
@@ -1021,7 +1021,7 @@
 			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
 			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
 			timeout_seconds: Math.max(60, Math.min(86400, Math.round(settings.timeout_seconds || 3600))),
-			random_color_catalog: !!settings.random_color_catalog,
+			catalog_mode: settings.catalog_mode === 'auto' ? 'auto' : 'fixed',
 		};
 	}
 
@@ -2715,7 +2715,7 @@
 		saveArtifacts?: boolean;
 		countGeneration?: boolean;
 		catalogId?: string;
-		randomColorCatalog?: boolean;
+		catalogMode?: 'fixed' | 'auto' | 'random';
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
 		wild?: boolean;
@@ -2854,7 +2854,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},
 				catalog_id: options.catalogId ?? selectedCatalog,
-				random_color_catalog: options.randomColorCatalog ?? false
+				catalog_mode: options.catalogMode ?? 'fixed'
 			})
 		});
 		if (!r.ok) {
@@ -3046,13 +3046,6 @@ if (unreadWords.length > 0) {
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
-	function randomColorCatalogId(excludeId?: string): string {
-		const ids = colorCatalogs.map((catalog) => catalog.id).filter((id): id is string => !!id);
-		if (ids.length === 0) return selectedCatalog;
-		const candidates = ids.length > 1 && excludeId ? ids.filter((id) => id !== excludeId) : ids;
-		return candidates[Math.floor(Math.random() * candidates.length)] ?? selectedCatalog;
-	}
-
 	async function generateDemoInstruction(settings: DemoSettings): Promise<string> {
 		const model = qualifiedModelId(settings.prompt_provider, settings.prompt_model);
 		const r = await apiFetch('/api/demo/instruction', {
@@ -3097,11 +3090,11 @@ if (unreadWords.length > 0) {
 					displayLabel: '[demo]',
 					catalogId: demoCatalogId,
 					tenkei: tenkeiLevel,
-					randomColorCatalog: settings.random_color_catalog,
+					catalogMode: settings.catalog_mode,
 				});
 				if (demoRunId !== runId || !loading) break;
 				demoGeneratedDdl = r.ddl;
-				if (settings.random_color_catalog && r.render_color_catalog_id) selectedCatalog = r.render_color_catalog_id;
+				if (settings.catalog_mode === 'auto' && r.render_color_catalog_id) selectedCatalog = r.render_color_catalog_id;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
 				const demoSourceDdl = r.source_ddl ?? r.ddl;
@@ -3314,7 +3307,8 @@ if (unreadWords.length > 0) {
 							displayLabel: `#${lines[i].line}`,
 							batchLineNumber: lines[i].line,
 							batchRunId,
-							catalogId: batchRandomColorCatalog ? randomColorCatalogId() : batchCatalogId,
+							catalogId: batchCatalogId,
+							catalogMode: batchAutoColorCatalog ? 'auto' : 'fixed',
 							canvasAspectId: batchCanvasAspectId,
 							wild: wildEnabled,
 							tenkei: tenkeiLevel,
@@ -6192,7 +6186,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{liveMs}
 						{batchFailureReport}
 						{batchPromptHistory}
-						bind:batchRandomColorCatalog
+						bind:batchAutoColorCatalog
 						bind:demoSettings
 						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}

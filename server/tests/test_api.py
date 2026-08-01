@@ -662,7 +662,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     assert initial.status_code == 200
     assert initial.json()["save_db"] is False
     assert initial.json()["save_files"] is False
-    assert initial.json()["random_color_catalog"] is False
+    assert initial.json()["catalog_mode"] == "fixed"
     assert initial.json()["interval_seconds"] == 30
     assert initial.json()["timeout_seconds"] == 3600
 
@@ -674,7 +674,7 @@ def test_current_user_demo_settings_are_persisted(auth_context):
         "seed_phrase": "短い冬の情景を生成",
         "interval_seconds": 45,
         "timeout_seconds": 7200,
-        "random_color_catalog": True,
+        "catalog_mode": "auto",
     }
     updated = client.put("/api/auth/me/demo-settings", headers=headers, json=body)
     assert updated.status_code == 200
@@ -2106,7 +2106,7 @@ def test_paint_random_catalog_excludes_current_and_uses_effective_map(monkeypatc
         json={
             "description": "一滴の墨",
             "catalog_id": "ink_season",
-            "random_color_catalog": True,
+            "catalog_mode": "random",
             "count_generation": False,
         },
         headers=headers,

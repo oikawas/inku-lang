@@ -5,7 +5,8 @@ import uuid
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from inku_server.api import _LOGIN_RATE_ATTEMPTS, _login_rate_limiter, app as inku_app
+from inku_server.api import app as inku_app
+from inku_server.api_core.routers.auth import _LOGIN_RATE_ATTEMPTS, _login_rate_limiter
 from inku_server.security import (
     ConcurrencyLimitMiddleware,
     RequestBodyLimitMiddleware,

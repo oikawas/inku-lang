@@ -227,7 +227,7 @@ def test_stage2_literal_delivery_restores_explicit_cloudform_from_ellipse() -> N
 
 
 def test_stage2_timeout_fallback_preserves_explicit_cloudform() -> None:
-    from inku_server.api import _fallback_score_from_ddl
+    from inku_server.api_core.routers.render import _fallback_score_from_ddl
 
     score = _fallback_score_from_ddl(
         "Scatter seven small green cloudforms across the right half.", lang="en"

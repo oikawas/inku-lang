@@ -285,7 +285,7 @@ def test_tenkei_persists_on_history_and_resolves_for_node(db_user):
 
 
 def test_resolved_tenkei_precedence(db_user):
-    from inku_server.api import _resolved_tenkei
+    from inku_server.api_core.rendering import _resolved_tenkei
 
     root = db.add_item(_history_item(db_user["id"], 3100, tenkei="none"))
     node_id = root["lineage_node_id"]

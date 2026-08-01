@@ -17,6 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from inku_server import api as api_module
+from inku_server.api_core.routers import render as render_routes
 from inku_server import color_selector, db
 from inku_server.api import app
 from inku_server.color_catalogs import color_catalog_ids, color_catalogs
@@ -60,12 +61,12 @@ FAKE_SCORE = {
 @pytest.fixture(autouse=True)
 def stub_stages(monkeypatch):
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
     )
     monkeypatch.setattr(
-        api_module, "compose", lambda ddl, model=None: Score.model_validate(FAKE_SCORE)
+        render_routes, "compose", lambda ddl, model=None: Score.model_validate(FAKE_SCORE)
     )
 
 
@@ -96,7 +97,7 @@ def _counting_selector(monkeypatch, *, real: bool) -> list[str]:
             return select_catalog_id(source_text, fallback_id=fallback_id)
         return ANSWERED
 
-    monkeypatch.setattr(api_module, "select_catalog_id", counted)
+    monkeypatch.setattr(render_routes, "select_catalog_id", counted)
     return calls
 
 
@@ -275,7 +276,7 @@ def test_t6_refinement_keeps_the_draw(monkeypatch, headers):
     def must_not_run(source_text: str, *, fallback_id: str) -> str:
         raise AssertionError("the selector must not run for catalog_mode=random")
 
-    monkeypatch.setattr(api_module, "select_catalog_id", must_not_run)
+    monkeypatch.setattr(render_routes, "select_catalog_id", must_not_run)
     data = _paint(headers, catalog_mode="random")
     assert data["render_color_catalog_id"] != REQUESTED
     assert data["render_color_catalog_id"] in color_catalog_ids()
@@ -288,9 +289,9 @@ def test_t6_the_draw_reaches_more_than_one_catalog(monkeypatch):
     def must_not_run(source_text: str, *, fallback_id: str) -> str:
         raise AssertionError("the selector must not run for catalog_mode=random")
 
-    monkeypatch.setattr(api_module, "select_catalog_id", must_not_run)
+    monkeypatch.setattr(render_routes, "select_catalog_id", must_not_run)
     drawn = {
-        api_module._resolved_paint_catalog_id(
+        render_routes._resolved_paint_catalog_id(
             REQUESTED, mode="random", source_text=DESCRIPTION
         )
         for _ in range(24)

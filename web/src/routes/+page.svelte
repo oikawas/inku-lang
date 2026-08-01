@@ -49,6 +49,7 @@
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
 	import { createExportActions } from '$lib/features/export/download';
+	import { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
 	import {
 		batchFailureReportStore,
@@ -371,45 +372,6 @@
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
-	type ModelInspectionResult = {
-		id: string;
-		model: string;
-		stage1Model?: string | null;
-		label: string;
-		input: string;
-		ddl: string;
-		svg: string;
-		score: Score;
-		stage2Model?: string | null;
-		renderBuildNumber?: string | null;
-		renderColorProfile?: Record<string, string> | null;
-		renderEngineId?: string | null;
-		renderEngineVersion?: string | null;
-		renderColorCatalogId?: string | null;
-		renderColorCatalogName?: string | null;
-		renderColorCatalogSub?: string | null;
-		renderColorMap?: Record<string, string> | null;
-		renderCanvasAspect?: string | null;
-		renderCanvasAspectId?: string | null;
-		renderCanvasAspectRatio?: number | null;
-		renderSeed?: number | null;
-		renderWild?: boolean | null;
-		compositionSeed?: number | null;
-		tokensIn: number | null;
-		tokensOut: number | null;
-		tokensInStage2: number | null;
-		tokensOutStage2: number | null;
-		elapsedMs: number;
-		lineageParentNodeId?: string | null;
-		compareMode: ModelCompareMode;
-		comparisonKind?: 'model' | 'language';
-		stage1Lang?: 'ja' | 'en';
-		stage2Lang?: 'ja' | 'en';
-		savedHistoryId?: string | null;
-		starred?: boolean;
-		saving?: boolean;
-	};
-	type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
@@ -426,27 +388,7 @@
 	let variationGridTotal = $state(0);
 	let variationGridAbortController: AbortController | null = null;
 	let variationGridStatus = $state<string | null>(null);
-	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
-	let modelCompareMode = $state<ModelCompareMode>('common');
-	let modelCompareFixedModel = $state('');
-	let modelInspectionBusy = $state(false);
-	let modelInspectionStatus = $state<string | null>(null);
-	let modelInspectionResults = $state<ModelInspectionResult[]>([]);
-	let modelInspectionSelectedModels = $state<string[]>([]);
-	let modelInspectionFailedModels = $state<Record<string, string>>({});
-	let modelInspectionRunId = 0;
 	let targetContextVersion = 0;
-	let modelInspectionAbortController: AbortController | null = null;
-	let modelInspectionCurrentModel = $state('');
-	// Language comparison selects (Stage 1 × Stage 2) language combinations directly,
-	// each id is `${stage1}:${stage2}` (e.g. 'ja:en').
-	let languageInspectionSelectedCombos = $state<string[]>([]);
-	let languageInspectionBusy = $state(false);
-	let languageInspectionStatus = $state<string | null>(null);
-	let languageInspectionResults = $state<ModelInspectionResult[]>([]);
-	let languageInspectionRunId = 0;
-	let languageInspectionAbortController: AbortController | null = null;
-	let languageInspectionCurrentLabel = $state('');
 
 	// ── UI ──────────────────────────────────────────────────
 	let windowWidth  = $state(1200);
@@ -870,7 +812,7 @@
 			? qualifiedModelId(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
 			: qualifiedModelId(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
-		modelInspectionSelectedModels = Array.isArray(settings.model_inspection_selected_models)
+		modelInspection.selectedModels = Array.isArray(settings.model_inspection_selected_models)
 			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
 			: [];
 	}
@@ -1338,7 +1280,7 @@
 			vision_model: visionModel,
 			okugaki_provider: splitModelRef(okugakiModel).provider ?? visionProvider,
 			okugaki_model: splitModelRef(okugakiModel).model,
-			model_inspection_selected_models: modelInspectionSelectedModels,
+			model_inspection_selected_models: modelInspection.selectedModels,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
 		try {
@@ -2580,15 +2522,8 @@
 	// Flows that issue several paints per run keep their own running totals.
 	let variationTokensIn = $state<number | null>(null);
 	let variationTokensOut = $state<number | null>(null);
-	let modelInspectionTokensIn = $state<number | null>(null);
-	let modelInspectionTokensOut = $state<number | null>(null);
-	let languageInspectionTokensIn = $state<number | null>(null);
-	let languageInspectionTokensOut = $state<number | null>(null);
 
 	const variationElapsed = createElapsed();
-	const modelInspectionElapsed = createElapsed();
-	const languageInspectionElapsed = createElapsed();
-
 	function addTokens(total: number | null, delta: number | null | undefined): number | null {
 		if (delta === null || delta === undefined) return total;
 		return (total ?? 0) + delta;
@@ -3859,395 +3794,33 @@ if (unreadWords.length > 0) {
 
 	const activeComparisonItem = $derived(currentComparisonItem());
 
-	function modelInspectionModelChoices(): ModelInspectionChoice[] {
-		const seen = new Set<string>();
-		const choices: ModelInspectionChoice[] = [];
-		for (const group of availableModelCatalog) {
-			for (const model of group.models) {
-				const id = qualifiedModelId(group.id as Provider, model.id);
-				if (seen.has(id)) continue;
-				seen.add(id);
-				choices.push({ id, label: model.label || model.id, providerLabel: group.label || String(group.id), model });
-			}
-		}
-		return choices;
-	}
 
-	const modelInspectionChoices = $derived(modelInspectionModelChoices());
-
-	const modelInspectionTargetStage1Model = $derived(result?.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model));
-	const modelInspectionTargetStage2Model = $derived(result?.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model));
-	const modelInspectionTargetModel = $derived(modelInspectionTargetStage1Model);
-
-	function setModelCompareMode(mode: ModelCompareMode) {
-		if (modelInspectionBusy) return;
-		modelCompareMode = mode;
-		modelCompareFixedModel = mode === 'stage1_fixed' ? modelInspectionTargetStage1Model : mode === 'stage2_fixed' ? modelInspectionTargetStage2Model : '';
-		modelInspectionSelectedModels = []; modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null;
-	}
-
-	function setModelCompareFixedModel(model: string) {
-		if (modelInspectionBusy) return;
-		modelCompareFixedModel = model; modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null;
-	}
-
-	function isModelInspectionChoiceBlocked(model: string) {
-		if (modelCompareMode === 'common') return model === modelInspectionTargetStage1Model || model === modelInspectionTargetStage2Model;
-		if (modelCompareMode === 'stage1_fixed') return modelCompareFixedModel === modelInspectionTargetStage1Model && model === modelInspectionTargetStage2Model;
-		return model === modelInspectionTargetStage1Model && modelCompareFixedModel === modelInspectionTargetStage2Model;
-	}
-
-	async function persistModelInspectionSelection(models: string[]) {
-		if (!currentUser) return;
-		try {
-			const r = await apiFetch('/api/auth/me/settings', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model_settings: {
-						model_inspection_selected_models: models.slice(0, 4),
-					},
-				}),
-			});
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			currentUser = await r.json() as UserItem;
-		} catch (e) {
-			console.warn('failed to save model comparison selection', e);
-		}
-	}
-
-	$effect(() => {
-		const available = new Set(modelInspectionChoices.map((choice) => choice.id));
-		const next = modelInspectionSelectedModels.filter((id) => available.has(id) && !isModelInspectionChoiceBlocked(id)).slice(0, 4);
-		if (next.join("\n") !== modelInspectionSelectedModels.join("\n")) {
-			modelInspectionSelectedModels = next;
-			void persistModelInspectionSelection(next);
-		}
+	// Model comparison and language comparison own their selection, their results
+	// and their run state; the page lends the artwork, the two paint stages and
+	// the history writes.
+	const modelInspection = createModelInspection({
+		availableModelCatalog: () => availableModelCatalog,
+		result: () => result,
+		stage1Provider: () => stage1Provider,
+		stage1Model: () => stage1Model,
+		stage2Provider: () => stage2Provider,
+		stage2Model: () => stage2Model,
+		loading: () => loading,
+		input: () => input,
+		refineTenkeiOverride: () => refineTenkeiOverride,
+		currentUser: () => currentUser,
+		setCurrentUser: (user) => { currentUser = user as UserItem; },
+		targetContextVersion: () => targetContextVersion,
+		apiFetch,
+		interpretOne,
+		composeOne,
+		ensureVisibleLineageParentId,
+		pushHistory: (it, options) => pushHistory(it as unknown as Iteration, options),
+		toggleHistoryStar,
+		addTokens,
+		statusModelName,
+		effectiveCanvasAspectId,
 	});
-
-	function toggleModelInspectionModel(modelId: string) {
-		if (modelInspectionBusy || isModelInspectionChoiceBlocked(modelId)) return;
-		if (modelInspectionSelectedModels.includes(modelId)) {
-			const next = modelInspectionSelectedModels.filter((id) => id !== modelId);
-			modelInspectionSelectedModels = next;
-			void persistModelInspectionSelection(next);
-			return;
-		}
-		if (modelInspectionSelectedModels.length >= 4) {
-			modelInspectionStatus = t().modelCompareMaxSelected;
-			return;
-		}
-		const next = [...modelInspectionSelectedModels, modelId];
-		modelInspectionSelectedModels = next;
-		if (modelInspectionFailedModels[modelId]) {
-			const { [modelId]: _failed, ...rest } = modelInspectionFailedModels;
-			modelInspectionFailedModels = rest;
-		}
-		void persistModelInspectionSelection(next);
-		modelInspectionStatus = null;
-	}
-
-	async function runModelInspection() {
-		if (modelInspectionBusy || loading) return;
-		const source = input.trim();
-		if (!source) return;
-		const contextVersion = targetContextVersion;
-		const modelParentNodeId = await ensureVisibleLineageParentId();
-		if (contextVersion !== targetContextVersion) return;
-		const selectedModels = modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
-		if (selectedModels.length === 0) { modelInspectionStatus = t().modelCompareSelectPrompt; return; }
-		const jobs = selectedModels.map((model) => {
-			const stage1 = modelCompareMode === "stage1_fixed" ? modelCompareFixedModel : model;
-			const stage2 = modelCompareMode === "stage2_fixed" ? modelCompareFixedModel : model;
-			return { model, stage1, stage2, id: modelCompareMode + ":" + stage1 + ":" + stage2 };
-		});
-		const rendered = new Set(modelInspectionResults.map((item) => item.id));
-		const pending = jobs.filter((job) => !rendered.has(job.id));
-		if (pending.length === 0) { modelInspectionStatus = t().modelCompareAllRendered; return; }
-
-		const runId = ++modelInspectionRunId;
-		const abortController = new AbortController();
-		modelInspectionAbortController = abortController;
-		modelInspectionBusy = true;
-		modelInspectionStatus = null;
-		modelInspectionTokensIn = null;
-		modelInspectionTokensOut = null;
-		modelInspectionElapsed.start();
-		const successful = [...modelInspectionResults];
-		const failed: Record<string, string> = {};
-		try {
-			for (const job of pending) {
-				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-				const jobStage1Name = statusModelName(job.stage1);
-				const jobStage2Name = statusModelName(job.stage2);
-				modelInspectionCurrentModel = jobStage1Name === jobStage2Name ? jobStage1Name : `${jobStage1Name} / ${jobStage2Name}`;
-				try {
-					const started = Date.now();
-					const interpreted = await interpretOne(source, abortController.signal, job.stage1, undefined, refineTenkeiOverride);
-					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-					modelInspectionTokensIn = addTokens(modelInspectionTokensIn, interpreted.tokens_in);
-					modelInspectionTokensOut = addTokens(modelInspectionTokensOut, interpreted.tokens_out);
-					const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2, undefined, { tenkei: refineTenkeiOverride, lineageParentNodeId: modelParentNodeId });
-					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-					modelInspectionTokensIn = addTokens(modelInspectionTokensIn, composed.tokens_in);
-					modelInspectionTokensOut = addTokens(modelInspectionTokensOut, composed.tokens_out);
-					successful.push({
-						id: job.id,
-						model: job.model,
-						stage1Model: job.stage1,
-						label: statusModelName(job.stage1) + " / " + statusModelName(job.stage2),
-						input: source,
-						ddl: interpreted.ddl,
-						svg: composed.svg,
-						score: composed.score,
-						stage2Model: composed.stage2_model ?? job.stage2,
-						renderBuildNumber: composed.render_build_number ?? null,
-						renderColorProfile: composed.render_color_profile ?? null,
-						renderEngineId: composed.render_engine_id ?? null,
-						renderEngineVersion: composed.render_engine_version ?? null,
-						renderColorCatalogId: composed.render_color_catalog_id ?? null,
-						renderColorCatalogName: composed.render_color_catalog_name ?? null,
-						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
-						renderColorMap: composed.render_color_map ?? null,
-						renderCanvasAspect: composed.render_canvas_aspect ?? null,
-						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
-						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
-						renderSeed: composed.render_seed ?? null,
-						renderWild: composed.render_wild ?? null,
-						compositionSeed: composed.composition_seed ?? null,
-						tokensIn: interpreted.tokens_in,
-						tokensOut: interpreted.tokens_out,
-						tokensInStage2: composed.tokens_in,
-						tokensOutStage2: composed.tokens_out,
-						elapsedMs: Date.now() - started,
-						lineageParentNodeId: modelParentNodeId,
-						compareMode: modelCompareMode,
-						savedHistoryId: null,
-						starred: false,
-						saving: false,
-					});
-					modelInspectionResults = [...successful];
-				} catch (cause) {
-					if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-					failed[job.model] = cause instanceof Error ? cause.message : String(cause);
-					modelInspectionFailedModels = { ...modelInspectionFailedModels, [job.model]: failed[job.model] };
-				}
-			}
-			if (Object.keys(failed).length > 0 && modelInspectionRunId === runId) {
-				modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
-			}
-		} finally {
-			if (modelInspectionRunId === runId) {
-				modelInspectionAbortController = null;
-				modelInspectionBusy = false;
-				modelInspectionCurrentModel = '';
-				modelInspectionElapsed.stop();
-			}
-		}
-	}
-
-	function abortModelInspection() {
-		modelInspectionAbortController?.abort();
-	}
-
-	const languageInspectionTargetLang = $derived(
-		(result?.instruction_lang_resolved === 'en' ? 'en' : result?.instruction_lang_resolved === 'ja' ? 'ja' : getLang()) as 'ja' | 'en'
-	);
-
-	// The target artwork's combination (Stage 1 lang == Stage 2 lang == target).
-	function isLanguageComboBlocked(stage1: 'ja' | 'en', stage2: 'ja' | 'en') {
-		return stage1 === languageInspectionTargetLang && stage2 === languageInspectionTargetLang;
-	}
-
-	function toggleLanguageCombo(id: string) {
-		if (languageInspectionBusy) return;
-		const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
-		if (isLanguageComboBlocked(s1, s2)) return;
-		languageInspectionSelectedCombos = languageInspectionSelectedCombos.includes(id)
-			? languageInspectionSelectedCombos.filter((value) => value !== id)
-			: [...languageInspectionSelectedCombos, id];
-		languageInspectionStatus = null;
-	}
-
-	function abortLanguageInspection() {
-		languageInspectionAbortController?.abort();
-	}
-
-	async function runLanguageInspection() {
-		if (languageInspectionBusy || loading) return;
-		const source = input.trim();
-		if (!source) return;
-		const selected = languageInspectionSelectedCombos.filter((id) => {
-			const [s1, s2] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
-			return !isLanguageComboBlocked(s1, s2);
-		});
-		if (selected.length === 0) {
-			languageInspectionStatus = getLang() === 'ja' ? '比較する組み合わせを1つ以上選択してください。' : 'Select at least one combination to compare.';
-			return;
-		}
-		const contextVersion = targetContextVersion;
-		const parentNodeId = await ensureVisibleLineageParentId();
-		if (contextVersion !== targetContextVersion) return;
-		const jobs = selected.map((id) => {
-			const [stage1Lang, stage2Lang] = id.split(':') as ['ja' | 'en', 'ja' | 'en'];
-			return { lang: stage2Lang, stage1Lang, stage2Lang, id };
-		});
-		const rendered = new Set(languageInspectionResults.map((item) => item.id));
-		const pending = jobs.filter((job) => !rendered.has(job.id));
-		if (pending.length === 0) {
-			languageInspectionStatus = getLang() === 'ja' ? '選択済みの言語構成はすべて描画済みです。' : 'All chosen language combinations have been painted.';
-			return;
-		}
-		const runId = ++languageInspectionRunId;
-		const abortController = new AbortController();
-		languageInspectionAbortController = abortController;
-		languageInspectionBusy = true;
-		languageInspectionStatus = null;
-		languageInspectionTokensIn = null;
-		languageInspectionTokensOut = null;
-		languageInspectionElapsed.start();
-		const successful = [...languageInspectionResults];
-		const langLabel = (lang: 'ja' | 'en') => lang === 'ja' ? (getLang() === 'ja' ? '日本語' : 'Japanese') : 'English';
-		try {
-			for (const job of pending) {
-				if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-				languageInspectionCurrentLabel = `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`;
-				try {
-					const started = Date.now();
-					const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang, refineTenkeiOverride);
-					languageInspectionTokensIn = addTokens(languageInspectionTokensIn, interpreted.tokens_in);
-					languageInspectionTokensOut = addTokens(languageInspectionTokensOut, interpreted.tokens_out);
-					const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang, { tenkei: refineTenkeiOverride, lineageParentNodeId: parentNodeId });
-					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-					languageInspectionTokensIn = addTokens(languageInspectionTokensIn, composed.tokens_in);
-					languageInspectionTokensOut = addTokens(languageInspectionTokensOut, composed.tokens_out);
-					successful.push({
-						id: job.id,
-						model: qualifiedModelId(stage1Provider, stage1Model),
-						stage1Model: qualifiedModelId(stage1Provider, stage1Model),
-						stage2Model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
-						label: `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`,
-						input: source,
-						ddl: interpreted.ddl,
-						svg: composed.svg,
-						score: composed.score,
-						renderBuildNumber: composed.render_build_number ?? null,
-						renderColorProfile: composed.render_color_profile ?? null,
-						renderEngineId: composed.render_engine_id ?? null,
-						renderEngineVersion: composed.render_engine_version ?? null,
-						renderColorCatalogId: composed.render_color_catalog_id ?? null,
-						renderColorCatalogName: composed.render_color_catalog_name ?? null,
-						renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
-						renderColorMap: composed.render_color_map ?? null,
-						renderCanvasAspect: composed.render_canvas_aspect ?? null,
-						renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
-						renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
-						renderSeed: composed.render_seed ?? null,
-						renderWild: composed.render_wild ?? null,
-						compositionSeed: composed.composition_seed ?? null,
-						tokensIn: interpreted.tokens_in,
-						tokensOut: interpreted.tokens_out,
-						tokensInStage2: composed.tokens_in,
-						tokensOutStage2: composed.tokens_out,
-						elapsedMs: Date.now() - started,
-						lineageParentNodeId: parentNodeId,
-						compareMode: 'common',
-						comparisonKind: 'language',
-						stage1Lang: job.stage1Lang,
-						stage2Lang: job.stage2Lang,
-						savedHistoryId: null,
-						starred: false,
-						saving: false,
-					});
-					languageInspectionResults = [...successful];
-				} catch (cause) {
-					if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
-					languageInspectionStatus = cause instanceof Error ? cause.message : String(cause);
-				}
-			}
-		} finally {
-			if (languageInspectionRunId === runId) {
-				languageInspectionAbortController = null;
-				languageInspectionBusy = false;
-				languageInspectionCurrentLabel = '';
-				languageInspectionElapsed.stop();
-			}
-		}
-	}
-
-
-	function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
-		modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
-		languageInspectionResults = languageInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
-	}
-
-	async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
-		if (item.saving) return;
-		const contextVersion = targetContextVersion;
-		if (item.savedHistoryId) {
-			if (options.star) {
-				await toggleHistoryStar({ id: item.savedHistoryId, starred: !!item.starred });
-				if (contextVersion === targetContextVersion) updateModelInspectionResult(item.id, { starred: !item.starred });
-			}
-			return;
-		}
-		updateModelInspectionResult(item.id, { saving: true });
-		if (item.comparisonKind === 'language') languageInspectionStatus = null;
-		else modelInspectionStatus = null;
-		try {
-			const saved = await pushHistory({
-				input: item.input,
-				ddl: item.ddl,
-				score: item.score,
-				svg: item.svg,
-				at: Date.now(),
-				elapsed_ms: item.elapsedMs,
-				stage1_model: item.stage1Model ?? item.model,
-				stage2_model: item.stage2Model ?? null,
-				tokens_in: (item.tokensIn ?? 0) + (item.tokensInStage2 ?? 0) || null,
-				tokens_out: (item.tokensOut ?? 0) + (item.tokensOutStage2 ?? 0) || null,
-				catalog_id: item.renderColorCatalogId ?? colorCatalogSettings.selected,
-				render_build_number: item.renderBuildNumber ?? null,
-				render_color_profile: item.renderColorProfile ?? null,
-				render_engine_id: item.renderEngineId ?? null,
-				render_engine_version: item.renderEngineVersion ?? null,
-				render_color_catalog_id: item.renderColorCatalogId ?? null,
-				render_color_catalog_name: item.renderColorCatalogName ?? null,
-				render_color_catalog_sub: item.renderColorCatalogSub ?? null,
-				render_color_map: item.renderColorMap ?? null,
-				render_canvas_aspect: item.renderCanvasAspect ?? item.renderCanvasAspectId ?? effectiveCanvasAspectId(),
-				render_canvas_aspect_id: item.renderCanvasAspectId ?? item.renderCanvasAspect ?? effectiveCanvasAspectId(),
-				render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
-				render_seed: item.renderSeed ?? null,
-				render_wild: item.renderWild ?? null,
-				composition_seed: item.compositionSeed ?? null,
-				instruction_lang_requested: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
-				instruction_lang_resolved: item.comparisonKind === 'language' ? item.stage2Lang : undefined,
-				ui_lang: getLang(),
-			}, {
-				countGeneration: true,
-				sourceText: item.input,
-				lineageParentNodeId: item.lineageParentNodeId ?? null,
-				derivationKind: item.lineageParentNodeId ? (item.comparisonKind === 'language' ? 'language_comparison' : 'model_comparison') : null,
-				derivationMetadata: item.comparisonKind === 'language'
-					? { comparison_mode: item.compareMode, stage1_language: item.stage1Lang, stage2_language: item.stage2Lang }
-					: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model },
-			});
-			if (!saved?.id) throw new Error('failed to save comparison result');
-			if (contextVersion !== targetContextVersion) return;
-			updateModelInspectionResult(item.id, { savedHistoryId: saved.id, starred: !!saved.starred, saving: false });
-			if (options.star) {
-				await toggleHistoryStar({ id: saved.id, starred: !!saved.starred, note: saved.note });
-				if (contextVersion === targetContextVersion) updateModelInspectionResult(item.id, { starred: !saved.starred });
-			}
-		} catch (e) {
-			if (contextVersion === targetContextVersion) {
-				updateModelInspectionResult(item.id, { saving: false });
-				if (item.comparisonKind === 'language') languageInspectionStatus = e instanceof Error ? e.message : String(e);
-				else modelInspectionStatus = e instanceof Error ? e.message : String(e);
-			}
-		}
-	}
 
 	async function replayHistoryItem(it: Iteration, source: ReplaySource = outputTab) {
 		if (demoRunning || reloading) return;
@@ -4688,19 +4261,7 @@ $effect(() => {
 			variationGridStatus = null;
 		}
 
-		if (modelInspectionAbortController) modelInspectionAbortController.abort();
-		modelInspectionAbortController = null;
-		modelInspectionRunId += 1;
-		modelInspectionBusy = false;
-		modelInspectionResults = [];
-		modelInspectionFailedModels = {};
-		modelInspectionStatus = null;
-		if (languageInspectionAbortController) languageInspectionAbortController.abort();
-		languageInspectionAbortController = null;
-		languageInspectionRunId += 1;
-		languageInspectionBusy = false;
-		languageInspectionResults = [];
-		languageInspectionStatus = null;
+		modelInspection.reset();
 
 		interpretationDiffParts = [];
 		reloadError = null;
@@ -6291,12 +5852,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				variationElapsedMs={variationElapsed.ms}
 				{variationTokensIn}
 				{variationTokensOut}
-				modelInspectionElapsedMs={modelInspectionElapsed.ms}
-				{modelInspectionTokensIn}
-				{modelInspectionTokensOut}
-				languageInspectionElapsedMs={languageInspectionElapsed.ms}
-				{languageInspectionTokensIn}
-				{languageInspectionTokensOut}
+				modelInspectionElapsedMs={modelInspection.elapsedMs}
+				modelInspectionTokensIn={modelInspection.tokensIn}
+				modelInspectionTokensOut={modelInspection.tokensOut}
+				languageInspectionElapsedMs={modelInspection.languageElapsedMs}
+				languageInspectionTokensIn={modelInspection.languageTokensIn}
+				languageInspectionTokensOut={modelInspection.languageTokensOut}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
@@ -6304,37 +5865,37 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onShowVariationCandidate={showVariationCandidate}
 				onToggleVariationCandidate={toggleVariationCandidate}
 				{activeComparisonItem}
-				modelInspectionTargetModel={modelInspectionTargetModel}
-				modelInspectionTargetStage1Model={modelInspectionTargetStage1Model}
-				modelInspectionTargetStage2Model={modelInspectionTargetStage2Model}
-				{modelCompareMode}
-				{modelCompareFixedModel}
-				{modelInspectionChoices}
-				{modelInspectionSelectedModels}
-				{modelInspectionFailedModels}
-				{modelInspectionBusy}
-				{modelInspectionStatus}
-				{modelInspectionResults}
-				onToggleModelInspectionModel={toggleModelInspectionModel}
-				onSetModelCompareMode={setModelCompareMode}
-				onSetModelCompareFixedModel={setModelCompareFixedModel}
-				isModelInspectionChoiceBlocked={isModelInspectionChoiceBlocked}
-				onRunModelInspection={runModelInspection}
-				onAbortModelInspection={abortModelInspection}
-				{modelInspectionCurrentModel}
-				onAdoptModelInspectionResult={(item) => saveModelInspectionResult(item)}
-				onToggleModelInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
-				{languageInspectionTargetLang}
-				{languageInspectionSelectedCombos}
-				{languageInspectionBusy}
-				{languageInspectionStatus}
-				{languageInspectionResults}
-				{languageInspectionCurrentLabel}
-				onToggleLanguageCombo={toggleLanguageCombo}
-				onRunLanguageInspection={runLanguageInspection}
-				onAbortLanguageInspection={abortLanguageInspection}
-				onAdoptLanguageInspectionResult={(item) => saveModelInspectionResult(item)}
-				onToggleLanguageInspectionStar={(item) => saveModelInspectionResult(item, { star: true })}
+				modelInspectionTargetModel={modelInspection.targetModel}
+				modelInspectionTargetStage1Model={modelInspection.targetStage1Model}
+				modelInspectionTargetStage2Model={modelInspection.targetStage2Model}
+				modelCompareMode={modelInspection.compareMode}
+				modelCompareFixedModel={modelInspection.compareFixedModel}
+				modelInspectionChoices={modelInspection.choices}
+				modelInspectionSelectedModels={modelInspection.selectedModels}
+				modelInspectionFailedModels={modelInspection.failedModels}
+				modelInspectionBusy={modelInspection.busy}
+				modelInspectionStatus={modelInspection.status}
+				modelInspectionResults={modelInspection.results}
+				onToggleModelInspectionModel={modelInspection.toggleModel}
+				onSetModelCompareMode={modelInspection.setCompareMode}
+				onSetModelCompareFixedModel={modelInspection.setCompareFixedModel}
+				isModelInspectionChoiceBlocked={modelInspection.isChoiceBlocked}
+				onRunModelInspection={modelInspection.run}
+				onAbortModelInspection={modelInspection.abort}
+				modelInspectionCurrentModel={modelInspection.currentModel}
+				onAdoptModelInspectionResult={(item) => modelInspection.saveResult(item)}
+				onToggleModelInspectionStar={(item) => modelInspection.saveResult(item, { star: true })}
+				languageInspectionTargetLang={modelInspection.languageTargetLang}
+				languageInspectionSelectedCombos={modelInspection.languageSelectedCombos}
+				languageInspectionBusy={modelInspection.languageBusy}
+				languageInspectionStatus={modelInspection.languageStatus}
+				languageInspectionResults={modelInspection.languageResults}
+				languageInspectionCurrentLabel={modelInspection.languageCurrentLabel}
+				onToggleLanguageCombo={modelInspection.toggleLanguageCombo}
+				onRunLanguageInspection={modelInspection.runLanguage}
+				onAbortLanguageInspection={modelInspection.abortLanguage}
+				onAdoptLanguageInspectionResult={(item) => modelInspection.saveResult(item)}
+				onToggleLanguageInspectionStar={(item) => modelInspection.saveResult(item, { star: true })}
 				{lineageGraph}
 				{lineageLoading}
 				{lineageError}

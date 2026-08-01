@@ -1853,3 +1853,65 @@ pytest **1910/31**（不変）、cli **77**、ruff clean、`npm run check` **221
 `lint:i18n` **956/47/0/0**（不変）。
 **決定的な層に差分が無いのでコーパスは焼き直していない。`android/` にも差分は無い。
 SPEC は履歴 tooltip の行を列挙していないので不変更。版数は patch。**
+
+### v2.9.22 — 色カタログが、記述を読んで決まる（Build 817、2026-08-01）
+
+台帳 **[I-082]** / 契約 `color-auto-select.md`（改訂 2）の実装を統合した版。
+
+**自動描画（デモ）とバッチの色カタログが、乱択から「記述を読んで選ぶ」へ変わった。**
+選択はサーバーで行い、`/api/paint` の `catalog_mode` が決め方を運ぶ。
+
+- `catalog_mode` は **`fixed` / `auto` / `random`** の 3 値で、旧来の真偽値
+  `random_color_catalog` を置き換えた。**送らない旧クライアントは `fixed`**
+- **`auto`** は新設の `color_selector.py`（150 行）が 13 カタログの札を作って Stage 1 と同じ
+  モデル解決で問い、**allowlist を通った id だけを採る**。失敗・タイムアウト・実在しない id は
+  **要求された `catalog_id` へ倒れる**（落とし先は `default` ではない）
+- **`random` は推敲専用として残した**（作者裁定 4）。「色カタログを変える」は
+  **同じ記述を別の色で見るための操作**で、記述を読ませると毎回同じカタログへ収束して機能が消える
+- デモ設定の鍵も `catalog_mode`（`fixed` / `auto` の 2 値）へ移した。
+  **保存済みの旧鍵は `_normalize_demo_settings` が既定から作り直すので migration は不要**
+  （配備先の本番 DB で実測）
+
+#### 記述を読んだ選択は、乱択とキーワード一致のあいだにある
+
+製品の `select_catalog_id` を段 0 と同じ 60 件・同じモデル・同じ `temperature=0.3` で通した実測:
+
+| 指標 | 段 0（試作・v2.9.19） | **実装（Build 814）** | 一様乱択 | キーワード一致 |
+|---|---|---|---|---|
+| 使われたカタログ | 11 / 13 | **11 / 13** | 13 / 13 | 1 / 13 |
+| 正規化エントロピー | 0.856 | **0.853** | 0.973 | 0.000 |
+| 同じ原文 3 回で同じ id | 19 / 20 | **19 / 20** | — | — |
+
+**一度も選ばれないカタログが 2 つある**（`fresco_study` / `ink_porcelain`。段 0 と同じ 2 つ）。
+1 回の所要は中央値 1.26 秒・最大 55.74 秒で、100 呼び出し中 1 件が `APITimeoutError` になり
+設計どおり落とし先へ倒れた。
+
+#### 受け入れで見つけて直したもの
+
+- **`inku-cli refine perform --kind color` が黙って壊れていた。**
+  `cli.py:2965` が削除済みの `random_color_catalog: True` を送り続けており、
+  **`PaintRequest` は未知フィールドを捨てる**（pydantic 既定 `extra="ignore"`）ので
+  **200 が返り `catalog_mode` は `fixed` のまま**＝同じカタログを描き直していた。
+  実測 = `PaintRequest(description="test", random_color_catalog=True).catalog_mode` は `"fixed"`
+- **契約 §7.5 は web の呼び出し元だけを数えていた。** 実装セッションがそこで 2 つ目
+  （`colorCatalogCandidateIds`）を見つけて作者裁定で残置したが、
+  **CLI は誰も数えていない 3 つ目だった**
+- **cli の 77 件は payload の鍵を 1 つも見ていない**ので緑のままだった。
+  鍵を読む検査を 1 本足し、旧鍵へ戻す摂動で赤・
+  **鍵を残して無関係の値を変える対照の摂動では 78 件すべて緑**であることまで見た
+
+#### 受け入れで当てた摂動
+
+実装が当てた 4 件（選択器を恒等化 / allowlist の撤去 / 札を 12 件で打ち切り /
+enum から `random` を落とす）に加えて、受け入れ側で**形を変えない摂動**を 1 つ当てた。
+
+- **デモ既定を `"fixed"` から `"auto"` へ反転**（データだけを壊す）→
+  **`test_api.py::test_current_user_demo_settings_are_persisted` が 1 本だけ赤**。
+  既存利用者のデモが黙って LLM を呼ぶようになる変更は守られている
+
+pytest **1927/31**（+17 = 新設 `test_color_auto_select.py`）、cli **78**（+1 = 受け入れで足した 1 件）、
+ruff clean、`npm run check` **221/0/2**、`lint:i18n` **956/47/0/0**（鍵の 1 対 1 改名なので不変）、
+`lint:models` 68、`lint:recommendations` 37、`check_frozen_corpora.py` バイト一致。
+**render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。
+`android/` は追随していない**（旧鍵のクライアント乱択が残る。台帳 [I-072] 系）。
+**SPEC は英語の運用節（Modes）に `catalog_mode` を書き足した。版数は patch。**

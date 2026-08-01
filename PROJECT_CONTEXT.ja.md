@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.21 / Build 815**
+**対象バージョン: v2.9.22 / Build 817**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -1340,6 +1340,23 @@ v2.9.21（Build 815）では **履歴のサムネイルが、どの engine で�
 **tooltip の幅は悪化しない** — ラベル列は `54px` 固定で、新ラベル `render engine`（13 字）は既存最長の `Color catalog`（13 字）と同幅である。
 pytest **1910/31**（不変）、cli **77**、ruff clean、`npm run check` **221/0/2**、`lint:i18n` **956/47/0/0**（不変）。
 **決定的な層に差分が無いのでコーパスは焼き直していない。版数は patch。**
+
+v2.9.22（Build 817）では **色カタログが、記述を読んで決まる**（台帳 [I-082]）。
+自動描画（デモ）とバッチの色カタログが乱択から「記述を読んで選ぶ」へ変わり、選択はサーバーで行う。
+`/api/paint` の `catalog_mode` が決め方を運び、**`fixed` / `auto` / `random` の 3 値**で旧来の真偽値 `random_color_catalog` を置き換えた。
+**送らない旧クライアントは `fixed`** である。
+`auto` は新設の `color_selector.py`（150 行）が 13 カタログの札を作って Stage 1 と同じモデル解決で問い、**allowlist を通った id だけを採る**。
+失敗・タイムアウト・実在しない id は **要求された `catalog_id` へ倒れる**（落とし先は `default` ではない）。
+**`random` は推敲専用として残した**（作者裁定 4）— 「色カタログを変える」は同じ記述を別の色で見るための操作で、記述を読ませると毎回同じカタログへ収束して機能が消える。
+デモ設定の鍵も `catalog_mode`（`fixed` / `auto` の 2 値）へ移したが、**保存済みの旧鍵は `_normalize_demo_settings` が既定から作り直すので migration は不要**である（配備先の本番 DB で実測）。
+製品の `select_catalog_id` を段 0 と同じ 60 件へ通した実測は、**使われたカタログ 11 / 13・正規化エントロピー 0.853**（一様乱択 0.973 / キーワード一致 0.000）で、記述を読んだ選択は乱択とキーワード一致のあいだにある。
+**一度も選ばれないカタログが 2 つある**（`fresco_study` / `ink_porcelain`）。
+**受け入れで `inku-cli refine perform --kind color` が黙って壊れていることが出た** — `cli.py:2965` が削除済みの `random_color_catalog: True` を送り続けており、**`PaintRequest` は未知フィールドを捨てる**ので 200 が返り `catalog_mode` は `fixed` のまま＝同じカタログを描き直していた。
+**契約 §7.5 は web の呼び出し元だけを数えており、CLI は誰も数えていない 3 つ目だった**（実装セッションは web の 2 つ目を見つけて作者裁定で残置している）。
+**cli の 77 件は payload の鍵を 1 つも見ていない**ので緑のままで、鍵を読む検査を 1 本足し、旧鍵へ戻す摂動で赤・鍵を残して無関係の値を変える対照の摂動で全緑になることまで見た。
+受け入れ側の**形を変えない摂動**（デモ既定を `"fixed"` から `"auto"` へ反転）は 1 本だけを赤にし、既定は守られていた。
+pytest **1927/31**（+17）、cli **78**（+1）、ruff clean、`npm run check` **221/0/2**、`lint:i18n` **956/47/0/0**、`lint:models` 68、`lint:recommendations` 37、`check_frozen_corpora.py` バイト一致。
+**render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。`android/` は追随していない。版数は patch。**
 
 v2.4.7（Build 697）では決定的な DDL 層を凍結した。
 `server/reference/ddl-engine-1/` に 29 ケース（A = 展開 15 / B = 補正 14）を焼き、`ddl_version` と

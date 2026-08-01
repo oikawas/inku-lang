@@ -2661,9 +2661,12 @@ active line is highlighted and the current DDL interpretation is displayed
 read-only.  Batch execution keeps failure reports until the next batch run, and
 stores batch prompt history per user.
 
-Batch mode can optionally choose a random server color catalog for each render.
-The selected catalog is sent as `catalog_id` to `/api/paint`, and history records
-store the catalog that was actually used.
+Batch mode can optionally let the server choose a color catalog by reading each
+line. The request carries the selected catalog as `catalog_id` and sets
+`catalog_mode` to `auto`; `catalog_id` is then the fallback the server keeps when
+the model is unreachable or names a catalog that does not exist. History records
+store the catalog that was actually used. **Until v2.9.22 this option drew a
+catalog at random in the browser.**
 
 In the color catalog dialog, clicking outside the dialog confirms the current
 selection exactly like the save/confirm action. The cancel button still restores
@@ -2680,10 +2683,19 @@ waits for the configured interval, and repeats.  Demo settings are stored per
 user.  Demo results are not saved by default; the user can explicitly save a
 current render to history.
 
-Demo mode can also choose a random server color catalog for each render.  This
-option is part of the per-user demo settings.  The status bar reflects the
-catalog reported by the render result, not only the current global catalog
-selection.
+Demo mode can also let the server choose a color catalog by reading each
+description.  This option is part of the per-user demo settings, which hold it as
+`catalog_mode` (`fixed` or `auto`).  The status bar reflects the catalog reported
+by the render result, not only the current global catalog selection.
+**Until v2.9.22 this option drew a catalog at random.**
+
+`/api/paint` takes `catalog_mode` as one of `fixed`, `auto`, and `random`.
+`fixed` uses `catalog_id` as given, `auto` reads the description, and `random`
+draws a catalog other than `catalog_id`. **`random` belongs to refinement**: its
+"Another catalog" exists to see one description in a different color, and reading
+the description would settle on the same catalog every time. A request that omits
+`catalog_mode` behaves as `fixed`. The field replaced the boolean
+`random_color_catalog` in v2.9.22.
 
 While demo is running, history interaction is restricted where it could confuse
 context.

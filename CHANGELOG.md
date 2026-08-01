@@ -1782,3 +1782,69 @@ pytest **1910/31** (unchanged), cli **77**, ruff clean, `npm run check` **221/0/
 **956/47/0/0** (unchanged). **No deterministic layer changed, so no corpus was rebaked. There is no
 `android/` diff. SPEC does not enumerate the history tooltip's rows and is unchanged. The version is
 a patch.**
+
+### v2.9.22 — the color catalog is decided by reading the description (Build 817, 2026-08-01)
+
+Integrates the implementation of ledger **[I-082]** / the contract `color-auto-select.md` (revision 2).
+
+**The color catalog for the demo and for batch runs changes from a draw to a reading.** The choice is
+made on the server, and `/api/paint` carries how it is made in `catalog_mode`.
+
+- `catalog_mode` is one of **`fixed`, `auto`, `random`** and replaces the boolean
+  `random_color_catalog`. **A client that omits it behaves as `fixed`**
+- **`auto`** has the new `color_selector.py` (150 lines) build a card of all thirteen catalogs and ask
+  the model through the same resolution Stage 1 uses, **accepting only an id that survives the
+  allowlist**. A failure, a timeout, or an id that does not exist **falls back to the requested
+  `catalog_id`** — not to `default`
+- **`random` was kept, for refinement only** (author's ruling 4). "Another catalog" exists to see one
+  description in a different color, and reading the description would settle on the same catalog
+  every time, which is the feature disappearing
+- The demo setting moved to `catalog_mode` as well (`fixed` or `auto`). **No migration is needed
+  because `_normalize_demo_settings` rebuilds from the defaults**, confirmed against the production
+  database on the deployment host
+
+#### A reading sits between a draw and a keyword match
+
+The product's `select_catalog_id` was run over the same 60 cases, the same model and the same
+`temperature=0.3` as the prototype:
+
+| measure | prototype (v2.9.19) | **implementation (Build 814)** | uniform draw | keyword match |
+|---|---|---|---|---|
+| catalogs used | 11 / 13 | **11 / 13** | 13 / 13 | 1 / 13 |
+| normalized entropy | 0.856 | **0.853** | 0.973 | 0.000 |
+| same text three times, same id | 19 / 20 | **19 / 20** | — | — |
+
+**Two catalogs are never chosen** (`fresco_study`, `ink_porcelain` — the same two as the prototype).
+One call takes a median of 1.26 seconds and at most 55.74; one call in a hundred raised
+`APITimeoutError` and fell back as designed.
+
+#### Found and fixed during acceptance
+
+- **`inku-cli refine perform --kind color` was silently broken.** `cli.py:2965` kept sending the
+  deleted `random_color_catalog: True`, and **`PaintRequest` discards fields it does not declare**
+  (pydantic's default `extra="ignore"`), so the request returned **200 with `catalog_mode` still
+  `fixed`** — the refinement redrew the catalog it started from. Measured:
+  `PaintRequest(description="test", random_color_catalog=True).catalog_mode` is `"fixed"`
+- **The contract's section 7.5 counted only the web callers.** The implementation session found a
+  second one there (`colorCatalogCandidateIds`, kept by the author's ruling), but **the CLI was a
+  third that nobody counted**
+- **None of the 77 cli tests read the payload key**, so they stayed green. A test that reads the key
+  was added; reverting to the old key reddens it, and **a control that keeps the key while changing
+  an unrelated value leaves all 78 green**
+
+#### Perturbations applied during acceptance
+
+Beyond the four the implementation applied (identity selector, allowlist removed, card truncated to
+twelve, `random` dropped from the enum), acceptance applied one that **changes no shape**.
+
+- **Flipping the demo default from `"fixed"` to `"auto"`** (data only) reddens exactly one test,
+  `test_api.py::test_current_user_demo_settings_are_persisted`. A change that would silently make
+  every existing user's demo call the model is guarded
+
+pytest **1927/31** (+17 from the new `test_color_auto_select.py`), cli **78** (+1 added during
+acceptance), ruff clean, `npm run check` **221/0/2**, `lint:i18n` **956/47/0/0** (the keys were
+renamed one for one), `lint:models` 68, `lint:recommendations` 37, `check_frozen_corpora.py`
+byte-identical. **The render engine stays at 20, and `ddl_version` 3 and `ddl_engine_version` 4 are
+unchanged. `android/` has not followed** (its client-side draw and the old key remain; ledger
+[I-072] family). **SPEC gains `catalog_mode` in the English operational section (Modes). The version
+is a patch.**

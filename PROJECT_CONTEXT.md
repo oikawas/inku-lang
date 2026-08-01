@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.21 / Build 815**
+**Target version: v2.9.22 / Build 817**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -1683,6 +1683,23 @@ The change is **three lines in `HistoryStrip.svelte`**, and **the API, the datab
 **The tooltip does not get wider** — the label column is a fixed `54px`, and the new label `render engine` (13 characters) is the same length as the existing longest, `Color catalog` (13 characters).
 pytest **1910/31** (unchanged), cli **77**, ruff clean, `npm run check` **221/0/2**, `lint:i18n` **956/47/0/0** (unchanged).
 **No deterministic layer changed, so no corpus was rebaked. The version is a patch.**
+
+v2.9.22 (Build 817) **decides the color catalog by reading the description** (ledger [I-082]).
+The catalog for the demo and for batch runs changes from a draw to a reading, and the choice is made on the server.
+`/api/paint` carries how it is made in `catalog_mode`, **one of `fixed`, `auto` and `random`**, replacing the boolean `random_color_catalog`.
+**A client that omits it behaves as `fixed`.**
+`auto` has the new `color_selector.py` (150 lines) build a card of all thirteen catalogs and ask the model through the same resolution Stage 1 uses, **accepting only an id that survives the allowlist**.
+A failure, a timeout, or an id that does not exist **falls back to the requested `catalog_id`**, not to `default`.
+**`random` was kept for refinement only** (author's ruling 4): "Another catalog" exists to see one description in a different color, and reading the description would settle on the same catalog every time.
+The demo setting moved to `catalog_mode` as well (`fixed` or `auto`), and **no migration is needed because `_normalize_demo_settings` rebuilds from the defaults**, confirmed against the production database on the deployment host.
+Running the product's `select_catalog_id` over the prototype's 60 cases gives **11 of 13 catalogs used and a normalized entropy of 0.853** (a uniform draw is 0.973, a keyword match 0.000), which places a reading between the two.
+**Two catalogs are never chosen** (`fresco_study`, `ink_porcelain`).
+**Acceptance surfaced that `inku-cli refine perform --kind color` was silently broken** — `cli.py:2965` kept sending the deleted `random_color_catalog: True`, and **`PaintRequest` discards fields it does not declare**, so the request returned 200 with `catalog_mode` still `fixed` and the refinement redrew the catalog it started from.
+**The contract's section 7.5 counted only the web callers, and the CLI was a third that nobody counted** (the implementation session had already found a second one on the web side and kept it by the author's ruling).
+**None of the 77 cli tests read the payload key**, so a test that reads it was added; reverting to the old key reddens it, and a control that keeps the key while changing an unrelated value leaves all 78 green.
+Acceptance's own perturbation **changes no shape** — flipping the demo default from `"fixed"` to `"auto"` reddens exactly one test, so the default is guarded.
+pytest **1927/31** (+17), cli **78** (+1), ruff clean, `npm run check` **221/0/2**, `lint:i18n` **956/47/0/0**, `lint:models` 68, `lint:recommendations` 37, `check_frozen_corpora.py` byte-identical.
+**The render engine stays at 20, and `ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` has not followed. The version is a patch.**
 
 v2.4.7 (Build 697) freezes the deterministic DDL layers.
 `server/reference/ddl-engine-1/` holds 29 cases (A = 15 expansion, B = 14 coercion), and

@@ -18,7 +18,6 @@ Sections (stable JSON keys):
 
 from __future__ import annotations
 
-import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -75,19 +74,22 @@ from .renderer import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_APP_VERSION_RE = re.compile(r"const\s+APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]")
 
 
 # --------------------------------------------------------------------------- #
 # meta                                                                        #
 # --------------------------------------------------------------------------- #
 def _app_version() -> str | None:
-    path = _REPO_ROOT / "web" / "src" / "routes" / "+page.svelte"
+    """Read web/APP_VERSION, the single source shared with the UI and /api/info.
+
+    This used to scan +page.svelte for `const APP_VERSION = '...'`, which pinned
+    that one line in a 7,400-line component: moving it broke the dump silently.
+    """
+    path = _REPO_ROOT / "web" / "APP_VERSION"
     try:
-        match = _APP_VERSION_RE.search(path.read_text(encoding="utf-8"))
+        return path.read_text(encoding="utf-8").strip() or None
     except OSError:
         return None
-    return match.group(1) if match else None
 
 
 def _build_number() -> str | None:

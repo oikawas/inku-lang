@@ -2074,3 +2074,54 @@ coordinates, and `db.get_items` not excluding trashed works).
 only by the deleted paragraphs; **no published document lost its last inbound reference** — all seven
 lost targets are still named from elsewhere). No code, specification, or drawing behavior was
 touched, so pytest, ruff, `npm run check`, and the frozen corpora do not apply.
+
+### v2.9.25 — Five values that called themselves a version collapse into one file (Build 822, 2026-08-01)
+
+Ledger [I-085]. **Two version numbers appeared on the same screen**: `/api/info` reported `2.7.2`
+while the UI displayed `v2.9.24`.
+
+**What was measured.** Five places supplied an "application version" independently:
+`server/pyproject.toml` (2.7.2, feeding `/api/info` and the server banner), a string literal at
+`+page.svelte:77` (v2.9.24, feeding the UI), `reference.py:84` (**scraping that literal out of
++page.svelte with a regular expression**), `web/package.json` (0.1.0, feeding the vite banner), and
+`cli/pyproject.toml` (0.1.0). **Two different functions named `_app_version` read two different
+sources** — `api_core/common.py` read pyproject, `reference.py` read the Svelte component.
+
+**Consumers were counted across all four areas.** **Nothing interprets `version` from `/api/info`**:
+web reads only `developer_mode` and `render_engine_version`, the CLI prints the response verbatim,
+and Android never calls the endpoint. The concern recorded when the item was filed — that changing
+the response would require counting consumers — **disappeared once they were counted**.
+
+**What was done.** **`web/APP_VERSION` is now the single source.** It sits beside `web/BUILD_NUMBER`
+and uses the same mechanism, with the same three readers: the `define` in `vite.config.ts`,
+`api_core/common.py`, and `cli.py`. **No new mechanism was introduced.**
+
+- `/api/info` reports two versions — `version` is the **application version** (`web/APP_VERSION`) and
+`release_version` is the **distributed package** (`pyproject.toml`). They disagree while releases are
+on hold, because they are different things
+- `+page.svelte` reads `__APP_VERSION__` from the vite define, which **removes the coupling that made
+one line inside a 7,411-line component load-bearing for the reference dump**
+- The regular-expression scrape in `reference.py` is gone, along with its now-unused `re` import
+- The vite banner reads `APP_VERSION` instead of `package.json` 0.1.0
+
+**Stamping got shorter.** `scripts/bump.py` writes all four systems across six files from one command
+(`APP_VERSION`, `BUILD_NUMBER`, the project-context target line in both languages, and the version
+marker table in both languages). `--scan-build` reads every local ref and reports max+1, stating in
+its output that it cannot see the deployment host. **A pattern that does not match exactly once is an
+error**, so a document that changes shape is never silently skipped.
+
+**A consistency gate was added.** `server/tests/test_version_consistency.py` (8 tests) checks that the
+four systems agree. **The v2.9.24 miss would have been caught by it.** Its discrimination was measured
+with three perturbations: reverting only the project-context target line to `v2.9.23 / Build 820`
+(**the miss that actually shipped**) turned exactly one test red; restoring a version literal in
+`+page.svelte` turned exactly one red; ageing the build number in the marker table turned exactly one
+red. **A control perturbation** — moving only `pyproject.toml` to `9.9.9` — **left all eight green**,
+confirming the gate does not mistake a lagging release version for a regression.
+
+**The API surface digest was regenerated**; the difference is one property added to one schema
+(`AppInfoResponse.release_version`). Endpoints 80 → 80, zero operation differences and zero removed
+properties were confirmed item by item before regenerating (`535566b6…` → `d4c57fed…`).
+
+pytest **1945/31** (+8, the new consistency gate), cli **78**, ruff clean, `npm run check` **229 files
+/ 0 errors / 2 warnings**, `lint:i18n` **956/47/0/0**, `check_docs.py` green. **No deterministic layer
+changed, so the frozen corpora were not regenerated. `android/` is untouched. The version is a patch.**

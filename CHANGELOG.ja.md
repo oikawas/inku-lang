@@ -2131,3 +2131,47 @@ CHANGELOG 側 82 行に対して 20 行という**圧縮率だけが違う複製
 `check_docs.py` 緑（内部参照 56 → 54。削除した段落だけが名指ししていた公開文書があるため。
 **参照が 0 になった公開文書は無い** — 失われた 7 件の宛先はすべて他の公開文書からも名指しされている）。
 コード・仕様・描画には触れていないので、pytest・ruff・`npm run check`・凍結コーパスは対象外。
+
+### v2.9.25 — 版数を名乗る 5 つの値が、1 つのファイルへ寄る（Build 822、2026-08-01）
+
+台帳 [I-085]。**同じ画面に 2 つの版数が出ていた** — `/api/info` は `2.7.2` を返し、UI は `v2.9.24` を表示していた。
+
+**測ったこと。** 「アプリのバージョン」を名乗る値が **5 か所**から独立に供給されていた。
+`server/pyproject.toml`（2.7.2 → `/api/info` と server 起動バナー）、
+`+page.svelte:77` の文字列リテラル（v2.9.24 → UI 表示）、
+`reference.py:84`（**その `+page.svelte` を正規表現で走査**）、
+`web/package.json`（0.1.0 → Vite 起動バナー）、`cli/pyproject.toml`（0.1.0）。
+**`_app_version` という同名の関数が 2 つあり、読む先が違っていた**（`api_core/common.py` は pyproject、`reference.py` は Svelte ファイル）。
+
+**受け手を 4 領域で数えた。** `/api/info` の `version` を**解釈している受け手は 0 件**だった —
+web は `developer_mode` と `render_engine_version` しか読まず、cli は応答を丸ごと印字するだけ、Android は `/api/info` を叩かない。
+起票時に「API の応答が変わるので受け手を数える必要がある」と書いた懸念は、**数えた結果消えた**。
+
+**したこと。** **`web/APP_VERSION` を単一情報源にした。**
+`web/BUILD_NUMBER` と同じ場所・同じ機構で、読み手も同じ 3 つ（`vite.config.ts` の `define`、`api_core/common.py`、`cli.py`）。
+**新しい仕組みは 1 つも増やしていない。**
+
+- `/api/info` は版を 2 つ返す — `version` が**アプリの版**（`web/APP_VERSION`）、`release_version` が**配布物の版**（`pyproject.toml`）。
+リリースを保留している間は一致しないが、それは 2 つが別の概念だからである
+- `+page.svelte` は `__APP_VERSION__`（vite の define）を読む。**7,411 行の中の 1 行を動かすと reference dump が壊れる結合が消えた**
+- `reference.py` の正規表現走査を撤去した（未使用になった `re` の import も）
+- Vite 起動バナーは `package.json` の 0.1.0 ではなく `APP_VERSION` を読む
+
+**採番の手数を減らした。** `scripts/bump.py` が 1 コマンドで 4 系統 6 ファイルへ書く
+（`APP_VERSION`・`BUILD_NUMBER`・PROJECT_CONTEXT の対象バージョン行の日英・版マーカー表の日英）。
+`--scan-build` は全ローカル ref を舐めて max+1 を出す（**配備先は見えないので別途確かめる**と出力に明記する）。
+**パターンが 1 回ちょうど一致しなければ落ちる** — 文書の形が変わったら黙って飛ばさない。
+
+**齟齬の検査を足した。** `server/tests/test_version_consistency.py`（8 件）が 4 系統の一致を見る。
+**v2.9.24 の漏れはこの検査があれば止まっていた。**
+判別力を摂動 3 件で測った — ①PROJECT_CONTEXT の対象バージョン行だけを `v2.9.23 / Build 820` へ戻す（**v2.9.24 で実際に起きた漏れ**）で 1 件だけ赤、
+②`+page.svelte` に版数のリテラルを戻すで 1 件だけ赤、③版マーカー表の Build を古くするで 1 件だけ赤。
+**対照の摂動**として `pyproject.toml` の版だけを `9.9.9` へ動かすと**全 8 件が緑のまま**で、
+リリース版数の遅れを退行と誤認しないことを確かめた。
+
+**API 表面のダイジェストは焼き直した** — 差分は 1 スキーマに 1 プロパティ追加だけ（`AppInfoResponse.release_version`）。
+endpoints 80 → 80、operations の差 0、消えた property 0 を項目単位で確かめてから焼いた（`535566b6…` → `d4c57fed…`）。
+
+pytest **1945/31**（+8 = 新設の整合検査）、cli **78**、ruff clean、`npm run check` **229 / 0 errors / 2 warnings**、
+`lint:i18n` **956/47/0/0**、`check_docs.py` 緑。
+**決定的な層に差分が無いので凍結コーパスは焼き直していない。`android/` にも差分は無い。版数は patch。**

@@ -27,6 +27,8 @@ from sqlalchemy import create_engine, inspect, text
 
 from inku_server import db
 from inku_server import api as api_module
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 from inku_server.api_core import common as api_common
 from inku_server.api_core import rendering as api_rendering
 from inku_server.api_core import state as api_state
@@ -141,9 +143,12 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert r.status_code == 200
     data = r.json()
     assert data["name"] == "inku-server"
-    # Track the installed distribution rather than a literal, so release version
-    # bumps in pyproject.toml do not require editing this test.
-    assert data["version"] == importlib.metadata.version("inku-server")
+    # version is the application version and comes from web/APP_VERSION, the
+    # single source the UI reads too; release_version is the installed
+    # distribution and lags while releases are on hold. Track both against their
+    # own source rather than a literal.
+    assert data["version"] == (REPO_ROOT / "web" / "APP_VERSION").read_text(encoding="utf-8").strip()
+    assert data["release_version"] == importlib.metadata.version("inku-server")
     assert data["build_number"]
     assert data["developer_mode"] is False
     assert data["render_engine_id"] == "default"

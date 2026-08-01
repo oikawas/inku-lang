@@ -42,6 +42,8 @@
 <div class="catalog-modal" role="dialog" aria-modal="true" tabindex="-1">
 	<div class="catalog-modal-head">
 		<div class="catalog-modal-title">{t().colorCatalogTitle}</div>
+		<!-- Same handler as the backdrop, so the two dismissal paths agree. -->
+		<button class="catalog-close" onclick={onConfirm} aria-label={t().closeLabel}>×</button>
 	</div>
 	<div class="catalog-body">
 		<div class="catalog-scroll">
@@ -101,6 +103,10 @@
 		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 	}
 	.catalog-modal-title { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; }
+	.catalog-close {
+		width: 24px; height: 24px; border: none; background: none;
+		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;
+	}
 	.catalog-body { flex: 1; min-height: 0; }
 	.catalog-scroll { height: 100%; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 	.catalog-item {

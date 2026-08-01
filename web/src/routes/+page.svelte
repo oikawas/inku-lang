@@ -6062,7 +6062,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{canvasAspectEnabled}
 			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
 			onClose={closeSettingsModal}
-			onCloseSettings={() => (settingsOpen = false)}
 			onSelectSettingsTab={selectSettingsTab}
 			onSetStage1Provider={setStage1Provider}
 			onSetStage1Model={setStage1Model}

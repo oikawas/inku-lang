@@ -193,7 +193,6 @@
 		animationExportSettings: AnimationExportSettings;
 		canvasAspectEnabled: boolean;
 		onClose: () => void;
-		onCloseSettings: () => void;
 		onSelectSettingsTab: (tab: SettingsTab) => void;
 		onSetStage1Provider: (provider: Provider) => void;
 		onSetStage1Model: (model: string) => void;
@@ -302,7 +301,6 @@
 		animationExportSettings = $bindable(),
 		canvasAspectEnabled,
 		onClose,
-		onCloseSettings,
 		onSelectSettingsTab,
 		onSetStage1Provider,
 		onSetStage1Model,
@@ -724,9 +722,9 @@
 <div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 	<div class="modal-head">
 		<div class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</div>
-		{#if settingsMode !== 'model'}
-			<button class="catalog-close" onclick={onCloseSettings}>×</button>
-		{/if}
+		<!-- onClose, not a bare `settingsOpen = false`: in model mode the close has to
+		     roll back the pending picker selection, the way the backdrop and Esc do. -->
+		<button class="catalog-close" onclick={onClose} aria-label={t().closeLabel}>×</button>
 	</div>
 	{#if settingsMode === 'model'}
 		<div class="settings-tabs model-selection-tabs" role="tablist" aria-label={t().modelSelectButton}>

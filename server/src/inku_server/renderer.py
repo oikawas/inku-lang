@@ -238,6 +238,11 @@ WEIGHT_STYLE: dict[str, dict[str, str | float]] = {
 
 BACKGROUND = "#ffffff"
 
+# engine 20: the frame an expanded group is fitted into once it has been moved
+# onto its declared anchor. Marks are allowed to touch the edge, not to leave.
+FRAME_LO = 0.02
+FRAME_HI = 0.98
+
 # SPEC §13.8: 揺らぎは Renderer 層で生成する (JSON Score は決定的な楽譜)
 #
 # 揺らぎ・滲みは「図形の代表寸法に対する比率」で定義する (v2.1)。
@@ -1715,7 +1720,7 @@ def _render_effect_hint(color_hint: str | None) -> str | None:
     return "; ".join(kept) if kept else None
 
 
-def _expand_arrangement(
+def _expand_arrangement_layout(
     ins: Instruction,
     performance_seed: int | None = None,
     canvas: CanvasSize | None = None,
@@ -1847,8 +1852,11 @@ def _expand_arrangement(
         return _apply_color_cycle(result, arr.color_cycle)
 
     if arr.layout == "radial":
-        cx = arr.center[0] if arr.center else 0.5
-        cy = arr.center[1] if arr.center else 0.5
+        # engine 20: `center` is radial's own rotation centre. When the
+        # description does not state one, the ring turns around the declared
+        # anchor -- not around the middle of the canvas.
+        cx = arr.center[0] if arr.center else ax
+        cy = arr.center[1] if arr.center else ay
         r = arr.radius if arr.radius else 0.3
         targets = [
             (
@@ -1877,6 +1885,65 @@ def _expand_arrangement(
         return _apply_color_cycle(result, arr.color_cycle)
 
     return _apply_color_cycle([ins], arr.color_cycle)
+
+
+def _fit_axis_scales(anchor: float, offsets: list[float]) -> tuple[float, float]:
+    """Shrink factors for one axis, one per direction (engine 20, R5).
+
+    Each side is shrunk only by what overflows on that side, so the spread away
+    from the frame is kept. A similarity shrink would collapse the whole group
+    for the sake of the one mark that overflows.
+    """
+    positive = [offset for offset in offsets if offset > 0]
+    negative = [offset for offset in offsets if offset < 0]
+    forward = min(1.0, (FRAME_HI - anchor) / max(positive)) if positive else 1.0
+    backward = min(1.0, (FRAME_LO - anchor) / min(negative)) if negative else 1.0
+    return max(forward, 0.0), max(backward, 0.0)
+
+
+def _fit_group_to_anchor(
+    ins: Instruction, expanded: list[Instruction]
+) -> list[Instruction]:
+    """Move an expanded group so that it sits on the declared anchor.
+
+    The layout branches decide how the group scatters; this decides where the
+    group is. Until engine 19 the second question was answered by the seed
+    alone, so 77.8% of the expanded marks never consulted the coordinates the
+    description had stated.
+    """
+    ax, ay = _anchor(ins)
+    points = [_anchor(item) for item in expanded]
+    cx = sum(point[0] for point in points) / len(points)
+    cy = sum(point[1] for point in points) / len(points)
+    offsets = [(px - cx, py - cy) for px, py in points]
+    x_forward, x_backward = _fit_axis_scales(ax, [dx for dx, _ in offsets])
+    y_forward, y_backward = _fit_axis_scales(ay, [dy for _, dy in offsets])
+    result: list[Instruction] = []
+    for item, (px, py), (dx, dy) in zip(expanded, points, offsets):
+        tx = ax + dx * (x_forward if dx > 0 else x_backward)
+        ty = ay + dy * (y_forward if dy > 0 else y_backward)
+        result.append(_shift(item, tx - px, ty - py))
+    return result
+
+
+def _expand_arrangement(
+    ins: Instruction,
+    performance_seed: int | None = None,
+    canvas: CanvasSize | None = None,
+) -> list[Instruction]:
+    """Expand an arrangement and place the resulting group on its anchor."""
+    expanded = _expand_arrangement_layout(ins, performance_seed, canvas)
+    if not expanded:
+        return expanded
+    arr = ins.arrangement
+    if arr is not None and arr.layout == "grid" and ins.at is not None:
+        # The one branch that already reads a stated position: a grid tiles
+        # `at.region`, and for that instruction `at` survives performance
+        # resolution instead of being folded into the anchor. Fitting here would
+        # replace the region the description gave with the shape's own centre,
+        # which for a tiling is the coordinate nobody stated.
+        return expanded
+    return _fit_group_to_anchor(ins, expanded)
 
 
 def _inject_blur_filters(

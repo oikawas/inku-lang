@@ -9,7 +9,13 @@ import re
 
 from inku_server.master_grid import MASTER_GRID_DECIMALS
 from inku_server.render_engines import current_render_engine
-from inku_server.schema import CanvasGroundSpec, Instruction, Score, SurfaceSpec
+from inku_server.schema import (
+    Arrangement,
+    CanvasGroundSpec,
+    Instruction,
+    Score,
+    SurfaceSpec,
+)
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
@@ -19,6 +25,7 @@ MANIFEST_PATH = CORPUS_DIR / "manifest.json"
 # 帰属の主張は版に紐づく。「そのとき何が動いたか」を後の版の manifest で読むと、
 # 主張の対象が黙って入れ替わる。
 ENGINE_18_MANIFEST = SERVER_ROOT / "reference" / "render-engine-18" / "manifest.json"
+ENGINE_19_MANIFEST = SERVER_ROOT / "reference" / "render-engine-19" / "manifest.json"
 
 
 def _generator():
@@ -37,12 +44,13 @@ def test_render_reference_case_counts() -> None:
     cases = _manifest()["cases"]
     # Engine 18 replaced the catalog data without touching the original 365
     # cases. Group F is now 13 catalogs x 9 abstract colors, six hint cases, and
-    # five non-white backgrounds.
-    assert len(cases) == 493
+    # five non-white backgrounds. Engine 20 added group G: the 32 cases that
+    # state an `arrangement`, which is the only way to reach placement at all.
+    assert len(cases) == 525
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
-        for prefix in ("A", "B", "C", "D", "E", "F")
-    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128}
+        for prefix in ("A", "B", "C", "D", "E", "F", "G")
+    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128, "G": 32}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -55,6 +63,7 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
     assert score_fields == set(Score.model_fields)
     assert set(generator.BASE_SURFACE) == set(SurfaceSpec.model_fields)
     assert set(generator.BASE_GROUND) == set(CanvasGroundSpec.model_fields)
+    assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields)
     for case_id, case in generator.build_inputs().items():
         score = case["score"]
         assert set(score) == score_fields
@@ -118,8 +127,11 @@ def test_engine_19_moves_the_tools_the_sheet_meets_and_no_others() -> None:
     地の抵抗は道具の性質なので、動いた / 動かないの境目は道具にある。
     機械 (rotring / computer) が 1 件でも入っていたら、抵抗が道具でなく
     全体にかかる効果になっている。
+
+    engine 19 についての主張なので、engine 19 の manifest を読む。現行版を
+    読むと、engine 20 で「動いた 32 件」へ主張の対象が黙って入れ替わる。
     """
-    manifest = _manifest()
+    manifest = json.loads(ENGINE_19_MANIFEST.read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "19"
     changed = set(manifest["changed_from_previous"])
     assert len(changed) == 227
@@ -213,6 +225,34 @@ def test_engine_18_palette_cases_match_the_current_renderer() -> None:
             wild=render_input["wild"],
         )
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"]
+
+
+def test_group_g_matches_the_current_renderer() -> None:
+    """Group G must traverse the live placement stage, not only frozen files.
+
+    Nothing else in this file re-renders anything: the other tests compare
+    frozen SVG with the frozen manifest, so a change to `_expand_arrangement`
+    leaves them all green. Group G is the only corpus group that reaches
+    placement at all, and this is the only test that runs it.
+    """
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    checked = 0
+    for case_id, render_input in inputs.items():
+        if not case_id.startswith("G-"):
+            continue
+        svg = generator.render(
+            Score.model_validate(render_input["score"]),
+            color_map=render_input["color_map"],
+            catalog_id=render_input["catalog_id"],
+            render_seed=render_input["render_seed"],
+            svg_profile=render_input["svg_profile"],
+            wild=render_input["wild"],
+        )
+        assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
+        checked += 1
+    assert checked == 32
 
 
 def test_render_reference_discriminator_cases() -> None:

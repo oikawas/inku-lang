@@ -317,7 +317,7 @@ def test_color_hint_does_not_change_the_performed_svg():
     )
 
 
-def test_count_adds_one_mark_without_reperforming_the_first_twelve():
+def test_count_adds_one_mark_without_reshuffling_the_first_twelve():
     first = Score.model_validate(
         {
             "instructions": [
@@ -342,7 +342,26 @@ def test_count_adds_one_mark_without_reperforming_the_first_twelve():
 
     assert len(first_marks) == 12
     assert len(second_marks) == 13
-    assert first_marks == second_marks[:12]
+
+    # `count` is not in the seed payload, so the thirteenth mark is an addition
+    # and not a reshuffle: the layout stage hands back the same twelve targets.
+    first_instruction = first.instructions[0]
+    second_instruction = second.instructions[0]
+    assert _seed_for_instruction(first_instruction, 431) == _seed_for_instruction(
+        second_instruction, 431
+    )
+    laid_out = [
+        [renderer._anchor(item) for item in renderer._expand_arrangement_layout(ins, 431)]
+        for ins in (first_instruction, second_instruction)
+    ]
+    assert laid_out[0] == laid_out[1][:12]
+
+    # engine 20: placement is a second stage, and it reads the whole group --
+    # the group is moved onto the declared anchor and shrunk where it leaves the
+    # frame. A thirteenth target changes the group's centroid and extent, so the
+    # first twelve marks are re-placed and therefore re-performed. Their XML is
+    # no longer a prefix; what holds still is the layout above and the seed.
+    assert first_marks != second_marks[:12]
 
 
 def test_preserve_space_changes_only_its_arrangement_effect():

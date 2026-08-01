@@ -245,8 +245,8 @@
 	let animationExportBusy = $state(false);
 	let animationExportError = $state<string | null>(null);
 
-	// Selection is confined to the page on screen, but in lineage mode the
-	// expanded members come from a separate request, so both pools are searched.
+	// Selection can span pages. The current page and expanded lineage members are
+	// checked first; off-page items are fetched on demand by export actions.
 	function findSelectedItem(id: string): HistoryItem | null {
 		const onPage = managedHistoryItems.find((it) => it.id === id);
 		if (onPage) return onPage;

@@ -59,8 +59,8 @@ _CATALOG_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {
         "id": "fresco_study",
         "name": "Fresco Study",
-        "sub": "plaster, pigment, warm stone",
-        "sub_ja": "漆喰、顔料、温かい石",
+        "sub": "sunlit wall, dry earth, warm shadow",
+        "sub_ja": "日なたの壁、乾いた土、温かい陰",
         "map": {"white": "#f5f1e8", "black": "#4a342e", "gray": "#8a8178", "red": "#c7432f", "orange": "#b06a2f", "yellow": "#c39a2b", "green": "#4f7942", "blue": "#1f4e8c", "purple": "#71487c"},
         "palette": [
             {"name": "Warm Stone", "name_ja": "温かい石", "code": "#8a8178"},
@@ -97,8 +97,8 @@ _CATALOG_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {
         "id": "ink_porcelain",
         "name": "Ink & Porcelain",
-        "sub": "ink, porcelain, mineral accents",
-        "sub_ja": "墨、磁器、鉱物の差し色",
+        "sub": "clear light, ink, sharp mineral accents",
+        "sub_ja": "澄んだ光、墨、冴えた鉱物の差し色",
         "map": {"white": "#fffdfa", "black": "#1a1a1b", "gray": "#4b4b4f", "red": "#c91f24", "orange": "#b5642c", "yellow": "#d6a01d", "green": "#00896c", "blue": "#0057a8", "purple": "#6a4c8c"},
         "palette": [
             {"name": "Cinnabar Red", "name_ja": "辰砂の赤", "code": "#c91f24"},

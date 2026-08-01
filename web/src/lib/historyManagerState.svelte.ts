@@ -232,7 +232,6 @@ export class HistoryManagerState {
 		const nextPage = Math.max(0, Math.min(page, this.totalPages - 1));
 		if (nextPage === this.page) return;
 		this.page = nextPage;
-		this.selectedIds = [];
 		void this.fetch({ page: nextPage });
 	};
 
@@ -245,7 +244,6 @@ export class HistoryManagerState {
 		}
 		this.pageSize = nextPageSize;
 		this.page = Math.max(0, Math.min(this.page, this.totalPages - 1));
-		this.selectedIds = [];
 		void this.fetch({ page: this.page });
 	};
 
@@ -263,7 +261,11 @@ export class HistoryManagerState {
 
 	toggleSelectAll() {
 		const ids = this.items.map((it) => it.id).filter((id): id is string => !!id);
-		this.selectedIds = this.selectedIds.length === ids.length ? [] : ids;
+		const pageIds = new Set(ids);
+		const allPageItemsSelected = ids.length > 0 && ids.every((id) => this.selectedIds.includes(id));
+		this.selectedIds = allPageItemsSelected
+			? this.selectedIds.filter((id) => !pageIds.has(id))
+			: [...this.selectedIds, ...ids.filter((id) => !this.selectedIds.includes(id))];
 	}
 
 	applyStarState(item: { id?: string; starred?: boolean; note?: string | null }) {

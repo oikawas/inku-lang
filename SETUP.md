@@ -55,6 +55,20 @@ tar xzf inku-lang-source-<build>.tar.gz
 cd inku-lang-source-<build>
 ```
 
+## Working from a git clone
+
+A clone needs one extra step that a source tarball does not. `web/BUILD_NUMBER`
+is a shared counter, so two branches bumping it is never a real disagreement --
+a merge driver keeps the larger number. Merge drivers live in `.git/config`,
+which is not versioned, so run this once per clone:
+
+```sh
+scripts/git/setup.sh
+```
+
+Worktrees share `.git/config`, so one run covers all of them. Skipping it is
+safe: the file simply conflicts on merge the way it always did.
+
 ## Running in Containers
 
 There are two container routes. **[`deploy/README.md`](deploy/README.md) is the authoritative deployment guide**; the first account, data persistence, version pinning, HTTPS and logs are covered there.

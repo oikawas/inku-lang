@@ -35,7 +35,13 @@ if [ ! -x "$driver" ]; then
 	exit 1
 fi
 
-git config merge.buildnumber.name 'keep the larger web/BUILD_NUMBER'
+# Deliberately no `merge.buildnumber.name`.  With a name but no driver git does
+# not fall back to the text merge -- it aborts the whole merge with
+# "fatal: custom merge driver buildnumber lacks command line" (measured
+# 2026-08-01).  With neither key set, the attribute names an unknown driver and
+# git quietly does what it did before this branch.  Keeping only the driver key
+# means every way of losing the configuration fails in the safe direction.
+git config --unset merge.buildnumber.name 2>/dev/null || true
 git config merge.buildnumber.driver "$driver %A %O %B"
 
 echo "configured merge.buildnumber.driver = $driver %A %O %B"

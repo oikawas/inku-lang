@@ -50,7 +50,17 @@
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
-	import { DEFAULT_ANIMATION_EXPORT_SETTINGS, parseAnimationExportSettings, type AnimationExportSettings } from '$lib/animationExport';
+	// Persisted settings: one feature, one file.  Adding a setting must not send
+	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
+	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
+	import { wildSettings } from '$lib/features/wild/settings.svelte';
+	import { exportSettings } from '$lib/features/export/settings.svelte';
+	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
+	import {
+		batchFailureReportStore,
+		type BatchFailure
+	} from '$lib/features/batch/failure-report.svelte';
 	import {
 		CANVAS_ASPECT_PLUGIN_ID,
 		DEFAULT_CANVAS_ASPECT_ID,
@@ -69,13 +79,6 @@
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
-	const CATALOG_KEY         = 'inku-color-catalog';
-	const TENKEI_KEY          = 'inku-tenkei';
-	const WILD_KEY            = 'inku-wild';
-	const PNG_ALPHA_KEY       = 'inku-png-alpha-white';
-	const ANIMATION_EXPORT_SETTINGS_KEY = 'inku-animation-export-settings';
-	const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
-	const RESULT_LOG_OPEN_KEY = 'inku-result-log-open';
 	const APP_VERSION = 'v2.9.22';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
@@ -84,8 +87,6 @@
 		if (Number.isNaN(stamp.getTime())) return null;
 		return stamp.toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
 	});
-	const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
-	const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
 	const BATCH_PROMPT_HISTORY_LIMIT = 20;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
 	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
@@ -158,16 +159,6 @@
 		currentVersion: string | null;
 		versionMessage: string | null;
 		provisionalSeed: number | null;
-	};
-	type BatchFailure = {
-		line: number;
-		input: string;
-		message: string;
-	};
-	type BatchFailureReport = {
-		success: number;
-		total: number;
-		failures: BatchFailure[];
 	};
 
 	type PluginEntry = {
@@ -335,7 +326,6 @@
 	let batchTotal   = $state(0);
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
-	let batchFailureReport = $state<BatchFailureReport | null>(null);
 	let batchPromptHistory = $state<string[]>([]);
 	let batchAutoColorCatalog = $state(false);
 	let batchActiveLine = $state<number | null>(null);
@@ -495,7 +485,6 @@
 	let canvasAspectId = $state<CanvasAspectId>(DEFAULT_CANVAS_ASPECT_ID);
 	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId } | null>(null);
 	let catalogSelectionSnapshot = $state<string | null>(null);
-	let statsOpen    = $state(false);
 	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
 	let lineageGraph = $state<LineageGraph | null>(null);
@@ -529,11 +518,8 @@
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
 	let currentRenderEngineVersion = $state<string | null>(null);
-	let pngAlphaWhite = $state(false);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
-	let animationExportSettings = $state<AnimationExportSettings>({ ...DEFAULT_ANIMATION_EXPORT_SETTINGS });
-	let miscSettingsLoaded = $state(false);
 
 	// DOM refs for outside-click handling
 	let pngWrapEl      = $state<HTMLDivElement | null>(null);
@@ -694,25 +680,12 @@
 	}
 
 	// ── Color catalog ────────────────────────────────────────
-	let selectedCatalog = $state('default');
-	// 添景水準 (v1.97). Explicit for describe-tab/root generation; refine flows omit it to inherit.
-	let tenkeiLevel = $state<TenkeiLevel>(DEFAULT_TENKEI);
-	function setTenkeiLevel(level: TenkeiLevel) {
-		tenkeiLevel = level;
-		try { localStorage.setItem(TENKEI_KEY, level); } catch {}
-	}
-	// 暴れる (engine 12): OFF = 予想のつく標準、ON = 天井を外した奔放なストローク。作品全体の 1 スイッチ・永続化。
-	let wildEnabled = $state(false);
-	function setWildEnabled(value: boolean) {
-		wildEnabled = value;
-		try { localStorage.setItem(WILD_KEY, value ? '1' : '0'); } catch {}
-	}
 	// Refine dialogs: null = inherit from the parent artwork (field omitted).
 	let refineTenkeiOverride = $state<TenkeiLevel | null>(null);
 	function setRefineTenkei(level: TenkeiLevel | null) { refineTenkeiOverride = level; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
-	const currentCatalog = $derived(catalogById(colorCatalogs, selectedCatalog) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
+	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.selected) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 
 	// ── Settings tabs ────────────────────────────────────────
 	let settingsStatus = $state<SettingsStatus | null>(null);
@@ -1419,12 +1392,12 @@
 	}
 
 	function openCatalogModal() {
-		catalogSelectionSnapshot = selectedCatalog;
+		catalogSelectionSnapshot = colorCatalogSettings.selected;
 		catalogOpen = true;
 	}
 
 	function persistSelectedCatalog() {
-		try { localStorage.setItem(CATALOG_KEY, selectedCatalog); } catch {}
+		colorCatalogSettings.save();
 	}
 
 	function confirmCatalogSelection() {
@@ -1435,7 +1408,7 @@
 
 	function cancelCatalogSelection() {
 		if (catalogSelectionSnapshot !== null) {
-			selectedCatalog = catalogSelectionSnapshot;
+			colorCatalogSettings.selected = catalogSelectionSnapshot;
 			persistSelectedCatalog();
 		}
 		catalogSelectionSnapshot = null;
@@ -1450,7 +1423,7 @@
 			if (!Array.isArray(data.catalogs) || data.catalogs.length === 0) throw new Error('empty color catalog list');
 			colorCatalogs = data.catalogs;
 			defaultCatalogId = data.default_catalog_id || 'default';
-			if (!catalogById(colorCatalogs, selectedCatalog)) selectedCatalog = defaultCatalogId;
+			if (!catalogById(colorCatalogs, colorCatalogSettings.selected)) colorCatalogSettings.selected = defaultCatalogId;
 		} catch (e) {
 			console.warn('failed to load color catalogs', e);
 		}
@@ -2476,18 +2449,6 @@
 		}
 	}
 
-	function persistMiscSettings() {
-		try {
-			localStorage.setItem(PNG_ALPHA_KEY, pngAlphaWhite ? '1' : '0');
-			localStorage.setItem(ANIMATION_EXPORT_SETTINGS_KEY, JSON.stringify(animationExportSettings));
-		} catch {}
-	}
-
-	function toggleStatsOpen() {
-		statsOpen = !statsOpen;
-		try { localStorage.setItem(RESULT_LOG_OPEN_KEY, statsOpen ? '1' : '0'); } catch {}
-	}
-
 	// ── 感情語 → DDL ヒント ──────────────────────────────────
 	const EMOTION_DDL_MAP: Record<string, string> = {
 		'美しい':  '線は細く(pencil)、揺らぎは小さく(fine)、動きはゆっくり(slow)',
@@ -2664,49 +2625,6 @@
 	function stopTimer() {
 		if (_timerHandle !== null) { clearInterval(_timerHandle); _timerHandle = null; }
 	}
-	function compactBatchFailureReport(report: BatchFailureReport): BatchFailureReport {
-		return {
-			success: report.success,
-			total: report.total,
-			failures: report.failures.slice(0, BATCH_FAILURE_REPORT_MAX_ITEMS).map((failure) => ({
-				line: failure.line,
-				input: failure.input.slice(0, BATCH_FAILURE_REPORT_MAX_TEXT),
-				message: failure.message.slice(0, BATCH_FAILURE_REPORT_MAX_TEXT),
-			})),
-		};
-	}
-	function setBatchFailureReport(report: BatchFailureReport | null) {
-		const compactReport = report ? compactBatchFailureReport(report) : null;
-		batchFailureReport = compactReport;
-		try {
-			if (compactReport) localStorage.setItem(BATCH_FAILURE_REPORT_KEY, JSON.stringify(compactReport));
-			else localStorage.removeItem(BATCH_FAILURE_REPORT_KEY);
-		} catch {
-			try { localStorage.removeItem(BATCH_FAILURE_REPORT_KEY); } catch {}
-		}
-	}
-	function loadBatchFailureReport(): BatchFailureReport | null {
-		try {
-			const raw = localStorage.getItem(BATCH_FAILURE_REPORT_KEY);
-			if (!raw) return null;
-			const report = JSON.parse(raw) as Partial<BatchFailureReport>;
-			if (
-				typeof report.success !== 'number' ||
-				typeof report.total !== 'number' ||
-				!Array.isArray(report.failures)
-			) return null;
-			const failures = report.failures
-				.filter((failure): failure is BatchFailure =>
-					typeof failure?.line === 'number' &&
-					typeof failure.input === 'string' &&
-					typeof failure.message === 'string'
-				);
-			if (failures.length === 0) return null;
-			return compactBatchFailureReport({ success: report.success, total: report.total, failures });
-		} catch {
-			return null;
-		}
-	}
 
 	// ── Core paint (2-stage) ─────────────────────────────────
 	type PaintOptions = {
@@ -2853,7 +2771,7 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				...(options.tenkei ? { tenkei: options.tenkei } : {}),
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},
-				catalog_id: options.catalogId ?? selectedCatalog,
+				catalog_id: options.catalogId ?? colorCatalogSettings.selected,
 				catalog_mode: options.catalogMode ?? 'fixed'
 			})
 		});
@@ -2973,7 +2891,7 @@ if (unreadWords.length > 0) {
 				description: originalText,
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
-				catalog_id: renderOptions.catalogId ?? selectedCatalog,
+				catalog_id: renderOptions.catalogId ?? colorCatalogSettings.selected,
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				...(renderOptions.tenkei ? { tenkei: renderOptions.tenkei } : {}),
@@ -3080,7 +2998,7 @@ if (unreadWords.length > 0) {
 				await saveDemoSettings(settings);
 				demoGeneratedPrompt = await generateDemoInstruction(settings);
 				if (demoRunId !== runId || !loading) break;
-				const demoCatalogId = selectedCatalog;
+				const demoCatalogId = colorCatalogSettings.selected;
 				const r = await paintOne(demoGeneratedPrompt, {
 					saveHistory: settings.save_db,
 					saveArtifacts: settings.save_files,
@@ -3089,12 +3007,12 @@ if (unreadWords.length > 0) {
 					sourceText: demoGeneratedPrompt,
 					displayLabel: '[demo]',
 					catalogId: demoCatalogId,
-					tenkei: tenkeiLevel,
+					tenkei: tenkeiSettings.level,
 					catalogMode: settings.catalog_mode,
 				});
 				if (demoRunId !== runId || !loading) break;
 				demoGeneratedDdl = r.ddl;
-				if (settings.catalog_mode === 'auto' && r.render_color_catalog_id) selectedCatalog = r.render_color_catalog_id;
+				if (settings.catalog_mode === 'auto' && r.render_color_catalog_id) colorCatalogSettings.selected = r.render_color_catalog_id;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
 				const demoSourceDdl = r.source_ddl ?? r.ddl;
@@ -3243,13 +3161,13 @@ if (unreadWords.length > 0) {
 				stageLabel = t().stageDdlGenerating;
 				const r = await paintOne(input, {
 					sourceText: input,
-					catalogId: selectedCatalog,
+					catalogId: colorCatalogSettings.selected,
 					canvasAspectId: effectiveCanvasAspectId(),
-					wild: wildEnabled,
+					wild: wildSettings.enabled,
 					lineageParentNodeId: submitParentNodeId,
 					derivationKind: submitDerivationKind,
 					derivationMetadata: submitDerivationMetadata,
-					tenkei: tenkeiLevel,
+					tenkei: tenkeiSettings.level,
 					signal: abortController.signal,
 					onStage1: (stage1) => {
 						elapsedStage1Ms = stage1.elapsed_ms;
@@ -3285,10 +3203,10 @@ if (unreadWords.length > 0) {
 					displayedHistoryItem = historyItems.find((item) => item.id === r.history_id) ?? null;
 				}
 			} else {
-				batchTotal = 0; batchSuccess = 0; batchFailures = []; setBatchFailureReport(null);
+				batchTotal = 0; batchSuccess = 0; batchFailures = []; batchFailureReportStore.set(null);
 				batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 				const batchCanvasAspectId = effectiveCanvasAspectId();
-				const batchCatalogId = selectedCatalog;
+				const batchCatalogId = colorCatalogSettings.selected;
 				const batchRunId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
@@ -3310,8 +3228,8 @@ if (unreadWords.length > 0) {
 							catalogId: batchCatalogId,
 							catalogMode: batchAutoColorCatalog ? 'auto' : 'fixed',
 							canvasAspectId: batchCanvasAspectId,
-							wild: wildEnabled,
-							tenkei: tenkeiLevel,
+							wild: wildSettings.enabled,
+							tenkei: tenkeiSettings.level,
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) break;
@@ -3331,7 +3249,7 @@ if (unreadWords.length > 0) {
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
 						if (batchFailures.length > 0) {
-							setBatchFailureReport({ success: batchSuccess, total: batchTotal, failures: batchFailures });
+							batchFailureReportStore.set({ success: batchSuccess, total: batchTotal, failures: batchFailures });
 						}
 					} catch (e) {
 						if (submitStopRequested || abortController.signal.aborted) break;
@@ -3343,13 +3261,13 @@ if (unreadWords.length > 0) {
 								message: e instanceof Error ? e.message : String(e),
 							},
 						];
-						setBatchFailureReport({ success: batchSuccess, total: batchTotal, failures: batchFailures });
+						batchFailureReportStore.set({ success: batchSuccess, total: batchTotal, failures: batchFailures });
 					}
 				}
 				elapsedTotalMs = Date.now() - _timerStart;
 				await refreshHistoryAfterRun();
 				if (batchFailures.length > 0) {
-					setBatchFailureReport({
+					batchFailureReportStore.set({
 						success: batchSuccess,
 						total: batchTotal,
 						failures: batchFailures,
@@ -3430,7 +3348,7 @@ if (unreadWords.length > 0) {
 					description: replayInput,
 					instruction_lang: instructionLang,
 					ui_lang: uiLang,
-					catalog_id: selectedCatalog,
+					catalog_id: colorCatalogSettings.selected,
 					canvas_aspect: effectiveCanvasAspectId(),
 					auto_repair: ddlAutoRepairEnabled
 				})
@@ -3507,7 +3425,7 @@ if (unreadWords.length > 0) {
 				stage2_model: savedStage2Model,
 				tokens_in: d.tokens_in,
 				tokens_out: d.tokens_out,
-				catalog_id: selectedCatalog !== 'default' ? selectedCatalog : null
+				catalog_id: colorCatalogSettings.selected !== 'default' ? colorCatalogSettings.selected : null
 			}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
 			if (savedHistory && result) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
@@ -3764,7 +3682,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? selectedCatalog, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.selected, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3802,7 +3720,7 @@ if (unreadWords.length > 0) {
 					stage2_model: result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
 					tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
-					catalog_id: result.render_color_catalog_id ?? (selectedCatalog !== 'default' ? selectedCatalog : null),
+					catalog_id: result.render_color_catalog_id ?? (colorCatalogSettings.selected !== 'default' ? colorCatalogSettings.selected : null),
 					save_artifacts: demoSettings.save_files,
 					canvas_aspect: effectiveCanvasAspectId(),
 					instruction_lang_requested: result.instruction_lang_requested ?? instructionLang,
@@ -3850,7 +3768,7 @@ if (unreadWords.length > 0) {
 		error = null;
 		reloadError = null;
 		batchFailures = [];
-		setBatchFailureReport(null);
+		batchFailureReportStore.set(null);
 		batchActiveLine = null;
 		batchActiveDdl = null;
 		batchLatestPrompt = '';
@@ -4296,7 +4214,7 @@ if (unreadWords.length > 0) {
 				stage2_model: item.stage2Model ?? null,
 				tokens_in: (item.tokensIn ?? 0) + (item.tokensInStage2 ?? 0) || null,
 				tokens_out: (item.tokensOut ?? 0) + (item.tokensOutStage2 ?? 0) || null,
-				catalog_id: item.renderColorCatalogId ?? selectedCatalog,
+				catalog_id: item.renderColorCatalogId ?? colorCatalogSettings.selected,
 				render_build_number: item.renderBuildNumber ?? null,
 				render_color_profile: item.renderColorProfile ?? null,
 				render_engine_id: item.renderEngineId ?? null,
@@ -4349,7 +4267,7 @@ if (unreadWords.length > 0) {
 		reloading = true;
 		reloadError = null;
 		try {
-			const catalogId = it.render_color_catalog_id ?? it.catalog_id ?? selectedCatalog;
+			const catalogId = it.render_color_catalog_id ?? it.catalog_id ?? colorCatalogSettings.selected;
 			const canvasId = it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? it.score?.canvas ?? effectiveCanvasAspectId();
 			const r = await apiFetch('/api/render-svg', {
 				method: 'POST',
@@ -4490,7 +4408,7 @@ async function toggleLineageStar(node: LineageNode, event?: Event): Promise<void
 }
 
 function lineageCatalogId(node: LineageNode): string {
-	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? selectedCatalog;
+	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? colorCatalogSettings.selected;
 }
 
 function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
@@ -4592,9 +4510,9 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	if (!nextDdl) return;
 	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
 	const composed = await composeOne(nextDdl, '', signal, undefined, undefined, {
-		catalogId: selectedCatalog,
+		catalogId: colorCatalogSettings.selected,
 		canvasAspectId: effectiveCanvasAspectId(),
-		tenkei: tenkeiLevel,
+		tenkei: tenkeiSettings.level,
 	});
 	const saved = await pushHistory({
 		input: '',
@@ -4609,7 +4527,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		stage2_model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
 		tokens_in: composed.tokens_in,
 		tokens_out: composed.tokens_out,
-		catalog_id: selectedCatalog,
+		catalog_id: colorCatalogSettings.selected,
 		render_build_number: composed.render_build_number,
 		render_color_profile: composed.render_color_profile,
 		render_engine_id: composed.render_engine_id,
@@ -4633,7 +4551,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		countGeneration: true,
 		sourceText: firstLine,
 		displayLabel: 'DDL',
-		tenkei: tenkeiLevel,
+		tenkei: tenkeiSettings.level,
 	});
 	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
 }
@@ -5064,7 +4982,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function setSelectedCatalog(id: string) {
 		displayedHistoryItem = null;
 		historyCursor = -1;
-		selectedCatalog = id;
+		colorCatalogSettings.selected = id;
 	}
 
 	async function varyPerformance() {
@@ -5560,7 +5478,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					stage2_model: candidate.result.stage2_model ?? null,
 					tokens_in: (candidate.result.tokens_in_stage1 ?? 0) + (candidate.result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
-					catalog_id: candidate.result.render_color_catalog_id ?? selectedCatalog,
+					catalog_id: candidate.result.render_color_catalog_id ?? colorCatalogSettings.selected,
 				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {}, tenkei: refineTenkeiOverride });
 				if (contextVersion !== targetContextVersion) return;
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
@@ -5627,7 +5545,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				const canvas = document.createElement('canvas');
 				canvas.width = pngWidth; canvas.height = pngHeight;
 				const ctx = canvas.getContext('2d')!;
-				if (!pngAlphaWhite) {
+				if (!exportSettings.pngAlphaWhite) {
 					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pngWidth, pngHeight);
 				}
 				const img = new Image();
@@ -6068,15 +5986,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
-			const cat = localStorage.getItem(CATALOG_KEY); if (cat) selectedCatalog = cat;
-			const tenkei = normalizeTenkei(localStorage.getItem(TENKEI_KEY)); if (tenkei) tenkeiLevel = tenkei;
-			const wild = localStorage.getItem(WILD_KEY); if (wild !== null) wildEnabled = wild === '1';
-			const alpha = localStorage.getItem(PNG_ALPHA_KEY); if (alpha !== null) pngAlphaWhite = alpha === '1';
-			animationExportSettings = parseAnimationExportSettings(localStorage.getItem(ANIMATION_EXPORT_SETTINGS_KEY));
-			statsOpen = localStorage.getItem(RESULT_LOG_OPEN_KEY) === '1';
-			const savedBatchFailureReport = loadBatchFailureReport();
-			setBatchFailureReport(savedBatchFailureReport);
-			miscSettingsLoaded = true;
+			colorCatalogSettings.load();
+			tenkeiSettings.load();
+			wildSettings.load();
+			exportSettings.load();
+			resultLogSettings.load();
+			batchFailureReportStore.load();
+			exportSettings.markLoaded();
 		} catch {}
 		void (async () => {
 			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), loadCurrentUser(), fetchPrompts()]);
@@ -6092,11 +6008,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	});
 
 	$effect(() => { const _lang = getLang(); fetchPrompts(); });
-	$effect(() => {
-		void pngAlphaWhite;
-		void animationExportSettings;
-		if (miscSettingsLoaded) persistMiscSettings();
-	});
+	// persist() reads every field it writes, so this effect tracks them all
+	// without the page having to name them one by one.
+	$effect(() => exportSettings.persist());
 	$effect(() => {
 		if (typeof document === 'undefined') return;
 		document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
@@ -6188,7 +6102,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{batchTokensInTotal}
 						{batchTokensOutTotal}
 						{liveMs}
-						{batchFailureReport}
+						batchFailureReport={batchFailureReportStore.report}
 						{batchPromptHistory}
 						bind:batchAutoColorCatalog
 						bind:demoSettings
@@ -6215,10 +6129,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						generationDisabled={variationGridBusy || reloading}
 						{error}
 						{stageLabel}
-						{tenkeiLevel}
-						onSelectTenkei={setTenkeiLevel}
-						{wildEnabled}
-						onSelectWild={setWildEnabled}
+						tenkeiLevel={tenkeiSettings.level}
+						onSelectTenkei={tenkeiSettings.set}
+						wildEnabled={wildSettings.enabled}
+						onSelectWild={wildSettings.set}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -6305,12 +6219,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{#if result && elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
 							<Tooltip placement="right" text={t().tooltipStatsToggle}>
-								<button class="stats-toggle" onclick={toggleStatsOpen}>
-									<span class="stats-arrow" class:open={statsOpen}>▶</span>
+								<button class="stats-toggle" onclick={resultLogSettings.toggle}>
+									<span class="stats-arrow" class:open={resultLogSettings.open}>▶</span>
 									<span>{t().resultLogLabel}</span>
 								</button>
 							</Tooltip>
-							{#if statsOpen}
+							{#if resultLogSettings.open}
 								<div class="stats-detail">
 									<div class="stats-grid">
 										{#if elapsedStage1Ms > 0}
@@ -6515,7 +6429,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onPaintOne={paintOne}
 				onVisionAdvice={requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}
-				{animationExportSettings}
+				animationExportSettings={exportSettings.animation}
 				{apiFetch}
 			/>
 		</div><!-- /body -->
@@ -6636,8 +6550,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:editGroupName
 		{editGroupId}
 		bind:autoRepairEnabled={ddlAutoRepairEnabled}
-		bind:pngAlphaWhite
-		bind:animationExportSettings
+		bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
+		bind:animationExportSettings={exportSettings.animation}
 		{exportTemplates}
 		{exportTemplateStatus}
 		{canvasAspectEnabled}
@@ -6778,7 +6692,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if catalogOpen}
 	<ColorCatalogModal
 		catalogs={colorCatalogs}
-		{selectedCatalog}
+		selectedCatalog={colorCatalogSettings.selected}
 		{currentCatalog}
 		onSelectCatalog={setSelectedCatalog}
 		onCancel={cancelCatalogSelection}
@@ -6802,7 +6716,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		managerTrashTotal={historyManager.trashTotal}
 		{trashTotal}
 		selectedHistoryIds={historyManager.selectedIds}
-		{animationExportSettings}
+		animationExportSettings={exportSettings.animation}
 		historyManagerStarredOnly={historyManager.starredOnly}
 		onClose={() => (historyManager.open = false)}
 		onSetView={historyManager.setView}

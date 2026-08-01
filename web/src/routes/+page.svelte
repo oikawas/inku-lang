@@ -5311,6 +5311,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
 	}
 
+	// Refinement keeps its draw (author's ruling, 2026-08-01). The batch and the
+	// demo now send catalog_mode=auto and let the server read each description,
+	// but this fills a grid of alternatives for the author to choose between:
+	// reading the description would answer once and collapse four cards into one.
 	function colorCatalogCandidateIds(count: 1 | 4): string[] {
 		const currentId = refinementCatalogId();
 		const candidates = colorCatalogs.map((catalog) => catalog.id).filter((id) => id && id !== currentId);

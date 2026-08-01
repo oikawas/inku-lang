@@ -3218,6 +3218,7 @@ def test_history_animation_export_preserves_requested_order(auth_context, monkey
                 "pattern": "slide",
                 "hold_seconds": 2.5,
                 "resolution": "4k",
+                "height_px": 300,
             },
             headers=headers,
         )
@@ -3232,6 +3233,7 @@ def test_history_animation_export_preserves_requested_order(auth_context, monkey
             "pattern": "slide",
             "hold_seconds": 2.5,
             "resolution": "4k",
+            "height_px": 300,
         }
     finally:
         db.delete_items(user["id"], item_ids)

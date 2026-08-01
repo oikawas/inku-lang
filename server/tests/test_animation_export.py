@@ -53,6 +53,44 @@ def test_builds_gif_with_transition_frames(monkeypatch):
     assert image.info["loop"] == 0
 
 
+def test_builds_animation_at_custom_height(monkeypatch):
+    requested_heights = []
+
+    def fake_rasterize(_svg, height):
+        requested_heights.append(height)
+        return _png("green", height=height)
+
+    monkeypatch.setattr(animation_export, "svg_to_png", fake_rasterize)
+    payload = animation_export.build_animation(
+        ["first", "second"],
+        output_format="apng",
+        pattern="cut",
+        hold_seconds=1,
+        resolution="1k",
+        height_px=150,
+    )
+
+    image = Image.open(BytesIO(payload))
+    assert image.height == 150
+    assert requested_heights == [150, 150]
+
+
+def test_rejects_custom_height_outside_supported_range():
+    try:
+        animation_export.build_animation(
+            ["first", "second"],
+            output_format="apng",
+            pattern="cut",
+            hold_seconds=1,
+            resolution="1k",
+            height_px=63,
+        )
+    except ValueError as error:
+        assert str(error) == "animation height must be between 64 and 12000 pixels"
+    else:
+        raise AssertionError("out-of-range animation height should fail")
+
+
 def test_requires_two_works():
     try:
         animation_export.build_animation(

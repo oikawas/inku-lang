@@ -1511,10 +1511,26 @@
 					<label>
 						<span>{t().settingsAnimationResolution}</span>
 						<select value={animationExportSettings.resolution} onchange={(event) => (animationExportSettings = { ...animationExportSettings, resolution: event.currentTarget.value as AnimationExportSettings["resolution"] })}>
+							<option value="150">{t().animationResolution150}</option>
+							<option value="300">{t().animationResolution300}</option>
+							<option value="500">{t().animationResolution500}</option>
 							<option value="1k">{t().animationResolution1k}</option>
 							<option value="4k">{t().animationResolution4k}</option>
 							<option value="8k">{t().animationResolution8k}</option>
+							<option value="custom">{t().animationResolutionCustom}</option>
 						</select>
+						{#if animationExportSettings.resolution === "custom"}
+							<input
+								type="number"
+								min="64"
+								max="12000"
+								step="1"
+								value={animationExportSettings.customHeight}
+								aria-label={t().animationCustomHeight}
+								onchange={(event) => (animationExportSettings = { ...animationExportSettings, customHeight: Math.max(64, Math.min(12000, Math.round(Number(event.currentTarget.value) || 720))) })}
+							/>
+							<small>{t().animationCustomHeight}</small>
+						{/if}
 					</label>
 				</div>
 			</div>

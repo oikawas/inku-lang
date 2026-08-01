@@ -596,9 +596,14 @@ export interface LangPack {
 	settingsAnimationHold: string;
 	settingsAnimationHoldHint: string;
 	settingsAnimationResolution: string;
+	animationResolution150: string;
+	animationResolution300: string;
+	animationResolution500: string;
 	animationResolution1k: string;
 	animationResolution4k: string;
 	animationResolution8k: string;
+	animationResolutionCustom: string;
+	animationCustomHeight: string;
 	historyAnimationExport: string;
 	historyAnimationExportHint: string;
 	lineageAnimationExport: string;

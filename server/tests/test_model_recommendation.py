@@ -219,7 +219,7 @@ def test_every_place_that_lists_metadata_keys_knows_the_recommendation_keys():
     """
     import inspect
 
-    from inku_server import api as api_module
+    from inku_server.api_core.routers import settings as settings_routes
     from inku_server import model_settings as ms
 
     expected = (
@@ -238,7 +238,7 @@ def test_every_place_that_lists_metadata_keys_knows_the_recommendation_keys():
     for key in expected:
         assert key in normaliser, f"{key} is not read on the way in"
 
-    fetch = inspect.getsource(api_module.api_settings_fetch_provider_models)
+    fetch = inspect.getsource(settings_routes.api_settings_fetch_provider_models)
     assert "MODEL_METADATA_KEYS" in fetch, "the live fetch no longer carries the shared key list"
 
 

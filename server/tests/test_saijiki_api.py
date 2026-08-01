@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from inku_server import api as api_module
+from inku_server.api_core.routers import public as public_routes
 from inku_server import db, saijiki
 from inku_server.api import app
 
@@ -54,7 +54,7 @@ def test_api_saijiki_matches_table():
                 json.dumps(
                     {
                         "categories": saijiki.display_categories(lang),
-                        "plugins": api_module._enabled_plugin_entries(),
+                        "plugins": public_routes._enabled_plugin_entries(),
                     }
                 )
             )

@@ -13,7 +13,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from inku_server import api as api_module
+from inku_server.api_core.routers import render as render_routes
 from inku_server import db
 from inku_server.api import app
 from inku_server.schema import Score
@@ -43,12 +43,12 @@ def auth():
 
 def _mock_pipeline(monkeypatch):
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
     )
     fake = Score.model_validate(_FAKE_SCORE)
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake)
 
 
 # invariant 1: no include_trace -> response unchanged, no trace key
@@ -91,7 +91,7 @@ def test_paint_with_trace_has_all_keys(monkeypatch, auth):
 
 def test_compose_with_trace_has_no_stage1(monkeypatch, auth):
     fake = Score.model_validate(_FAKE_SCORE)
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake)
     r = client.post("/api/compose", json={"ddl": "中心に円", "include_trace": True}, headers=auth)
     assert r.status_code == 200
     trace = r.json()["trace"]

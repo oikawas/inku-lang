@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from inku_server import db
-from inku_server.api import _render_seed_from_text
+from inku_server.api_core.rendering import _render_seed_from_text
 from inku_server.coerce import coerce_score
 from inku_server.schema import Score
 from inku_server.feature_analysis import composition_distance, composition_vector, motif_signatures

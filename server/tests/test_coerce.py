@@ -2781,7 +2781,7 @@ def test_coerce_score_adds_vanishing_trace_for_fading_context():
 
 
 def test_fallback_score_preserves_explicit_count_circle_and_polygon():
-    from inku_server.api import _fallback_score_from_ddl
+    from inku_server.api_core.routers.render import _fallback_score_from_ddl
 
     circle = _fallback_score_from_ddl("黒い円を三つだけ置く。", lang="ja")
     assert circle.instructions[0].primitive == "circle"
@@ -2796,7 +2796,7 @@ def test_fallback_score_preserves_explicit_count_circle_and_polygon():
 
 
 def test_stage2_fallback_coverage_preserves_right_edge_and_presence_context():
-    from inku_server.api import _fallback_score_from_ddl
+    from inku_server.api_core.routers.render import _fallback_score_from_ddl
     from inku_server.coerce import coerce_score
 
     ddl = (

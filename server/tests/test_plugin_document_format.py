@@ -136,7 +136,7 @@ def test_stage15_and_coerce_have_no_plugin_injection_path() -> None:
 
 
 def test_pipeline_expands_before_stage15_and_stage2(monkeypatch, tmp_path: Path) -> None:
-    from inku_server import api as api_module
+    from inku_server.api_core.routers import render as render_routes
     from inku_server.schema import Score
 
     plugin = tmp_path / "minimal.inku-plugin.md"
@@ -161,15 +161,15 @@ def test_pipeline_expands_before_stage15_and_stage2(monkeypatch, tmp_path: Path)
             }
         )
 
-    monkeypatch.setattr(api_module, "DOCUMENT_PLUGIN_MANAGER", manager)
-    monkeypatch.setattr(api_module, "compose", fake_compose)
-    explicit = api_module._call_compose_detail(
+    monkeypatch.setattr(render_routes, "DOCUMENT_PLUGIN_MANAGER", manager)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
+    explicit = render_routes._call_compose_detail(
         "Sketch.双弧を描く。", original_description="Sketch.双弧を描く", lang="ja"
     )
-    natural = api_module._call_compose_detail(
+    natural = render_routes._call_compose_detail(
         "中央に形を置く。", original_description="双弧を中央に置く", lang="ja"
     )
-    ordinary = api_module._call_compose_detail(
+    ordinary = render_routes._call_compose_detail(
         "中央に円を置く。", original_description="静かな円", lang="ja"
     )
     assert explicit.plugin_provenance and natural.plugin_provenance

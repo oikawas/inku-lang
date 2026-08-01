@@ -27,6 +27,13 @@ from sqlalchemy import create_engine, inspect, text
 
 from inku_server import db
 from inku_server import api as api_module
+from inku_server.api_core import common as api_common
+from inku_server.api_core import rendering as api_rendering
+from inku_server.api_core import state as api_state
+from inku_server.api_core.routers import history as history_routes
+from inku_server.api_core.routers import public as public_routes
+from inku_server.api_core.routers import render as render_routes
+from inku_server.api_core.routers import settings as settings_routes
 from inku_server.api import app
 from inku_server.ddl_expander import FOCUS_IDS, focus_word
 from inku_server.model_settings import (
@@ -85,18 +92,18 @@ def test_resolved_stage_models_qualify_current_user_provider():
         }
     }
 
-    assert api_module._resolved_stage1_model(None, actor) == "openai:gpt-5.2"
-    assert api_module._resolved_stage1_model("gpt-5.2", actor) == "openai:gpt-5.2"
-    assert api_module._resolved_stage2_model(None, actor) == "anthropic:claude-sonnet-4-6"
-    assert api_module._resolved_stage2_model("claude-sonnet-4-6", actor) == "anthropic:claude-sonnet-4-6"
-    assert api_module._resolved_vision_model(None, actor) == "nvidia:meta/llama-3.2-90b-vision-instruct"
-    assert api_module._resolved_vision_model("openai:gpt-4.1", actor) == "openai:gpt-4.1"
+    assert render_routes._resolved_stage1_model(None, actor) == "openai:gpt-5.2"
+    assert render_routes._resolved_stage1_model("gpt-5.2", actor) == "openai:gpt-5.2"
+    assert render_routes._resolved_stage2_model(None, actor) == "anthropic:claude-sonnet-4-6"
+    assert render_routes._resolved_stage2_model("claude-sonnet-4-6", actor) == "anthropic:claude-sonnet-4-6"
+    assert api_common._resolved_vision_model(None, actor) == "nvidia:meta/llama-3.2-90b-vision-instruct"
+    assert api_common._resolved_vision_model("openai:gpt-4.1", actor) == "openai:gpt-4.1"
     # A reference qualified by a provider other than this actor's stage is left
     # alone. It used to say "ovms:qwen-api", which passed for the wrong reason once
     # ovms was withdrawn: an unqualified reference that is not the stage's own model
     # is also returned unchanged, so the assertion held without rule 1 running.
-    assert api_module._resolved_stage1_model("gemini:gemini-2.5-pro", actor) == "gemini:gemini-2.5-pro"
-    assert api_module._resolved_stage1_model("qwen-api", actor) == "qwen-api"
+    assert render_routes._resolved_stage1_model("gemini:gemini-2.5-pro", actor) == "gemini:gemini-2.5-pro"
+    assert render_routes._resolved_stage1_model("qwen-api", actor) == "qwen-api"
 
 
 def _auth_headers(user: dict) -> tuple[dict[str, str], str]:
@@ -151,7 +158,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
 
 def test_info_reads_current_render_engine_at_request_time(monkeypatch):
     engine = types.SimpleNamespace(id="test-engine", version="test-version")
-    monkeypatch.setattr(api_module, "current_render_engine", lambda: engine)
+    monkeypatch.setattr(public_routes, "current_render_engine", lambda: engine)
 
     r = client.get("/api/info")
 
@@ -799,7 +806,7 @@ def test_compose_happy_path(monkeypatch, auth_context):
             ]
         }
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post("/api/compose", json={"ddl": "中心に円"}, headers=headers)
     assert r.status_code == 200
@@ -829,7 +836,7 @@ def test_compose_reports_relation_drop_during_auto_repair(monkeypatch, auth_cont
             ]
         }
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post("/api/compose", json={"ddl": "前の線に沿う線"}, headers=headers)
 
@@ -853,7 +860,7 @@ def test_compose_resolves_english_instruction_language(monkeypatch, auth_context
             {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
 
     r = client.post(
         "/api/compose",
@@ -879,7 +886,7 @@ def test_compose_uses_ui_language_when_text_has_no_language_signal(monkeypatch, 
             {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
     r = client.post(
         "/api/compose",
         json={"ddl": "12345", "instruction_lang": "auto", "ui_lang": "en"},
@@ -982,7 +989,7 @@ def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
             ]
         }
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post("/api/compose", json={"ddl": "横線", "canvas_aspect": "pillar"}, headers=headers)
 
@@ -1005,7 +1012,7 @@ def test_compose_canvas_aspect_override_preserves_ground(monkeypatch, auth_conte
             ],
         }
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post("/api/compose", json={"ddl": "横線", "canvas_aspect": "pillar"}, headers=headers)
 
@@ -1024,7 +1031,7 @@ def test_compose_accepts_byobu_canvas_with_multiline_ddl(monkeypatch, auth_conte
             ]
         }
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post(
         "/api/compose",
@@ -1061,7 +1068,7 @@ def test_compose_sanitizes_random_ddl_before_stage2(monkeypatch, auth_context):
             {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
     r = client.post("/api/compose", json={"ddl": "赤い円をランダムに十二個散らす。"}, headers=headers)
     assert r.status_code == 200
     assert "赤い円を画面全体に点々と十二個散らす。" in captured["ddl"]
@@ -1079,7 +1086,7 @@ def test_compose_composer_failure_returns_502(monkeypatch, auth_context):
     def boom(ddl: str, model=None):
         raise RuntimeError("haiku unavailable")
 
-    monkeypatch.setattr(api_module, "compose", boom)
+    monkeypatch.setattr(render_routes, "compose", boom)
     r = client.post("/api/compose", json={"ddl": "中心に円"}, headers=headers)
     assert r.status_code == 502
     assert r.json()["detail"] == "compose failed"
@@ -1098,7 +1105,7 @@ def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):
             {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
 
     r = client.post("/api/compose", json={"ddl": "黒い線を引く。"}, headers=headers)
 
@@ -1114,7 +1121,7 @@ def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):
 def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "compose",
         lambda ddl, model=None, original_description=None, system_prompt=None, lang="ja": Score(instructions=[]),
     )
@@ -1136,7 +1143,7 @@ def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
             {"instructions": [{"primitive": "line", "from": [0.5, 0.0], "to": [0.5, 1.0], "color": "green"}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
 
     r = client.post(
         "/api/compose",
@@ -1153,7 +1160,7 @@ def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
 def test_compose_fallback_preserves_arrangement_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "compose",
         lambda ddl, model=None, original_description=None, system_prompt=None, lang="ja": Score(instructions=[]),
     )
@@ -1174,7 +1181,7 @@ def test_compose_fallback_preserves_arrangement_path(monkeypatch, auth_context):
 def test_compose_fallback_preserves_line_arrangement_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "compose",
         lambda ddl, model=None, original_description=None, system_prompt=None, lang="ja": Score(instructions=[]),
     )
@@ -1195,7 +1202,7 @@ def test_compose_fallback_preserves_line_arrangement_path(monkeypatch, auth_cont
 def test_compose_fallback_clusters_large_counts_and_palette(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "compose",
         lambda ddl, model=None, original_description=None, system_prompt=None, lang="ja": Score(instructions=[]),
     )
@@ -1218,7 +1225,7 @@ def test_compose_fallback_clusters_large_counts_and_palette(monkeypatch, auth_co
 def test_compose_fallback_uses_triangle_for_mountain(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "compose",
         lambda ddl, model=None, original_description=None, system_prompt=None, lang="ja": Score(instructions=[]),
     )
@@ -1234,7 +1241,7 @@ def test_compose_fallback_uses_triangle_for_mountain(monkeypatch, auth_context):
 def test_compose_fallback_adds_negative_space_support_for_paper_trace(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "compose",
         lambda ddl, model=None, original_description=None, system_prompt=None, lang="ja": Score(instructions=[]),
     )
@@ -1263,7 +1270,7 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
             {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", slow_compose)
+    monkeypatch.setattr(render_routes, "compose", slow_compose)
 
     r = client.post("/api/compose", json={"ddl": "黒い線を引く。"}, headers=headers)
 
@@ -1275,15 +1282,15 @@ def test_compose_hard_timeout_uses_fallback(monkeypatch, auth_context):
 
 
 def test_compose_retry_reason_only_retries_empty_instructions():
-    assert api_module._compose_retry_reason(Score(instructions=[]), tokens_out=10, elapsed_ms=1) == "empty_instructions"
+    assert render_routes._compose_retry_reason(Score(instructions=[]), tokens_out=10, elapsed_ms=1) == "empty_instructions"
     score = Score.model_validate(
         {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "color": "black"}]}
     )
-    assert api_module._compose_retry_reason(score, tokens_out=999999, elapsed_ms=999999) == "none"
+    assert render_routes._compose_retry_reason(score, tokens_out=999999, elapsed_ms=999999) == "none"
 
 
 def test_stage1_fallback_does_not_treat_dawn_as_night():
-    ddl = api_module._fallback_ddl_from_text("夜明けの湖で、最初の光が水のしわをほどく。", lang="ja")
+    ddl = render_routes._fallback_ddl_from_text("夜明けの湖で、最初の光が水のしわをほどく。", lang="ja")
 
     assert ddl.startswith("背景を白で埋める。")
     assert "背景を黒" not in ddl
@@ -1291,10 +1298,10 @@ def test_stage1_fallback_does_not_treat_dawn_as_night():
 
 def test_stage_timeout_keeps_capacity_bound_until_worker_finishes(monkeypatch):
     executor = ThreadPoolExecutor(max_workers=1)
-    monkeypatch.setattr(api_module, "_stage_executor", executor)
-    monkeypatch.setattr(api_module, "_stage_slots", api_module.BoundedSemaphore(1))
+    monkeypatch.setattr(render_routes, "_stage_executor", executor)
+    monkeypatch.setattr(render_routes, "_stage_slots", api_state.BoundedSemaphore(1))
     monkeypatch.setattr(
-        api_module,
+        api_state,
         "_stage_stats",
         {"submitted": 0, "completed": 0, "failed": 0, "timed_out": 0, "rejected": 0},
     )
@@ -1304,22 +1311,22 @@ def test_stage_timeout_keeps_capacity_bound_until_worker_finishes(monkeypatch):
         return "late"
 
     try:
-        with pytest.raises(api_module.StageHardTimeoutError):
-            api_module._run_with_hard_timeout("stage-test", 0.01, slow_operation)
-        with pytest.raises(api_module.StageHardTimeoutError):
-            api_module._run_with_hard_timeout("stage-test", 0.01, lambda: "blocked")
+        with pytest.raises(render_routes.StageHardTimeoutError):
+            render_routes._run_with_hard_timeout("stage-test", 0.01, slow_operation)
+        with pytest.raises(render_routes.StageHardTimeoutError):
+            render_routes._run_with_hard_timeout("stage-test", 0.01, lambda: "blocked")
 
         time.sleep(0.14)
-        assert api_module._run_with_hard_timeout("stage-test", 0.05, lambda: "ok") == "ok"
-        assert api_module._stage_stats["timed_out"] == 1
-        assert api_module._stage_stats["rejected"] == 1
+        assert render_routes._run_with_hard_timeout("stage-test", 0.05, lambda: "ok") == "ok"
+        assert api_state._stage_stats["timed_out"] == 1
+        assert api_state._stage_stats["rejected"] == 1
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
 
 
 def test_interpret_happy_path(monkeypatch, auth_context):
     headers, _, _ = auth_context
-    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
+    monkeypatch.setattr(render_routes, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     r = client.post("/api/interpret", json={"description": "一滴の墨"}, headers=headers)
     assert r.status_code == 200
     assert r.json() == {
@@ -1334,7 +1341,7 @@ def test_interpret_happy_path(monkeypatch, auth_context):
 def test_interpret_sanitizes_random_placement(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("赤い小さな円をランダムに十二個散らす。", None),
     )
@@ -1361,7 +1368,7 @@ def test_interpret_reads_the_description_when_no_stage1_input(monkeypatch, auth_
     """A client that injects no context sends only the description, and Stage 1 reads it."""
     headers, _, _ = auth_context
     seen: list[str] = []
-    monkeypatch.setattr(api_module, "interpret_detail", _capturing_interpret(seen))
+    monkeypatch.setattr(render_routes, "interpret_detail", _capturing_interpret(seen))
     r = client.post("/api/interpret", json={"description": "一滴の墨"}, headers=headers)
     assert r.status_code == 200
     assert seen == ["一滴の墨"]
@@ -1371,7 +1378,7 @@ def test_interpret_reads_the_stage1_input_when_it_is_sent(monkeypatch, auth_cont
     """The augmented text is what Stage 1 reads; the description stays the author's own."""
     headers, _, _ = auth_context
     seen: list[str] = []
-    monkeypatch.setattr(api_module, "interpret_detail", _capturing_interpret(seen))
+    monkeypatch.setattr(render_routes, "interpret_detail", _capturing_interpret(seen))
     r = client.post(
         "/api/interpret",
         json={"description": "一滴の墨", "stage1_input": "一滴の墨\n\n感情: 静か"},
@@ -1385,9 +1392,9 @@ def test_paint_keeps_the_augmented_text_out_of_the_history(monkeypatch, auth_con
     """What is saved is the description, not the string Stage 1 was handed."""
     headers, user, _ = auth_context
     seen: list[str] = []
-    monkeypatch.setattr(api_module, "interpret_detail", _capturing_interpret(seen))
+    monkeypatch.setattr(render_routes, "interpret_detail", _capturing_interpret(seen))
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "compose",
         lambda ddl, model=None: Score.model_validate(
             {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
@@ -1422,7 +1429,7 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
             {"instructions": [{"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5], "color": "black"}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
 
     r = client.post(
         "/api/compose",
@@ -1458,11 +1465,11 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
 
 def test_paint_pipeline(monkeypatch, auth_context):
     headers, _, _ = auth_context
-    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
+    monkeypatch.setattr(render_routes, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post("/api/paint", json={"description": "一滴の墨"}, headers=headers)
     assert r.status_code == 200
@@ -1536,8 +1543,8 @@ def test_paint_prompt_digests_round_trip_without_changing_rh3(
         prompt_metadata["stage2_prompt_digest"] = "3333333333333333"
         return fake_score, 3, 4
 
-    monkeypatch.setattr(api_module, "interpret_detail", fake_interpret)
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "interpret_detail", fake_interpret)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
 
     response = client.post(
         "/api/paint",
@@ -1584,14 +1591,14 @@ def _stream_events(response) -> list[dict]:
 def test_paint_stream_emits_stage1_before_done(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
     )
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post("/api/paint/stream", json={"description": "一滴の墨"}, headers=headers)
     assert r.status_code == 200
@@ -1618,14 +1625,14 @@ def test_paint_stream_emits_stage1_before_done(monkeypatch, auth_context):
 def test_paint_stream_matches_paint_response_shape(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
     )
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     payload = {"description": "一滴の墨", "save_history": False, "count_generation": False}
     plain = client.post("/api/paint", json=payload, headers=headers)
@@ -1641,7 +1648,7 @@ def test_paint_stream_matches_paint_response_shape(monkeypatch, auth_context):
 def test_paint_stream_reports_compose_failure_as_error_event(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
     )
@@ -1649,7 +1656,7 @@ def test_paint_stream_reports_compose_failure_as_error_event(monkeypatch, auth_c
     def fail_compose(*args, **kwargs):
         raise RuntimeError("compose failed for test")
 
-    monkeypatch.setattr(api_module, "compose", fail_compose)
+    monkeypatch.setattr(render_routes, "compose", fail_compose)
 
     r = client.post("/api/paint/stream", json={"description": "壊れる描画"}, headers=headers)
     assert r.status_code == 200
@@ -1662,14 +1669,14 @@ def test_paint_stream_reports_compose_failure_as_error_event(monkeypatch, auth_c
 def test_paint_records_input_and_expanded_ddl_separately(monkeypatch, auth_context):
     headers, user, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
     )
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post(
         "/api/paint", json={"description": "一滴の墨", "save_history": True}, headers=headers
@@ -1691,14 +1698,14 @@ def test_paint_records_input_and_expanded_ddl_separately(monkeypatch, auth_conte
 
 def _stub_stages(monkeypatch):
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
     )
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
 
 def test_focus_is_no_longer_an_api_input_but_is_still_recorded(monkeypatch, auth_context):
@@ -1821,7 +1828,7 @@ def test_compose_returns_source_ddl(monkeypatch, auth_context):
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post("/api/compose", json={"ddl": "中心に黒い円を置く。"}, headers=headers)
     assert r.status_code == 200
@@ -1833,7 +1840,7 @@ def test_compose_returns_source_ddl(monkeypatch, auth_context):
 def test_empty_stage1_output_falls_back_instead_of_drawing_nothing(monkeypatch, auth_context):
     headers, user, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("   ", None),
     )
@@ -1845,7 +1852,7 @@ def test_empty_stage1_output_falls_back_instead_of_drawing_nothing(monkeypatch, 
             {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
 
     r = client.post(
         "/api/paint", json={"description": "空を返すモデル", "save_history": True}, headers=headers
@@ -1882,7 +1889,7 @@ def test_provider_end_of_life_is_reported_as_a_typed_error(monkeypatch, auth_con
             "Error code: 410 - The model 'x' has reached its end of life.", 410
         )
 
-    monkeypatch.setattr(api_module, "interpret_detail", gone)
+    monkeypatch.setattr(render_routes, "interpret_detail", gone)
 
     r = client.post("/api/paint", json={"description": "提供終了モデル"}, headers=headers)
     assert r.status_code == 502
@@ -1900,7 +1907,7 @@ def test_provider_auth_and_rate_limit_are_distinguished(monkeypatch, auth_contex
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("黒い円を置く。", None),
     )
@@ -1909,7 +1916,7 @@ def test_provider_auth_and_rate_limit_are_distinguished(monkeypatch, auth_contex
         def failing(*args, _status=status, **kwargs):
             raise _FakeProviderError(f"boom {_status}", _status)
 
-        monkeypatch.setattr(api_module, "compose", failing)
+        monkeypatch.setattr(render_routes, "compose", failing)
         r = client.post("/api/paint", json={"description": "失敗する描画"}, headers=headers)
         assert r.status_code == 502
         detail = r.json()["detail"]
@@ -1917,7 +1924,7 @@ def test_provider_auth_and_rate_limit_are_distinguished(monkeypatch, auth_contex
         assert detail["stage"] == "compose"
         assert detail["provider_status"] == status
 
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
 
 def test_retired_models_are_marked_eol_in_the_catalog():
@@ -1945,7 +1952,7 @@ def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
 
     # 提供元は gemma しか返さない状況を作る。
     monkeypatch.setattr(
-        api_module,
+        settings_routes,
         "_fetch_provider_model_list",
         lambda provider_id, settings: [{"id": "google/gemma-4-31b-it", "label": "google/gemma-4-31b-it"}],
     )
@@ -2020,8 +2027,8 @@ def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
             {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
         )
 
-    monkeypatch.setattr(api_module, "interpret_detail", slow_interpret)
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "interpret_detail", slow_interpret)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
 
     r = client.post("/api/paint", json={"description": "応答しない指示"}, headers=headers)
 
@@ -2035,12 +2042,12 @@ def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
 
 def test_failed_paint_does_not_increment_generation_count(monkeypatch, auth_context):
     headers, _, _ = auth_context
-    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("黒い円を置く。", None))
+    monkeypatch.setattr(render_routes, "interpret_detail", lambda text, model=None, include_thinking=False: ("黒い円を置く。", None))
 
     def fail_compose(*args, **kwargs):
         raise RuntimeError("compose failed for test")
 
-    monkeypatch.setattr(api_module, "compose", fail_compose)
+    monkeypatch.setattr(render_routes, "compose", fail_compose)
 
     r = client.post("/api/paint", json={"description": "壊れる描画"}, headers=headers)
     assert r.status_code == 502
@@ -2054,7 +2061,7 @@ def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
     headers, _, _ = auth_context
     captured: dict[str, str] = {}
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("赤い小さな円をランダムに十二個散らす。", None),
     )
@@ -2065,7 +2072,7 @@ def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
             {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
         )
 
-    monkeypatch.setattr(api_module, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
     r = client.post("/api/paint", json={"description": "赤い点を散らす"}, headers=headers)
     assert r.status_code == 200
     assert "赤い小さな円を画面全体に点々と十二個散らす。" in r.json()["ddl"]
@@ -2076,7 +2083,7 @@ def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
 def test_paint_random_catalog_excludes_current_and_uses_effective_map(monkeypatch, auth_context):
     headers, _, _ = auth_context
     monkeypatch.setattr(
-        api_module,
+        render_routes,
         "interpret_detail",
         lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None),
     )
@@ -2092,14 +2099,14 @@ def test_paint_random_catalog_excludes_current_and_uses_effective_map(monkeypatc
             ]
         }
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
     captured_candidates: list[str] = []
 
     def choose_first(candidates: list[str]) -> str:
         captured_candidates.extend(candidates)
         return candidates[0]
 
-    monkeypatch.setattr(api_module.secrets, "choice", choose_first)
+    monkeypatch.setattr(render_routes.secrets, "choice", choose_first)
 
     response = client.post(
         "/api/paint",
@@ -2124,11 +2131,11 @@ def test_paint_random_catalog_excludes_current_and_uses_effective_map(monkeypatc
 
 def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     headers, user, _ = auth_context
-    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
+    monkeypatch.setattr(render_routes, "interpret_detail", lambda text, model=None, include_thinking=False: ("中心に黒い円を置く。", None))
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post(
         "/api/paint",
@@ -2298,11 +2305,11 @@ def test_history_svg_endpoint_keeps_display_svg_and_regenerates_editable(auth_co
 
 def test_paint_resolves_catalog_id_on_server(monkeypatch, auth_context):
     headers, _, _ = auth_context
-    monkeypatch.setattr(api_module, "interpret_detail", lambda text, model=None, include_thinking=False: ("緑の円を置く。", None))
+    monkeypatch.setattr(render_routes, "interpret_detail", lambda text, model=None, include_thinking=False: ("緑の円を置く。", None))
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1, "color": "green"}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post(
         "/api/paint",
@@ -2331,7 +2338,7 @@ def test_cors_allows_localhost(monkeypatch, auth_context):
     fake_score = Score.model_validate(
         {"instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}]}
     )
-    monkeypatch.setattr(api_module, "compose", lambda ddl, model=None: fake_score)
+    monkeypatch.setattr(render_routes, "compose", lambda ddl, model=None: fake_score)
 
     r = client.post(
         "/api/compose",
@@ -2354,7 +2361,7 @@ def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, ca
     caplog.set_level(logging.WARNING, logger=api_module.__name__)
 
     prefix = tmp_path / "out" / "sample"
-    api_module._save_output_files(
+    api_rendering._save_output_files(
         prefix,
         "input text",
         "normalized ddl",
@@ -2466,11 +2473,11 @@ def test_artifact_save_submit_skips_when_queue_is_full(monkeypatch, caplog):
         def submit(self, *args, **kwargs):
             raise AssertionError("executor must not be called when artifact queue is full")
 
-    monkeypatch.setattr(api_module, "_save_slots", FullSlots())
-    monkeypatch.setattr(api_module, "_save_executor", FailingExecutor())
+    monkeypatch.setattr(api_rendering, "_save_slots", FullSlots())
+    monkeypatch.setattr(api_rendering, "_save_executor", FailingExecutor())
     caplog.set_level(logging.WARNING, logger=api_module.__name__)
 
-    assert api_module._submit_history_artifact_save({"id": "history-full"}) is False
+    assert api_rendering._submit_history_artifact_save({"id": "history-full"}) is False
     assert "artifact save queue is full" in caplog.text
 
 
@@ -2492,11 +2499,11 @@ def test_artifact_save_submit_releases_slot_after_save(monkeypatch):
 
     slots = AvailableSlots()
     saved = []
-    monkeypatch.setattr(api_module, "_save_slots", slots)
-    monkeypatch.setattr(api_module, "_save_executor", InlineExecutor())
-    monkeypatch.setattr(api_module, "_save_history_artifacts", lambda item: saved.append(item["id"]))
+    monkeypatch.setattr(api_rendering, "_save_slots", slots)
+    monkeypatch.setattr(api_rendering, "_save_executor", InlineExecutor())
+    monkeypatch.setattr(api_rendering, "_save_history_artifacts", lambda item: saved.append(item["id"]))
 
-    assert api_module._submit_history_artifact_save({"id": "history-ok"}) is True
+    assert api_rendering._submit_history_artifact_save({"id": "history-ok"}) is True
     assert saved == ["history-ok"]
     assert slots.released == 1
 
@@ -2518,11 +2525,11 @@ def test_artifact_save_submit_releases_slot_when_executor_fails(monkeypatch, cap
             raise RuntimeError("executor closed")
 
     slots = AvailableSlots()
-    monkeypatch.setattr(api_module, "_save_slots", slots)
-    monkeypatch.setattr(api_module, "_save_executor", FailingExecutor())
+    monkeypatch.setattr(api_rendering, "_save_slots", slots)
+    monkeypatch.setattr(api_rendering, "_save_executor", FailingExecutor())
     caplog.set_level(logging.ERROR, logger=api_module.__name__)
 
-    assert api_module._submit_history_artifact_save({"id": "history-submit-fail"}) is False
+    assert api_rendering._submit_history_artifact_save({"id": "history-submit-fail"}) is False
     assert slots.released == 1
     assert "failed to submit artifact save job" in caplog.text
 
@@ -2991,7 +2998,7 @@ def test_history_is_scoped_to_authenticated_user():
     assert "<script" not in item_a["svg"]
     assert "<svg" in item_a["svg"]
     assert item_a["seed_text"] == "夕立"
-    assert item_a["render_seed"] == api_module._render_seed_from_text("夕立", None)[0]
+    assert item_a["render_seed"] == api_rendering._render_seed_from_text("夕立", None)[0]
     post_a_second = client.post(
         "/api/history",
         json={**payload, "input": "blue crayon search target", "ddl": "青い線", "at": payload["at"] + 1},
@@ -3209,7 +3216,7 @@ def test_history_animation_export_preserves_requested_order(auth_context, monkey
             captured["options"] = options
             return b"GIF89a"
 
-        monkeypatch.setattr(api_module, "build_animation", fake_build)
+        monkeypatch.setattr(history_routes, "build_animation", fake_build)
         response = client.post(
             "/api/history/export-animation",
             json={
@@ -3343,7 +3350,7 @@ def test_render_concurrency_settings_are_admin_only():
         assert data["max_limit"] == db.RENDER_CONCURRENCY_MAX
 
         # The running server honours the new limit, not the import-time default.
-        from inku_server.api import _render_slots
+        from inku_server.api_core.state import _render_slots
 
         assert _render_slots.limit == 5
 
@@ -3364,7 +3371,7 @@ def test_render_concurrency_settings_are_admin_only():
                 json=payload,
             ).status_code == 400
     finally:
-        from inku_server.api import _render_slots as _slots
+        from inku_server.api_core.state import _render_slots as _slots
 
         db.update_render_concurrency_settings(int(baseline["server_limit"]), int(baseline["client_limit"]))
         _slots.set_limit(int(baseline["server_limit"]))

@@ -1,0 +1,265 @@
+"""Endpoints for the history group, moved out of api.py unchanged."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Literal
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from pydantic import BaseModel, Field
+from ...animation_export import build_animation
+from ...feature_analysis import composition_distance
+from ...coerce import coerce_score
+from ...ddl_expander import FOCUS_IDS
+from ...schema import Score
+from ... import db as _db
+from ..common import _unexpected_http_error
+from ..deps import _current_user
+from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
+from ..rendering import _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _resolved_tenkei, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
+
+
+router = APIRouter(dependencies=[Depends(_current_user)])
+
+
+class HistoryIdsBody(BaseModel):
+    ids: list[str] = Field(default_factory=list, max_length=1000)
+
+
+class AnimationExportBody(BaseModel):
+    ids: list[str] = Field(..., min_length=2, max_length=100)
+    format: Literal["apng", "gif"] = "apng"
+    pattern: Literal["cut", "crossfade", "fade_white", "slide"] = "cut"
+    hold_seconds: float = Field(default=1.0, ge=0.1, le=30.0)
+    resolution: Literal["1k", "4k", "8k"] = "1k"
+    height_px: int | None = Field(default=None, ge=64, le=12000)
+
+
+class HistoryStarBody(BaseModel):
+    starred: bool = False
+    note: str | None = None
+
+
+@router.get("/api/history", response_model=HistoryListResponse, response_model_exclude_none=True)
+def api_history_get(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+    trashed: bool = Query(default=False),
+    starred: bool = Query(default=False),
+    q: str = Query(default="", max_length=200),
+    anchor_id: str | None = Query(default=None, max_length=100),
+    actor: dict = Depends(_current_user),
+) -> HistoryListResponse:
+    if anchor_id:
+        position = _db.item_position(actor["id"], anchor_id, trashed=trashed, starred=starred)
+        if position is not None:
+            offset = (position // limit) * limit
+    items, total = _db.list_items(
+        actor["id"],
+        offset=offset,
+        limit=limit,
+        trashed=trashed,
+        query_text=q,
+        starred=starred,
+    )
+    return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
+
+
+@router.post("/api/history/export-animation")
+def api_history_export_animation(
+    body: AnimationExportBody,
+    actor: dict = Depends(_current_user),
+) -> Response:
+    ids = list(dict.fromkeys(body.ids))
+    if len(ids) < 2:
+        raise HTTPException(status_code=400, detail="at least two distinct works are required")
+    items = _db.get_items(actor["id"], ids)
+    if len(items) != len(ids):
+        raise HTTPException(status_code=404, detail="one or more history items were not found")
+    svgs = [str(item.get("svg") or "") for item in items]
+    if any(not svg for svg in svgs):
+        raise HTTPException(status_code=409, detail="one or more works have no saved SVG")
+    try:
+        payload = build_animation(
+            svgs,
+            output_format=body.format,
+            pattern=body.pattern,
+            hold_seconds=body.hold_seconds,
+            resolution=body.resolution,
+            height_px=body.height_px,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    extension = "png" if body.format == "apng" else "gif"
+    media_type = "image/apng" if body.format == "apng" else "image/gif"
+    filename = f"inku-animation-{timestamp}.{extension}"
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": "attachment; filename=\"" + filename + "\"",
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/api/history/{item_id}/neighbors", response_model=list[HistoryItem], response_model_exclude_none=True)
+def api_history_neighbors(item_id: str, actor: dict = Depends(_current_user)) -> list[HistoryItem]:
+    focus = _db.get_items(actor["id"], [item_id])
+    if not focus:
+        raise HTTPException(status_code=404, detail="history item not found")
+    candidates = _db.list_neighbor_candidates(actor["id"], item_id)
+    ranked = sorted(
+        candidates,
+        key=lambda item: (composition_distance(focus[0].get("score") or {}, item.get("score") or {}), -int(item.get("at") or 0)),
+    )[:3]
+    return [HistoryItem(**item) for item in _db.get_items(actor["id"], [item["id"] for item in ranked])]
+
+
+@router.get("/api/history/{item_id}/svg")
+def api_history_svg(
+    item_id: str,
+    profile: str = Query(default="display", description="SVG output profile: display / editable / compat"),
+    actor: dict = Depends(_current_user),
+) -> Response:
+    svg_profile = _validated_svg_profile(profile)
+    items = _db.get_items(actor["id"], [item_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="history item not found")
+    item = items[0]
+    if svg_profile == "display":
+        svg = item.get("svg", "")
+    else:
+        try:
+            svg = _render_score_svg(
+                item.get("score", {}),
+                catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
+                svg_profile=svg_profile,
+                wild=bool(item.get("render_wild")),
+            )
+        except HTTPException:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise _unexpected_http_error("history svg render", 422) from e
+    return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
+
+
+@router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
+def api_history_post(
+    body: HistoryPostBody,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
+    actor: dict = Depends(_current_user),
+) -> HistoryItem:
+    metadata_seed_text = body.derivation_metadata.get("seed_text")
+    requested_seed_text = body.seed_text
+    if requested_seed_text is None and isinstance(metadata_seed_text, str):
+        requested_seed_text = metadata_seed_text
+    render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
+    try:
+        score = coerce_score(Score.model_validate(body.score))
+        catalog_id = _resolved_catalog_id(body.catalog_id)
+        canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
+        if canvas_aspect is not None:
+            score = _score_with_canvas(score, canvas_aspect)
+        render_metadata = {
+            **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+            "stage1_prompt_digest": body.stage1_prompt_digest,
+            "stage1_prompt_base_digest": body.stage1_prompt_base_digest,
+            "stage2_prompt_digest": body.stage2_prompt_digest,
+            "instruction_lang_requested": body.instruction_lang_requested,
+            "instruction_lang_resolved": body.instruction_lang_resolved,
+            "ui_lang": body.ui_lang,
+            "render_seed": render_seed,
+            "composition_seed": body.composition_seed,
+            # v1.97: 保存時に水準を確定する（renderer 専用派生でも系統の水準が途切れない）
+            "tenkei": _resolved_tenkei(body.tenkei, actor, body.lineage_parent_node_id),
+            "focus": body.focus if body.focus in FOCUS_IDS else None,
+            "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
+            "variation_seed": body.variation_seed,
+            "seed_text": seed_text,
+            "interpretation_seed": body.interpretation_seed,
+        }
+        svg, render_metadata = _render_with_metadata(score, render_metadata)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise _unexpected_http_error("history score render", 422) from e
+    item_dict = _add_history_item(
+        actor=actor,
+        input_text=body.input,
+        ddl=body.ddl,
+        expanded_ddl=body.expanded_ddl,
+        interpret_fallback=body.interpret_fallback,
+        score=score,
+        svg=svg,
+        at=body.at,
+        elapsed_ms=body.elapsed_ms,
+        stage1_model=body.stage1_model,
+        stage2_model=body.stage2_model,
+        tokens_in=body.tokens_in,
+        tokens_out=body.tokens_out,
+        catalog_id=None if catalog_id == "default" else catalog_id,
+        save_artifacts=body.save_artifacts,
+        render_metadata=render_metadata,
+        source_text=body.source_text,
+        display_label=body.display_label,
+        batch_line_number=body.batch_line_number,
+        batch_run_id=body.batch_run_id,
+        history_visibility=body.history_visibility,
+        lineage_parent_node_id=body.lineage_parent_node_id,
+        derivation_kind=body.derivation_kind,
+        derivation_metadata=body.derivation_metadata,
+        idempotency_key=idempotency_key,
+    )
+    if body.count_generation and not item_dict.get("_idempotent_replay"):
+        if _db.increment_user_generation_count(actor["id"]) is None:
+            raise HTTPException(status_code=404, detail="user not found")
+    return HistoryItem(**item_dict)
+
+
+@router.delete("/api/history")
+def api_history_delete(
+    x_inku_confirm: str | None = Header(default=None, alias="X-Inku-Confirm"),
+    actor: dict = Depends(_current_user),
+) -> dict[str, int | bool]:
+    if x_inku_confirm != "permanent-delete-trash":
+        raise HTTPException(
+            status_code=409,
+            detail="X-Inku-Confirm: permanent-delete-trash is required",
+        )
+    count = _db.delete_all_trashed_items(actor["id"])
+    return {"ok": True, "count": count}
+
+
+@router.post("/api/history/trash")
+def api_history_trash(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    count = _db.trash_items(actor["id"], body.ids)
+    return {"ok": True, "count": count}
+
+
+@router.post("/api/history/restore")
+def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    count = _db.restore_items(actor["id"], body.ids)
+    return {"ok": True, "count": count}
+
+
+@router.patch("/api/history/{item_id}/star", response_model=HistoryItem, response_model_exclude_none=True)
+def api_history_star(item_id: str, body: HistoryStarBody, actor: dict = Depends(_current_user)) -> HistoryItem:
+    item = _db.set_item_starred(actor["id"], item_id, body.starred, body.note)
+    if not item:
+        raise HTTPException(status_code=404, detail="history item not found")
+    return HistoryItem(**item)
+
+
+@router.post("/api/history/rebuild-output-files")
+def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    items = _db.get_items(actor["id"], body.ids)
+    for item in items:
+        _save_history_artifacts(item)
+    return {"ok": True, "count": len(items)}
+
+
+@router.post("/api/history/permanent-delete")
+def api_history_permanent_delete(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    count = _db.delete_items(actor["id"], body.ids, require_trashed=True)
+    return {"ok": True, "count": count}

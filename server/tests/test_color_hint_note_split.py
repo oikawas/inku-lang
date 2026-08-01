@@ -18,7 +18,9 @@ from inku_server.schema import Instruction, Score
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_SOURCE = ROOT / "src" / "inku_server" / "coerce" / "compose.py"
 NORMALIZE_SOURCE = ROOT / "src" / "inku_server" / "coerce" / "normalize.py"
-API_SOURCE = ROOT / "src" / "inku_server" / "api.py"
+# The ten API-side write sites live in the render router since api.py was split
+# into routers; the census below counts the same ten.
+API_SOURCE = ROOT / "src" / "inku_server" / "api_core" / "routers" / "render.py"
 GOLDEN_PATH = Path(__file__).resolve().parent / "golden" / "coerce_golden.json"
 
 DIAGNOSTIC_FRAGMENTS = (

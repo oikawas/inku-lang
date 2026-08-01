@@ -1369,6 +1369,7 @@ class AnimationExportBody(BaseModel):
     pattern: Literal["cut", "crossfade", "fade_white", "slide"] = "cut"
     hold_seconds: float = Field(default=1.0, ge=0.1, le=30.0)
     resolution: Literal["1k", "4k", "8k"] = "1k"
+    height_px: int | None = Field(default=None, ge=64, le=12000)
 
 
 class HistoryStarBody(BaseModel):
@@ -4128,6 +4129,7 @@ def api_history_export_animation(
             pattern=body.pattern,
             hold_seconds=body.hold_seconds,
             resolution=body.resolution,
+            height_px=body.height_px,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

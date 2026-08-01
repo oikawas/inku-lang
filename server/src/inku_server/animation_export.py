@@ -67,14 +67,18 @@ def build_animation(
     pattern: AnimationPattern,
     hold_seconds: float,
     resolution: Literal["1k", "4k", "8k"],
+    height_px: int | None = None,
 ) -> bytes:
     """Rasterize saved SVGs and encode a looping APNG or GIF."""
     if len(svgs) < 2:
         raise ValueError("at least two works are required")
-    height = RESOLUTION_HEIGHTS[resolution]
+    height = height_px if height_px is not None else RESOLUTION_HEIGHTS[resolution]
+    if height_px is not None and not 64 <= height <= 12000:
+        raise ValueError("animation height must be between 64 and 12000 pixels")
+    transition_steps = TRANSITION_STEPS[resolution] if height_px is None else (6 if height <= 1080 else 4 if height <= 2160 else 2)
     first_png = Image.open(BytesIO(svg_to_png(svgs[0], height=height))).convert("RGBA")
     width = first_png.width
-    transition_count = 0 if pattern == "cut" else TRANSITION_STEPS[resolution]
+    transition_count = 0 if pattern == "cut" else transition_steps
     encoded_frame_count = len(svgs) + (len(svgs) - 1) * transition_count
     if width * height * encoded_frame_count > MAX_ENCODED_PIXELS:
         first_png.close()
@@ -98,7 +102,7 @@ def build_animation(
                 frame,
                 frames[index + 1],
                 pattern,
-                TRANSITION_STEPS[resolution],
+                transition_steps,
             )
             encoded_frames.extend(transitions)
             durations.extend([transition_ms] * len(transitions))

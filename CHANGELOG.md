@@ -2125,3 +2125,54 @@ properties were confirmed item by item before regenerating (`535566b6…` → `d
 pytest **1945/31** (+8, the new consistency gate), cli **78**, ruff clean, `npm run check` **229 files
 / 0 errors / 2 warnings**, `lint:i18n` **956/47/0/0**, `check_docs.py` green. **No deterministic layer
 changed, so the frozen corpora were not regenerated. `android/` is untouched. The version is a patch.**
+
+### v2.9.26 — Two cards no description ever reached become reachable (Build 823, 2026-08-02)
+
+**Two of the thirteen color catalogs (`fresco_study` / `ink_porcelain`) had never been picked
+by the path that chooses a catalog by reading the description** — zero out of sixty production
+descriptions (measured at v2.9.22). **Four strings changed**, the `sub` / `sub_ja` of those two
+entries in `server/src/inku_server/color_catalogs.py`; the `map`, the `palette` and the names
+all stand.
+
+**The cause was measured down to one before the contract was written.** The guess on file --
+that the card never carries the wording to the model -- was **false**: those two lines of
+`build_catalog_card()` carry `sub`, `sub_ja` and all ten palette names. Position in the list was
+not it either (the zeros sit next to a 7 and a 9, and a 6 and a 9). **What remained was the color
+overlap**: over all 78 pairs the closest is `default`—`fresco_study` (mean ΔE 11.4), then
+`default`—`ink_porcelain` (12.2), then the two against each other (13.3), against a 25.4 median.
+**And the two were not dead**: of the 45 descriptions where a user had picked a catalog by hand,
+6 (13.3%) name these two -- above the 3.5/45 an even split would give. **The auto path was
+applying a different criterion**: the card tells the model to read the subject, the light, the
+season and the material, yet **none of those six descriptions contains a subject word either
+catalog owns** (across all sixty: plaster, mural, pigment = 0; porcelain, ceramic, kiln = 0,
+while wave 29, brush 23, night 10 are real). So the provenance-of-the-pigment words gave way to
+words for a scene: "plaster, pigment, warm stone" → "sunlit wall, dry earth, warm shadow", and
+"ink, porcelain, mineral accents" → "clear light, ink, sharp mineral accents".
+
+**The effect was measured over four rounds on the same model and the same sixty descriptions**
+(`nvidia / google/gemma-4-31b-it`, `temperature=0.3`, serial). **0 / 0 before, 5 / 1 after.**
+Normalized entropy went 0.845 → **0.890**, the largest share fell from `default` 14 to 12, and
+**all thirteen catalogs were picked at least once** (eleven before). **Reverting the four strings
+returns 0 / 0**, so the four strings are what moved it. As a control, keeping the new `sub` while
+reverting `sub_ja` gives 3 / 0 -- **`fresco_study` moves off zero on the English side alone**
+(the single `ink_porcelain` hit is n=1, so which language carried it cannot be told apart).
+
+**⚠ No existing test can measure this change.** `test_api.py` pins only `default`'s two strings,
+and T-3 in `test_color_auto_select.py` asserts `catalog["sub"] in card` -- **its expected value
+comes from the product data**, so it stays green through any rewrite. **No new test was added**:
+a "never write a `sub` of pure material provenance" check would promote an n=12 observation to a
+law, and `vivid_material` (material words only, four picks) already contradicts it. A test that
+pins the wording itself is a record that gets regenerated when the data changes, not a check of a
+property. **The acceptance lives in the runs.**
+
+**One statement in the contract was wrong**: `entry.sub` at `contactSheet.ts:185` is not the
+catalog's `sub` but the history timestamp (`formatHistoryDate`) -- the names merely collided.
+Four places display it (`ColorCatalogModal`, `ManualRefineModal`, the provenance list in
+`CanvasPanel`, and the AI sheet note). **None of them truncates the new wording**, checked
+against the CSS and the string widths (not in a browser).
+
+pytest **1945/31**, cli **78**, ruff clean, `check_docs.py` green (54 internal references).
+**`sub` reaches neither the drawing nor the Score, so no frozen corpus was rebaked**
+(`"sub"` appears 0 times in the `render-engine-20` and `ddl-engine-4` manifests).
+**Not one line of web changed** (the copy in `colors.ts` is `default` alone).
+**The same two lines under `android/` belong to [I-070] and were left alone.** Patch bump.

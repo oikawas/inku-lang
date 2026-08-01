@@ -30,18 +30,19 @@ CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-01"
 REASON = (
-    "The ground began to resist the hand. Until engine 18 the ground and the "
-    "drawing were composited independently and never met, so a stroke looked the "
-    "same whether it was laid on paper or on nothing. Every work now has one "
-    "constant support, and which of its two quantities a tool meets is a property "
-    "of the tool: a brush is drunk by the sheet and swells, a waxy or hard tool is "
-    "refused and the ink is cut, leaving bare paper. The cut removes ink rather "
-    "than narrowing it, because narrowing was measured to be invisible on exactly "
-    "the tools that get refused. A cut stroke is still one element: the runs are "
-    "subpaths of the same `d`. A line the description made waver meets the same "
-    "sheet: the renderer rebuilds its outline around the varied centerline and "
-    "carries the cuts across. 227 of the 493 cases move and 266 do not; rotring "
-    "and computer are byte-identical because a machine has no contact with paper."
+    "The position of a group came back to the description. Until engine 19 every "
+    "layout branch invented its own place: scatter and cluster read only the seed "
+    "and the margin, a path pinned its cross axis to 0.5, and radial without a "
+    "stated centre turned around the middle of the canvas. 77.8% of the expanded "
+    "marks in production never consulted the coordinates the description had "
+    "given, so moving every declared coordinate by y+0.2 moved the ink's centroid "
+    "by a median of 0.0000 while changing the seed alone moved 4.06% of the "
+    "pixels. The layout branches still decide how a group scatters; a common "
+    "post-stage now decides where it is, by moving the group onto the declared "
+    "anchor and shrinking only the side that overflows the frame, so the anchor "
+    "is met and the spread away from the edge survives. The A-F cases are "
+    "byte-identical -- none of them states an arrangement, which is why this "
+    "version brings group G, the 32 cases where placement can be decided at all."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -92,6 +93,16 @@ BASE_SURFACE: dict[str, Any] = {
 BASE_GROUND: dict[str, Any] = {
     "material": "plain", "tone": "off_white", "grain": "medium",
     "density": 0.45, "opacity": 0.16, "seed": 13579,
+}
+BASE_ARRANGEMENT: dict[str, Any] = {
+    "count": 60, "layout": "scatter", "rows": None, "cols": None, "jitter": 0.12,
+    "path": "none", "color_cycle": [], "margin": 0.1, "center": None,
+    "radius": None, "density": "none", "cluster_count": None, "fade": "none",
+    "preserve_space": False, "rhythm_spacing": "none",
+}
+# Group G's anchors. "edge" is the one under which the frame correction fires.
+G_ANCHORS: dict[str, list[float]] = {
+    "center": [0.5, 0.5], "corner": [0.2, 0.2], "edge": [0.85, 0.85],
 }
 GEOMETRY: dict[str, dict[str, Any]] = {
     "line": {"from": [0.18, 0.50], "to": [0.82, 0.50]},
@@ -341,9 +352,59 @@ def build_inputs() -> dict[str, dict[str, Any]]:
             catalog_id=catalog_id,
         )
 
-    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128}
+    # G: placement authority. A-F never state an `arrangement`, so none of the
+    # 493 reaches `_expand_arrangement` -- engine 20 could be deleted whole and
+    # they would all stay green. Every G case carries one, and inside an anchor
+    # triplet the declared centre is the only thing that differs.
+    def _g(case_id: str, anchor: str, **changes: Any) -> None:
+        arrangement = copy.deepcopy(BASE_ARRANGEMENT)
+        arrangement.update(changes)
+        _case(cases, case_id,
+              _instruction("circle", weight="pen", center=list(G_ANCHORS[anchor]),
+                           radius=0.03, arrangement=arrangement))
+
+    # The largest route (40.9% of the expanded marks in production).
+    for anchor in G_ANCHORS:
+        _g(f"G-scatter-{anchor}", anchor)
+        _g(f"G-scatter-small-{anchor}", anchor, count=5)
+
+    # Clusters (27.1%). preserve_space raises the centre margin to 0.20.
+    for anchor in G_ANCHORS:
+        _g(f"G-cluster-{anchor}", anchor, cluster_count=3)
+    _g("G-cluster-preserve-edge", "edge", cluster_count=3, preserve_space=True)
+
+    # Paths (9.1%). The cross axis was written as a literal 0.5 until engine 20.
+    for path in ("wave", "diagonal", "top_to_bottom"):
+        _g(f"G-path-{path}-edge", "edge", layout="vertical", path=path)
+    _g("G-path-wave-center", "center", layout="vertical", path="wave")
+    _g("G-path-wave-corner", "corner", layout="vertical", path="wave")
+    _g("G-path-hwave-edge", "edge", layout="horizontal", path="wave")
+
+    # vertical / horizontal without a path: one axis already kept the
+    # declaration, so the centre pair here is a control that must not move.
+    for anchor in G_ANCHORS:
+        _g(f"G-vertical-nopath-{anchor}", anchor, layout="vertical")
+        _g(f"G-horizontal-nopath-{anchor}", anchor, layout="horizontal")
+
+    # radial: stage 2's target. Without `center` the ring used to turn around
+    # the middle of the canvas; the centre anchor is the control that stays.
+    for anchor in G_ANCHORS:
+        _g(f"G-radial-nocenter-{anchor}", anchor, layout="radial", count=12)
+    _g("G-radial-center-edge", "edge", layout="radial", count=12, center=[0.3, 0.3])
+
+    # The smallest route (0.7%), and the only one that tiles a region.
+    for anchor in G_ANCHORS:
+        _g(f"G-grid-{anchor}", anchor, layout="grid", count=16, rows=4, cols=4)
+
+    # Density, fade and rhythm ride along the same anchor as the scatter cases:
+    # they change how a group is drawn, never who decides where it is.
+    _g("G-scatter-dense-edge", "edge", density="high")
+    _g("G-scatter-fade-edge", "edge", fade="outward")
+    _g("G-scatter-rhythm-edge", "edge", rhythm_spacing="loose")
+
+    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128, "G": 32}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 493:
+    if actual != expected or len(cases) != 525:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

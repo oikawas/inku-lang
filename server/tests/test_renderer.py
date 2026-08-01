@@ -1644,7 +1644,11 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # (吸う 0.15 / 弾く 0.15) ので幅が動く。書き出される数値は 1444 個から
     # 1724 個へ増えたが、これは墨が切れて subpath が増えたぶんであり、
     # 要素は 1 つも増えていない (`test_ground_resistance.py` が留めている)。
-    assert digest == "a81beef258f526fc7066b09b17e77dff1d01a0888c8eca8ccc1db8a293c23a8d"
+    # engine 20 (群れの位置を記述へ返す) で再採取。この 4 つはどれも
+    # arrangement を持つので、展開された群れが宣言アンカー (0.5, 0.5) へ寄る。
+    # horizontal と vertical は片軸を既に宣言から取っていたが、もう片方の軸が
+    # 動く。数値の個数は engine 19 と同じ 1724 個で、動いたのは値だけである。
+    assert digest == "51894cf270949abff3330e3529dd5448119de86b9db763f4a1a95fc527ed3617"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

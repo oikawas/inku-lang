@@ -1949,3 +1949,88 @@ expected too** — no deterministic-layer line changed. **The render engine stay
 touched. The refactor changes no behavior, and the author's visual check (a drawing, the settings,
 the history, the lineage) passed. SPEC gains one correction on the Japanese side. The version is a
 patch.**
+
+### v2.9.24 — the eighty endpoints leave the shared thoroughfare (Build 821, 2026-08-01)
+
+Contract `api-router-split` (ledger [I-089]). **`api.py` goes from 4,474 lines to 251**, and
+**all eighty endpoints** move into ten files under `api_core/routers/`. What stays behind is the
+app wiring alone: `_lifespan`, three middlewares, the four boot calls and ten `include_router`
+lines. **Not one byte of observable behavior changes.**
+
+#### What moved where
+
+- **Ten routers** — `render` 8, `settings` 9, `history` 11, `public` 9, `me` 12, `lineage` 8,
+  `users` 8, `plugins` 8, `auth` 4, `feedback` 3. **Nothing was left unassigned**
+- **Five shared modules** (`api_core/{state,models,deps,common,rendering}.py`, 806 lines together).
+  The `api/deps.py` name the contract suggested cannot be used — `inku_server/api.py` and
+  `inku_server/api/` cannot coexist — so it became `api_core/`
+- **The dependency direction is one-way**: `api.py` -> `api_core/routers/*` ->
+  `api_core/{state,models,deps,common,rendering}`. **No router imports `api.py`**
+- **Every router is built without a prefix and no path string changed by a character**
+  (three `lineage` routes live under `/api/history/...`)
+
+#### One premise of the contract was wrong: guards cannot be moved
+
+The contract said per-route guards would **move** to a router-level default. **Forty-nine of the
+eighty cannot move**: their bodies use the `actor` value, so `actor: dict = Depends(_current_user)`
+has to stay in the signature (measured: **49 use the guard argument, 25 declare it without using
+it, 6 have none**).
+
+**So the router default is a second enforcement point, not a relocation.** The benefit for new
+endpoints stands — one added to a router inherits the guard — but **removing the existing
+per-route declarations is separate work** and none of it was done here.
+
+The mismatch surfaced through a perturbation: removing `dependencies=[...]` from the `history`
+router, exactly as the contract instructed, **left the authorization test green**. There are
+twelve enforcement points (one router default plus eleven per-route), and dropping one still
+leaves the other putting the same guard in the dependency tree. **Only hitting all twelve turns it
+red**, and the nine paths that then appear as `unguarded` (eleven routes) are **all history**, with
+no other group mixed in.
+
+#### Acceptance
+
+- **D-1, where the route bodies live** — walk the live `app.routes` and count
+  `route.endpoint.__module__`. **Against a do-nothing value of 80/80, zero routes still answer
+  `inku_server.api`.** Per the [I-088] ruling, **line count is not an acceptance gate**
+- **D-2, the API surface** — an exact match against the digest shipped with the contract
+  (endpoints 80, operations 80, schemas 79). **The expected value was measured when the contract
+  was issued and went in byte for byte; it was not re-baked** (the sha256 was checked on the way in)
+- **The reason for D-2 held up under perturbation** — dropping one field from a response model
+  **leaves both the authorization gate and the endpoint count green**, and only D-2 goes red
+- **The control perturbation** (reversing the order of the ten `include_router` calls) **stayed
+  green everywhere**, confirming D-2's normalization does not look at ordering
+
+#### Five things a pure move did not cover
+
+1. **`_build_number()`: `parents[3]` -> `parents[4]`** — it derives the repository root relative to
+   `__file__`, and the file went one level deeper. Until it was fixed `/api/info` returned `None`
+   and five tests were red. **Every `__file__`-relative site was swept** (`reference.py` keeps
+   `parents[3]`; its depth did not change)
+2. **`_logger` pinned to `logging.getLogger("inku_server.api")`** — left as `__name__` the log
+   channel would be renamed, and three `caplog` sites name that channel explicitly
+3. **Reference re-pointing across twelve test files** (36 symbols, 128 sites). **For the nine
+   symbols bound in more than one module the call site decided, not the definition** — `_save_slots`
+   is defined in `state` and imported by `rendering`, but the reader is `rendering`'s binding, so
+   patching `state` has no effect
+4. `API_SOURCE` in `test_color_hint_note_split.py` repointed (the census value of 10 is unchanged)
+5. Five unused imports removed by ruff
+
+#### Left standing
+
+- **The "API route" line in `SPEC.ja.md`** was corrected to `api_core/routers/` in this cycle
+- **Seven unreachable definitions still in `api.py`** (`_validated_color_map`, `_bearer_token`,
+  `_can_manage_user`, `_strip_anthropic_prefix`, `InterpretResponse`, `_OUTPUT_DIR`,
+  `_OUTPUT_PNG_SIZE`). **They were already dead before the split and deleting them is outside a
+  pure relocation**
+- **Folding per-route `Depends` into the router defaults** for the twenty-five routes where it is
+  possible. Ledger [I-091]
+- **`/api/prompts` is still unauthenticated**, on the allowlist with its reason (ledger [I-086])
+
+pytest **1937/31** (+2, the `test_api_surface.py` and `test_route_module_split.py` the contract
+specified; the `def test_` lists were compared with `comm -23` and **no name disappeared**), cli
+**78**, ruff clean. **`npm run check` and `lint:i18n` were not run** — the only `web/` diff is the
+two lines holding `APP_VERSION` and `BUILD_NUMBER`, with no display string and no type touched.
+**`check_frozen_corpora.py` was not run either** — no deterministic-layer file changed, and the
+corpus generator does not import `inku_server.api` (measured). **The render engine stays at 20, and
+`ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` and `macos_swift/` were not
+touched. The version is a patch.**

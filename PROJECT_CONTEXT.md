@@ -1724,6 +1724,26 @@ C-2 removed `Depends(_current_user)` from `/api/auth/me` to redden `test_every_r
 pytest **1935/31** (+8, and `comm -23` shows no name disappeared), cli **78**, ruff clean, `npm run check` **0/2/229**, `lint:i18n` **956/47/0/0**, `lint:models` 68, `lint:recommendations` 37, `check_frozen_corpora.py` byte-identical.
 **The render engine stays at 20, and `ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` and `macos_swift/` were not touched. The refactor changes no behavior and the author's visual check passed. The version is a patch.**
 
+v2.9.24 (Build 821) **takes the eighty endpoints off the shared thoroughfare**.
+Contract `api-router-split` (ledger [I-089]) reduces `api.py` from **4,474 lines to 251**,
+and **all eighty endpoints** move into ten files under `api_core/routers/`.
+What remains in `api.py` is the app wiring alone: `_lifespan`, three middlewares, the four boot calls and ten `include_router` lines.
+The shared definitions live in five modules, `api_core/{state,models,deps,common,rendering}.py` (806 lines),
+and **the dependency direction is one-way**, `api.py` -> routers -> shared (no router imports `api.py`).
+The `api/deps.py` name the contract suggested cannot be used, because `inku_server/api.py` and `inku_server/api/` cannot coexist, so it became `api_core/`.
+**One premise of the contract was wrong**: it said per-route guards would **move** to a router-level default,
+but **forty-nine of the eighty use the `actor` value in their bodies** and cannot drop `Depends` from the signature (measured: 49 use it, 25 declare it unused, 6 have none).
+**The router default is therefore a second enforcement point rather than a relocation**; the benefit for new endpoints stands, but removing the existing per-route declarations is separate work (ledger [I-091]).
+The mismatch surfaced under perturbation: removing `dependencies=[...]` from the `history` router exactly as instructed left the authorization test green, and **only hitting all twelve enforcement points turned it red**.
+The gate is not a line count but **a walk over the live `app.routes` counting `route.endpoint.__module__`** (the [I-088] ruling), reading zero against a do-nothing value of 80/80.
+**The API surface digest went in byte for byte from the value measured when the contract was issued; it was not re-baked.**
+Perturbation confirmed why that expected value is needed: dropping one field from a response model **leaves the authorization test and the endpoint count green**, and only the digest goes red.
+Five things a pure move did not cover, chiefly **`_build_number()`'s `parents[3]` -> `parents[4]`** (until fixed, `/api/info` returned `None`)
+and the re-pointing of 128 references across twelve test files and 36 symbols (**for the nine bound in more than one module the call site decided, not the definition**).
+pytest **1937/31** (+2), cli **78**, ruff clean.
+**`npm run check`, `lint:i18n` and `check_frozen_corpora.py` were not run** — the only `web/` diff is the two version lines, and no deterministic-layer file changed.
+**The render engine stays at 20, and `ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` and `macos_swift/` were not touched. The version is a patch.**
+
 v2.4.7 (Build 697) freezes the deterministic DDL layers.
 `server/reference/ddl-engine-1/` holds 29 cases (A = 15 expansion, B = 14 coercion), and
 `ddl_version` and `ddl_engine_version` are introduced at **1** (source of truth:

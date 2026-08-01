@@ -2011,3 +2011,86 @@ cli **78**、ruff clean、`npm run check` **0/2/229**（files +8 = 新設の 8 �
 **render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。
 `android/` `macos_swift/` には触れていない。振る舞いを変えない改修であり、作者の目視（描画・設定・
 履歴・系譜）を受けている。SPEC は日本語側の 1 件を訂正した。版数は patch。**
+
+### v2.9.24 — 80 本のエンドポイントが、共通の通り道から出る（Build 821、2026-08-01）
+
+契約 `api-router-split`（台帳 [I-089]）。**`api.py` 4,474 行 → 251 行**で、
+**エンドポイント 80 本すべて**が `api_core/routers/` の 10 ファイルへ移った。
+`api.py` に残るのは `app` の組み立て・`_lifespan`・ミドルウェア 3・起動時の 4 呼び出し・
+`include_router` 10 行だけである。**振る舞いは 1 バイトも変えていない。**
+
+#### 何をどこへ移したか
+
+- **router 10 本** — `render` 8 / `settings` 9 / `history` 11 / `public` 9 / `me` 12 /
+  `lineage` 8 / `users` 8 / `plugins` 8 / `auth` 4 / `feedback` 3。**割り当て不能は 0 本**
+- **共有モジュール 5 本**（`api_core/{state,models,deps,common,rendering}.py`・計 806 行）。
+  契約が推奨した `api/deps.py` という名前は採れない（`inku_server/api.py` と
+  `inku_server/api/` は同居できない）ので `api_core/` へ読み替えた
+- **依存の向きは `api.py` → `api_core/routers/*` → `api_core/{state,models,deps,common,rendering}`**
+  の一方向。**router から `api.py` を import している箇所は 0 件**
+- **全 router を prefix なしで作り、パス文字列は 1 文字も変えていない**
+  （`lineage` の 3 本が `/api/history/...` の下に居るため）
+
+#### ⚠ 契約の前提が 1 つ外れていた — ガードは「移す」ことができない
+
+契約は「per-route のガードを router 単位の既定依存へ**移す**」と書いたが、**80 本のうち 49 本は
+移せない**。本体が `actor` の値を使うので `actor: dict = Depends(_current_user)` を
+シグネチャに残さざるを得ないためである（実測: **本体で使う 49 / 引数はあるが未使用 25 /
+ガード引数なし 6**）。
+
+**したがって router 既定は「移した先」ではなく 2 つ目の強制点として足された。**
+新しいエンドポイントが既定を継ぐ利得はそのまま残るが、**既存の per-route を消す作業は
+別物**であり、本契約では 1 行も行っていない（実際に寄せられるのは未使用の 25 本のうち
+router 既定と同じガードを持つものに限られる）。
+
+この食い違いは**摂動で表に出た** — 契約の指示どおり `history` router から
+`dependencies=[...]` を外しても**認可テストは緑のまま**だった。強制点が 12 個
+（router 既定 1 + per-route 11）あり、片方を外してももう片方が同じガードを依存木へ入れる。
+**12 個すべてに当てて初めて赤**になり、`unguarded` に現れた 9 パス（= 11 ルート）は
+**全部 history** で他の群は 1 本も混ざらなかった。
+
+#### 受入
+
+- **D-1 ルート本体の所在** — 生きた `app.routes` を歩いて `route.endpoint.__module__` を数える。
+  **何もしない値 80/80 に対し、`inku_server.api` に残るルートは 0 本**。
+  [I-088] の裁定に従い**行数は受入に据えていない**
+- **D-2 API 表面の同一性** — 契約が同梱した期待値（endpoints 80 / operations 80 / schemas 79）と
+  **完全一致**。**期待値は契約発行時に測ったものをバイト単位でそのまま入れており、焼き直していない**
+  （受け入れ側で sha256 の一致を確認した）
+- **D-2 を据えた理由が摂動で裏づいた** — 応答モデルから 1 フィールド削ると
+  **認可テストもエンドポイント数 80 も緑のまま**で、D-2 だけが赤くなる
+- **対照の摂動**（`include_router` 10 本の呼び出し順を逆順）は**全部緑のまま**。
+  D-2 の正規化が並びを見ていないことの確認になった
+
+#### 移動だけでは通らなかった 5 件
+
+1. **`_build_number()` の `parents[3]` → `parents[4]`** — リポジトリ根を `__file__` からの
+   相対で出しており、1 階層深くなった。直すまで `/api/info` が `None` を返し 5 テストが赤かった。
+   **`__file__` に依存する箇所は全走査済み**（`reference.py` は深さが変わらないので `parents[3]` のまま）
+2. **`_logger` を `logging.getLogger("inku_server.api")` に固定** — `__name__` のままだと
+   ログチャネル名が変わり、`caplog` でチャネルを名指ししている 3 箇所が外れる
+3. **テスト 12 ファイルの参照付け替え**（36 シンボル・128 箇所）。**同じ名前が複数モジュールに
+   束縛されている 9 シンボルは、束縛先ではなく「呼び出し側」で決めた** — 例えば `_save_slots` は
+   `state` が定義し `rendering` が import しているが、読むのは `rendering` の束縛なので
+   `state` を patch しても効かない
+4. `test_color_hint_note_split.py` の `API_SOURCE` を移動先へ（census の値 10 は不変）
+5. ruff の未使用 import 5 件
+
+#### 残したもの
+
+- **`SPEC.ja.md` の「API 経路」の記述**を `api_core/routers/` へ訂正した（本サイクルで実施）
+- **`api.py` に残った到達不能な定義 7 件**（`_validated_color_map` `_bearer_token`
+  `_can_manage_user` `_strip_anthropic_prefix` `InterpretResponse` `_OUTPUT_DIR` `_OUTPUT_PNG_SIZE`）。
+  **分割前から死んでいたもので、純粋な再配置の範囲外として消していない**
+- **per-route の `Depends` を router 既定へ寄せる作業**（上記の 25 本ぶん）。台帳 [I-091]
+- **`/api/prompts` が未認証**のまま allowlist に理由つきで残っている（台帳 [I-086]）
+
+pytest **1937/31**（+2 = 契約が指定した `test_api_surface.py` と `test_route_module_split.py`。
+`def test_` の一覧を `comm -23` で突き合わせ、**消えた名前が 0 件**であることを見た）、
+cli **78**、ruff clean。
+**`npm run check` と `lint:i18n` は回していない** — `web/` の差分が `APP_VERSION` と
+`BUILD_NUMBER` の 2 行だけで、表示文字列も型も動いていない。
+**`check_frozen_corpora.py` も回していない** — 決定的な層に差分が 0 件で、
+凍結コーパスの生成器は `inku_server.api` を読んでいない（実測）。
+**render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。
+`android/` `macos_swift/` には触れていない。版数は patch。**

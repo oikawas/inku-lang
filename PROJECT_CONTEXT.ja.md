@@ -1381,6 +1381,26 @@ C-2 は `/api/auth/me` から `Depends(_current_user)` を外して `test_every_
 pytest **1935/31**（+8・`comm -23` で消えた名前 0 件）、cli **78**、ruff clean、`npm run check` **0/2/229**、`lint:i18n` **956/47/0/0**、`lint:models` 68、`lint:recommendations` 37、`check_frozen_corpora.py` バイト一致。
 **render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。`android/` `macos_swift/` には触れていない。振る舞いを変えない改修で、作者の目視を受けている。版数は patch。**
 
+v2.9.24（Build 821）では **80 本のエンドポイントが、共通の通り道から出る**。
+契約 `api-router-split`（台帳 [I-089]）で `api.py` は **4,474 行から 251 行**になり、
+**エンドポイント 80 本すべて**が `api_core/routers/` の 10 ファイルへ移った。
+`api.py` に残るのは `app` の組み立て・`_lifespan`・ミドルウェア 3・起動時の 4 呼び出し・`include_router` 10 行だけである。
+共有される定義は `api_core/{state,models,deps,common,rendering}.py` の 5 本（806 行）に置き、
+**依存の向きは `api.py` → routers → 共有の一方向**にした（router から `api.py` を import している箇所は 0 件）。
+契約が推奨した `api/deps.py` という名前は採れない — `inku_server/api.py` と `inku_server/api/` は同居できないので `api_core/` へ読み替えた。
+**契約の前提が 1 つ外れていた** — 契約は「per-route のガードを router 既定へ**移す**」と書いたが、
+**80 本のうち 49 本は本体が `actor` の値を使うので `Depends` をシグネチャから外せない**（実測: 使う 49 / 引数はあるが未使用 25 / 引数なし 6）。
+**router 既定は「移した先」ではなく 2 つ目の強制点として足された**のであり、新しいエンドポイントが既定を継ぐ利得は残るが、既存の per-route を消す作業は別物である（台帳 [I-091]）。
+この食い違いは摂動で表に出た — 契約の指示どおり `history` router から `dependencies=[...]` を外しても認可テストは緑のままで、**強制点 12 個すべてに当てて初めて赤**になった。
+受入は行数ではなく**生きた `app.routes` を歩いて `route.endpoint.__module__` を数える**形に据えてあり（[I-088] の裁定）、何もしない値 80/80 に対して残留 0 本。
+**API 表面のダイジェストは契約発行時に測った期待値をバイト単位でそのまま使い、焼き直していない。**
+その期待値が要る理由も摂動で裏づいた — 応答モデルから 1 フィールド削ると**認可テストもエンドポイント数 80 も緑のまま**で、ダイジェストだけが赤くなる。
+移動だけでは通らなかったのは 5 件で、**`_build_number()` の `parents[3]` → `parents[4]`**（直すまで `/api/info` が `None` を返した）と、
+テスト 12 ファイル 36 シンボル 128 箇所の参照付け替え（**同じ名前が複数モジュールに束縛されている 9 件は束縛先でなく呼び出し側で決めた**）が主だったものである。
+pytest **1937/31**（+2）、cli **78**、ruff clean。
+**`npm run check` と `lint:i18n` と `check_frozen_corpora.py` は回していない** — `web/` の差分が採番の 2 行だけで、決定的な層の差分が 0 件だからである。
+**render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。`android/` `macos_swift/` には触れていない。版数は patch。**
+
 v2.4.7（Build 697）では決定的な DDL 層を凍結した。
 `server/reference/ddl-engine-1/` に 29 ケース（A = 展開 15 / B = 補正 14）を焼き、`ddl_version` と
 `ddl_engine_version` を **1** から導入した（正本 `layer_versions.py`）。

@@ -1754,7 +1754,8 @@ inku-lang/                 # github.com/oikawas/inku-lang
 モジュール構成・API 経路・CLI サブコマンド・語彙定数の**現行値は本書に列挙しない**。次を正とする:
 
 - 語彙・定型句・マーカー・領域・weight 特性・検証閾値: **reference dump**（`GET /api/reference` / `inku-cli reference --md`。実装テーブルの機械生成鏡）
-- API 経路: `server/src/inku_server/api.py`（FastAPI ルート定義）
+- API 経路: `server/src/inku_server/api_core/routers/`（FastAPI ルート定義 10 本）と
+  `server/src/inku_server/api.py`（`app` の組み立て・ミドルウェア・`include_router`）
 - CLI サブコマンド: `inku-cli --help` および `manual/ja/cli-reference-for-ai.md`
 - 各パッケージの内部構成: `server/README.md` / `web/README.md` / `cli/README.md`（**`cli/README.md` だけが書かれている。`server/README.md` は空・`web/README.md` は SvelteKit の雛形のままで、正本として機能していない**。台帳 [I-087]）
 

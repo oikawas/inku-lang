@@ -2,7 +2,6 @@
 	import { onMount, tick } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
-	import AIRefineModal from './AIRefineModal.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
@@ -848,18 +847,20 @@ $effect(() => {
 {/if}
 
 {#if activeAIRefineNode}
-	<AIRefineModal
-		node={activeAIRefineNode}
-		onClose={() => (activeAIRefineNode = null)}
-		{onPaintOne}
-		{onVisionAdvice}
-		{onSaveVisionModel}
-		{visionModel}
-		{visionProviderGroups}
-		{stage1ModelLabel}
-		{stage2ModelLabel}
-		onLoadBranch={onLoadBranch}
-	/>
+	{#await import('./AIRefineModal.svelte') then { default: AIRefineModal }}
+		<AIRefineModal
+			node={activeAIRefineNode}
+			onClose={() => (activeAIRefineNode = null)}
+			{onPaintOne}
+			{onVisionAdvice}
+			{onSaveVisionModel}
+			{visionModel}
+			{visionProviderGroups}
+			{stage1ModelLabel}
+			{stage2ModelLabel}
+			onLoadBranch={onLoadBranch}
+		/>
+	{/await}
 {/if}
 
 

@@ -13,19 +13,12 @@
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import ColorCatalogModal from '$lib/components/ColorCatalogModal.svelte';
 	import TenkeiSelect from '$lib/components/TenkeiSelect.svelte';
-	import ReplayComparisonModal from '$lib/components/ReplayComparisonModal.svelte';
 	import { DEFAULT_TENKEI, normalizeTenkei, type TenkeiLevel } from '$lib/tenkei';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
-	import DdlEditorDialog from '$lib/components/DdlEditorDialog.svelte';
-	import HistoryManager from '$lib/components/HistoryManager.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
-	import ProfileModal from '$lib/components/ProfileModal.svelte';
-	import SaijikiDrawer from '$lib/components/SaijikiDrawer.svelte';
-	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { normalizeUiCustom, normalizeUiMode, resolveUiVisibility, UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import {
@@ -6464,149 +6457,157 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 </div><!-- /root -->
 
-<SaijikiDrawer
-	open={saijikiOpen}
-	{pluginEntries}
-	bind:activePreview={activeSaijikiPreview}
-	onClose={() => (saijikiOpen = false)}
-	previewForWord={saijikiPreview}
-/>
+{#await import('$lib/components/SaijikiDrawer.svelte') then { default: SaijikiDrawer }}
+	<SaijikiDrawer
+		open={saijikiOpen}
+		{pluginEntries}
+		bind:activePreview={activeSaijikiPreview}
+		onClose={() => (saijikiOpen = false)}
+		previewForWord={saijikiPreview}
+	/>
+{/await}
 
-<DdlEditorDialog
-	open={ddlDialogOpen}
-	isJapanese={getLang() === 'ja'}
-	title={ddlDialogMode === 'new' ? t().ddlNewDialogTitle : t().ddlEditButton}
-	subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
-	initialDdl={ddlDialogInitial}
-	drawing={ddlDialogDrawing}
-	{stage1ModelLabel}
-	{stage2ModelLabel}
-	drawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
-	drawingModelGroups={availableModelCatalog}
-	onSelectDrawingModel={selectDdlDialogDrawingModel}
-	runTokensIn={activeRunTokensIn}
-	runTokensOut={activeRunTokensOut}
-	error={ddlDialogError}
-	previewForWord={saijikiPreview}
-	{pluginEntries}
-	showTenkei={ddlDialogMode === 'edit'}
-	tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
-	tenkeiInherited={ddlDialogTenkeiOverride === null}
-	onSelectTenkei={(level) => (ddlDialogTenkeiOverride = level)}
-	onDraw={handleDdlDialogDraw}
-	onClose={closeDdlDialog}
-/>
+{#if ddlDialogOpen}
+	{#await import('$lib/components/DdlEditorDialog.svelte') then { default: DdlEditorDialog }}
+		<DdlEditorDialog
+			open={ddlDialogOpen}
+			isJapanese={getLang() === 'ja'}
+			title={ddlDialogMode === 'new' ? t().ddlNewDialogTitle : t().ddlEditButton}
+			subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
+			initialDdl={ddlDialogInitial}
+			drawing={ddlDialogDrawing}
+			{stage1ModelLabel}
+			{stage2ModelLabel}
+			drawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+			drawingModelGroups={availableModelCatalog}
+			onSelectDrawingModel={selectDdlDialogDrawingModel}
+			runTokensIn={activeRunTokensIn}
+			runTokensOut={activeRunTokensOut}
+			error={ddlDialogError}
+			previewForWord={saijikiPreview}
+			{pluginEntries}
+			showTenkei={ddlDialogMode === 'edit'}
+			tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
+			tenkeiInherited={ddlDialogTenkeiOverride === null}
+			onSelectTenkei={(level) => (ddlDialogTenkeiOverride = level)}
+			onDraw={handleDdlDialogDraw}
+			onClose={closeDdlDialog}
+		/>
+	{/await}
+{/if}
 
 <!-- ══ SETTINGS MODAL ══ -->
 {#if settingsOpen}
-	<SettingsModal
-		{settingsMode}
-		{settingsTab}
-		{stage1Provider}
-		{stage1Model}
-		{stage2Provider}
-		{stage2Model}
-		{visionProvider}
-		{visionModel}
-		providerGroups={settingsMode === 'model' ? availableModelCatalog : modelCatalog}
-		visionProviderGroups={availableVisionModelCatalog}
-		allowVisionSelection={modelSelectionAllowVision}
-		bind:includeThinking
-		{settingsStatus}
-		{settingsStatusError}
-		{settingsStatusLoading}
-		bind:modelSettings
-		{modelSettingsStatus}
-		{modelFetchResults}
-		{modelSettingsLoading}
-		{dbBackupStatus}
-		{outputSaveStatus}
-		{logRetentionStatus}
-		{currentUser}
-		{uiMode}
-		{uiCustom}
-		{uiModeSaving}
-		{uiModeSaveError}
-		onSetUiMode={(mode) => void updateUiMode(mode)}
-		onSetUiCustomItem={updateUiCustomItem}
-		{userSettingsStatus}
-		{userSettingsLoading}
-		bind:loginUserName
-		bind:loginPassword
-		{users}
-		{groups}
-		bind:newUserName
-		bind:newUserEmail
-		bind:newUserPassword
-		bind:newUserRole
-		bind:newUserGroupId
-		{selectedUserId}
-		bind:editUserName
-		bind:editUserEmail
-		bind:editUserPassword
-		bind:editUserRole
-		bind:editUserGroupId
-		bind:newGroupName
-		bind:editGroupName
-		{editGroupId}
-		bind:autoRepairEnabled={ddlAutoRepairEnabled}
-		bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
-		bind:animationExportSettings={exportSettings.animation}
-		{exportTemplates}
-		{exportTemplateStatus}
-		{canvasAspectEnabled}
-		onSetCanvasAspectEnabled={setCanvasAspectEnabled}
-		onClose={closeSettingsModal}
-		onCloseSettings={() => (settingsOpen = false)}
-		onSelectSettingsTab={selectSettingsTab}
-		onSetStage1Provider={setStage1Provider}
-		onSetStage1Model={setStage1Model}
-		onSetStage2Provider={setStage2Provider}
-		onSetStage2Model={setStage2Model}
-		onSetVisionProvider={setVisionProvider}
-		onSetVisionModel={setVisionModel}
-		onUpdateModelProvider={updateModelProvider}
-		onAddModelProvider={addModelProvider}
-		onAskDeleteModelProvider={askDeleteModelProvider}
-		onAskClearModelApiKey={askClearModelApiKey}
-		onFetchModelList={fetchProviderModels}
-		onSaveModelProviderName={saveModelProviderName}
-		onSaveModelProviderMemo={saveModelProviderMemo}
-		onSaveModelProvider={saveModelProvider}
-		onSaveModelSettings={saveModelSettings}
-		onLoadModelSettings={loadModelSettings}
-		onLoadSettingsStatus={loadSettingsStatus}
-		{pluginActionStatus}
-		onLoadPluginContent={loadPluginContent}
-		onSavePlugin={savePlugin}
-		onCreatePlugin={createPlugin}
-		onDeletePlugin={deletePlugin}
-		onSetPluginEnabled={setPluginEnabled}
-		onUpdateDbBackupSettings={updateDbBackupSettings}
-		onRunDbBackupNow={runDbBackupNow}
-		onUpdateOutputSaveSettings={updateOutputSaveSettings}
-		{renderConcurrencyStatus}
-		onUpdateRenderConcurrencySettings={updateRenderConcurrencySettings}
-		onUpdateLogRetentionSettings={updateLogRetentionSettings}
-		onLoadUserSettings={loadUserSettings}
-		onLogin={login}
-		onLogout={logout}
-		onAddUser={addUser}
-		onSetEditUser={setEditUser}
-		onClearEditUser={clearEditUser}
-		onSaveUserEdit={saveUserEdit}
-		onRemoveUser={removeUser}
-		onAddGroup={addGroup}
-		onRemoveGroup={removeGroup}
-		onSetEditGroup={setEditGroup}
-		onClearEditGroup={clearEditGroup}
-		onSaveGroupEdit={saveGroupEdit}
-		onCancelModelSelection={cancelModelSelection}
-		onConfirmModelSelection={confirmModelSelection}
-		onAddExportTemplate={addExportTemplate}
-		onUpdateExportTemplate={updateExportTemplate}
-		onRemoveExportTemplate={removeExportTemplate}
-	/>
+	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
+		<SettingsModal
+			{settingsMode}
+			{settingsTab}
+			{stage1Provider}
+			{stage1Model}
+			{stage2Provider}
+			{stage2Model}
+			{visionProvider}
+			{visionModel}
+			providerGroups={settingsMode === 'model' ? availableModelCatalog : modelCatalog}
+			visionProviderGroups={availableVisionModelCatalog}
+			allowVisionSelection={modelSelectionAllowVision}
+			bind:includeThinking
+			{settingsStatus}
+			{settingsStatusError}
+			{settingsStatusLoading}
+			bind:modelSettings
+			{modelSettingsStatus}
+			{modelFetchResults}
+			{modelSettingsLoading}
+			{dbBackupStatus}
+			{outputSaveStatus}
+			{logRetentionStatus}
+			{currentUser}
+			{uiMode}
+			{uiCustom}
+			{uiModeSaving}
+			{uiModeSaveError}
+			onSetUiMode={(mode) => void updateUiMode(mode)}
+			onSetUiCustomItem={updateUiCustomItem}
+			{userSettingsStatus}
+			{userSettingsLoading}
+			bind:loginUserName
+			bind:loginPassword
+			{users}
+			{groups}
+			bind:newUserName
+			bind:newUserEmail
+			bind:newUserPassword
+			bind:newUserRole
+			bind:newUserGroupId
+			{selectedUserId}
+			bind:editUserName
+			bind:editUserEmail
+			bind:editUserPassword
+			bind:editUserRole
+			bind:editUserGroupId
+			bind:newGroupName
+			bind:editGroupName
+			{editGroupId}
+			bind:autoRepairEnabled={ddlAutoRepairEnabled}
+			bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
+			bind:animationExportSettings={exportSettings.animation}
+			{exportTemplates}
+			{exportTemplateStatus}
+			{canvasAspectEnabled}
+			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
+			onClose={closeSettingsModal}
+			onCloseSettings={() => (settingsOpen = false)}
+			onSelectSettingsTab={selectSettingsTab}
+			onSetStage1Provider={setStage1Provider}
+			onSetStage1Model={setStage1Model}
+			onSetStage2Provider={setStage2Provider}
+			onSetStage2Model={setStage2Model}
+			onSetVisionProvider={setVisionProvider}
+			onSetVisionModel={setVisionModel}
+			onUpdateModelProvider={updateModelProvider}
+			onAddModelProvider={addModelProvider}
+			onAskDeleteModelProvider={askDeleteModelProvider}
+			onAskClearModelApiKey={askClearModelApiKey}
+			onFetchModelList={fetchProviderModels}
+			onSaveModelProviderName={saveModelProviderName}
+			onSaveModelProviderMemo={saveModelProviderMemo}
+			onSaveModelProvider={saveModelProvider}
+			onSaveModelSettings={saveModelSettings}
+			onLoadModelSettings={loadModelSettings}
+			onLoadSettingsStatus={loadSettingsStatus}
+			{pluginActionStatus}
+			onLoadPluginContent={loadPluginContent}
+			onSavePlugin={savePlugin}
+			onCreatePlugin={createPlugin}
+			onDeletePlugin={deletePlugin}
+			onSetPluginEnabled={setPluginEnabled}
+			onUpdateDbBackupSettings={updateDbBackupSettings}
+			onRunDbBackupNow={runDbBackupNow}
+			onUpdateOutputSaveSettings={updateOutputSaveSettings}
+			{renderConcurrencyStatus}
+			onUpdateRenderConcurrencySettings={updateRenderConcurrencySettings}
+			onUpdateLogRetentionSettings={updateLogRetentionSettings}
+			onLoadUserSettings={loadUserSettings}
+			onLogin={login}
+			onLogout={logout}
+			onAddUser={addUser}
+			onSetEditUser={setEditUser}
+			onClearEditUser={clearEditUser}
+			onSaveUserEdit={saveUserEdit}
+			onRemoveUser={removeUser}
+			onAddGroup={addGroup}
+			onRemoveGroup={removeGroup}
+			onSetEditGroup={setEditGroup}
+			onClearEditGroup={clearEditGroup}
+			onSaveGroupEdit={saveGroupEdit}
+			onCancelModelSelection={cancelModelSelection}
+			onConfirmModelSelection={confirmModelSelection}
+			onAddExportTemplate={addExportTemplate}
+			onUpdateExportTemplate={updateExportTemplate}
+			onRemoveExportTemplate={removeExportTemplate}
+		/>
+	{/await}
 {/if}
 
 {#if appInfoOpen}
@@ -6674,86 +6675,94 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {/if}
 
 {#if profileOpen && currentUser}
-		<ProfileModal
-			username={currentUser.username}
-			email={currentUser.email}
-			generationCount={currentUser.image_generation_count}
-			status={profileStatus}
-		saving={profileSaving}
-		bind:profileEmail
-		bind:profileCurrentPassword
-		bind:profileNewPassword
-		onClose={closeProfile}
-		onSave={saveProfile}
-	/>
+		{#await import('$lib/components/ProfileModal.svelte') then { default: ProfileModal }}
+			<ProfileModal
+				username={currentUser.username}
+				email={currentUser.email}
+				generationCount={currentUser.image_generation_count}
+				status={profileStatus}
+			saving={profileSaving}
+			bind:profileEmail
+			bind:profileCurrentPassword
+			bind:profileNewPassword
+			onClose={closeProfile}
+			onSave={saveProfile}
+		/>
+		{/await}
 {/if}
 
 <!-- ══ CATALOG MODAL ══ -->
 {#if catalogOpen}
-	<ColorCatalogModal
-		catalogs={colorCatalogs}
-		selectedCatalog={colorCatalogSettings.selected}
-		{currentCatalog}
-		onSelectCatalog={setSelectedCatalog}
-		onCancel={cancelCatalogSelection}
-		onConfirm={confirmCatalogSelection}
-	/>
+	{#await import('$lib/components/ColorCatalogModal.svelte') then { default: ColorCatalogModal }}
+		<ColorCatalogModal
+			catalogs={colorCatalogs}
+			selectedCatalog={colorCatalogSettings.selected}
+			{currentCatalog}
+			onSelectCatalog={setSelectedCatalog}
+			onCancel={cancelCatalogSelection}
+			onConfirm={confirmCatalogSelection}
+		/>
+	{/await}
 {/if}
 
 <!-- ══ HISTORY MANAGER MODAL ══ -->
 {#if historyManager.open}
-	<HistoryManager
-		bind:historyManagerTab={historyManager.tab}
-		bind:historySearch={historyManager.search}
-		historyManagerView={historyManager.view}
-		historyManagerPage={historyManager.page}
-		historyManagerLoading={historyManager.loading}
-		historyManagerTotalPages={historyManager.totalPages}
-		historyManagerOffset={historyManager.offset}
-		historyManagerShownTo={historyManager.shownTo}
-		managedHistoryItems={historyManager.items}
-		managedHistoryTotal={historyManager.total}
-		managerTrashTotal={historyManager.trashTotal}
-		{trashTotal}
-		selectedHistoryIds={historyManager.selectedIds}
-		animationExportSettings={exportSettings.animation}
-		historyManagerStarredOnly={historyManager.starredOnly}
-		onClose={() => (historyManager.open = false)}
-		onSetView={historyManager.setView}
-		onSetPage={historyManager.setPage}
-		onSetLatestPage={() => historyManager.setPage(0)}
-		onSetFirstPage={() => historyManager.setPage(historyManager.totalPages - 1)}
-		onSetPageSize={historyManager.setPageSize}
-		onSetStarredOnly={historyManager.setStarredOnly}
-		onSelectAll={selectAllManagedHistory}
-		onAskTrash={askTrash}
-		onAskRestore={askRestore}
-		onAskPermanentDelete={askPermanentDelete}
-		onToggleSelection={toggleHistorySelection}
-		onLoadItem={loadIterationItem}
-		onToggleStar={toggleHistoryStar}
-		{historyModelSummary}
-		{formatHistoryDate}
-		{formatElapsed}
-		{catalogName}
-		{historyPreviewText}
-		{shortModel}
-		{apiFetch}
-		currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
-		currentLineageRootId={displayedHistoryItem?.lineage_root_node_id ?? null}
-	/>
+	{#await import('$lib/components/HistoryManager.svelte') then { default: HistoryManager }}
+		<HistoryManager
+			bind:historyManagerTab={historyManager.tab}
+			bind:historySearch={historyManager.search}
+			historyManagerView={historyManager.view}
+			historyManagerPage={historyManager.page}
+			historyManagerLoading={historyManager.loading}
+			historyManagerTotalPages={historyManager.totalPages}
+			historyManagerOffset={historyManager.offset}
+			historyManagerShownTo={historyManager.shownTo}
+			managedHistoryItems={historyManager.items}
+			managedHistoryTotal={historyManager.total}
+			managerTrashTotal={historyManager.trashTotal}
+			{trashTotal}
+			selectedHistoryIds={historyManager.selectedIds}
+			animationExportSettings={exportSettings.animation}
+			historyManagerStarredOnly={historyManager.starredOnly}
+			onClose={() => (historyManager.open = false)}
+			onSetView={historyManager.setView}
+			onSetPage={historyManager.setPage}
+			onSetLatestPage={() => historyManager.setPage(0)}
+			onSetFirstPage={() => historyManager.setPage(historyManager.totalPages - 1)}
+			onSetPageSize={historyManager.setPageSize}
+			onSetStarredOnly={historyManager.setStarredOnly}
+			onSelectAll={selectAllManagedHistory}
+			onAskTrash={askTrash}
+			onAskRestore={askRestore}
+			onAskPermanentDelete={askPermanentDelete}
+			onToggleSelection={toggleHistorySelection}
+			onLoadItem={loadIterationItem}
+			onToggleStar={toggleHistoryStar}
+			{historyModelSummary}
+			{formatHistoryDate}
+			{formatElapsed}
+			{catalogName}
+			{historyPreviewText}
+			{shortModel}
+			{apiFetch}
+			currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
+			currentLineageRootId={displayedHistoryItem?.lineage_root_node_id ?? null}
+		/>
+	{/await}
 {/if}
 
 {#if replayComparison}
-	<ReplayComparisonModal
-		originalSvg={replayComparison.originalSvg}
-		replayedSvg={replayComparison.replayedSvg}
-		recordedVersion={replayComparison.recordedVersion}
-		currentVersion={replayComparison.currentVersion}
-		versionMessage={replayComparison.versionMessage}
-		provisionalSeed={replayComparison.provisionalSeed}
-		onClose={closeReplayComparison}
-	/>
+	{#await import('$lib/components/ReplayComparisonModal.svelte') then { default: ReplayComparisonModal }}
+		<ReplayComparisonModal
+			originalSvg={replayComparison.originalSvg}
+			replayedSvg={replayComparison.replayedSvg}
+			recordedVersion={replayComparison.recordedVersion}
+			currentVersion={replayComparison.currentVersion}
+			versionMessage={replayComparison.versionMessage}
+			provisionalSeed={replayComparison.provisionalSeed}
+			onClose={closeReplayComparison}
+		/>
+	{/await}
 {/if}
 
 {#if confirmAction}

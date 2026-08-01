@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.24 / Build 821**
+**Target version: v2.9.25 / Build 822**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -100,7 +100,7 @@ To learn why something took its current shape, search the changelog by term, ver
 
 | Subject | Value | Source of truth |
 |---|---|---|
-| Application | v2.9.24 / Build 821 | `APP_VERSION` in `web/src/routes/+page.svelte`, `web/BUILD_NUMBER` |
+| Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 20 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 4 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.2` | `android/VERSION` (a namespace separate from web and server) |

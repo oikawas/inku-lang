@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.24 / Build 821**
+**対象バージョン: v2.9.25 / Build 822**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -87,7 +87,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 
 | 対象 | 値 | 正本 |
 |---|---|---|
-| アプリ | v2.9.24 / Build 821 | `web/src/routes/+page.svelte` の `APP_VERSION`、`web/BUILD_NUMBER` |
+| アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
 | Render Engine | 20 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 4 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.2` | `android/VERSION`（web / server とは別の名前空間） |

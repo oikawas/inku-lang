@@ -14,7 +14,28 @@ from .deps import _logger
 
 
 def _app_version() -> str:
-    """Report the installed distribution version so pyproject.toml stays the single source."""
+    """Read the application version from web/APP_VERSION, the single source.
+
+    The same file feeds the UI (through the vite define) and the CLI, so the
+    version shown on screen and the version reported by /api/info cannot drift.
+    This is the development version of the running tree; the released
+    distribution version is a different thing and lives in _release_version.
+    """
+    # Same depth as _build_number: api_core/common.py -> inku_server -> src ->
+    # server -> repository root.
+    path = Path(__file__).resolve().parents[4] / "web" / "APP_VERSION"
+    try:
+        return path.read_text(encoding="utf-8").strip() or "unknown"
+    except OSError:
+        return "unknown"
+
+
+def _release_version() -> str:
+    """Report the installed distribution version, which pyproject.toml owns.
+
+    This moves only when a release is tagged, so it lags the application version
+    on purpose while releases are on hold.
+    """
     try:
         return importlib.metadata.version("inku-server")
     except importlib.metadata.PackageNotFoundError:
@@ -22,6 +43,7 @@ def _app_version() -> str:
 
 
 _APP_VERSION = _app_version()
+_RELEASE_VERSION = _release_version()
 
 
 def _unexpected_http_error(operation: str, status_code: int) -> HTTPException:

@@ -113,7 +113,8 @@ but never asserts "the output will change"**.
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` / `server/pyproject.toml` | the product release | v2.9.24 | per release |
+| `APP_VERSION` | the application version | v2.9.24 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
 | `web/BUILD_NUMBER` | build serial | 821 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
@@ -360,11 +361,14 @@ recover; databases that already have accounts are left untouched). An empty
 string is treated as unset (v2.4.0), and the distributed compose file refuses
 to start without a value.
 
-`/api/info` reports `version` as the server implementation version
-(`server/pyproject.toml`, made the single source in v2.4.0 and stamped per
-release). It is a separate namespace from the web display version
-(`APP_VERSION`), but the numbers normally coincide because releases are
-repo-wide.
+`/api/info` reports two versions, split apart in v2.9.25. `version` is the
+**application version**, read from the single file `web/APP_VERSION`, so it
+always equals what the UI puts on screen. `release_version` is the **distributed
+package version**, read from `server/pyproject.toml` through
+`importlib.metadata`. **They are different things and do not coincide while
+releases are on hold** (measured 2026-08-01: application v2.9.24 against package
+2.7.2). Before the split, `version` reported only the package version, so two
+different version numbers appeared on the same screen.
 
 **Developer mode (v2.4.3):** the `INKU_DEVELOPER_MODE` environment variable
 decides only whether developer-facing options are shown. With it off, NVIDIA NIM

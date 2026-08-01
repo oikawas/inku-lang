@@ -1,4 +1,5 @@
 <script module lang="ts">
+	declare const __APP_VERSION__: string;
 	declare const __BUILD_NUMBER__: string;
 	declare const __BUILD_DATE__: string;
 </script>
@@ -73,7 +74,9 @@
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
-	const APP_VERSION = 'v2.9.24';
+	// Injected by vite.config from web/APP_VERSION, the single source shared with
+	// the server (/api/info) and the CLI. Never write the version here again.
+	const APP_VERSION = __APP_VERSION__;
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
 	const buildDateLabel = $derived.by(() => {

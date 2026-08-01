@@ -7,7 +7,7 @@ import { resolve, dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const buildNumberFile = resolve(__dirname, 'BUILD_NUMBER');
-const packageFile = resolve(__dirname, 'package.json');
+const appVersionFile = resolve(__dirname, 'APP_VERSION');
 
 let buildNumber = 1;
 try {
@@ -19,9 +19,13 @@ try {
 	buildDate = statSync(buildNumberFile).mtime.toISOString();
 } catch { /* first run */ }
 
-let appVersion = '0.1.0';
+// APP_VERSION is the single source for the application version: this banner, the
+// UI (via __APP_VERSION__), the server (/api/info) and the CLI all read this one
+// file. package.json carries the npm package version and is deliberately not read
+// here -- it is 0.1.0 and names a different thing.
+let appVersion = 'unknown';
 try {
-	appVersion = JSON.parse(readFileSync(packageFile, 'utf-8')).version ?? appVersion;
+	appVersion = readFileSync(appVersionFile, 'utf-8').trim() || appVersion;
 } catch { /* first run */ }
 
 function startupBannerPlugin() {
@@ -49,6 +53,7 @@ function startupBannerPlugin() {
 
 export default defineConfig({
 	define: {
+		__APP_VERSION__: JSON.stringify(appVersion),
 		__BUILD_NUMBER__: JSON.stringify(String(buildNumber)),
 		// The build date is the mtime of BUILD_NUMBER, the same source the server
 		// banner reads (api.py:_build_date). A fresh clone stamps its own mtime.

@@ -333,6 +333,18 @@ def _cli_build_number() -> str | None:
             continue
     return None
 
+def _app_version() -> str | None:
+    # web/APP_VERSION is the single source the UI and the server also read. An
+    # installed CLI with no repository tree above it simply reports nothing,
+    # exactly as _cli_build_number does.
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "web" / "APP_VERSION"
+        try:
+            return candidate.read_text(encoding="utf-8").strip() or None
+        except OSError:
+            continue
+    return None
+
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -3361,6 +3373,7 @@ def command_version(args: argparse.Namespace) -> int:
         "cli": {
             "name": "inku-cli",
             "version": _cli_version(),
+            "app_version": _app_version(),
             "build_number": _cli_build_number(),
         },
         "server": server_info,

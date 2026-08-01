@@ -17,7 +17,7 @@ from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...model_settings import connection_for, model_provider_catalog, provider_for_model
 from ... import db as _db
-from ..common import _APP_VERSION, _build_number, _env_flag, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
+from ..common import _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
 from ..models import ModelSettingsResponse
 
@@ -32,7 +32,11 @@ class PromptsResponse(BaseModel):
 
 class AppInfoResponse(BaseModel):
     name: str
+    # The application version of the running tree, from web/APP_VERSION -- the
+    # same value the UI shows. release_version is the tagged distribution and
+    # lags on purpose while releases are on hold.
     version: str
+    release_version: str
     build_number: str | None = None
     developer_mode: bool = False
     render_engine_id: str
@@ -68,6 +72,7 @@ def api_info() -> AppInfoResponse:
     return AppInfoResponse(
         name="inku-server",
         version=_APP_VERSION,
+        release_version=_RELEASE_VERSION,
         build_number=_build_number(),
         developer_mode=_env_flag("INKU_DEVELOPER_MODE"),
         render_engine_id=engine.id,

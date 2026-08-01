@@ -1745,3 +1745,40 @@ while **changing `render_seed` alone moved 4.06% of the pixels**.
 
 pytest **1910/31** (+9 = 8 from the implementation, 1 added during acceptance), cli **77**, ruff
 clean, `npm run check` **221/0/2**, `check_frozen_corpora.py` byte-identical. **The version is a patch.**
+
+### v2.9.21 — a history thumbnail says which engine drew it (Build 815, 2026-08-01)
+
+Integrates the Codex branch `feat/history-tooltip-render-engine` (1 commit).
+
+The tooltip on the history thumbnails along the bottom of the screen gains one `render engine` row.
+
+- The value reads `id / version` (`default / 20`). **If only one of the two was recorded, only that
+  one is shown; if neither was, the row reads "not recorded"** (`historyVersionNotRecorded`, an
+  existing string in both languages)
+- The change is **three lines in `HistoryStrip.svelte`**: `render_engine_id` and
+  `render_engine_version` are added to the `HistoryItem` type, and one tooltip row is added.
+  **The API, the database, the stored history format and the drawing are untouched**
+
+#### Acceptance
+
+- **The completion report gives the branch point as main `d5940d8` (Build 808, render engine 19),
+  but the measured `merge-base` is the current main `0e4a686`** (after the engine 20 merge). There
+  were no conflicts
+- **The values shown were measured to actually arrive.** The strip's items are `data.items` from
+  `GET /api/history` verbatim, and the `HistoryItem` response model carries both columns; a probe
+  confirmed `default` / `20` appear in the list response
+- **An existing test already guards that dependency** —
+  `test_api.py::test_paint_can_save_server_generated_history` reads `render_engine_id` and
+  `render_engine_version` **off the list response**. Dropping both columns from `db._row_to_dict`
+  reddens it with a `KeyError`. **No new test was added**
+- **The wording follows the existing house style**: the provenance table in `CanvasPanel.svelte`
+  already uses the same bare `render engine` label and the same `id / version` form. `lint:i18n`
+  does not look at bare display strings, so the judgement was made by counting existing callers
+- **The tooltip does not get wider**: the label column is a fixed `54px`, and the new label
+  `render engine` (13 characters) is the same length as the existing longest, `Color catalog`
+  (13 characters). The extra row grows upward, and the strip sits at the bottom of the screen
+
+pytest **1910/31** (unchanged), cli **77**, ruff clean, `npm run check` **221/0/2**, `lint:i18n`
+**956/47/0/0** (unchanged). **No deterministic layer changed, so no corpus was rebaked. There is no
+`android/` diff. SPEC does not enumerate the history tooltip's rows and is unchanged. The version is
+a patch.**

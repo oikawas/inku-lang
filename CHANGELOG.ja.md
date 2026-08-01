@@ -1818,3 +1818,38 @@ Score が書いた座標ではなく renderer の配置規則が置いていた�
 
 pytest **1910/31**（+9 = 実装の 8 件と受け入れで足した 1 件）、cli **77**、ruff clean、
 `npm run check` **221/0/2**、`check_frozen_corpora.py` バイト一致。**版数は patch。**
+
+### v2.9.21 — 履歴のサムネイルが、どの engine で描かれたかを言う（Build 815、2026-08-01）
+
+Codex の枝 `feat/history-tooltip-render-engine`（1 commit）を統合した版。
+
+画面下部の履歴サムネイルの tooltip へ `render engine` の行を 1 つ足した。
+
+- 値は `id / version` の形（`default / 20`）。**片方だけ記録されていれば在るほうだけを出し、
+  両方とも無ければ「記録なし」**（`historyVersionNotRecorded`。日英とも既存の文言）
+- 変更は `HistoryStrip.svelte` の **3 行だけ** — `HistoryItem` 型へ
+  `render_engine_id` / `render_engine_version` を足し、tooltip の行を 1 つ足した。
+  **API・DB・履歴の保存形式・描画は 1 行も変えていない**
+
+#### 受け入れ
+
+- **完了レポートは起点を main `d5940d8`（Build 808 / render engine 19）と書いているが、
+  実測した `merge-base` は現在の main `0e4a686`**（engine 20 のマージ後）である。衝突は 0
+- **表示される値が本当に届くことを測った。** strip の items は `GET /api/history` の
+  `data.items` そのままで、応答モデル `HistoryItem` が 2 列を持つ。
+  probe で一覧応答に `default` / `20` が載ることを確認した
+- **この依存は既存の検査が既に守っていた** —
+  `test_api.py::test_paint_can_save_server_generated_history` が
+  **一覧応答の** `render_engine_id` / `render_engine_version` を見ている。
+  `db._row_to_dict` から 2 列を落とす摂動で赤（`KeyError`）。**新しい検査は足していない**
+- **表記は既存の作法と一致する** — `CanvasPanel.svelte` の来歴表が
+  同じ裸ラベル `render engine` と同じ `id / version` 形式を既に使っている。
+  `lint:i18n` は裸の表示文字列を見ないので、判断は既存の呼び出し元を数えて行った
+- **tooltip の幅は悪化しない** — ラベル列は `54px` 固定で、
+  新ラベル `render engine`（13 字）は既存最長の `Color catalog`（13 字）と同幅である。
+  行が 1 つ増えるぶんは上へ伸びるが、strip は画面下端にある
+
+pytest **1910/31**（不変）、cli **77**、ruff clean、`npm run check` **221/0/2**、
+`lint:i18n` **956/47/0/0**（不変）。
+**決定的な層に差分が無いのでコーパスは焼き直していない。`android/` にも差分は無い。
+SPEC は履歴 tooltip の行を列挙していないので不変更。版数は patch。**

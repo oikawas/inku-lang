@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.20 / Build 813**
+**対象バージョン: v2.9.21 / Build 815**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -1326,6 +1326,20 @@ v2.9.20（Build 813）では **群れの位置が記述へ返った**（render e
 `Arrangement.center` の description が「省略=0.5,0.5」のままで段 2 の後は誤りだが、**Stage 2 の tool schema へ渡る文字列なので触っていない**（台帳 [I-080]）。
 pytest **1910/31**（+9 = 実装の 8 件と受け入れで足した 1 件）、cli **77**、ruff clean、`npm run check` **221/0/2**、`check_frozen_corpora.py` バイト一致。
 **版数は patch。**
+
+v2.9.21（Build 815）では **履歴のサムネイルが、どの engine で描かれたかを言う**。
+画面下部の履歴サムネイルの tooltip へ `render engine` の行を 1 つ足した。
+値は `id / version` の形（`default / 20`）で、**片方だけ記録されていれば在るほうだけを出し、両方とも無ければ「記録なし」**である。
+変更は `HistoryStrip.svelte` の **3 行だけ**で、**API・DB・履歴の保存形式・描画は 1 行も変えていない**。
+**完了レポートは起点を main `d5940d8`（Build 808 / render engine 19）と書いているが、実測した `merge-base` は現在の main `0e4a686`**（engine 20 のマージ後）であり、衝突は 0 だった。
+**表示される値が本当に届くことを測った** — strip の items は `GET /api/history` の `data.items` そのままで、応答モデル `HistoryItem` が 2 列を持つ。
+**この依存は既存の検査が既に守っていた** — `test_api.py::test_paint_can_save_server_generated_history` が一覧応答の `render_engine_id` / `render_engine_version` を見ており、`db._row_to_dict` から 2 列を落とす摂動で赤になる。
+**新しい検査は足していない。**
+**表記は既存の作法と一致する** — `CanvasPanel.svelte` の来歴表が同じ裸ラベル `render engine` と同じ `id / version` 形式を既に使っている。
+`lint:i18n` は裸の表示文字列を見ないので、判断は既存の呼び出し元を数えて行った。
+**tooltip の幅は悪化しない** — ラベル列は `54px` 固定で、新ラベル `render engine`（13 字）は既存最長の `Color catalog`（13 字）と同幅である。
+pytest **1910/31**（不変）、cli **77**、ruff clean、`npm run check` **221/0/2**、`lint:i18n` **956/47/0/0**（不変）。
+**決定的な層に差分が無いのでコーパスは焼き直していない。版数は patch。**
 
 v2.4.7（Build 697）では決定的な DDL 層を凍結した。
 `server/reference/ddl-engine-1/` に 29 ケース（A = 展開 15 / B = 補正 14）を焼き、`ddl_version` と

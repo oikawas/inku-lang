@@ -1915,3 +1915,99 @@ ruff clean、`npm run check` **221/0/2**、`lint:i18n` **956/47/0/0**（鍵の 1
 **render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。
 `android/` は追随していない**（旧鍵のクライアント乱択が残る。台帳 [I-072] 系）。
 **SPEC は英語の運用節（Modes）に `catalog_mode` を書き足した。版数は patch。**
+
+### v2.9.23 — 共有カウンタが競合しなくなり、最初に読む量が半分以下になる（Build 820、2026-08-01）
+
+3 段の契約（`module-split-and-merge-conflicts`）を 1 サイクルでマージした。
+**依頼の前提は「巨大モジュールが衝突の原因」だったが、実測はそう言わなかった。**
+過去 80 マージを `git merge-tree` で再現すると **21 件が競合し、そのうち 20 件（95%）は
+1 行の `web/BUILD_NUMBER`** だった。`+page.svelte` の 2 件も行の重なりは各 1 行で、
+原因は大きさではなく**両側が別々の設定を足して隣り合う「共通の追記点」**だった。
+
+#### 段 1 — 衝突を出所で止める
+
+- **`web/BUILD_NUMBER` の merge driver**（`.gitattributes` の 1 行 +
+  `scripts/git/build-number-merge.sh`）。共有カウンタなので「両側が採番した」は
+  意見の相違ではなく、**大きいほうが常に答え**である
+- **driver の命令は `.git/config` にあり版管理されない**ので `scripts/git/setup.sh` を置いた。
+  worktree は `.git/config` を共有するので 1 回で全 worktree に効くが、**新しい clone では未設定**
+- **設定が失われる向きはすべて安全側**。未設定の clone・`driver` の unset・`.gitattributes` の
+  行の消失は、どれも**従来どおり競合するだけ**で誤ったマージにはならない。
+  **`merge.buildnumber.name` は意図的に書いていない** — name があって driver が無いと
+  git は既定のテキストマージへ落ちず `fatal: custom merge driver buildnumber lacks command line`
+  でマージ自体を中止する（実測）。name を落とすことで、設定の失われ方が 1 つ残らず安全側になる
+- **設定永続化の追記点を機能ごとに畳んだ** — 7 キーを
+  `web/src/lib/features/{color-catalog,tenkei,wild,export,result-log,batch}/` へ移した。
+  **効いたのはファイル数ではなく「そのファイルが誰の通り道か」である。**
+  キー・`$state`・load・persist・touch の 5 か所が、どの機能ブランチも触る `+page.svelte` から
+  **他の枝が触らない 1 ファイル**へ移った
+
+#### 段 2 — 最初に読む量
+
+開閉フラグの後ろにある 9 個（`SettingsModal` `LineagePanel` `DdlEditorDialog` `HistoryManager`
+`ReplayComparisonModal` `ProfileModal` `ColorCatalogModal` `AIRefineModal` `SaijikiDrawer`）を
+`await import()` へ移し、`features/export/download.ts` と
+`features/model-inspection/state.svelte.ts` を `+page.svelte` から抽出した。
+
+- **最大チャンク gzip 166,815 → 79,533 B**（−52%）、チャンク数 1 → 31。
+  client JS の**合計は 688,180 → 702,784 B と増える** — この指標は「最初に読む量」であって総量ではない
+- **`SaijikiDrawer` だけは `{#if}` で包んでいない。** この抽斗は常に DOM にあり
+  CSS の `transition: width` で開くので、開いた瞬間に mount すると**その 1 回だけ動きが出ない**。
+  独立チャンクにはなるが取得は読み込み時である
+- **`+page.svelte` は 7,411 → 6,836 行**（script 6,110 → 5,519 行）
+
+#### 段 3 — 認可の網羅
+
+エンドポイントの認可を網羅する検査が 1 本も無かった。`server/tests/test_route_authorization.py`
+を新設し、**生きた `app.routes` を歩いて**（ソースの正規表現ではない）依存木を再帰的に辿る。
+ガードなしの集合が `PUBLIC` の 6 本と**完全一致**すること、ルート総数が **80** であること、
+`PUBLIC` が実在するパスだけを挙げていることを見る。
+
+**`api.py` の APIRouter 分割そのものは行っていない**（下記「残したもの」）。
+
+#### 受け入れで測ったこと
+
+実装セッションの報告を鵜呑みにせず、受け入れ側で測り直した。
+
+| 受入 | 実測 |
+|---|---|
+| A-1 `merge-census.py 80` | `conflicted=4` / `web/BUILD_NUMBER` **0 件** |
+| A-2 対照① `merge.buildnumber` の両キーを unset | **21 / 20** → 戻して **4 / 0** |
+| A-2 対照② `.gitattributes` の 1 行を削除 | **21 / 20** → 戻して **4 / 0** |
+| C-2 製品ガードを剥がす摂動 | `/api/auth/me` から `Depends(_current_user)` を外すと **`test_every_route_is_guarded_or_listed_public` が赤**（余分な要素として `/api/auth/me` が出る）→ 戻して緑 |
+
+**赤くなった名前**は `merge-census.py` の `conflicted` と `web/BUILD_NUMBER` の行、
+および `test_every_route_is_guarded_or_listed_public` である。
+
+使い捨ての repo で**実 `git merge`** も測った（base 800 / ours 803 / theirs 805）:
+未設定 = CONFLICT、`name` のみ = `fatal`、設定済み = clean で **805**。
+**マージ 2（段 1 の 818 と段 2 の 819）が実地の確認になった** — driver が働いて
+衝突なしで 819 に解決した。
+
+- **属性の出所は作業ツリーの `.gitattributes` である。** `merge-tree` は replay 対象の
+  歴史のツリーではなく checkout の `.gitattributes` を読むので、**行を持たない checkout や
+  古い枝の worktree では従来どおり競合する**（安全側）
+
+#### 残したもの
+
+- **段 2 の受入 B-2（script 部 ≤ 3,000 行）に達していない**（5,519 行）。
+  契約 §2.2 が名指しした 5 単位を**全部切っても 4,388 行**で 3,000 には届かない、と実測が出ている。
+  **受入の数字と、切る場所の表が別々に決められていた。**続きと切る単位の実測は台帳 [I-088]
+- **`api.py` の APIRouter 分割は未実施**（4,474 行・80 ルート・ルートが共有する
+  モジュール直下のヘルパが 80 個以上）。**分割の前後で 80 本と `PUBLIC` の一致を測れる検査は
+  先に入った。**台帳 [I-089]
+- **`.svelte.ts` のモジュール直下 `$state` と SSR** — 段 1 で作った 6 本と既存の
+  `mascot.svelte.ts` / `i18n/index.svelte.ts` が同じ形で、この app は adapter-node で SSR が有効。
+  段 1 が持ち込んだ問題ではなく既存の流儀に合わせた結果である。台帳 [I-090]
+- **`/api/prompts` が未認証**のまま allowlist に理由つきで残っている（台帳 [I-086]）
+
+pytest **1935/31**（+8 = `test_merge_driver.py` 5 と `test_route_authorization.py` 3。
+`def test_` の一覧を `comm -23` で突き合わせ、**消えた名前が 0 件**であることを見た）、
+cli **78**、ruff clean、`npm run check` **0/2/229**（files +8 = 新設の 8 本）、
+`lint:i18n` **956/47/0/0**、`lint:models` 68、`lint:recommendations` 37、
+`check_docs.py` 緑（内部参照 56）、`check_frozen_corpora.py` バイト一致。
+**`lint:i18n` が動かないのは期待どおり** — 設定と機能を移しただけで表示文字列を 1 つも足していない。
+**`check_frozen_corpora.py` が動かないのも期待どおり** — 決定的な層を 1 行も変えていない。
+**render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。
+`android/` `macos_swift/` には触れていない。振る舞いを変えない改修であり、作者の目視（描画・設定・
+履歴・系譜）を受けている。SPEC は日本語側の 1 件を訂正した。版数は patch。**

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.22 / Build 817**
+**Target version: v2.9.23 / Build 820**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -1700,6 +1700,29 @@ Running the product's `select_catalog_id` over the prototype's 60 cases gives **
 Acceptance's own perturbation **changes no shape** — flipping the demo default from `"fixed"` to `"auto"` reddens exactly one test, so the default is guarded.
 pytest **1927/31** (+17), cli **78** (+1), ruff clean, `npm run check` **221/0/2**, `lint:i18n` **956/47/0/0**, `lint:models` 68, `lint:recommendations` 37, `check_frozen_corpora.py` byte-identical.
 **The render engine stays at 20, and `ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` has not followed. The version is a patch.**
+
+v2.9.23 (Build 820) **stops the shared counter from conflicting and halves the first read**.
+A three-stage contract (`module-split-and-merge-conflicts`) merged in one cycle.
+**The premise behind the request was "the giant modules cause the conflicts", and replaying the last 80 merges with `git merge-tree` gives 21 conflicts of which 20 (95%) are the one-line `web/BUILD_NUMBER`.**
+The two `+page.svelte` conflicts overlap by one line each; the cause is not size but a **shared append point** where both sides added a different setting and the key constants landed next to each other.
+Stage 1 gives `web/BUILD_NUMBER` a merge driver (one line in `.gitattributes` plus `scripts/git/build-number-merge.sh`).
+It is a shared counter, so "both sides bumped it" is never a real disagreement — **the larger number is always the answer**.
+**The driver's command lives in `.git/config`, which is not versioned**, so `scripts/git/setup.sh` writes it (worktrees share `.git/config`, so one run covers every worktree, and **a fresh clone starts unconfigured**).
+**Every way of losing the configuration fails in the safe direction**: an unconfigured clone, an unset `driver`, or a deleted `.gitattributes` line each conflicts exactly as it always did.
+**`merge.buildnumber.name` is deliberately not written** — with a name but no driver git does not fall back to the text merge, it aborts with `fatal: custom merge driver buildnumber lacks command line` (measured).
+Seven persisted settings moved into `web/src/lib/features/{color-catalog,tenkei,wild,export,result-log,batch}/`, **moving the five places a setting touches (key, `$state`, load, persist, touch) out of the `+page.svelte` every feature branch edits and into one file no other branch touches**.
+Stage 2 moves the nine components behind an open/close flag to `await import()`, taking **the largest chunk from 166,815 to 79,533 B gzip** (−52%, chunk count 1 → 31).
+**Total client JS grows, 688,180 → 702,784 B** — this metric is the first read, not the total.
+**`SaijikiDrawer` alone is not wrapped in `{#if}`**, because the drawer is always in the DOM and opens through a CSS `transition: width`, so mounting it on open would drop the motion that one time.
+Stage 3 adds `server/tests/test_route_authorization.py`, which **walks the live `app.routes`** rather than a regex over the source and asserts that the unguarded set exactly equals the six entries of `PUBLIC` and that the route total is 80.
+Acceptance reproduced A-1 (`conflicted=4`, `BUILD_NUMBER` 0) and applied **two controls** — unsetting both keys and deleting the `.gitattributes` line, each returning 21 / 20 and restoring to 4 / 0.
+C-2 removed `Depends(_current_user)` from `/api/auth/me` to redden `test_every_route_is_guarded_or_listed_public`, then restored it to green.
+**The attribute source is the working tree's `.gitattributes`** — `merge-tree` reads the checkout, not the historical trees being replayed, so a checkout without the line or a worktree on an older branch still conflicts as before (the safe direction).
+**Merge 2 of this cycle was the live confirmation**: stage 1 carried 818 and stage 2 carried 819, and the driver resolved it to 819 with no conflict.
+**Stage 2's gate B-2 (script under 3,000 lines) is not met** at 5,519 — the five units the contract named come to 4,388 lines even if all are extracted, so **the gate's number and the table of places to cut were decided separately** (ledger [I-088]).
+**The APIRouter split of `api.py` is also not done** (ledger [I-089]; the test that measures 80 routes and the `PUBLIC` match across the split is already in place).
+pytest **1935/31** (+8, and `comm -23` shows no name disappeared), cli **78**, ruff clean, `npm run check` **0/2/229**, `lint:i18n` **956/47/0/0**, `lint:models` 68, `lint:recommendations` 37, `check_frozen_corpora.py` byte-identical.
+**The render engine stays at 20, and `ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` and `macos_swift/` were not touched. The refactor changes no behavior and the author's visual check passed. The version is a patch.**
 
 v2.4.7 (Build 697) freezes the deterministic DDL layers.
 `server/reference/ddl-engine-1/` holds 29 cases (A = 15 expansion, B = 14 coercion), and

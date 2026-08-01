@@ -1848,3 +1848,104 @@ byte-identical. **The render engine stays at 20, and `ddl_version` 3 and `ddl_en
 unchanged. `android/` has not followed** (its client-side draw and the old key remain; ledger
 [I-072] family). **SPEC gains `catalog_mode` in the English operational section (Modes). The version
 is a patch.**
+
+### v2.9.23 — the shared counter stops conflicting, and the first read halves (Build 820, 2026-08-01)
+
+A three-stage contract (`module-split-and-merge-conflicts`) merged in one cycle.
+**The premise behind the request was "the giant modules cause the conflicts", and the measurement
+disagreed.** Replaying the last 80 merges with `git merge-tree` produces **21 conflicts, and 20 of
+them (95%) are the one-line `web/BUILD_NUMBER`**. The two `+page.svelte` conflicts overlap by one
+line each; the cause is not size but a **shared append point** — both sides added a different
+setting and the key constants landed next to each other.
+
+#### Stage 1 — stop the conflicts at their source
+
+- **A merge driver for `web/BUILD_NUMBER`** (one line in `.gitattributes` plus
+  `scripts/git/build-number-merge.sh`). It is a shared counter, so "both sides bumped it" is never
+  a real disagreement — **the larger number is always the answer**
+- **The driver's command lives in `.git/config`, which is not versioned**, so
+  `scripts/git/setup.sh` writes it. Worktrees share `.git/config`, so one run covers every
+  worktree of a repository; **a fresh clone starts unconfigured**
+- **Every way of losing the configuration fails in the safe direction.** An unconfigured clone,
+  an unset `driver`, a deleted `.gitattributes` line — each **conflicts exactly as it always did**
+  and never produces a wrong merge. **`merge.buildnumber.name` is deliberately not written**: with
+  a name but no driver, git does not fall back to the text merge — it aborts the whole merge with
+  `fatal: custom merge driver buildnumber lacks command line` (measured). Dropping the name leaves
+  no unsafe way to lose the setting
+- **The settings append point is folded per feature** — seven keys moved into
+  `web/src/lib/features/{color-catalog,tenkei,wild,export,result-log,batch}/`.
+  **What changed is not the number of files but whose path each file is on.** The five places a
+  setting touches (key, `$state`, load, persist, touch) moved out of `+page.svelte`, which every
+  feature branch edits, into **one file no other branch touches**
+
+#### Stage 2 — how much is read first
+
+The nine components behind an open/close flag (`SettingsModal`, `LineagePanel`, `DdlEditorDialog`,
+`HistoryManager`, `ReplayComparisonModal`, `ProfileModal`, `ColorCatalogModal`, `AIRefineModal`,
+`SaijikiDrawer`) moved to `await import()`, and `features/export/download.ts` and
+`features/model-inspection/state.svelte.ts` came out of `+page.svelte`.
+
+- **The largest chunk drops from 166,815 to 79,533 B gzip** (−52%); the chunk count goes 1 → 31.
+  **Total client JS grows, 688,180 → 702,784 B** — this metric is the first read, not the total
+- **`SaijikiDrawer` alone is not wrapped in `{#if}`.** The drawer is always in the DOM and opens
+  through a CSS `transition: width`; mounting it at the moment it opens would **drop the motion
+  that one time**. It becomes its own chunk, but it is fetched at load rather than on first open
+- **`+page.svelte` goes 7,411 → 6,836 lines** (script 6,110 → 5,519)
+
+#### Stage 3 — authorization coverage
+
+No test covered endpoint authorization. `server/tests/test_route_authorization.py` is new: it
+**walks the live `app.routes`** (not a regex over the source) and follows the dependency tree
+recursively. It asserts that the unguarded set **exactly equals** the six entries of `PUBLIC`, that
+the route total is **80**, and that `PUBLIC` names only routes that exist.
+
+**The APIRouter split of `api.py` itself was not done** (see "left open" below).
+
+#### What acceptance measured
+
+The implementation session's report was re-measured rather than taken at face value.
+
+| Gate | Measured |
+|---|---|
+| A-1 `merge-census.py 80` | `conflicted=4` / `web/BUILD_NUMBER` **0** |
+| A-2 control 1: unset both `merge.buildnumber` keys | **21 / 20** → restored **4 / 0** |
+| A-2 control 2: delete the `.gitattributes` line | **21 / 20** → restored **4 / 0** |
+| C-2 strip a product guard | removing `Depends(_current_user)` from `/api/auth/me` reddens **`test_every_route_is_guarded_or_listed_public`** (it reports `/api/auth/me` as the extra item) → restored, green |
+
+**The names that reddened** are `conflicted` and the `web/BUILD_NUMBER` row of `merge-census.py`,
+and `test_every_route_is_guarded_or_listed_public`.
+
+A real `git merge` was measured in a throwaway repo (base 800 / ours 803 / theirs 805): unconfigured
+= CONFLICT, name only = `fatal`, configured = clean at **805**. **Merge 2 of this cycle was the
+live confirmation** — stage 1 carried 818 and stage 2 carried 819, and the driver resolved it to
+819 with no conflict.
+
+- **The attribute source is the working tree's `.gitattributes`.** `merge-tree` reads the checkout,
+  not the historical trees being replayed, so **a checkout without the line, or a worktree on an
+  older branch, still conflicts as before** (the safe direction)
+
+#### Left open
+
+- **Stage 2's gate B-2 (script under 3,000 lines) is not met** (5,519). The measurement says the
+  five units the contract named come to 4,388 lines even if all of them are extracted, which does
+  not reach 3,000. **The gate's number and the table of places to cut were decided separately.**
+  The continuation and the measured units are ledger [I-088]
+- **The APIRouter split of `api.py` is not done** (4,474 lines, 80 routes, and more than 80
+  module-level helpers shared across routes). **The test that measures 80 routes and the `PUBLIC`
+  match across the split is already in place.** Ledger [I-089]
+- **Module-level `$state` in `.svelte.ts` and SSR** — the six new files match the existing
+  `mascot.svelte.ts` and `i18n/index.svelte.ts`, and this app runs adapter-node with SSR on. Not
+  introduced by stage 1; it follows the existing idiom. Ledger [I-090]
+- **`/api/prompts` remains unauthenticated**, kept in the allowlist with a reason (ledger [I-086])
+
+pytest **1935/31** (+8 from `test_merge_driver.py` 5 and `test_route_authorization.py` 3; the
+`def test_` lists were compared with `comm -23` and **no name disappeared**), cli **78**, ruff
+clean, `npm run check` **0/2/229** (files +8, the eight new ones), `lint:i18n` **956/47/0/0**,
+`lint:models` 68, `lint:recommendations` 37, `check_docs.py` green (56 internal references),
+`check_frozen_corpora.py` byte-identical. **`lint:i18n` not moving is expected** — settings and
+features moved and not one display string was added. **`check_frozen_corpora.py` not moving is
+expected too** — no deterministic-layer line changed. **The render engine stays at 20, and
+`ddl_version` 3 and `ddl_engine_version` 4 are unchanged. `android/` and `macos_swift/` were not
+touched. The refactor changes no behavior, and the author's visual check (a drawing, the settings,
+the history, the lineage) passed. SPEC gains one correction on the Japanese side. The version is a
+patch.**

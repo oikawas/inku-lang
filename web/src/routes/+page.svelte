@@ -73,7 +73,7 @@
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
-	const APP_VERSION = 'v2.9.22';
+	const APP_VERSION = 'v2.9.23';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	// vite.config が BUILD_NUMBER の mtime を焼き込む。読めなければ null。
 	const buildDateLabel = $derived.by(() => {

@@ -1724,7 +1724,7 @@ v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → S
 - ~~履歴管理のスケール対応~~ → v1.11 でサーバーサイド検索 / ページング化し、全件DOM描画を廃止
 - ~~出力ファイル保存失敗が見えない~~ → v1.11 以降で SVG/JSON/入力/DDL 保存と PNG 変換を分離し、filesystem / PNG 変換エラーをサーバーログへ記録
 - ~~バッチ描画の行単位失敗が見えない~~ → v1.11 以降で成功 / 失敗サマリーと失敗行詳細を UI に保持表示。v1.20 で実行中の現在行ハイライトと処理中解釈の読み取り専用表示を追加
-- ~~UI実装が単一巨大コンポーネントに集中している~~ → v1.20 で AuthPanel / InputPanel / BatchPanel / DdlEditor / CanvasPanel / HistoryStrip / HistoryManager / SettingsModal / ColorCatalogModal / SaijikiDrawer / ConfirmDialog に分割し、`+page.svelte` はページ全体の orchestration を主責務とする形へ整理
+- **UI実装が単一巨大コンポーネントに集中している（未解決）** → v1.20 で AuthPanel / InputPanel / BatchPanel / DdlEditor / CanvasPanel / HistoryStrip / HistoryManager / SettingsModal / ColorCatalogModal / SaijikiDrawer / ConfirmDialog に分割したが、**その後 `+page.svelte` 自体が再び肥大した**（v2.9.22 時点で 7,411 行 / script 部 6,110 行）。v2.9.23 で機能ごとの縦割り（`web/src/lib/features/<name>/`）と開閉コンポーネント 9 個の動的 import を入れ、**6,836 行 / script 部 5,519 行・初回チャンク gzip 166,815 → 79,533 B** まで下げた。**縦割りは途中である**（残る単位の実測は台帳 [I-088]）。**共通ファイルへの「横割り」は採らない** — どの機能ブランチもその共通ファイルを触るようになり、追記衝突が場所を変えるだけになるため（過去 80 マージの実測が根拠。[版史](docs/spec/render-engine-history.ja.md)）
 - ~~サムネイル用SVG加工がレンダーごとに文字列処理される~~ → v1.20 で `HistoryThumbnail` へ分離し、サムネイル単位の `$derived` で加工済み SVG を管理する形へ変更
 - ~~UIテーマがブラウザローカル状態に閉じている~~ → v1.21 でライト / ダークモードをユーザー設定としてサーバー DB に保存し、ログインユーザーごとに復元する
 - ~~バッチ指示履歴が端末ごとに分断される~~ → v1.21 でバッチ指示履歴をユーザーごとにサーバー DB へ保存し、プルダウン選択時点で即復元する
@@ -1756,7 +1756,7 @@ inku-lang/                 # github.com/oikawas/inku-lang
 - 語彙・定型句・マーカー・領域・weight 特性・検証閾値: **reference dump**（`GET /api/reference` / `inku-cli reference --md`。実装テーブルの機械生成鏡）
 - API 経路: `server/src/inku_server/api.py`（FastAPI ルート定義）
 - CLI サブコマンド: `inku-cli --help` および `manual/ja/cli-reference-for-ai.md`
-- 各パッケージの内部構成: `server/README.md` / `web/README.md` / `cli/README.md`
+- 各パッケージの内部構成: `server/README.md` / `web/README.md` / `cli/README.md`（**`cli/README.md` だけが書かれている。`server/README.md` は空・`web/README.md` は SvelteKit の雛形のままで、正本として機能していない**。台帳 [I-087]）
 
 `ddl/` は初期 Python PoC（Android 補完軸のベース）であり、Web 版は `server/` に移行済み。
 

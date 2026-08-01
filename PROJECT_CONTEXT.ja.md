@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.22 / Build 817**
+**対象バージョン: v2.9.23 / Build 820**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -1357,6 +1357,29 @@ v2.9.22（Build 817）では **色カタログが、記述を読んで決まる*
 受け入れ側の**形を変えない摂動**（デモ既定を `"fixed"` から `"auto"` へ反転）は 1 本だけを赤にし、既定は守られていた。
 pytest **1927/31**（+17）、cli **78**（+1）、ruff clean、`npm run check` **221/0/2**、`lint:i18n` **956/47/0/0**、`lint:models` 68、`lint:recommendations` 37、`check_frozen_corpora.py` バイト一致。
 **render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。`android/` は追随していない。版数は patch。**
+
+v2.9.23（Build 820）では **共有カウンタが競合しなくなり、最初に読む量が半分以下になる**。
+3 段の契約（`module-split-and-merge-conflicts`）を 1 サイクルでマージした。
+**依頼の前提は「巨大モジュールが衝突の原因」だったが、過去 80 マージを `git merge-tree` で再現すると 21 件の競合のうち 20 件（95%）が 1 行の `web/BUILD_NUMBER`** だった。
+`+page.svelte` の 2 件も行の重なりは各 1 行で、原因は大きさではなく**両側が別々の設定を足して隣り合う「共通の追記点」**である。
+段 1 は `web/BUILD_NUMBER` に merge driver を入れた（`.gitattributes` の 1 行 + `scripts/git/build-number-merge.sh`）。
+共有カウンタなので「両側が採番した」は意見の相違ではなく、**大きいほうが常に答え**である。
+**driver の命令は `.git/config` にあり版管理されない**ので `scripts/git/setup.sh` を置いた（worktree は `.git/config` を共有するので 1 回で全 worktree に効き、**新しい clone では未設定**になる）。
+**設定が失われる向きはすべて安全側**で、未設定の clone・`driver` の unset・`.gitattributes` の行の消失はどれも従来どおり競合するだけである。
+**`merge.buildnumber.name` は意図的に書いていない** — name があって driver が無いと git は既定のテキストマージへ落ちず `fatal: custom merge driver buildnumber lacks command line` でマージ自体を中止する（実測）。
+設定永続化の 7 キーを `web/src/lib/features/{color-catalog,tenkei,wild,export,result-log,batch}/` へ移し、**キー・`$state`・load・persist・touch の 5 か所を、どの機能ブランチも触る `+page.svelte` から他の枝が触らない 1 ファイルへ動かした**。
+段 2 は開閉フラグの後ろにある 9 個を `await import()` へ移し、**最大チャンクを gzip 166,815 → 79,533 B**（−52%・チャンク数 1 → 31）にした。
+**client JS の合計は 688,180 → 702,784 B と増える** — この指標は「最初に読む量」であって総量ではない。
+**`SaijikiDrawer` だけは `{#if}` で包んでいない**（常に DOM にあり CSS の `transition: width` で開くので、開いた瞬間に mount するとその 1 回だけ動きが出ない）。
+段 3 は `server/tests/test_route_authorization.py` を新設し、**生きた `app.routes` を歩いて**（ソースの正規表現ではない）ガードなしの集合が `PUBLIC` の 6 本と完全一致すること・ルート総数が 80 であることを見る。
+受け入れでは A-1（`conflicted=4` / `BUILD_NUMBER` 0 件）を再現し、**対照の摂動を 2 つ**当てた（両キーの unset と `.gitattributes` の行削除。どちらも 21 / 20 へ戻り、復旧で 4 / 0）。
+C-2 は `/api/auth/me` から `Depends(_current_user)` を外して `test_every_route_is_guarded_or_listed_public` を赤にし、戻して緑に戻した。
+**属性の出所は作業ツリーの `.gitattributes` である** — `merge-tree` は replay 対象の歴史のツリーではなく checkout を読むので、行を持たない checkout や古い枝の worktree では従来どおり競合する（安全側）。
+**マージ 2（段 1 の 818 と段 2 の 819）が実地の確認になった**（driver が働いて衝突なしで 819 に解決した）。
+**段 2 の受入 B-2（script 部 ≤ 3,000 行）には達していない**（5,519 行）— 契約 §2.2 が名指しした 5 単位を全部切っても 4,388 行で、**受入の数字と切る場所の表が別々に決められていた**（台帳 [I-088]）。
+**`api.py` の APIRouter 分割も未実施**である（台帳 [I-089]。分割の前後で 80 本と `PUBLIC` の一致を測れる検査は先に入った）。
+pytest **1935/31**（+8・`comm -23` で消えた名前 0 件）、cli **78**、ruff clean、`npm run check` **0/2/229**、`lint:i18n` **956/47/0/0**、`lint:models` 68、`lint:recommendations` 37、`check_frozen_corpora.py` バイト一致。
+**render engine は 20 のまま・`ddl_version` 3・`ddl_engine_version` 4 も不変。`android/` `macos_swift/` には触れていない。振る舞いを変えない改修で、作者の目視を受けている。版数は patch。**
 
 v2.4.7（Build 697）では決定的な DDL 層を凍結した。
 `server/reference/ddl-engine-1/` に 29 ケース（A = 展開 15 / B = 補正 14）を焼き、`ddl_version` と

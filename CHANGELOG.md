@@ -1608,3 +1608,64 @@ Android has no diff. The version is a patch.**
 > **Found while deploying**: `models.ts` **had reached pentala at Build 802 and was gone again** — today's
 > md5 comparison showed pentala's copy identical to main's, without the branch's change. **One real
 > instance of [I-053], a parallel rsync erasing someone else's work.** This release puts it back.
+
+### v2.9.19 — the colors become one sheet, selection outlives the page, and the animation gains a height (Build 812, 2026-08-01)
+
+**Three Codex branches collected in one version.** Each is an independent UI or export change and
+none contains another's commits. Nothing in the deterministic layers (`coerce/`, `renderer.py`,
+`stroke_engine.py`, `schema.py`, `saijiki.py`, `language_support/`) changed, so **the reference
+corpora were not refrozen, and `android/` has no diff.**
+
+#### The color catalog modal becomes a contact sheet (Build 810)
+
+- The list-on-the-left, detail-on-the-right arrangement is gone. **All 13 catalogs show their
+  palettes at once**: everything selectable is visible before anything is selected
+- Each color carries its swatch, hex and English name, plus the Japanese name when the UI is
+  Japanese. The catalog name, catalog ID and subtitle sit alongside
+- Ten columns by default, five below 980px, three below 380px
+- The selected catalog is marked with the theme's `--accent` and a check
+- **The confirm button loses its dedicated fill (`primary-inline`) and matches cancel as a
+  `ghost-btn`** — sizing still comes from the `--btn-sm-*` tokens, with no literal color anywhere
+
+#### History selection survives a page turn (Build 811)
+
+- `selectedIds = []` was removed from `setPage()` and `setPageSize()`. **Turning the page or
+  changing the page size keeps what was selected**
+- Select-all on the current page **adds or removes only the current page's ids, leaving ids chosen
+  on other pages alone**
+- **The places that do drop the selection are still there** — switching between active and trash,
+  the starred filter, and a changed search all clear it as before (seven clear sites became five,
+  and the two that went are exactly `setPage` and `setPageSize`)
+- Works selected off-page are fetched by the existing id lookup when an export runs
+
+#### Animation export gains a height axis (Build 812)
+
+- The resolution choice gains **150px, 300px and 500px**, plus a **custom value from 64 to 12000px**
+- The API takes a backward-compatible optional **`height_px`**. Omit it and the old `resolution`
+  route runs unchanged
+- `build_animation()` rasterizes at that height when it is given, **keeping the aspect ratio and the
+  existing encoded-pixel ceiling (600,000,000)**
+- `1k` / `4k` / `8k` remain. Stored localStorage settings and existing API callers still work
+
+#### Acceptance — one perturbation showed exactly where the test was missing
+
+The web client **sends `height_px` for every choice** (picking `1k` also sends `height_px: 1080`),
+so **the three presets travel through the new derived branch too**. That branch rebuilds the
+transition-step ladder from the height (`6 if height <= 1080 else 4 if height <= 2160 else 2`), and
+**if the ladder disagrees with `TRANSITION_STEPS` every existing export silently changes length.**
+
+Three perturbations were applied:
+
+1. Ignore `height_px` (disable the feature) → **red**
+2. Drop the 64–12000 range guard → **red**
+3. **Flatten the ladder to one constant** → **all 123 tests green**
+
+Number 3 stayed green because the new height test was written with `pattern="cut"`, a condition
+under which **no transition frame is produced at all**. **Two tests were added: a round trip at the
+preset heights (the frame count must match with and without `height_px`) and the ladder's
+boundaries (64 / 1080 / 1081 / 2160 / 2161 / 4320).** With those in place all three perturbations go
+red and the unmodified tree is green.
+
+pytest **1901/31** (+4: two from the branch, two added during acceptance), cli **77**, ruff clean,
+`npm run check` **221/0/2**, `lint:i18n` **956/47/0/0** (five new English strings),
+`lint:models` 68, `lint:recommendations` 37, `npm run build` succeeds. **The version step is a patch.**

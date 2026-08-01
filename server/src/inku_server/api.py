@@ -40,6 +40,7 @@ from .autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_
 from .feature_analysis import composition_distance
 from .okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL, generate_okugaki
 from .color_catalogs import color_catalog_ids, color_catalogs, get_color_catalog, render_color_map_for_catalog
+from .color_selector import select_catalog_id
 from .coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from .composer import _finalize_score, compose
 from .ddl_expander import FOCUS_IDS, VARIATION_AMPLITUDES
@@ -828,12 +829,17 @@ def _resolved_catalog_id(catalog_id: str | None) -> str:
     return str(catalog["id"])
 
 
-def _resolved_paint_catalog_id(catalog_id: str | None, *, random_catalog: bool) -> str:
+def _resolved_paint_catalog_id(catalog_id: str | None, *, mode: str, source_text: str) -> str:
     resolved = _resolved_catalog_id(catalog_id)
-    if not random_catalog:
-        return resolved
-    candidates = [candidate for candidate in color_catalog_ids() if candidate != resolved]
-    return secrets.choice(candidates) if candidates else resolved
+    if mode == "auto":
+        return select_catalog_id(source_text, fallback_id=resolved)
+    if mode == "random":
+        # Refinement keeps the draw: "another catalog" exists to see the same
+        # description in a different colour, and reading the description would
+        # settle on the same catalog every time.
+        candidates = [candidate for candidate in color_catalog_ids() if candidate != resolved]
+        return secrets.choice(candidates) if candidates else resolved
+    return resolved
 
 
 def _validated_canvas_aspect(value: str | None) -> str:
@@ -1030,8 +1036,8 @@ class PaintRequest(BaseModel):
     lineage_parent_node_id: str | None = None
     derivation_kind: str | None = None
     derivation_metadata: dict[str, object] = Field(default_factory=dict)
-    catalog_id: str | None = Field(default=None, description="使用する色カタログID。ランダム選択時は直前IDとして除外する")
-    random_color_catalog: bool = Field(default=False, description="現在のcatalog_idを除外してサーバー側で色カタログを選ぶか")
+    catalog_id: str | None = Field(default=None, description="使用する色カタログID。auto では失敗時の落とし先、random では除外する直前ID")
+    catalog_mode: Literal["fixed", "auto", "random"] = Field(default="fixed", description="色カタログの決め方。fixed=catalog_id をそのまま使う / auto=記述を読んでサーバーが選ぶ / random=catalog_id 以外から抽選 (推敲専用)")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
     variation_amplitude: str | None = Field(default=None, description="変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効")
@@ -1484,7 +1490,9 @@ class DemoSettingsBody(BaseModel):
     seed_phrase: str = Field(default="日本の四季を感じさせる文章を40語以内で生成", min_length=1, max_length=1000)
     interval_seconds: int = Field(default=30, ge=1, le=3600)
     timeout_seconds: int = Field(default=3600, ge=60, le=86400)
-    random_color_catalog: bool = False
+    # The demo toggle is two-valued: the draw it used to offer is gone, and
+    # "random" stays a refinement-only mode of /api/paint.
+    catalog_mode: Literal["fixed", "auto"] = "fixed"
 
 
 class DemoInstructionBody(BaseModel):
@@ -3622,7 +3630,9 @@ def _paint_events(
     instruction_lang_resolved = _resolve_instruction_lang(
         source_text, instruction_lang_requested, ui_lang=ui_lang
     )
-    catalog_id = _resolved_paint_catalog_id(req.catalog_id, random_catalog=req.random_color_catalog)
+    catalog_id = _resolved_paint_catalog_id(
+        req.catalog_id, mode=req.catalog_mode, source_text=source_text
+    )
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)

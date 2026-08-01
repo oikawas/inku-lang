@@ -36,7 +36,7 @@
 		actionDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
-		randomColorCatalog: boolean;
+		autoColorCatalog: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -68,7 +68,7 @@
 		actionDisabled,
 		error,
 		batchPromptHistory,
-		randomColorCatalog = $bindable(false),
+		autoColorCatalog = $bindable(false),
 		stage1ModelLabel,
 		stage2ModelLabel,
 		onRememberBatchPrompt,
@@ -182,8 +182,8 @@
 {#if !batchRunning}
 	<div class="batch-tools">
 		<label class="batch-option">
-			<input type="checkbox" bind:checked={randomColorCatalog} />
-			<span>{t().batchRandomColorCatalog}</span>
+			<input type="checkbox" bind:checked={autoColorCatalog} />
+			<span>{t().batchAutoColorCatalog}</span>
 		</label>
 	</div>
 {/if}

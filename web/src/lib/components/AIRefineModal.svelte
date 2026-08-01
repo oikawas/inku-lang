@@ -141,7 +141,7 @@
           countGeneration: true,
           signal: abortController.signal
         };
-        if (kind === 'catalog_change') options.randomColorCatalog = true;
+        if (kind === 'catalog_change') options.catalogMode = 'random';
         if (kind === 'variation') {
           options.variationAmplitude = variationAmplitude;
           options.variationSeed = await allocateVariationSeed(variationAmplitude);

@@ -2962,7 +2962,7 @@ def command_refine(args: argparse.Namespace) -> int:
             params["render_seed"] = target.get("render_seed")
             params["composition_seed"] = target.get("composition_seed")
             params["interpretation_seed"] = target.get("interpretation_seed")
-            params["random_color_catalog"] = True
+            params["catalog_mode"] = "random"
             
         data, _ = client.request("POST", "/api/paint", data=params)
         

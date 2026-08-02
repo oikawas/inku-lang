@@ -2315,3 +2315,57 @@ defining it** (`ProfileModal` defines it in a grouped selector).
 **The compare buttons were not touched** -- the dark fill is `--action-disabled-bg`, the disabled
 state that holds while no model or combination is checked (checking one turns it `--action-bg`, the
 same fill as the main paint button). **Left as it stands, by the author's decision.** Patch bump.
+
+### 2026-08-02 — The Japanese and English versions correspond section for section (**no version bump**, documentation only, stage 1 of 3)
+
+**It started with the author's observation** that `SPEC.md` looked older than `SPEC.ja.md`.
+
+Measured, **the declared version matched at `v1.92.0` in both**; the difference was in the commits.
+`SPEC.ja.md` was last touched by `1f900b22` (v2.9.24) and `SPEC.md` by `6dbf1625` (v2.9.22), **two
+documentation cycles behind**. But both edits that never crossed over landed **inside sections the
+English file does not have** (§17, open items, and the repository appendix), so no stale statement
+was left in English (`api.py` and `+page.svelte` are named nowhere in it).
+
+**The reason the drift was invisible is mechanical.** The bilingual check in `check_docs.py` compares
+`_heading_shape()` -- **the sequence of heading levels and nothing else** -- and the SPEC pair was
+registered with a declared exception, so **prose drift was caught by no check at all**.
+
+**Two defects surfaced at the same time.**
+
+- The opening of `SPEC.md` claimed "Sections 1 to 17 follow the Japanese file section for section",
+  but **§15 and §17 are absent in English** (it runs 1-14 and 16). **A published document was
+  misdeclaring its own structure.**
+- **A single blank line split the §3 vocabulary table.** The second half (relations, places, angles,
+  proportions, colors) had neither a header nor a delimiter row, so **GitHub rendered it as literal
+  pipe-separated text rather than a table.** Half of the ten-category vocabulary table -- the core of
+  the public specification -- was shipping broken.
+
+**The author's ruling of 2026-08-02 withdraws the 2026-07-28 division** under which Japanese was
+canonical for the concepts and English carried the operational sections alone. The two files now
+correspond section for section. **Japanese remains the canonical source.**
+
+This cycle (stage 1 of 3) did the following.
+
+- **The structural gap was wider than the declared exception said.** It recorded "English still lacks
+  §15 and §17"; in fact **§1.1-1.3, §3.1-3.2 and §11.1-11.4 -- nine subsections -- were also absent.**
+- **§1**: English gained an About This Document section (the origin of the name, the ecosystem naming
+  convention) and the 1.1/1.2/1.3 split. In the other direction, the paragraph only English carried --
+  that inku is not a drawing program, that the description is the durable work and the SVG one
+  performance of it -- went into Japanese §1.1.
+- **§3**: English gained 3.1/3.2 and the five core properties. Japanese gained the origin of the name
+  Saijiki, the v1.92 pruning and the v2.7.9 silverpoint rename, the catalog id list and its naming
+  policy, the `sub`/`sub_ja`/`name_ja` display rules, and the render JSON field record.
+- **§11**: Japanese held the v0.8-era plan where English held current practice -- **the two were not
+  translations of each other**. Current practice won; 11.1-11.4 now match in both, and **the original
+  plan is kept as 11.4 in both languages**.
+- **§15 (development policy) and the repository appendix were written in English.**
+- **`SPEC.md` §24 withdraws "Keep public English wording concise and readable"** -- the one remaining
+  instruction that invited abridgement -- and states instead that the English must not abridge and
+  that `check_docs.py` is the only gate.
+- The two declared exceptions in `check_docs.py` were rewritten **from permanent waivers into
+  descriptions of temporary remaining work.**
+
+**What is left (stages 2 and 3)**: Japanese versions of English §6.7, §7.8, §12.14 and §18-24
+(613 lines / 39,004 characters), a Japanese version of the implementation-status inventory (429 lines /
+30,080 characters), and the disposition of §17 -- **none of its 31 open items appear in the issue ledger, so
+dropping the section would drop them from tracking.**

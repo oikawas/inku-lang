@@ -9,9 +9,15 @@ the canonical source because the author works in Japanese.  When the
 specification changes, update `SPEC.ja.md` first, then refresh this English
 version.
 
-Sections 1 to 17 follow the Japanese file section for section, so a number
-means the same thing in both languages.  Sections 18 onward carry the
-operational side of the reference implementation and exist only in English.
+**By the author's ruling of 2026-08-02 the two language versions correspond
+section for section.**  Neither language holds a section the other lacks, so a
+number means the same thing in both.  This replaces the ruling of 2026-07-28,
+under which Japanese was canonical for the concepts and English carried the
+operational sections alone.  **Japanese remains the canonical source**: a change
+to the specification is written in `SPEC.ja.md` first and then reflected here.
+
+Sections 18 onward do not yet have a Japanese counterpart; bringing them across
+is the remaining part of that work.
 
 For ordinary development, start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
 and read only the specification sections relevant to the task. Chronological
@@ -20,30 +26,77 @@ more detailed canonical notes in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
 ---
 
-## 1. What inku Is
+## About This Document
 
-`inku` is the reference implementation of DDL, the Drawing Description
-Language.  DDL is a compact language for writing visual instructions that can be
-interpreted by LLMs and rendered as abstract SVG drawings.
+**inku** is the reference implementation project for DDL (Drawing Description
+Language).  DDL is the language specification; inku is its implementation.
 
-inku is not a drawing program in the usual sense.  It treats the written
-description as the durable work, and the rendered SVG as one performance of that
-work.  The same description may be rendered again later, with controlled
-sway, while preserving the underlying score.
+This document records the **design philosophy, the language design, and the
+current principal contracts**.  For ordinary development, read the short entry
+point [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) first and come back here only
+for the sections a task actually touches.  The chronological implementation and
+design record is kept separately in [`CHANGELOG.md`](CHANGELOG.md).
 
-The project stands at the intersection of three traditions:
+### The Name "inku"
 
-- Sol LeWitt's instruction-based art, where the instruction itself is part of
-  the work.
-- Bonsai, where constraint, scale, and material focus expression rather than
-  reducing it.
-- Tanka, where a fixed form makes presentation more important than assertion.
+- From インク, the Japanese reading of **ink**
+- The material of writing is itself the name -- structurally the same idea as
+  DDL's concept that the description is the work
+- The association with 墨 (sumi): the world of calligraphy and ink painting,
+  echoed by the "shades of sumi" of the color palette
+- The `-lang` suffix places it as a language project, beside rust-lang, go-lang
+  and the like
 
-The name `inku` comes from the Japanese reading of "ink".  It also points to
-the material nature of writing and to the sumi-ink world that informs the visual
-palette.
+### Ecosystem Naming
 
-DDL is designed as a language for writing visual tanka.
+Derived projects share the `inku-` prefix:
+
+- `inku-core` -- the core library
+- `inku-saijiki` -- the vocabulary dictionary
+- `inku-nature` -- the Nature plugin
+- `inku-web` -- the web UI implementation
+- `inku-android` -- the Android implementation
+- `inku-cli` -- the command line tool
+
+---
+
+## 1. Core Concepts
+
+### 1.1 A Language for Writing Visual Tanka
+
+DDL is not a language for describing pictures.  It is positioned as a language
+for **writing visual tanka**.
+
+`inku` is the reference implementation of DDL.  It is not a drawing program in
+the usual sense: it treats the written description as the durable work, and the
+rendered SVG as one performance of that work.  The same description may be
+rendered again later, with controlled sway, while preserving the underlying
+score.
+
+It stands at the intersection of three traditions:
+
+| Tradition | What it contributes to DDL |
+|---|---|
+| Sol LeWitt's instructions | the idea that the description itself is the work |
+| Bonsai | constraint is not limitation but condensation |
+| Tanka | do not assert, present. The form pares away the ego |
+
+### 1.2 The Underlying Stance
+
+- **Do not assert, present** -- the author's feeling and reading must not
+  intrude into the work
+- **A short description is the essence** -- a long description leans toward
+  assertion. Brevity is what makes presentation possible
+- **The form pares away the ego** -- it is precisely because there is a fixed
+  form and a constraint that the essence surfaces
+
+### 1.3 Origin
+
+- 2026-04-02, the exhibition "Sol LeWitt: Open Structures" at the Museum of
+  Contemporary Art Tokyo
+- To reproduce, in the different medium of drawing, the experience the author
+  had known through writing: that the fog of the mind is pared away and what
+  was there all along becomes visible
 
 ---
 
@@ -65,8 +118,11 @@ line behavior, color, weight, and negative space.
 
 ---
 
-## 3. Core Vocabulary
+## 3. Separating Core From Extensions
 
+### 3.1 What Belongs in the Core
+
+The core vocabulary is the nine Saijiki categories plus **relations** (あいだ).
 The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
@@ -80,7 +136,6 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | continuity | つらなり | solid (default), dashed, dotted, dash-dot |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
-
 | relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
@@ -88,6 +143,27 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | colors | いろ | white, black (default), blue, red, green, gray, yellow, orange, purple |
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were pruned from the vocabulary by the author's decision. In v2.7.9 the second of those came back under the name it should have had: `hair` was never a brush but a **silverpoint** — 0.5px, the least wavering line a hand can draw — and it is now 銀筆 / silverpoint, first in the touches list. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
+
+The canvas proportion is not vocabulary: it is handled by the canvas-aspect
+plugin (§4.4), with the nine kinds square / golden / a4 / b4 / pillar / oban /
+wide / byobu / vertical.
+
+**Properties of the core:**
+
+- vocabulary of physical material only (zero words for feeling)
+- centered on the act of *placing* rather than the act of *drawing* -- the
+  sense in which a bonsai branch is "placed"
+- the design of the motion vocabulary matters most: place, line up, fill --
+  these are the verbs of presentation
+- **the movements category holds movement words only**: "swaying finely" and
+  "undulating slowly" are allowed, "swaying beautifully" and "swaying
+  violently" are excluded (§13 has the detail)
+- **the relations category holds observable relations only**: "along" and "not
+  touching" are positional relations an outside observer can verify. Words of
+  intent or personification, such as "nestling against" or "answering each
+  other", are excluded (§14 has the detail). This is the addition of a
+  predicate (syntax), not of vocabulary (nouns), so it does not contradict
+  plugin principle 1
 
 `Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
 
@@ -154,6 +230,14 @@ metadata, and `render_canvas_aspect_ratio` records the actual rendered
 width/height ratio as a number.  `render_canvas_aspect` remains for
 compatibility; old records can be backfilled in responses by deriving the new id
 and ratio from it.
+
+### 3.2 What Is Separated Out as an Extension
+
+- the **Nature plugin** (rain, leaves, water, wind, and the like)
+- concrete vocabulary such as a **bamboo extension**
+
+**The principle: do not pollute the core.**  Every concrete or culturally
+specific vocabulary is offered in a form that can be added as an extension.
 
 ---
 
@@ -1010,7 +1094,26 @@ visual events where omitting the reaction would weaken the subject.
 
 ---
 
-## 11. Testing and Evaluation
+## 11. Testing Strategy
+
+### 11.1 Separating the Axes of Evaluation
+
+| Judged by machine | Judged by a human (or an LLM) |
+|---|---|
+| is the JSON valid | does it reflect the intent |
+| is every primitive implemented | is it artistically interesting |
+| is the token length in range | is the sway appropriate |
+| does the rendering complete | — |
+
+The CLI judge metrics (`visual_event`, `negative_space_pressure`,
+`motion_energy` and the like) are diagnostic values for catching a sudden
+collapse in quality or an implementation regression.  Build 448 confirmed cases
+such as JP #23 where a low `visual_event` and a high human evaluation diverge,
+so these metrics are not retuned into a final evaluation of the work or into an
+acceptance gate.  The final judgment of quality belongs to the afterwards
+choice of §8 -- the human act of picking among the works laid out.
+
+### 11.2 The Layers of Evaluation
 
 The project evaluates quality through several layers:
 
@@ -1022,6 +1125,8 @@ The project evaluates quality through several layers:
 - visual review of generated SVG/PNG output
 - stress tests using invalid, ambiguous, emotional, conversational, and
   contradictory instructions
+
+### 11.3 What the Benchmarks Watch
 
 Benchmarks focus on:
 
@@ -1038,10 +1143,37 @@ For NVIDIA free API testing, elapsed time is treated as operational metadata,
 not as an artistic quality signal.  Queue delays can indicate service pressure,
 but they do not exclude a successful work from aesthetic or structural review.
 
----
-
 **The inventory of what is currently implemented moved to
 [current implementation status](docs/spec/implementation-status.md) on 2026-07-28.**
+
+### 11.4 The Original Test Plan (v0.8 to v1.6)
+
+What follows was the plan at the time and is kept as a record of what was done.
+
+**Automatic generation of test cases** -- have Opus 4.7 generate the test
+instructions.  The axes are **difficulty** (simple, several lines, several
+primitives, abstract concept, poetic expression) and **kind** (geometric,
+concrete, emotional, poetic).  The generated test cases are themselves an
+exploration of the DDL vocabulary.
+
+**The automatic test pipeline:**
+
+```
+test instruction set (automatically generated)
+    ↓
+composer (DDL → JSON)
+    ↓ machine judgment: valid / token / primitive
+renderer (JSON → SVG)
+    ↓ machine judgment: generated / number of drawn elements
+result log (instruction / JSON / SVG / error kind / generation time)
+```
+
+The log viewer can share the UI foundation of the user-facing drawing tool.
+
+**Order of work** -- (1) build a small test set by hand (10 to 20 cases, spread
+across difficulty and kind), (2) write a script to run them automatically
+(saving results to a JSON log), (3) expand the test cases with Opus 4.7 (to
+around 100), (4) build a log viewer (SVGs side by side for visual review).
 
 ---
 
@@ -2482,6 +2614,42 @@ performance.
 
 ---
 
+## 15. Development Policy
+
+### 15.1 Axes of Development
+
+**Main axis**: web UI (browser) + Python FastAPI + the Opus 4.7 API
+
+- the reasons: speed of development, ease of demonstration, room to grow
+- testing and iteration are done on the Mac
+
+**Complementary axis**: an Android app (Pixel 9) + Gemma 4 E2B-IT
+
+- end-to-end operation confirmed
+- kept as the "it runs on a local LLM too" point of difference
+- further development is kept to a minimum
+
+### 15.2 Phase 1 (completing the PoC) -- reached by v0.8 (the plan as it stood)
+
+- [x] build the FastAPI server (the `/compose` endpoint)
+- [x] connect the Opus 4.7 API (reusing and updating the existing `composer.py`)
+- [x] confirm the SVG renderer (reusing the existing `renderer.py`)
+- [x] implement the web UI (description area + SVG display + iteration UI)
+- [x] the triple display of DDL text, JSON Score, and SVG
+
+### 15.3 Phase 2 (raising quality) -- reached by v1.6 (the plan as it stood)
+
+- [x] generating several variations at once
+- [x] SVG download
+- [x] a collection of sample DDL texts
+- [x] the LLM comparison view (Gemma against Opus)
+
+**The per-version engine record moved to the
+[render engine history](docs/spec/render-engine-history.md) on 2026-07-28.**
+Distribution, the deterministic layers, versions and identity IDs, the reference
+corpora, the rule that the engine does not go backward, the handling of PNG, and
+what each version changed are canonical there.
+
 ## 16. Licensing
 
 The intended license direction is:
@@ -2914,12 +3082,56 @@ outputs, making benchmark review less dependent on manual image assembly.
 When updating the specification:
 
 1. Update `SPEC.ja.md` first.
-2. Refresh this English `SPEC.md` to reflect the same intent.
-3. Keep public English wording concise and readable.
+2. Refresh this English `SPEC.md` so that it carries the same content, section
+   for section.  Neither language may hold a section the other lacks (the
+   author's ruling of 2026-08-02).
+3. Do not abridge.  Earlier practice asked the English wording to stay concise;
+   that instruction is withdrawn, because it produced a file that silently said
+   less than the canonical one.
 4. Do not introduce English-only behavior that is absent from the Japanese
    source.
 5. Keep current contracts in the specification and chronological implementation
    detail in the changelog.
+6. `server/scripts/check_docs.py` checks that the two files have the same
+   heading shape.  It is the only gate on this rule, and it must be run before
+   a documentation change is merged.
+
+---
+
+## Appendix: Repository Layout (an Overview)
+
+```
+inku-lang/                 # github.com/oikawas/inku-lang
+├── SPEC.ja.md / SPEC.md               # the specification (Japanese canonical / English public)
+├── PROJECT_CONTEXT.ja.md / .md        # the short entry point for developers and AI
+├── CHANGELOG.ja.md / .md              # the chronological implementation and design record
+├── README.ja.md / README.md           # the project introduction
+├── server/                            # the FastAPI backend (inku_server, managed with uv)
+├── web/                               # the SvelteKit 2 + Svelte 5 frontend
+├── cli/                               # inku-cli (an HTTP API client, managed with uv)
+├── manual/ja|en/cli-reference-for-ai.md  # the CLI reference
+└── android/                           # the native Android implementation (canonical: android/ANDROID_SPEC.md)
+```
+
+The **current values** of the module layout, the API routes, the CLI
+subcommands, and the vocabulary constants are **not listed in this document**.
+These are canonical instead:
+
+- vocabulary, fixed phrases, markers, regions, weight characteristics, and
+  validation thresholds: the **reference dump** (`GET /api/reference` /
+  `inku-cli reference --md`, a machine-generated mirror of the implementation
+  tables)
+- API routes: `server/src/inku_server/api_core/routers/` (ten FastAPI route
+  definition files) and `server/src/inku_server/api.py` (assembling `app`,
+  the middleware, and `include_router`)
+- CLI subcommands: `inku-cli --help` and `manual/en/cli-reference-for-ai.md`
+- the internal layout of each package: `server/README.md` / `web/README.md` /
+  `cli/README.md` (**only `cli/README.md` is written. `server/README.md` is
+  empty and `web/README.md` is still the SvelteKit template, so neither
+  functions as a canonical source**; issue ledger I-087)
+
+`ddl/` is the early Python PoC that the complementary Android axis was built
+from; the web version has moved to `server/`.
 
 ---
 

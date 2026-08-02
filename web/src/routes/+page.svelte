@@ -46,6 +46,8 @@
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { batchSettings } from '$lib/features/batch/settings.svelte';
+	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
 	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -320,6 +322,8 @@
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
+	// 0 while the batch is on its original pass, n while it is on retry round n.
+	let batchRetryRound = $state(0);
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchPromptHistory = $state<string[]>([]);
@@ -3075,7 +3079,7 @@ if (unreadWords.length > 0) {
 		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
+		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null;
 		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 		if (submittedMode === 'batch') {
 			batchLatestResult = null;
@@ -3141,19 +3145,24 @@ if (unreadWords.length > 0) {
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => item.input);
-				batchTotal = lines.length; outputTab = 'canvas';
-				for (let i = 0; i < lines.length; i++) {
-					if (submitStopRequested) break;
-					batchCurrent = i + 1;
-					batchActiveLine = lines[i].line;
+				// The report's `total` is how many lines the batch had. batchTotal drives
+				// the progress readouts and is re-pointed at each retry round, so the
+				// report keeps its own copy.
+				const batchLineTotal = lines.length;
+				batchTotal = batchLineTotal; outputTab = 'canvas';
+				let batchInterrupted = false;
+
+				/** true = painted, string = the failure message, null = the run was interrupted. */
+				const paintBatchLine = async (item: { line: number; input: string }): Promise<true | string | null> => {
+					batchActiveLine = item.line;
 					batchActiveTokensIn = null;
 					batchActiveTokensOut = null;
 					try {
-						const r = await paintOne(lines[i].input, {
-							historyInput: `#${lines[i].line} ${lines[i].input}`,
-							sourceText: lines[i].input,
-							displayLabel: `#${lines[i].line}`,
-							batchLineNumber: lines[i].line,
+						const r = await paintOne(item.input, {
+							historyInput: `#${item.line} ${item.input}`,
+							sourceText: item.input,
+							displayLabel: `#${item.line}`,
+							batchLineNumber: item.line,
 							batchRunId,
 							catalogId: batchCatalogId,
 							catalogMode: batchAutoColorCatalog ? 'auto' : 'fixed',
@@ -3162,7 +3171,7 @@ if (unreadWords.length > 0) {
 							tenkei: tenkeiSettings.level,
 							signal: abortController.signal,
 						});
-						if (submitStopRequested) break;
+						if (submitStopRequested) return null;
 						batchActiveDdl = r.ddl;
 						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
 						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
@@ -3172,37 +3181,79 @@ if (unreadWords.length > 0) {
 						batchLatestResult = r;
 						batchLatestDdl = r.ddl;
 						batchLatestThinking = r.thinking;
-						batchLatestPrompt = `#${lines[i].line} ${lines[i].input}`;
+						batchLatestPrompt = `#${item.line} ${item.input}`;
 						if (inputMode === 'batch' && batchAutoFollowLatest) {
 							displayLatestBatchRender();
 						}
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
-						if (batchFailures.length > 0) {
-							batchFailureReportStore.set({ success: batchSuccess, total: batchTotal, failures: batchFailures });
-						}
+						return true;
 					} catch (e) {
-						if (submitStopRequested || abortController.signal.aborted) break;
+						if (submitStopRequested || abortController.signal.aborted) return null;
+						return e instanceof Error ? e.message : String(e);
+					}
+				};
+
+				const publishFailureReport = () => {
+					batchFailureReportStore.set(
+						batchFailures.length > 0
+							? { success: batchSuccess, total: batchLineTotal, failures: batchFailures }
+							: null,
+					);
+				};
+
+				for (let i = 0; i < lines.length; i++) {
+					if (submitStopRequested) { batchInterrupted = true; break; }
+					batchCurrent = i + 1;
+					const outcome = await paintBatchLine(lines[i]);
+					if (outcome === null) { batchInterrupted = true; break; }
+					if (outcome !== true) {
 						batchFailures = [
 							...batchFailures,
-							{
-								line: lines[i].line,
-								input: lines[i].input,
-								message: e instanceof Error ? e.message : String(e),
-							},
+							{ line: lines[i].line, input: lines[i].input, message: outcome },
 						];
-						batchFailureReportStore.set({ success: batchSuccess, total: batchTotal, failures: batchFailures });
 					}
+					publishFailureReport();
 				}
+
+				// Retry the lines that failed, if the author asked for retries. An
+				// interrupted batch is never retried: the lines that never ran are not
+				// failures, and the author stopped the run on purpose.
+				let completedRetryRounds = 0;
+				for (;;) {
+					const round = planRetryRound(
+						batchFailures,
+						completedRetryRounds,
+						batchSettings.maxRetries,
+						batchInterrupted || submitStopRequested || abortController.signal.aborted,
+					);
+					if (!round) break;
+					batchRetryRound = round.round;
+					batchTotal = round.items.length;
+					for (let i = 0; i < round.items.length; i++) {
+						if (submitStopRequested) { batchInterrupted = true; break; }
+						batchCurrent = i + 1;
+						const item = round.items[i];
+						const outcome = await paintBatchLine(item);
+						if (outcome === null) { batchInterrupted = true; break; }
+						if (outcome === true) {
+							batchFailures = dropFailedLine(batchFailures, item.line);
+						} else {
+							batchFailures = batchFailures.map((failure) =>
+								failure.line === item.line ? { ...failure, message: outcome } : failure,
+							);
+						}
+						publishFailureReport();
+					}
+					if (batchInterrupted) break;
+					completedRetryRounds += 1;
+				}
+				batchRetryRound = 0;
+				batchTotal = batchLineTotal;
+
 				elapsedTotalMs = Date.now() - _timerStart;
 				await refreshHistoryAfterRun();
-				if (batchFailures.length > 0) {
-					batchFailureReportStore.set({
-						success: batchSuccess,
-						total: batchTotal,
-						failures: batchFailures,
-					});
-				}
+				publishFailureReport();
 			}
 		} catch (e) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
@@ -3211,7 +3262,7 @@ if (unreadWords.length > 0) {
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;
 			submitStopRequested = false;
-			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
+			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
@@ -5490,6 +5541,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			exportSettings.load();
 			resultLogSettings.load();
 			batchFailureReportStore.load();
+			batchSettings.load();
 			exportSettings.markLoaded();
 		} catch {}
 		void (async () => {
@@ -5595,6 +5647,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{batchActiveDdlHighlighted}
 						{batchTotal}
 						{batchCurrent}
+						{batchRetryRound}
 						{batchActiveTokensIn}
 						{batchActiveTokensOut}
 						{batchTokensInTotal}

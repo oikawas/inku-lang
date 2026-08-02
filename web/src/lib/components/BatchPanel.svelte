@@ -24,6 +24,7 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		batchRetryRound: number;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
 		batchActiveTokensIn: number | null;
@@ -56,6 +57,7 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		batchRetryRound,
 		runTokensIn,
 		runTokensOut,
 		batchActiveTokensIn,
@@ -191,7 +193,9 @@
 {#if batchRunning && batchTotal > 0}
 	<div class="batch-progress-wrap">
 		<RunStatus
-			label={t().batchProgress(batchCurrent, batchTotal)}
+			label={batchRetryRound > 0
+				? t().batchRetryProgress(batchCurrent, batchTotal, batchRetryRound)
+				: t().batchProgress(batchCurrent, batchTotal)}
 			stage1Model={stage1ModelLabel}
 			stage2Model={stage2ModelLabel}
 			elapsedMs={liveMs}

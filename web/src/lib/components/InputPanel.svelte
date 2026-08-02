@@ -39,6 +39,7 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		batchRetryRound: number;
 		batchActiveTokensIn: number | null;
 		batchActiveTokensOut: number | null;
 		batchTokensInTotal: number;
@@ -114,6 +115,7 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		batchRetryRound,
 		batchActiveTokensIn,
 		batchActiveTokensOut,
 		batchTokensInTotal,
@@ -181,13 +183,20 @@
 
 	// Progress sits on the tab only while the batch is running, so the tab returns
 	// to its plain label the moment the run stops. batchCurrent is 0 outside a run.
+	// During a retry round the counter runs over that round's own lines, marked
+	// with ↻n so the numbers restarting does not read as the batch restarting.
+	const batchRetryMark = $derived(batchRetryRound > 0 ? ` ↻${batchRetryRound}` : '');
 	const batchProgress = $derived(
-		batchRunning && batchTotal > 0 && batchCurrent > 0 ? `(${batchCurrent}/${batchTotal})` : '',
+		batchRunning && batchTotal > 0 && batchCurrent > 0
+			? `(${batchCurrent}/${batchTotal}${batchRetryMark})`
+			: '',
 	);
 	// The counter is reserved at its widest form -- "(NN/NN)" for a two-digit total --
 	// so the label beside it does not shuffle as the count crosses a digit boundary.
 	// The tabs themselves are flex: 1 with a zero basis, so no tab can push another.
-	const batchProgressWidth = $derived(2 * String(batchTotal).length + 3);
+	const batchProgressWidth = $derived(
+		2 * String(batchTotal).length + 3 + (batchRetryRound > 0 ? 2 + String(batchRetryRound).length : 0),
+	);
 
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning, progress: '' },
@@ -373,6 +382,7 @@
 			{batchActiveDdlHighlighted}
 			{batchTotal}
 			{batchCurrent}
+			{batchRetryRound}
 			{batchActiveTokensIn}
 			{batchActiveTokensOut}
 			{batchTokensInTotal}

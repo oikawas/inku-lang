@@ -120,6 +120,10 @@ export interface LangPack {
 	stageInterpreting: string;
 	stageStructuring: (tokLabel: string) => string;
 	batchProgress: (current: number, total: number) => string;
+	batchRetryProgress: (current: number, total: number, round: number) => string;
+	settingsBatchRetryLabel: string;
+	settingsBatchRetryDescription: string;
+	settingsBatchRetryCount: string;
 
 	// Results
 	vocabInInputLabel: string;

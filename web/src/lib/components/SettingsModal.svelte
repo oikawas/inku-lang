@@ -6,6 +6,7 @@
 	import { modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
+	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -1540,6 +1541,20 @@
 				</label>
 			</div>
 		{:else}
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsBatchRetryLabel}</div>
+				<div class="db-test-result">{t().settingsBatchRetryDescription}</div>
+				<div class="batch-retry-field">
+					<span>{t().settingsBatchRetryCount}</span>
+					<NumberStepper
+						label={t().settingsBatchRetryCount}
+						min={BATCH_RETRY_MIN}
+						max={BATCH_RETRY_MAX}
+						value={batchSettings.maxRetries}
+						onChange={(value) => batchSettings.setMaxRetries(value)}
+					/>
+				</div>
+			</div>
 			<div class="popover-group ui-mode-settings">
 				<div class="popover-group-label">{t().uiModeLabel}</div>
 				<div class="db-test-result">{t().uiModeDescription}</div>
@@ -1954,6 +1969,10 @@
 		margin-top: 10px;
 	}
 	.db-backup-grid label,
+	.batch-retry-field {
+		display: flex; align-items: center; gap: 10px;
+		font-size: var(--btn-sm-font-size);
+	}
 	.db-backup-field {
 		display: flex;
 		flex-direction: column;

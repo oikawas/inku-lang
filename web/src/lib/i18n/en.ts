@@ -141,6 +141,10 @@ export const en: LangPack = {
 	stageInterpreting: 'interpreting your words…',
 	stageStructuring: (tok) => `writing the score…${tok}`,
 	batchProgress: (cur, tot) => `performing ${cur} / ${tot}…`,
+	batchRetryProgress: (cur, tot, round) => `retry ${round}: performing ${cur} / ${tot}…`,
+	settingsBatchRetryLabel: 'Batch retry',
+	settingsBatchRetryDescription: 'After a batch finishes, draw the failed lines again. 0 retries nothing. A batch you stopped is not retried.',
+	settingsBatchRetryCount: 'Retry rounds',
 
 	vocabInInputLabel: 'Vocabulary in the description',
 	thinkingLabel: 'Thinking (Qwen3 internal)',

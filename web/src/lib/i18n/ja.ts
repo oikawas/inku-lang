@@ -141,6 +141,10 @@ export const ja: LangPack = {
 	stageInterpreting: '解釈中…',
 	stageStructuring: (tok) => `構造化中…${tok}`,
 	batchProgress: (cur, tot) => `${cur} / ${tot} 番目を描画中…`,
+	batchRetryProgress: (cur, tot, round) => `再試行 ${round} 巡目: ${cur} / ${tot} 番目を描画中…`,
+	settingsBatchRetryLabel: 'バッチの再試行',
+	settingsBatchRetryDescription: 'バッチが一巡したあと、失敗した行だけをもう一度描きます。0 なら再試行しません。中断したときは再試行しません。',
+	settingsBatchRetryCount: '再試行の回数',
 
 	vocabInInputLabel: '入力に含まれた語彙',
 	thinkingLabel: '思考 (qwen3 内部)',

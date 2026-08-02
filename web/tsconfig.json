@@ -1,5 +1,20 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
+	// Unit tests run on node:test (npm run test:unit) and import node: builtins.
+	// Type-checking them would need @types/node, a dependency this project does
+	// not otherwise carry, so svelte-check skips them; node itself type-strips
+	// and runs them. The service-worker entries are the generated config's own
+	// excludes, repeated because `exclude` replaces rather than extends.
+	"exclude": [
+		"node_modules/**",
+		"src/**/*.test.ts",
+		"src/service-worker.js",
+		"src/service-worker/**/*.js",
+		"src/service-worker.ts",
+		"src/service-worker/**/*.ts",
+		"src/service-worker.d.ts",
+		"src/service-worker/**/*.d.ts"
+	],
 	"compilerOptions": {
 		"rewriteRelativeImportExtensions": true,
 		"allowJs": true,

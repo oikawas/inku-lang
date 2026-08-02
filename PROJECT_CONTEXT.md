@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.27 / Build 825**
+**Target version: v2.9.28 / Build 826**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -240,7 +240,7 @@ A separate developer-facing register holds them, with state.
 
 ## Documentation Update Rules
 
-- Update `SPEC.ja.md` first for a specification change, then adapt the same intent into `SPEC.md`.
+- Update `SPEC.ja.md` first for a specification change, then carry **the same content, section for section**, into `SPEC.md`. Neither language may hold a section the other lacks (the author's ruling of 2026-08-02; **Japanese remains canonical**). `server/scripts/check_docs.py` is the only gate on this and must be run before merging.
 - When current architecture or a major contract changes, update both project-context files.
 - Update `CHANGELOG.ja.md` first for release/Build history, then reflect publicly relevant content in `CHANGELOG.md`.
 - Keep current contracts in the specification and chronological implementation detail in the changelog.

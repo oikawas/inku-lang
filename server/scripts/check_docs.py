@@ -87,35 +87,31 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "SPEC.ja.md",
         "SPEC.md",
         "shape",
-        "stage 4c-0 of ledger I-032 gave the English file the section order "
-        "of the Japanese one, so the numbers now mean the same thing in both "
-        "(they did not before: ja §5 was the pipeline where en §5 was the "
-        "core vocabulary). Two differences remain and only one of them will "
-        "close. (1) Stage 4c is finished for the concepts: 4c-1 wrote §13, "
-        "4c-2 wrote §4, §8 and §9, 4c-3 wrote §7 and §14, 4c-4a wrote §10 and "
-        "rebuilt §5 and §6 into the Japanese subsection structure, and 4c-4b "
-        "rebuilt §12 into its thirteen. What English still lacks is §15 and "
-        "§17, the development policy and the open-items list, which are "
-        "deliberately out of scope. English also carries three subsections "
-        "the Japanese does not: §6.7, what the English instruction path does "
-        "and how it was measured; §7.8, what the reference web application "
-        "actually provides; and §12.14, what the renderer implementation "
-        "owns. Each says so in its own opening line. (2) The operational "
-        "sections -- JSON Score, Canvas Model, Modes, History, Security, CLI, "
-        "Source of Truth, some 490 lines numbered §18 onward -- exist only in "
-        "English and are not owed a translation: the 2026-07-28 ruling makes "
-        "Japanese canonical for the concepts and English the carrier of "
-        "operations. So this pair will never pass a shape check, and saying "
-        "stage 4c closes it would be wrong",
+        "the 2026-07-28 ruling that made Japanese canonical for the concepts "
+        "and English the sole carrier of the operational sections was "
+        "withdrawn on 2026-08-02. The two files must now correspond section "
+        "for section, with Japanese still canonical. This exception is "
+        "therefore temporary and must be deleted when the shapes match -- "
+        "the check itself will say so. What is already done: §1 gained an "
+        "About This Document section and the 1.1/1.2/1.3 split in English, "
+        "§3 gained 3.1/3.2 and the core properties in English and the "
+        "vocabulary provenance, catalog naming, and render JSON fields in "
+        "Japanese, §11 was rebuilt into 11.1-11.4 in both (Japanese had the "
+        "v0.8 plan where English had current practice, so current practice "
+        "won and the plan is kept as 11.4), and §15 and the repository "
+        "appendix were written in English. What is left: §6.7, §7.8, §12.14 "
+        "and §18 through §24 have no Japanese version yet, and §17 is still "
+        "Japanese-only pending a decision on where its 31 open items go",
     ),
     (
         "docs/spec/implementation-status.ja.md",
         "docs/spec/implementation-status.md",
         "shape",
-        "English only, and deliberately so. This is the inventory of what is "
-        "built, which the 2026-07-28 ruling puts on the operational side: "
-        "Japanese is canonical for the concepts, English carries operations. "
-        "The Japanese file is not owed and is not planned",
+        "English only for now. The 2026-07-28 ruling that put this inventory "
+        "on the English-carries-operations side was withdrawn on 2026-08-02: "
+        "the author decided a Japanese version is owed. It has not been "
+        "written yet, so this exception is temporary and must be deleted "
+        "once docs/spec/implementation-status.ja.md exists",
     ),
     # Split on 2026-07-28. The current file carries v2.5.0 onward and the two
     # languages hold the same 30 entries, so this pair needs no exception any

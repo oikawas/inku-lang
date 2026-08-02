@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.29 / Build 830**
+**対象バージョン: v2.9.30 / Build 831**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -140,6 +140,11 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 - 日英の UI。英語の用語は `web/src/lib/i18n/GLOSSARY.md` が正本で、`npm run lint:i18n` が強制する
 
 UI の寸法は `+page.svelte` の `:root` のトークン（`--btn-sm-*`）が、色は `--action-*` と `--accent*` が正本で、px と色の直書きは退行として扱う。
+
+機能ごとの設定は `web/src/lib/features/<name>/` に閉じる。
+localStorage への保存・server への永続・描画要求への同梱は、
+**機能を 1 つも名指ししない 3 つの登録簿**（`persisted-settings.ts` / `user-settings.ts` / `render-payload.ts`）が集めるので、
+設定を 1 本足しても `+page.svelte` は 1 行も動かない。
 
 ### server（FastAPI）
 

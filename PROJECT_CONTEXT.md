@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.29 / Build 830**
+**Target version: v2.9.30 / Build 831**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -168,6 +168,12 @@ System Access API; the rest fall back to the browser default)
 
 UI dimensions come from the `:root` tokens in `+page.svelte` (`--btn-sm-*`) and colors from
 `--action-*` and `--accent*`; literal px values and literal colors are treated as regressions.
+
+A feature's settings stay inside `web/src/lib/features/<name>/`.
+Storing them in localStorage, persisting them on the server and putting them on the render request
+are collected by **three registries that name no feature at all**
+(`persisted-settings.ts`, `user-settings.ts`, `render-payload.ts`),
+so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 

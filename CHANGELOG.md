@@ -2459,3 +2459,36 @@ down to **returning an empty string rather than raising when the key does not ma
 down to the digest**, across five fastapi minor versions, and the frozen corpora are
 **byte-identical** as well (the ground texture seed is a hash of the whole Score dump, so drift
 there would have changed the pictures).
+### v2.9.30 — A setting registers itself, and the wild switch is given its own name (Build 831, 2026-08-02)
+
+**Adding one setting used to cost six lines in `+page.svelte`; it now costs none.**
+A setting that is kept in localStorage, rides the render request and shows on
+screen had to be written into four separate enumerations in the page itself:
+load, save, request assembly, prop forwarding. **The enumerations have been
+turned inside out into registries** -- `features/render-payload.ts`,
+`features/persisted-settings.ts` and `features/user-settings.ts` **name no
+feature at all**, and each feature registers itself with a single line of its
+own. The page calls each registry once.
+
+**The gate was not line count but "how many lines does one more setting cost"**
+(two probes, measured 6 -> 0 and 4 -> 0). `+page.svelte` went from 7,023 to
+6,986 lines -- **only 37 fewer, and that is not a failure**: folding the
+thoroughfare and shrinking the file are different goals.
+
+**Request behaviour was preserved by comparing all fourteen call shapes one by
+one.** That comparison turned up **two asymmetries that predate this change**,
+and both were carried across unchanged (demo always sent `wild` as false; the
+two in-place redraws inherit the staffage level while drawing quietly).
+**No image changes in this release** -- the frozen corpora are byte-identical.
+
+**Three visual defects found by eye were fixed.** (1) The wild switch drifted
+away from the staffage buttons and floated mid-row: `.compare-head` spread
+three children with `space-between`, and `.ddled-foot` gave the left-aligning
+margin to staffage alone. Both now wrap the pair in one box. (2) The switch
+carried **no name** -- only "(inherited)" -- so **"Stroke limit (inherited):"**
+now stands to its left. (3) **The comparison status overflowed its slot.** The
+rule that widened it was written by `64cbbfda` against `.compare-status`, and
+when `2cbc93b3` unified the running indicator into `RunStatus` the **comment
+survived while the rule stopped matching anything**. It is back, keyed on a
+class this component writes itself -- `.run-status` belongs to the child, so a
+selector naming it would be scoped away.

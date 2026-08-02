@@ -4,6 +4,7 @@
 // here, so a new setting is a new file (or a new field in this one) instead of
 // five edits scattered through +page.svelte.
 import { bindColorCatalogRenderState } from '$lib/features/color-catalog/render';
+import { registerPersistedSetting } from '$lib/features/persisted-settings';
 
 const CATALOG_KEY = 'inku-color-catalog';
 
@@ -31,3 +32,6 @@ export const colorCatalogSettings = new ColorCatalogSettings();
 // The render slice lives in ./render.ts (plain .ts, so it is testable without
 // the rune compiler); it reads the live selection through this.
 bindColorCatalogRenderState(() => colorCatalogSettings.selected);
+
+// Restored at start-up with every other persisted setting.
+registerPersistedSetting({ id: 'color-catalog', load: colorCatalogSettings.load });

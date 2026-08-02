@@ -48,6 +48,8 @@
 	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { colorCatalogOverride } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
+	import { loadPersistedSettings } from '$lib/features/persisted-settings';
+	import { applyUserSettings, collectUserSettings } from '$lib/features/user-settings';
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
@@ -263,7 +265,6 @@
 		vision_model: string;
 		okugaki_provider?: Provider;
 		okugaki_model?: string;
-		model_inspection_selected_models?: string[];
 		instruction_caption_visible?: boolean;
 	};
 	type ModelProviderSetting = {
@@ -879,9 +880,7 @@
 			? qualifiedModelId(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
 			: qualifiedModelId(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
-		modelInspection.selectedModels = Array.isArray(settings.model_inspection_selected_models)
-			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
-			: [];
+		applyUserSettings(settings);
 	}
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
@@ -1339,7 +1338,8 @@
 	async function persistModelSelection() {
 		if (!currentUser) return;
 		const previousUser = currentUser;
-		const model_settings: UserModelSettings = {
+		// What the page owns; the features add their own fields to the save.
+		const pageModelSettings: UserModelSettings = {
 			stage1_provider: stage1Provider,
 			stage1_model: stage1Model,
 			stage2_provider: stage2Provider,
@@ -1348,9 +1348,9 @@
 			vision_model: visionModel,
 			okugaki_provider: splitModelRef(okugakiModel).provider ?? visionProvider,
 			okugaki_model: splitModelRef(okugakiModel).model,
-			model_inspection_selected_models: modelInspection.selectedModels,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
+		const model_settings = { ...pageModelSettings, ...collectUserSettings() };
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -5660,14 +5660,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
-			colorCatalogSettings.load();
-			tenkeiSettings.load();
-			wildSettings.load();
-			exportSettings.load();
-			resultLogSettings.load();
-			batchFailureReportStore.load();
-			batchSettings.load();
-			exportSettings.markLoaded();
+			loadPersistedSettings();
 		} catch {}
 		void (async () => {
 			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), loadCurrentUser(), fetchPrompts()]);

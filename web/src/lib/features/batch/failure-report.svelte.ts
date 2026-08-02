@@ -1,6 +1,8 @@
 // The failure report of the last batch run, kept across reloads so the user can
 // still read it after closing the tab.  Key, caps, compaction, parser and state
 // stay together -- see features/color-catalog/settings.svelte.ts for why.
+import { registerPersistedSetting } from '$lib/features/persisted-settings';
+
 const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
 const BATCH_FAILURE_REPORT_MAX_TEXT = 300;
@@ -76,3 +78,6 @@ class BatchFailureReportStore {
 }
 
 export const batchFailureReportStore = new BatchFailureReportStore();
+
+// Restored at start-up with every other persisted setting.
+registerPersistedSetting({ id: 'batch-failure-report', load: batchFailureReportStore.load });

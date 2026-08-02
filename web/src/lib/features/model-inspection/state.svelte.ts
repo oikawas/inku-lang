@@ -4,6 +4,7 @@ import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup }
 import { type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import { type RenderOverrides } from '$lib/features/render-payload';
 import { tenkeiOverride } from '$lib/features/tenkei/render';
+import { registerUserSettingsContributor } from '$lib/features/user-settings';
 import { type TenkeiLevel } from '$lib/tenkei';
 import { type Score } from '$lib/historyManagerState.svelte';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
@@ -142,6 +143,19 @@ let modelInspectionBusy = $state(false);
 let modelInspectionStatus = $state<string | null>(null);
 let modelInspectionResults = $state<ModelInspectionResult[]>([]);
 let modelInspectionSelectedModels = $state<string[]>([]);
+// The selection rides along in the user's model_settings on the server. The
+// key is the one the server already stores; nothing is renamed.
+const SELECTED_MODELS_FIELD = 'model_inspection_selected_models';
+registerUserSettingsContributor({
+	id: 'model-inspection',
+	collect: () => ({ [SELECTED_MODELS_FIELD]: modelInspectionSelectedModels }),
+	apply: (settings) => {
+		const stored = settings[SELECTED_MODELS_FIELD];
+		modelInspectionSelectedModels = Array.isArray(stored)
+			? stored.filter((model): model is string => typeof model === 'string').slice(0, 4)
+			: [];
+	}
+});
 let modelInspectionFailedModels = $state<Record<string, string>>({});
 let modelInspectionRunId = 0;
 let modelInspectionAbortController: AbortController | null = null;

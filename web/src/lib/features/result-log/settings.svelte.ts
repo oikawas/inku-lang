@@ -1,5 +1,7 @@
 // Whether the result log panel under the canvas is expanded.  Key, default and
 // state stay together -- see features/color-catalog/settings.svelte.ts for why.
+import { registerPersistedSetting } from '$lib/features/persisted-settings';
+
 const RESULT_LOG_OPEN_KEY = 'inku-result-log-open';
 
 class ResultLogSettings {
@@ -21,3 +23,6 @@ class ResultLogSettings {
 }
 
 export const resultLogSettings = new ResultLogSettings();
+
+// Restored at start-up with every other persisted setting.
+registerPersistedSetting({ id: 'result-log', load: resultLogSettings.load });

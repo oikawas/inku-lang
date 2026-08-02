@@ -235,6 +235,12 @@ class UserAccountRow(Base):
     ui_mode       = Column(String, nullable=False, default="simple")
     ui_custom     = Column(Text, nullable=False, default="{}")
     tooltips_enabled = Column(Boolean, nullable=False, default=True)
+    # Whether this user asked downloads to go to a folder they picked. The
+    # directory handle itself cannot come here -- it is a browser object that
+    # only survives in IndexedDB -- so the server holds the intent and the
+    # folder's display name, and the browser holds the permission.
+    download_folder_enabled = Column(Boolean, nullable=False, default=False)
+    download_folder_name = Column(String, nullable=True)
     settings_tab  = Column(String, nullable=False, default="db")
     model_settings = Column(Text, nullable=False, default="{}")
     image_generation_count = Column(Integer, nullable=False, default=0)
@@ -341,6 +347,8 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "ui_mode": "ALTER TABLE user_accounts ADD COLUMN ui_mode VARCHAR NOT NULL DEFAULT 'simple'",
     "ui_custom": "ALTER TABLE user_accounts ADD COLUMN ui_custom TEXT NOT NULL DEFAULT '{}'",
     "tooltips_enabled": "ALTER TABLE user_accounts ADD COLUMN tooltips_enabled BOOLEAN NOT NULL DEFAULT 1",
+    "download_folder_enabled": "ALTER TABLE user_accounts ADD COLUMN download_folder_enabled BOOLEAN NOT NULL DEFAULT 0",
+    "download_folder_name": "ALTER TABLE user_accounts ADD COLUMN download_folder_name VARCHAR",
     "settings_tab": "ALTER TABLE user_accounts ADD COLUMN settings_tab VARCHAR NOT NULL DEFAULT 'db'",
     "model_settings": "ALTER TABLE user_accounts ADD COLUMN model_settings TEXT NOT NULL DEFAULT '{}'",
     "image_generation_count": (
@@ -1976,6 +1984,8 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "ui_mode": row.ui_mode if row.ui_mode in _UI_MODES else "simple",
         "ui_custom": ui_custom,
         "tooltips_enabled": row.tooltips_enabled is not False,
+        "download_folder_enabled": row.download_folder_enabled is True,
+        "download_folder_name": row.download_folder_name,
         "settings_tab": row.settings_tab if row.settings_tab in _SETTINGS_TABS else "db",
         "model_settings": normalize_user_model_settings(model_settings),
         "image_generation_count": row.image_generation_count or 0,
@@ -2509,6 +2519,8 @@ def update_user_settings(
     ui_mode: str | None = None,
     ui_custom: dict | None = None,
     tooltips_enabled: bool | None = None,
+    download_folder_enabled: bool | None = None,
+    download_folder_name: str | None = None,
     settings_tab: str | None = None,
     model_settings: dict | None = None,
 ) -> dict | None:
@@ -2525,6 +2537,10 @@ def update_user_settings(
         raise ValueError("invalid custom ui settings")
     if tooltips_enabled is not None and not isinstance(tooltips_enabled, bool):
         raise ValueError("invalid tooltips enabled setting")
+    if download_folder_enabled is not None and not isinstance(download_folder_enabled, bool):
+        raise ValueError("invalid download folder setting")
+    if download_folder_name is not None and len(download_folder_name) > 240:
+        raise ValueError("download folder name is too long")
     if settings_tab is not None and settings_tab not in _SETTINGS_TABS:
         raise ValueError("invalid settings tab")
     with SessionLocal() as session:
@@ -2539,6 +2555,11 @@ def update_user_settings(
             row.ui_custom = json.dumps(ui_custom, ensure_ascii=False, sort_keys=True)
         if tooltips_enabled is not None:
             row.tooltips_enabled = tooltips_enabled
+        if download_folder_enabled is not None:
+            row.download_folder_enabled = download_folder_enabled
+        if download_folder_name is not None:
+            # An empty name clears it: the user dropped the folder.
+            row.download_folder_name = download_folder_name.strip() or None
         if settings_tab is not None:
             row.settings_tab = settings_tab
         if model_settings is not None:

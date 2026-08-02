@@ -2,6 +2,8 @@
 	import Tooltip from './Tooltip.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import { saveBlob } from '$lib/features/export/save-target';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 	import { buildContactSheet, sheetCapacity, sheetPageCount, type ContactSheetEntry, type SheetVariant } from '$lib/contactSheet';
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
@@ -390,13 +392,12 @@
 		};
 	}
 
-	function triggerDownload(blob: Blob, filename: string) {
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement('a');
-		anchor.href = url;
-		anchor.download = filename;
-		anchor.click();
-		URL.revokeObjectURL(url);
+	// Same single path as every other download -- see features/export/save-target.
+	async function triggerDownload(blob: Blob, filename: string): Promise<void> {
+		const outcome = await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
+		if (outcome.kind === 'browser' && outcome.reason === 'denied') {
+			contactSheetError = t().downloadFolderFellBack;
+		}
 	}
 
 	async function downloadContactSheet(variant: SheetVariant): Promise<void> {

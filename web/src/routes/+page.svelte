@@ -47,6 +47,7 @@
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
+	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
 	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
@@ -295,6 +296,8 @@
 		ui_mode?: UiMode;
 		ui_custom?: UiCustomVisibility;
 		tooltips_enabled?: boolean;
+		download_folder_enabled?: boolean;
+		download_folder_name?: string | null;
 		settings_tab?: SettingsTab;
 		model_settings?: UserModelSettings;
 		image_generation_count: number;
@@ -778,6 +781,55 @@
 		}
 	}
 
+	// The server holds the intent and the folder's name; the handle itself lives
+	// in this browser's IndexedDB, so the two are applied together on sign-in.
+	function applyDownloadFolderSettings(user: UserItem | null) {
+		downloadFolderSettings.applyUser(user);
+		void downloadFolderSettings.refresh();
+	}
+
+	async function updateDownloadFolder(update: { enabled?: boolean; name?: string | null }) {
+		if (!currentUser) return;
+		const previousUser = currentUser;
+		const body: Record<string, unknown> = {};
+		if (update.enabled !== undefined) body.download_folder_enabled = update.enabled;
+		if (update.name !== undefined) body.download_folder_name = update.name ?? '';
+		currentUser = {
+			...currentUser,
+			...(update.enabled !== undefined ? { download_folder_enabled: update.enabled } : {}),
+			...(update.name !== undefined ? { download_folder_name: update.name } : {}),
+		};
+		downloadFolderSettings.applyUser(currentUser);
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
+			}
+			currentUser = await r.json() as UserItem;
+			downloadFolderSettings.applyUser(currentUser);
+		} catch (e) {
+			currentUser = previousUser;
+			downloadFolderSettings.applyUser(previousUser);
+			console.warn('failed to update the download folder setting', e);
+		}
+	}
+
+	async function chooseDownloadFolder() {
+		const name = await downloadFolderSettings.choose();
+		if (name === null) return;
+		await updateDownloadFolder({ enabled: true, name });
+	}
+
+	async function clearDownloadFolder() {
+		await downloadFolderSettings.clear();
+		await updateDownloadFolder({ enabled: false, name: null });
+	}
+
 	function applyUserTheme(user: UserItem | null) {
 		// No stored preference (signed out, or a row without one) follows the
 		// release default rather than falling back to light.
@@ -1162,6 +1214,7 @@
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 		} catch (e) {
 			currentUser = previousUser;
 			darkMode = previousDarkMode;
@@ -1730,6 +1783,7 @@
 			if (requestId !== userSettingsRequestId) return;
 			currentUser = actor;
 			applyUserTheme(actor);
+			applyDownloadFolderSettings(actor);
 			applyUserModelSettings(actor);
 			authToken = 'cookie';
 			if (actor.role !== 'admin') {
@@ -2067,6 +2121,7 @@
 			if (!r.ok) throw new Error('session expired');
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
@@ -2210,6 +2265,7 @@
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 			profileEmail = currentUser.email;
 			profileCurrentPassword = '';
 			profileNewPassword = '';
@@ -3692,6 +3748,7 @@ if (unreadWords.length > 0) {
 			if (!r.ok) return;
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 		} catch {
 			/* ignore */
 		}
@@ -6155,6 +6212,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{exportTemplateStatus}
 			{canvasAspectEnabled}
 			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
+			onChooseDownloadFolder={chooseDownloadFolder}
+			onClearDownloadFolder={clearDownloadFolder}
 			onClose={closeSettingsModal}
 			onSelectSettingsTab={selectSettingsTab}
 			onSetStage1Provider={setStage1Provider}

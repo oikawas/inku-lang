@@ -124,6 +124,15 @@ export interface LangPack {
 	settingsBatchRetryLabel: string;
 	settingsBatchRetryDescription: string;
 	settingsBatchRetryCount: string;
+	settingsDownloadFolderLabel: string;
+	settingsDownloadFolderDescription: string;
+	settingsDownloadFolderBrowserOnly: string;
+	settingsDownloadFolderChoose: string;
+	settingsDownloadFolderClear: string;
+	settingsDownloadFolderNone: string;
+	settingsDownloadFolderNeedsPicking: string;
+	settingsDownloadFolderCurrent: (name: string) => string;
+	downloadFolderFellBack: string;
 
 	// Results
 	vocabInInputLabel: string;

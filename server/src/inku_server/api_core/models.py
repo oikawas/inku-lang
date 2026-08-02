@@ -99,6 +99,8 @@ class UserAccountItem(BaseModel):
     ui_mode: str = "simple"
     ui_custom: dict[str, bool] = Field(default_factory=dict)
     tooltips_enabled: bool = True
+    download_folder_enabled: bool = False
+    download_folder_name: str | None = None
     settings_tab: str = "db"
     model_settings: dict = Field(default_factory=dict)
     image_generation_count: int = 0

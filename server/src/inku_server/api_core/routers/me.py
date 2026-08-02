@@ -25,6 +25,8 @@ class UserSettingsBody(BaseModel):
     ui_mode: str | None = None
     ui_custom: dict[str, bool] | None = None
     tooltips_enabled: bool | None = None
+    download_folder_enabled: bool | None = None
+    download_folder_name: str | None = None
     settings_tab: str | None = None
     model_settings: dict | None = None
 
@@ -83,6 +85,8 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
             ui_mode=body.ui_mode,
             ui_custom=body.ui_custom,
             tooltips_enabled=body.tooltips_enabled,
+            download_folder_enabled=body.download_folder_enabled,
+            download_folder_name=body.download_folder_name,
             settings_tab=body.settings_tab,
             model_settings=body.model_settings,
         )

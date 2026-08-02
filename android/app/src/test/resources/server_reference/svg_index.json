@@ -106,7 +106,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 49415,
+    "bytes": 47053,
     "counts": {
       "path": 39,
       "polyline": 0,
@@ -150,7 +150,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 9587,
+    "bytes": 9445,
     "counts": {
       "path": 5,
       "polyline": 0,
@@ -665,7 +665,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 55644,
+    "bytes": 52720,
     "counts": {
       "path": 46,
       "polyline": 0,
@@ -903,7 +903,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 12717,
+    "bytes": 12241,
     "counts": {
       "path": 1,
       "polyline": 2,
@@ -1166,7 +1166,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 7636,
+    "bytes": 7590,
     "counts": {
       "path": 8,
       "polyline": 0,
@@ -1297,7 +1297,7 @@
     "svg_profile": "editable",
     "wild": true,
     "color_catalog_id": "default",
-    "bytes": 12422,
+    "bytes": 12280,
     "counts": {
       "path": 2,
       "polyline": 3,
@@ -1343,7 +1343,7 @@
     "svg_profile": "editable",
     "wild": true,
     "color_catalog_id": "default",
-    "bytes": 52821,
+    "bytes": 50459,
     "counts": {
       "path": 39,
       "polyline": 0,
@@ -1534,10 +1534,10 @@
       "material-outline"
     ],
     "stroke_colors": [
-      "#e5e8e8"
+      "#26282a"
     ],
     "fill_colors": [
-      "#e5e8e8",
+      "#26282a",
       "#fcfcfc"
     ]
   },
@@ -1564,7 +1564,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "sea_stone",
-    "bytes": 49414,
+    "bytes": 47052,
     "counts": {
       "path": 39,
       "polyline": 0,
@@ -1585,7 +1585,7 @@
     ],
     "fill_colors": [
       "#191970",
-      "#ffffff"
+      "#f2f7f7"
     ]
   },
   "36_circle_pen_default_yellow": {
@@ -1623,10 +1623,10 @@
       "material-outline"
     ],
     "stroke_colors": [
-      "#2f6b3a"
+      "#b8901f"
     ],
     "fill_colors": [
-      "#2f6b3a",
+      "#b8901f",
       "#ffffff"
     ]
   },

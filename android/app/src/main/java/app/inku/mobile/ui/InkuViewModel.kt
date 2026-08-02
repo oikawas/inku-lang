@@ -43,7 +43,6 @@ data class InkuUiState(
     val confirmDdlOverwrite: Boolean = false,
     val batchText: String = "赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く\n緑の四角を12個、散らす",
     val batchPromptHistory: List<String> = emptyList(),
-    val batchRandomColorCatalog: Boolean = false,
     val batchTotal: Int = 0,
     val batchCurrent: Int = 0,
     val batchSuccess: Int = 0,
@@ -56,7 +55,6 @@ data class InkuUiState(
     val demoSeed: String = DefaultDemoSeedPhrase,
     val selectedTenkei: String = "auto",
     val demoIntervalSeconds: Int = 30,
-    val demoRandomColorCatalog: Boolean = true,
     val demoGeneratedPrompt: String = "",
     val demoGeneratedDdl: String? = null,
     val demoCurrentCatalogId: String? = null,
@@ -261,11 +259,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         localState.value = localState.value.copy(batchText = "", message = null)
     }
 
-    fun setBatchRandomColorCatalog(enabled: Boolean) {
-        localState.value = localState.value.copy(batchRandomColorCatalog = enabled)
-        persistSetting("batch_random_color_catalog", JSONObject().put("enabled", enabled).toString())
-    }
-
     fun restoreBatchPrompt(prompt: String) {
         if (state.value.isDrawing) return
         localState.value = localState.value.copy(batchText = prompt, message = null)
@@ -284,11 +277,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val normalized = value.coerceIn(1, 999)
         localState.value = localState.value.copy(demoIntervalSeconds = normalized, message = null)
         persistSetting("demo_interval_seconds", JSONObject().put("value", normalized).toString())
-    }
-
-    fun setDemoRandomColorCatalog(enabled: Boolean) {
-        localState.value = localState.value.copy(demoRandomColorCatalog = enabled)
-        persistSetting("demo_random_color_catalog", JSONObject().put("enabled", enabled).toString())
     }
 
     fun setCatalog(id: String) {
@@ -811,7 +799,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     message = "Batch running: ${index + 1}/${lines.size}",
                 )
                 runCatching {
-                    val catalogId = if (current.batchRandomColorCatalog) randomColorCatalogId() else current.selectedCatalogId
+                    val catalogId = current.selectedCatalogId
                     withContext(Dispatchers.IO) {
                         repository.paint(
                             description = prompt,
@@ -879,11 +867,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         persistSetting("batch_prompt_history", JSONObject().put("items", JSONArray(next)).toString())
     }
 
-    private fun randomColorCatalogId(): String {
-        val ids = ColorCatalogs.all.map { it.id }
-        return ids[Random.nextInt(ids.size)]
-    }
-
     fun startDemo() {
         val current = state.value
         validateSelectedModels(current)?.let { message ->
@@ -920,7 +903,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
                     }
                     if (!isCurrentDrawingRun(runId)) return@launch
-                    val catalogId = randomColorCatalogId()
+                    val catalogId = cycle.selectedCatalogId
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
                         demoGeneratedDdl = null,
@@ -1189,10 +1172,8 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val litertPromptOptimization = settings["litert_stage1_prompt_optimization"]?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         val mascotKind = settings["mascot_kind"]?.let { JSONObject(it).optString("value", current.mascotKind) } ?: current.mascotKind
-        val batchRandom = settings["batch_random_color_catalog"]?.let { JSONObject(it).optBoolean("enabled", current.batchRandomColorCatalog) } ?: current.batchRandomColorCatalog
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
-        val demoRandom = true
         val batchHistory = settings["batch_prompt_history"]?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
         val modelSelection = settings["model_selection"]?.let(::JSONObject)
         val restoredStage1Model = modelSelection?.optString("stage1_model")?.takeIf { it.isNotBlank() }
@@ -1215,10 +1196,8 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             litertStage1PromptOptimization = litertPromptOptimization,
             uiMode = uiMode,
             mascotKind = mascotKind,
-            batchRandomColorCatalog = batchRandom,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),
-            demoRandomColorCatalog = demoRandom,
             batchPromptHistory = batchHistory,
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,

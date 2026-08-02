@@ -933,7 +933,7 @@ class DefaultSvgRenderer : SvgRenderer {
                 gridStep = gridStep
             )
             materialCenterline = centerline
-            ServerStrokeEngine.outlineForCenterline(centerline, varied.samples.map { it.width })
+            ServerStrokeEngine.outlineForCenterline(centerline, varied.samples.map { it.width }, varied.cuts)
         } else {
             stroke.outline
         }

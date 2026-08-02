@@ -68,7 +68,8 @@ data class StrokeResult(
     val eventCount: Int,
     val burrSide: Int,
     val burrOpacity: Double,
-    val gridStep: Double = 0.0
+    val gridStep: Double = 0.0,
+    val cuts: List<Boolean> = emptyList()
 )
 
 data class ContourStrokeResult(
@@ -83,6 +84,51 @@ data class ContourStrokeResult(
 )
 
 const val CLOSED_ENVELOPE_FLOOR: Double = 0.35
+
+data class Support(
+    val absorb: Double,
+    val tooth: Double
+)
+
+val DEFAULT_SUPPORT = Support(absorb = 1.0, tooth = 1.0)
+
+val TOOL_SUPPORT_BIAS: Map<String, Pair<Double, Double>> = mapOf(
+    "brush_thin" to Pair(1.00, 0.15),
+    "brush_thick" to Pair(1.00, 0.15),
+    "crayon" to Pair(0.10, 1.00),
+    "pencil" to Pair(0.10, 1.00),
+    "chalk" to Pair(0.10, 1.00),
+    "pen" to Pair(0.15, 0.15),
+    "silverpoint" to Pair(0.05, 0.25),
+    "drypoint" to Pair(0.00, 0.35),
+    "burin" to Pair(0.00, 0.10),
+    "rotring" to Pair(0.00, 0.00),
+    "computer" to Pair(0.00, 0.00)
+)
+
+data class ResistanceLevel(
+    val bleedAmp: Double,
+    val bleedSpan: Double,
+    val bleedRate: Double,
+    val skipDepth: Double,
+    val skipSpan: Double,
+    val skipRate: Double
+)
+
+val RESISTANCE_LEVELS: Map<String, ResistanceLevel> = mapOf(
+    "g0" to ResistanceLevel(0.00, 0.00, 0.0, 0.00, 0.00, 0.0),
+    "g1" to ResistanceLevel(0.35, 0.10, 0.9, 0.70, 0.05, 0.9),
+    "g2" to ResistanceLevel(0.70, 0.16, 1.5, 0.88, 0.07, 1.5),
+    "g3" to ResistanceLevel(1.20, 0.24, 2.2, 1.00, 0.10, 2.2)
+)
+
+val RESISTANCE = RESISTANCE_LEVELS["g2"]!!
+
+const val SKIP_CUT_LEVEL: Double = 0.55
+
+val BREAK: Pair<Double, Double> = Pair(Double.NaN, Double.NaN)
+
+fun isBreak(point: Pair<Double, Double>): Boolean = point.first.isNaN()
 
 object ServerStrokeEngine {
 
@@ -191,6 +237,105 @@ object ServerStrokeEngine {
         return events
     }
 
+    fun supportEnvelope(
+        n: Int,
+        seed: Long,
+        label: String,
+        bias: Double,
+        rate: Double,
+        spanRatio: Double
+    ): DoubleArray {
+        if (bias <= 0.0 || rate <= 0.0 || spanRatio <= 0.0 || n < 8) {
+            return DoubleArray(n)
+        }
+        val span = Math.max(2, Math.round(n * spanRatio).toInt())
+        val probability = Math.min(0.35, rate * bias / Math.max(1, n - 4))
+        val centres = mutableListOf<Int>()
+        for (i in 2 until (n - 2)) {
+            if (unitHash(seed, "$label-arrival", i) < probability) {
+                centres.add(i)
+                if (centres.size >= 3) {
+                    break
+                }
+            }
+        }
+        val out = DoubleArray(n)
+        for (c in centres) {
+            val size = 0.6 + 0.4 * unitHash(seed, "$label-size", c)
+            for (k in -span..span) {
+                val idx = c + k
+                if (idx in 0 until n) {
+                    val window = 0.5 * (1.0 + Math.cos(Math.PI * k / span))
+                    out[idx] = Math.max(out[idx], size * window)
+                }
+            }
+        }
+        return out
+    }
+
+    fun supportResponse(
+        widths: List<Double>,
+        weight: String,
+        seed: Long,
+        support: Support = DEFAULT_SUPPORT
+    ): Pair<List<Double>, List<Boolean>> {
+        val (rawAbsorb, rawTooth) = TOOL_SUPPORT_BIAS[weight] ?: Pair(0.0, 0.0)
+        val absorb = rawAbsorb * support.absorb
+        val tooth = rawTooth * support.tooth
+        val level = RESISTANCE
+        val n = widths.size
+        val swell = supportEnvelope(n, seed, "bleed", absorb, level.bleedRate, level.bleedSpan)
+        val pinch = supportEnvelope(n, seed xor 0x5BD1L, "skip", tooth, level.skipRate, level.skipSpan)
+        val strength = level.skipDepth * tooth
+        val outWidths = List(n) { i ->
+            Math.max(0.015, widths[i] * (1.0 + level.bleedAmp * absorb * swell[i]) * (1.0 - strength * pinch[i]))
+        }
+        val cuts = List(n) { i -> strength * pinch[i] >= SKIP_CUT_LEVEL }
+        return Pair(outWidths, cuts)
+    }
+
+    fun cutRuns(cuts: List<Boolean>, minimum: Int): List<List<Int>> {
+        val runs = mutableListOf<List<Int>>()
+        var current = mutableListOf<Int>()
+        for (index in cuts.indices) {
+            if (cuts[index]) {
+                if (current.size >= minimum) {
+                    runs.add(current)
+                }
+                current = mutableListOf()
+            } else {
+                current.add(index)
+            }
+        }
+        if (current.size >= minimum) {
+            runs.add(current)
+        }
+        return runs
+    }
+
+    fun splitAtBreaks(points: List<Pair<Double, Double>>, minimum: Int): List<List<Pair<Double, Double>>> {
+        val runs = mutableListOf<List<Pair<Double, Double>>>()
+        var current = mutableListOf<Pair<Double, Double>>()
+        for (point in points) {
+            if (isBreak(point)) {
+                if (current.size >= minimum) {
+                    runs.add(current)
+                }
+                current = mutableListOf()
+            } else {
+                current.add(point)
+            }
+        }
+        if (current.size >= minimum) {
+            runs.add(current)
+        }
+        return runs
+    }
+
+    fun closedSubpath(points: List<Pair<Double, Double>>): String {
+        return "M " + points.joinToString(" L ") { "${formatCoord(it.first)} ${formatCoord(it.second)}" } + " Z"
+    }
+
     fun synthesizeStroke(
         start: Pair<Double, Double>,
         end: Pair<Double, Double>,
@@ -199,7 +344,8 @@ object ServerStrokeEngine {
         seed: Long,
         samplesCount: Int = 49,
         wild: Boolean = false,
-        gridStep: Double = 0.0
+        gridStep: Double = 0.0,
+        support: Support = DEFAULT_SUPPORT
     ): StrokeResult {
         val grammar = GRAMMARS[weight] ?: error("Unknown weight: $weight")
         val dx = end.first - start.first
@@ -318,20 +464,46 @@ object ServerStrokeEngine {
         result[0] = StrokeSample(0.0, start.first, start.second, result[0].width, result[0].energy, 0.0, null, 0.0)
         result[result.size - 1] = StrokeSample(1.0, end.first, end.second, result[result.size - 1].width, result[result.size - 1].energy, 0.0, null, 0.0)
 
-        val left = result.map { p -> Pair(p.x + nx * p.width / 2.0, p.y + ny * p.width / 2.0) }
-        val right = result.reversed().map { p -> Pair(p.x - nx * p.width / 2.0, p.y - ny * p.width / 2.0) }
-        
+        // Meet the sheet last, so the tool grammar is what arrives at the paper.
+        val (widths, cuts) = supportResponse(result.map { it.width }, weight, seed, support)
+        for (i in result.indices) {
+            val p = result[i]
+            result[i] = StrokeSample(p.t, p.x, p.y, widths[i], p.energy, p.lateral, p.event, p.residual)
+        }
+
+        val outline: List<Pair<Double, Double>>
+        if (cuts.any { it }) {
+            val outList = mutableListOf<Pair<Double, Double>>()
+            for (run in cutRuns(cuts, minimum = 2)) {
+                if (outList.isNotEmpty()) {
+                    outList.add(BREAK)
+                }
+                for (i in run) {
+                    outList.add(Pair(result[i].x + nx * result[i].width / 2.0, result[i].y + ny * result[i].width / 2.0))
+                }
+                for (i in run.reversed()) {
+                    outList.add(Pair(result[i].x - nx * result[i].width / 2.0, result[i].y - ny * result[i].width / 2.0))
+                }
+            }
+            outline = outList
+        } else {
+            val left = result.map { p -> Pair(p.x + nx * p.width / 2.0, p.y + ny * p.width / 2.0) }
+            val right = result.reversed().map { p -> Pair(p.x - nx * p.width / 2.0, p.y - ny * p.width / 2.0) }
+            outline = left + right
+        }
+
         val side = if (unitHash(seed, "burr-side", 0) < 0.5) -1 else 1
         val slowEnergy = result.sumOf { it.energy } / result.size
         val burrOpacity = 0.15 + 0.12 * (1.0 - slowEnergy) + 0.08 * unitHash(seed, "burr-ink", 0)
 
         return StrokeResult(
             result,
-            left + right,
+            outline,
             events.size,
             side,
             Math.min(0.35, burrOpacity),
-            gridStep
+            gridStep,
+            cuts
         )
     }
 
@@ -341,7 +513,12 @@ object ServerStrokeEngine {
 
     fun polygonPath(points: List<Pair<Double, Double>>): String {
         if (points.isEmpty()) return ""
-        return "M " + points.joinToString(" L ") { "${formatCoord(it.first)} ${formatCoord(it.second)}" } + " Z"
+        if (points.any { isBreak(it) }) {
+            return splitAtBreaks(points, 3)
+                .joinToString(" ") { closedSubpath(it) }
+                .trim()
+        }
+        return closedSubpath(points)
     }
 
     fun ringPath(outer: List<Pair<Double, Double>>, inner: List<Pair<Double, Double>>): String {
@@ -352,7 +529,14 @@ object ServerStrokeEngine {
         if (result.closed) {
             return ringPath(result.left, result.right)
         }
-        return polygonPath(result.left + result.right.reversed())
+        if (!result.left.any { isBreak(it) }) {
+            return polygonPath(result.left + result.right.reversed())
+        }
+        val leftRuns = splitAtBreaks(result.left, 2)
+        val rightRuns = splitAtBreaks(result.right, 2)
+        return leftRuns.zip(rightRuns)
+            .joinToString(" ") { (leftRun, rightRun) -> closedSubpath(leftRun + rightRun.reversed()) }
+            .trim()
     }
 
     fun centerlineNormals(points: List<Pair<Double, Double>>, closed: Boolean): List<Pair<Double, Double>> {
@@ -400,12 +584,32 @@ object ServerStrokeEngine {
         return running.map { it / total }
     }
 
-    fun outlineForCenterline(points: List<Pair<Double, Double>>, widths: List<Double>): List<Pair<Double, Double>> {
+    fun outlineForCenterline(
+        points: List<Pair<Double, Double>>,
+        widths: List<Double>,
+        cuts: List<Boolean> = emptyList()
+    ): List<Pair<Double, Double>> {
         if (points.size < 2) {
             return points
         }
         val (left, right) = banksForCenterline(points, widths, closed = false)
-        return left + right.reversed()
+        if (!cuts.any { it }) {
+            return left + right.reversed()
+        }
+        val outline = mutableListOf<Pair<Double, Double>>()
+        val cutRunsList = cutRuns(cuts.take(left.size), minimum = 2)
+        for (run in cutRunsList) {
+            if (outline.isNotEmpty()) {
+                outline.add(BREAK)
+            }
+            for (index in run) {
+                outline.add(left[index])
+            }
+            for (index in run.reversed()) {
+                outline.add(right[index])
+            }
+        }
+        return outline
     }
 
     fun banksForCenterline(
@@ -435,7 +639,8 @@ object ServerStrokeEngine {
         closed: Boolean,
         anchors: Set<Int> = emptySet(),
         gridStep: Double = 0.0,
-        wild: Boolean = false
+        wild: Boolean = false,
+        support: Support = DEFAULT_SUPPORT
     ): ContourStrokeResult {
         val points = centerline
         val count = points.size
@@ -583,9 +788,25 @@ object ServerStrokeEngine {
             samples = closedSeamCorrection(samples, points, parameters)
         }
 
+        // Meet the sheet last, so the tool grammar is what arrives at the paper.
+        val (widths, cuts) = supportResponse(samples.map { it.width }, weight, seed, support)
+        for (i in samples.indices) {
+            val s = samples[i]
+            samples[i] = StrokeSample(s.t, s.x, s.y, widths[i], s.energy, s.lateral, s.event, s.residual)
+        }
+
         val performed = samples.map { Pair(it.x, it.y) }
-        val widths = samples.map { it.width }
-        val (left, right) = banksForCenterline(performed, widths, closed)
+        val (rawLeft, rawRight) = banksForCenterline(performed, widths, closed)
+
+        val left: List<Pair<Double, Double>>
+        val right: List<Pair<Double, Double>>
+        if (!closed && cuts.any { it }) {
+            left = rawLeft.mapIndexed { index, point -> if (cuts[index]) BREAK else point }
+            right = rawRight.mapIndexed { index, point -> if (cuts[index]) BREAK else point }
+        } else {
+            left = rawLeft
+            right = rawRight
+        }
 
         val side = if (unitHash(seed, "burr-side", 0) < 0.5) -1 else 1
         val slowEnergy = samples.sumOf { it.energy } / samples.size
@@ -639,4 +860,5 @@ object ServerStrokeEngine {
         return corrected
     }
 }
+
 

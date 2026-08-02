@@ -5,25 +5,71 @@ data class ColorCatalog(
     val name: String,
     val sub: String,
     val map: Map<String, String>,
-    val swatches: List<String>,
 ) {
+    val swatches: List<String> = ColorCatalogs.SWATCH_KEY_ORDER.mapNotNull { map[it] }
+
     val renderMap: Map<String, String>
         get() = map + ColorCatalogs.paletteFor(id).mapKeys { "palette:${it.key}" }
 }
 
 object ColorCatalogs {
+    val SWATCH_KEY_ORDER = listOf(
+        "red", "orange", "yellow", "green", "blue", "purple", "black", "gray", "white"
+    )
+
     val all = listOf(
-        ColorCatalog("default", "inku Default", "neutral baseline", mapOf("white" to "#ffffff", "black" to "#111111", "blue" to "#2c3e91", "red" to "#a2342a", "green" to "#2f6b3a", "gray" to "#888888"), listOf("#111111", "#ffffff", "#2c3e91", "#a2342a", "#2f6b3a", "#888888", "#555555", "#eeeeee")),
-        ColorCatalog("ink_season", "Ink & Season", "ink, paper, seasonal accents", mapOf("black" to "#111111", "white" to "#fffffb", "red" to "#d3381c", "blue" to "#165e83", "green" to "#007b43", "gray" to "#595857"), listOf("#111111", "#fffffb", "#d3381c", "#165e83", "#007b43", "#595857", "#a591c5", "#ffb61e")),
-        ColorCatalog("fresco_study", "Fresco Study", "plaster, pigment, warm stone", mapOf("black" to "#4a342e", "white" to "#f5f1e8", "red" to "#c7432f", "blue" to "#1f4e8c", "green" to "#4f7942", "gray" to "#8a8178"), listOf("#8a8178", "#1f4e8c", "#c7432f", "#f7e89f", "#4f7942", "#a0522d", "#f5f1e8", "#4a342e")),
-        ColorCatalog("open_air_light", "Open-Air Light", "soft light, sky, reflected shade", mapOf("black" to "#4b4a78", "white" to "#ffffff", "red" to "#ee8fa2", "blue" to "#82c7de", "green" to "#4e8372", "gray" to "#afa6bd"), listOf("#4b4a78", "#ee8fa2", "#ffce00", "#4e8372", "#afa6bd", "#82c7de", "#ffffff", "#fbceb1")),
-        ColorCatalog("ink_porcelain", "Ink & Porcelain", "ink, porcelain, mineral accents", mapOf("black" to "#1a1a1b", "white" to "#fffdfa", "red" to "#c91f24", "blue" to "#0057a8", "green" to "#00896c", "gray" to "#4b4b4f"), listOf("#c91f24", "#d6a01d", "#00896c", "#0057a8", "#6a4c8c", "#fffdfa", "#1a1a1b", "#ff4d00")),
-        ColorCatalog("cool_material", "Cool Material", "cool light, wood, stone", mapOf("black" to "#2c3e50", "white" to "#fcfcfc", "red" to "#a98467", "blue" to "#4f8fb8", "green" to "#4b5d43", "gray" to "#95a5a6"), listOf("#fcfcfc", "#2c3e50", "#4b5d43", "#95a5a6", "#e5e8e8", "#4f8fb8", "#f4d03f", "#a98467")),
-        ColorCatalog("dye_earth", "Dye & Earth", "textile dye, earth, rain shade", mapOf("black" to "#2b2736", "white" to "#fffaf0", "red" to "#b7285f", "blue" to "#006c8f", "green" to "#6b7d3a", "gray" to "#8d7f73"), listOf("#e8862e", "#d6b72a", "#b7285f", "#6b7d3a", "#006c8f", "#d83fb1", "#8d7f73", "#fffaf0")),
-        ColorCatalog("desert_mineral", "Desert Mineral", "mineral, linen, desert shadow", mapOf("black" to "#1c1b18", "white" to "#f1e4c8", "red" to "#b31b1b", "blue" to "#1f4b8f", "green" to "#1c8a68", "gray" to "#8f8878"), listOf("#1f4b8f", "#c9ad57", "#b31b1b", "#1c8a68", "#f1e4c8", "#1c1b18", "#bd6f2c", "#e8e4c9")),
-        ColorCatalog("vivid_material", "Vivid Material", "vivid pigment, lime, stone", mapOf("black" to "#1c1c1c", "white" to "#f4f4f4", "red" to "#f50087", "blue" to "#73c2fb", "green" to "#008f39", "gray" to "#7d6f66"), listOf("#f50087", "#73c2fb", "#008f39", "#ff9800", "#7d6f66", "#fff200", "#f4f4f4", "#1c1c1c")),
-        ColorCatalog("weathered_heritage", "Weathered Heritage", "fog, brick, wool, rain", mapOf("black" to "#1f2933", "white" to "#fffdd0", "red" to "#b93a32", "blue" to "#4169e1", "green" to "#004225", "gray" to "#708090"), listOf("#004225", "#4169e1", "#708090", "#b93a32", "#8b8589", "#fffdd0", "#dcdcdc", "#1f2933")),
-        ColorCatalog("sea_stone", "Sea & Stone", "sea light, stone, dry earth", mapOf("black" to "#191970", "white" to "#ffffff", "red" to "#e2725b", "blue" to "#005bae", "green" to "#808000", "gray" to "#b2beb5"), listOf("#ffffff", "#89cff0", "#005bae", "#b2beb5", "#808000", "#f9d71c", "#e2725b", "#191970")),
+        ColorCatalog(
+            "default", "inku Default", "neutral baseline",
+            mapOf("white" to "#ffffff", "black" to "#111111", "gray" to "#888888", "red" to "#a2342a", "orange" to "#b9671e", "yellow" to "#b8901f", "green" to "#2f6b3a", "blue" to "#2c3e91", "purple" to "#6a4d94")
+        ),
+        ColorCatalog(
+            "ink_season", "Ink & Season", "ink, paper, seasonal accents",
+            mapOf("white" to "#fffffb", "black" to "#141210", "gray" to "#595857", "red" to "#d3381c", "orange" to "#ffb61e", "yellow" to "#847a2e", "green" to "#007b43", "blue" to "#165e83", "purple" to "#a591c5")
+        ),
+        ColorCatalog(
+            "fresco_study", "Fresco Study", "sunlit wall, dry earth, warm shadow",
+            mapOf("white" to "#f5f1e8", "black" to "#4a342e", "gray" to "#8a8178", "red" to "#c7432f", "orange" to "#b06a2f", "yellow" to "#c39a2b", "green" to "#4f7942", "blue" to "#1f4e8c", "purple" to "#71487c")
+        ),
+        ColorCatalog(
+            "open_air_light", "Open-Air Light", "soft light, sky, reflected shade",
+            mapOf("white" to "#fdfeff", "black" to "#43474e", "gray" to "#afa6bd", "red" to "#ee8fa2", "orange" to "#f0b184", "yellow" to "#a3bd5b", "green" to "#4e8372", "blue" to "#82c7de", "purple" to "#4b4a78")
+        ),
+        ColorCatalog(
+            "ink_porcelain", "Ink & Porcelain", "clear light, ink, sharp mineral accents",
+            mapOf("white" to "#fffdfa", "black" to "#1a1a1b", "gray" to "#4b4b4f", "red" to "#c91f24", "orange" to "#b5642c", "yellow" to "#d6a01d", "green" to "#00896c", "blue" to "#0057a8", "purple" to "#6a4c8c")
+        ),
+        ColorCatalog(
+            "cool_material", "Cool Material", "cool light, wood, stone",
+            mapOf("white" to "#fcfcfc", "black" to "#26282a", "gray" to "#95a5a6", "red" to "#6f4340", "orange" to "#a98467", "yellow" to "#4b5d43", "green" to "#3a544a", "blue" to "#4f8fb8", "purple" to "#575168")
+        ),
+        ColorCatalog(
+            "dye_earth", "Dye & Earth", "textile dye, earth, rain shade",
+            mapOf("white" to "#fffaf0", "black" to "#2b2736", "gray" to "#8d7f73", "red" to "#b7285f", "orange" to "#e8862e", "yellow" to "#d6b72a", "green" to "#33684a", "blue" to "#006c8f", "purple" to "#d83fb1")
+        ),
+        ColorCatalog(
+            "vivid_material", "Vivid Material", "vivid pigment, lime, stone",
+            mapOf("white" to "#f4f4f4", "black" to "#1c1c1c", "gray" to "#7d6f66", "red" to "#f50087", "orange" to "#ff9800", "yellow" to "#c7a000", "green" to "#008f39", "blue" to "#73c2fb", "purple" to "#8a4fc9")
+        ),
+        ColorCatalog(
+            "weathered_heritage", "Weathered Heritage", "fog, brick, wool, rain",
+            mapOf("white" to "#dcdcdc", "black" to "#1f2933", "gray" to "#708090", "red" to "#b93a32", "orange" to "#9e6428", "yellow" to "#9b8342", "green" to "#004225", "blue" to "#4169e1", "purple" to "#7b6293")
+        ),
+        ColorCatalog(
+            "sea_stone", "Sea & Stone", "sea light, stone, dry earth",
+            mapOf("white" to "#f2f7f7", "black" to "#10141a", "gray" to "#b2beb5", "red" to "#e2725b", "orange" to "#c97a45", "yellow" to "#808000", "green" to "#2e613b", "blue" to "#005bae", "purple" to "#191970")
+        ),
+        ColorCatalog(
+            "moss_bark", "Moss & Bark", "bark, leaf, moss, dappled light",
+            mapOf("white" to "#f2efe7", "black" to "#181a17", "gray" to "#9ba39e", "red" to "#9c3330", "orange" to "#7d5531", "yellow" to "#d5ae43", "green" to "#3e5a41", "blue" to "#43798a", "purple" to "#57355f")
+        ),
+        ColorCatalog(
+            "neon_plate", "Neon & Plate", "discharge tube, printing plate, coating",
+            mapOf("white" to "#f4f8fb", "black" to "#0d0d10", "gray" to "#777c82", "red" to "#e5004b", "orange" to "#ff8514", "yellow" to "#e3b800", "green" to "#00c853", "blue" to "#2f52d9", "purple" to "#7a2fd0")
+        ),
+        ColorCatalog(
+            "lantern_dew", "Lantern & Dew", "night air, lantern, dew",
+            mapOf("white" to "#e6e8ec", "black" to "#121216", "gray" to "#4d4e54", "red" to "#6d2a23", "orange" to "#c78c33", "yellow" to "#c9b34a", "green" to "#2b4234", "blue" to "#1e2e52", "purple" to "#453a6e")
+        ),
     )
 
     private val byId = all.associateBy { it.id }
@@ -31,16 +77,19 @@ object ColorCatalogs {
     fun get(id: String?): ColorCatalog = byId[id] ?: byId.getValue("default")
 
     fun paletteFor(id: String): Map<String, String> = when (id) {
-        "ink_season" -> mapOf("Deep Ink" to "#111111", "Warm Paper" to "#fffffb", "Vermilion Accent" to "#d3381c", "Indigo Shade" to "#165e83", "Evergreen" to "#007b43", "Soft Soot" to "#595857", "Pale Violet" to "#a591c5", "Golden Flower" to "#ffb61e")
-        "fresco_study" -> mapOf("Warm Stone" to "#8a8178", "Deep Blue Pigment" to "#1f4e8c", "Red Earth" to "#c7432f", "Soft Yellow" to "#f7e89f", "Green Earth" to "#4f7942", "Burnt Earth" to "#a0522d", "Plaster White" to "#f5f1e8", "Umber Shadow" to "#4a342e")
-        "open_air_light" -> mapOf("Violet Gray Shade" to "#4b4a78", "Rose Light" to "#ee8fa2", "Sunlit Yellow" to "#ffce00", "Outdoor Green" to "#4e8372", "Lilac Gray" to "#afa6bd", "Sky Blue" to "#82c7de", "Clear White" to "#ffffff", "Apricot Light" to "#fbceb1")
-        "ink_porcelain" -> mapOf("Cinnabar Red" to "#c91f24", "Mineral Gold" to "#d6a01d", "Jade Green" to "#00896c", "Porcelain Blue" to "#0057a8", "Mineral Violet" to "#6a4c8c", "Porcelain White" to "#fffdfa", "Ink Black" to "#1a1a1b", "Bright Vermilion" to "#ff4d00")
-        "cool_material" -> mapOf("Snow Light" to "#fcfcfc", "Midnight Blue" to "#2c3e50", "Moss Wood" to "#4b5d43", "Granite Gray" to "#95a5a6", "Pale Birch" to "#e5e8e8", "Muted Sea" to "#4f8fb8", "Low Sun" to "#f4d03f", "Clay Brown" to "#a98467")
-        "dye_earth" -> mapOf("Saffron Dye" to "#e8862e", "Yellow Dye" to "#d6b72a", "Deep Rose Dye" to "#b7285f", "Leaf Dye" to "#6b7d3a", "Peacock Blue" to "#006c8f", "Bright Pink" to "#d83fb1", "Wet Earth" to "#8d7f73", "Warm Cotton" to "#fffaf0")
-        "desert_mineral" -> mapOf("Deep Mineral Blue" to "#1f4b8f", "Muted Gold" to "#c9ad57", "Red Mineral" to "#b31b1b", "Malachite Green" to "#1c8a68", "Dry Paper" to "#f1e4c8", "Basalt Black" to "#1c1b18", "Desert Ochre" to "#bd6f2c", "Linen Light" to "#e8e4c9")
-        "vivid_material" -> mapOf("Vivid Rose" to "#f50087", "Bright Blue" to "#73c2fb", "Fresh Green" to "#008f39", "Orange Marigold" to "#ff9800", "Urban Stone" to "#7d6f66", "Sun Yellow" to "#fff200", "Lime White" to "#f4f4f4", "Volcanic Black" to "#1c1c1c")
-        "weathered_heritage" -> mapOf("Deep Green" to "#004225", "Rain Blue" to "#4169e1", "Slate Gray" to "#708090", "Brick Red" to "#b93a32", "Wool Gray" to "#8b8589", "Cream" to "#fffdd0", "Fog Light" to "#dcdcdc", "Charcoal" to "#1f2933")
-        "sea_stone" -> mapOf("Clear White" to "#ffffff", "Pale Sea" to "#89cff0", "Deep Sea" to "#005bae", "Stone Gray" to "#b2beb5", "Dry Olive" to "#808000", "Sun Yellow" to "#f9d71c", "Clay Red" to "#e2725b", "Night Sea" to "#191970")
-        else -> mapOf("Black" to "#111111", "White" to "#ffffff", "Blue" to "#2c3e91", "Red" to "#a2342a", "Green" to "#2f6b3a", "Gray" to "#888888", "Ink Shade" to "#555555", "Paper" to "#eeeeee")
+        "default" -> mapOf("Black" to "#111111", "White" to "#ffffff", "Gray" to "#888888", "Red" to "#a2342a", "Green" to "#2f6b3a", "Blue" to "#2c3e91", "Yellow" to "#b8901f", "Orange" to "#b9671e", "Purple" to "#6a4d94", "Deep Red" to "#7c2f26")
+        "ink_season" -> mapOf("Pine Soot" to "#141210", "Warm Paper" to "#fffffb", "Soft Soot" to "#595857", "Vermilion Accent" to "#d3381c", "Evergreen" to "#007b43", "Indigo Shade" to "#165e83", "Uguisu" to "#847a2e", "Golden Flower" to "#ffb61e", "Pale Violet" to "#a591c5", "Madder" to "#8c2d1d")
+        "fresco_study" -> mapOf("Umber Shadow" to "#4a342e", "Plaster White" to "#f5f1e8", "Warm Stone" to "#8a8178", "Red Earth" to "#c7432f", "Green Earth" to "#4f7942", "Deep Blue Pigment" to "#1f4e8c", "Yellow Ocher" to "#c39a2b", "Raw Sienna" to "#b06a2f", "Manganese Violet" to "#71487c", "Burnt Earth" to "#a0522d")
+        "open_air_light" -> mapOf("River Stone" to "#43474e", "Zinc White" to "#fdfeff", "Lilac Gray" to "#afa6bd", "Rose Light" to "#ee8fa2", "Outdoor Green" to "#4e8372", "Sky Blue" to "#82c7de", "Young Grass" to "#a3bd5b", "Apricot Shade" to "#f0b184", "Violet Gray Shade" to "#4b4a78", "Sunlit Yellow" to "#ffce00")
+        "ink_porcelain" -> mapOf("Ink Black" to "#1a1a1b", "Porcelain White" to "#fffdfa", "Kiln Soot" to "#4b4b4f", "Cinnabar Red" to "#c91f24", "Jade Green" to "#00896c", "Porcelain Blue" to "#0057a8", "Mineral Gold" to "#d6a01d", "Copper Overglaze" to "#b5642c", "Mineral Violet" to "#6a4c8c", "Bright Vermilion" to "#ff4d00")
+        "cool_material" -> mapOf("Graphite" to "#26282a", "Snow Light" to "#fcfcfc", "Granite Gray" to "#95a5a6", "Rowan Berry" to "#6f4340", "Spruce" to "#3a544a", "Muted Sea" to "#4f8fb8", "Moss Wood" to "#4b5d43", "Clay Brown" to "#a98467", "Slate Violet" to "#575168", "Midnight Blue" to "#2c3e50")
+        "dye_earth" -> mapOf("Iron Mordant" to "#2b2736", "Warm Cotton" to "#fffaf0", "Wet Earth" to "#8d7f73", "Deep Rose Dye" to "#b7285f", "Indigo-Leaf Green" to "#33684a", "Peacock Blue" to "#006c8f", "Yellow Dye" to "#d6b72a", "Saffron Dye" to "#e8862e", "Bright Pink" to "#d83fb1", "Leaf Dye" to "#6b7d3a")
+        "vivid_material" -> mapOf("Volcanic Black" to "#1c1c1c", "Lime White" to "#f4f4f4", "Urban Stone" to "#7d6f66", "Vivid Rose" to "#f50087", "Fresh Green" to "#008f39", "Bright Blue" to "#73c2fb", "Deep Cadmium Yellow" to "#c7a000", "Orange Marigold" to "#ff9800", "Cobalt Violet" to "#8a4fc9", "Sun Yellow" to "#fff200")
+        "weathered_heritage" -> mapOf("Charcoal" to "#1f2933", "Fog Light" to "#dcdcdc", "Slate Gray" to "#708090", "Brick Red" to "#b93a32", "Deep Green" to "#004225", "Rain Blue" to "#4169e1", "Tarnished Brass" to "#9b8342", "Iron Rust" to "#9e6428", "Heather" to "#7b6293", "Wet Moss" to "#48684d")
+        "sea_stone" -> mapOf("Abyss Dark" to "#10141a", "Sea Foam White" to "#f2f7f7", "Stone Gray" to "#b2beb5", "Clay Red" to "#e2725b", "Sea Kelp Green" to "#2e613b", "Deep Sea" to "#005bae", "Dry Olive" to "#808000", "Coral Orange" to "#c97a45", "Night Sea" to "#191970", "Pale Sea" to "#89cff0")
+        "moss_bark" -> mapOf("Forest Dark" to "#181a17", "Birch Bark" to "#f2efe8", "Morning Fog" to "#9ba39e", "Ripe Berry" to "#9c3330", "Moss" to "#3e5a41", "Ravine Water" to "#43798a", "Dappled Light" to "#d5ae43", "Bark" to "#7d5531", "Wild Grape" to "#57355f", "New Leaf" to "#5da55f")
+        "neon_plate" -> mapOf("Unlit Pixel" to "#0d0d10", "Diffuser White" to "#f4f8fb", "Housing Gray" to "#777c82", "Signal Red" to "#e5004b", "Emitter Green" to "#00c853", "Discharge Blue" to "#2f52d9", "Halftone Yellow" to "#e3b800", "Safety Coating" to "#ff8514", "Tube Violet" to "#7a2fd0", "Cyan Plate" to "#00b7eb")
+        "lantern_dew" -> mapOf("New Moon" to "#121216", "Dew White" to "#e6e8ec", "Night Air" to "#4d4e54", "Ember" to "#6d2a23", "Night Moss" to "#2b4234", "Night Indigo" to "#1e2e52", "Firefly" to "#c9b34a", "Lantern Amber" to "#c78c33", "Twilight Violet" to "#453a6e", "Mulberry" to "#402445")
+        else -> mapOf("Black" to "#111111", "White" to "#ffffff", "Gray" to "#888888", "Red" to "#a2342a", "Green" to "#2f6b3a", "Blue" to "#2c3e91", "Yellow" to "#b8901f", "Orange" to "#b9671e", "Purple" to "#6a4d94", "Deep Red" to "#7c2f26")
     }
 }

@@ -151,6 +151,18 @@ def test_t3_english_clause_survives_without_any_marker() -> None:
 
 WEB_DDL_SPEC = ROOT / "android/app/src/main/java/app/inku/mobile/pipeline/WebDdlSpec.kt"
 
+# `android/` is permanently excluded from every pentala sync path (standing rule
+# 2026-07-30), so on the deployed server the whole tree is absent and reading the
+# Kotlin file raised FileNotFoundError in 15 T-5 cases. Key the skip to the
+# DIRECTORY, not the file: wherever `android/` exists -- every checkout, every
+# developer machine, CI -- the assertions below still run, and a moved or renamed
+# WebDdlSpec.kt is still a failure rather than a skip.
+ANDROID_TREE = ROOT / "android"
+android_only = pytest.mark.skipif(
+    not ANDROID_TREE.is_dir(),
+    reason="android/ is never synced to the server; the Kotlin prompts are checked where the tree exists",
+)
+
 # Every phrasing that pinned the background to five colours or named gray as
 # forbidden, across ja and en, stage 1 and stage 2, server and Android. Asserting
 # only on the five-colour set is not enough: WebDdlSpec.kt's LiteRT stage 1
@@ -177,30 +189,45 @@ GRAY_PROHIBITIONS = (
 )
 
 
-def _prompt_sources() -> dict[str, str]:
+def _server_prompt_sources() -> dict[str, str]:
     return {
         "composer.SYSTEM_PROMPT": SYSTEM_PROMPT,
         "composer.SYSTEM_PROMPT_EN": SYSTEM_PROMPT_EN,
         "interpreter ja": _build_system_prompt("白い背景に白い線を引く"),
         "interpreter en": _build_system_prompt("white lines on a white background", lang="en"),
-        # Read as text: the Kotlin constants are the Android copies of the same
-        # prompts, and editing only the Python side must turn this red.
-        "WebDdlSpec.kt": WEB_DDL_SPEC.read_text(encoding="utf-8").replace('\\"', '"'),
     }
 
 
+def _web_ddl_spec_text() -> str:
+    # Read as text: the Kotlin constants are the Android copies of the same
+    # prompts, and editing only the Python side must turn the Android pair red.
+    return WEB_DDL_SPEC.read_text(encoding="utf-8").replace('\\"', '"')
+
+
 @pytest.mark.parametrize("phrase", FIVE_COLOUR_SETS)
-def test_t5_no_prompt_limits_the_background_to_five_colours(phrase: str) -> None:
-    offenders = [name for name, text in _prompt_sources().items() if phrase in text]
+def test_t5_no_server_prompt_limits_the_background_to_five_colours(phrase: str) -> None:
+    offenders = [name for name, text in _server_prompt_sources().items() if phrase in text]
     assert offenders == [], f"{phrase!r} still restricts: {offenders}"
 
 
 @pytest.mark.parametrize("phrase", GRAY_PROHIBITIONS)
-def test_t5_no_prompt_forbids_a_gray_background(phrase: str) -> None:
-    offenders = [name for name, text in _prompt_sources().items() if phrase in text]
+def test_t5_no_server_prompt_forbids_a_gray_background(phrase: str) -> None:
+    offenders = [name for name, text in _server_prompt_sources().items() if phrase in text]
     assert offenders == [], f"{phrase!r} still forbids gray: {offenders}"
 
 
+@android_only
+@pytest.mark.parametrize("phrase", FIVE_COLOUR_SETS + GRAY_PROHIBITIONS)
+def test_t5_web_ddl_spec_carries_no_background_restriction(phrase: str) -> None:
+    """The Android half of T-5, kept in its own test so it can skip on the server.
+
+    Folding the Kotlin text into the server helper made all 15 T-5 cases raise
+    FileNotFoundError on pentala, where `android/` does not exist.
+    """
+    assert phrase not in _web_ddl_spec_text(), f"{phrase!r} still restricts WebDdlSpec.kt"
+
+
+@android_only
 def test_t5_web_ddl_spec_is_where_we_think_it_is() -> None:
     """Without this, a moved or renamed Kotlin file makes T-5 pass on nothing."""
     assert WEB_DDL_SPEC.is_file()

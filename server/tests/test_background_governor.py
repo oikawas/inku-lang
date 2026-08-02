@@ -214,3 +214,49 @@ def test_t5_web_ddl_spec_is_where_we_think_it_is() -> None:
         "STAGE1_PROMPT_PREFIX_JA_LITERT",
     ):
         assert const in text
+
+
+# --------------------------------------------------------------------------- #
+# T-7 -- stage 5 (I-104): gray leaves coerce_score gray                        #
+# --------------------------------------------------------------------------- #
+
+
+def test_t7_a_gray_background_survives_coerce() -> None:
+    """The fourth block on the colour, found after stages 1-3 were already in.
+
+    Stages 2 and 3 were measured working on pentala at Build 834 (0 -> 20 stage-1
+    clauses, 0 -> 19 stage-2 `background="gray"`), and all 19 still came out
+    white: `coerce_score` called `_visible_background` at the entry, ahead of the
+    governor, and it rewrote gray unconditionally. Stage 5 removed it
+    (作者裁定 2026-08-02, option A of I-104).
+
+    The context here carries a density marker and no fill clause -- the exact
+    shape that governs black to white in the T-3 control above -- so this also
+    pins that gray is outside the governor's set rather than merely escaping it.
+    """
+    ddl = _coerce_context("灰色の線を一本引く。", "静かな気配。")
+    assert coerce_score(_score_with_background("gray"), ddl=ddl).background == "gray"
+    assert coerce_score(_score_with_background("black"), ddl=ddl).background == "white"
+
+
+def test_t7_gray_on_gray_stays_legible_without_moving_the_background() -> None:
+    """"Keep the background" must not be bought by dropping the foreground rule.
+
+    The visibility of gray on gray was carried by two mechanisms; only the
+    background-side one was removed. This asserts the foreground-side one still
+    fires on its own.
+    """
+    score = Score.model_validate(
+        {
+            "background": "gray",
+            "instructions": [
+                {"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5], "color": "gray"}
+            ],
+        }
+    )
+
+    fixed = coerce_score(score)
+
+    assert fixed.background == "gray"
+    assert fixed.instructions[0].color == "black"
+    assert "made visible" in (fixed.instructions[0].note or "")

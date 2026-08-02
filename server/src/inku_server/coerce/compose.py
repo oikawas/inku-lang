@@ -120,12 +120,6 @@ SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_v
 MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("motif_intent_markers")
 
 
-def _visible_background(background: str) -> str:
-    if background == "gray":
-        return "white"
-    return background
-
-
 def _with_material_hint(ins: Instruction, ddl: str | None) -> Instruction:
     if not ddl or ins.weight != "pen":
         return ins

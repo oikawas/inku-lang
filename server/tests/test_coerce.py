@@ -10,6 +10,15 @@ def test_ensure_renderable_score_rejects_empty_instructions():
 
 
 def test_coerce_score_makes_gray_on_gray_visible():
+    """The gray background survives; the foreground is what moves.
+
+    Until 2026-08-02 this asserted `background == "white"`, because
+    `_visible_background` turned every gray background white before the governor
+    ran. That was a second, unconditional block on gray (I-104), and removing it
+    is stage 5 of 契約 background-color-openness. The property this test defends
+    -- gray-on-gray stays legible -- is carried by the foreground rule alone, so
+    the assertions on the instruction below are unchanged.
+    """
     score = Score.model_validate(
         {
             "background": "gray",
@@ -26,12 +35,18 @@ def test_coerce_score_makes_gray_on_gray_visible():
 
     fixed = coerce_score(score)
 
-    assert fixed.background == "white"
+    assert fixed.background == "gray"
     assert fixed.instructions[0].color == "black"
     assert "made visible" in (fixed.instructions[0].note or "")
 
 
 def test_coerce_score_keeps_tiny_particle_cloud_visible_and_bounded():
+    """Same inversion as above (I-104): the background stays gray.
+
+    Every other repair -- colour, fill, minimum size, count ceiling, density,
+    clustering -- is asserted unchanged, so "keep the background" cannot be
+    bought by dropping the foreground rules.
+    """
     score = Score.model_validate(
         {
             "background": "gray",
@@ -51,7 +66,7 @@ def test_coerce_score_keeps_tiny_particle_cloud_visible_and_bounded():
     fixed = coerce_score(score)
     ins = fixed.instructions[0]
 
-    assert fixed.background == "white"
+    assert fixed.background == "gray"
     assert ins.color == "black"
     assert ins.filled is True
     assert ins.size == (0.008, 0.008)

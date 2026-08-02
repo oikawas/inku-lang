@@ -44,6 +44,7 @@
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
+		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null, wild?: boolean | null) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
@@ -76,7 +77,7 @@
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -227,6 +228,52 @@
 		if (!value) return '—';
 		const [prefix, digest] = value.split(':', 2);
 		return digest ? `${prefix}:${digest.slice(0, 10)}…` : `${value.slice(0, 12)}…`;
+	}
+
+	// The details row shows the hash abbreviated, so the button copies the whole
+	// value the way the history manager does -- a truncated hash identifies nothing.
+	let copiedHashNodeId = $state<string | null>(null);
+	let copiedHashTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function copyRenderHash(node: LineageNode, event: MouseEvent): void {
+		event.stopPropagation();
+		event.preventDefault();
+		const hash = node.render_hash;
+		if (!hash) return;
+		if (navigator.clipboard?.writeText) {
+			void navigator.clipboard.writeText(hash).catch(() => fallbackCopy(hash));
+		} else {
+			fallbackCopy(hash);
+		}
+		copiedHashNodeId = node.id;
+		if (copiedHashTimer) clearTimeout(copiedHashTimer);
+		copiedHashTimer = setTimeout(() => (copiedHashNodeId = null), 1400);
+	}
+
+	function fallbackCopy(text: string): void {
+		const textarea = document.createElement('textarea');
+		textarea.value = text;
+		textarea.setAttribute('readonly', '');
+		textarea.style.position = 'fixed';
+		textarea.style.left = '-9999px';
+		textarea.style.top = '0';
+		document.body.appendChild(textarea);
+		textarea.select();
+		try {
+			document.execCommand('copy');
+		} finally {
+			document.body.removeChild(textarea);
+		}
+	}
+
+	// Same shape the canvas provenance uses: the engine id and its version share a
+	// line. Works recorded before the field existed carry neither, and an em dash
+	// says that more quietly than a bare slash.
+	function engineLabel(history: HistoryItem): string {
+		const id = history.render_engine_id ?? '';
+		const version = history.render_engine_version ?? '';
+		if (!id && !version) return '—';
+		return version ? `${id || '—'} / ${version}` : id;
 	}
 
 	function operationLabel(kind?: string): string {
@@ -762,6 +809,16 @@ $effect(() => {
 			onpointerdown={(event) => event.stopPropagation()}
 			onclick={(event) => { event.stopPropagation(); void onToggleStar(node, event); }}
 		>★</button>
+		<button
+			type="button"
+			class="card-mark"
+			class:marked={!!node.history.for_revision}
+			title={node.history.for_revision ? t().forRevisionOn : t().forRevisionOff}
+			aria-label={node.history.for_revision ? t().forRevisionOn : t().forRevisionOff}
+			aria-pressed={!!node.history.for_revision}
+			onpointerdown={(event) => event.stopPropagation()}
+			onclick={(event) => { event.stopPropagation(); void onToggleForRevision(node, event); }}
+		>✎</button>
 	{/if}
 	<span class="identity-marks">
 		{#if node.id === graph.focus_node_id}<span class="active-mark">{isJapanese ? '表示中' : 'Displayed'}</span>{/if}
@@ -835,7 +892,18 @@ $effect(() => {
 										<dl>
 											<dt>{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
 											<dt>dh1</dt><dd>{shortHash(node.description_hash)}</dd>
-											<dt>rh2</dt><dd>{shortHash(node.render_hash)}</dd>
+											<dt>rh2</dt>
+											<dd class="hash-cell">
+												<span>{shortHash(node.render_hash)}</span>
+												{#if node.render_hash}
+													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={t().historyHashCopyTitle} onclick={(event) => copyRenderHash(node, event)}>
+														{copiedHashNodeId === node.id ? t().promptCopied : t().promptCopy}
+													</button>
+												{/if}
+											</dd>
+											<dt>render engine</dt><dd>{engineLabel(node.history)}</dd>
+											<dt>{t().provenanceLabelTransformLayer}</dt><dd>{node.history.ddl_engine_version || '—'}</dd>
+											<dt>Build</dt><dd>{node.history.render_build_number || '—'}</dd>
 											<dt>Stage 1</dt><dd>{node.history.stage1_model ? modelDisplayName(node.history.stage1_model) : '—'}</dd>
 											<dt>Stage 2</dt><dd>{node.history.stage2_model ? modelDisplayName(node.history.stage2_model) : '—'}</dd>
 											<dt>seed</dt><dd>{node.history.render_seed ?? '—'} / {node.history.composition_seed ?? '—'} / {node.history.interpretation_seed ?? '—'}</dd>
@@ -988,6 +1056,10 @@ $effect(() => {
 	/* 作品の星。押しても作品は切り替えない（選択はカード本体） */
 	.card-star { flex: 0 0 auto; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg3); font-size: 10px; line-height: 1; font-family: inherit; cursor: pointer; }
 	.card-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
+	/* The revision mark rides beside the star in the same shell: the two are
+	   separate columns and a work can carry either, both or neither. */
+	.card-mark { flex: 0 0 auto; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg3); font-size: 10px; line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-mark.marked { color: var(--accent); background: var(--accent-light); border-color: var(--accent); }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
 	.lineage-edit-backdrop { position: fixed; inset: 0; z-index: 1460; width: 100%; height: 100%; border: 0; padding: 0; background: #0009; cursor: default; }
 	.lineage-edit-dialog { position: fixed; z-index: 1461; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(780px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
@@ -1052,6 +1124,9 @@ $effect(() => {
 	.node-details dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; margin: 6px 0 0; }
 	.node-details dt { color: var(--fg3); }
 	.node-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+	.node-details dd.hash-cell { display: flex; align-items: center; gap: 6px; }
+	.hash-copy { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 1px 6px; background: var(--panel); color: var(--fg3); font-family: inherit; font-size: inherit; line-height: 1.5; cursor: pointer; }
+	.hash-copy:hover { border-color: var(--accent); color: var(--fg); }
 	.full-source { max-height: 7em; overflow: auto; white-space: pre-wrap; }
 	.note-editor { display: grid; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 	.note-editor label { color: var(--fg3); }

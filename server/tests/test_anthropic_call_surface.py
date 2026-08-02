@@ -61,7 +61,7 @@ def _install(monkeypatch, call: _Call, *, blocks: list[dict]) -> None:
 
     def _response() -> object:
         wrapped = [
-            _ReadRecorder(block, call.reads, f"content[].") for block in blocks
+            _ReadRecorder(block, call.reads, "content[].") for block in blocks
         ]
         return _ReadRecorder(
             {

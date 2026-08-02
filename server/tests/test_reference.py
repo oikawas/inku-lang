@@ -103,6 +103,18 @@ def test_relation_literals_match_composer() -> None:
     )
 
 
+def test_reference_does_not_tell_the_reader_gray_backgrounds_are_refused() -> None:
+    """Stage 4 of 契約 background-color-openness had no gate of its own.
+
+    Reverting the reference wording turned nothing red during acceptance, so the
+    dump could drift back to describing a restriction the pipeline no longer has.
+    Assert the claim itself rather than the sentence, so a rewording stays green.
+    """
+    notes = " ".join(_ref()["normalized_ddl_phrases"]["notes"])
+    assert "refused" not in notes
+    assert "gray" in notes
+
+
 def test_core_markers_and_regions_match_document_format() -> None:
     expansion = _ref()["expansion_layer"]
     for lang in ("ja", "en"):

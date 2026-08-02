@@ -2668,3 +2668,37 @@ routes = `api.py`" line now names `api_core/routers/` (ten files) and the role o
 both languages, and the struck-through claim that the giant UI component was resolved in v1.20
 disappeared with `dc71ff4b` (the change that moved the list of open items out of the
 specification and into the ledger). **Only the delegation line was left.**
+
+### Android `2.1.4-android.4` — the mascots stop being emoji, and two settings that did nothing are removed (android Build 148091 unchanged, 2026-08-02)
+
+**What Android called a ported mascot was not a ported drawing.** `IncuMascotView` was a `Row`
+of `Text("🧊")` and a label, `YuragiMascotView` the same with `Text("🦀")`; **not one line of the
+151-line and 208-line web components had arrived**. The 5x5 pixel grids and their animations now
+live in **pure Kotlin data plus a Compose Canvas**. Incu orbits every 15 seconds while each pixel
+runs a 4-second vortex breathe and the three incubator pixels change colour on 5 / 6 / 7-second
+periods. Yuragi steps sideways every 1.5 seconds, waves its left claw every 11 and its right every
+8, blinks on a 7-second period (the right eye has one extra wink), and blows bubbles every 12.
+
+**The material was extracted into pure Kotlin for the sake of the gates.** Composable functions
+cannot be exercised from a JVM unit test (Robolectric is not installed). **Putting the material —
+the 25-cell table, the colours, the periods — in an object free of Compose types makes it testable
+without a device and without Robolectric.**
+
+**Two settings did nothing when pressed.** All 16 occurrences of `showKiwi` / `showCrab` were
+state, persistence, and a settings row: **no composable ever drew a Kiwi or a Crab**. They are
+gone. **The `show_kiwi` / `show_crab` rows already stored on the server were left alone** — they
+simply lost their reader.
+
+**The mapping table in `ANDROID_SPEC` pointed at a canonical source that no longer exists** —
+`KiwiMascot.svelte` is gone from web, where `web/src/lib/components/` holds `IncuMascot.svelte`
+and `YuragiMascot.svelte`. Both language versions now describe what was actually ported.
+
+**Counts did not hold the picture.** During acceptance, **moving one leg a single cell sideways,
+and swapping the breathe delays of two cells, both left all 127 tests green**: red 13 / eyes 2 /
+empty 10 still held, and so did the set of delays. **The assertions now compare all 25 cells
+against the web original**, and both perturbations turn red. **The control perturbation — reversing
+the order of the table — stays green**, because the drawing derives its position from `cell.x` /
+`cell.y` rather than from the order.
+
+Unit tests go from **118 to 127**. **Not one line of `web/`, `server/`, or `cli/` changed**, so
+there is no pentala deployment.

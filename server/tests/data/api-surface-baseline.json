@@ -1,5 +1,5 @@
 {
-  "digest": "d4c57fed861ebb22d569a798a8d025ce37abad0f2dbaa0b568638b40cea26087",
+  "digest": "37cb20bb6870fb37b322f58fe0ae723b4f736838df77173eea1327cd38a74943",
   "endpoint_count": 80,
   "operation_count": 80,
   "operations": [
@@ -403,6 +403,7 @@
         "cookie:inku_session:opt",
         "header:authorization:opt",
         "query:limit:opt",
+        "query:min_items:opt",
         "query:offset:opt",
         "query:q:opt",
         "query:starred:opt",

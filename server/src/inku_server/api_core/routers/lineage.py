@@ -55,10 +55,12 @@ def api_history_lineage_groups(
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
+    min_items: int = Query(default=1, ge=1, le=1000),
     actor: dict = Depends(_current_user),
 ) -> HistoryLineageGroupListResponse:
     groups, total = _db.list_lineage_groups(
-        actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred
+        actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred,
+        min_item_count=min_items,
     )
     return HistoryLineageGroupListResponse(groups=groups, total=total, offset=offset, limit=limit)
 

@@ -3143,10 +3143,11 @@ These are canonical instead:
   definition files) and `server/src/inku_server/api.py` (assembling `app`,
   the middleware, and `include_router`)
 - CLI subcommands: `inku-cli --help` and `manual/en/cli-reference-for-ai.md`
-- the internal layout of each package: `server/README.md` / `web/README.md` /
-  `cli/README.md` (**only `cli/README.md` is written. `server/README.md` is
-  empty and `web/README.md` is still the SvelteKit template, so neither
-  functions as a canonical source**; issue ledger I-087)
+- the internal layout of each package: "The current state of the product" in
+  `PROJECT_CONTEXT.md` (**the delegation to the package READMEs was dropped on
+  2026-08-02**. `server/README.md` was empty, `web/README.md` was still the
+  SvelteKit template, and `cli/README.md` holds usage recipes and a copy of
+  `--help`, so none of the three described an internal layout)
 
 `ddl/` is the early Python PoC that the complementary Android axis was built
 from; the web version has moved to `server/`.

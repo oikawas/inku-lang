@@ -1985,7 +1985,7 @@ inku-lang/                 # github.com/oikawas/inku-lang
 - API 経路: `server/src/inku_server/api_core/routers/`（FastAPI ルート定義 10 本）と
   `server/src/inku_server/api.py`（`app` の組み立て・ミドルウェア・`include_router`）
 - CLI サブコマンド: `inku-cli --help` および `manual/ja/cli-reference-for-ai.md`
-- 各パッケージの内部構成: `server/README.md` / `web/README.md` / `cli/README.md`（**`cli/README.md` だけが書かれている。`server/README.md` は空・`web/README.md` は SvelteKit の雛形のままで、正本として機能していない**。台帳 [I-087]）
+- 各パッケージの内部構成: `PROJECT_CONTEXT.ja.md` の「現在の製品状態」（**パッケージ README への委譲は 2026-08-02 にやめた**。`server/README.md` は空・`web/README.md` は SvelteKit の雛形・`cli/README.md` は使い方と `--help` の写しで、3 つとも内部構成を書いていなかった）
 
 `ddl/` は初期 Python PoC（Android 補完軸のベース）であり、Web 版は `server/` に移行済み。
 

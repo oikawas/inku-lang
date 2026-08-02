@@ -2633,3 +2633,38 @@ acceptance.
 and `render-engine-20` (525) are byte-identical, because **not one corpus case traverses this
 layer** — green here is not evidence of correctness but evidence that nobody was looking.
 Seven new assertions carry the acceptance instead.
+
+### 2026-08-02 — The specification stops delegating to empty READMEs (**no version bump**, documentation only)
+
+**The specification correctly declared that the module layout is not listed in it, and pointed at
+`server/README.md` / `web/README.md` / `cli/README.md` as canonical instead.** Issue ledger
+[I-087] was filed saying two of the three were empty; **a fresh measurement showed that none of
+the three described an internal layout.**
+
+- `server/README.md` is **0 lines**
+- `web/README.md` is 42 lines of the **untouched SvelteKit template** (`# sv` / `npx sv create`)
+- `cli/README.md` has 1,000 lines but **zero mentions of `.py`**. Its headings are three usage
+  recipes and `## Command Line Help Reference`, and **the 960 lines from line 39 on are a
+  machine-generated copy of `--help`**. The cli package itself is two files, `__init__.py`
+  and `cli.py`
+
+**Length was substance, but not the delegated role.** "Only `cli/README.md` is written" took the
+line count as a proxy for the contents; **the third one was not functioning either.**
+
+**The description already existed elsewhere.** "The current state of the product" in
+`PROJECT_CONTEXT.md` holds, in the present tense, the per-feature directories and the three
+registries for web, and the names of the ten router files, the five shared modules, the
+one-way dependency, and the two enforcement points of authorization for server (the Japanese
+`PROJECT_CONTEXT.ja.md` holds the same). **Rather than fill an empty canonical source, the
+specification now points at where it is written.**
+
+Outside those two lines in the Japanese and English specifications, **not one tracked file
+references `server/README.md` or `web/README.md`** (`check_docs.py` only pairs the root
+`README.ja.md` / `README.md`; it never looks at a package README). The READMEs themselves
+were not deleted.
+
+**The two adjacent items had already been resolved between filing and this cycle** — the "API
+routes = `api.py`" line now names `api_core/routers/` (ten files) and the role of `api.py` in
+both languages, and the struck-through claim that the giant UI component was resolved in v1.20
+disappeared with `dc71ff4b` (the change that moved the list of open items out of the
+specification and into the ledger). **Only the delegation line was left.**

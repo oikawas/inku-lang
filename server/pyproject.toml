@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "inku-analysis",
-    "anthropic>=0.96.0",
+    "anthropic>=0.120.2",
     "fastapi>=0.141.1",
     "openai>=2.32.0",
     "pydantic>=2.13.4",

@@ -2459,7 +2459,7 @@ down to **returning an empty string rather than raising when the key does not ma
 down to the digest**, across five fastapi minor versions, and the frozen corpora are
 **byte-identical** as well (the ground texture seed is a hash of the whole Score dump, so drift
 there would have changed the pictures).
-### v2.9.30 — A setting registers itself, and the wild switch is given its own name (Build 831, 2026-08-02)
+### v2.9.30 — A setting registers itself, and the wild switch is given its own name (Build 832, 2026-08-02)
 
 **Adding one setting used to cost six lines in `+page.svelte`; it now costs none.**
 A setting that is kept in localStorage, rides the render request and shows on
@@ -2492,3 +2492,9 @@ when `2cbc93b3` unified the running indicator into `RunStatus` the **comment
 survived while the rule stopped matching anything**. It is back, keyed on a
 class this component writes itself -- `.run-status` belongs to the child, so a
 selector naming it would be scoped away.
+
+**The staffage label was brought to the same shape** -- `Staffage (inherited):`.
+**When two labels share a row and only one carries a colon, it does not read as
+variety; it reads as an accident.** The wild button in the input panel is left
+unlabelled: that row has no notion of inheriting, and none of its buttons carry
+a label.

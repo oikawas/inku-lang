@@ -5924,6 +5924,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			>{leftPanelCollapsed ? '›' : '‹'}</button>
 
 			<CanvasPanel
+				{catalogName}
+				{formatHistoryDate}
+				{historyPreviewText}
 				bind:outputTab
 				bind:promptStage1Expanded
 				bind:promptStage2Expanded

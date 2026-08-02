@@ -10,6 +10,10 @@
 	import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
+	import { runContactSheet } from '$lib/features/contact-sheet/run';
+	import { saveBlob } from '$lib/features/export/save-target';
+	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import type { SheetVariant } from '$lib/contactSheet';
 
 	export type LineageNode = {
 		id: string;
@@ -63,12 +67,15 @@
 		visionProviderGroups: ProviderGroup[];
 		animationExportSettings: AnimationExportSettings;
 		apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+		catalogName: (id: string | null | undefined) => string;
+		formatHistoryDate: (at: number) => string;
+		historyPreviewText: (text: string) => string;
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -82,6 +89,8 @@
 	let arrowPaths = $state<ArrowPath[]>([]);
 	let checkedHistoryIds = $state<string[]>([]);
 	let animationExportBusy = $state(false);
+	let contactSheetBusy = $state<SheetVariant | null>(null);
+	let contactSheetError = $state<string | null>(null);
 	let animationExportError = $state<string | null>(null);
 	let noteDrafts = $state<Record<string, string>>({});
 	let savingNoteIds = $state<string[]>([]);
@@ -229,6 +238,38 @@ function toggleCheckedHistory(historyId: string): void {
 
 function askTrashChecked(): void {
 	if (checkedHistoryIds.length > 0) onAskTrash([...checkedHistoryIds]);
+}
+
+// The same implementation the history manager uses -- see
+// features/contact-sheet/run. Only the selection and the lookup differ: the
+// works are already in the graph here, so no fetch is needed.
+async function downloadCheckedContactSheet(variant: SheetVariant): Promise<void> {
+	if (contactSheetBusy || checkedHistoryIds.length === 0) return;
+	contactSheetBusy = variant;
+	contactSheetError = null;
+	try {
+		await runContactSheet(variant, {
+			ids: () => checkedHistoryIds,
+			resolveWork: (id) => graph?.nodes.find((node) => node.history?.id === id)?.history ?? null,
+			catalogName,
+			formatDate: formatHistoryDate,
+			previewText: historyPreviewText,
+			save: async (blob, filename) => {
+				const outcome = await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
+				if (outcome.kind === 'browser' && outcome.reason === 'denied') {
+					contactSheetError = t().downloadFolderFellBack;
+				}
+			},
+			labels: {
+				title: t().historyContactSheetTitle,
+				subtitle: (total, date, page, pages) => t().historyContactSheetSubtitle(total, date, page, pages),
+			},
+		});
+	} catch {
+		contactSheetError = t().historyContactSheetFailed;
+	} finally {
+		contactSheetBusy = null;
+	}
 }
 
 async function downloadFocusAnimation(): Promise<void> {
@@ -626,6 +667,12 @@ $effect(() => {
 		{animationExportBusy ? t().animationExportBusy : t().lineageAnimationExport}
 		{#if !animationExportBusy && focusAnimationHistoryIds.length > 1}<span>({focusAnimationHistoryIds.length})</span>{/if}
 	</button>
+	<!-- The AI contact sheet over the checked works, same builder as the history
+	     manager (features/contact-sheet/run) and the same save path. -->
+	<button type="button" title={t().historyContactSheetAiHint} disabled={checkedHistoryIds.length === 0 || contactSheetBusy !== null} onclick={() => downloadCheckedContactSheet('ai')}>
+		{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
+		{#if contactSheetBusy === null && checkedHistoryIds.length > 0}<span>({checkedHistoryIds.length})</span>{/if}
+	</button>
 	<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
 		<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
 		{#if checkedHistoryIds.length > 0}<span>{checkedHistoryIds.length}</span>{/if}
@@ -634,6 +681,7 @@ $effect(() => {
 </div>
 	</header>
 	{#if animationExportError}<div class="lineage-message error">{animationExportError}</div>{/if}
+	{#if contactSheetError}<div class="lineage-message error">{contactSheetError}</div>{/if}
 	{#if loading || overviewLoading}
 		<div class="lineage-message">{isJapanese ? '系譜を読み込み中…' : 'Loading lineage…'}</div>
 	{:else if error}

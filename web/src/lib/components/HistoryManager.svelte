@@ -5,7 +5,8 @@
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { saveBlob } from '$lib/features/export/save-target';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import { buildContactSheet, sheetCapacity, sheetPageCount, type ContactSheetEntry, type SheetVariant } from '$lib/contactSheet';
+	import { type SheetVariant } from '$lib/contactSheet';
+	import { runContactSheet } from '$lib/features/contact-sheet/run';
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
 	import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
@@ -362,36 +363,6 @@
 	// The AI sheet carries index badges only, so the notes file has to restate
 	// everything a caption would have said, plus the machinery behind the
 	// performance. Labels stay English; the description keeps its own language.
-	function noteEntryFor(item: HistoryItem): ContactSheetNoteEntry {
-		const catalog = item.render_color_catalog_name
-			? item.render_color_catalog_sub
-				? `${item.render_color_catalog_name} (${item.render_color_catalog_sub})`
-				: item.render_color_catalog_name
-			: catalogName(item.render_color_catalog_id ?? item.catalog_id);
-		const aspect = item.render_canvas_aspect ?? item.render_canvas_aspect_id ?? '';
-		const ratio = item.render_canvas_aspect_ratio;
-		const engineName = [item.render_engine_id, item.render_engine_version].filter(Boolean).join(' ');
-		const level = normalizeTenkei(item.tenkei);
-		const models = [item.stage1_model, item.stage2_model].filter(Boolean).join(' -> ');
-		const variation = item.variation_amplitude
-			? item.variation_seed == null
-				? item.variation_amplitude
-				: `${item.variation_amplitude} (seed ${item.variation_seed})`
-			: '';
-		return {
-			description: item.source_text || item.input || '',
-			staffage: level ? tenkeiLabel(level, false) : '',
-			colorCatalog: catalog,
-			canvas: aspect ? (ratio ? `${aspect} (${ratio.toFixed(3)})` : aspect) : '',
-			engine: engineName ? (item.render_build_number ? `${engineName} / build ${item.render_build_number}` : engineName) : '',
-			models,
-			variation,
-			renderHash: item.render_hash_short ?? item.render_hash ?? '',
-			created: formatHistoryDate(item.at),
-			ddl: item.ddl
-		};
-	}
-
 	// Same single path as every other download -- see features/export/save-target.
 	async function triggerDownload(blob: Blob, filename: string): Promise<void> {
 		const outcome = await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
@@ -405,60 +376,18 @@
 		contactSheetBusy = variant;
 		contactSheetError = null;
 		try {
-			const entries: ContactSheetEntry[] = [];
-			const notes: ContactSheetNoteEntry[] = [];
-			for (const id of selectedHistoryIds) {
-				const item = findSelectedItem(id) ?? await fetchHistoryItem(id);
-				if (!item?.svg) continue;
-				entries.push({
-					svg: item.svg,
-					caption: historyPreviewText(item.display_label || item.source_text || item.input || ''),
-					sub: formatHistoryDate(item.at)
-				});
-				if (variant === 'ai') notes.push(noteEntryFor(item));
-			}
-			if (entries.length === 0) throw new Error('no artworks to place on the sheet');
-			const generatedAt = new Date();
-			const stamp = [
-				generatedAt.getFullYear(),
-				String(generatedAt.getMonth() + 1).padStart(2, '0'),
-				String(generatedAt.getDate()).padStart(2, '0'),
-				'-',
-				String(generatedAt.getHours()).padStart(2, '0'),
-				String(generatedAt.getMinutes()).padStart(2, '0'),
-				String(generatedAt.getSeconds()).padStart(2, '0')
-			].join('');
-			const capacity = sheetCapacity(variant);
-			const pages = sheetPageCount(entries.length, variant);
-			const kind = variant === 'ai' ? '-ai' : '';
-			const sheetFiles: Array<{ name: string; from: number; to: number }> = [];
-			for (let page = 0; page < pages; page += 1) {
-				const startIndex = page * capacity;
-				const slice = entries.slice(startIndex, startIndex + capacity);
-				const blob = await buildContactSheet(slice, {
-					variant,
+			await runContactSheet(variant, {
+				ids: () => selectedHistoryIds,
+				resolveWork: async (id) => findSelectedItem(id) ?? await fetchHistoryItem(id),
+				catalogName,
+				formatDate: formatHistoryDate,
+				previewText: historyPreviewText,
+				save: triggerDownload,
+				labels: {
 					title: t().historyContactSheetTitle,
-					subtitle: t().historyContactSheetSubtitle(entries.length, formatHistoryDate(generatedAt.getTime()), page + 1, pages),
-					startIndex
-				});
-				const suffix = pages > 1 ? `-${String(page + 1).padStart(2, '0')}` : '';
-				const filename = `inku-contact-sheet${kind}-${stamp}${suffix}.png`;
-				sheetFiles.push({ name: filename, from: startIndex + 1, to: startIndex + slice.length });
-				triggerDownload(blob, filename);
-				// Browsers drop back-to-back programmatic downloads; space them out.
-				if (page < pages - 1) await new Promise((resolve) => setTimeout(resolve, 400));
-			}
-			// One notes file for the whole selection, numbered straight through the
-			// split sheets, so the badges stay unambiguous across files.
-			if (variant === 'ai' && notes.length > 0) {
-				await new Promise((resolve) => setTimeout(resolve, 400));
-				const markdown = buildContactSheetNotes(notes, {
-					title: t().historyContactSheetTitle,
-					generatedAt: formatHistoryDate(generatedAt.getTime()),
-					sheets: sheetFiles
-				});
-				triggerDownload(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }), `inku-contact-sheet-ai-${stamp}.md`);
-			}
+					subtitle: (total, date, page, pages) => t().historyContactSheetSubtitle(total, date, page, pages),
+				},
+			});
 		} catch {
 			contactSheetError = t().historyContactSheetFailed;
 		} finally {

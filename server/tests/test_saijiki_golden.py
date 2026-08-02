@@ -16,6 +16,9 @@ Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪
   (saijiki.py が歳時記語彙ではないと定めているため)、許可動詞へ 敷き詰める/tile を
   追加 (うごき の語彙表と 1 語ずれていた)、en の rise/fall を運動語として書き分け
   (かたむきの rising/falling は語彙)、ペン(既定) を既定値であって推奨値ではないと明示
+- ja/en: 背景色を抽象九色へ開放 (2026-08-02・契約 background-color-openness)。
+  背景の色集合を 5 色に限る記述と gray の名指しの禁止を落とした。本番 DB 2,061 作品で
+  背景に出ていたのは白・黒・青の 3 色だけで、黄・橙は全期間 0 件だった
 
 これ以外の差分 (空白・順序・行の脱落 = 組み立てバグ) はテスト失敗とする。
 """
@@ -89,6 +92,23 @@ _REORDERED_JA = (
         "# 数量表現\n",
         1,
     ),
+    # --- 2026-08-02: 契約 background-color-openness = 背景を抽象九色へ開放 ---
+    # 背景色の集合を 5 色に限る記述と、gray の名指しの禁止を落とす。
+    # 前の 2026-07-27 の項が「塗りつぶす」→「埋める」を済ませた後に当てる。
+    (
+        "強い単色背景（黒・赤・青・緑）は、",
+        "強い単色背景（黒・灰・赤・橙・黄・緑・青・紫）は、",
+        1,
+    ),
+    (
+        "- 「背景を灰で埋める」を出力してはいけない。"
+        "入力が灰色背景を求めても、背景は白・黒・青・赤・緑の文脈に合う色へ置き換える\n"
+        "- 灰色は背景ではなく、必要なときだけ前景の線・点・四角の色として使う。",
+        "- 入力が灰色背景を求めたら「背景を灰で埋める」と出力してよい。"
+        "背景は白・黒・灰・赤・橙・黄・緑・青・紫の抽象九色から文脈に合う色を選ぶ\n"
+        "- 灰色は背景にも、前景の線・点・四角の色にも使える。",
+        1,
+    ),
 )
 _REORDERED_EN = (
     ("hair, ", "silverpoint, ", 2),
@@ -148,6 +168,23 @@ _REORDERED_EN = (
         "Choose the touch from texture even when a thinness word is present.\n"
         "\n"
         "# Quantity\n",
+        1,
+    ),
+    # --- 2026-08-02: 契約 background-color-openness = 背景を抽象九色へ開放 ---
+    (
+        "Strong solid backgrounds such as black, red, blue, or green are allowed",
+        "Strong solid backgrounds such as black, gray, red, orange, yellow, green, blue, "
+        "or purple are allowed",
+        1,
+    ),
+    (
+        '- Do not output "Fill background with gray". Even if the input asks for a gray '
+        "background, replace the background with contextual white, black, blue, red, or green\n"
+        "- Use gray only as a foreground color for lines, dots, or shapes when needed.",
+        '- If the input asks for a gray background, output "Fill background with gray". '
+        "Choose the background from the nine abstract colors: "
+        "white, black, gray, red, orange, yellow, green, blue, purple\n"
+        "- Gray works as a background and as a foreground color for lines, dots, or shapes.",
         1,
     ),
 )

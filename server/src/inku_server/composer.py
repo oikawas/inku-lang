@@ -103,13 +103,13 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 - **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で埋める」→ {"background":"black","instructions":[...]}。保存済み作品にある旧表現「背景を黒で塗りつぶす」も同じ background として受ける。この文は面を要素で埋める指示ではないので、密度・数量の規則を当てない**
 - **背景色と描画色が同じで、実質的に見えない instruction を作ってはいけない。background と同色なら面積の少ない側を変更する。通常は線・小図形・点の color を黒・白・青・赤・緑などの文脈に合う可視色へ寄せる。大きな主題図形が同色の場合だけ background 側を変更してよい**
-- **background="gray" を使ってはいけない。正規化DDL が灰背景を要求しても background は white/black/blue/red/green から文脈に合う色を選ぶ**
-- **灰色の主題は background ではなく foreground の color="gray" として扱う。灰の濃淡だけで構成せず、黒・白・青・赤・緑の可視色を併用する**
+- **background は white/black/gray/red/orange/yellow/green/blue/purple の九色すべてから文脈に合う色を選ぶ。正規化DDL が灰背景を要求したら background="gray" をそのまま使う**
+- **灰色の主題は foreground の color="gray" としても background="gray" としても扱える。灰の濃淡だけで構成せず、黒・白・青・赤・緑の可視色を併用する**
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
 - **色とりどり・多色配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
 - **明示色が少ない場合は場のトーンで抽象色を選ぶ。春・花・温かい光は red/green/white、水・夜・冷気は blue/white/gray、森・葉・香りは green/white/gray、陽光・実り・金属・灯りは yellow/orange、夕暮れ・薄明・花の陰は purple。抽象色に収まらないニュアンスは color_hint に保持する**
 - **黄・橙・紫は他の抽象色と同格である。該当する場面では遠慮なく選ぶこと。**
-- **強い単色背景 (black/red/blue/green) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
+- **強い単色背景 (black/gray/red/orange/yellow/green/blue/purple) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
 
 ## 配置と焦点
 
@@ -495,13 +495,13 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}. This sentence is not a request to fill an area with elements, so do not apply the density or count rules to it**
 - **Do not create effectively invisible instructions whose drawing color matches the background. If they match, change the smaller visual area. Usually change line/small-shape/dot color to a context-fitting visible color such as black, white, blue, red, or green. Change the background only when the matching subject is large and dominant**
-- **Do not use background="gray". Even if normalized DDL asks for a gray background, choose a contextual background from white/black/blue/red/green instead**
-- **Treat gray subjects as foreground color="gray", not as the background. Do not build gray value-only drawings; combine gray with visible black, white, blue, red, or green foreground**
+- **Choose the background from all nine abstract colors: white/black/gray/red/orange/yellow/green/blue/purple. If normalized DDL asks for a gray background, keep background="gray"**
+- **A gray subject may be a foreground color="gray" or a background="gray". Do not build gray value-only drawings; combine gray with visible black, white, blue, red, or green foreground**
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
 - **When explicit colors are sparse, choose the abstract colors by scene tone. Spring/flowers/warm light → red/green/white; water/night/cold air → blue/white/gray; forest/leaves/fragrance → green/white/gray; sunlight/harvest/metal/lamplight → yellow/orange; dusk/twilight/shadowed flowers → purple. Preserve unavailable nuance in color_hint**
 - **Yellow, orange, and purple are peers of the other abstract colors. Choose them freely when the scene calls for them.**
-- **Strong solid backgrounds (black/red/blue/green) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
+- **Strong solid backgrounds (black/gray/red/orange/yellow/green/blue/purple) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
 
 ## Placement and focus
 

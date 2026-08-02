@@ -8,7 +8,6 @@ from .compose import (
     _record_branch_fire,
     _record_value_branch_fire,
     _style_coerce_disabled,
-    _visible_background,
     _with_background_dominance_governor,
     _with_color_delivery_repair,
     _with_complex_motif_repair,
@@ -108,12 +107,11 @@ def coerce_score(
         if added > 0:
             scenery_budget -= added
 
-    visible_background = _visible_background(score.background)
-    background = _with_background_dominance_governor(visible_background, ddl=ddl)
+    background = _with_background_dominance_governor(score.background, ddl=ddl)
     _record_value_branch_fire(
         branch_report,
         "with_background_dominance_governor",
-        visible_background,
+        score.background,
         background,
     )
     _branch_before = score.instructions

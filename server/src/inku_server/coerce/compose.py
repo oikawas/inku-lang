@@ -120,12 +120,6 @@ SHAPE_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_v
 MOTIF_INTENT_MARKERS: tuple[tuple[tuple[str, ...], str], ...] = _coerce_marker_values("motif_intent_markers")
 
 
-def _visible_background(background: str) -> str:
-    if background == "gray":
-        return "white"
-    return background
-
-
 def _with_material_hint(ins: Instruction, ddl: str | None) -> Instruction:
     if not ddl or ins.weight != "pen":
         return ins
@@ -237,6 +231,15 @@ DAWN_MARKERS: tuple[str, ...] = _coerce_marker_values("dawn")
 
 
 NIGHT_MARKERS: tuple[str, ...] = _coerce_marker_values("night")
+
+
+# The clause is the description's own instruction; the scene markers above are
+# inferences about it. An explicit clause must not need a sunset to be believed.
+_EXPLICIT_BACKGROUND_CLAUSE = re.compile(
+    r"背景を[^。、\n]{1,12}?(?:で|に)(?:塗|ぬ|埋|し)"
+    r"|(?:fill|paint)\s+(?:the\s+)?background",
+    re.I,
+)
 
 
 def _context_has_density_governor(ddl: str | None) -> bool:
@@ -390,6 +393,10 @@ def _has_explicit_background_intent(ddl: str | None) -> bool:
     context = _source_context(ddl) or ddl
     if _looks_like_generated_background_plan(context):
         return False
+    # Match against the whole string: the fill clause lives in the normalized DDL,
+    # which sits after the newline, while `context` is only the original description.
+    if _EXPLICIT_BACKGROUND_CLAUSE.search(ddl):
+        return True
     lower = context.lower()
     if _any_marker_in_text(EXPLICIT_SURFACE_MARKERS, context, lower):
         return True

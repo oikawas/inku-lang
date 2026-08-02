@@ -238,8 +238,8 @@ def _normalized_ddl_phrases() -> dict[str, Any]:
             "relation_literals appears; relations are never inferred.",
             "Ground texture comes from a '地: ...' sentence and surface texture "
             "from a '面: ...' sentence; neither is inferred from scenery.",
-            "background='gray' is refused; a gray subject stays a foreground "
-            "color='gray' instead.",
+            "background accepts every one of the nine abstract colors, "
+            "background='gray' included.",
         ],
     }
 

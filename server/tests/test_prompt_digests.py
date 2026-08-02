@@ -27,12 +27,13 @@ def empty_plugin_vocabulary(monkeypatch):
 @pytest.mark.parametrize(
     ("lang", "tenkei", "expected_bytes", "expected_digest"),
     [
-        ("ja", "auto", 18_963, "0832fcd61f23f7f7"),
-        ("ja", "sparse", 19_273, "ea671ea519e10c02"),
-        ("ja", "none", 19_345, "ee47cb830c02ee41"),
-        ("en", "auto", 17_956, "cce2a1e52758d47c"),
-        ("en", "sparse", 18_185, "55a5b447eda93171"),
-        ("en", "none", 18_321, "3bded395a1d7d979"),
+        # 契約 background-color-openness (2026-08-02): Stage 1 の背景 3 行が動いた
+        ("ja", "auto", 18_981, "1430ea03025e3f8c"),
+        ("ja", "sparse", 19_291, "7859b78d348816ca"),
+        ("ja", "none", 19_363, "adcac628762f93da"),
+        ("en", "auto", 18_020, "b056eb26fc3748ef"),
+        ("en", "sparse", 18_249, "de337b52c8816a04"),
+        ("en", "none", 18_385, "f78abdbfd8c7fa39"),
     ],
 )
 def test_stage1_prompt_base_digest_expected_values(
@@ -54,9 +55,9 @@ def test_stage1_prompt_base_digest_expected_values(
 @pytest.mark.parametrize(
     ("text", "lang", "expected_bytes", "expected_digest"),
     [
-        ("中心に円を置く。", "ja", 19_650, "54300e7559acaa71"),
-        ("雨上がりの水面に光が散る。", "ja", 19_819, "7bb1014adcd78c12"),
-        ("Place one circle at the center.", "en", 18_630, "1ed3b790af376fce"),
+        ("中心に円を置く。", "ja", 19_668, "e1e1a3563ea0e35f"),
+        ("雨上がりの水面に光が散る。", "ja", 19_837, "1f49d277ab509e0d"),
+        ("Place one circle at the center.", "en", 18_694, "246ae8b96397bf7c"),
     ],
 )
 def test_stage1_actual_prompt_digest_expected_values(
@@ -77,7 +78,7 @@ def test_stage1_base_digest_excludes_input_dependent_examples():
         "雨上がりの水面に光が散る。"
     )
     assert _digest(first_prompt) != _digest(second_prompt)
-    assert _digest(first_base) == _digest(second_base) == "0832fcd61f23f7f7"
+    assert _digest(first_base) == _digest(second_base) == "1430ea03025e3f8c"
 
 
 @pytest.mark.usefixtures("empty_plugin_vocabulary")
@@ -113,10 +114,10 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 44_116
-    assert _digest(composer.SYSTEM_PROMPT) == "a47487d8623bfe80"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 42_191
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "708949b703cc09fe"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 44_193
+    assert _digest(composer.SYSTEM_PROMPT) == "8b0c2559310f85e2"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 42_242
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "4fbf91abd7c32e84"
     # `hair` -> `silverpoint` の改名で、Stage 2 の素材語対応表 2 行と作例 8 件、
     # そして weight の enum と description が動いた。tool schema は 17_696 -> 17_713。
     # 色選択の一行が `palette` を捨てて `抽象色` / `the abstract colors` になった
@@ -133,8 +134,10 @@ def test_stage2_prompt_and_tool_expected_values():
     # (I-036 / I-038)。**上の 2 行はここで動かない** — この tool_json は
     # テスト側で `sort_keys=True` を掛けており、並びを潰しているため。
     # 動くのは並びを見るようになった下の 2 行だけ (2026-07-29)。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "28611a96db1df2b9"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "755a45da85f21a6b"
+    # 契約 background-color-openness (2026-08-02): 背景規則 3 行 (日英) が九色へ開いた。
+    # **tool schema は動いていない** (18_492 / c1c1... のまま) — enum は既に九色だった。
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "fed555f3c5257d4a"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "5ab8e4594daace0f"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -187,8 +190,8 @@ def test_saijiki_word_changes_both_stage1_base_digests(monkeypatch):
         for category in original_categories
     )
     expected = {
-        "ja": (18_999, "dd45f22a664e112a"),
-        "en": (17_974, "bcc09dc4594aea95"),
+        "ja": (19_017, "5509baecdfcf78d8"),
+        "en": (18_038, "d7e2a61ee0fb116a"),
     }
     for lang, prefix in (
         ("ja", interpreter.SYSTEM_PROMPT_PREFIX),
@@ -237,8 +240,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
     # The temporary schema change must remain visible after the nine-color update.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "9fdfe85ff9a2847b"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "a47487d8623bfe80"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "1018ce144028a6b0"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "8b0c2559310f85e2"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

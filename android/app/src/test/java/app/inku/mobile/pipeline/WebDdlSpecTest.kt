@@ -18,7 +18,10 @@ class WebDdlSpecTest {
             "ランダムは禁止",
             "真円固定禁止",
             "人/顔/動物は具象化しない",
-            "灰背景は禁止",
+            // 契約 background-color-openness (2026-08-02): 旧文は「灰背景は禁止」だった。
+            // LiteRT の stage 1 プロンプトは 5 色集合を並べないので、集合だけを見る検査では
+            // この行は見つからない。語形ごと表明する
+            "灰は背景にも前景にも使える",
         ).forEach { required ->
             assertTrue("missing required contract phrase: $required", liteRt.contains(required))
         }

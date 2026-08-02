@@ -1671,14 +1671,6 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.weight(1f))
-            MiniPill(
-                text = "ランダムな色カタログ",
-                selected = state.batchRandomColorCatalog,
-                onClick = if (state.isDrawing) null else {
-                    { viewModel.setBatchRandomColorCatalog(!state.batchRandomColorCatalog) }
-                },
-            )
         }
         if (!state.isDrawing) {
             if (state.batchPromptHistory.isNotEmpty()) {

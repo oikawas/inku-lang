@@ -628,8 +628,8 @@ the language-specific extension separate on their own.
 
 ### 6.7 The English Instruction Path
 
-This subsection is on the operational side and has no Japanese counterpart.
-It records what the English path actually does and how it was measured.
+This subsection is on the operational side.  It records what the English path
+actually does and how it was measured.
 
 Builds 403-427 extend the English instruction path beyond structural routing.
 Japanese and English now live in separate language files for Stage 1 prompts,
@@ -859,9 +859,7 @@ part I rewrote" and "the degree to which the LLM read it" on a single screen.
 ### 7.8 The Reference Web Application
 
 What follows records what the reference interface actually provides.  It is
-operational rather than conceptual and has no Japanese counterpart: under the
-2026-07-28 ruling, Japanese is canonical for the concepts and English carries the
-operations.
+operational rather than conceptual.
 
 Short English tabs, buttons, and labels follow the casing and vocabulary rules
 in `web/src/lib/i18n/GLOSSARY.md`, which is canonical for the English interface
@@ -1705,9 +1703,9 @@ is not an rh2 ingredient.
 
 ### 12.14 What the Renderer Owns
 
-This subsection is on the operational side and has no Japanese counterpart.
-The concept of the renderer as the layer where sway is performed belongs to
-§13.8; what follows is what the implementation of that layer actually holds.
+This subsection is on the operational side.  The concept of the renderer as the
+layer where sway is performed belongs to §13.8; what follows is what the
+implementation of that layer actually holds.
 
 The renderer converts JSON Score into SVG.  It owns visual realization:
 

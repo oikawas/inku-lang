@@ -2365,7 +2365,14 @@ This cycle (stage 1 of 3) did the following.
 - The two declared exceptions in `check_docs.py` were rewritten **from permanent waivers into
   descriptions of temporary remaining work.**
 
-**What is left (stages 2 and 3)**: Japanese versions of English §6.7, §7.8, §12.14 and §18-24
-(613 lines / 39,004 characters), a Japanese version of the implementation-status inventory (429 lines /
-30,080 characters), and the disposition of §17 -- **none of its 31 open items appear in the issue ledger, so
-dropping the section would drop them from tracking.**
+**Stage 2 followed the same day** -- **§6.7 (the English instruction path), §7.8 (the reference web
+application) and §12.14 (what the renderer owns), which only English carried, were written in
+Japanese** (185 lines / 14,332 characters). The three English opening lines that said "has no
+Japanese counterpart" and cited the 2026-07-28 ruling were removed. **The heading shapes now match
+through the 116th heading**; only §17 and §18 onward still diverge.
+
+**What is left (stage 3)**: Japanese versions of English §18-24 (428 lines / 24,672 characters), a
+Japanese version of the implementation-status inventory (429 lines / 30,080 characters), and the
+disposition of §17 -- **none of its 31 open items appear in the issue ledger, so dropping the section
+would drop them from tracking.** The author ruled that they be inventoried before being filed
+(ledger I-095).

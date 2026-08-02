@@ -2533,3 +2533,52 @@ three layers (page → canvas → lineage), so **a single missed connection woul
 produce the defect where the button exists and nothing happens**. Removing each
 of the two intermediate hops turned the type check red, and restoring them
 returned it to green.
+
+### Android `2.1.4-android.3` — the drawing layer catches up to render engine 19, and the dice are gone (ground resistance, thirteen colour catalogues) (android Build 148090 unchanged, 2026-08-02)
+
+**The port arrived in four stages.** (1) engine 19's surface response (ground
+resistance) in `ServerStrokeEngine.kt`; (2) `ColorCatalogs.kt` from **eleven
+catalogues with six `map` keys to thirteen with nine** (the engine 18 data);
+(3) **removal of the random catalogue selection** (ledger [I-081], decided by the
+author); (4) the version declaration moved to 19.
+
+**The expectations were baked by the commissioner and placed on the branch
+first.** The starting point was **`tests=117 failures=13`**, full marks were **0
+failures**, and **the contract named which failure belonged to which stage**
+before the work was handed over. The finish was **`tests=118 failures=0`** (stage
+3 added one test). **The implementation did not touch a single byte of the
+fixtures** -- when the expectations move during a parity port, nobody can say
+afterwards what was measured.
+
+**Not every engine 19 expectation moved.** The ledger assumed all of them would;
+**measurement showed 16 of 53** (the tool grammar, normals, arc lengths and
+cloud-form outlines are unchanged under engine 19). **When writing a port
+contract, count how many downstream expectations the upstream version bump
+actually moves.**
+
+**Removing the dice reached six places.** Deleting `randomColorCatalogId()` was
+not the end: the two call sites (batch and demo), two persisted keys
+(`batch_random_color_catalog`, `demo_random_color_catalog`) with their restore
+paths, and one toggle in `InkuApp.kt` all had to go. **On the Android side, the
+change that retired randomness on the server is not one feature but one whole
+setting.**
+
+**The test added to guard that removal was vacuous.**
+`ColorCatalogSelectionDeterminismTest` has a private helper inside the test that
+returns `selectedCatalogId`, and **calls no production code at all**. During
+acceptance, **restoring random selection in the production demo path** left
+**all 118 tests green**. The removal itself is correct (**no `Random` remains**),
+so what is missing is only the gate: **a real one needs Robolectric, or a single
+pure function the selection must pass through** (ledger [I-103]). **The symptom
+was visible in the implementation's own perturbation record** -- for stage 3
+alone, what was perturbed was not production code but **the selection logic
+inside the test**. **A perturbation that edits the test is not measuring whether
+the test discriminates.**
+
+**engine 20 (placement authority) stays out of scope** (ledger [I-077]). **No
+fixture declares an arrangement, so the server generator needs a stage that adds
+such cases before the port can follow.**
+
+**Only `android/VERSION` was stamped.** `APP_VERSION` (`v2.9.31`),
+`web/BUILD_NUMBER` (833) and `android/BUILD_NUMBER` (148090) all stand still, and
+**no pentala deployment is needed**.

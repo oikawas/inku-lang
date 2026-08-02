@@ -3,6 +3,8 @@ import { DEFAULT_TENKEI, normalizeTenkei, type TenkeiLevel } from '$lib/tenkei';
 // 添景水準 (v1.97). Explicit for describe-tab/root generation; refine flows omit
 // it to inherit.  Key, default, parser and state stay together -- see
 // features/color-catalog/settings.svelte.ts for why.
+import { bindTenkeiRenderState } from '$lib/features/tenkei/render';
+
 const TENKEI_KEY = 'inku-tenkei';
 
 class TenkeiSettings {
@@ -25,3 +27,6 @@ class TenkeiSettings {
 }
 
 export const tenkeiSettings = new TenkeiSettings();
+
+// The render slice lives in ./render.ts; it reads the live level through this.
+bindTenkeiRenderState(() => tenkeiSettings.level);

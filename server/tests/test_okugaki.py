@@ -197,9 +197,18 @@ def test_the_routes_say_colophon_and_no_longer_say_okugaki():
     **DB のテーブル名・列名・`model_settings` の `okugaki_model` は動かさない。**
     辞書 §6 が識別子を範囲の外に置いており、保存済みデータに触れるため。
     """
+    from fastapi.routing import iter_route_contexts
+
     from inku_server.api import app
 
-    paths = {route.path for route in app.routes if getattr(route, "path", "").startswith("/api/")}
+    # fastapi 0.141 no longer flattens included routers into app.routes, so read
+    # the paths through iter_route_contexts (measured 2026-08-02: 81 -> 0).
+    paths = {
+        ctx.path
+        for ctx in iter_route_contexts(app.routes)
+        if (ctx.path or "").startswith("/api/")
+    }
+    assert len(paths) > 50, "route enumeration went empty; the gate below would be vacuous"
     assert "/api/lineage/{node_id}/colophon" in paths
     assert "/api/colophon/{colophon_id}" in paths
     assert not [path for path in paths if "okugaki" in path], "ローマ字のパスが残っている"

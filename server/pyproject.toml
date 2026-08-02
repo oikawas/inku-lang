@@ -6,15 +6,15 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "inku-analysis",
-    "anthropic>=0.96.0",
-    "fastapi>=0.136.0",
-    "openai>=2.32.0",
-    "pydantic>=2.13.3",
+    "anthropic>=0.120.2",
+    "fastapi>=0.141.1",
+    "openai>=2.52.0",
+    "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
-    "cryptography>=46.0.0",
-    "sqlalchemy>=2.0.0",
+    "cryptography>=50.0.0",
+    "sqlalchemy>=2.0.51",
     "svgwrite>=1.4.3",
-    "uvicorn[standard]>=0.45.0",
+    "uvicorn[standard]>=0.52.1",
     "pillow>=12.3.0",
 ]
 
@@ -27,9 +27,18 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.3",
-    "ruff>=0.15.11",
+    "pytest>=9.1.1",
+    "ruff>=0.16.1",
 ]
+
+[tool.ruff.lint]
+# ruff 0.16 widened its default rule set from 59 rules to 413, turning a version
+# bump into a silent change of what "ruff check" means (353 findings appeared
+# with no code change; 76 of them were B008 against FastAPI's own Depends()
+# idiom).  Pin the set that was in effect through 0.15 -- the tier that is wrong
+# regardless of taste: undefined names, unused imports and bindings, syntax-level
+# errors.  Whether to adopt any of the 354 advisory rules is a separate decision.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.uv.sources]
 inku-analysis = { path = "../shared", editable = true }

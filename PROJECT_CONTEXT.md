@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.26 / Build 824**
+**Target version: v2.9.27 / Build 825**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -155,10 +155,14 @@ An authenticated single-page application with description, work, batch, demo, an
 refinement and variation
 - 13 color catalogs (`color_catalogs.py`; every catalog carries all 9 colors), canvas ratios, tenkei
 level, and display mode
-- Per-user history, stars, comments, trash, search, lineage groups, and explicit lineage nodes and edges
+- Per-user history, stars, revision marks, comments, trash, search, lineage groups, and explicit lineage
+nodes and edges.
+The two marks are independent: filtering on both shows only the works that carry both
 - Model, language, and drawing-element comparison; generation-info, prompt, and JSON inspectors; the
 colophon
-- SVG, PNG, and animation export
+- SVG, PNG, and animation export.
+One code path drops every file, and it can write to a folder the user picked (browsers with the File
+System Access API; the rest fall back to the browser default)
 - A Japanese and English UI.
 `web/src/lib/i18n/GLOSSARY.md` is canonical for English terminology and `npm run lint:i18n` enforces it.
 
@@ -167,7 +171,7 @@ UI dimensions come from the `:root` tokens in `+page.svelte` (`--btn-sm-*`) and 
 
 ### server (FastAPI)
 
-- The 80 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
+- The 81 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
 `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`).
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
 - `api.py` holds only the `app` assembly, `_lifespan`, middleware, startup calls, and `include_router`
@@ -205,6 +209,8 @@ byte-identical regeneration.
 - **`cli/tests`** — pytest.
 - **`npm run check`**, **`lint:i18n`**, **`lint:models`**, **`lint:recommendations`** — web types,
 terminology, and model resolution.
+- **`npm run test:unit`** — unit tests over web's pure functions (Node's `node:test`; no new
+dependency).
 - **`scripts/check_docs.py`** — internal references in public documents.
 
 The **deterministic layers** are `coerce/`, `ddl_expander.py`, `renderer.py`, `stroke_engine.py`,

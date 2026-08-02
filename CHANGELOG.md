@@ -2176,3 +2176,121 @@ pytest **1945/31**, cli **78**, ruff clean, `check_docs.py` green (54 internal r
 (`"sub"` appears 0 times in the `render-engine-20` and `ddl-engine-4` manifests).
 **Not one line of web changed** (the copy in `colors.ts` is `default` alone).
 **The same two lines under `android/` belong to [I-070] and were left alone.** Patch bump.
+
+### v2.9.27 — Thirteen items the author sent in one message land in one release (Build 825, 2026-08-02)
+
+**Thirteen items the author sent in one message** were folded into a single contract and landed in one
+cycle. They are not ledger entries. The work touched 28 files under `web`, 6 implementation files and
+7 test files under `server`, and 1 under `cli`; **not one line of the drawing changed.**
+
+**The color chips of all thirteen catalogs now share one order.** Taking the ten colors of `default`
+as the reference, **only the order of the entries** in the other twelve palettes was rearranged
+(54 lines moved; `name`, `name_ja` and `code` are untouched, and so are `map` and `SWATCH_KEY_ORDER`).
+`palette` has two readers -- the chip grid in the modal and the one-line card the Stage 1 model reads --
+so a shared order makes the grids match and makes the cards name their colors in the same sequence.
+
+**The rearrangement turned the frozen corpora red once, and not one drawing moved.**
+The only file that changed was `server/reference/render-engine-20/manifest.json`:
+**all 525 SVGs are byte-identical**, the manifest's 592 changed lines have **an added set equal to the
+removed set** (bar the trailing commas), and read as JSON the two are **deep-equal** -- normalising with
+`sort_keys` makes them identical and only the raw serialisation differs. The manifest writes `color_map`
+in dict insertion order, and that order follows `palette`. **This is a record that gets re-baked when the
+data changes, not a test of a property.** It was re-baked and adopted.
+
+**A close button appeared on the two modals that lacked one** (the color catalog and the model picker).
+**The second was not a matter of looks.** The `onCloseSettings` the button reached only set
+`settingsOpen = false`; it never ran what `closeSettingsModal()` does -- roll a half-made model choice
+back with `cancelModelSelection()`. **The condition that withheld the button was covering a path that
+closed without rolling back and left a stale snapshot behind.** The button was rewired to `onClose`,
+the handler the backdrop and Esc already use, and `onCloseSettings` was removed along with its prop.
+
+**The batch tab shows `(x/y)` while a batch runs.** The tabs are `flex: 1`, so the three keep equal
+widths whatever they hold, and the counter carries `tabular-nums` and a `min-width` sized for the digit
+count, so it does not shift as the numbers grow.
+
+**Lines that failed are drawn again, as many rounds as configured.** The default is **0 -- the old
+behaviour**: making it 1 would silently double the model spend of a failed batch for anyone who never
+opened the setting. The main loop was lifted into `paintBatchLine()` so the first pass and the retry
+passes run the same implementation. **An interrupted run (stop button, aborted request) is never
+retried** -- lines that did not run are not failures. The failure report's `total` stays the original
+line count, and only the progress display is re-pointed per round, reading `(2/5 ↻1)`.
+
+**The thumbnail tab of history management lays works out by lineage.** Lineages with a single work drop
+out. **The filter runs in the aggregate's `HAVING`, and `total` counts the same subquery**, so the page
+and the count cannot disagree (discarding on the client would thin a page of 8 and contradict `total`).
+Within a lineage the order is **by generation** (`lineage_generation` ascending, `at` ascending within a
+generation), and the connection is shown by **an enclosure and generation numbers rather than lines** --
+lines break the moment the grid wraps.
+
+**That stage turned up one pre-existing inconsistency, unrelated to this work, and fixed it.**
+`list_lineage_groups` groups by `coalesce(root_node_id, id)` while `list_lineage_group_items` filtered on
+`root_node_id == :root` exactly. `root_node_id` was added by a migration with no backfill, so
+**a root created before it holds NULL: it counted towards its group's total but fell out of its own
+member list.** Both now use the same expression.
+
+**A second mark, independent of the star, was added** -- `for_revision` ("For revision only").
+`starred` is not overloaded; it is a separate column, and **raising both filters means AND** (only works
+carrying both marks). All nine places `starred` appears got a counterpart (column, migration, index,
+response, creation default, both FTS search statements, the listing, the lineage-group aggregate, and
+the other listing path), and `PATCH /api/history/{item_id}/for-revision` is new. **The senders were
+counted across `web`, `server` and `cli` and all of them were carried** (`cli` gained `--for-revision`
+on `history` and `history export`). **`android` was not**, and for now neither sends nor reads it.
+
+**Downloads can go to a folder the user picked** (File System Access API, Chromium only; Firefox and
+Safari fall back to the browser default as before). **The intent and the display name live on the server
+(two columns on `user_accounts`) while the directory handle itself lives in the browser's IndexedDB** --
+a handle travels only as a structured clone and cannot be sent to the server. The permission is checked
+**on every save**, and when it is refused the file goes to the browser default **and the screen says the
+destination changed**. The three places that dropped a file were **folded into one**
+(`features/export/save-target.ts`), so all four callers -- the three SVG profiles, PNG, the contact sheet
+and the animation -- pass through it. **On a browser without the API the setting is not disabled but
+omitted entirely.**
+
+**The AI contact sheet can be built from the lineage panel too.** Rather than duplicate it, the body of
+`HistoryManager`'s was moved into `features/contact-sheet/run.ts` and **both call the same
+implementation** -- paging, the numbering that runs across split sheets, and the wait between successive
+downloads all drift silently on one side if they are copied. Each panel supplies only which ids are
+selected and how to resolve an id to a work; the lineage side resolves from the graph it already holds
+and needs no fetch.
+
+**A lineage card names the model that drew the work**, shortened: no provider name, and the vendor
+prefix (up to the first `/`) dropped -- `google/gemma-4-31b-it` becomes `gemma-4-31b-it`.
+**The string is never truncated** (overflow is caught by the caller's `ellipsis`).
+**Two names appear only when Stage 1 and Stage 2 differ**, one when they agree; the full
+`provider / model` for both stages stays in the `title`. A work with no model recorded shows nothing.
+
+**The drawing-parameter editor (`adjust`) gained a model picker** -- the same `ModelCardPicker`, label
+and handler as `DdlEditorDialog`, and **choosing there rewrites the `stage2Provider` / `stage2Model`
+default**. Stage 1 is untouched; the screen for that is the model comparison.
+
+**The wild switch now reaches all six modals a work's menu opens** (one `WildToggle.svelte`, not six
+copies). Following staffage, **it carries an "inherited" state**: specify nothing and the parent work's
+`render_wild` is inherited. **This changes behaviour**: the refine paths sent no `wild` at all, and
+`paintOne` sent the default `false` via `options.wild ?? false`. **A wild parent was being redrawn calm.**
+
+**The reported mismatch between the two compare buttons could not be found in the code.** The model
+comparison and the language comparison agree on component, `icon` / `block`, ancestor chain, width and
+color, and the leading hypothesis -- that the `Tooltip` wrapper shrinks one of them -- was already
+handled in `CanvasPanel.svelte`. **No CSS was added on a guess. A before screenshot from the author is
+what this needs.**
+
+**The survey of ageing libraries stopped at the survey**, as the contract asked. **Not one line of code
+changed.** `svgwrite` is at 1.4.3 upstream too and cannot be raised, and the `cookie` override cannot be
+dropped while `@sveltejs/kit` 2.69.3 still declares `^0.6.0`. **Nothing is declared and entirely unused.
+Which of them to raise waits on the author.**
+
+**web gained a unit-test base** with no new dependency -- Node v26's `node:test` and its direct
+TypeScript execution were enough. `npm run test:unit` runs **14 tests**: 9 over the batch retry decision,
+which was lifted out into a pure function, and 5 over the shortened model name (**including that two ids
+differing only in their tail never collapse to one string**).
+
+pytest **2011 / 31 skipped** (+66), cli **78** (unchanged), ruff clean,
+`npm run check` **235 FILES / 0 ERRORS / 2 WARNINGS** (the two warnings are the pre-existing ones),
+`lint:i18n` **975/47/0/0**, `lint:models` **68**, `lint:recommendations` **37**,
+the `test_api_surface.py` baseline **81 / 81 / 80** (one new route and one body schema; **nothing was
+removed**), `test_route_authorization.py` **81**, `check_docs.py` green, **frozen corpora byte-identical**.
+Acceptance applied **seven perturbations**: an order-only swap (one new test red; the 177 existing color
+catalog checks see none of it), a **control** that renames without reordering (all 178 green), disabling
+the `HAVING` (3), reverting `coalesce` to strict equality (1), disabling the revision filter (2),
+disabling the folder-name clear (1), and `<` to `<=` on the retry limit (2 of 14). All were reverted and
+the values read back to confirm restoration. Patch bump.

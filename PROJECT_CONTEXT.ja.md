@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.26 / Build 824**
+**対象バージョン: v2.9.27 / Build 825**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -131,16 +131,19 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 
 - 記述の入力と再現可能な推敲（タッチ・配置・読み取り）、AI による自律推敲と変奏
 - 色カタログ 13 本（`color_catalogs.py`。全カタログが 9 色すべてを持つ）、キャンバス比率、添景水準、表示モードの選択
-- ユーザー別の履歴、スター、コメント、ゴミ箱、検索、系譜グループ、明示的な lineage node / edge
+- ユーザー別の履歴、スター、推敲マーク、コメント、ゴミ箱、検索、系譜グループ、明示的な lineage node / edge。
+2 つの印は独立していて、両方で絞ると両方を持つ作品だけが出る
 - モデル・言語・描画要素の比較、生成情報／プロンプト／JSON のインスペクタ、奥書（colophon）
-- 作品の SVG / PNG / アニメーション書き出し
+- 作品の SVG / PNG / アニメーション書き出し。
+落とし口は 1 本で、利用者が選んだフォルダへ書ける（File System Access API を持つブラウザのみ。
+持たないブラウザはブラウザ既定へ落ちる）
 - 日英の UI。英語の用語は `web/src/lib/i18n/GLOSSARY.md` が正本で、`npm run lint:i18n` が強制する
 
 UI の寸法は `+page.svelte` の `:root` のトークン（`--btn-sm-*`）が、色は `--action-*` と `--accent*` が正本で、px と色の直書きは退行として扱う。
 
 ### server（FastAPI）
 
-- エンドポイント 80 本は `server/src/inku_server/api_core/routers/` の 10 ファイルに在る（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）。
+- エンドポイント 81 本は `server/src/inku_server/api_core/routers/` の 10 ファイルに在る（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）。
 共有される定義は `api_core/{state,models,deps,common,rendering}.py` に置く。
 - `api.py` が持つのは `app` の組み立て・`_lifespan`・ミドルウェア・起動時の呼び出し・`include_router` だけである。
 **依存の向きは `api.py` → routers → 共有の一方向**で、router から `api.py` を import しない。
@@ -168,6 +171,7 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 現役は `render-engine-20`（525 件）と `ddl-engine-4`（33 件）で、再生成のバイト一致を CI が強制する。
 - **`cli/tests`** — pytest。
 - **`npm run check`** と **`lint:i18n`** / **`lint:models`** / **`lint:recommendations`** — web の型と用語とモデル解決。
+- **`npm run test:unit`** — web の純関数の単体テスト（Node の `node:test`。依存を足していない）。
 - **`scripts/check_docs.py`** — 公開文書の内部参照。
 
 **決定的な層**（`coerce/`・`ddl_expander.py`・`renderer.py`・`stroke_engine.py`・`schema.py`・`saijiki.py`・`language_support/{ja,en}.py`）に触れたときは、凍結コーパスの照合を必ず通す。

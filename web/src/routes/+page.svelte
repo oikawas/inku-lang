@@ -4121,6 +4121,11 @@ async function toggleLineageStar(node: LineageNode, event?: Event): Promise<void
 	await toggleHistoryStar({ id: node.history.id, starred: !!node.history.starred }, event);
 }
 
+async function toggleLineageForRevision(node: LineageNode, event?: Event): Promise<void> {
+	if (!node.history?.id) return;
+	await toggleHistoryForRevision({ id: node.history.id, for_revision: !!node.history.for_revision }, event);
+}
+
 function lineageCatalogId(node: LineageNode): string {
 	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? colorCatalogSettings.selected;
 }
@@ -6040,6 +6045,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onOpenLineageNode={openLineageNode}
 				onOpenLineageNodeInCanvas={openLineageNodeInCanvas}
 				onToggleLineageStar={toggleLineageStar}
+				onToggleLineageForRevision={toggleLineageForRevision}
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}

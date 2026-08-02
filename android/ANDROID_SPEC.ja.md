@@ -350,7 +350,7 @@ local single-user equivalent と明記されたものを除き、Web component �
 | `HistoryThumbnail.svelte` | history tiles / list rows の `ArtworkPreview` 経由で移植。 |
 | `ConfirmDialog.svelte` | DDL overwrite と destructive history operations に移植。Non-history destructive settings confirmations は parity test backlog。 |
 | `SettingsModal.svelte` | model selection、model connection settings、plugin setting、DB status、export templates、misc settings に移植。Server-only logs/output-save は local-only equivalents として表現。 |
-| `KiwiMascot.svelte` | visibility setting として表現。Android progress indicator は native Material progress を使う。 |
+| `IncuMascot.svelte` / `YuragiMascot.svelte` | MascotWidget および IncuMascotView / YuragiMascotView として 5x5 ピクセルグリッドとアニメーションを純 Kotlin / Compose Canvas へ移植。 |
 
 ## 実装順序
 

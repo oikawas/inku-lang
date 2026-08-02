@@ -403,7 +403,7 @@ component unless marked as a local single-user equivalent.
 | `HistoryThumbnail.svelte` | Ported through `ArtworkPreview` in history tiles and list rows. |
 | `ConfirmDialog.svelte` | Ported for DDL overwrite and destructive history operations. Non-history destructive settings confirmations remain in the parity test backlog. |
 | `SettingsModal.svelte` | Ported for model selection, model connection settings, plugin setting, DB status, export templates, and misc settings. Server-only logs/output-save are represented as local-only equivalents. |
-| `KiwiMascot.svelte` | Represented by persisted visibility setting; the Android progress indicator uses native Material progress. |
+| `IncuMascot.svelte` / `YuragiMascot.svelte` | Ported as MascotWidget and IncuMascotView / YuragiMascotView with 5x5 pixel grid and animations in pure Kotlin / Compose Canvas. |
 
 ## Implementation Order
 

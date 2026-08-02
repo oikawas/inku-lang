@@ -2586,3 +2586,50 @@ Gradle raises it itself on every `install*` task, so it moves the moment the
 build reaches a device (editing it by hand raises it twice). **Deployed to a
 Pixel 9 (tokay) and observed starting as `versionCode=148091` /
 `versionName=2.1.4-android.3`.**
+
+### v2.9.32 — The background opens to all nine abstract colours, and a fourth block on gray comes out (Build 836, 2026-08-02)
+
+**Across 2,061 production works the background was only ever three colours** — white 66.2%,
+black 21.0%, blue 5.4%. Gray, red and green exist only before Build 700; yellow and orange
+never appeared at all. **The schema was not what closed it**: both `Color` and the Stage 2
+tool schema had declared all nine colours the whole time.
+
+**What failed was delivery.** The rate at which the DDL asks for a non-white background has
+gone up, not down (53% in the engine 20 period, the highest yet); what fell was the rate at
+which the request arrives (92% in Builds 0–399 against 42% in 800–814). Both losses came from
+deterministic machinery rather than model variance — **22 works to the coerce background
+governor, 13 to the gray substitution in stage 1.5**.
+
+**The governor never read the clause itself.** `_has_explicit_background_intent` judged only
+the scene words of the original description — night, sunset, dawn — so "fill the background
+with black", the description's own instruction, was never consulted. The function returned
+False for all 22. **An explicit clause must not need a sunset to be believed**, so the clause
+is now part of the judgement.
+
+**The stage 1.5 substitution and the five-colour prompt wording are gone.** The prompts wrote
+the foreground in nine colours while **the background text alone stayed at five**. Thirteen
+sites carried it, seven of them in Android's `WebDdlSpec.kt` — which turned out to hold **two
+LiteRT prompts with no server counterpart, phrased differently**: "gray backgrounds are
+forbidden, use gray in the foreground" names no five-colour set at all. **A check that looks
+only for the five-colour set stays green while that line survives.**
+
+**Then a fourth block appeared.** With stages 1–3 in place, 60 descriptions measured under
+production conditions showed stage 1 producing the gray clause 20 times and stage 2 returning
+`background="gray"` 19 times — and **all 19 coming out of coerce white**. `coerce_score` called
+`_visible_background` at its entrance, **turning gray white before the governor ever ran**.
+
+**That mechanism was a second, redundant guard.** With it removed, gray-on-gray stays legible
+through the foreground rule alone (`background: gray` / `color: black` / a note saying
+`made visible`). The two assertions that turned red were defending **the old shape in which
+both sides move**, not legibility itself, so they were inverted: the background stays gray and
+the foreground goes black.
+
+**Opening an exit is not the same as being used.** Yellow, orange and purple backgrounds have
+never once been requested in production, so an open exit need not produce them. **Gating on
+demand that does not exist would fail a correct implementation**, so it is not part of the
+acceptance.
+
+**The renderer is untouched** (still render engine 20). The frozen corpora `ddl-engine-4` (33)
+and `render-engine-20` (525) are byte-identical, because **not one corpus case traverses this
+layer** — green here is not evidence of correctness but evidence that nobody was looking.
+Seven new assertions carry the acceptance instead.

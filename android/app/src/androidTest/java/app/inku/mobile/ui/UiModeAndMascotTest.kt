@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
@@ -48,7 +49,7 @@ class UiModeAndMascotTest {
             MascotWidget(mascotKind = "incu")
         }
 
-        composeTestRule.onNodeWithText("Incu (立方体)").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mascot_incu").assertIsDisplayed()
     }
 
     @Test
@@ -57,6 +58,6 @@ class UiModeAndMascotTest {
             MascotWidget(mascotKind = "yuragi")
         }
 
-        composeTestRule.onNodeWithText("Yuragi (蟹)").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("mascot_yuragi").assertIsDisplayed()
     }
 }

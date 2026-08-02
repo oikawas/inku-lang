@@ -2386,3 +2386,32 @@ that remains, and it is blocked on ledger I-095** -- none of its 31 open items a
 so dropping the section would drop them from tracking; the author ruled that they be inventoried
 first and only the live ones filed. **The SPEC pair's declared exception is kept as a temporary note
 describing that one remaining point.**
+
+### 2026-08-02 — The list of open items moves out of the specification and into the ledger (**no version bump**, documentation only, stage 2 of 3)
+
+**§17 of `SPEC.ja.md`, "Open Items", became a section that only names where things are.** The same
+section now stands in both languages, and **the declared exception for the SPEC pair was deleted
+from `check_docs.py`**. The two files now match at **136 headings each**.
+
+**The list was inventoried before it was moved** (author's ruling, 2026-08-02). Each of the 31
+unresolved entries was measured against the code, and **the 24 that are still live were filed in
+the ledger as five items**, grouped by area (renderer, stage 2, stage 1, web UI, testing and
+specification). **Five entries were dropped**: three were already implemented (the side-by-side
+multi-model comparison view, the plugin loading mechanism and its namespaces, the English Saijiki
+and English prompts), one names a training mode **that was withdrawn in v1.2**, so there is nothing
+left to evaluate, and one **was a statement of fact rather than a task** (the size of the example
+pools). The 48 resolved entries were dropped because the changelog holds them.
+
+**The inventory turned up three places where the text and the code disagreed.**
+
+- **One more variation axis is unimplemented than the specification said** — `Dimension` declares
+  six axes, but the renderer reads only `position_x` and `position_y`; **`radius` goes unread along
+  with `angle`, `length` and `rotation`**
+- **The examples that steer the model toward arcs exist only on the English side** — twelve in the
+  English pool, **none in the Japanese one**
+- **History export is only half there** — SVG, PNG, animation and contact sheets can be written
+  out, but **history JSON cannot, and the only import path is the one for plugin documents**
+
+**Until 2026-08-02 §17 carried the list itself.** Resolved entries had grown to more than half the
+section, and the unresolved ones were tracked in two places at once. **The changelog keeps the
+record; the ledger keeps the tracking.**

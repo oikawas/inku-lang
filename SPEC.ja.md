@@ -1727,118 +1727,16 @@ tune_bench Build 346〜436 の教訓——一方向の補修レイヤーの累�
 
 ## 17. 残件と検討事項
 
-v0.8 時点で **E2E パイプライン (自由記述 → 解釈 → Score → SVG) はブラウザで稼働**している。以下は今後の拡張 / 品質向上タスク。
+**本仕様は未解決の残件の一覧を持たない。** 所在は次のとおり。
 
-### A. Renderer (実装優先)
+- **これから何を決めるか・何が残っているか** — 開発側の課題台帳が持つ（Git 管理外なので公開仕様には含めない）
+- **何をしたか・なぜそうしたか** — [変更履歴](CHANGELOG.ja.md)
+- **いま何がどこまで実装されているか** — [実装状況](docs/spec/implementation-status.ja.md)
+- **描画層の版ごとの変遷** — [版史](docs/spec/render-engine-history.ja.md)
 
-| 項目 | 状態 | 備考 |
-|---|---|---|
-| line 揺らぎ | 実装済 (v0.8) | polyline 化。perlin/wave/pink/white。分割数は v2.1.0 で固定 80 → 長さ比例（クランプ 32〜200）|
-| 滲む (pink quality) | 実装済 (v1.8) | SVG `feGaussianBlur` フィルター。stdDeviation は v2.1.0 で `BLUR_RATIO`（代表寸法比 0.009 / 0.03 / 0.07）|
-| circle 揺らぎ | 実装済 (v1.99) | 分割輪郭 + 周期ノイズ（perlin は格子 wrap、wave は整数周波数で閉合）。継ぎ目連続 |
-| ellipse 揺らぎ | 実装済 (v1.99) | circle と同一機構。dims により x / y / 法線方向オフセット |
-| triangle 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定 |
-| square 揺らぎ | 実装済 (v1.99) | 辺ごとに line 揺らぎを適用し角を固定（polygon も同様） |
-| arc 揺らぎ | 実装済 (v1.99) | 分割 + オフセット、両端点は完全固定（touching 接点契約の維持） |
-| `angle` / `rotation` / `length` dimension | 未対応 | 線の端点位置に作用する軸 |
-| てざわり視覚品質 | 実装済 (v1.25) | `weight` ごとに stroke 属性、texture filter、副線、粒、撚り線を生成。line / circle / ellipse / square / arc の輪郭に適用 |
-
-### B. Stage 2 composer (精度改善)
-
-- fixture 合格率 9/15、残 6 件の改善案（当時のローカル backend `qwen-api` で計測。**この接続先は v2.9.10 で退役したので、課題は残るが数値は測り直しを要する**）:
-  - center/position 混同の対比例を EXAMPLE_POOL 形式で追加
-  - 複数命令並列用の例を追加
-- **てざわり → weight フィールド変換**: v1.25 で Stage 1 に文脈からの素材選択ルールを追加し、Stage 1.5 に鉛筆・クレヨン・ロットリング・縄の追加DDL候補を追加。fixture 16〜20 としててざわり専用ケースの追加が望ましい
-- Anthropic Haiku 4.5 path の fidelity 測定 (ベースライン比較)
-- Gemma3-4B 対応: tool parameters 用の flat schema 生成ヘルパ (`_flatten_schema_for_tool()`)
-- tolerance `±0.05` の妥当性 (複数 LLM 横断比較で再調整)
-
-### C. Stage 1 interpreter
-
-- EXAMPLE_POOL 現在 ja 65 件 / en 50 件 (v1.92 時点)。k=5 動的選択
-- EXAMPLE_POOL に arc 例 (弧を使う詩句 → `弧を引く` 等) 追加、弧出力を誘導
-- Stage 1 → Stage 2 の E2E 汎化試験 (interpret 結果が composer を通るか)
-- SPEC §2 原則5 違反動詞の混入率測定 (v0.7 強化 + v1.0 属性保持強化後の再評価)
-- Anthropic Opus 4.7 path の測定 (作者感による解釈品質比較)
-- 学習モードの生成サンプル品質評価 (style ローテーションの多様性実測)
-
-### D. Web UI / 体験 (SPEC §7 未消化)
-
-- **Prev/Next 並置の二枚鑑賞** — 現状は単枚差替え、SPEC §7.7 は並置を想定
-- **LLM Model Inspection** — Stage 2 を複数モデルで同時実行し結果を横並べ比較するビュー
-- 履歴 export・import JSON
-- **解釈のズレ併記** (7.6 発展) — 別解釈を並べて提示
-- **差分の色分けルール** (7.2/7.7) — 前回との変更・追加・削除を色分け
-- **記述エリアのサイズ制限** (短歌的「型」として文字数ガイド)
-- 解釈フィードバック色パレットの確定 (v0.6 で `墨の濃淡` 採用、朱色追加要否)
-- サンプル記述集 (SPEC §15.3 Phase 2)
-
-### E. テスト / CI / 運用
-
-- LLM fixture テストを夜間バッチ化、model × fixture 行列で記録
-- latency / token usage メトリクス収集
-- LLM hallucination エラー回復 (SPEC §12.8) 未実装
-
-### F. 仕様 / エコシステム (長期)
-
-- **Nature plugin** — 風 / さざ波 / 葉などの現象起因揺らぎ (SPEC §13.7)
-- **エクステンション機構** — プラグイン読込、名前空間 (SPEC §4)
-- **Saijiki 辞書の配信形式** — v1.92 で server の saijiki テーブルを単一情報源とし `GET /api/saijiki` + スナップショット同期ストアへ一本化済み。`inku-saijiki` パッケージとしての切り出しは将来課題のまま
-- **Base Language** — 英語版 Saijiki + 英語 prompt (SPEC §5)
-- **短歌的制約の強化** — 文字数カウント、句跨ぎの扱い
-- **リーダーボード / 作品共有** — v1.10 でユーザーごとの履歴分離は実装済み。グループ内共有・公開作品コレクションは将来機能
-
-### G. 既に解消済 (参考)
-
-- ~~てざわり語彙 (クレヨン・チョーク等) が Stage 2 の weight フィールドに変換されない~~ → v1.8 で composer.py にてざわり→weight 対応表 + 4 例追加。EXAMPLE_POOL にも太筆・縄・ロットリング等の例を追加
-- ~~滲む (ゆらぎ quality=pink) が実装されていない~~ → v1.8 で SVG `feGaussianBlur` フィルター実装 (`BLUR_STD` dict: fine=2px / medium=6px / broad=15px)
-- ~~arc primitive の角度フィールド仕様~~ → v0.7 で解消 (現 v0.8 付録参照)
-- ~~Renderer 揺らぎの基本実装~~ → v0.8 で line に実装
-- ~~Opus 4.7 API の利用方針 (二段階 vs 一段階)~~ → v0.3 二段階確定
-- ~~LLM モデル選択の UI~~ → v0.7 で dropdown + localStorage
-- ~~qwen3 thinking 可視化~~ → v0.7 で実装
-- ~~NVIDIA NIM プロバイダー追加 + モデル per-stage 選択~~ → v0.9 で実装
-- ~~本数・個数の arrangement 展開 (JSON サイズ問題)~~ → v0.9 で実装
-- ~~プロンプト無限増殖問題~~ → v0.9 で schema-as-spec + EXAMPLE_POOL により構造的に解決
-- ~~大量オブジェクト描画 (100本・200個)~~ → v1.0 で count 上限 500 + scatter hash 化
-- ~~scatter 固定10点問題~~ → v1.0 で SHA-256 hash ベースに変更、N 個任意対応
-- ~~line from/to 省略時のレンダーエラー~~ → v1.0 で layout から推定補完 + fallback
-- ~~Stage 1 属性脱落問題 (色・素材・方向の省略)~~ → v1.0 で属性保持セクション + EXAMPLE_POOL 強化
-- ~~履歴の localStorage 上限・永続化~~ → v1.0 でサーバーサイド無制限保存 + ページネーション
-- ~~render failed: 必須フィールド欠損エラー~~ → v1.1 で coerce.py (PRIMITIVE_SPECS テーブル駆動) により事前補修
-- ~~非 Saijiki 語の展開 (固定辞書の限界)~~ → v1.1 で LLM 意味理解 + SYSTEM_PROMPT_PREFIX 展開原則に転換
-- ~~背景色の固定 (white のみ)~~ → v1.1 で Score.background フィールド追加
-- ~~大量配置時の単色制約~~ → v1.1 で Arrangement.color_cycle 追加
-- ~~Stage 2 がユーザーの元の記述を参照できない~~ → v1.1 で original_text パス・スルー実装
-- ~~比率・形状の語彙不足 (縦長/横長/月形等)~~ → v1.2 で Saijiki わりあいカテゴリ追加
-- ~~演奏中に何をしているか分からない~~ → v1.2 で 2 コール方式 + ステージラベル表示
-- ~~1 記述ずつしか処理できない~~ → v1.2 でバッチ記述モード追加
-- ~~学習モードの複雑さ~~ → v1.2 で廃止 (実験的機能として trainer.py は残置)
-- ~~解釈DDL 編集後に再レンダリングできない~~ → v1.6 で「再演奏」(Stage 2 のみ呼出し) 実装
-- ~~接続設定が常時表示で占有面積過大~~ → v1.6 でポップオーバーに集約
-- ~~固定の6色制約~~ → v1.6 で色カタログシステム導入（default + 10素材・光・技法ベースのカタログ選択可）
-- ~~キャンバスのズーム不可~~ → v1.6 でズームUI追加（0.5×〜3×）
-- ~~スクロール型レイアウトで全要素の関係が見えにくい~~ → v1.6 で固定ビューポート2ペイン構成に刷新
-- ~~ユーザー管理が prototype UI のみ~~ → v1.10 で認証、ユーザー/グループ管理 API、DB 永続化、ロール制御を実装
-- ~~描画履歴が全ユーザーで共有される~~ → v1.10 で `history.user_id` を追加し、履歴取得・保存・削除をログインユーザー単位に分離。既存履歴は初回起動時に admin 所有へ移行
-- ~~DB設定 / プラグイン管理が prototype UI のみ~~ → v1.11 で管理者向け read-only API に接続し、DB は `INKU_DB_URL` 起動時設定、プラグインは未実装であることを UI に明示
-- ~~履歴保存時に Web UI から送られた SVG を DB に保存できる~~ → v1.12 で `/api/paint` が生成直後に履歴保存し、Web UI から履歴保存用 SVG を送り返さない形へ変更。互換用 `POST /api/history` でもリクエスト `svg` は無視してサーバー側で再レンダリングする
-- ~~生成系 API の認証境界が弱い~~ → v1.13 で `/api/interpret`、`/api/compose`、`/api/paint` を認証必須化。未認証リクエストは 401 を返す
-- ~~セッショントークンを localStorage に保存している~~ → v1.14 で Web UI はセッショントークンを保持せず、サーバーが HttpOnly / SameSite=Lax Cookie としてセッションを管理する形へ変更
-- ~~履歴DBと出力ファイル保存の整合性~~ → v1.15 で DB の履歴レコードを正本、出力ファイルを再生成可能な副産物と定義。`POST /api/history/rebuild-output-files` で DB から出力ファイルを再生成できる
-- ~~初期管理者アカウントが既知のデフォルトパスワードで作成される~~ → v1.16 で `INKU_BOOTSTRAP_ADMIN_PASSWORD` が明示された新規DBの場合のみ bootstrap admin を作成する形へ変更。v2.4.0 で空文字を「未設定」として扱う是正と、配布 compose 側の必須チェックを追加（[版史](docs/spec/render-engine-history.ja.md) の「配布」）
-- ~~ユーザー管理タブの表示がサーバー最新状態から遅れる~~ → v1.17 でユーザー管理タブ表示時 / 再読み込み時に `/api/auth/me`、`/api/user-groups`、`/api/users` を `cache: no-store` で再取得する形へ変更
-- ~~テストが実DBにテストユーザーを残す可能性がある~~ → v1.17 で pytest は既定で `/tmp` の一時SQLite DBを使う形へ変更
-- ~~履歴管理のスケール対応~~ → v1.11 でサーバーサイド検索 / ページング化し、全件DOM描画を廃止
-- ~~出力ファイル保存失敗が見えない~~ → v1.11 以降で SVG/JSON/入力/DDL 保存と PNG 変換を分離し、filesystem / PNG 変換エラーをサーバーログへ記録
-- ~~バッチ描画の行単位失敗が見えない~~ → v1.11 以降で成功 / 失敗サマリーと失敗行詳細を UI に保持表示。v1.20 で実行中の現在行ハイライトと処理中解釈の読み取り専用表示を追加
-- **UI実装が単一巨大コンポーネントに集中している（未解決）** → v1.20 で AuthPanel / InputPanel / BatchPanel / DdlEditor / CanvasPanel / HistoryStrip / HistoryManager / SettingsModal / ColorCatalogModal / SaijikiDrawer / ConfirmDialog に分割したが、**その後 `+page.svelte` 自体が再び肥大した**（v2.9.22 時点で 7,411 行 / script 部 6,110 行）。v2.9.23 で機能ごとの縦割り（`web/src/lib/features/<name>/`）と開閉コンポーネント 9 個の動的 import を入れ、**6,836 行 / script 部 5,519 行・初回チャンク gzip 166,815 → 79,533 B** まで下げた。**縦割りは途中である**（残る単位の実測は台帳 [I-088]）。**共通ファイルへの「横割り」は採らない** — どの機能ブランチもその共通ファイルを触るようになり、追記衝突が場所を変えるだけになるため（過去 80 マージの実測が根拠。[版史](docs/spec/render-engine-history.ja.md)）
-- ~~サムネイル用SVG加工がレンダーごとに文字列処理される~~ → v1.20 で `HistoryThumbnail` へ分離し、サムネイル単位の `$derived` で加工済み SVG を管理する形へ変更
-- ~~UIテーマがブラウザローカル状態に閉じている~~ → v1.21 でライト / ダークモードをユーザー設定としてサーバー DB に保存し、ログインユーザーごとに復元する
-- ~~バッチ指示履歴が端末ごとに分断される~~ → v1.21 でバッチ指示履歴をユーザーごとにサーバー DB へ保存し、プルダウン選択時点で即復元する
-- ~~気に入った履歴を後から抽出できない~~ → v1.21 で履歴 DB にスター状態を保存し、ステータスバー / 履歴ストリップ / 履歴管理でスター操作とスターのみ表示フィルタを追加
-- ~~FastAPI 起動が常に reload=True になっている~~ → v1.21 で `INKU_SERVER_RELOAD` が真値の場合のみ reload 起動とし、systemd 運用の既定は reload 無効に変更
-- ~~セッション Cookie の max-age と DB セッション寿命が連動していない~~ → v1.21 で DB セッションも `INKU_SESSION_COOKIE_MAX_AGE` に従って期限判定し、期限切れ行を削除する形へ変更
+2026-08-02 まで、この節は残件の一覧そのものを抱えていた。解消済みの項目が節の過半を占め、
+未解決の項目は台帳と二重に管理されていた。**記録は変更履歴が、追跡は台帳が持つ**と定め、
+この節はその所在だけを示す。
 
 作者のローカルサーバー固有の運用詳細は公開仕様へ含めず、Git管理外の `AGENTS.md` または `no-git-sync/` に集約する。通常開発はMacからrsyncで同期してsystemdサービスを再起動し、Docker Composeはリリース前など節目の本番構成検証に使用する。
 

@@ -2661,6 +2661,26 @@ the reference implementation as one concrete path.
 
 ---
 
+## 17. Open Items
+
+**This specification does not carry a list of open items.** They live here instead:
+
+- **what is still to be decided, and what remains** — the development issue ledger holds it (kept outside Git, so it is not part of the published specification)
+- **what was done, and why** — the [changelog](CHANGELOG.md)
+- **what is implemented, and how far** — the [implementation status](docs/spec/implementation-status.md)
+- **how the rendering layer changed from version to version** — the [version history](docs/spec/render-engine-history.md)
+
+Until 2026-08-02 the Japanese specification carried the list itself. Resolved entries had grown to
+more than half the section, and the unresolved ones were tracked in two places at once. **The
+changelog keeps the record and the ledger keeps the tracking**; this section names where they are.
+
+Operational details specific to the author's local server are kept out of the published
+specification and collected in `AGENTS.md` or `no-git-sync/`, both outside Git. Ordinary
+development syncs from the Mac with rsync and restarts the systemd services; Docker Compose is
+used to verify the production configuration at milestones such as a release.
+
+---
+
 ## 18. JSON Score
 
 JSON Score is the machine-readable score produced by Stage 2.  It is not the

@@ -83,26 +83,12 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "sections",
         None,
     ),
-    (
-        "SPEC.ja.md",
-        "SPEC.md",
-        "shape",
-        "the 2026-07-28 ruling that made Japanese canonical for the concepts "
-        "and English the sole carrier of the operational sections was "
-        "withdrawn on 2026-08-02. The two files must now correspond section "
-        "for section, with Japanese still canonical. This exception is "
-        "therefore temporary and must be deleted when the shapes match -- "
-        "the check itself will say so. **Only §17 is left.** Setting it "
-        "aside, the two files match exactly at 135 headings each: §1, §3 and "
-        "§11 were reconciled, §15 and the repository appendix were written "
-        "in English, and §6.7, §7.8, §12.14 and §18 through §24 were written "
-        "in Japanese. §17 is the open-items list, and it cannot simply be "
-        "dropped: its 31 unresolved entries appear nowhere in the issue "
-        "ledger, so removing the section would remove them from tracking. "
-        "The author ruled on 2026-08-02 that they be inventoried first and "
-        "only the live ones filed -- that is ledger I-095. When I-095 closes "
-        "and §17 is settled in both languages, delete this exception",
-    ),
+    # The two files correspond section for section as of 2026-08-02, with
+    # Japanese still canonical. §17 was the last one left: it carried the
+    # open-items list, whose live entries are now filed in the issue ledger
+    # (I-097 through I-101), so the section became a pointer in both languages
+    # and the pair needs no exception any more.
+    ("SPEC.ja.md", "SPEC.md", "shape", None),
     # The Japanese version was written on 2026-08-02, so the pair needs no
     # exception any more. The 2026-07-28 ruling that made this inventory
     # English-only was withdrawn the same day.

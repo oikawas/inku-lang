@@ -37,6 +37,47 @@ class MascotArtStage1Test {
 
         assertEquals(1, rightIncubator?.x)
         assertEquals(1, rightIncubator?.y)
+
+        // Counts alone do not hold the picture: a face moved to another cell keeps
+        // every count intact. Compare all 25 cells against the web source of truth
+        // (IncuMascot.svelte), including the per-cell breathe delay -- the set of
+        // delays is unchanged when two cells swap theirs.
+        val byPos = grid.associateBy { it.x to it.y }
+        assertEquals(25, byPos.size)
+        val expected = listOf(
+            Triple(-2 to -2, MascotArt.IncuFace.NONE, false) to 0.0,
+            Triple(-1 to -2, MascotArt.IncuFace.NONE, false) to -0.2,
+            Triple(0 to -2, MascotArt.IncuFace.TOP, false) to -0.4,
+            Triple(1 to -2, MascotArt.IncuFace.NONE, false) to -0.2,
+            Triple(2 to -2, MascotArt.IncuFace.NONE, false) to 0.0,
+            Triple(-2 to -1, MascotArt.IncuFace.NONE, false) to -0.2,
+            Triple(-1 to -1, MascotArt.IncuFace.TOP, false) to -0.4,
+            Triple(0 to -1, MascotArt.IncuFace.TOP, true) to -0.6,
+            Triple(1 to -1, MascotArt.IncuFace.TOP, false) to -0.4,
+            Triple(2 to -1, MascotArt.IncuFace.NONE, false) to -0.2,
+            Triple(-2 to 0, MascotArt.IncuFace.LEFT, false) to -0.4,
+            Triple(-1 to 0, MascotArt.IncuFace.LEFT, false) to -0.6,
+            Triple(0 to 0, MascotArt.IncuFace.TOP, false) to -0.8,
+            Triple(1 to 0, MascotArt.IncuFace.RIGHT, false) to -0.6,
+            Triple(2 to 0, MascotArt.IncuFace.RIGHT, false) to -0.4,
+            Triple(-2 to 1, MascotArt.IncuFace.NONE, false) to -0.2,
+            Triple(-1 to 1, MascotArt.IncuFace.LEFT, false) to -0.4,
+            Triple(0 to 1, MascotArt.IncuFace.LEFT, true) to -0.6,
+            Triple(1 to 1, MascotArt.IncuFace.RIGHT, true) to -0.4,
+            Triple(2 to 1, MascotArt.IncuFace.RIGHT, false) to -0.2,
+            Triple(-2 to 2, MascotArt.IncuFace.NONE, false) to 0.0,
+            Triple(-1 to 2, MascotArt.IncuFace.NONE, false) to -0.2,
+            Triple(0 to 2, MascotArt.IncuFace.LEFT, false) to -0.4,
+            Triple(1 to 2, MascotArt.IncuFace.RIGHT, false) to -0.2,
+            Triple(2 to 2, MascotArt.IncuFace.NONE, false) to 0.0,
+        )
+        for ((key, delay) in expected) {
+            val (pos, face, incubator) = key
+            val cell = byPos[pos]
+            assertEquals("face at " + pos, face, cell?.face)
+            assertEquals("incubator at " + pos, incubator, cell?.isIncubator)
+            assertEquals("delay at " + pos, delay, cell?.delaySeconds ?: 99.0, 0.0001)
+        }
     }
 
     @Test

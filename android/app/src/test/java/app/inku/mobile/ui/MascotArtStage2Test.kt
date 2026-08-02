@@ -44,6 +44,41 @@ class MascotArtStage2Test {
         val incubatorCell = incubators.first()
         assertEquals(0, incubatorCell.x)
         assertEquals(0, incubatorCell.y)
+
+        // Counts and three coordinates do not hold the picture: a leg moved one cell
+        // sideways keeps red 13 / eyes 2 / empty 10 intact. Compare all 25 cells
+        // against the web source of truth (YuragiMascot.svelte), including the
+        // per-leg tremble delay.
+        val byPos = grid.associateBy { it.x to it.y }
+        assertEquals(25, byPos.size)
+        data class Expected(val type: MascotArt.YuragiCellType, val leg: Boolean, val legDelay: Double)
+        val R = MascotArt.YuragiCellType.RED
+        val E = MascotArt.YuragiCellType.EYE
+        val N = MascotArt.YuragiCellType.NONE
+        val expected = mapOf(
+            (-2 to -2) to Expected(R, false, 0.0), (-1 to -2) to Expected(N, false, 0.0),
+            (0 to -2) to Expected(N, false, 0.0), (1 to -2) to Expected(N, false, 0.0),
+            (2 to -2) to Expected(R, false, 0.0),
+            (-2 to -1) to Expected(R, false, 0.0), (-1 to -1) to Expected(E, false, 0.0),
+            (0 to -1) to Expected(R, false, 0.0), (1 to -1) to Expected(E, false, 0.0),
+            (2 to -1) to Expected(R, false, 0.0),
+            (-2 to 0) to Expected(R, true, 0.0), (-1 to 0) to Expected(R, false, 0.0),
+            (0 to 0) to Expected(R, false, 0.0), (1 to 0) to Expected(R, false, 0.0),
+            (2 to 0) to Expected(R, true, 0.3),
+            (-2 to 1) to Expected(R, true, 0.1), (-1 to 1) to Expected(N, false, 0.0),
+            (0 to 1) to Expected(R, true, 0.2), (1 to 1) to Expected(N, false, 0.0),
+            (2 to 1) to Expected(R, true, 0.4),
+            (-2 to 2) to Expected(N, false, 0.0), (-1 to 2) to Expected(N, false, 0.0),
+            (0 to 2) to Expected(N, false, 0.0), (1 to 2) to Expected(N, false, 0.0),
+            (2 to 2) to Expected(N, false, 0.0),
+        )
+        assertEquals(25, expected.size)
+        for ((pos, exp) in expected) {
+            val cell = byPos[pos]
+            assertEquals("type at " + pos, exp.type, cell?.type)
+            assertEquals("leg at " + pos, exp.leg, cell?.isLeg)
+            assertEquals("leg delay at " + pos, exp.legDelay, cell?.legDelaySeconds ?: 99.0, 0.0001)
+        }
     }
 
     @Test

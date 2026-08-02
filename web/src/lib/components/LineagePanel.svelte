@@ -4,6 +4,7 @@
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
+	import WildToggle from './WildToggle.svelte';
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
@@ -44,7 +45,7 @@
 		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null, wild?: boolean | null) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
@@ -112,6 +113,8 @@
 	let editElapsedMs = $state(0);
 	let editDrawController: AbortController | null = null;
 	let editTenkeiOverride = $state<TenkeiLevel | null>(null);
+	// null = inherit the parent work's setting, the same rule staffage follows.
+	let editWildOverride = $state<boolean | null>(null);
 
 	// While the edit dialog is drawing, tick an elapsed timer for the status element.
 	$effect(() => {
@@ -394,6 +397,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	function openEditDialog(node: LineageNode, mode: 'description' | 'ddl'): void {
 		if (!node.history) return;
 		editTenkeiOverride = null;
+		editWildOverride = null;
 		activeEditNode = node;
 		editMode = mode;
 		editDraft = mode === 'description'
@@ -417,7 +421,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		editError = null;
 		editDrawController = new AbortController();
 		try {
-			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editTenkeiOverride);
+			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editTenkeiOverride, editWildOverride);
 			else await onDrawDdl(activeEditNode, editDraft);
 			activeEditNode = null;
 			editMode = null;
@@ -889,6 +893,7 @@ $effect(() => {
 					/>
 				{:else}
 					<TenkeiSelect compact value={editTenkeiOverride ?? normalizeTenkei(activeEditNode?.history?.tenkei) ?? DEFAULT_TENKEI} {isJapanese} inherited={editTenkeiOverride === null} onSelect={(level) => (editTenkeiOverride = level)} />
+					<WildToggle value={editWildOverride ?? (activeEditNode?.history?.render_wild === true)} {isJapanese} inherited={editWildOverride === null} onSelect={(next) => (editWildOverride = next)} />
 					<button type="button" onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
 					<button type="button" class="edit-draw" disabled={!editDraft.trim()} onclick={drawEditedArtwork}>{isJapanese ? '描画' : 'Draw'}</button>
 				{/if}

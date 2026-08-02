@@ -414,6 +414,7 @@
 	let ddlDialogDrawing = $state(false);
 	let ddlDialogError = $state<string | null>(null);
 	let ddlDialogTenkeiOverride = $state<TenkeiLevel | null>(null);
+	let ddlDialogWildOverride = $state<boolean | null>(null);
 	// DDL-authored (standalone) artworks carry the display_label marker 'DDL'.
 	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
@@ -627,6 +628,9 @@
 	// Refine dialogs: null = inherit from the parent artwork (field omitted).
 	let refineTenkeiOverride = $state<TenkeiLevel | null>(null);
 	function setRefineTenkei(level: TenkeiLevel | null) { refineTenkeiOverride = level; }
+	// null = inherit the displayed work's setting, the same rule staffage follows.
+	let refineWildOverride = $state<boolean | null>(null);
+	function setRefineWild(value: boolean | null) { refineWildOverride = value; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
 	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.selected) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
@@ -2839,7 +2843,7 @@ if (unreadWords.length > 0) {
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; lineageParentNodeId?: string | null } = {}): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; wild?: boolean | null; lineageParentNodeId?: string | null } = {}): Promise<{
 		score: Score;
 		svg: string;
 		// Stage 2 に渡った展開後 DDL (v1.98)
@@ -2885,6 +2889,7 @@ if (unreadWords.length > 0) {
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				...(renderOptions.tenkei ? { tenkei: renderOptions.tenkei } : {}),
+				...(renderOptions.wild != null ? { wild: renderOptions.wild } : {}),
 				...(renderOptions.lineageParentNodeId ? { lineage_parent_node_id: renderOptions.lineageParentNodeId } : {}),
 			})
 		});
@@ -4148,7 +4153,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await fetchLineage(nodeId, true);
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null, wild?: boolean | null): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
 	const rendered = await paintOne(sourceText, {
@@ -4161,6 +4166,8 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		signal,
 		tenkei,
+		// null override = inherit the parent work's setting.
+		wild: wild ?? node.history.render_wild === true,
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
@@ -4173,6 +4180,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		catalogId: lineageCatalogId(node),
 		canvasAspectId: lineageCanvasAspectId(node),
 		tenkei: ddlDialogTenkeiOverride,
+		wild: ddlDialogWildOverride ?? node.history.render_wild === true,
 		lineageParentNodeId: node.id,
 	});
 	const resolvedEditStage1Model = node.history.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
@@ -4275,6 +4283,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 
 function openNewDdlDialog(): void {
 	ddlDialogTenkeiOverride = null;
+	ddlDialogWildOverride = null;
 	ddlDialogMode = 'new';
 	ddlDialogNode = null;
 	ddlDialogInitial = '';
@@ -4297,6 +4306,7 @@ async function openCurrentDdlEditor(): Promise<void> {
 
 function openLineageDdlEditor(node: LineageNode): void {
 	ddlDialogTenkeiOverride = null;
+	ddlDialogWildOverride = null;
 	ddlDialogMode = 'edit';
 	ddlDialogNode = node;
 	ddlDialogInitial = node.history?.ddl ?? '';
@@ -4907,6 +4917,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				auto_repair: ddlAutoRepairEnabled,
 				composition_seed: compositionSeed,
 				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				wild: effectiveRefineWild,
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
@@ -4929,6 +4940,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			interpretationSeed,
 			signal,
 			tenkei: refineTenkeiOverride,
+			wild: effectiveRefineWild,
 			lineageParentNodeId: currentLineageParentId(),
 		});
 		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
@@ -5008,6 +5020,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				variation_amplitude: amplitude,
 				variation_seed: seed,
 				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				wild: effectiveRefineWild,
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
@@ -5369,6 +5382,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			: null
 	);
 	const targetTenkei = $derived(normalizeTenkei(displayedHistoryItem?.tenkei) ?? DEFAULT_TENKEI);
+	// What a refine inherits when nothing is overridden: the work on screen, or
+	// the global setting when nothing is on screen.
+	const targetWild = $derived(displayedHistoryItem?.render_wild ?? result?.render_wild ?? wildSettings.enabled);
+	const effectiveRefineWild = $derived(refineWildOverride ?? targetWild === true);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
@@ -6069,6 +6086,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				statusTenkei={normalizeTenkei(displayedHistoryItem?.tenkei)}
 				refineTenkeiValue={refineTenkeiOverride ?? targetTenkei}
 				refineTenkeiInherited={refineTenkeiOverride === null}
+				refineDrawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+				refineDrawingModelGroups={availableModelCatalog}
+				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
+				refineWildValue={effectiveRefineWild}
+				refineWildInherited={refineWildOverride === null}
+				onSetRefineWild={setRefineWild}
 				onSetRefineTenkei={setRefineTenkei}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
@@ -6149,6 +6172,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
 			tenkeiInherited={ddlDialogTenkeiOverride === null}
 			onSelectTenkei={(level) => (ddlDialogTenkeiOverride = level)}
+			wildValue={ddlDialogWildOverride ?? (ddlDialogNode?.history?.render_wild === true)}
+			wildInherited={ddlDialogWildOverride === null}
+			onSelectWild={(next) => (ddlDialogWildOverride = next)}
 			onDraw={handleDdlDialogDraw}
 			onClose={closeDdlDialog}
 		/>

@@ -5,6 +5,7 @@
 	import SaijikiInline from './SaijikiInline.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
+	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { TenkeiLevel } from '$lib/tenkei';
@@ -40,12 +41,15 @@
 		showTenkei?: boolean;
 		tenkeiValue?: TenkeiLevel;
 		tenkeiInherited?: boolean;
+		wildValue?: boolean;
+		wildInherited?: boolean;
+		onSelectWild?: (value: boolean) => void;
 		onSelectTenkei?: (level: TenkeiLevel) => void;
 		onDraw: (ddl: string, signal?: AbortSignal) => void | Promise<void>;
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -225,6 +229,7 @@
 				</div>
 				{#if showTenkei && onSelectTenkei}
 					<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
+					{#if onSelectWild}<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />{/if}
 				{/if}
 				<button type="button" class="ddled-cancel" onclick={requestClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
 				<button type="button" class="ddled-draw" disabled={!value.trim()} onclick={requestDraw}>{isJapanese ? '描画' : 'Draw'}</button>

@@ -5025,15 +5025,217 @@ internal fun IncuMascotView(modifier: Modifier = Modifier) {
 
 @Composable
 internal fun YuragiMascotView(modifier: Modifier = Modifier) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(6.dp),
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val isAnimated = remember {
+        try {
+            android.provider.Settings.Global.getFloat(
+                context.contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1.0f
+            ) != 0.0f
+        } catch (_: Throwable) {
+            true
+        }
+    }
+
+    val transition = rememberInfiniteTransition(label = "yuragi_anim")
+    val timeMs by if (isAnimated) {
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 370440f, // LCM of periods
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 370440, easing = LinearEasing)
+            ),
+            label = "time_ms"
+        )
+    } else {
+        remember { mutableStateOf(0f) }
+    }
+
+    Box(
+        modifier = modifier
+            .testTag("mascot_yuragi")
+            .size(32.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
     ) {
-        Text("🦀", style = MaterialTheme.typography.bodyMedium)
-        Text("Yuragi (蟹)", style = MaterialTheme.typography.labelMedium)
+        Canvas(modifier = Modifier.size(32.dp)) {
+            val scaleFactor = size.width / 92f
+            val timeSec = timeMs / 1000.0
+
+            val (stepTx, stepRotate) = if (isAnimated) {
+                val stepPhase = (timeSec % MascotArt.YURAGI_CRAB_STEP_PERIOD_SEC) / MascotArt.YURAGI_CRAB_STEP_PERIOD_SEC
+                val p = kotlin.math.sin(2.0 * kotlin.math.PI * stepPhase).toFloat()
+                Pair(p * 4.0f, p * 3.0f)
+            } else Pair(0f, 0f)
+
+            withTransform({
+                scale(scaleFactor, scaleFactor, pivot = Offset.Zero)
+            }) {
+                // Render Bubbles first (background)
+                if (isAnimated) {
+                    for (b in MascotArt.YURAGI_BUBBLES) {
+                        val rawT = (timeSec - b.delaySeconds) % MascotArt.YURAGI_BUBBLE_PERIOD_SEC
+                        val t = if (rawT < 0) rawT + MascotArt.YURAGI_BUBBLE_PERIOD_SEC else rawT
+                        val phase = t / MascotArt.YURAGI_BUBBLE_PERIOD_SEC
+                        if (phase >= 0.85) {
+                            val relP = ((phase - 0.85) / 0.15).toFloat()
+                            val (bTx, bTy, bScale, bAlpha, bRadius) = when {
+                                relP < 0.133f -> {
+                                    val subP = relP / 0.133f
+                                    Tuple5(b.txPx * 0.2f * subP, -5.0f * subP, 0.2f + 0.2f * subP, 0.9f * subP, 3.2f)
+                                }
+                                relP < 0.467f -> {
+                                    val subP = (relP - 0.133f) / 0.334f
+                                    Tuple5(
+                                        b.txPx * (0.2f + 0.5f * subP),
+                                        -5.0f - 25.0f * subP,
+                                        0.4f + (b.scale - 0.4f) * subP,
+                                        0.9f - 0.3f * subP,
+                                        3.2f + 4.8f * subP
+                                    )
+                                }
+                                else -> {
+                                    val subP = (relP - 0.467f) / 0.533f
+                                    Tuple5(
+                                        b.txPx * (0.7f + 0.3f * subP),
+                                        -30.0f - 60.0f * subP,
+                                        b.scale * (1.0f + 0.5f * subP),
+                                        0.6f * (1.0f - subP),
+                                        8.0f
+                                    )
+                                }
+                            }
+
+                            val bubbleBaseLeft = 38.0f + bTx
+                            val bubbleBaseTop = 34.0f + bTy
+                            val color = Color(android.graphics.Color.parseColor(MascotArt.COLOR_BUBBLE)).copy(alpha = bAlpha)
+
+                            withTransform({
+                                scale(bScale, bScale, pivot = Offset(bubbleBaseLeft + 8f, bubbleBaseTop + 8f))
+                            }) {
+                                drawRoundRect(
+                                    color = color,
+                                    topLeft = Offset(bubbleBaseLeft, bubbleBaseTop),
+                                    size = Size(16f, 16f),
+                                    cornerRadius = CornerRadius(bRadius, bRadius)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Render Crab Body Grid
+                withTransform({
+                    translate(stepTx, 0f)
+                    rotate(stepRotate, pivot = Offset(46f, 46f))
+                }) {
+                    for (cell in MascotArt.YURAGI_GRID) {
+                        if (cell.type == MascotArt.YuragiCellType.NONE) continue
+
+                        val col = cell.x + 2
+                        val row = cell.y + 2
+                        val baseLeft = col * 19.0f
+                        val baseTop = row * 19.0f
+
+                        val hexColor = when (cell.type) {
+                            MascotArt.YuragiCellType.RED -> {
+                                if (cell.isIncubator) {
+                                    val phase = (timeSec % MascotArt.YURAGI_INCUBATE_PERIOD_SEC) / MascotArt.YURAGI_INCUBATE_PERIOD_SEC
+                                    if (isAnimated && phase >= 0.5) MascotArt.COLOR_INCUBATE_INK else MascotArt.COLOR_RED
+                                } else MascotArt.COLOR_RED
+                            }
+                            MascotArt.YuragiCellType.EYE -> {
+                                val isBlinking = if (cell.isEyeLeft) MascotArt.isLeftEyeBlinking(timeSec) else MascotArt.isRightEyeBlinking(timeSec)
+                                if (isAnimated && isBlinking) MascotArt.COLOR_EYE_BLACK else MascotArt.COLOR_EYE_WHITE
+                            }
+                            else -> MascotArt.COLOR_RED
+                        }
+                        val color = Color(android.graphics.Color.parseColor(hexColor))
+
+                        val legTy = if (isAnimated && cell.isLeg) {
+                            val tLeg = (timeSec - cell.legDelaySeconds) % MascotArt.YURAGI_LEG_TREMBLE_PERIOD_SEC
+                            val normT = if (tLeg < 0) tLeg + MascotArt.YURAGI_LEG_TREMBLE_PERIOD_SEC else tLeg
+                            val p = kotlin.math.sin(2.0 * kotlin.math.PI * normT / MascotArt.YURAGI_LEG_TREMBLE_PERIOD_SEC).toFloat()
+                            -kotlin.math.abs(p) * 3.0f
+                        } else 0f
+
+                        // Claw animation
+                        var clawScale = 1.0f
+                        var clawRotate = 0.0f
+                        var clawTy = 0.0f
+                        var clawRadius = 0.0f
+                        var pivotX = baseLeft + 8f
+                        var pivotY = baseTop + 8f
+
+                        if (isAnimated && cell.isClawLeft) {
+                            pivotX = baseLeft + 16f
+                            pivotY = baseTop + 16f
+                            val phase = (timeSec % MascotArt.YURAGI_CLAW_LEFT_PERIOD_SEC) / MascotArt.YURAGI_CLAW_LEFT_PERIOD_SEC
+                            if (phase in 0.85..0.95) {
+                                val subP = ((phase - 0.85) / 0.10).toFloat()
+                                clawScale = 1.3f
+                                clawTy = -4.0f
+                                clawRadius = 8.0f
+                                clawRotate = when {
+                                    subP < 0.2f -> -45.0f * (subP / 0.2f)
+                                    subP < 0.4f -> -45.0f + 60.0f * ((subP - 0.2f) / 0.2f)
+                                    subP < 0.6f -> 15.0f - 60.0f * ((subP - 0.4f) / 0.2f)
+                                    subP < 0.8f -> -45.0f + 60.0f * ((subP - 0.6f) / 0.2f)
+                                    else -> 15.0f - 15.0f * ((subP - 0.8f) / 0.2f)
+                                }
+                            }
+                        } else if (isAnimated && cell.isClawRight) {
+                            pivotX = baseLeft
+                            pivotY = baseTop + 16f
+                            val phase = (timeSec % MascotArt.YURAGI_CLAW_RIGHT_PERIOD_SEC) / MascotArt.YURAGI_CLAW_RIGHT_PERIOD_SEC
+                            if (phase in 0.80..0.92) {
+                                val subP = ((phase - 0.80) / 0.12).toFloat()
+                                clawScale = 1.3f
+                                clawTy = -4.0f
+                                clawRadius = 8.0f
+                                clawRotate = when {
+                                    subP < 0.166f -> 45.0f * (subP / 0.166f)
+                                    subP < 0.333f -> 45.0f - 60.0f * ((subP - 0.166f) / 0.167f)
+                                    subP < 0.500f -> -15.0f + 60.0f * ((subP - 0.333f) / 0.167f)
+                                    subP < 0.666f -> 45.0f - 60.0f * ((subP - 0.500f) / 0.166f)
+                                    subP < 0.833f -> -15.0f + 60.0f * ((subP - 0.666f) / 0.167f)
+                                    else -> 45.0f - 45.0f * ((subP - 0.833f) / 0.167f)
+                                }
+                            }
+                        }
+
+                        withTransform({
+                            translate(0f, legTy + clawTy)
+                            if (clawRotate != 0f || clawScale != 1.0f) {
+                                rotate(clawRotate, pivot = Offset(pivotX, pivotY))
+                                scale(clawScale, clawScale, pivot = Offset(pivotX, pivotY))
+                            }
+                        }) {
+                            if (clawRadius > 0f) {
+                                drawRoundRect(
+                                    color = color,
+                                    topLeft = Offset(baseLeft, baseTop),
+                                    size = Size(16.0f, 16.0f),
+                                    cornerRadius = CornerRadius(clawRadius, clawRadius)
+                                )
+                            } else {
+                                drawRect(
+                                    color = color,
+                                    topLeft = Offset(baseLeft, baseTop),
+                                    size = Size(16.0f, 16.0f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
+
+private data class Tuple5<A, B, C, D, E>(val a: A, val b: B, val c: C, val d: D, val e: E)
+
 
 @Composable
 internal fun TenkeiSelect(

@@ -228,8 +228,12 @@
 					/>
 				</div>
 				{#if showTenkei && onSelectTenkei}
-					<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
-					{#if onSelectWild}<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />{/if}
+					<!-- One box: the left-aligning margin belongs to the pair, not to
+					     staffage alone, or the switch drifts toward the buttons. -->
+					<div class="ddled-settings">
+						<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
+						{#if onSelectWild}<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />{/if}
+					</div>
 				{/if}
 				<button type="button" class="ddled-cancel" onclick={requestClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
 				<button type="button" class="ddled-draw" disabled={!value.trim()} onclick={requestDraw}>{isJapanese ? '描画' : 'Draw'}</button>
@@ -511,7 +515,7 @@
 		border-color: var(--action-disabled-bg);
 		opacity: 1;
 	}
-	.ddled-foot > :global(.tenkei-inline) { margin-right: auto; }
+	.ddled-settings { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-right: auto; }
 	.ddled-cancel:hover:not(:disabled) {
 		background: var(--bg2);
 	}

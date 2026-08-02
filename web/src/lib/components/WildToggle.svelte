@@ -24,7 +24,13 @@
 </script>
 
 <div class="wild-inline" role="group" aria-label={t().wildButton}>
-	{#if inherited}<span class="wild-inherit">{isJapanese ? '（継承）' : '(inherited)'}</span>{/if}
+	<!-- Named like TenkeiSelect's compact label so the two controls read as one
+	     row: what the switch governs, then whether it is inherited. -->
+	<span class="wild-inline-label"
+		>{isJapanese ? '筆致制限' : 'Stroke limit'}{#if inherited}<span class="wild-inherit"
+				>{isJapanese ? '（継承）' : '(inherited)'}</span
+			>{/if}{isJapanese ? '：' : ':'}</span
+	>
 	<button
 		type="button"
 		class="ghost-btn wild-btn"
@@ -37,7 +43,8 @@
 
 <style>
 	.wild-inline { display: inline-flex; align-items: center; gap: 4px; }
-	.wild-inherit { color: var(--fg3); font-size: 10px; }
+	.wild-inline-label { font-size: 11px; color: var(--fg3); white-space: nowrap; }
+	.wild-inherit { margin-left: 2px; color: var(--fg3); }
 	/* Svelte scopes styles per component, so `ghost-btn` alone would style nothing
 	   here and the button would fall back to the browser's own. The definition is
 	   the same one InputPanel and the other panels carry. */

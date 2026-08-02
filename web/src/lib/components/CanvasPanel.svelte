@@ -877,8 +877,10 @@
 					{:else if refineView === 'compare'}
 					<div class="compare-panel">
 					<div class="compare-head">
-						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} />
-						<div class="compare-action-wrap">
+						<!-- One box, so `space-between` puts the settings at the left and the
+						     action at the right instead of stranding the switch between them. -->
+						<div class="compare-head-settings"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
+						<div class="compare-action-wrap" class:running={modelInspection.busy}>
 							{#if modelInspection.busy}
 								<RunStatus
 									variant="inline"
@@ -955,8 +957,8 @@
 					{:else}
 					<div class="compare-panel">
 						<div class="compare-head">
-							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} />
-							<div class="compare-action-wrap">
+							<div class="compare-head-settings"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
+							<div class="compare-action-wrap" class:running={modelInspection.languageBusy}>
 								{#if modelInspection.languageBusy}
 									<RunStatus
 										variant="inline"
@@ -1723,6 +1725,7 @@
 		justify-content: space-between;
 		gap: 16px;
 	}
+	.compare-head-settings { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 	.compare-action-wrap {
 		width: min(260px, 34%);
 		min-width: 210px;
@@ -1730,7 +1733,10 @@
 	.compare-action-wrap :global(.tooltip-wrap) { width: 100%; }
 	.compare-action-wrap :global(.paint-btn) { margin-top: 0; }
 	/* While comparing, let the status widen past the button width so the full
-	   model name shows without truncation. */
+	   model name shows without truncation.  Keyed on a class this component
+	   writes: the status element belongs to RunStatus, so a selector naming it
+	   would be scoped away and match nothing. */
+	.compare-action-wrap.running { width: auto; min-width: 0; max-width: 62%; }
 	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover :global(.model-hover-card),

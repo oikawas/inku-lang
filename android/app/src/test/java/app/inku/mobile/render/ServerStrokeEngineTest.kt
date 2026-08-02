@@ -276,8 +276,18 @@ class ServerStrokeEngineTest {
             for (oIdx in result.outline.indices) {
                 val expPt = expectedOutline.getJSONArray(oIdx)
                 val actPt = result.outline[oIdx]
-                assertEquals("outline $oIdx X for $name", expPt.getDouble(0), actPt.first, 1e-6)
-                assertEquals("outline $oIdx Y for $name", expPt.getDouble(1), actPt.second, 1e-6)
+                val expX = expPt.getDouble(0)
+                val expY = expPt.getDouble(1)
+                if (expX.isNaN() && actPt.first.isNaN()) {
+                    // Both NaN: break marker match
+                } else {
+                    assertEquals("outline $oIdx X for $name", expX, actPt.first, 1e-6)
+                }
+                if (expY.isNaN() && actPt.second.isNaN()) {
+                    // Both NaN: break marker match
+                } else {
+                    assertEquals("outline $oIdx Y for $name", expY, actPt.second, 1e-6)
+                }
             }
 
             assertEquals("event_count for $name", caseObj.getInt("event_count"), result.eventCount)
@@ -348,8 +358,18 @@ class ServerStrokeEngineTest {
             for (lIdx in result.left.indices) {
                 val expPt = expectedLeft.getJSONArray(lIdx)
                 val actPt = result.left[lIdx]
-                assertEquals("left $lIdx X for $name", expPt.getDouble(0), actPt.first, 1e-4)
-                assertEquals("left $lIdx Y for $name", expPt.getDouble(1), actPt.second, 1e-4)
+                val expX = expPt.getDouble(0)
+                val expY = expPt.getDouble(1)
+                if (expX.isNaN() && actPt.first.isNaN()) {
+                    // Both NaN: break marker match
+                } else {
+                    assertEquals("left $lIdx X for $name", expX, actPt.first, 1e-4)
+                }
+                if (expY.isNaN() && actPt.second.isNaN()) {
+                    // Both NaN: break marker match
+                } else {
+                    assertEquals("left $lIdx Y for $name", expY, actPt.second, 1e-4)
+                }
             }
 
             // Right bank check
@@ -358,8 +378,18 @@ class ServerStrokeEngineTest {
             for (rIdx in result.right.indices) {
                 val expPt = expectedRight.getJSONArray(rIdx)
                 val actPt = result.right[rIdx]
-                assertEquals("right $rIdx X for $name", expPt.getDouble(0), actPt.first, 1e-4)
-                assertEquals("right $rIdx Y for $name", expPt.getDouble(1), actPt.second, 1e-4)
+                val expX = expPt.getDouble(0)
+                val expY = expPt.getDouble(1)
+                if (expX.isNaN() && actPt.first.isNaN()) {
+                    // Both NaN: break marker match
+                } else {
+                    assertEquals("right $rIdx X for $name", expX, actPt.first, 1e-4)
+                }
+                if (expY.isNaN() && actPt.second.isNaN()) {
+                    // Both NaN: break marker match
+                } else {
+                    assertEquals("right $rIdx Y for $name", expY, actPt.second, 1e-4)
+                }
             }
 
             assertEquals("event_count for $name", caseObj.getInt("event_count"), result.eventCount)

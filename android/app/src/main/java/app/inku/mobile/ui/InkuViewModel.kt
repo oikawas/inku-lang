@@ -33,6 +33,7 @@ import kotlin.random.Random
 
 const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。"
 const val DemoCanvasAspectId = "pixel9_landscape_safe"
+const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
 
@@ -82,8 +83,6 @@ data class InkuUiState(
     val historyStarredOnly: Boolean = false,
     val canvasAspectPluginEnabled: Boolean = true,
     val pngAlphaWhite: Boolean = false,
-    val showKiwi: Boolean = true,
-    val showCrab: Boolean = false,
     val saveReplayAsNewVersion: Boolean = true,
     val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val historySelectionCatalog: HistorySelectionBehavior = HistorySelectionBehavior.Current,
@@ -448,18 +447,8 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         persistSetting("png_alpha_white", JSONObject().put("enabled", enabled).toString())
     }
 
-    fun setShowKiwi(enabled: Boolean) {
-        localState.value = localState.value.copy(showKiwi = enabled)
-        persistSetting("show_kiwi", JSONObject().put("enabled", enabled).toString())
-    }
-
     fun setRenderWild(wild: Boolean) {
         localState.value = localState.value.copy(renderWild = wild)
-    }
-
-    fun setShowCrab(enabled: Boolean) {
-        localState.value = localState.value.copy(showCrab = enabled)
-        persistSetting("show_crab", JSONObject().put("enabled", enabled).toString())
     }
 
     fun setSaveReplayAsNewVersion(enabled: Boolean) {
@@ -537,7 +526,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
     fun setMascotKind(kind: String) {
         val normalized = if (kind == "yuragi") "yuragi" else "incu"
         localState.value = localState.value.copy(mascotKind = normalized, message = null)
-        persistSetting("mascot_kind", JSONObject().put("value", normalized).toString())
+        persistSetting(SETTING_KEY_MASCOT_KIND, JSONObject().put("value", normalized).toString())
     }
 
     fun toggleSaijiki() {
@@ -1163,15 +1152,13 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         val canvas = settings["canvas_aspect"]?.let { JSONObject(it).optString("value", current.selectedCanvasAspect) } ?: current.selectedCanvasAspect
         val canvasPlugin = settings["canvas_aspect_plugin"]?.let { JSONObject(it).optBoolean("enabled", current.canvasAspectPluginEnabled) } ?: current.canvasAspectPluginEnabled
         val pngAlpha = settings["png_alpha_white"]?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
-        val kiwi = settings["show_kiwi"]?.let { JSONObject(it).optBoolean("enabled", current.showKiwi) } ?: current.showKiwi
-        val crab = settings["show_crab"]?.let { JSONObject(it).optBoolean("enabled", current.showCrab) } ?: current.showCrab
         val replay = settings["save_replay_as_new_version"]?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
         val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val ddlAutoRepair = settings["ddl_auto_repair"]?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
         val litertPromptOptimization = settings["litert_stage1_prompt_optimization"]?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
-        val mascotKind = settings["mascot_kind"]?.let { JSONObject(it).optString("value", current.mascotKind) } ?: current.mascotKind
+        val mascotKind = settings[SETTING_KEY_MASCOT_KIND]?.let { JSONObject(it).optString("value", current.mascotKind) } ?: current.mascotKind
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
         val batchHistory = settings["batch_prompt_history"]?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
@@ -1187,8 +1174,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             selectedCanvasAspect = CanvasAspects.normalize(canvas),
             canvasAspectPluginEnabled = canvasPlugin,
             pngAlphaWhite = pngAlpha,
-            showKiwi = kiwi,
-            showCrab = crab,
             saveReplayAsNewVersion = replay,
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,

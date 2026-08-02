@@ -2184,10 +2184,6 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 ChipButton("Yuragi (蟹)", selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
             }
         }
-        SettingsCard("マスコット", "Web版の表示設定", "保存済み") {
-            SettingCheckRow(state.showKiwi, "進行表示のKiwi", viewModel::setShowKiwi)
-            SettingCheckRow(state.showCrab, "バッチ表示のCrab", viewModel::setShowCrab)
-        }
         SettingsCard("履歴選択", "Web版の履歴反映設定", "保存済み") {
             SettingChoiceRow(
                 title = "キャンバス",

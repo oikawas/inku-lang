@@ -2294,3 +2294,24 @@ catalog checks see none of it), a **control** that renames without reordering (a
 the `HAVING` (3), reverting `coalesce` to strict equality (1), disabling the revision filter (2),
 disabling the folder-name clear (1), and `<` to `<=` on the retry limit (2 of 14). All were reverted and
 the values read back to confirm restoration. Patch bump.
+
+### v2.9.28 — The wild toggle stops showing the browser's own button (Build 826, 2026-08-02)
+
+**The `WildToggle` that v2.9.27 placed in six modals was the one light box in a dark dialog.**
+
+The cause was CSS scoping. The button was written `class="ghost-btn wild-btn"`, but
+**`WildToggle.svelte`'s own `<style>` carried no `.ghost-btn` definition**, and Svelte scopes styles
+per component -- so **`ghost-btn` styled nothing**. `.wild-btn` holds only the size tokens
+(`--btn-sm-*`), so the off state fell through to **the browser's own button**. The on state looked
+right, because `.wild-btn.active` paints `--accent` -- **looking only at the pressed state hides it.**
+
+The definition `InputPanel` and the other panels carry was placed in `WildToggle.svelte`.
+**Tokens only; no literal px and no literal colors.**
+
+**Counted across the components, `WildToggle` was the only one that used `.ghost-btn` without
+defining it** (`ProfileModal` defines it in a grouped selector).
+
+`npm run check` **235 / 0 / 2**, `lint:i18n` **975/47/0/0** and `test:unit` **14** are all unchanged.
+**The compare buttons were not touched** -- the dark fill is `--action-disabled-bg`, the disabled
+state that holds while no model or combination is checked (checking one turns it `--action-bg`, the
+same fill as the main paint button). **Left as it stands, by the author's decision.** Patch bump.

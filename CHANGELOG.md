@@ -2415,3 +2415,47 @@ pools). The 48 resolved entries were dropped because the changelog holds them.
 **Until 2026-08-02 §17 carried the list itself.** Resolved entries had grown to more than half the
 section, and the unresolved ones were tracked in two places at once. **The changelog keeps the
 record; the ledger keeps the tracking.**
+
+### v2.9.29 — Raising every dependency at once turns up two gates that were green and watching nothing (Build 828, 2026-08-02)
+
+**pydantic, sqlalchemy, pytest, ruff, fastapi, starlette, uvicorn, cryptography, anthropic, openai,
+@sveltejs/kit, svelte, svelte-check, vite and pillow all moved. Not one line of product code
+changed.**
+
+**What this release actually amounts to shows up in the checks, not in the version numbers.**
+
+**`fastapi` 0.141 stopped `include_router` from flattening routes into `app.routes` and put an
+opaque wrapper there instead.** Counting `APIRoute` objects out of `app.routes` goes from **81 to
+0**. No product code reads `app.routes`, so **nothing about the running server changed** — but of
+the three tests that did read it, **two kept returning green with nothing to enumerate**: the list
+of "endpoints still living in api.py" came out empty not because the condition held but because
+**the enumeration picked up nothing at all**. All three now read through
+`fastapi.routing.iter_route_contexts`, and **an explicit non-empty assertion was added**. The next
+time upstream moves the enumeration, it will fail instead of falling silent.
+
+**Nothing tested the `anthropic` call surface.** Before the SDK moved,
+`server/tests/test_anthropic_call_surface.py` (13 tests) was written to freeze **the set of keys
+sent and the set of response attributes read** at all four call sites. The SDK then went from
+0.96.0 to 0.120.2 with **all thirteen green and no product change**, and **one real call was put
+through** (stage 1 and stage 2 to a 6,724-byte SVG, 3.54 seconds in total).
+
+**`ruff` 0.16 widened its default rule set from 59 rules to 413.** The repository carried no ruff
+configuration at all, so **what "All checks passed" meant was delegated to whichever version was
+installed**. 353 findings appeared without a line of code changing, and the largest group of 76 was
+against **the `Depends()` form FastAPI itself prescribes**. `select = ["E4", "E7", "E9", "F"]` now
+states the set explicitly and **freezes it at the same 59 rules as before** (the cli side carries
+the same pin). **Which of the 354 added rules to adopt is a question the ledger holds.**
+
+**`typescript` 7 was left out.** `svelte-check` refuses TypeScript 7 on its own before type
+checking begins, and in the dual install it demands, **the `--tsgo` path checks 38 files where the
+current path checks 235** (16%). **Cutting the type-checking net to a sixth in order to raise a
+dependency is the wrong trade**, so 6.0.3 stays. → ledger
+
+**Stored data was read back through ciphertext made before the upgrade** — three API keys were
+encrypted under `cryptography` 47.0.0, the library was raised to 50.0.0, and **all three decrypted**,
+down to **returning an empty string rather than raising when the key does not match**.
+
+**What did not move**: the ledger in `test_api_surface.py` stayed at **81 / 81 / 80, byte-identical
+down to the digest**, across five fastapi minor versions, and the frozen corpora are
+**byte-identical** as well (the ground texture seed is a hash of the whole Score dump, so drift
+there would have changed the pictures).

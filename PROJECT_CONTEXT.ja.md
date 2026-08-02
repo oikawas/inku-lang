@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.28 / Build 827**
+**対象バージョン: v2.9.29 / Build 828**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -166,7 +166,7 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 
 ### 検査面
 
-- **`server/tests`** — pytest。ルート認可の網羅（生きた `app.routes` を歩く）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
+- **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
 現役は `render-engine-20`（525 件）と `ddl-engine-4`（33 件）で、再生成のバイト一致を CI が強制する。
 - **`cli/tests`** — pytest。

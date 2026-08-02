@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.28 / Build 827**
+**Target version: v2.9.29 / Build 828**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -200,9 +200,11 @@ It can lag at any time, so an Android version number must not be read as the ser
 
 ### Verification surfaces
 
-- **`server/tests`** — pytest, including route-authorization coverage (walking the live `app.routes`),
-API-surface identity (compared against `tests/data/api-surface-baseline.json`), and route-body
-location (counting `route.endpoint.__module__`).
+- **`server/tests`** — pytest, including route-authorization coverage (walking the live routes
+through `fastapi.routing.iter_route_contexts`; **reading `app.routes` directly yields nothing from
+fastapi 0.141 onward**), API-surface identity (compared against
+`tests/data/api-surface-baseline.json`), and route-body location (counting
+`route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
 `render-engine-20` (525 cases) and `ddl-engine-4` (33 cases) are current, and CI enforces
 byte-identical regeneration.

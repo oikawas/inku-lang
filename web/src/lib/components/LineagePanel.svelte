@@ -7,7 +7,7 @@
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
-	import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
 	import { runContactSheet } from '$lib/features/contact-sheet/run';
@@ -229,6 +229,22 @@
 	function operationLabel(kind?: string): string {
 		return derivationKindLabel(kind, isJapanese);
 	}
+
+// The short name is for the card; the full "provider / model" stays in the
+// title, so the provider is one hover away rather than gone.
+function stageModelNames(history: HistoryItem | null | undefined): string {
+	const stage1 = modelShortName(history?.stage1_model);
+	const stage2 = modelShortName(history?.stage2_model);
+	if (!stage1 && !stage2) return '';
+	if (stage1 && stage2 && stage1 !== stage2) return `${stage1} / ${stage2}`;
+	return stage1 || stage2;
+}
+
+function stageModelTitle(history: HistoryItem | null | undefined): string {
+	const stage1 = history?.stage1_model ? modelDisplayName(history.stage1_model) : '';
+	const stage2 = history?.stage2_model ? modelDisplayName(history.stage2_model) : '';
+	return [stage1 && `Stage 1: ${stage1}`, stage2 && `Stage 2: ${stage2}`].filter(Boolean).join('\n');
+}
 
 function toggleCheckedHistory(historyId: string): void {
 	checkedHistoryIds = checkedHistoryIds.includes(historyId)
@@ -790,6 +806,14 @@ $effect(() => {
 								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted work')} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
+										<!-- Both stages only when they differ: naming the same model twice
+										     on a card this narrow says nothing and costs the width the
+										     operation label needs. Nothing at all when no model was
+										     recorded -- an em dash on every such card fills the lineage
+										     with punctuation. -->
+										{#if stageModelNames(node.history)}
+											<span class="operation-model" title={stageModelTitle(node.history)}>{stageModelNames(node.history)}</span>
+										{/if}
 									</div>
 									<div class="preview">
 										{#if node.history?.svg}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{isJapanese ? '削除済み' : 'Deleted'}</span>{/if}
@@ -1000,7 +1024,12 @@ $effect(() => {
 	.card-main { user-select: none; display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: .7rem; }
+	/* One line, never wrapping: the card has a fixed width and the operation
+	   label sets the row height. The model name gives up its width first and
+	   ends in an ellipsis rather than pushing the label onto a second line. */
+	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: .7rem; display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+	.operation > span:first-child { flex: 0 0 auto; }
+	.operation-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg3); font-size: .62rem; }
 	.identity-marks { min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 3px; }
 	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: .62rem; }
 	.identity-mark { color: var(--fg3); background: var(--bg2); }

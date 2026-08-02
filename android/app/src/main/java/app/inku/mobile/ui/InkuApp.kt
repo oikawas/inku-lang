@@ -1,5 +1,14 @@
 package app.inku.mobile.ui
 
+import app.inku.mobile.ui.mascot.MascotArt
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Easing
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.drawscope.withTransform
 import android.content.Context
 import android.content.Intent
 import android.content.ClipData
@@ -4893,13 +4902,124 @@ internal fun MascotWidget(
 
 @Composable
 internal fun IncuMascotView(modifier: Modifier = Modifier) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(6.dp),
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val isAnimated = remember {
+        try {
+            android.provider.Settings.Global.getFloat(
+                context.contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1.0f
+            ) != 0.0f
+        } catch (_: Throwable) {
+            true
+        }
+    }
+
+    val transition = rememberInfiniteTransition(label = "incu_anim")
+    val timeMs by if (isAnimated) {
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 420000f, // 420s LCM of periods
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 420000, easing = LinearEasing)
+            ),
+            label = "time_ms"
+        )
+    } else {
+        remember { mutableStateOf(0f) }
+    }
+
+    Box(
+        modifier = modifier
+            .testTag("mascot_incu")
+            .size(32.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
     ) {
-        Text("🧊", style = MaterialTheme.typography.bodyMedium)
-        Text("Incu (立方体)", style = MaterialTheme.typography.labelMedium)
+        Canvas(modifier = Modifier.size(32.dp)) {
+            val scaleFactor = size.width / 92f
+            val timeSec = timeMs / 1000.0
+
+            val spinAngle = if (isAnimated) ((timeSec % MascotArt.INCU_SPIN_PERIOD_SEC) / MascotArt.INCU_SPIN_PERIOD_SEC * 360.0).toFloat() else 0f
+
+            withTransform({
+                scale(scaleFactor, scaleFactor, pivot = Offset.Zero)
+                rotate(spinAngle, pivot = Offset(46f, 46f))
+            }) {
+                for (cell in MascotArt.INCU_GRID) {
+                    if (cell.face == MascotArt.IncuFace.NONE) continue
+
+                    val hexColor = when (cell.face) {
+                        MascotArt.IncuFace.TOP -> {
+                            if (cell.isIncubator) {
+                                val phase = ((timeSec % MascotArt.INCU_INCUBATE_TOP_PERIOD_SEC) / MascotArt.INCU_INCUBATE_TOP_PERIOD_SEC)
+                                if (isAnimated && phase >= 0.5) MascotArt.COLOR_INCUBATE_TOP else MascotArt.COLOR_TOP
+                            } else MascotArt.COLOR_TOP
+                        }
+                        MascotArt.IncuFace.LEFT -> {
+                            if (cell.isIncubator) {
+                                val phase = ((timeSec % MascotArt.INCU_INCUBATE_LEFT_PERIOD_SEC) / MascotArt.INCU_INCUBATE_LEFT_PERIOD_SEC)
+                                if (isAnimated && phase >= 0.5) MascotArt.COLOR_INCUBATE_LEFT else MascotArt.COLOR_LEFT
+                            } else MascotArt.COLOR_LEFT
+                        }
+                        MascotArt.IncuFace.RIGHT -> {
+                            if (cell.isIncubator) {
+                                val phase = ((timeSec % MascotArt.INCU_INCUBATE_RIGHT_PERIOD_SEC) / MascotArt.INCU_INCUBATE_RIGHT_PERIOD_SEC)
+                                if (isAnimated && phase >= 0.5) MascotArt.COLOR_INCUBATE_RIGHT else MascotArt.COLOR_RIGHT
+                            } else MascotArt.COLOR_RIGHT
+                        }
+                        else -> MascotArt.COLOR_TOP
+                    }
+                    val color = Color(android.graphics.Color.parseColor(hexColor))
+
+                    val (cellScale, cellAngle, cornerRadius) = if (isAnimated) {
+                        val rawT = (timeSec - cell.delaySeconds) % MascotArt.INCU_BREATHE_PERIOD_SEC
+                        val t = if (rawT < 0) rawT + MascotArt.INCU_BREATHE_PERIOD_SEC else rawT
+                        val normT = t / MascotArt.INCU_BREATHE_PERIOD_SEC
+                        when {
+                            normT < 0.10 -> Triple(1.0f, 0.0f, 0.0f)
+                            normT < 0.40 -> {
+                                val p = ((normT - 0.10) / 0.30).toFloat()
+                                Triple(1.0f - p * 0.67f, p * 180f, p * 8.0f)
+                            }
+                            normT < 0.60 -> Triple(0.33f, 180.0f, 8.0f)
+                            normT < 0.90 -> {
+                                val p = ((normT - 0.60) / 0.30).toFloat()
+                                Triple(0.33f + p * 0.67f, 180f + p * 180f, 8.0f * (1.0f - p))
+                            }
+                            else -> Triple(1.0f, 360.0f, 0.0f)
+                        }
+                    } else Triple(1.0f, 0.0f, 0.0f)
+
+                    val col = cell.x + 2
+                    val row = cell.y + 2
+                    val baseLeft = col * 19.0f
+                    val baseTop = row * 19.0f
+                    val cellCenterX = baseLeft + 8.0f
+                    val cellCenterY = baseTop + 8.0f
+
+                    withTransform({
+                        rotate(cellAngle, pivot = Offset(46f, 46f))
+                        scale(cellScale, cellScale, pivot = Offset(cellCenterX, cellCenterY))
+                    }) {
+                        if (cornerRadius > 0f) {
+                            drawRoundRect(
+                                color = color,
+                                topLeft = Offset(baseLeft, baseTop),
+                                size = Size(16.0f, 16.0f),
+                                cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+                            )
+                        } else {
+                            drawRect(
+                                color = color,
+                                topLeft = Offset(baseLeft, baseTop),
+                                size = Size(16.0f, 16.0f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -2498,3 +2498,38 @@ selector naming it would be scoped away.
 variety; it reads as an accident.** The wild button in the input panel is left
 unlabelled: that row has no notion of inheriting, and none of its buttons carry
 a label.
+
+### v2.9.31 — The lineage details name their engine, and the hash can be carried out (Build 833, 2026-08-02)
+
+**Three things were added to the lineage cards.** None of them is a new
+mechanism: each shows **something that already arrived and simply never reached
+the screen**. The lineage response carries the history row as it stands, so
+`render_engine_id`, `render_engine_version`, `ddl_engine_version`,
+`render_build_number` and `for_revision` were **already on the node before this
+change**. Not a line of the server moved.
+
+**(1) The details name the engine.** Opening "Details" now shows **render engine
+/ transform layer / Build** directly under rh2 -- **the same trio in the same
+order as the provenance on the canvas**, so a lineage card and the canvas
+details read in one vocabulary. A work with nothing recorded shows the same `—`
+its neighbouring rows use (**older works are the ones that lack it, and phrasing
+that case differently would make an absence look like a fault**).
+
+**(2) The render hash can be carried out.** The rh2 row grew a copy button.
+**What it copies is the whole `render_hash`, not the abbreviation on screen** --
+the first ten characters are a shape for the eye, not an identity you can paste.
+The fallback for browsers without `navigator.clipboard` matches the one the
+history manager already uses.
+
+**(3) The revision mark moved next to the star.** Until now the mark could only
+be toggled from the history manager, so **a work you decided to revise while
+reading the lineage could not be marked without leaving the view**. A ✎ now sits
+in the same place and the same shell as the star, and pressing it moves the same
+column the history manager's "for revision" filter reads. **The star and the
+revision mark are independent** -- a work may carry either, both or neither.
+
+**The wiring was confirmed by perturbation.** The callback is threaded through
+three layers (page → canvas → lineage), so **a single missed connection would
+produce the defect where the button exists and nothing happens**. Removing each
+of the two intermediate hops turned the type check red, and restoring them
+returned it to green.

@@ -6,9 +6,9 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class Engine17VersionTest {
+class Engine19VersionTest {
     @Test
-    fun testRendererMetadataDeclaresEngine17() {
+    fun testRendererMetadataDeclaresEngine19() {
         val result = DefaultSvgRenderer().render(
             app.inku.mobile.pipeline.RenderRequest(
                 scoreJson = """{"instructions":[]}""",
@@ -17,11 +17,11 @@ class Engine17VersionTest {
                 svgProfile = "editable",
             )
         )
-        assertEquals("17", JSONObject(result.metadataJson).getString("render_engine_version"))
+        assertEquals("19", JSONObject(result.metadataJson).getString("render_engine_version"))
     }
 
     @Test
-    fun testRenderHashDefaultsMissingAndBlankMetadataToEngine17() {
+    fun testRenderHashDefaultsMissingAndBlankMetadataToEngine19() {
         val pipeline = LocalFallbackPipeline()
         val method = LocalFallbackPipeline::class.java.getDeclaredMethod(
             "renderHash",
@@ -44,15 +44,15 @@ class Engine17VersionTest {
                 "default",
             ) as String
 
-        val explicit17 = hash(JSONObject().put("render_engine_version", "17"))
-        assertEquals(explicit17, hash(JSONObject()))
-        assertEquals(explicit17, hash(JSONObject().put("render_engine_version", "")))
+        val explicit19 = hash(JSONObject().put("render_engine_version", "19"))
+        assertEquals(explicit19, hash(JSONObject()))
+        assertEquals(explicit19, hash(JSONObject().put("render_engine_version", "")))
     }
 
     // The version the UI shows is pinned to a literal so that leaving it stale fails here.
     @Test
-    fun testCompatibilityConstantsDeclareEngine17() {
-        assertEquals("17", CompatibilityConstants.renderEngineVersion)
+    fun testCompatibilityConstantsDeclareEngine19() {
+        assertEquals("19", CompatibilityConstants.renderEngineVersion)
         assertEquals("default", CompatibilityConstants.renderEngineId)
     }
 

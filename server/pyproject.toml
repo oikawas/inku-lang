@@ -7,14 +7,14 @@ requires-python = ">=3.12"
 dependencies = [
     "inku-analysis",
     "anthropic>=0.96.0",
-    "fastapi>=0.136.0",
+    "fastapi>=0.141.1",
     "openai>=2.32.0",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "cryptography>=46.0.0",
     "sqlalchemy>=2.0.51",
     "svgwrite>=1.4.3",
-    "uvicorn[standard]>=0.45.0",
+    "uvicorn[standard]>=0.52.1",
     "pillow>=12.3.0",
 ]
 

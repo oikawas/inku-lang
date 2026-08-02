@@ -4,9 +4,15 @@ The gate walks the live app, not the source text.  A regex over api.py would
 stop working the moment routes move into routers -- which is exactly what the
 module split does.  Router-level dependencies DO appear in route.dependant
 (verified 2026-08-01), so the split does not have to keep per-route guards.
+
+Enumerate through `iter_route_contexts`, not `app.routes` directly: fastapi
+0.141 stopped flattening included routers into `app.routes` and puts an opaque
+`_IncludedRouter` wrapper there instead, so `isinstance(r, APIRoute)` over
+`app.routes` silently yields nothing (measured 2026-08-02: 81 -> 0).  A gate that
+enumerates zero routes stays green while checking nothing.
 """
 
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, iter_route_contexts
 
 from inku_server.api import app
 
@@ -44,8 +50,13 @@ def _guard_names(dependant, seen=None) -> set[str]:
     return names
 
 
-def _api_routes() -> list[APIRoute]:
-    return [r for r in app.routes if isinstance(r, APIRoute)]
+def _api_routes() -> list:
+    # RouteContext forwards .path and .dependant to the effective route.
+    return [
+        ctx
+        for ctx in iter_route_contexts(app.routes)
+        if isinstance(ctx.original_route, APIRoute)
+    ]
 
 
 def test_endpoint_count_is_unchanged():

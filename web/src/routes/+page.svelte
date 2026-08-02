@@ -3645,6 +3645,47 @@ if (unreadWords.length > 0) {
 		}
 	}
 
+	type HistoryForRevisionTarget = { id?: string; for_revision?: boolean };
+
+	// The revision mark rides the same paths as the star and never touches it:
+	// the two are separate columns, and a work can carry either, both or neither.
+	function updateHistoryForRevisionState(item: HistoryForRevisionTarget) {
+		if (!item.id) return;
+		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		historyManager.applyForRevisionState(item);
+		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, for_revision: item.for_revision };
+		if (lineageGraph) {
+			lineageGraph = {
+				...lineageGraph,
+				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
+					? { ...node, history: { ...node.history, for_revision: item.for_revision } }
+					: node)
+			};
+		}
+	}
+
+	async function toggleHistoryForRevision(item: HistoryForRevisionTarget | null | undefined, event?: Event): Promise<void> {
+		event?.stopPropagation();
+		if (!item?.id) return;
+		const nextForRevision = !item.for_revision;
+		updateHistoryForRevisionState({ ...item, for_revision: nextForRevision });
+		try {
+			const r = await apiFetch(`/api/history/${item.id}/for-revision`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ for_revision: nextForRevision })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const updated = await r.json() as Iteration;
+			updateHistoryForRevisionState(updated);
+			if (historyManager.forRevisionOnly) await historyManager.fetch();
+		} catch (e) {
+			updateHistoryForRevisionState(item);
+			console.warn('failed to update the revision mark', e);
+		}
+	}
+
 	async function refreshCurrentUserOnly(): Promise<void> {
 		try {
 			const r = await apiFetch('/api/auth/me', { cache: 'no-store' });
@@ -6281,6 +6322,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			selectedHistoryIds={historyManager.selectedIds}
 			animationExportSettings={exportSettings.animation}
 			historyManagerStarredOnly={historyManager.starredOnly}
+			historyManagerForRevisionOnly={historyManager.forRevisionOnly}
 			onClose={() => (historyManager.open = false)}
 			onSetView={historyManager.setView}
 			onSetPage={historyManager.setPage}
@@ -6288,6 +6330,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetFirstPage={() => historyManager.setPage(historyManager.totalPages - 1)}
 			onSetPageSize={historyManager.setPageSize}
 			onSetStarredOnly={historyManager.setStarredOnly}
+			onSetForRevisionOnly={historyManager.setForRevisionOnly}
+			onToggleForRevision={toggleHistoryForRevision}
 			onSelectAll={selectAllManagedHistory}
 			onAskTrash={askTrash}
 			onAskRestore={askRestore}

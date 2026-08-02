@@ -322,6 +322,10 @@ export const ja: LangPack = {
 	starOn: 'スターを外す',
 	starOff: 'スターを付ける',
 	historyStarredOnly: 'スターのみ',
+	historyForRevisionOnly: '推敲のみ',
+	tooltipHistoryForRevisionOnly: '推敲マークを付けた作品だけを表示します。スターのみと併せると両方に該当する作品だけになります。',
+	forRevisionOn: '推敲マークを外す',
+	forRevisionOff: '推敲マークを付ける',
 
 	promptStage1Input: 'Stage 1 ユーザー入力',
 	promptStage1System: 'Stage 1 システムプロンプト',
@@ -678,6 +682,7 @@ export const ja: LangPack = {
 	historyLineageEmpty: '該当する系譜はありません。',
 	historyLineageWorkCount: (n) => `作品 ${n}件`,
 	historyLineageStarCount: (n) => `スター ${n}件`,
+	historyLineageForRevisionCount: (n) => `推敲 ${n}件`,
 	historyCurrentLineage: '表示中作品の系譜',
 	historyLineageExpand: '作品を表示',
 	historyLineageCollapse: '閉じる',

@@ -69,6 +69,8 @@ class HistoryItem(HistoryPostBody):
     render_hash_short: str | None = None
     trashed: bool = False
     starred: bool = False
+    # The revision mark, independent of starred.
+    for_revision: bool = False
     note: str | None = None
     description_hash: str | None = None
     lineage_node_id: str | None = None

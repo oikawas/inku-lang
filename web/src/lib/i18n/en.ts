@@ -322,6 +322,10 @@ export const en: LangPack = {
 	starOn: 'Remove star',
 	starOff: 'Add star',
 	historyStarredOnly: 'Starred only',
+	historyForRevisionOnly: 'For revision only',
+	tooltipHistoryForRevisionOnly: 'Show only the works marked for revision. Combined with Starred only it shows the works that carry both marks.',
+	forRevisionOn: 'Remove revision mark',
+	forRevisionOff: 'Mark for revision',
 
 	promptStage1Input: 'Stage 1 user input',
 	promptStage1System: 'Stage 1 system prompt',
@@ -678,6 +682,7 @@ export const en: LangPack = {
 	historyLineageEmpty: 'No matching lineages.',
 	historyLineageWorkCount: (n) => `${n} work${n === 1 ? '' : 's'}`,
 	historyLineageStarCount: (n) => `${n} starred`,
+	historyLineageForRevisionCount: (n) => `${n} for revision`,
 	historyCurrentLineage: 'Lineage of the displayed work',
 	historyLineageExpand: 'Show works',
 	historyLineageCollapse: 'Collapse',

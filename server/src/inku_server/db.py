@@ -138,6 +138,10 @@ class HistoryRow(Base):
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
+    # A second, independent mark: 'this one is worth working on again'. Kept
+    # apart from starred so a work can be a favourite, a revision target, both
+    # or neither.
+    for_revision = Column(Integer,    nullable=False, default=0)
     note         = Column(Text,       nullable=True)
     source_text = Column(Text, nullable=True)
     display_label = Column(String, nullable=True)
@@ -318,6 +322,7 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "render_hash": "ALTER TABLE history ADD COLUMN render_hash VARCHAR",
     "trashed": "ALTER TABLE history ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
     "starred": "ALTER TABLE history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
+    "for_revision": "ALTER TABLE history ADD COLUMN for_revision INTEGER NOT NULL DEFAULT 0",
     "note": "ALTER TABLE history ADD COLUMN note TEXT",
     "source_text": "ALTER TABLE history ADD COLUMN source_text TEXT",
     "display_label": "ALTER TABLE history ADD COLUMN display_label VARCHAR",
@@ -436,6 +441,10 @@ _HISTORY_INDEX_MIGRATIONS = (
     (
         "ix_history_user_starred_trashed_at",
         "CREATE INDEX IF NOT EXISTS ix_history_user_starred_trashed_at ON history (user_id, starred, trashed, at)",
+    ),
+    (
+        "ix_history_user_for_revision_trashed_at",
+        "CREATE INDEX IF NOT EXISTS ix_history_user_for_revision_trashed_at ON history (user_id, for_revision, trashed, at)",
     ),
     ("ix_history_render_hash", "CREATE INDEX IF NOT EXISTS ix_history_render_hash ON history (render_hash)"),
     ("ix_history_user_description_hash", "CREATE INDEX IF NOT EXISTS ix_history_user_description_hash ON history (user_id, description_hash)"),
@@ -1785,6 +1794,7 @@ def _row_to_dict(row: HistoryRow) -> dict:
         "render_hash_short": render_hash_short(row.render_hash),
         "trashed":      bool(row.trashed),
         "starred":      bool(row.starred),
+        "for_revision": bool(row.for_revision),
     "note":         row.note,
     "source_text": row.source_text if row.source_text is not None else row.input,
     "display_label": row.display_label,
@@ -2031,7 +2041,7 @@ def add_item(item: dict) -> dict:
         interpret_fallback=item.get("interpret_fallback"),
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
         seed_text=item.get("seed_text"),
-        render_hash=render_hash, trashed=0, starred=0, note=item.get("note"),
+        render_hash=render_hash, trashed=0, starred=0, for_revision=0, note=item.get("note"),
         source_text=source_text, display_label=item.get("display_label"),
         batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),
         description_hash=desc_hash, history_visibility=visibility, lineage_node_id=node_id,
@@ -2876,6 +2886,7 @@ def _list_items_with_fts(
     trashed: bool,
     search: str,
     starred: bool,
+    for_revision: bool = False,
 ) -> tuple[list[dict], int]:
     params = {
         "user_id": user_id,
@@ -2885,6 +2896,9 @@ def _list_items_with_fts(
         "offset": offset,
     }
     starred_clause = "AND h.starred = 1" if starred else ""
+    # Both marks filter at once and independently: asking for starred and for
+    # for_revision means both, not either.
+    for_revision_clause = "AND h.for_revision = 1" if for_revision else ""
     total = session.execute(
         text(
             f"""
@@ -2895,6 +2909,7 @@ def _list_items_with_fts(
               AND h.trashed = :trashed
               AND h.history_visibility = 'normal'
               {starred_clause}
+              {for_revision_clause}
               AND history_fts MATCH :match
             """
         ),
@@ -2912,6 +2927,7 @@ def _list_items_with_fts(
                   AND h.trashed = :trashed
                   AND h.history_visibility = 'normal'
                   {starred_clause}
+                  {for_revision_clause}
                   AND history_fts MATCH :match
                 ORDER BY h.at DESC
                 LIMIT :limit OFFSET :offset
@@ -2935,6 +2951,7 @@ def list_items(
     trashed: bool = False,
     query_text: str = "",
     starred: bool = False,
+    for_revision: bool = False,
 ) -> tuple[list[dict], int]:
     with SessionLocal() as session:
         query = session.query(HistoryRow).filter(
@@ -2944,9 +2961,13 @@ def list_items(
         )
         if starred:
             query = query.filter(HistoryRow.starred == 1)
+        if for_revision:
+            query = query.filter(HistoryRow.for_revision == 1)
         search = query_text.strip()
         if search and _use_history_fts(search):
-            return _list_items_with_fts(session, user_id, offset, limit, trashed, search, starred)
+            return _list_items_with_fts(
+                session, user_id, offset, limit, trashed, search, starred, for_revision
+            )
         if search:
             query = query.filter(_history_search_clause(search))
         total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
@@ -2967,6 +2988,7 @@ def list_lineage_groups(
     trashed: bool = False,
     query_text: str = "",
     starred: bool = False,
+    for_revision: bool = False,
     min_item_count: int = 1,
 ) -> tuple[list[dict], int]:
     """List deterministic history groups, paginated by lineage rather than artwork.
@@ -2989,6 +3011,8 @@ def list_lineage_groups(
         )
         if starred:
             query = query.filter(HistoryRow.starred == 1)
+        if for_revision:
+            query = query.filter(HistoryRow.for_revision == 1)
         search = query_text.strip()
         if search:
             query = query.filter(_history_search_clause(search))
@@ -2997,6 +3021,7 @@ def list_lineage_groups(
             root_id.label("root_node_id"),
             func.count(HistoryRow.id).label("item_count"),
             func.sum(case((HistoryRow.starred == 1, 1), else_=0)).label("starred_count"),
+            func.sum(case((HistoryRow.for_revision == 1, 1), else_=0)).label("for_revision_count"),
             func.max(HistoryRow.at).label("latest_at"),
         ).group_by(root_id)
         if min_item_count > 1:
@@ -3049,6 +3074,7 @@ def list_lineage_groups(
                 "representative": representative,
                 "item_count": int(row.item_count or 0),
                 "starred_count": int(row.starred_count or 0),
+                "for_revision_count": int(row.for_revision_count or 0),
                 "latest_at": int(row.latest_at or 0),
             })
         return groups, total
@@ -3062,6 +3088,7 @@ def list_lineage_group_items(
     trashed: bool = False,
     query_text: str = "",
     starred: bool = False,
+    for_revision: bool = False,
 ) -> tuple[list[dict], int]:
     with SessionLocal() as session:
         root = session.query(LineageNodeRow).filter(
@@ -3088,6 +3115,8 @@ def list_lineage_group_items(
         )
         if starred:
             query = query.filter(HistoryRow.starred == 1)
+        if for_revision:
+            query = query.filter(HistoryRow.for_revision == 1)
         search = query_text.strip()
         if search:
             query = query.filter(_history_search_clause(search))
@@ -3096,7 +3125,13 @@ def list_lineage_group_items(
         return _rows_to_dicts_with_lineage(session, rows), total
 
 
-def item_position(user_id: str, item_id: str, trashed: bool = False, starred: bool = False) -> int | None:
+def item_position(
+    user_id: str,
+    item_id: str,
+    trashed: bool = False,
+    starred: bool = False,
+    for_revision: bool = False,
+) -> int | None:
     with SessionLocal() as session:
         target = session.query(HistoryRow).filter(
             HistoryRow.user_id == user_id,
@@ -3105,6 +3140,8 @@ def item_position(user_id: str, item_id: str, trashed: bool = False, starred: bo
             HistoryRow.history_visibility == "normal",
         ).first()
         if target is None or (starred and not target.starred):
+            return None
+        if for_revision and not target.for_revision:
             return None
         query = session.query(func.count(HistoryRow.id)).filter(
             HistoryRow.user_id == user_id,
@@ -3117,6 +3154,8 @@ def item_position(user_id: str, item_id: str, trashed: bool = False, starred: bo
         )
         if starred:
             query = query.filter(HistoryRow.starred == 1)
+        if for_revision:
+            query = query.filter(HistoryRow.for_revision == 1)
         return int(query.scalar() or 0)
 
 
@@ -3133,6 +3172,22 @@ def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None
         if note is not None:
             clean_note = note.strip()[:240]
             row.note = clean_note or None
+        session.commit()
+        session.refresh(row)
+        return _row_to_dict(row)
+
+
+def set_item_for_revision(user_id: str, item_id: str, for_revision: bool) -> dict | None:
+    """Raise or drop the revision mark. Independent of starred: neither reads the other."""
+    with SessionLocal() as session:
+        row = (
+            session.query(HistoryRow)
+            .filter(HistoryRow.user_id == user_id, HistoryRow.id == item_id)
+            .first()
+        )
+        if not row:
+            return None
+        row.for_revision = 1 if for_revision else 0
         session.commit()
         session.refresh(row)
         return _row_to_dict(row)

@@ -326,6 +326,11 @@ export interface LangPack {
 	selectionNotePrompt: string;
 	selectionNoteLabel: string;
 	historyStarredOnly: string;
+	historyForRevisionOnly: string;
+	tooltipHistoryForRevisionOnly: string;
+	forRevisionOn: string;
+	forRevisionOff: string;
+	historyLineageForRevisionCount: (count: number) => string;
 
 	// Prompts tab
 	promptStage1Input: string;

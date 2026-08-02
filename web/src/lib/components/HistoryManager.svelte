@@ -46,10 +46,11 @@
 	lineage_root_node_id?: string | null;
 		trashed?: boolean;
 		starred?: boolean;
+		for_revision?: boolean;
 	note?: string | null;
 	};
 
-	type LineageHistoryGroup = { root_node_id: string; representative: HistoryItem; item_count: number; starred_count: number; latest_at: number };
+	type LineageHistoryGroup = { root_node_id: string; representative: HistoryItem; item_count: number; starred_count: number; for_revision_count: number; latest_at: number };
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
 	type Props = {
@@ -68,6 +69,7 @@
 		animationExportSettings: AnimationExportSettings;
 		historySearch: string;
 		historyManagerStarredOnly: boolean;
+		historyManagerForRevisionOnly: boolean;
 		onClose: () => void;
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
@@ -75,6 +77,8 @@
 		onSetFirstPage: () => void | Promise<void>;
 		onSetPageSize: (pageSize: number) => void;
 		onSetStarredOnly: (value: boolean) => void;
+		onSetForRevisionOnly: (value: boolean) => void;
+		onToggleForRevision: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		onSelectAll: () => void;
 		onAskTrash: (ids: string[]) => void;
 		onAskRestore: (ids: string[]) => void;
@@ -109,6 +113,7 @@
 		animationExportSettings,
 		historySearch = $bindable(''),
 		historyManagerStarredOnly,
+		historyManagerForRevisionOnly,
 		onClose,
 		onSetView,
 		onSetPage,
@@ -116,6 +121,8 @@
 		onSetFirstPage,
 		onSetPageSize,
 		onSetStarredOnly,
+		onSetForRevisionOnly,
+		onToggleForRevision,
 		onSelectAll,
 		onAskTrash,
 		onAskRestore,
@@ -204,6 +211,7 @@
 		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim() });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
+		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
 		// The thumbnail tab lays a lineage's works out side by side, so a lineage
 		// holding one work has nothing to lay out. The server drops them, because
 		// dropping them here would leave short pages and a total that disagrees.
@@ -250,6 +258,7 @@
 		const params = new URLSearchParams({ limit: '10000', q: historySearch.trim() });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
+		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
 		try {
 			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -260,6 +269,20 @@
 		} finally {
 			lineageMemberLoadingIds = lineageMemberLoadingIds.filter((id) => id !== rootNodeId);
 			if (lineageMemberControllers.get(rootNodeId) === controller) lineageMemberControllers.delete(rootNodeId);
+		}
+	}
+
+	// Mirrors toggleLineageMemberStar: the parent owns the request, this keeps the
+	// group's own copy of the member and its count in step.
+	async function toggleLineageMemberForRevision(item: HistoryItem, event: MouseEvent): Promise<void> {
+		event.preventDefault();
+		event.stopPropagation();
+		const nextForRevision = !item.for_revision;
+		await onToggleForRevision(item, event);
+		for (const [rootId, members] of Object.entries(lineageGroupItems)) {
+			if (!members.some((member) => member.id === item.id)) continue;
+			lineageGroupItems = { ...lineageGroupItems, [rootId]: members.map((member) => member.id === item.id ? { ...member, for_revision: nextForRevision } : member) };
+			lineageGroups = lineageGroups.map((group) => group.root_node_id === rootId ? { ...group, for_revision_count: Math.max(0, group.for_revision_count + (nextForRevision ? 1 : -1)), representative: group.representative.id === item.id ? { ...group.representative, for_revision: nextForRevision } : group.representative } : group);
 		}
 	}
 
@@ -524,7 +547,7 @@
 		if (historyDisplayMode !== 'lineage') return;
 		// historyManagerTab is a dependency because the thumbnail tab asks the
 		// server for a different set (min_items=2) than the list tab does.
-		historyManagerView; historySearch; historyManagerStarredOnly; lineageGroupPage; managedHistoryTotal; managerTrashTotal; historyManagerTab;
+		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; lineageGroupPage; managedHistoryTotal; managerTrashTotal; historyManagerTab;
 		void fetchLineageGroups();
 	});
 
@@ -633,6 +656,13 @@
 					onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
 				>{t().historyStarredOnly}</button>
 			</Tooltip>
+			<Tooltip placement="bottom-right" text={t().tooltipHistoryForRevisionOnly}>
+				<button
+					class="ghost-btn"
+					class:ghost-active={historyManagerForRevisionOnly}
+					onclick={() => onSetForRevisionOnly(!historyManagerForRevisionOnly)}
+				>{t().historyForRevisionOnly}</button>
+			</Tooltip>
 			<Tooltip placement="bottom-right" text={t().tooltipHistoryTrashView}>
 				<button
 					class="ghost-btn"
@@ -713,7 +743,7 @@
 							</button>
 							<div class="lineage-group-summary">
 								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input)}</strong>
-								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {formatHistoryDate(group.latest_at)}</span>
+								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {t().historyLineageForRevisionCount(group.for_revision_count)} · {formatHistoryDate(group.latest_at)}</span>
 								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
 							</div>
 							<button class="ghost-btn" type="button" title={t().historyLineageExpandTitle} onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
@@ -736,6 +766,7 @@
 											</button>
 											<div class="lineage-member-actions">
 												<button class="hash-row-star" class:starred={!!it.starred} title={it.starred ? t().starOn : t().starOff} aria-label={it.starred ? t().starOn : t().starOff} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
+												<button class="hash-row-mark" class:marked={!!it.for_revision} title={it.for_revision ? t().forRevisionOn : t().forRevisionOff} aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff} onclick={(event) => toggleLineageMemberForRevision(it, event)}>✎</button>
 												{#if historyManagerView === 'active'}
 													<button class="ghost-btn icon-trash-btn" title={t().historyTrashItemTitle} onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
 												{:else}
@@ -791,6 +822,13 @@
 									title={it.starred ? t().starOn : t().starOff}
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
+								<button
+									class="hash-row-mark"
+									class:marked={!!it.for_revision}
+									onclick={(event) => onToggleForRevision(it, event)}
+									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+								>✎</button>
 								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
 								<span class="thumb-model" title={historyModelSummary(it)}>{historyModelSummary(it)}</span>
 							</div>
@@ -826,6 +864,13 @@
 									title={it.starred ? t().starOn : t().starOff}
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
+								<button
+									class="thumb-star mini-star mini-mark"
+									class:marked={!!it.for_revision}
+									onclick={(event) => onToggleForRevision(it, event)}
+									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+								>✎</button>
 							</td>
 							<td>{#if hashLabel(it)}<button class="hash-chip table-hash" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>#{hashLabel(it)}</button>{/if}</td>
 							<td>{formatHistoryDate(it.at)}</td>
@@ -1204,6 +1249,28 @@
 		align-items: center;
 		justify-content: center;
 		padding: 0;
+	}
+	/* The revision mark sits beside the star and must not read as a second star:
+	   a pencil, and the accent colour rather than the star colour. */
+	.hash-row-mark {
+		padding: var(--btn-sm-padding);
+		border: 1px solid var(--border);
+		border-radius: var(--btn-sm-radius);
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: var(--btn-sm-font-size);
+		line-height: 1;
+		cursor: pointer;
+	}
+	.hash-row-mark.marked {
+		border-color: var(--accent);
+		background: var(--accent-light);
+		color: var(--accent);
+	}
+	.mini-mark.marked {
+		border-color: var(--accent);
+		background: var(--accent-light);
+		color: var(--accent);
 	}
 	.hash-row-star.starred {
 		color: var(--star-fg);

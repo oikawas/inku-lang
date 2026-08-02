@@ -2534,7 +2534,7 @@ produce the defect where the button exists and nothing happens**. Removing each
 of the two intermediate hops turned the type check red, and restoring them
 returned it to green.
 
-### Android `2.1.4-android.3` — the drawing layer catches up to render engine 19, and the dice are gone (ground resistance, thirteen colour catalogues) (android Build 148090 unchanged, 2026-08-02)
+### Android `2.1.4-android.3` — the drawing layer catches up to render engine 19, and the dice are gone (ground resistance, thirteen colour catalogues) (android Build 148091, 2026-08-02)
 
 **The port arrived in four stages.** (1) engine 19's surface response (ground
 resistance) in `ServerStrokeEngine.kt`; (2) `ColorCatalogs.kt` from **eleven
@@ -2579,6 +2579,10 @@ the test discriminates.**
 fixture declares an arrangement, so the server generator needs a stage that adds
 such cases before the port can follow.**
 
-**Only `android/VERSION` was stamped.** `APP_VERSION` (`v2.9.31`),
-`web/BUILD_NUMBER` (833) and `android/BUILD_NUMBER` (148090) all stand still, and
-**no pentala deployment is needed**.
+**Two files were stamped: `android/VERSION` and `android/BUILD_NUMBER`.**
+`APP_VERSION` (`v2.9.31`) and `web/BUILD_NUMBER` (833) stand still, and **no
+pentala deployment is needed**. **`android/BUILD_NUMBER` went 148090 -> 148091**:
+Gradle raises it itself on every `install*` task, so it moves the moment the
+build reaches a device (editing it by hand raises it twice). **Deployed to a
+Pixel 9 (tokay) and observed starting as `versionCode=148091` /
+`versionName=2.1.4-android.3`.**

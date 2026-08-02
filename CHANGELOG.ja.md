@@ -2540,7 +2540,7 @@ server は 1 行も変えていない。
 **どこか 1 段でも繋ぎ忘れると「ボタンはあるが何も起きない」型の欠陥になる**。
 中間の 2 箇所をそれぞれ外して型検査が赤くなること、戻すと緑に復することを見た。
 
-### Android `2.1.4-android.3` — 描画層が render engine 19 へ追随し、乱択が消える（地の抵抗・13 本の色カタログ）（android Build 148090 据え置き、2026-08-02）
+### Android `2.1.4-android.3` — 描画層が render engine 19 へ追随し、乱択が消える（地の抵抗・13 本の色カタログ）（android Build 148091、2026-08-02）
 
 **移植は 4 段で入った。** ①`ServerStrokeEngine.kt` に engine 19 の支持体応答（地の抵抗）
 ②`ColorCatalogs.kt` を **11 本・`map` 6 キー → 13 本・`map` 9 キー**へ（engine 18 のデータ）
@@ -2572,5 +2572,8 @@ batch と demo の呼び出し 2 か所・保存キー 2 つ（`batch_random_col
 **engine 20（配置の主導権）は範囲外のまま**（台帳 [I-077]）。
 **arrangement を宣言する fixture が 0 件なので、追随の前に server 側で生成器へケースを足す段が要る。**
 
-**採番は `android/VERSION` だけ。** `APP_VERSION`（`v2.9.31`）・`web/BUILD_NUMBER`（833）・
-`android/BUILD_NUMBER`（148090）はいずれも不動で、**pentala 反映も不要**。
+**採番は `android/VERSION` と `android/BUILD_NUMBER` の 2 つ。**
+`APP_VERSION`（`v2.9.31`）・`web/BUILD_NUMBER`（833）は不動で、**pentala 反映も不要**。
+**`android/BUILD_NUMBER` は 148090 → 148091** — Gradle が `install*` のたびに自分で上げるので、
+**実機へ入れた時点で動く**（手で編集すると二重に上がる）。**Pixel 9（tokay）へ配備し、
+`versionCode=148091` / `versionName=2.1.4-android.3` で起動することを実測した。**

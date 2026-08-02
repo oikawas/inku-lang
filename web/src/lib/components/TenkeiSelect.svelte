@@ -31,9 +31,13 @@
 
 {#if compact}
 	<div class="tenkei-inline" role="group" aria-label={title}>
-		<span class="tenkei-inline-label">
-			{title}{#if inherited}<span class="tenkei-inherit">{isJapanese ? '（継承）' : '(inherited)'}</span>{/if}
-		</span>
+		<!-- Same shape as WildToggle's label, colon included: the two sit in one
+		     row and a colon on only one of them reads as an accident. -->
+		<span class="tenkei-inline-label"
+			>{title}{#if inherited}<span class="tenkei-inherit"
+					>{isJapanese ? '（継承）' : '(inherited)'}</span
+				>{/if}{isJapanese ? '：' : ':'}</span
+		>
 		<div class="tenkei-seg">
 			{#each TENKEI_LEVELS as level (level)}
 				<button

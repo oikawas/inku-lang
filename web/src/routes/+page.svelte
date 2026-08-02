@@ -5798,10 +5798,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						generationDisabled={variationGridBusy || reloading}
 						{error}
 						{stageLabel}
-						tenkeiLevel={tenkeiSettings.level}
-						onSelectTenkei={tenkeiSettings.set}
-						wildEnabled={wildSettings.enabled}
-						onSelectWild={wildSettings.set}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -6029,12 +6025,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				variationElapsedMs={variationElapsed.ms}
 				{variationTokensIn}
 				{variationTokensOut}
-				modelInspectionElapsedMs={modelInspection.elapsedMs}
-				modelInspectionTokensIn={modelInspection.tokensIn}
-				modelInspectionTokensOut={modelInspection.tokensOut}
-				languageInspectionElapsedMs={modelInspection.languageElapsedMs}
-				languageInspectionTokensIn={modelInspection.languageTokensIn}
-				languageInspectionTokensOut={modelInspection.languageTokensOut}
+				{modelInspection}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
@@ -6042,37 +6033,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onShowVariationCandidate={showVariationCandidate}
 				onToggleVariationCandidate={toggleVariationCandidate}
 				{activeComparisonItem}
-				modelInspectionTargetModel={modelInspection.targetModel}
-				modelInspectionTargetStage1Model={modelInspection.targetStage1Model}
-				modelInspectionTargetStage2Model={modelInspection.targetStage2Model}
-				modelCompareMode={modelInspection.compareMode}
-				modelCompareFixedModel={modelInspection.compareFixedModel}
-				modelInspectionChoices={modelInspection.choices}
-				modelInspectionSelectedModels={modelInspection.selectedModels}
-				modelInspectionFailedModels={modelInspection.failedModels}
-				modelInspectionBusy={modelInspection.busy}
-				modelInspectionStatus={modelInspection.status}
-				modelInspectionResults={modelInspection.results}
-				onToggleModelInspectionModel={modelInspection.toggleModel}
-				onSetModelCompareMode={modelInspection.setCompareMode}
-				onSetModelCompareFixedModel={modelInspection.setCompareFixedModel}
-				isModelInspectionChoiceBlocked={modelInspection.isChoiceBlocked}
-				onRunModelInspection={modelInspection.run}
-				onAbortModelInspection={modelInspection.abort}
-				modelInspectionCurrentModel={modelInspection.currentModel}
-				onAdoptModelInspectionResult={(item) => modelInspection.saveResult(item)}
-				onToggleModelInspectionStar={(item) => modelInspection.saveResult(item, { star: true })}
-				languageInspectionTargetLang={modelInspection.languageTargetLang}
-				languageInspectionSelectedCombos={modelInspection.languageSelectedCombos}
-				languageInspectionBusy={modelInspection.languageBusy}
-				languageInspectionStatus={modelInspection.languageStatus}
-				languageInspectionResults={modelInspection.languageResults}
-				languageInspectionCurrentLabel={modelInspection.languageCurrentLabel}
-				onToggleLanguageCombo={modelInspection.toggleLanguageCombo}
-				onRunLanguageInspection={modelInspection.runLanguage}
-				onAbortLanguageInspection={modelInspection.abortLanguage}
-				onAdoptLanguageInspectionResult={(item) => modelInspection.saveResult(item)}
-				onToggleLanguageInspectionStar={(item) => modelInspection.saveResult(item, { star: true })}
 				{lineageGraph}
 				{lineageLoading}
 				{lineageError}

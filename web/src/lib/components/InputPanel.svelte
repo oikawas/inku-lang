@@ -5,7 +5,9 @@
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
-	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
+	import { tenkeiLabel } from '$lib/tenkei';
+	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
+	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import type { DemoSettings } from '$lib/demo';
@@ -72,10 +74,6 @@
 		demoError: string | null;
 		lockNonDemo: boolean;
 		stageLabel: string;
-		tenkeiLevel: TenkeiLevel;
-		onSelectTenkei: (level: TenkeiLevel) => void;
-		wildEnabled: boolean;
-		onSelectWild: (value: boolean) => void;
 		canvasAspectEnabled: boolean;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectMenuOpen: boolean;
@@ -148,10 +146,6 @@
 		demoError,
 		lockNonDemo,
 		stageLabel,
-		tenkeiLevel,
-		onSelectTenkei,
-		wildEnabled,
-		onSelectWild,
 		canvasAspectEnabled,
 		canvasAspectId,
 		canvasAspectMenuOpen,
@@ -258,15 +252,15 @@
 				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
 			</Tooltip>
 			<Tooltip text={t().tooltipInputTenkei}>
-				<TenkeiSelect value={tenkeiLevel} {isJapanese} onSelect={onSelectTenkei} />
+				<TenkeiSelect value={tenkeiSettings.level} {isJapanese} onSelect={tenkeiSettings.set} />
 			</Tooltip>
 			<Tooltip text={t().tooltipInputWild}>
 				<button
 					type="button"
 					class="ghost-btn wild-btn"
-					class:active={wildEnabled}
-					aria-pressed={wildEnabled}
-					onclick={() => onSelectWild(!wildEnabled)}
+					class:active={wildSettings.enabled}
+					aria-pressed={wildSettings.enabled}
+					onclick={() => wildSettings.set(!wildSettings.enabled)}
 				>{t().wildButton}</button>
 			</Tooltip>
 			{#if canvasAspectEnabled}
@@ -322,7 +316,7 @@
 		<span class="cs-divider"></span>
 		<span class="cs-group">
 			<span class="cs-label">{isJapanese ? '添景' : 'Staffage'}</span>
-			<span class="cs-value">{tenkeiLabel(tenkeiLevel, isJapanese)}</span>
+			<span class="cs-value">{tenkeiLabel(tenkeiSettings.level, isJapanese)}</span>
 		</span>
 		<span class="cs-divider"></span>
 		<span class="cs-group">

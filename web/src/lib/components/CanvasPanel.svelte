@@ -16,6 +16,9 @@
 	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel, type DerivationKind } from '$lib/derivation';
 	import type { ModelOption } from '$lib/models';
+	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
+
+	type ModelInspection = ReturnType<typeof createModelInspection>;
 	import Tooltip from './Tooltip.svelte';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
@@ -115,12 +118,8 @@
 		variationElapsedMs: number;
 		variationTokensIn: number | null;
 		variationTokensOut: number | null;
-		modelInspectionElapsedMs: number;
-		modelInspectionTokensIn: number | null;
-		modelInspectionTokensOut: number | null;
-		languageInspectionElapsedMs: number;
-		languageInspectionTokensIn: number | null;
-		languageInspectionTokensOut: number | null;
+		/** The whole feature, so a new field costs no line here. */
+		modelInspection: ModelInspection;
 		variationGridCanAbort: boolean;
 		variationGridIncludesReading: boolean;
 		variationGridTaskLabel: string;
@@ -134,37 +133,6 @@
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
 		onToggleVariationCandidate: (id: string) => void;
 		activeComparisonItem: { svg: string } | null;
-		modelInspectionTargetModel: string;
-		modelInspectionTargetStage1Model: string;
-		modelInspectionTargetStage2Model: string;
-		modelCompareMode: ModelCompareMode;
-		modelCompareFixedModel: string;
-		modelInspectionChoices: ModelInspectionChoice[];
-		modelInspectionSelectedModels: string[];
-		modelInspectionFailedModels: Record<string, string>;
-		modelInspectionBusy: boolean;
-		modelInspectionStatus: string | null;
-		modelInspectionResults: ModelInspectionResult[];
-		onToggleModelInspectionModel: (modelId: string) => void;
-		onSetModelCompareMode: (mode: ModelCompareMode) => void;
-		onSetModelCompareFixedModel: (model: string) => void;
-		isModelInspectionChoiceBlocked: (model: string) => boolean;
-		onRunModelInspection: () => void | Promise<void>;
-		onAbortModelInspection: () => void;
-		modelInspectionCurrentModel: string;
-		onAdoptModelInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
-		onToggleModelInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
-		languageInspectionTargetLang: 'ja' | 'en';
-		languageInspectionSelectedCombos: string[];
-		languageInspectionBusy: boolean;
-		languageInspectionStatus: string | null;
-		languageInspectionResults: ModelInspectionResult[];
-		languageInspectionCurrentLabel: string;
-		onToggleLanguageCombo: (id: string) => void;
-		onRunLanguageInspection: () => void | Promise<void>;
-		onAbortLanguageInspection: () => void;
-		onAdoptLanguageInspectionResult: (item: ModelInspectionResult) => void | Promise<void>;
-		onToggleLanguageInspectionStar: (item: ModelInspectionResult) => void | Promise<void>;
 		lineageGraph: LineageGraph | null;
 		lineageLoading: boolean;
 		lineageError: string | null;
@@ -283,12 +251,7 @@
 		variationElapsedMs = 0,
 		variationTokensIn = null,
 		variationTokensOut = null,
-		modelInspectionElapsedMs = 0,
-		modelInspectionTokensIn = null,
-		modelInspectionTokensOut = null,
-		languageInspectionElapsedMs = 0,
-		languageInspectionTokensIn = null,
-		languageInspectionTokensOut = null,
+		modelInspection,
 		variationGridCanAbort = false,
 		variationGridIncludesReading = false,
 		variationGridTaskLabel = '',
@@ -302,37 +265,6 @@
 		onShowVariationCandidate,
 		onToggleVariationCandidate,
 		activeComparisonItem,
-		modelInspectionTargetModel,
-		modelInspectionTargetStage1Model,
-		modelInspectionTargetStage2Model,
-		modelCompareMode = 'common',
-		modelCompareFixedModel = '',
-		modelInspectionChoices = [],
-		modelInspectionSelectedModels = [],
-		modelInspectionFailedModels = {},
-		modelInspectionBusy = false,
-		modelInspectionStatus = null,
-		modelInspectionResults = [],
-		onToggleModelInspectionModel,
-		onSetModelCompareMode,
-		onSetModelCompareFixedModel,
-		isModelInspectionChoiceBlocked,
-		onRunModelInspection,
-		onAbortModelInspection,
-		modelInspectionCurrentModel,
-		onAdoptModelInspectionResult,
-		onToggleModelInspectionStar,
-		languageInspectionTargetLang,
-		languageInspectionSelectedCombos = [],
-		languageInspectionBusy = false,
-		languageInspectionStatus = null,
-		languageInspectionResults = [],
-		languageInspectionCurrentLabel = '',
-		onToggleLanguageCombo,
-		onRunLanguageInspection,
-		onAbortLanguageInspection,
-		onAdoptLanguageInspectionResult,
-		onToggleLanguageInspectionStar,
 		lineageGraph = null,
 		lineageLoading = false,
 		lineageError = null,
@@ -947,52 +879,52 @@
 					<div class="compare-head">
 						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} />
 						<div class="compare-action-wrap">
-							{#if modelInspectionBusy}
+							{#if modelInspection.busy}
 								<RunStatus
 									variant="inline"
 									label={t().modelCompareBusy}
-									model={modelInspectionCurrentModel}
-									elapsedMs={modelInspectionElapsedMs}
-									tokensIn={modelInspectionTokensIn}
-									tokensOut={modelInspectionTokensOut}
-									onStop={onAbortModelInspection}
+									model={modelInspection.currentModel}
+									elapsedMs={modelInspection.elapsedMs}
+									tokensIn={modelInspection.tokensIn}
+									tokensOut={modelInspection.tokensOut}
+									onStop={modelInspection.abort}
 								/>
 							{:else}
-								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={onRunModelInspection} disabled={!result || variationGridBusy || modelInspectionSelectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
+								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={modelInspection.run} disabled={!result || variationGridBusy || modelInspection.selectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
 							{/if}
 						</div>
 					</div>
 					<div class="compare-mode-tabs" role="tablist" aria-label={t().modelCompareModeLabel}>
-						<button class:active={modelCompareMode === 'common'} onclick={() => onSetModelCompareMode('common')}>{t().modelCompareModeCommon}</button>
-						<button class:active={modelCompareMode === 'stage1_fixed'} onclick={() => onSetModelCompareMode('stage1_fixed')}>{t().modelCompareModeStage1Fixed}</button>
-						<button class:active={modelCompareMode === 'stage2_fixed'} onclick={() => onSetModelCompareMode('stage2_fixed')}>{t().modelCompareModeStage2Fixed}</button>
+						<button class:active={modelInspection.compareMode === 'common'} onclick={() => modelInspection.setCompareMode('common')}>{t().modelCompareModeCommon}</button>
+						<button class:active={modelInspection.compareMode === 'stage1_fixed'} onclick={() => modelInspection.setCompareMode('stage1_fixed')}>{t().modelCompareModeStage1Fixed}</button>
+						<button class:active={modelInspection.compareMode === 'stage2_fixed'} onclick={() => modelInspection.setCompareMode('stage2_fixed')}>{t().modelCompareModeStage2Fixed}</button>
 					</div>
-					{#if modelCompareMode !== 'common'}
-						<label class="compare-fixed-model"><span>{modelCompareMode === 'stage1_fixed' ? t().modelCompareFixedStage1 : t().modelCompareFixedStage2}</span><select value={modelCompareFixedModel} disabled={modelInspectionBusy} onchange={(event) => onSetModelCompareFixedModel(event.currentTarget.value)}>{#each modelInspectionChoices as choice (choice.id)}<option value={choice.id}>{choice.label} · {choice.providerLabel}</option>{/each}</select></label>
+					{#if modelInspection.compareMode !== 'common'}
+						<label class="compare-fixed-model"><span>{modelInspection.compareMode === 'stage1_fixed' ? t().modelCompareFixedStage1 : t().modelCompareFixedStage2}</span><select value={modelInspection.compareFixedModel} disabled={modelInspection.busy} onchange={(event) => modelInspection.setCompareFixedModel(event.currentTarget.value)}>{#each modelInspection.choices as choice (choice.id)}<option value={choice.id}>{choice.label} · {choice.providerLabel}</option>{/each}</select></label>
 					{/if}
 					<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
-						{#each modelInspectionChoices as choice (choice.id)}
-							{@const blocked = isModelInspectionChoiceBlocked(choice.id)}
-							{@const checked = modelInspectionSelectedModels.includes(choice.id)}
-							{@const failed = !!modelInspectionFailedModels[choice.id]}
+						{#each modelInspection.choices as choice (choice.id)}
+							{@const blocked = modelInspection.isChoiceBlocked(choice.id)}
+							{@const checked = modelInspection.selectedModels.includes(choice.id)}
+							{@const failed = !!modelInspection.failedModels[choice.id]}
 							{@const choiceExtra = [blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join(' · ')}
 							<div class="model-metadata-hover">
-								<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || (!checked && modelInspectionSelectedModels.length >= 4)}>
-									<input type="checkbox" checked={checked} disabled={modelInspectionBusy || blocked || (!checked && modelInspectionSelectedModels.length >= 4)} onchange={() => onToggleModelInspectionModel(choice.id)} />
+								<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || (!checked && modelInspection.selectedModels.length >= 4)}>
+									<input type="checkbox" checked={checked} disabled={modelInspection.busy || blocked || (!checked && modelInspection.selectedModels.length >= 4)} onchange={() => modelInspection.toggleModel(choice.id)} />
 									<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
 								</label>
 								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} purpose="llm" />
 							</div>
 						{/each}
 					</div>
-					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspectionSelectedModels.length, 4)}</div>
-					{#if modelInspectionStatus}<div class="variation-grid-status">{modelInspectionStatus}</div>{/if}
-					<div class="model-compare-stage" class:busy={modelInspectionBusy}>
-						<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspectionTargetStage1Model}<br />Stage 2: {modelInspectionTargetStage2Model}</div></div>
+					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspection.selectedModels.length, 4)}</div>
+					{#if modelInspection.status}<div class="variation-grid-status">{modelInspection.status}</div>{/if}
+					<div class="model-compare-stage" class:busy={modelInspection.busy}>
+						<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {modelInspection.targetStage1Model}<br />Stage 2: {modelInspection.targetStage2Model}</div></div>
 						<div class="model-results-column">
-							{#if modelInspectionResults.length > 0}
+							{#if modelInspection.results.length > 0}
 								<div class="model-inspection-grid">
-									{#each modelInspectionResults as item (item.id)}
+									{#each modelInspection.results as item (item.id)}
 										<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
 											<div class="comparison-label">{item.label}</div>
 											<div class="model-comparison-art-wrap">
@@ -1002,14 +934,14 @@
 													class:selected={!!item.savedHistoryId}
 													type="button"
 													disabled={item.saving || !!item.savedHistoryId}
-													onclick={() => onAdoptModelInspectionResult(item)}
+													onclick={() => modelInspection.saveResult(item)}
 													title={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
 													aria-label={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
 												>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button>
 											</div>
 											<div class="model-result-actions">
 												<Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}>
-													<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleModelInspectionStar(item)} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
+													<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => modelInspection.saveResult(item, { star: true })} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
 												</Tooltip>
 											</div>
 											<pre>{item.ddl}</pre>
@@ -1025,18 +957,18 @@
 						<div class="compare-head">
 							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} />
 							<div class="compare-action-wrap">
-								{#if languageInspectionBusy}
+								{#if modelInspection.languageBusy}
 									<RunStatus
 										variant="inline"
 										label={isJapanese ? '比較中' : 'Comparing'}
-										model={languageInspectionCurrentLabel}
-										elapsedMs={languageInspectionElapsedMs}
-										tokensIn={languageInspectionTokensIn}
-										tokensOut={languageInspectionTokensOut}
-										onStop={onAbortLanguageInspection}
+										model={modelInspection.languageCurrentLabel}
+										elapsedMs={modelInspection.languageElapsedMs}
+										tokensIn={modelInspection.languageTokensIn}
+										tokensOut={modelInspection.languageTokensOut}
+										onStop={modelInspection.abortLanguage}
 									/>
 								{:else}
-									<PaintButton onclick={onRunLanguageInspection} disabled={!result || variationGridBusy || languageInspectionSelectedCombos.length === 0}>{isJapanese ? '選んだ組み合わせで比較' : 'Compare selected combinations'}</PaintButton>
+									<PaintButton onclick={modelInspection.runLanguage} disabled={!result || variationGridBusy || modelInspection.languageSelectedCombos.length === 0}>{isJapanese ? '選んだ組み合わせで比較' : 'Compare selected combinations'}</PaintButton>
 								{/if}
 							</div>
 						</div>
@@ -1046,19 +978,19 @@
 								{@const stage1 = combo[0]}
 								{@const stage2 = combo[1]}
 								{@const comboId = `${stage1}:${stage2}`}
-								{@const blocked = stage1 === languageInspectionTargetLang && stage2 === languageInspectionTargetLang}
-								{@const checked = languageInspectionSelectedCombos.includes(comboId)}
+								{@const blocked = stage1 === modelInspection.languageTargetLang && stage2 === modelInspection.languageTargetLang}
+								{@const checked = modelInspection.languageSelectedCombos.includes(comboId)}
 								<label class="model-choice lang-combo" class:checked={checked} class:target={blocked} class:disabled={blocked}>
-									<input type="checkbox" checked={checked} disabled={languageInspectionBusy || blocked} onchange={() => onToggleLanguageCombo(comboId)} />
+									<input type="checkbox" checked={checked} disabled={modelInspection.languageBusy || blocked} onchange={() => modelInspection.toggleLanguageCombo(comboId)} />
 									<span><strong>Stage 1: {langName(stage1)} ／ Stage 2: {langName(stage2)}</strong><small>{blocked ? (isJapanese ? '対象作品で使用中' : 'Used by target') : ''}</small></span>
 								</label>
 							{/each}
 						</div>
-						{#if languageInspectionStatus}<div class="variation-grid-status">{languageInspectionStatus}</div>{/if}
-						<div class="model-compare-stage" class:busy={languageInspectionBusy}>
-							<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {langName(languageInspectionTargetLang)}<br />Stage 2: {langName(languageInspectionTargetLang)}</div></div>
+						{#if modelInspection.languageStatus}<div class="variation-grid-status">{modelInspection.languageStatus}</div>{/if}
+						<div class="model-compare-stage" class:busy={modelInspection.languageBusy}>
+							<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}{@html activeComparisonItem.svg}{/if}</div><div class="model-target-meta">Stage 1: {langName(modelInspection.languageTargetLang)}<br />Stage 2: {langName(modelInspection.languageTargetLang)}</div></div>
 							<div class="model-results-column">
-								{#if languageInspectionResults.length > 0}<div class="model-inspection-grid">{#each languageInspectionResults as item (item.id)}<div class="model-inspection-card" class:saved={!!item.savedHistoryId}><div class="comparison-label">{item.label}</div><div class="model-comparison-art-wrap"><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div><button class="variation-select model-adopt-select" class:selected={!!item.savedHistoryId} type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => onAdoptLanguageInspectionResult(item)}>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button></div><div class="model-result-actions"><button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => onToggleLanguageInspectionStar(item)}>{item.starred ? '★' : '☆'}</button></div><pre>{item.ddl}</pre></div>{/each}</div>{/if}
+								{#if modelInspection.languageResults.length > 0}<div class="model-inspection-grid">{#each modelInspection.languageResults as item (item.id)}<div class="model-inspection-card" class:saved={!!item.savedHistoryId}><div class="comparison-label">{item.label}</div><div class="model-comparison-art-wrap"><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{@html item.svg}</div><button class="variation-select model-adopt-select" class:selected={!!item.savedHistoryId} type="button" disabled={item.saving || !!item.savedHistoryId} onclick={() => modelInspection.saveResult(item)}>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button></div><div class="model-result-actions"><button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => modelInspection.saveResult(item, { star: true })}>{item.starred ? '★' : '☆'}</button></div><pre>{item.ddl}</pre></div>{/each}</div>{/if}
 							</div>
 						</div>
 					</div>

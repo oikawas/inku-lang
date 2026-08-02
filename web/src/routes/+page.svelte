@@ -46,6 +46,9 @@
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { batchSettings } from '$lib/features/batch/settings.svelte';
+	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
 	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -293,6 +296,8 @@
 		ui_mode?: UiMode;
 		ui_custom?: UiCustomVisibility;
 		tooltips_enabled?: boolean;
+		download_folder_enabled?: boolean;
+		download_folder_name?: string | null;
 		settings_tab?: SettingsTab;
 		model_settings?: UserModelSettings;
 		image_generation_count: number;
@@ -320,6 +325,8 @@
 	let stageLabel = $state('');
 	let batchCurrent = $state(0);
 	let batchTotal   = $state(0);
+	// 0 while the batch is on its original pass, n while it is on retry round n.
+	let batchRetryRound = $state(0);
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchPromptHistory = $state<string[]>([]);
@@ -407,6 +414,7 @@
 	let ddlDialogDrawing = $state(false);
 	let ddlDialogError = $state<string | null>(null);
 	let ddlDialogTenkeiOverride = $state<TenkeiLevel | null>(null);
+	let ddlDialogWildOverride = $state<boolean | null>(null);
 	// DDL-authored (standalone) artworks carry the display_label marker 'DDL'.
 	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
@@ -620,6 +628,9 @@
 	// Refine dialogs: null = inherit from the parent artwork (field omitted).
 	let refineTenkeiOverride = $state<TenkeiLevel | null>(null);
 	function setRefineTenkei(level: TenkeiLevel | null) { refineTenkeiOverride = level; }
+	// null = inherit the displayed work's setting, the same rule staffage follows.
+	let refineWildOverride = $state<boolean | null>(null);
+	function setRefineWild(value: boolean | null) { refineWildOverride = value; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
 	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.selected) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
@@ -772,6 +783,55 @@
 		} catch {
 			if (requestId === nearbyHistoryRequestId) nearbyHistory = [];
 		}
+	}
+
+	// The server holds the intent and the folder's name; the handle itself lives
+	// in this browser's IndexedDB, so the two are applied together on sign-in.
+	function applyDownloadFolderSettings(user: UserItem | null) {
+		downloadFolderSettings.applyUser(user);
+		void downloadFolderSettings.refresh();
+	}
+
+	async function updateDownloadFolder(update: { enabled?: boolean; name?: string | null }) {
+		if (!currentUser) return;
+		const previousUser = currentUser;
+		const body: Record<string, unknown> = {};
+		if (update.enabled !== undefined) body.download_folder_enabled = update.enabled;
+		if (update.name !== undefined) body.download_folder_name = update.name ?? '';
+		currentUser = {
+			...currentUser,
+			...(update.enabled !== undefined ? { download_folder_enabled: update.enabled } : {}),
+			...(update.name !== undefined ? { download_folder_name: update.name } : {}),
+		};
+		downloadFolderSettings.applyUser(currentUser);
+		try {
+			const r = await apiFetch('/api/auth/me/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
+			}
+			currentUser = await r.json() as UserItem;
+			downloadFolderSettings.applyUser(currentUser);
+		} catch (e) {
+			currentUser = previousUser;
+			downloadFolderSettings.applyUser(previousUser);
+			console.warn('failed to update the download folder setting', e);
+		}
+	}
+
+	async function chooseDownloadFolder() {
+		const name = await downloadFolderSettings.choose();
+		if (name === null) return;
+		await updateDownloadFolder({ enabled: true, name });
+	}
+
+	async function clearDownloadFolder() {
+		await downloadFolderSettings.clear();
+		await updateDownloadFolder({ enabled: false, name: null });
 	}
 
 	function applyUserTheme(user: UserItem | null) {
@@ -1158,6 +1218,7 @@
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 		} catch (e) {
 			currentUser = previousUser;
 			darkMode = previousDarkMode;
@@ -1726,6 +1787,7 @@
 			if (requestId !== userSettingsRequestId) return;
 			currentUser = actor;
 			applyUserTheme(actor);
+			applyDownloadFolderSettings(actor);
 			applyUserModelSettings(actor);
 			authToken = 'cookie';
 			if (actor.role !== 'admin') {
@@ -2063,6 +2125,7 @@
 			if (!r.ok) throw new Error('session expired');
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 			applyUserModelSettings(currentUser);
 			authToken = 'cookie';
 			loginStatus = null;
@@ -2206,6 +2269,7 @@
 			}
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 			profileEmail = currentUser.email;
 			profileCurrentPassword = '';
 			profileNewPassword = '';
@@ -2779,7 +2843,7 @@ if (unreadWords.length > 0) {
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; lineageParentNodeId?: string | null } = {}): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; wild?: boolean | null; lineageParentNodeId?: string | null } = {}): Promise<{
 		score: Score;
 		svg: string;
 		// Stage 2 に渡った展開後 DDL (v1.98)
@@ -2825,6 +2889,7 @@ if (unreadWords.length > 0) {
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				...(renderOptions.tenkei ? { tenkei: renderOptions.tenkei } : {}),
+				...(renderOptions.wild != null ? { wild: renderOptions.wild } : {}),
 				...(renderOptions.lineageParentNodeId ? { lineage_parent_node_id: renderOptions.lineageParentNodeId } : {}),
 			})
 		});
@@ -3075,7 +3140,7 @@ if (unreadWords.length > 0) {
 		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null;
+		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null;
 		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 		if (submittedMode === 'batch') {
 			batchLatestResult = null;
@@ -3141,19 +3206,24 @@ if (unreadWords.length > 0) {
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
 					.filter((item) => item.input);
-				batchTotal = lines.length; outputTab = 'canvas';
-				for (let i = 0; i < lines.length; i++) {
-					if (submitStopRequested) break;
-					batchCurrent = i + 1;
-					batchActiveLine = lines[i].line;
+				// The report's `total` is how many lines the batch had. batchTotal drives
+				// the progress readouts and is re-pointed at each retry round, so the
+				// report keeps its own copy.
+				const batchLineTotal = lines.length;
+				batchTotal = batchLineTotal; outputTab = 'canvas';
+				let batchInterrupted = false;
+
+				/** true = painted, string = the failure message, null = the run was interrupted. */
+				const paintBatchLine = async (item: { line: number; input: string }): Promise<true | string | null> => {
+					batchActiveLine = item.line;
 					batchActiveTokensIn = null;
 					batchActiveTokensOut = null;
 					try {
-						const r = await paintOne(lines[i].input, {
-							historyInput: `#${lines[i].line} ${lines[i].input}`,
-							sourceText: lines[i].input,
-							displayLabel: `#${lines[i].line}`,
-							batchLineNumber: lines[i].line,
+						const r = await paintOne(item.input, {
+							historyInput: `#${item.line} ${item.input}`,
+							sourceText: item.input,
+							displayLabel: `#${item.line}`,
+							batchLineNumber: item.line,
 							batchRunId,
 							catalogId: batchCatalogId,
 							catalogMode: batchAutoColorCatalog ? 'auto' : 'fixed',
@@ -3162,7 +3232,7 @@ if (unreadWords.length > 0) {
 							tenkei: tenkeiSettings.level,
 							signal: abortController.signal,
 						});
-						if (submitStopRequested) break;
+						if (submitStopRequested) return null;
 						batchActiveDdl = r.ddl;
 						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
 						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
@@ -3172,37 +3242,79 @@ if (unreadWords.length > 0) {
 						batchLatestResult = r;
 						batchLatestDdl = r.ddl;
 						batchLatestThinking = r.thinking;
-						batchLatestPrompt = `#${lines[i].line} ${lines[i].input}`;
+						batchLatestPrompt = `#${item.line} ${item.input}`;
 						if (inputMode === 'batch' && batchAutoFollowLatest) {
 							displayLatestBatchRender();
 						}
 						await refreshHistoryAfterServerSave();
 						batchSuccess += 1;
-						if (batchFailures.length > 0) {
-							batchFailureReportStore.set({ success: batchSuccess, total: batchTotal, failures: batchFailures });
-						}
+						return true;
 					} catch (e) {
-						if (submitStopRequested || abortController.signal.aborted) break;
+						if (submitStopRequested || abortController.signal.aborted) return null;
+						return e instanceof Error ? e.message : String(e);
+					}
+				};
+
+				const publishFailureReport = () => {
+					batchFailureReportStore.set(
+						batchFailures.length > 0
+							? { success: batchSuccess, total: batchLineTotal, failures: batchFailures }
+							: null,
+					);
+				};
+
+				for (let i = 0; i < lines.length; i++) {
+					if (submitStopRequested) { batchInterrupted = true; break; }
+					batchCurrent = i + 1;
+					const outcome = await paintBatchLine(lines[i]);
+					if (outcome === null) { batchInterrupted = true; break; }
+					if (outcome !== true) {
 						batchFailures = [
 							...batchFailures,
-							{
-								line: lines[i].line,
-								input: lines[i].input,
-								message: e instanceof Error ? e.message : String(e),
-							},
+							{ line: lines[i].line, input: lines[i].input, message: outcome },
 						];
-						batchFailureReportStore.set({ success: batchSuccess, total: batchTotal, failures: batchFailures });
 					}
+					publishFailureReport();
 				}
+
+				// Retry the lines that failed, if the author asked for retries. An
+				// interrupted batch is never retried: the lines that never ran are not
+				// failures, and the author stopped the run on purpose.
+				let completedRetryRounds = 0;
+				for (;;) {
+					const round = planRetryRound(
+						batchFailures,
+						completedRetryRounds,
+						batchSettings.maxRetries,
+						batchInterrupted || submitStopRequested || abortController.signal.aborted,
+					);
+					if (!round) break;
+					batchRetryRound = round.round;
+					batchTotal = round.items.length;
+					for (let i = 0; i < round.items.length; i++) {
+						if (submitStopRequested) { batchInterrupted = true; break; }
+						batchCurrent = i + 1;
+						const item = round.items[i];
+						const outcome = await paintBatchLine(item);
+						if (outcome === null) { batchInterrupted = true; break; }
+						if (outcome === true) {
+							batchFailures = dropFailedLine(batchFailures, item.line);
+						} else {
+							batchFailures = batchFailures.map((failure) =>
+								failure.line === item.line ? { ...failure, message: outcome } : failure,
+							);
+						}
+						publishFailureReport();
+					}
+					if (batchInterrupted) break;
+					completedRetryRounds += 1;
+				}
+				batchRetryRound = 0;
+				batchTotal = batchLineTotal;
+
 				elapsedTotalMs = Date.now() - _timerStart;
 				await refreshHistoryAfterRun();
-				if (batchFailures.length > 0) {
-					batchFailureReportStore.set({
-						success: batchSuccess,
-						total: batchTotal,
-						failures: batchFailures,
-					});
-				}
+				publishFailureReport();
 			}
 		} catch (e) {
 			if (!(submitStopRequested || abortController.signal.aborted)) {
@@ -3211,7 +3323,7 @@ if (unreadWords.length > 0) {
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;
 			submitStopRequested = false;
-			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
+			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
@@ -3594,12 +3706,54 @@ if (unreadWords.length > 0) {
 		}
 	}
 
+	type HistoryForRevisionTarget = { id?: string; for_revision?: boolean };
+
+	// The revision mark rides the same paths as the star and never touches it:
+	// the two are separate columns, and a work can carry either, both or neither.
+	function updateHistoryForRevisionState(item: HistoryForRevisionTarget) {
+		if (!item.id) return;
+		historyItems = historyItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		historyManager.applyForRevisionState(item);
+		trashItems = trashItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		if (displayedHistoryItem?.id === item.id) displayedHistoryItem = { ...displayedHistoryItem, for_revision: item.for_revision };
+		if (lineageGraph) {
+			lineageGraph = {
+				...lineageGraph,
+				nodes: lineageGraph.nodes.map((node) => node.history && node.history.id === item.id
+					? { ...node, history: { ...node.history, for_revision: item.for_revision } }
+					: node)
+			};
+		}
+	}
+
+	async function toggleHistoryForRevision(item: HistoryForRevisionTarget | null | undefined, event?: Event): Promise<void> {
+		event?.stopPropagation();
+		if (!item?.id) return;
+		const nextForRevision = !item.for_revision;
+		updateHistoryForRevisionState({ ...item, for_revision: nextForRevision });
+		try {
+			const r = await apiFetch(`/api/history/${item.id}/for-revision`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ for_revision: nextForRevision })
+			});
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			const updated = await r.json() as Iteration;
+			updateHistoryForRevisionState(updated);
+			if (historyManager.forRevisionOnly) await historyManager.fetch();
+		} catch (e) {
+			updateHistoryForRevisionState(item);
+			console.warn('failed to update the revision mark', e);
+		}
+	}
+
 	async function refreshCurrentUserOnly(): Promise<void> {
 		try {
 			const r = await apiFetch('/api/auth/me', { cache: 'no-store' });
 			if (!r.ok) return;
 			currentUser = await r.json() as UserItem;
 			applyUserTheme(currentUser);
+			applyDownloadFolderSettings(currentUser);
 		} catch {
 			/* ignore */
 		}
@@ -3999,7 +4153,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await fetchLineage(nodeId, true);
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null, wild?: boolean | null): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
 	const rendered = await paintOne(sourceText, {
@@ -4012,6 +4166,8 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		signal,
 		tenkei,
+		// null override = inherit the parent work's setting.
+		wild: wild ?? node.history.render_wild === true,
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
@@ -4024,6 +4180,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		catalogId: lineageCatalogId(node),
 		canvasAspectId: lineageCanvasAspectId(node),
 		tenkei: ddlDialogTenkeiOverride,
+		wild: ddlDialogWildOverride ?? node.history.render_wild === true,
 		lineageParentNodeId: node.id,
 	});
 	const resolvedEditStage1Model = node.history.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
@@ -4126,6 +4283,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 
 function openNewDdlDialog(): void {
 	ddlDialogTenkeiOverride = null;
+	ddlDialogWildOverride = null;
 	ddlDialogMode = 'new';
 	ddlDialogNode = null;
 	ddlDialogInitial = '';
@@ -4148,6 +4306,7 @@ async function openCurrentDdlEditor(): Promise<void> {
 
 function openLineageDdlEditor(node: LineageNode): void {
 	ddlDialogTenkeiOverride = null;
+	ddlDialogWildOverride = null;
 	ddlDialogMode = 'edit';
 	ddlDialogNode = node;
 	ddlDialogInitial = node.history?.ddl ?? '';
@@ -4758,6 +4917,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				auto_repair: ddlAutoRepairEnabled,
 				composition_seed: compositionSeed,
 				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				wild: effectiveRefineWild,
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
@@ -4780,6 +4940,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			interpretationSeed,
 			signal,
 			tenkei: refineTenkeiOverride,
+			wild: effectiveRefineWild,
 			lineageParentNodeId: currentLineageParentId(),
 		});
 		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
@@ -4859,6 +5020,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				variation_amplitude: amplitude,
 				variation_seed: seed,
 				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
+				wild: effectiveRefineWild,
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
@@ -5220,6 +5382,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			: null
 	);
 	const targetTenkei = $derived(normalizeTenkei(displayedHistoryItem?.tenkei) ?? DEFAULT_TENKEI);
+	// What a refine inherits when nothing is overridden: the work on screen, or
+	// the global setting when nothing is on screen.
+	const targetWild = $derived(displayedHistoryItem?.render_wild ?? result?.render_wild ?? wildSettings.enabled);
+	const effectiveRefineWild = $derived(refineWildOverride ?? targetWild === true);
 	const statusGeneration = $derived(((statusHistoryItem as { lineage_generation?: number | null } | null)?.lineage_generation) ?? null);
 
 	function formatHistoryDate(at: number): string {
@@ -5490,6 +5656,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			exportSettings.load();
 			resultLogSettings.load();
 			batchFailureReportStore.load();
+			batchSettings.load();
 			exportSettings.markLoaded();
 		} catch {}
 		void (async () => {
@@ -5595,6 +5762,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{batchActiveDdlHighlighted}
 						{batchTotal}
 						{batchCurrent}
+						{batchRetryRound}
 						{batchActiveTokensIn}
 						{batchActiveTokensOut}
 						{batchTokensInTotal}
@@ -5773,6 +5941,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			>{leftPanelCollapsed ? '›' : '‹'}</button>
 
 			<CanvasPanel
+				{catalogName}
+				{formatHistoryDate}
+				{historyPreviewText}
 				bind:outputTab
 				bind:promptStage1Expanded
 				bind:promptStage2Expanded
@@ -5915,6 +6086,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				statusTenkei={normalizeTenkei(displayedHistoryItem?.tenkei)}
 				refineTenkeiValue={refineTenkeiOverride ?? targetTenkei}
 				refineTenkeiInherited={refineTenkeiOverride === null}
+				refineDrawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
+				refineDrawingModelGroups={availableModelCatalog}
+				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
+				refineWildValue={effectiveRefineWild}
+				refineWildInherited={refineWildOverride === null}
+				onSetRefineWild={setRefineWild}
 				onSetRefineTenkei={setRefineTenkei}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
@@ -5995,6 +6172,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
 			tenkeiInherited={ddlDialogTenkeiOverride === null}
 			onSelectTenkei={(level) => (ddlDialogTenkeiOverride = level)}
+			wildValue={ddlDialogWildOverride ?? (ddlDialogNode?.history?.render_wild === true)}
+			wildInherited={ddlDialogWildOverride === null}
+			onSelectWild={(next) => (ddlDialogWildOverride = next)}
 			onDraw={handleDdlDialogDraw}
 			onClose={closeDdlDialog}
 		/>
@@ -6061,8 +6241,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{exportTemplateStatus}
 			{canvasAspectEnabled}
 			onSetCanvasAspectEnabled={setCanvasAspectEnabled}
+			onChooseDownloadFolder={chooseDownloadFolder}
+			onClearDownloadFolder={clearDownloadFolder}
 			onClose={closeSettingsModal}
-			onCloseSettings={() => (settingsOpen = false)}
 			onSelectSettingsTab={selectSettingsTab}
 			onSetStage1Provider={setStage1Provider}
 			onSetStage1Model={setStage1Model}
@@ -6229,6 +6410,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			selectedHistoryIds={historyManager.selectedIds}
 			animationExportSettings={exportSettings.animation}
 			historyManagerStarredOnly={historyManager.starredOnly}
+			historyManagerForRevisionOnly={historyManager.forRevisionOnly}
 			onClose={() => (historyManager.open = false)}
 			onSetView={historyManager.setView}
 			onSetPage={historyManager.setPage}
@@ -6236,6 +6418,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSetFirstPage={() => historyManager.setPage(historyManager.totalPages - 1)}
 			onSetPageSize={historyManager.setPageSize}
 			onSetStarredOnly={historyManager.setStarredOnly}
+			onSetForRevisionOnly={historyManager.setForRevisionOnly}
+			onToggleForRevision={toggleHistoryForRevision}
 			onSelectAll={selectAllManagedHistory}
 			onAskTrash={askTrash}
 			onAskRestore={askRestore}

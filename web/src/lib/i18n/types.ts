@@ -120,6 +120,19 @@ export interface LangPack {
 	stageInterpreting: string;
 	stageStructuring: (tokLabel: string) => string;
 	batchProgress: (current: number, total: number) => string;
+	batchRetryProgress: (current: number, total: number, round: number) => string;
+	settingsBatchRetryLabel: string;
+	settingsBatchRetryDescription: string;
+	settingsBatchRetryCount: string;
+	settingsDownloadFolderLabel: string;
+	settingsDownloadFolderDescription: string;
+	settingsDownloadFolderBrowserOnly: string;
+	settingsDownloadFolderChoose: string;
+	settingsDownloadFolderClear: string;
+	settingsDownloadFolderNone: string;
+	settingsDownloadFolderNeedsPicking: string;
+	settingsDownloadFolderCurrent: (name: string) => string;
+	downloadFolderFellBack: string;
 
 	// Results
 	vocabInInputLabel: string;
@@ -322,6 +335,11 @@ export interface LangPack {
 	selectionNotePrompt: string;
 	selectionNoteLabel: string;
 	historyStarredOnly: string;
+	historyForRevisionOnly: string;
+	tooltipHistoryForRevisionOnly: string;
+	forRevisionOn: string;
+	forRevisionOff: string;
+	historyLineageForRevisionCount: (count: number) => string;
 
 	// Prompts tab
 	promptStage1Input: string;

@@ -1146,7 +1146,13 @@ def _select_history_items(
         raise CliError("no history hashes were specified")
     return selected
 
-def _fetch_all_history(client: ApiClient, *, starred: bool = False, query: str | None = None) -> list[dict[str, Any]]:
+def _fetch_all_history(
+    client: ApiClient,
+    *,
+    starred: bool = False,
+    for_revision: bool = False,
+    query: str | None = None,
+) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     offset = 0
     limit = 100
@@ -1155,7 +1161,13 @@ def _fetch_all_history(client: ApiClient, *, starred: bool = False, query: str |
         data, _ = client.request(
             "GET",
             "/api/history",
-            query={"offset": offset, "limit": limit, "q": query, "starred": starred},
+            query={
+                "offset": offset,
+                "limit": limit,
+                "q": query,
+                "starred": starred,
+                "for_revision": for_revision,
+            },
         )
         page = data.get("items")
         if not isinstance(page, list):
@@ -2774,7 +2786,13 @@ def command_history(args: argparse.Namespace) -> int:
     data, _ = client.request(
         "GET",
         "/api/history",
-        query={"offset": args.offset, "limit": args.limit, "q": args.query, "starred": args.starred},
+        query={
+            "offset": args.offset,
+            "limit": args.limit,
+            "q": args.query,
+            "starred": args.starred,
+            "for_revision": args.for_revision,
+        },
     )
     _print_json(data)
     return 0
@@ -2802,7 +2820,9 @@ def command_history_export(args: argparse.Namespace) -> int:
         config.token,
         timeout_seconds=_resolved_timeout_seconds(args, config),
     )
-    items = _fetch_all_history(client, starred=args.starred, query=args.query)
+    items = _fetch_all_history(
+        client, starred=args.starred, for_revision=args.for_revision, query=args.query
+    )
     selected = _select_history_items(
         items,
         hashes=args.hashes or [],
@@ -3540,6 +3560,7 @@ def build_parser() -> argparse.ArgumentParser:
     history.add_argument("--limit", type=int, default=20)
     history.add_argument("--query", "-q")
     history.add_argument("--starred", action="store_true")
+    history.add_argument("--for-revision", action="store_true")
     history.set_defaults(func=command_history)
 
     unread_words = subparsers.add_parser("unread-words", help="report words the interpreter could not confidently read")
@@ -3558,6 +3579,11 @@ def build_parser() -> argparse.ArgumentParser:
     history_export.add_argument("--thumb-size", type=int, default=220)
     history_export.add_argument("--query", "-q", help="filter history before resolving hashes")
     history_export.add_argument("--starred", action="store_true", help="filter history to starred items before resolving hashes")
+    history_export.add_argument(
+        "--for-revision",
+        action="store_true",
+        help="filter history to items marked for revision before resolving hashes",
+    )
     history_export.set_defaults(func=command_history_export)
 
     api_command = subparsers.add_parser(

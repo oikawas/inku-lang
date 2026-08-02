@@ -6,6 +6,8 @@
 	import { modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose, type ModelStage } from '$lib/modelMeta';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
+	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
+	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
@@ -192,8 +194,9 @@
 		exportTemplateStatus: string | null;
 		animationExportSettings: AnimationExportSettings;
 		canvasAspectEnabled: boolean;
+		onChooseDownloadFolder: () => void | Promise<void>;
+		onClearDownloadFolder: () => void | Promise<void>;
 		onClose: () => void;
-		onCloseSettings: () => void;
 		onSelectSettingsTab: (tab: SettingsTab) => void;
 		onSetStage1Provider: (provider: Provider) => void;
 		onSetStage1Model: (model: string) => void;
@@ -301,8 +304,9 @@
 		exportTemplateStatus,
 		animationExportSettings = $bindable(),
 		canvasAspectEnabled,
+		onChooseDownloadFolder,
+		onClearDownloadFolder,
 		onClose,
-		onCloseSettings,
 		onSelectSettingsTab,
 		onSetStage1Provider,
 		onSetStage1Model,
@@ -724,9 +728,9 @@
 <div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 	<div class="modal-head">
 		<div class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</div>
-		{#if settingsMode !== 'model'}
-			<button class="catalog-close" onclick={onCloseSettings}>×</button>
-		{/if}
+		<!-- onClose, not a bare `settingsOpen = false`: in model mode the close has to
+		     roll back the pending picker selection, the way the backdrop and Esc do. -->
+		<button class="catalog-close" onclick={onClose} aria-label={t().closeLabel}>×</button>
 	</div>
 	{#if settingsMode === 'model'}
 		<div class="settings-tabs model-selection-tabs" role="tablist" aria-label={t().modelSelectButton}>
@@ -1441,6 +1445,32 @@
 		{:else if settingsTab === 'unread'}
 			<UnreadWordsPanel {isAdmin} />
 		{:else if settingsTab === 'export'}
+			<!-- Chromium only: showDirectoryPicker does not exist in Firefox or
+			     Safari, and a setting that is visible but cannot work is worse than
+			     no setting, so the whole group is withheld rather than disabled. -->
+			{#if downloadFolderSettings.supported}
+				<div class="popover-group">
+					<div class="popover-group-label">{t().settingsDownloadFolderLabel}</div>
+					<div class="db-test-result">{t().settingsDownloadFolderDescription}</div>
+					<div class="db-test-result">{t().settingsDownloadFolderBrowserOnly}</div>
+					<div class="download-folder-row">
+						<span class="download-folder-name">
+							{#if downloadFolderSettings.enabled && downloadFolderSettings.name}
+								{t().settingsDownloadFolderCurrent(downloadFolderSettings.name)}
+							{:else}
+								{t().settingsDownloadFolderNone}
+							{/if}
+						</span>
+						<button class="ghost-btn" onclick={onChooseDownloadFolder}>{t().settingsDownloadFolderChoose}</button>
+						{#if downloadFolderSettings.enabled}
+							<button class="ghost-btn" onclick={onClearDownloadFolder}>{t().settingsDownloadFolderClear}</button>
+						{/if}
+					</div>
+					{#if downloadFolderSettings.needsPicking}
+						<div class="inline-message">{t().settingsDownloadFolderNeedsPicking}</div>
+					{/if}
+				</div>
+			{/if}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsExportTemplatesTitle}</div>
 				<div class="db-test-result">{t().settingsExportTemplatesDescription}</div>
@@ -1542,6 +1572,20 @@
 				</label>
 			</div>
 		{:else}
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsBatchRetryLabel}</div>
+				<div class="db-test-result">{t().settingsBatchRetryDescription}</div>
+				<div class="batch-retry-field">
+					<span>{t().settingsBatchRetryCount}</span>
+					<NumberStepper
+						label={t().settingsBatchRetryCount}
+						min={BATCH_RETRY_MIN}
+						max={BATCH_RETRY_MAX}
+						value={batchSettings.maxRetries}
+						onChange={(value) => batchSettings.setMaxRetries(value)}
+					/>
+				</div>
+			</div>
 			<div class="popover-group ui-mode-settings">
 				<div class="popover-group-label">{t().uiModeLabel}</div>
 				<div class="db-test-result">{t().uiModeDescription}</div>
@@ -1956,6 +2000,15 @@
 		margin-top: 10px;
 	}
 	.db-backup-grid label,
+	.download-folder-row {
+		display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+		font-size: var(--btn-sm-font-size);
+	}
+	.download-folder-name { color: var(--fg2); }
+	.batch-retry-field {
+		display: flex; align-items: center; gap: 10px;
+		font-size: var(--btn-sm-font-size);
+	}
 	.db-backup-field {
 		display: flex;
 		flex-direction: column;

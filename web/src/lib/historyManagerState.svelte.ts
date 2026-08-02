@@ -65,6 +65,7 @@ export type HistoryItem = {
 	seed_text?: string | null;
 	trashed?: boolean;
 	starred?: boolean;
+	for_revision?: boolean;
 	note?: string | null;
 };
 
@@ -76,6 +77,7 @@ type FetchOptions = {
 	page?: number;
 	search?: string;
 	starredOnly?: boolean;
+	forRevisionOnly?: boolean;
 	pageSize?: number;
 	silent?: boolean;
 };
@@ -88,6 +90,7 @@ export class HistoryManagerState {
 	pageSize = $state(HISTORY_MANAGER_DEFAULT_PAGE_SIZE);
 	loading = $state(false);
 	starredOnly = $state(false);
+	forRevisionOnly = $state(false);
 	activeItems = $state<HistoryItem[]>([]);
 	activeTotal = $state(0);
 	trashItems = $state<HistoryItem[]>([]);
@@ -117,6 +120,7 @@ export class HistoryManagerState {
 		this.pageSize = HISTORY_MANAGER_DEFAULT_PAGE_SIZE;
 		this.loading = false;
 		this.starredOnly = false;
+		this.forRevisionOnly = false;
 		this.activeItems = [];
 		this.activeTotal = 0;
 		this.trashItems = [];
@@ -135,7 +139,7 @@ export class HistoryManagerState {
 		this.page = 0;
 		this.search = '';
 		this.selectedIds = [];
-		if (!this.preloadMatches('active', 0, this.pageSize, '', false, activeTotal)) {
+		if (!this.preloadMatches('active', 0, this.pageSize, '', false, false, activeTotal)) {
 			this.activeItems = activeItems;
 		}
 		this.activeTotal = activeTotal;
@@ -149,6 +153,7 @@ export class HistoryManagerState {
 		const page = options.page ?? this.page;
 		const search = options.search ?? this.search.trim();
 		const starredOnly = options.starredOnly ?? this.starredOnly;
+		const forRevisionOnly = options.forRevisionOnly ?? this.forRevisionOnly;
 		const pageSize = options.pageSize ?? this.pageSize;
 		const silent = options.silent ?? false;
 		this.pendingRequests += 1;
@@ -163,6 +168,8 @@ export class HistoryManagerState {
 			});
 			if (trashed) params.set('trashed', 'true');
 			if (starredOnly) params.set('starred', 'true');
+			// The two marks are independent, so asking for both means both.
+			if (forRevisionOnly) params.set('for_revision', 'true');
 			const r = await this.apiFetch(`/api/history?${params.toString()}`);
 			if (requestId !== this.requestId) return;
 			if (!r.ok) return;
@@ -176,7 +183,7 @@ export class HistoryManagerState {
 				this.activeItems = data.items;
 				this.activeTotal = data.total;
 			}
-			this.preloadKey = this.cacheKey(view, page, pageSize, search, starredOnly, data.total);
+			this.preloadKey = this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, data.total);
 			if (data.items.length === 0 && data.total > 0 && page > 0) {
 				const fallbackPage = page - 1;
 				this.page = fallbackPage;
@@ -184,8 +191,9 @@ export class HistoryManagerState {
 					this.view === view &&
 					this.search.trim() === search &&
 					this.starredOnly === starredOnly
+					&& this.forRevisionOnly === forRevisionOnly
 				) {
-					await this.fetch({ view, page: fallbackPage, search, starredOnly });
+					await this.fetch({ view, page: fallbackPage, search, starredOnly, forRevisionOnly });
 				}
 			}
 		} catch { /* ignore */ }
@@ -199,10 +207,10 @@ export class HistoryManagerState {
 		const nextPageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
 		this.trashTotal = trashTotal;
 		this.activeTotal = activeTotal;
-		if (this.preloadMatches('active', 0, nextPageSize, '', false, activeTotal)) return;
+		if (this.preloadMatches('active', 0, nextPageSize, '', false, false, activeTotal)) return;
 		this.pageSize = nextPageSize;
 		if (activeItems.length > this.activeItems.length) this.activeItems = activeItems;
-		void this.fetch({ view: 'active', page: 0, search: '', starredOnly: false, pageSize: nextPageSize, silent: true });
+		void this.fetch({ view: 'active', page: 0, search: '', starredOnly: false, forRevisionOnly: false, pageSize: nextPageSize, silent: true });
 	}
 
 	primeFirstPage(activeItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
@@ -211,7 +219,7 @@ export class HistoryManagerState {
 		this.activeItems = activeItems;
 		this.activeTotal = activeTotal;
 		this.trashTotal = trashTotal;
-		this.preloadKey = this.cacheKey('active', 0, nextPageSize, '', false, activeTotal);
+		this.preloadKey = this.cacheKey('active', 0, nextPageSize, '', false, false, activeTotal);
 	}
 
 	setView = (view: HistoryManagerView) => {
@@ -226,6 +234,13 @@ export class HistoryManagerState {
 		this.page = 0;
 		this.selectedIds = [];
 		void this.fetch({ page: 0, starredOnly: value });
+	};
+
+	setForRevisionOnly = (value: boolean) => {
+		this.forRevisionOnly = value;
+		this.page = 0;
+		this.selectedIds = [];
+		void this.fetch({ page: 0, forRevisionOnly: value });
 	};
 
 	setPage = (page: number) => {
@@ -268,6 +283,13 @@ export class HistoryManagerState {
 			: [...this.selectedIds, ...ids.filter((id) => !this.selectedIds.includes(id))];
 	}
 
+	applyForRevisionState(item: { id?: string; for_revision?: boolean }) {
+		if (!item.id) return;
+		this.activeItems = this.activeItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		this.trashItems = this.trashItems.map((it) => it.id === item.id ? { ...it, for_revision: item.for_revision } : it);
+		this.preloadKey = "";
+	}
+
 	applyStarState(item: { id?: string; starred?: boolean; note?: string | null }) {
 		if (!item.id) return;
 		const hasNote = Object.prototype.hasOwnProperty.call(item, "note");
@@ -276,14 +298,14 @@ export class HistoryManagerState {
 		this.preloadKey = "";
 	}
 
-	private cacheKey(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, total: number): string {
-		return [view, page, pageSize, search, starredOnly ? 1 : 0, total].join('|');
+	private cacheKey(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): string {
+		return [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0, total].join('|');
 	}
 
-	private preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, total: number): boolean {
+	private preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): boolean {
 		const expectedItems = Math.min(pageSize, total);
 		return (
-			this.preloadKey === this.cacheKey(view, page, pageSize, search, starredOnly, total) &&
+			this.preloadKey === this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, total) &&
 			this.items.length >= expectedItems
 		);
 	}

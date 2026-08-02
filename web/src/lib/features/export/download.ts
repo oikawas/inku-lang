@@ -1,6 +1,8 @@
 import { getCanvasAspectOption, type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import { withPngCaptureDate } from '$lib/pngMetadata';
 import { exportSettings } from './settings.svelte';
+import { downloadFolderSettings } from './download-folder.svelte';
+import { saveBlob, type SaveOutcome } from './save-target';
 
 export type SvgProfile = 'display' | 'editable' | 'compat';
 
@@ -25,16 +27,18 @@ export type ExportDeps = {
 	refinementCatalogId: () => string;
 	refinementCanvasAspectId: () => CanvasAspectId;
 	effectiveCanvasAspectId: () => CanvasAspectId;
+	/** Told where the file actually landed, so a fallback can be reported. */
+	onSaved?: (outcome: SaveOutcome) => void;
 };
 
 function escapeXml(s: string): string {
 	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function triggerDownload(blob: Blob, filename: string) {
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-	URL.revokeObjectURL(url);
+// Every file leaves the page through save-target.saveBlob; this only supplies
+// the user's setting and hands the outcome to the caller's reporter.
+function triggerDownload(blob: Blob, filename: string): Promise<SaveOutcome> {
+	return saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
 }
 
 export function createExportActions(deps: ExportDeps) {
@@ -64,7 +68,8 @@ export function createExportActions(deps: ExportDeps) {
 			if (!r.ok) throw await deps.apiError(r);
 			svg = await r.text();
 		}
-		triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), deps.exportFilename(profile === 'display' ? 'svg' : `${profile}.svg`));
+		const outcome = await triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), deps.exportFilename(profile === 'display' ? 'svg' : `${profile}.svg`));
+		deps.onSaved?.(outcome);
 	}
 
 	async function downloadPNG(size: number) {
@@ -98,7 +103,8 @@ export function createExportActions(deps: ExportDeps) {
 						// this inside the callback.
 						const generatedAt = deps.displayedHistoryItem()?.at ?? deps.result()?.history_at ?? Date.now();
 						withPngCaptureDate(b, new Date(generatedAt))
-							.then((stamped) => { triggerDownload(stamped, deps.exportFilename('png', size)); resolve(); })
+							.then((stamped) => triggerDownload(stamped, deps.exportFilename('png', size)))
+							.then((outcome) => { deps.onSaved?.(outcome); resolve(); })
 							.catch(reject);
 					}, 'image/png');
 				};

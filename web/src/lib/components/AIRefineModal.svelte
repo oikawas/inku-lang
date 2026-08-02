@@ -7,6 +7,7 @@
   import RunStatus from './RunStatus.svelte';
   import Tooltip from './Tooltip.svelte';
   import TenkeiSelect from './TenkeiSelect.svelte';
+  import WildToggle from './WildToggle.svelte';
   import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
   import { t } from '$lib/i18n/index.svelte';
   import { createElapsed } from '$lib/elapsed.svelte';
@@ -55,7 +56,10 @@
   const isJapanese = $derived(t().code === 'ja');
   // null = inherit the parent artwork's level (field omitted).
   let tenkeiOverride = $state<TenkeiLevel | null>(null);
+  // null = inherit the parent work's setting, the same rule staffage follows.
+  let wildOverride = $state<boolean | null>(null);
   const parentTenkei = $derived(normalizeTenkei(node.history?.tenkei) ?? DEFAULT_TENKEI);
+  const parentWild = $derived(node.history?.render_wild === true);
 
   $effect(() => { if (!selectedVisionModel) selectedVisionModel = visionModel; });
   onDestroy(() => abortController?.abort());
@@ -136,6 +140,7 @@
             ...(advice ? { vision_model: advice.model, vision_observation: advice.observation, vision_next_direction: advice.next_direction } : {})
           },
           ...(tenkeiOverride ? { tenkei: tenkeiOverride } : {}),
+          ...(wildOverride !== null ? { wild: wildOverride } : {}),
           historyVisibility: i === generations - 1 ? 'normal' : 'lineage_only',
           saveHistory: true,
           countGeneration: true,
@@ -190,7 +195,7 @@
         <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" bind:group={refineMode} value="random" /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" bind:group={refineMode} value="vision" /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
         {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea>{#if refineMode === 'random'}<small class="field-hint">{t().aiRefineDirectionRandomHint}</small>{/if}</div>
-        <div class="form-row"><div class="form-group tenkei-group"><span class="tenkei-group-label">&nbsp;</span><TenkeiSelect compact value={tenkeiOverride ?? parentTenkei} {isJapanese} inherited={tenkeiOverride === null} onSelect={(level) => (tenkeiOverride = level)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
+        <div class="form-row"><div class="form-group tenkei-group"><span class="tenkei-group-label">&nbsp;</span><TenkeiSelect compact value={tenkeiOverride ?? parentTenkei} {isJapanese} inherited={tenkeiOverride === null} onSelect={(level) => (tenkeiOverride = level)} /><WildToggle value={wildOverride ?? parentWild} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
         <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip><Tooltip placement="bottom" text={t().tooltipVariation}><label><input type="checkbox" bind:checked={enableVariation} /><span>{t().variationTitle}</span></label></Tooltip>{#if enableVariation}<div class="variation-amplitude-field"><div class="variation-amplitude-grid" role="radiogroup" aria-label={t().variationTitle}>{#each [['small', t().variationSmall, t().variationTooltipSmall, 'top-right'], ['medium', t().variationMedium, t().variationTooltipMedium, 'top'], ['large', t().variationLarge, t().variationTooltipLarge, 'top-left']] as [level, label, hint, place] (level)}<label class="amplitude-choice" class:checked={variationAmplitude === level}><input type="radio" name="ai-variation-amplitude" value={level} checked={variationAmplitude === level} onchange={() => (variationAmplitude = level as VariationAmplitude)} /><Tooltip placement={place as 'top' | 'top-left' | 'top-right'} text={hint}><span class="amplitude-choice-label"><strong>{label}</strong><span class="amplitude-info-mark" aria-hidden="true">i</span></span></Tooltip></label>{/each}</div></div>{/if}</div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}

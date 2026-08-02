@@ -11,6 +11,8 @@
 	import RunStatus from './RunStatus.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
+	import WildToggle from './WildToggle.svelte';
+	import ModelCardPicker from './ModelCardPicker.svelte';
 	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel, type DerivationKind } from '$lib/derivation';
 	import type { ModelOption } from '$lib/models';
@@ -79,6 +81,11 @@
 		pngTemplates: ExportTemplate[];
 		animationExportSettings: AnimationExportSettings;
 		apiFetch: ApiFetch;
+		// Passed through to LineagePanel for the contact sheet it builds from the
+		// checked works; CanvasPanel does not read them itself.
+		catalogName: (id: string | null | undefined) => string;
+		formatHistoryDate: (at: number) => string;
+		historyPreviewText: (text: string) => string;
 		onGotoNext: () => void | Promise<void>;
 		onGotoPrev: () => void | Promise<void>;
 		onGotoLatest: () => void | Promise<void>;
@@ -173,6 +180,14 @@
 		statusDdlOrigin: boolean;
 		statusTenkei: TenkeiLevel | null;
 		refineTenkeiValue: TenkeiLevel;
+		// The drawing (Stage 2) model, the same one DdlEditorDialog offers and with
+		// the same effect: choosing here rewrites the default and persists it.
+		refineDrawingModelId: string;
+		refineDrawingModelGroups: ProviderGroup[];
+		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
+		refineWildValue: boolean;
+		refineWildInherited: boolean;
+		onSetRefineWild: (value: boolean | null) => void;
 		refineTenkeiInherited: boolean;
 		onSetRefineTenkei: (level: TenkeiLevel | null) => void;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
@@ -236,6 +251,9 @@
 		pngTemplates,
 		animationExportSettings,
 		apiFetch,
+		catalogName,
+		formatHistoryDate,
+		historyPreviewText,
 		onGotoNext,
 		onGotoPrev,
 		onGotoLatest,
@@ -330,6 +348,12 @@
 		statusDdlOrigin,
 		statusTenkei,
 		refineTenkeiValue,
+		refineDrawingModelId,
+		refineDrawingModelGroups,
+		onSelectRefineDrawingModel,
+		refineWildValue,
+		refineWildInherited,
+		onSetRefineWild,
 		refineTenkeiInherited,
 		onSetRefineTenkei,
 		onSaveOkugakiModel,
@@ -837,7 +861,18 @@
 												<span>{refineCostLabel}</span>
 											</div>
 										{/if}
-										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /></div>
+										<!-- Same picker and same semantics as DdlEditorDialog: it rewrites
+										     the saved default, which the status row above shows. Stage 1 is
+										     not touched here; 使用モデル変更 is the view for that. -->
+										<div class="refine-model-row">
+											<ModelCardPicker
+												label={t().ddlDialogDrawingModel}
+												selectedModel={refineDrawingModelId}
+												providerGroups={refineDrawingModelGroups}
+												onSelect={onSelectRefineDrawingModel}
+											/>
+										</div>
+										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
 
 									{#if variationBusy || variationGridBusy}
 										<RunStatus
@@ -910,7 +945,7 @@
 					{:else if refineView === 'compare'}
 					<div class="compare-panel">
 					<div class="compare-head">
-						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
+						<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} />
 						<div class="compare-action-wrap">
 							{#if modelInspectionBusy}
 								<RunStatus
@@ -988,7 +1023,7 @@
 					{:else}
 					<div class="compare-panel">
 						<div class="compare-head">
-							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} />
+							<TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} />
 							<div class="compare-action-wrap">
 								{#if languageInspectionBusy}
 									<RunStatus
@@ -1031,7 +1066,7 @@
 				</div>
 			{:else if outputTab === 'lineage'}
 				{#await import('./LineagePanel.svelte') then { default: LineagePanel }}
-					<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} {animationExportSettings} {apiFetch} />
+					<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} {animationExportSettings} {apiFetch} {catalogName} {formatHistoryDate} {historyPreviewText} />
 				{/await}
 			{/if}
 		</div>
@@ -1768,7 +1803,8 @@
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover :global(.model-hover-card),
 	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
-	.refine-tenkei-row { display: flex; align-items: center; margin-top: 6px; }
+	.refine-tenkei-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+	.refine-model-row { margin-top: 6px; }
 
 	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
 	.compare-mode-tabs button { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg3); font: inherit; cursor: pointer; }

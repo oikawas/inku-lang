@@ -1,3 +1,5 @@
+import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+import { saveBlob } from '$lib/features/export/save-target';
 export type AnimationExportFormat = 'apng' | 'gif';
 export type AnimationPattern = 'cut' | 'crossfade' | 'fade_white' | 'slide';
 export type AnimationResolution = '150' | '300' | '500' | '1k' | '4k' | '8k' | 'custom';
@@ -91,13 +93,8 @@ export async function downloadAnimation(
 		throw new Error(typeof payload?.detail === 'string' ? payload.detail : `HTTP ${response.status}`);
 	}
 	const blob = await response.blob();
-	const url = URL.createObjectURL(blob);
-	try {
-		const anchor = document.createElement('a');
-		anchor.href = url;
-		anchor.download = filenameFromResponse(response, settings.format);
-		anchor.click();
-	} finally {
-		URL.revokeObjectURL(url);
-	}
+	// Same single path as every other download -- see features/export/save-target.
+	await saveBlob(blob, filenameFromResponse(response, settings.format), {
+		enabled: downloadFolderSettings.enabled,
+	});
 }

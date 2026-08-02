@@ -39,18 +39,25 @@ class HistoryStarBody(BaseModel):
     note: str | None = None
 
 
+class HistoryForRevisionBody(BaseModel):
+    for_revision: bool = False
+
+
 @router.get("/api/history", response_model=HistoryListResponse, response_model_exclude_none=True)
 def api_history_get(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
+    for_revision: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     anchor_id: str | None = Query(default=None, max_length=100),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
     if anchor_id:
-        position = _db.item_position(actor["id"], anchor_id, trashed=trashed, starred=starred)
+        position = _db.item_position(
+            actor["id"], anchor_id, trashed=trashed, starred=starred, for_revision=for_revision
+        )
         if position is not None:
             offset = (position // limit) * limit
     items, total = _db.list_items(
@@ -60,6 +67,7 @@ def api_history_get(
         trashed=trashed,
         query_text=q,
         starred=starred,
+        for_revision=for_revision,
     )
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
@@ -246,6 +254,16 @@ def api_history_restore(body: HistoryIdsBody, actor: dict = Depends(_current_use
 @router.patch("/api/history/{item_id}/star", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_star(item_id: str, body: HistoryStarBody, actor: dict = Depends(_current_user)) -> HistoryItem:
     item = _db.set_item_starred(actor["id"], item_id, body.starred, body.note)
+    if not item:
+        raise HTTPException(status_code=404, detail="history item not found")
+    return HistoryItem(**item)
+
+
+@router.patch("/api/history/{item_id}/for-revision", response_model=HistoryItem, response_model_exclude_none=True)
+def api_history_for_revision(
+    item_id: str, body: HistoryForRevisionBody, actor: dict = Depends(_current_user)
+) -> HistoryItem:
+    item = _db.set_item_for_revision(actor["id"], item_id, body.for_revision)
     if not item:
         raise HTTPException(status_code=404, detail="history item not found")
     return HistoryItem(**item)

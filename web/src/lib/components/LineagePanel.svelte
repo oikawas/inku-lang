@@ -4,12 +4,17 @@
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
+	import WildToggle from './WildToggle.svelte';
 	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
-	import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
+	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
+	import { runContactSheet } from '$lib/features/contact-sheet/run';
+	import { saveBlob } from '$lib/features/export/save-target';
+	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import type { SheetVariant } from '$lib/contactSheet';
 
 	export type LineageNode = {
 		id: string;
@@ -40,7 +45,7 @@
 		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null, wild?: boolean | null) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
@@ -63,12 +68,15 @@
 		visionProviderGroups: ProviderGroup[];
 		animationExportSettings: AnimationExportSettings;
 		apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+		catalogName: (id: string | null | undefined) => string;
+		formatHistoryDate: (at: number) => string;
+		historyPreviewText: (text: string) => string;
 	};
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -82,6 +90,8 @@
 	let arrowPaths = $state<ArrowPath[]>([]);
 	let checkedHistoryIds = $state<string[]>([]);
 	let animationExportBusy = $state(false);
+	let contactSheetBusy = $state<SheetVariant | null>(null);
+	let contactSheetError = $state<string | null>(null);
 	let animationExportError = $state<string | null>(null);
 	let noteDrafts = $state<Record<string, string>>({});
 	let savingNoteIds = $state<string[]>([]);
@@ -103,6 +113,8 @@
 	let editElapsedMs = $state(0);
 	let editDrawController: AbortController | null = null;
 	let editTenkeiOverride = $state<TenkeiLevel | null>(null);
+	// null = inherit the parent work's setting, the same rule staffage follows.
+	let editWildOverride = $state<boolean | null>(null);
 
 	// While the edit dialog is drawing, tick an elapsed timer for the status element.
 	$effect(() => {
@@ -221,6 +233,22 @@
 		return derivationKindLabel(kind, isJapanese);
 	}
 
+// The short name is for the card; the full "provider / model" stays in the
+// title, so the provider is one hover away rather than gone.
+function stageModelNames(history: HistoryItem | null | undefined): string {
+	const stage1 = modelShortName(history?.stage1_model);
+	const stage2 = modelShortName(history?.stage2_model);
+	if (!stage1 && !stage2) return '';
+	if (stage1 && stage2 && stage1 !== stage2) return `${stage1} / ${stage2}`;
+	return stage1 || stage2;
+}
+
+function stageModelTitle(history: HistoryItem | null | undefined): string {
+	const stage1 = history?.stage1_model ? modelDisplayName(history.stage1_model) : '';
+	const stage2 = history?.stage2_model ? modelDisplayName(history.stage2_model) : '';
+	return [stage1 && `Stage 1: ${stage1}`, stage2 && `Stage 2: ${stage2}`].filter(Boolean).join('\n');
+}
+
 function toggleCheckedHistory(historyId: string): void {
 	checkedHistoryIds = checkedHistoryIds.includes(historyId)
 		? checkedHistoryIds.filter((id) => id !== historyId)
@@ -229,6 +257,38 @@ function toggleCheckedHistory(historyId: string): void {
 
 function askTrashChecked(): void {
 	if (checkedHistoryIds.length > 0) onAskTrash([...checkedHistoryIds]);
+}
+
+// The same implementation the history manager uses -- see
+// features/contact-sheet/run. Only the selection and the lookup differ: the
+// works are already in the graph here, so no fetch is needed.
+async function downloadCheckedContactSheet(variant: SheetVariant): Promise<void> {
+	if (contactSheetBusy || checkedHistoryIds.length === 0) return;
+	contactSheetBusy = variant;
+	contactSheetError = null;
+	try {
+		await runContactSheet(variant, {
+			ids: () => checkedHistoryIds,
+			resolveWork: (id) => graph?.nodes.find((node) => node.history?.id === id)?.history ?? null,
+			catalogName,
+			formatDate: formatHistoryDate,
+			previewText: historyPreviewText,
+			save: async (blob, filename) => {
+				const outcome = await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
+				if (outcome.kind === 'browser' && outcome.reason === 'denied') {
+					contactSheetError = t().downloadFolderFellBack;
+				}
+			},
+			labels: {
+				title: t().historyContactSheetTitle,
+				subtitle: (total, date, page, pages) => t().historyContactSheetSubtitle(total, date, page, pages),
+			},
+		});
+	} catch {
+		contactSheetError = t().historyContactSheetFailed;
+	} finally {
+		contactSheetBusy = null;
+	}
 }
 
 async function downloadFocusAnimation(): Promise<void> {
@@ -337,6 +397,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	function openEditDialog(node: LineageNode, mode: 'description' | 'ddl'): void {
 		if (!node.history) return;
 		editTenkeiOverride = null;
+		editWildOverride = null;
 		activeEditNode = node;
 		editMode = mode;
 		editDraft = mode === 'description'
@@ -360,7 +421,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		editError = null;
 		editDrawController = new AbortController();
 		try {
-			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editTenkeiOverride);
+			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editTenkeiOverride, editWildOverride);
 			else await onDrawDdl(activeEditNode, editDraft);
 			activeEditNode = null;
 			editMode = null;
@@ -626,6 +687,12 @@ $effect(() => {
 		{animationExportBusy ? t().animationExportBusy : t().lineageAnimationExport}
 		{#if !animationExportBusy && focusAnimationHistoryIds.length > 1}<span>({focusAnimationHistoryIds.length})</span>{/if}
 	</button>
+	<!-- The AI contact sheet over the checked works, same builder as the history
+	     manager (features/contact-sheet/run) and the same save path. -->
+	<button type="button" title={t().historyContactSheetAiHint} disabled={checkedHistoryIds.length === 0 || contactSheetBusy !== null} onclick={() => downloadCheckedContactSheet('ai')}>
+		{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
+		{#if contactSheetBusy === null && checkedHistoryIds.length > 0}<span>({checkedHistoryIds.length})</span>{/if}
+	</button>
 	<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
 		<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
 		{#if checkedHistoryIds.length > 0}<span>{checkedHistoryIds.length}</span>{/if}
@@ -634,6 +701,7 @@ $effect(() => {
 </div>
 	</header>
 	{#if animationExportError}<div class="lineage-message error">{animationExportError}</div>{/if}
+	{#if contactSheetError}<div class="lineage-message error">{contactSheetError}</div>{/if}
 	{#if loading || overviewLoading}
 		<div class="lineage-message">{isJapanese ? '系譜を読み込み中…' : 'Loading lineage…'}</div>
 	{:else if error}
@@ -742,6 +810,14 @@ $effect(() => {
 								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted work')} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
+										<!-- Both stages only when they differ: naming the same model twice
+										     on a card this narrow says nothing and costs the width the
+										     operation label needs. Nothing at all when no model was
+										     recorded -- an em dash on every such card fills the lineage
+										     with punctuation. -->
+										{#if stageModelNames(node.history)}
+											<span class="operation-model" title={stageModelTitle(node.history)}>{stageModelNames(node.history)}</span>
+										{/if}
 									</div>
 									<div class="preview">
 										{#if node.history?.svg}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{isJapanese ? '削除済み' : 'Deleted'}</span>{/if}
@@ -817,6 +893,7 @@ $effect(() => {
 					/>
 				{:else}
 					<TenkeiSelect compact value={editTenkeiOverride ?? normalizeTenkei(activeEditNode?.history?.tenkei) ?? DEFAULT_TENKEI} {isJapanese} inherited={editTenkeiOverride === null} onSelect={(level) => (editTenkeiOverride = level)} />
+					<WildToggle value={editWildOverride ?? (activeEditNode?.history?.render_wild === true)} {isJapanese} inherited={editWildOverride === null} onSelect={(next) => (editWildOverride = next)} />
 					<button type="button" onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
 					<button type="button" class="edit-draw" disabled={!editDraft.trim()} onclick={drawEditedArtwork}>{isJapanese ? '描画' : 'Draw'}</button>
 				{/if}
@@ -952,7 +1029,12 @@ $effect(() => {
 	.card-main { user-select: none; display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: .7rem; }
+	/* One line, never wrapping: the card has a fixed width and the operation
+	   label sets the row height. The model name gives up its width first and
+	   ends in an ellipsis rather than pushing the label onto a second line. */
+	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: .7rem; display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+	.operation > span:first-child { flex: 0 0 auto; }
+	.operation-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg3); font-size: .62rem; }
 	.identity-marks { min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 3px; }
 	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: .62rem; }
 	.identity-mark { color: var(--fg3); background: var(--bg2); }

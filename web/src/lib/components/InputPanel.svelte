@@ -39,6 +39,7 @@
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
+		batchRetryRound: number;
 		batchActiveTokensIn: number | null;
 		batchActiveTokensOut: number | null;
 		batchTokensInTotal: number;
@@ -114,6 +115,7 @@
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
+		batchRetryRound,
 		batchActiveTokensIn,
 		batchActiveTokensOut,
 		batchTokensInTotal,
@@ -179,10 +181,27 @@
 		|| (inputMode === 'demo' && demoSettings.catalog_mode === 'auto')
 	);
 
+	// Progress sits on the tab only while the batch is running, so the tab returns
+	// to its plain label the moment the run stops. batchCurrent is 0 outside a run.
+	// During a retry round the counter runs over that round's own lines, marked
+	// with ↻n so the numbers restarting does not read as the batch restarting.
+	const batchRetryMark = $derived(batchRetryRound > 0 ? ` ↻${batchRetryRound}` : '');
+	const batchProgress = $derived(
+		batchRunning && batchTotal > 0 && batchCurrent > 0
+			? `(${batchCurrent}/${batchTotal}${batchRetryMark})`
+			: '',
+	);
+	// The counter is reserved at its widest form -- "(NN/NN)" for a two-digit total --
+	// so the label beside it does not shuffle as the count crosses a digit boundary.
+	// The tabs themselves are flex: 1 with a zero basis, so no tab can push another.
+	const batchProgressWidth = $derived(
+		2 * String(batchTotal).length + 3 + (batchRetryRound > 0 ? 2 + String(batchRetryRound).length : 0),
+	);
+
 	const tabItems = $derived([
-		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning },
-		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning },
-		{ mode: 'demo' as const, label: t().modeDemo, running: demoRunning },
+		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning, progress: '' },
+		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning, progress: batchProgress },
+		{ mode: 'demo' as const, label: t().modeDemo, running: demoRunning, progress: '' },
 	]);
 
 	const singleInputStats = $derived.by(() => {
@@ -216,6 +235,7 @@
 				}}
 			>
 				<span class="tab-label">{item.label}</span>
+				{#if item.progress}<span class="tab-progress" style="min-width: {batchProgressWidth}ch">{item.progress}</span>{/if}
 				{#if item.running}<span class="tab-running-dot" aria-hidden="true"></span>{/if}
 			</button>
 		</Tooltip>
@@ -362,6 +382,7 @@
 			{batchActiveDdlHighlighted}
 			{batchTotal}
 			{batchCurrent}
+			{batchRetryRound}
 			{batchActiveTokensIn}
 			{batchActiveTokensOut}
 			{batchTokensInTotal}
@@ -446,6 +467,13 @@
 	.panel-tab.active.running::before { background: var(--accent); animation: none; }
 	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
 	.tab-label { line-height: 1; }
+	.tab-progress {
+		line-height: 1;
+		font-size: 11px;
+		color: var(--fg3);
+		font-variant-numeric: tabular-nums;
+		text-align: center;
+	}
 	.tab-running-dot {
 		width: 6px;
 		height: 6px;

@@ -2,8 +2,11 @@
 	import Tooltip from './Tooltip.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import { saveBlob } from '$lib/features/export/save-target';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import { buildContactSheet, sheetCapacity, sheetPageCount, type ContactSheetEntry, type SheetVariant } from '$lib/contactSheet';
+	import { type SheetVariant } from '$lib/contactSheet';
+	import { runContactSheet } from '$lib/features/contact-sheet/run';
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
 	import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
@@ -46,10 +49,11 @@
 	lineage_root_node_id?: string | null;
 		trashed?: boolean;
 		starred?: boolean;
+		for_revision?: boolean;
 	note?: string | null;
 	};
 
-	type LineageHistoryGroup = { root_node_id: string; representative: HistoryItem; item_count: number; starred_count: number; latest_at: number };
+	type LineageHistoryGroup = { root_node_id: string; representative: HistoryItem; item_count: number; starred_count: number; for_revision_count: number; latest_at: number };
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
 	type Props = {
@@ -68,6 +72,7 @@
 		animationExportSettings: AnimationExportSettings;
 		historySearch: string;
 		historyManagerStarredOnly: boolean;
+		historyManagerForRevisionOnly: boolean;
 		onClose: () => void;
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
@@ -75,6 +80,8 @@
 		onSetFirstPage: () => void | Promise<void>;
 		onSetPageSize: (pageSize: number) => void;
 		onSetStarredOnly: (value: boolean) => void;
+		onSetForRevisionOnly: (value: boolean) => void;
+		onToggleForRevision: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		onSelectAll: () => void;
 		onAskTrash: (ids: string[]) => void;
 		onAskRestore: (ids: string[]) => void;
@@ -109,6 +116,7 @@
 		animationExportSettings,
 		historySearch = $bindable(''),
 		historyManagerStarredOnly,
+		historyManagerForRevisionOnly,
 		onClose,
 		onSetView,
 		onSetPage,
@@ -116,6 +124,8 @@
 		onSetFirstPage,
 		onSetPageSize,
 		onSetStarredOnly,
+		onSetForRevisionOnly,
+		onToggleForRevision,
 		onSelectAll,
 		onAskTrash,
 		onAskRestore,
@@ -166,6 +176,35 @@
 		try { localStorage.setItem('inku-history-display-mode', mode); } catch {}
 	}
 
+	// The thumbnail tab and the list tab page over different sets in lineage mode
+	// (the thumbnail tab asks for min_items=2), so an offset carried across the
+	// switch would land on a page that does not exist in the other set.
+	function selectHistoryManagerTab(tab: 'thumbs' | 'list') {
+		if (tab === historyManagerTab) return;
+		historyManagerTab = tab;
+		if (historyDisplayMode === 'lineage') {
+			lineageGroupPage = 0;
+			expandedRootIds = [];
+		}
+	}
+
+	const lineageThumbsMode = $derived(
+		historyDisplayMode === 'lineage' && historyManagerTab === 'thumbs',
+	);
+
+	// Generation order, not time order: the point of laying a lineage out is to
+	// show what came from what, and a sibling made later than its cousin would
+	// otherwise sit between a parent and its child. `at` breaks ties inside a
+	// generation, and a work with no recorded generation sorts to the front so it
+	// never hides between two numbered ones.
+	function membersInGenerationOrder(items: HistoryItem[] | undefined): HistoryItem[] {
+		return [...(items ?? [])].sort(
+			(a, b) =>
+				(a.lineage_generation ?? 0) - (b.lineage_generation ?? 0)
+				|| (a.at ?? 0) - (b.at ?? 0),
+		);
+	}
+
 	async function fetchLineageGroups(): Promise<void> {
 		const requestId = ++lineageRequestId;
 		lineageGroupController?.abort();
@@ -175,6 +214,11 @@
 		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim() });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
+		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
+		// The thumbnail tab lays a lineage's works out side by side, so a lineage
+		// holding one work has nothing to lay out. The server drops them, because
+		// dropping them here would leave short pages and a total that disagrees.
+		if (lineageThumbsMode) params.set('min_items', '2');
 		try {
 			const response = await apiFetch('/api/history/lineage-groups?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -184,6 +228,12 @@
 			lineageGroupTotal = data.total;
 			lineageGroupItems = {};
 			expandedRootIds = [];
+			if (lineageThumbsMode) {
+				// The works are the point of this view, so they load with the page
+				// instead of waiting for a click on every group.
+				expandedRootIds = data.groups.map((group) => group.root_node_id);
+				await Promise.all(data.groups.map((group) => loadLineageMembers(group.root_node_id)));
+			}
 		} catch (error) {
 			if (!(error instanceof DOMException && error.name === 'AbortError')) throw error;
 		} finally {
@@ -199,6 +249,11 @@
 		}
 		expandedRootIds = [...expandedRootIds, rootNodeId];
 		if (lineageGroupItems[rootNodeId]) return;
+		await loadLineageMembers(rootNodeId);
+	}
+
+	async function loadLineageMembers(rootNodeId: string): Promise<void> {
+		if (lineageGroupItems[rootNodeId]) return;
 		lineageMemberLoadingIds = [...lineageMemberLoadingIds, rootNodeId];
 		lineageMemberControllers.get(rootNodeId)?.abort();
 		const controller = new AbortController();
@@ -206,6 +261,7 @@
 		const params = new URLSearchParams({ limit: '10000', q: historySearch.trim() });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
+		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
 		try {
 			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -216,6 +272,20 @@
 		} finally {
 			lineageMemberLoadingIds = lineageMemberLoadingIds.filter((id) => id !== rootNodeId);
 			if (lineageMemberControllers.get(rootNodeId) === controller) lineageMemberControllers.delete(rootNodeId);
+		}
+	}
+
+	// Mirrors toggleLineageMemberStar: the parent owns the request, this keeps the
+	// group's own copy of the member and its count in step.
+	async function toggleLineageMemberForRevision(item: HistoryItem, event: MouseEvent): Promise<void> {
+		event.preventDefault();
+		event.stopPropagation();
+		const nextForRevision = !item.for_revision;
+		await onToggleForRevision(item, event);
+		for (const [rootId, members] of Object.entries(lineageGroupItems)) {
+			if (!members.some((member) => member.id === item.id)) continue;
+			lineageGroupItems = { ...lineageGroupItems, [rootId]: members.map((member) => member.id === item.id ? { ...member, for_revision: nextForRevision } : member) };
+			lineageGroups = lineageGroups.map((group) => group.root_node_id === rootId ? { ...group, for_revision_count: Math.max(0, group.for_revision_count + (nextForRevision ? 1 : -1)), representative: group.representative.id === item.id ? { ...group.representative, for_revision: nextForRevision } : group.representative } : group);
 		}
 	}
 
@@ -293,43 +363,12 @@
 	// The AI sheet carries index badges only, so the notes file has to restate
 	// everything a caption would have said, plus the machinery behind the
 	// performance. Labels stay English; the description keeps its own language.
-	function noteEntryFor(item: HistoryItem): ContactSheetNoteEntry {
-		const catalog = item.render_color_catalog_name
-			? item.render_color_catalog_sub
-				? `${item.render_color_catalog_name} (${item.render_color_catalog_sub})`
-				: item.render_color_catalog_name
-			: catalogName(item.render_color_catalog_id ?? item.catalog_id);
-		const aspect = item.render_canvas_aspect ?? item.render_canvas_aspect_id ?? '';
-		const ratio = item.render_canvas_aspect_ratio;
-		const engineName = [item.render_engine_id, item.render_engine_version].filter(Boolean).join(' ');
-		const level = normalizeTenkei(item.tenkei);
-		const models = [item.stage1_model, item.stage2_model].filter(Boolean).join(' -> ');
-		const variation = item.variation_amplitude
-			? item.variation_seed == null
-				? item.variation_amplitude
-				: `${item.variation_amplitude} (seed ${item.variation_seed})`
-			: '';
-		return {
-			description: item.source_text || item.input || '',
-			staffage: level ? tenkeiLabel(level, false) : '',
-			colorCatalog: catalog,
-			canvas: aspect ? (ratio ? `${aspect} (${ratio.toFixed(3)})` : aspect) : '',
-			engine: engineName ? (item.render_build_number ? `${engineName} / build ${item.render_build_number}` : engineName) : '',
-			models,
-			variation,
-			renderHash: item.render_hash_short ?? item.render_hash ?? '',
-			created: formatHistoryDate(item.at),
-			ddl: item.ddl
-		};
-	}
-
-	function triggerDownload(blob: Blob, filename: string) {
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement('a');
-		anchor.href = url;
-		anchor.download = filename;
-		anchor.click();
-		URL.revokeObjectURL(url);
+	// Same single path as every other download -- see features/export/save-target.
+	async function triggerDownload(blob: Blob, filename: string): Promise<void> {
+		const outcome = await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
+		if (outcome.kind === 'browser' && outcome.reason === 'denied') {
+			contactSheetError = t().downloadFolderFellBack;
+		}
 	}
 
 	async function downloadContactSheet(variant: SheetVariant): Promise<void> {
@@ -337,60 +376,18 @@
 		contactSheetBusy = variant;
 		contactSheetError = null;
 		try {
-			const entries: ContactSheetEntry[] = [];
-			const notes: ContactSheetNoteEntry[] = [];
-			for (const id of selectedHistoryIds) {
-				const item = findSelectedItem(id) ?? await fetchHistoryItem(id);
-				if (!item?.svg) continue;
-				entries.push({
-					svg: item.svg,
-					caption: historyPreviewText(item.display_label || item.source_text || item.input || ''),
-					sub: formatHistoryDate(item.at)
-				});
-				if (variant === 'ai') notes.push(noteEntryFor(item));
-			}
-			if (entries.length === 0) throw new Error('no artworks to place on the sheet');
-			const generatedAt = new Date();
-			const stamp = [
-				generatedAt.getFullYear(),
-				String(generatedAt.getMonth() + 1).padStart(2, '0'),
-				String(generatedAt.getDate()).padStart(2, '0'),
-				'-',
-				String(generatedAt.getHours()).padStart(2, '0'),
-				String(generatedAt.getMinutes()).padStart(2, '0'),
-				String(generatedAt.getSeconds()).padStart(2, '0')
-			].join('');
-			const capacity = sheetCapacity(variant);
-			const pages = sheetPageCount(entries.length, variant);
-			const kind = variant === 'ai' ? '-ai' : '';
-			const sheetFiles: Array<{ name: string; from: number; to: number }> = [];
-			for (let page = 0; page < pages; page += 1) {
-				const startIndex = page * capacity;
-				const slice = entries.slice(startIndex, startIndex + capacity);
-				const blob = await buildContactSheet(slice, {
-					variant,
+			await runContactSheet(variant, {
+				ids: () => selectedHistoryIds,
+				resolveWork: async (id) => findSelectedItem(id) ?? await fetchHistoryItem(id),
+				catalogName,
+				formatDate: formatHistoryDate,
+				previewText: historyPreviewText,
+				save: triggerDownload,
+				labels: {
 					title: t().historyContactSheetTitle,
-					subtitle: t().historyContactSheetSubtitle(entries.length, formatHistoryDate(generatedAt.getTime()), page + 1, pages),
-					startIndex
-				});
-				const suffix = pages > 1 ? `-${String(page + 1).padStart(2, '0')}` : '';
-				const filename = `inku-contact-sheet${kind}-${stamp}${suffix}.png`;
-				sheetFiles.push({ name: filename, from: startIndex + 1, to: startIndex + slice.length });
-				triggerDownload(blob, filename);
-				// Browsers drop back-to-back programmatic downloads; space them out.
-				if (page < pages - 1) await new Promise((resolve) => setTimeout(resolve, 400));
-			}
-			// One notes file for the whole selection, numbered straight through the
-			// split sheets, so the badges stay unambiguous across files.
-			if (variant === 'ai' && notes.length > 0) {
-				await new Promise((resolve) => setTimeout(resolve, 400));
-				const markdown = buildContactSheetNotes(notes, {
-					title: t().historyContactSheetTitle,
-					generatedAt: formatHistoryDate(generatedAt.getTime()),
-					sheets: sheetFiles
-				});
-				triggerDownload(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }), `inku-contact-sheet-ai-${stamp}.md`);
-			}
+					subtitle: (total, date, page, pages) => t().historyContactSheetSubtitle(total, date, page, pages),
+				},
+			});
 		} catch {
 			contactSheetError = t().historyContactSheetFailed;
 		} finally {
@@ -478,7 +475,9 @@
 
 	$effect(() => {
 		if (historyDisplayMode !== 'lineage') return;
-		historyManagerView; historySearch; historyManagerStarredOnly; lineageGroupPage; managedHistoryTotal; managerTrashTotal;
+		// historyManagerTab is a dependency because the thumbnail tab asks the
+		// server for a different set (min_items=2) than the list tab does.
+		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; lineageGroupPage; managedHistoryTotal; managerTrashTotal; historyManagerTab;
 		void fetchLineageGroups();
 	});
 
@@ -514,10 +513,10 @@
 			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
 			<div class="settings-tabs history-mode-tabs">
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryThumbsTab}>
-					<button class:active={historyManagerTab === 'thumbs'} onclick={() => (historyManagerTab = 'thumbs')}>{t().historyThumbsTab}</button>
+					<button class:active={historyManagerTab === 'thumbs'} onclick={() => selectHistoryManagerTab('thumbs')}>{t().historyThumbsTab}</button>
 				</Tooltip>
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryListTab}>
-					<button class:active={historyManagerTab === 'list'} onclick={() => (historyManagerTab = 'list')}>{t().historyListTab}</button>
+					<button class:active={historyManagerTab === 'list'} onclick={() => selectHistoryManagerTab('list')}>{t().historyListTab}</button>
 				</Tooltip>
 			</div>
 			<div class="settings-tabs history-group-tabs">
@@ -587,6 +586,13 @@
 					onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
 				>{t().historyStarredOnly}</button>
 			</Tooltip>
+			<Tooltip placement="bottom-right" text={t().tooltipHistoryForRevisionOnly}>
+				<button
+					class="ghost-btn"
+					class:ghost-active={historyManagerForRevisionOnly}
+					onclick={() => onSetForRevisionOnly(!historyManagerForRevisionOnly)}
+				>{t().historyForRevisionOnly}</button>
+			</Tooltip>
 			<Tooltip placement="bottom-right" text={t().tooltipHistoryTrashView}>
 				<button
 					class="ghost-btn"
@@ -653,7 +659,7 @@
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
 	</div>
 	{#if historyDisplayMode === 'lineage'}
-		<div class="lineage-history-list" class:list-mode={historyManagerTab === 'list'}>
+		<div class="lineage-history-list" class:list-mode={historyManagerTab === 'list'} class:thumbs-mode={lineageThumbsMode}>
 			{#if lineageGroupLoading}
 				<div class="lineage-history-message">{t().historyLoading}</div>
 			{:else if lineageGroups.length === 0}
@@ -667,7 +673,7 @@
 							</button>
 							<div class="lineage-group-summary">
 								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input)}</strong>
-								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {formatHistoryDate(group.latest_at)}</span>
+								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {t().historyLineageForRevisionCount(group.for_revision_count)} · {formatHistoryDate(group.latest_at)}</span>
 								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
 							</div>
 							<button class="ghost-btn" type="button" title={t().historyLineageExpandTitle} onclick={() => toggleLineageGroup(group.root_node_id)} aria-expanded={expandedRootIds.includes(group.root_node_id)}>
@@ -680,15 +686,17 @@
 								<div class="lineage-history-message">{t().historyLoading}</div>
 							{:else}
 								<div class="lineage-member-grid">
-									{#each lineageGroupItems[group.root_node_id] ?? [] as it (it.id ?? it.at)}
+									{#each membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => it.id && onToggleSelection(it.id)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
+											{#if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
 											<button class="lineage-member-main" type="button" title={t().historyOpenItemTitle} onclick={() => loadItemAndClose(it)}>
 												<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
 												<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
 											</button>
 											<div class="lineage-member-actions">
 												<button class="hash-row-star" class:starred={!!it.starred} title={it.starred ? t().starOn : t().starOff} aria-label={it.starred ? t().starOn : t().starOff} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
+												<button class="hash-row-mark" class:marked={!!it.for_revision} title={it.for_revision ? t().forRevisionOn : t().forRevisionOff} aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff} onclick={(event) => toggleLineageMemberForRevision(it, event)}>✎</button>
 												{#if historyManagerView === 'active'}
 													<button class="ghost-btn icon-trash-btn" title={t().historyTrashItemTitle} onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
 												{:else}
@@ -744,6 +752,13 @@
 									title={it.starred ? t().starOn : t().starOff}
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
+								<button
+									class="hash-row-mark"
+									class:marked={!!it.for_revision}
+									onclick={(event) => onToggleForRevision(it, event)}
+									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+								>✎</button>
 								{#if hashLabel(it)}<button class="hash-chip" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>{hashLabel(it)}</button>{/if}
 								<span class="thumb-model" title={historyModelSummary(it)}>{historyModelSummary(it)}</span>
 							</div>
@@ -779,6 +794,13 @@
 									title={it.starred ? t().starOn : t().starOff}
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
+								<button
+									class="thumb-star mini-star mini-mark"
+									class:marked={!!it.for_revision}
+									onclick={(event) => onToggleForRevision(it, event)}
+									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
+								>✎</button>
 							</td>
 							<td>{#if hashLabel(it)}<button class="hash-chip table-hash" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>#{hashLabel(it)}</button>{/if}</td>
 							<td>{formatHistoryDate(it.at)}</td>
@@ -837,6 +859,30 @@
 	.lineage-history-list.list-mode .lineage-member-main { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px; }
 	.lineage-history-list.list-mode .lineage-member-main :global(svg) { width: 48px; height: 48px; }
 	.lineage-history-list.list-mode .lineage-member-main span { margin-top: 0; }
+	/* Thumbnail tab, lineage mode: the works of one lineage have to read as one
+	   run. A connector drawn between cards would break the moment the grid wraps,
+	   so the run is carried by an enclosure instead -- a spine down the group's
+	   left edge and one tinted shelf under its works -- plus the generation number
+	   on each card, which survives any wrap. */
+	.lineage-history-list.thumbs-mode .lineage-history-group { border-left: 3px solid var(--border); }
+	.lineage-history-list.thumbs-mode .lineage-history-group.current-lineage { border-left-color: var(--accent); }
+	.lineage-history-list.thumbs-mode .lineage-member-grid {
+		background: color-mix(in srgb, var(--accent) 5%, var(--bg));
+	}
+	.lineage-generation-badge {
+		position: absolute; top: 8px; right: 8px; z-index: 5;
+		min-width: 16px; padding: 1px 5px;
+		border-radius: 999px;
+		background: var(--accent-light); color: var(--accent);
+		font-size: 9px; line-height: 1.5; text-align: center;
+		font-variant-numeric: tabular-nums;
+	}
+	/* A narrow window drops the works to one column; the spine and the shelf keep
+	   the grouping legible when the grid can no longer show a row. */
+	@media (max-width: 640px) {
+		.lineage-history-list.thumbs-mode .lineage-member-grid { grid-template-columns: 1fr; }
+		.lineage-history-list.thumbs-mode .lineage-group-head { flex-wrap: wrap; }
+	}
 	.history-group-tabs { flex-shrink: 0; }
 	.modal-backdrop {
 		position: fixed;
@@ -1133,6 +1179,28 @@
 		align-items: center;
 		justify-content: center;
 		padding: 0;
+	}
+	/* The revision mark sits beside the star and must not read as a second star:
+	   a pencil, and the accent colour rather than the star colour. */
+	.hash-row-mark {
+		padding: var(--btn-sm-padding);
+		border: 1px solid var(--border);
+		border-radius: var(--btn-sm-radius);
+		background: var(--panel);
+		color: var(--fg3);
+		font-size: var(--btn-sm-font-size);
+		line-height: 1;
+		cursor: pointer;
+	}
+	.hash-row-mark.marked {
+		border-color: var(--accent);
+		background: var(--accent-light);
+		color: var(--accent);
+	}
+	.mini-mark.marked {
+		border-color: var(--accent);
+		background: var(--accent-light);
+		color: var(--accent);
 	}
 	.hash-row-star.starred {
 		color: var(--star-fg);

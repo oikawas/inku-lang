@@ -253,6 +253,32 @@ export function modelDisplayName(
 }
 
 /**
+ * The short form: the model alone, for places too narrow for the provider.
+ *
+ * Differs from modelDisplayName in exactly one way -- no provider prefix -- and
+ * additionally drops the vendor prefix a served id often carries
+ * ("google/gemma-4-31b-it" -> "gemma-4-31b-it"), because that prefix repeats
+ * across a whole catalog and buys no distinction inside one.
+ *
+ * The string is never truncated. gemma-4-31b-it and gemma-4-31b-it-v2 are
+ * different models and a cut tail makes them the same word; overflow is the
+ * caller's problem, to be solved with text-overflow on a box that has a width.
+ */
+export function modelShortName(
+	modelId: string | null | undefined,
+	groups?: ProviderGroup[],
+	stageProvider: Provider = DEFAULT_PROVIDER
+): string {
+	const ref = String(modelId ?? '').trim();
+	if (!ref) return '';
+	const { provider, model } = resolveModelRefForDisplay(ref, groups, stageProvider);
+	const fromArgument = groups?.find((group) => group.id === provider)?.models.find((item) => item.id === model)?.label;
+	const name = fromArgument || registeredModelLabels.get(`${provider}:${model}`) || model;
+	const slash = name.indexOf('/');
+	return slash === -1 ? name : name.slice(slash + 1);
+}
+
+/**
  * Split "provider:model"; provider is null when the reference is not qualified.
  *
  * Written with indexOf/slice on purpose. `'a:b:c'.split(':', 1)` returns

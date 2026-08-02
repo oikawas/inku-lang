@@ -20,6 +20,7 @@ class HistoryLineageGroup(BaseModel):
     representative: HistoryItem
     item_count: int
     starred_count: int
+    for_revision_count: int
     latest_at: int
 
 
@@ -54,11 +55,14 @@ def api_history_lineage_groups(
     limit: int = Query(default=12, ge=1, le=100),
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
+    for_revision: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
+    min_items: int = Query(default=1, ge=1, le=1000),
     actor: dict = Depends(_current_user),
 ) -> HistoryLineageGroupListResponse:
     groups, total = _db.list_lineage_groups(
-        actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred
+        actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred,
+        for_revision=for_revision, min_item_count=min_items,
     )
     return HistoryLineageGroupListResponse(groups=groups, total=total, offset=offset, limit=limit)
 
@@ -70,11 +74,13 @@ def api_history_lineage_group_items(
     limit: int = Query(default=100, ge=1, le=10_000),
     trashed: bool = Query(default=False),
     starred: bool = Query(default=False),
+    for_revision: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
     items, total = _db.list_lineage_group_items(
-        actor["id"], root_node_id, offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred
+        actor["id"], root_node_id, offset=offset, limit=limit, trashed=trashed, query_text=q,
+        starred=starred, for_revision=for_revision,
     )
     if total == 0:
         root = _db.get_lineage(actor["id"], root_node_id, descendant_depth=0, node_limit=1)

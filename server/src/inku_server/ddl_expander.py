@@ -185,17 +185,6 @@ def _apply_nature_plugin_macros(ddl: str, *, lang: str, enable_plugins: bool) ->
     return _join_sentences([base, joined_macro], lang=lang) if base and joined_macro else (base or joined_macro or ddl)
 
 
-def _avoid_gray_background(text: str, *, lang: str) -> str:
-    if lang == "en":
-        return re.sub(
-            r"Fill background with gr[ae]y\.?",
-            "Fill background with white.",
-            text,
-            flags=re.IGNORECASE,
-        )
-    return re.sub(r"背景を灰(?:色)?で(?:塗りつぶす|埋める)。?", "背景を白で埋める。", text)
-
-
 def _seed(text: str, salt: str) -> int:
     digest = hashlib.sha256(f"{salt}:{text}".encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big")
@@ -1070,7 +1059,6 @@ def expand_intermediate_ddl(
     """
 
     sanitized = _sanitize_placement_words(ddl).strip()
-    sanitized = _avoid_gray_background(sanitized, lang=lang)
     sanitized = _apply_nature_plugin_macros(sanitized, lang=lang, enable_plugins=enable_plugins)
     if not sanitized:
         return sanitized

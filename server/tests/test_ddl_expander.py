@@ -87,10 +87,10 @@ def test_expand_intermediate_ddl_selects_focused_layers():
     selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in expanded]
 
     assert "ランダム" not in expanded
-    assert "背景を灰" not in expanded
-    # 旧表現「塗りつぶす」の入力も受け、出力は現行の「埋める」へ寄せる
-    assert "背景を白で埋める" in expanded
-    assert "塗りつぶす" not in expanded
+    # 契約 background-color-openness 段 2 で `_avoid_gray_background` を落としたので、
+    # 灰背景の文はそのまま運ばれる（旧表明は「背景を白で埋める」への書き換え）
+    assert "背景を灰で塗りつぶす。" in expanded
+    assert "背景を白で埋める" not in expanded
     assert "画面全体に点々と十二個" in expanded
     assert "正五角形" not in expanded
     assert "中心から" not in expanded
@@ -105,12 +105,17 @@ def test_expand_intermediate_ddl_selects_focused_layers():
     assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "焦点", "寄り"))
 
 
-def test_avoid_gray_background_accepts_both_wordings():
-    """灰背景の是正は、現行の「埋める」と保存済み作品の「塗りつぶす」の両方に効く。"""
+def test_gray_background_survives_stage_15_in_both_wordings():
+    """灰背景は Stage 1.5 を素通りする（契約 background-color-openness・段 2）。
+
+    裏返す前の表明は「灰は白へ是正される」だった。`_avoid_gray_background` は
+    現行の「埋める」と保存済み作品の「塗りつぶす」の両方を書き換えていたので、
+    素通りの表明も両語形で立てる。
+    """
     for ddl in ("背景を灰で埋める。黒い線を一本引く。", "背景を灰色で塗りつぶす。黒い線を一本引く。"):
         expanded = expand_intermediate_ddl(ddl)
-        assert "背景を白で埋める" in expanded
-        assert "背景を灰" not in expanded
+        assert "背景を灰" in expanded
+        assert "背景を白で埋める" not in expanded
 
 
 def test_expand_intermediate_ddl_is_idempotent_after_expansion():
@@ -219,14 +224,15 @@ def test_expand_intermediate_ddl_en_selects_focused_layers():
     assert "rising to the right" in expanded
 
 
-def test_expand_intermediate_ddl_en_avoids_gray_background():
+def test_expand_intermediate_ddl_en_keeps_gray_background():
+    """英語側の分岐も `_avoid_gray_background` の中にあったので、同じ表明を英語でも裏返す。"""
     expanded = expand_intermediate_ddl(
         "Fill background with gray. Draw three black horizontal lines.",
         lang="en",
     )
 
-    assert "background with gray" not in expanded.lower()
-    assert "Fill background with white." in expanded
+    assert "Fill background with gray" in expanded
+    assert "Fill background with white" not in expanded
 
 
 def test_expand_intermediate_ddl_en_reframes_center():

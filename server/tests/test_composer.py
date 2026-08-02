@@ -436,8 +436,11 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "実質的に見えない instruction" in SYSTEM_PROMPT
     assert "面積の少ない側" in SYSTEM_PROMPT
     assert "background=\"gray\"" in SYSTEM_PROMPT
-    assert "background=\"gray\" を使ってはいけない" in SYSTEM_PROMPT
-    assert "灰色の主題は background ではなく foreground" in SYSTEM_PROMPT
+    # 契約 background-color-openness (2026-08-02): 背景は抽象九色すべてを取る。
+    # 旧表明「background="gray" を使ってはいけない」を裏返した
+    assert "background=\"gray\" を使ってはいけない" not in SYSTEM_PROMPT
+    assert "white/black/gray/red/orange/yellow/green/blue/purple の九色すべて" in SYSTEM_PROMPT
+    assert "灰色の主題は background ではなく foreground" not in SYSTEM_PROMPT
     assert "白い横線を中央に引く" in SYSTEM_PROMPT
     assert "白い線を可視化" in SYSTEM_PROMPT
     assert "白い短い線を上から下へ百三十七本" in SYSTEM_PROMPT
@@ -511,8 +514,10 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "effectively invisible instructions" in SYSTEM_PROMPT_EN
     assert "smaller visual area" in SYSTEM_PROMPT_EN
     assert 'background="gray"' in SYSTEM_PROMPT_EN
-    assert 'Do not use background="gray"' in SYSTEM_PROMPT_EN
-    assert 'Treat gray subjects as foreground color="gray"' in SYSTEM_PROMPT_EN
+    # 契約 background-color-openness (2026-08-02): 英語側も同じく裏返す
+    assert 'Do not use background="gray"' not in SYSTEM_PROMPT_EN
+    assert "all nine abstract colors" in SYSTEM_PROMPT_EN
+    assert 'Treat gray subjects as foreground color="gray"' not in SYSTEM_PROMPT_EN
     assert "white line made visible" in SYSTEM_PROMPT_EN
     assert "one gray line rising from the bottom-left to the upper-right" in SYSTEM_PROMPT_EN
     assert "short white lines from top to bottom" in SYSTEM_PROMPT_EN

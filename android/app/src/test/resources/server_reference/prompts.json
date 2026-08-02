@@ -2,20 +2,20 @@
   "note": "Kotlin の同名定数は server のこれと一字一句同じであること。LiteRT 用の短縮プロンプトは対象外。",
   "prompts": {
     "STAGE1_PROMPT_PREFIX_JA": {
-      "bytes": 18963,
-      "sha256": "0832fcd61f23f7f7ee6addfed093a5e23d3bfef7bcfe1c62eec10f738a23cd52"
+      "bytes": 18981,
+      "sha256": "1430ea03025e3f8c42898250b5f33d4d7f0be577f6009e72ff371ac65b9c371b"
     },
     "STAGE1_PROMPT_PREFIX_EN": {
-      "bytes": 17956,
-      "sha256": "cce2a1e52758d47c2836152e0465b1f87db922f94ebd1969d13c892544f2d573"
+      "bytes": 18020,
+      "sha256": "b056eb26fc3748efedef88bd3d59ba66d10c72b9d7fbf3e9fc61505a233a8137"
     },
     "STAGE2_SYSTEM_PROMPT_JA": {
-      "bytes": 44116,
-      "sha256": "a47487d8623bfe8013b353b27316440ba381dfdfeb3bc30d714d393de3b21a00"
+      "bytes": 44193,
+      "sha256": "8b0c2559310f85e22d9f049c4c2939c1c4b089a15ed3e5a73a4530afd263d0ea"
     },
     "STAGE2_SYSTEM_PROMPT_EN": {
-      "bytes": 42191,
-      "sha256": "708949b703cc09fefae49fc7bc9572ad63383c29296f41dcd96d283521a50005"
+      "bytes": 42242,
+      "sha256": "4fbf91abd7c32e84f8d15f4f9aff020128f078383672921b9eb6e797dd5b8e82"
     }
   }
 }

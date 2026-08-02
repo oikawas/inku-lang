@@ -1495,7 +1495,17 @@ def test_coerce_score_governs_unrequested_saturated_background_in_presence_scene
     assert "white foreground made visible" in (fixed.instructions[0].note or "")
 
 
-def test_coerce_score_governs_stage1_inferred_black_background_when_source_did_not_request_it():
+def test_coerce_score_keeps_black_when_the_normalized_ddl_states_the_fill_clause():
+    """契約 background-color-openness (2026-08-02) で裏返した表明。
+
+    旧名 `..._governs_stage1_inferred_black_background_when_source_did_not_request_it`。
+    原文に情景語しかなくても、正規化DDL が「背景を黒で塗りつぶす」と書いていれば
+    それは記述の側の指示であり、ガバナは守らない。本番 DB の 22 件が
+    この分岐で白へ落ちていた（§0.2 の実測）。
+
+    ガバナ自体は残っている。原文にも正規化DDL にも明示が無い場合は依然として
+    白へ落ちる（`test_coerce_score_governs_generated_background_plan_...` が対照）。
+    """
     score = Score.model_validate(
         {
             "background": "black",
@@ -1516,7 +1526,7 @@ def test_coerce_score_governs_stage1_inferred_black_background_when_source_did_n
         ddl="古い鏡の奥に、忘れた部屋の冷たい気配が沈んでいる。\n背景を黒で塗りつぶす。灰色の四角を置く。",
     )
 
-    assert fixed.background == "white"
+    assert fixed.background == "black"
 
 
 def test_coerce_score_governs_generated_background_plan_without_original_source_context():
@@ -1630,7 +1640,13 @@ def test_coerce_score_keeps_explicit_dark_field_background():
     assert any(ins.color == "white" for ins in fixed.instructions)
 
 
-def test_coerce_score_governs_dawn_background_generated_from_source_context():
+def test_coerce_score_keeps_dawn_black_when_the_normalized_ddl_states_the_fill_clause():
+    """契約 background-color-openness (2026-08-02) で裏返した表明。
+
+    旧名 `..._governs_dawn_background_generated_from_source_context`。
+    DAWN_MARKERS は「夜明け」を非明示と読むが、明示句はその推論より先に効く。
+    明示句が信じられるのに夜明けを要さない、というのが段 1 の順序である。
+    """
     score = Score.model_validate(
         {
             "background": "black",
@@ -1656,7 +1672,7 @@ def test_coerce_score_governs_dawn_background_generated_from_source_context():
         ),
     )
 
-    assert fixed.background == "white"
+    assert fixed.background == "black"
 
 
 def test_coerce_score_tempers_unintentional_large_filled_shape():
@@ -2810,7 +2826,10 @@ def test_stage2_fallback_coverage_preserves_right_edge_and_presence_context():
         ddl=f"雨のバス停で、待つ人の気配が透明な膜になっている。\n{ddl}",
     )
 
-    assert score.background == "white"
+    # 契約 background-color-openness (2026-08-02): 「背景を青で塗りつぶす」は明示句なので
+    # ガバナは守らない（旧表明は white）。この test の主題は右端の線と presence の保存で、
+    # 背景色はその副産物である
+    assert score.background == "blue"
     assert score.presence is not None
     assert score.presence.kind == "figure_like"
     right_edge_lines = [

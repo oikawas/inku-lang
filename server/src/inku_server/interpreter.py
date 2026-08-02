@@ -177,7 +177,7 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 - 反復、列、糸、柵、鍵盤 → 等間隔にしすぎず、少しだけ欠落や角度差を含める
 
 「中央」は明示されている場合だけ使う。迷った場合は右上・左上・右下・左下・上端寄り・右半分などの動的な焦点を選ぶ。
-強い単色背景（黒・赤・青・緑）は、夜・炎・標識・海など文脈上必要な場合だけ使う。
+強い単色背景（黒・灰・赤・橙・黄・緑・青・紫）は、夜・炎・標識・海など文脈上必要な場合だけ使う。
 一つの出力に複数の技法を詰め込まない。主技法を一つ、必要なら副次的なゆらぎを一つまでにする。
 
 # 色とりどり・多色配色
@@ -198,8 +198,8 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 - 背景が小さな領域で、主題図形が大きい場合だけ背景側を変える
 - 白い背景 + 白い線/小図形 → 黒・青・赤・緑など、文脈に合う可視色へ変える
 - 黒い背景 + 黒い線/小図形 → 白・灰・青などへ変える
-- 「背景を灰で埋める」を出力してはいけない。入力が灰色背景を求めても、背景は白・黒・青・赤・緑の文脈に合う色へ置き換える
-- 灰色は背景ではなく、必要なときだけ前景の線・点・四角の色として使う。灰だけで構成せず、黒・白・青・赤・緑など見える描画色を併用する
+- 入力が灰色背景を求めたら「背景を灰で埋める」と出力してよい。背景は白・黒・灰・赤・橙・黄・緑・青・紫の抽象九色から文脈に合う色を選ぶ
+- 灰色は背景にも、前景の線・点・四角の色にも使える。灰だけで構成せず、黒・白・青・赤・緑など見える描画色を併用する
 - 白い雪・白い星・白い月など白が主題の場合でも、必ず背景を灰にする必要はない。面積の少ない側や補助要素を青・黒・赤・緑などへ変えてよい
 - 明示的な色指定が背景と同じ場合 → 主題性と面積を見て、近い可視色または構図上自然な別色を選ぶ
 
@@ -1053,7 +1053,7 @@ Use that relationship to decide focus, negative space, repetition, and line qual
 - Do not read substrings as sensory words. "crescent" is an arc/moon word, not "scent"; "waits" alone is not "waiting time", "buds", or "five-sense presence".
 
 Use "center" only when explicitly requested. If unsure, choose a dynamic focus: upper right, upper left, lower right, lower left, upper edge, or right half.
-Strong solid backgrounds such as black, red, blue, or green are allowed only when the context needs them.
+Strong solid backgrounds such as black, gray, red, orange, yellow, green, blue, or purple are allowed only when the context needs them.
 Do not pack multiple techniques into one output. Use one dominant technique and at most one supporting movement/texture.
 
 # Colorful / Multi-color
@@ -1074,8 +1074,8 @@ Do not normalize to the same foreground and background color. Invisible output i
 - only change the background when the matching subject is large and visually dominant
 - white background + white line/small shape → change the drawing to a context-fitting visible color such as black, blue, red, or green
 - black background + black line/small shape → change the drawing to white, gray, or blue
-- Do not output "Fill background with gray". Even if the input asks for a gray background, replace the background with contextual white, black, blue, red, or green
-- Use gray only as a foreground color for lines, dots, or shapes when needed. Do not build gray-only drawings; combine it with visible black, white, blue, red, or green
+- If the input asks for a gray background, output "Fill background with gray". Choose the background from the nine abstract colors: white, black, gray, red, orange, yellow, green, blue, purple
+- Gray works as a background and as a foreground color for lines, dots, or shapes. Do not build gray-only drawings; combine it with visible black, white, blue, red, or green
 - if white snow/stars/moon are the subject, do not always force gray. You may change the smaller side or supporting elements to blue, black, red, or green when that fits the context
 - if an explicit foreground color matches the background → choose a nearby visible color or a compositionally natural contrasting color
 

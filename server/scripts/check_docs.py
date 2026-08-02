@@ -92,26 +92,25 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "withdrawn on 2026-08-02. The two files must now correspond section "
         "for section, with Japanese still canonical. This exception is "
         "therefore temporary and must be deleted when the shapes match -- "
-        "the check itself will say so. What is already done: §1 gained an "
-        "About This Document section and the 1.1/1.2/1.3 split in English, "
-        "§3 gained 3.1/3.2 and the core properties in English and the "
-        "vocabulary provenance, catalog naming, and render JSON fields in "
-        "Japanese, §11 was rebuilt into 11.1-11.4 in both (Japanese had the "
-        "v0.8 plan where English had current practice, so current practice "
-        "won and the plan is kept as 11.4), and §15 and the repository "
-        "appendix were written in English. What is left: §6.7, §7.8, §12.14 "
-        "and §18 through §24 have no Japanese version yet, and §17 is still "
-        "Japanese-only pending a decision on where its 31 open items go",
+        "the check itself will say so. **Only §17 is left.** Setting it "
+        "aside, the two files match exactly at 135 headings each: §1, §3 and "
+        "§11 were reconciled, §15 and the repository appendix were written "
+        "in English, and §6.7, §7.8, §12.14 and §18 through §24 were written "
+        "in Japanese. §17 is the open-items list, and it cannot simply be "
+        "dropped: its 31 unresolved entries appear nowhere in the issue "
+        "ledger, so removing the section would remove them from tracking. "
+        "The author ruled on 2026-08-02 that they be inventoried first and "
+        "only the live ones filed -- that is ledger I-095. When I-095 closes "
+        "and §17 is settled in both languages, delete this exception",
     ),
+    # The Japanese version was written on 2026-08-02, so the pair needs no
+    # exception any more. The 2026-07-28 ruling that made this inventory
+    # English-only was withdrawn the same day.
     (
         "docs/spec/implementation-status.ja.md",
         "docs/spec/implementation-status.md",
         "shape",
-        "English only for now. The 2026-07-28 ruling that put this inventory "
-        "on the English-carries-operations side was withdrawn on 2026-08-02: "
-        "the author decided a Japanese version is owed. It has not been "
-        "written yet, so this exception is temporary and must be deleted "
-        "once docs/spec/implementation-status.ja.md exists",
+        None,
     ),
     # Split on 2026-07-28. The current file carries v2.5.0 onward and the two
     # languages hold the same 30 entries, so this pair needs no exception any

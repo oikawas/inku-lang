@@ -2377,8 +2377,12 @@ were written in Japanese. Doing so also exposed **three missing headings in the 
 for Refinement section** (two for v1.80 and one for v1.88): **the prose was there in English, only
 the headings were absent, leaving two against the Japanese five.**
 
-**Setting §17 aside, the two heading shapes now match exactly** (135 against 135). **§17 is all that
-remains, and it is blocked on ledger I-095** -- none of its 31 open items appear in the ledger, so
-dropping the section would drop them from tracking; the author ruled that they be inventoried before
-being filed. The Japanese version of the implementation-status inventory (429 lines / 30,080
-characters) is also not started.
+**The Japanese version of the implementation-status inventory, `docs/spec/implementation-status.ja.md`,
+was also written** (against 429 English lines / 30,080 characters). **That pair's declared exception is
+gone and it now actually passes the shape check in `check_docs.py`.**
+
+**Setting §17 aside, the two SPEC heading shapes now match exactly** (135 against 135). **§17 is all
+that remains, and it is blocked on ledger I-095** -- none of its 31 open items appear in the ledger,
+so dropping the section would drop them from tracking; the author ruled that they be inventoried
+first and only the live ones filed. **The SPEC pair's declared exception is kept as a temporary note
+describing that one remaining point.**

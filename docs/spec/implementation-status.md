@@ -4,8 +4,9 @@
 2026-07-28: an inventory of what is built is not a specification of what the language is, and
 it was the single largest section standing between a reader and the concepts.
 
-**English only.** There is no Japanese counterpart, and none is owed: the ruling of 2026-07-28
-is that Japanese is canonical for the concepts and English carries the operational side.
+**Both languages.** By the author's ruling of 2026-08-02 this file corresponds to
+[`implementation-status.ja.md`](implementation-status.ja.md) section for section. Japanese is the
+canonical source; this replaces the 2026-07-28 ruling under which the inventory was English only.
 
 The reference implementation currently includes:
 

@@ -46,11 +46,17 @@
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { colorCatalogOverride } from '$lib/features/color-catalog/render';
+	import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
+	import { loadPersistedSettings } from '$lib/features/persisted-settings';
+	import { applyUserSettings, collectUserSettings } from '$lib/features/user-settings';
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
 	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
+	import { tenkeiOverride } from '$lib/features/tenkei/render';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
+	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
 	import { createExportActions } from '$lib/features/export/download';
 	import { createModelInspection } from '$lib/features/model-inspection/state.svelte';
@@ -259,7 +265,6 @@
 		vision_model: string;
 		okugaki_provider?: Provider;
 		okugaki_model?: string;
-		model_inspection_selected_models?: string[];
 		instruction_caption_visible?: boolean;
 	};
 	type ModelProviderSetting = {
@@ -875,9 +880,7 @@
 			? qualifiedModelId(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
 			: qualifiedModelId(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
-		modelInspection.selectedModels = Array.isArray(settings.model_inspection_selected_models)
-			? settings.model_inspection_selected_models.filter((model): model is string => typeof model === 'string').slice(0, 4)
-			: [];
+		applyUserSettings(settings);
 	}
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
@@ -1335,7 +1338,8 @@
 	async function persistModelSelection() {
 		if (!currentUser) return;
 		const previousUser = currentUser;
-		const model_settings: UserModelSettings = {
+		// What the page owns; the features add their own fields to the save.
+		const pageModelSettings: UserModelSettings = {
 			stage1_provider: stage1Provider,
 			stage1_model: stage1Model,
 			stage2_provider: stage2Provider,
@@ -1344,9 +1348,9 @@
 			vision_model: visionModel,
 			okugaki_provider: splitModelRef(okugakiModel).provider ?? visionProvider,
 			okugaki_model: splitModelRef(okugakiModel).model,
-			model_inspection_selected_models: modelInspection.selectedModels,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
+		const model_settings = { ...pageModelSettings, ...collectUserSettings() };
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -2626,11 +2630,10 @@
 		saveHistory?: boolean;
 		saveArtifacts?: boolean;
 		countGeneration?: boolean;
-		catalogId?: string;
-		catalogMode?: 'fixed' | 'auto' | 'random';
 		canvasAspectId?: CanvasAspectId;
 		renderSeed?: number;
-		wild?: boolean;
+		/** Per-feature overrides for the render request; built by the features. */
+		renderOverrides?: RenderOverrides;
 		compositionSeed?: number;
 		// 変奏 (v2.0): 両方そろって初めてサーバーが展開層をずらす。
 		variationAmplitude?: string;
@@ -2745,7 +2748,6 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				ui_lang: uiLang,
 				canvas_aspect: options.canvasAspectId ?? effectiveCanvasAspectId(),
 				render_seed: options.renderSeed,
-				wild: options.wild ?? false,
 				composition_seed: options.compositionSeed,
 				variation_amplitude: options.variationAmplitude ?? null,
 				variation_seed: options.variationSeed ?? null,
@@ -2762,11 +2764,9 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 				batch_run_id: options.batchRunId ?? null,
 				history_visibility: options.historyVisibility ?? 'normal',
 				lineage_parent_node_id: options.lineageParentNodeId ?? null,
-				...(options.tenkei ? { tenkei: options.tenkei } : {}),
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},
-				catalog_id: options.catalogId ?? colorCatalogSettings.selected,
-				catalog_mode: options.catalogMode ?? 'fixed'
+				...renderSettingsPayload('paint', options.renderOverrides)
 			})
 		});
 		if (!r.ok) {
@@ -2843,7 +2843,7 @@ if (unreadWords.length > 0) {
 		};
 	}
 
-	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { catalogId?: string; canvasAspectId?: CanvasAspectId; tenkei?: TenkeiLevel | null; wild?: boolean | null; lineageParentNodeId?: string | null } = {}): Promise<{
+	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { canvasAspectId?: CanvasAspectId; lineageParentNodeId?: string | null; renderOverrides?: RenderOverrides } = {}): Promise<{
 		score: Score;
 		svg: string;
 		// Stage 2 に渡った展開後 DDL (v1.98)
@@ -2885,11 +2885,9 @@ if (unreadWords.length > 0) {
 				description: originalText,
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
-				catalog_id: renderOptions.catalogId ?? colorCatalogSettings.selected,
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
-				...(renderOptions.tenkei ? { tenkei: renderOptions.tenkei } : {}),
-				...(renderOptions.wild != null ? { wild: renderOptions.wild } : {}),
+				...renderSettingsPayload('compose', renderOptions.renderOverrides),
 				...(renderOptions.lineageParentNodeId ? { lineage_parent_node_id: renderOptions.lineageParentNodeId } : {}),
 			})
 		});
@@ -3001,9 +2999,10 @@ if (unreadWords.length > 0) {
 					historyInput: `[demo] ${demoGeneratedPrompt}`,
 					sourceText: demoGeneratedPrompt,
 					displayLabel: '[demo]',
-					catalogId: demoCatalogId,
-					tenkei: tenkeiSettings.level,
-					catalogMode: settings.catalog_mode,
+					renderOverrides: {
+						...colorCatalogOverride(demoCatalogId, settings.catalog_mode),
+						...wildOverride(false)
+					},
 				});
 				if (demoRunId !== runId || !loading) break;
 				demoGeneratedDdl = r.ddl;
@@ -3156,13 +3155,10 @@ if (unreadWords.length > 0) {
 				stageLabel = t().stageDdlGenerating;
 				const r = await paintOne(input, {
 					sourceText: input,
-					catalogId: colorCatalogSettings.selected,
 					canvasAspectId: effectiveCanvasAspectId(),
-					wild: wildSettings.enabled,
 					lineageParentNodeId: submitParentNodeId,
 					derivationKind: submitDerivationKind,
 					derivationMetadata: submitDerivationMetadata,
-					tenkei: tenkeiSettings.level,
 					signal: abortController.signal,
 					onStage1: (stage1) => {
 						elapsedStage1Ms = stage1.elapsed_ms;
@@ -3225,11 +3221,8 @@ if (unreadWords.length > 0) {
 							displayLabel: `#${item.line}`,
 							batchLineNumber: item.line,
 							batchRunId,
-							catalogId: batchCatalogId,
-							catalogMode: batchAutoColorCatalog ? 'auto' : 'fixed',
 							canvasAspectId: batchCanvasAspectId,
-							wild: wildSettings.enabled,
-							tenkei: tenkeiSettings.level,
+							renderOverrides: colorCatalogOverride(batchCatalogId, batchAutoColorCatalog ? 'auto' : 'fixed'),
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) return null;
@@ -3390,9 +3383,9 @@ if (unreadWords.length > 0) {
 					description: replayInput,
 					instruction_lang: instructionLang,
 					ui_lang: uiLang,
-					catalog_id: colorCatalogSettings.selected,
 					canvas_aspect: effectiveCanvasAspectId(),
-					auto_repair: ddlAutoRepairEnabled
+					auto_repair: ddlAutoRepairEnabled,
+					...renderSettingsPayload('compose')
 				})
 			});
 			if (!r.ok) {
@@ -3996,11 +3989,10 @@ if (unreadWords.length > 0) {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					score: it.score,
-					catalog_id: catalogId,
 					canvas_aspect: canvasId,
 					render_seed: replaySeed,
-					wild: Boolean(it.render_wild),
 					seed_text: it.seed_text,
+					...renderSettingsPayload('render-svg', { ...colorCatalogOverride(catalogId), ...wildOverride(Boolean(it.render_wild)) }),
 				})
 			});
 			if (!r.ok) throw await apiError(r);
@@ -4159,15 +4151,17 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	const rendered = await paintOne(sourceText, {
 		sourceText,
 		historyInput: sourceText,
-		catalogId: lineageCatalogId(node),
 		canvasAspectId: lineageCanvasAspectId(node),
 		lineageParentNodeId: node.id,
 		derivationKind: 'description_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
 		signal,
-		tenkei,
 		// null override = inherit the parent work's setting.
-		wild: wild ?? node.history.render_wild === true,
+		renderOverrides: {
+			...colorCatalogOverride(lineageCatalogId(node)),
+			...tenkeiOverride(tenkei),
+			...wildOverride(wild ?? node.history.render_wild === true)
+		},
 	});
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
@@ -4177,11 +4171,13 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 	if (!nextDdl || !node.history) return;
 	const sourceText = node.history.source_text ?? node.history.input ?? '';
 	const composed = await composeOne(nextDdl, sourceText, signal, undefined, undefined, {
-		catalogId: lineageCatalogId(node),
 		canvasAspectId: lineageCanvasAspectId(node),
-		tenkei: ddlDialogTenkeiOverride,
-		wild: ddlDialogWildOverride ?? node.history.render_wild === true,
 		lineageParentNodeId: node.id,
+		renderOverrides: {
+			...colorCatalogOverride(lineageCatalogId(node)),
+			...tenkeiOverride(ddlDialogTenkeiOverride),
+			...wildOverride(ddlDialogWildOverride ?? node.history.render_wild === true)
+		},
 	});
 	const resolvedEditStage1Model = node.history.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model);
 	const resolvedEditStage2Model = composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model);
@@ -4235,9 +4231,8 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	if (!nextDdl) return;
 	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
 	const composed = await composeOne(nextDdl, '', signal, undefined, undefined, {
-		catalogId: colorCatalogSettings.selected,
 		canvasAspectId: effectiveCanvasAspectId(),
-		tenkei: tenkeiSettings.level,
+		renderOverrides: tenkeiOverride(tenkeiSettings.level),
 	});
 	const saved = await pushHistory({
 		input: '',
@@ -4718,9 +4713,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					score: result.score,
-					catalog_id: refinementCatalogId(),
 					canvas_aspect: refinementCanvasAspectId(),
 					render_seed: nextSeed,
+					...renderSettingsPayload('render-svg', colorCatalogOverride(refinementCatalogId())),
 				})
 			});
 			if (!r.ok) throw await apiError(r);
@@ -4754,7 +4749,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const usedSeeds = new Set<number>();
 			if (Number.isFinite(result.composition_seed ?? NaN)) usedSeeds.add(Number(result.composition_seed));
 			const nextVarySeed = createSafeIntegerSeed(usedSeeds);
-			const r = await paintOne(source, { compositionSeed: nextVarySeed, historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_change' : null, derivationMetadata: { composition_seed: nextVarySeed } });
+			const r = await paintOne(source, { compositionSeed: nextVarySeed, historyInput: source, sourceText: source, canvasAspectId: refinementCanvasAspectId(), renderOverrides: inPlaceRedrawOverrides(), lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'layout_change' : null, derivationMetadata: { composition_seed: nextVarySeed } });
 			ddl = r.source_ddl ?? r.ddl;
 			expandedDdl = r.ddl;
 			ddlGeneratedBaseline = ddl;
@@ -4800,7 +4795,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const previousDdl = ddl;
 		try {
 			const interpretationSeed = createInterpretationSeed();
-			const r = await paintOne(source, { historyInput: source, sourceText: source, catalogId: refinementCatalogId(), canvasAspectId: refinementCanvasAspectId(), interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
+			const r = await paintOne(source, { historyInput: source, sourceText: source, canvasAspectId: refinementCanvasAspectId(), renderOverrides: inPlaceRedrawOverrides(), interpretationSeed, lineageParentNodeId: parentNodeId, derivationKind: parentNodeId ? 'reinterpretation' : null, derivationMetadata: { interpretation_seed: interpretationSeed } });
 			interpretationDiffParts = buildDdlDiffParts(previousDdl, r.ddl);
 			ddl = r.source_ddl ?? r.ddl;
 			expandedDdl = r.ddl;
@@ -4855,6 +4850,27 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return result?.render_color_catalog_id ?? displayedHistoryItem?.catalog_id ?? defaultCatalogId;
 	}
 
+	// The two in-place redraws (vary the layout, reinterpret) keep the artwork's
+	// catalog but have never carried the level or the switch: they omit the level
+	// so the parent's is inherited, and draw tame. Preserved as-is.
+	function inPlaceRedrawOverrides(): RenderOverrides {
+		return {
+			...colorCatalogOverride(refinementCatalogId()),
+			...tenkeiOverride(null),
+			...wildOverride(false)
+		};
+	}
+
+	// A refinement redraws against the artwork it refines: its catalog, the level
+	// the author chose for this round, and the switch the artwork was drawn with.
+	function refinementRenderOverrides(): RenderOverrides {
+		return {
+			...colorCatalogOverride(refinementCatalogId()),
+			...tenkeiOverride(refineTenkeiOverride),
+			...wildOverride(effectiveRefineWild)
+		};
+	}
+
 	function refinementCanvasAspectId(): CanvasAspectId {
 		return normalizeCanvasAspectId(result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? effectiveCanvasAspectId());
 	}
@@ -4871,11 +4887,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				score: result.score,
 				input: input.trim(),
 				ddl: ddl ?? '',
-				catalog_id: refinementCatalogId(),
 				canvas_aspect: refinementCanvasAspectId(),
 				composition_seed: result.composition_seed,
 				interpretation_seed: result.interpretation_seed,
 				seed_text: normalizedSeedText,
+				...renderSettingsPayload('render-score', colorCatalogOverride(refinementCatalogId())),
 			}),
 		});
 		if (!r.ok) throw await apiError(r);
@@ -4912,12 +4928,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
-				catalog_id: refinementCatalogId(),
 				canvas_aspect: refinementCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				composition_seed: compositionSeed,
-				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
-				wild: effectiveRefineWild,
+				...renderSettingsPayload('compose', refinementRenderOverrides()),
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
@@ -4935,12 +4949,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			saveHistory: false,
 			saveArtifacts: false,
 			countGeneration: false,
-			catalogId: refinementCatalogId(),
 			canvasAspectId: refinementCanvasAspectId(),
 			interpretationSeed,
 			signal,
-			tenkei: refineTenkeiOverride,
-			wild: effectiveRefineWild,
+			renderOverrides: refinementRenderOverrides(),
 			lineageParentNodeId: currentLineageParentId(),
 		});
 		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: currentLineageParentId(), derivation_kind: currentLineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
@@ -4973,11 +4985,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				score: result.score,
 				input: source,
 				ddl: ddl ?? "",
-				catalog_id: catalogId,
 				canvas_aspect: refinementCanvasAspectId(),
 				render_seed: result.render_seed,
 				composition_seed: result.composition_seed,
 				interpretation_seed: result.interpretation_seed,
+				...renderSettingsPayload('render-score', colorCatalogOverride(catalogId)),
 			}),
 		});
 		if (!r.ok) throw await apiError(r);
@@ -5014,13 +5026,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
-				catalog_id: refinementCatalogId(),
 				canvas_aspect: refinementCanvasAspectId(),
 				auto_repair: ddlAutoRepairEnabled,
 				variation_amplitude: amplitude,
 				variation_seed: seed,
-				...(refineTenkeiOverride ? { tenkei: refineTenkeiOverride } : {}),
-				wild: effectiveRefineWild,
+				...renderSettingsPayload('compose', refinementRenderOverrides()),
 				...(currentLineageParentId() ? { lineage_parent_node_id: currentLineageParentId() } : {}),
 			})
 		});
@@ -5650,14 +5660,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
-			colorCatalogSettings.load();
-			tenkeiSettings.load();
-			wildSettings.load();
-			exportSettings.load();
-			resultLogSettings.load();
-			batchFailureReportStore.load();
-			batchSettings.load();
-			exportSettings.markLoaded();
+			loadPersistedSettings();
 		} catch {}
 		void (async () => {
 			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), loadCurrentUser(), fetchPrompts()]);
@@ -5795,10 +5798,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						generationDisabled={variationGridBusy || reloading}
 						{error}
 						{stageLabel}
-						tenkeiLevel={tenkeiSettings.level}
-						onSelectTenkei={tenkeiSettings.set}
-						wildEnabled={wildSettings.enabled}
-						onSelectWild={wildSettings.set}
 						{canvasAspectEnabled}
 						{canvasAspectId}
 						{canvasAspectMenuOpen}
@@ -6026,12 +6025,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				variationElapsedMs={variationElapsed.ms}
 				{variationTokensIn}
 				{variationTokensOut}
-				modelInspectionElapsedMs={modelInspection.elapsedMs}
-				modelInspectionTokensIn={modelInspection.tokensIn}
-				modelInspectionTokensOut={modelInspection.tokensOut}
-				languageInspectionElapsedMs={modelInspection.languageElapsedMs}
-				languageInspectionTokensIn={modelInspection.languageTokensIn}
-				languageInspectionTokensOut={modelInspection.languageTokensOut}
+				{modelInspection}
 				bind:touchSeedText
 				onGenerateVariationCandidates={generateVariationCandidates}
 				onAbortVariationCandidates={abortVariationCandidates}
@@ -6039,37 +6033,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onShowVariationCandidate={showVariationCandidate}
 				onToggleVariationCandidate={toggleVariationCandidate}
 				{activeComparisonItem}
-				modelInspectionTargetModel={modelInspection.targetModel}
-				modelInspectionTargetStage1Model={modelInspection.targetStage1Model}
-				modelInspectionTargetStage2Model={modelInspection.targetStage2Model}
-				modelCompareMode={modelInspection.compareMode}
-				modelCompareFixedModel={modelInspection.compareFixedModel}
-				modelInspectionChoices={modelInspection.choices}
-				modelInspectionSelectedModels={modelInspection.selectedModels}
-				modelInspectionFailedModels={modelInspection.failedModels}
-				modelInspectionBusy={modelInspection.busy}
-				modelInspectionStatus={modelInspection.status}
-				modelInspectionResults={modelInspection.results}
-				onToggleModelInspectionModel={modelInspection.toggleModel}
-				onSetModelCompareMode={modelInspection.setCompareMode}
-				onSetModelCompareFixedModel={modelInspection.setCompareFixedModel}
-				isModelInspectionChoiceBlocked={modelInspection.isChoiceBlocked}
-				onRunModelInspection={modelInspection.run}
-				onAbortModelInspection={modelInspection.abort}
-				modelInspectionCurrentModel={modelInspection.currentModel}
-				onAdoptModelInspectionResult={(item) => modelInspection.saveResult(item)}
-				onToggleModelInspectionStar={(item) => modelInspection.saveResult(item, { star: true })}
-				languageInspectionTargetLang={modelInspection.languageTargetLang}
-				languageInspectionSelectedCombos={modelInspection.languageSelectedCombos}
-				languageInspectionBusy={modelInspection.languageBusy}
-				languageInspectionStatus={modelInspection.languageStatus}
-				languageInspectionResults={modelInspection.languageResults}
-				languageInspectionCurrentLabel={modelInspection.languageCurrentLabel}
-				onToggleLanguageCombo={modelInspection.toggleLanguageCombo}
-				onRunLanguageInspection={modelInspection.runLanguage}
-				onAbortLanguageInspection={modelInspection.abortLanguage}
-				onAdoptLanguageInspectionResult={(item) => modelInspection.saveResult(item)}
-				onToggleLanguageInspectionStar={(item) => modelInspection.saveResult(item, { star: true })}
 				{lineageGraph}
 				{lineageLoading}
 				{lineageError}

@@ -3,6 +3,7 @@ import {
 	parseAnimationExportSettings,
 	type AnimationExportSettings
 } from '$lib/animationExport';
+import { registerPersistedSetting } from '$lib/features/persisted-settings';
 
 // Export settings that survive a reload.  They are written back as a group by a
 // single $effect in the page, so adding one here needs no edit anywhere else --
@@ -45,3 +46,6 @@ class ExportSettings {
 }
 
 export const exportSettings = new ExportSettings();
+
+// Restored at start-up with every other persisted setting.
+registerPersistedSetting({ id: 'export', load: exportSettings.load, afterLoad: exportSettings.markLoaded });

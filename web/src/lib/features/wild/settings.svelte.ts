@@ -1,6 +1,9 @@
 // 暴れる (engine 12): OFF = 予想のつく標準、ON = 天井を外した奔放なストローク。
 // One switch for the whole artwork, persisted.  Key, default and state stay
 // together -- see features/color-catalog/settings.svelte.ts for why.
+import { bindWildRenderState } from '$lib/features/wild/render';
+import { registerPersistedSetting } from '$lib/features/persisted-settings';
+
 const WILD_KEY = 'inku-wild';
 
 class WildSettings {
@@ -23,3 +26,9 @@ class WildSettings {
 }
 
 export const wildSettings = new WildSettings();
+
+// The render slice lives in ./render.ts; it reads the live switch through this.
+bindWildRenderState(() => wildSettings.enabled);
+
+// Restored at start-up with every other persisted setting.
+registerPersistedSetting({ id: 'wild', load: wildSettings.load });

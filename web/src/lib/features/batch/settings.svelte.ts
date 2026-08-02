@@ -1,6 +1,8 @@
 // How many extra passes a batch makes over the lines that failed.
 // Key, default, parser and state stay together -- see
 // features/color-catalog/settings.svelte.ts for why.
+import { registerPersistedSetting } from '$lib/features/persisted-settings';
+
 const BATCH_RETRY_KEY = 'inku-batch-retry';
 
 // Zero by default: a batch keeps behaving exactly as it did before this setting
@@ -35,3 +37,6 @@ class BatchSettings {
 }
 
 export const batchSettings = new BatchSettings();
+
+// Restored at start-up with every other persisted setting.
+registerPersistedSetting({ id: 'batch', load: batchSettings.load });

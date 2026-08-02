@@ -2371,8 +2371,14 @@ Japanese** (185 lines / 14,332 characters). The three English opening lines that
 Japanese counterpart" and cited the 2026-07-28 ruling were removed. **The heading shapes now match
 through the 116th heading**; only §17 and §18 onward still diverge.
 
-**What is left (stage 3)**: Japanese versions of English §18-24 (428 lines / 24,672 characters), a
-Japanese version of the implementation-status inventory (429 lines / 30,080 characters), and the
-disposition of §17 -- **none of its 31 open items appear in the issue ledger, so dropping the section
-would drop them from tracking.** The author ruled that they be inventoried before being filed
-(ledger I-095).
+**The specification half of stage 3 followed the same day** -- English §18-24 (JSON Score, the canvas
+model, modes, history and data integrity, security and operations, the CLI, and the source of truth)
+were written in Japanese. Doing so also exposed **three missing headings in the English Accounting
+for Refinement section** (two for v1.80 and one for v1.88): **the prose was there in English, only
+the headings were absent, leaving two against the Japanese five.**
+
+**Setting §17 aside, the two heading shapes now match exactly** (135 against 135). **§17 is all that
+remains, and it is blocked on ledger I-095** -- none of its 31 open items appear in the ledger, so
+dropping the section would drop them from tracking; the author ruled that they be inventoried before
+being filed. The Japanese version of the implementation-status inventory (429 lines / 30,080
+characters) is also not started.

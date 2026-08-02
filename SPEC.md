@@ -3142,9 +3142,13 @@ inku treats convergence caused by accumulated quality repairs as part of its imp
 - Release review places the new JP30/EN30 contact sheets beside the preceding two releases and records any newly increased repetition together with the motif-census delta. Finding no increase is also recorded.
 - Similarity features, motif frequency, vision observations, and coerce firing rates are audit mirrors. They never automatically control default-generation branches or suppression, acceptance gates, or optimization objectives. As an explicit exception, a user-started finite AI Vision autonomous-refinement run may feed non-scoring observational advice into the next generation. It never ranks, accepts, rejects, or discards a generation; every generation remains in lineage and the human makes the final decision.
 
+### v1.80: the mirror, the wind, the earth, the blade
+
 v1.80 adds a deterministic Score-derived composition mirror shared by server and CLI, three unranked nearby history thumbnails, similarity ordering for contact sheets, a mechanical motif census over artifact sets or the current user's history, explicit renderer-only `seed_text`, a private unread-word ledger with `unread-words` and admin-only `unread-words --all` reporting, per-branch coerce observation, and an on-demand NIM vision review. Similarity never implies lineage: lineage remains the record of explicit creative causation. When drawing continues from an unsaved refinement candidate, that candidate is automatically materialized as the direct `lineage_only` ancestor without entering regular history; it can later be promoted explicitly from the lineage view.
 
 The Canvas UI separates work facts from pending generation settings. The top row labels the models, color catalog, canvas, and creation time actually used by the displayed work as `Displayed`; the bottom status bar labels the currently selected models, color catalog, and canvas for the next run as `Next generation`. When Stage 1 and Stage 2 use the same model, the UI combines them as `Interpretation / performance`. The provenance inspector (`Provenance`) has `Details`, `Prompts`, and `JSON` views. Details contains the two stage models, color catalog, canvas, render/layout/interpretation seeds, render and description hashes, render engine and version, build, elapsed time, and input/output token counts. In the Prompts view, the initial heights of Stage 1 user input and Stage 2 system prompt are reduced by half without changing their content; Stage 1 system prompt and Stage 2 user input retain their existing heights.
+
+### The v1.80 accounting record
 
 Refinement account for v1.80: the proposed automatic statistics-to-generation “unexplored” path was removed from this release, and vision review remains manual rather than release-automatic. Existing default-path repair branches could not yet be removed. The release makes unnoticed self-repetition, unrecorded external performance seeds, and privacy-losing unread-word aggregation less likely; it deliberately does not make dissimilarity a goal.
 
@@ -3201,6 +3205,8 @@ A colophon is an append-only, first-person reading attached to one lineage branc
 - The server appends the reader model and date as a mechanical signature. Records store the target node, branch snapshot, model, time, language, body, warnings, and fact sheet in the current user's scope.
 - Records can be appended or deleted, but never edited. Idempotency keys prevent duplicate saves, and lists are displayed oldest first.
 - The colophon is available only through the explicit Lineage action or `inku-cli colophon`; `--dry-run` generates without saving. It never affects dh1, rh2, generation, variation, refinement selection, acceptance, quality functions, or branch recommendation.
+
+### The v1.88 refinement account
 
 v1.88 adds no automatic repair or generation branch. Its refinement accounting deliberately limits the new AI reading to a disconnected mirror, making teleological “best branch” narratives less likely to become application behavior.
 

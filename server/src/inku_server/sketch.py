@@ -48,7 +48,10 @@ _RULES_JA = """あなたは inku の写生層である。作者の記述を、�
 - 目に見えるものだけを書く。物・形・色・位置・向き・数・速さ・明暗。
 - 感情語と評価語を書かない。「美しい」「趣がある」「寂しい」「見事だ」の類は使わない。
 - 比喩・連想・解釈を足さない。記述に無い物を持ち込まない。
-- 記述にある物は落とさない。
+- 記述にある物は落とさない。物は一つずつ言い切る。物ごとに、色・位置・向き・数・
+  速さ・明暗のうち記述から分かるものを添える。
+- 時刻・季節・天候・素材の名詞（夜・朝・雪・葉・布・岩）は物であって感情語ではない。
+  「暗い」「黒い」へ言い換えず、そのまま使う。
 - 出力は日本語の平叙文だけ。見出し・箇条書き・記号・前置き・後書きを書かない。"""
 
 _RULES_EN = """You rewrite the author's description as plain prose that names only things.
@@ -60,29 +63,34 @@ _RULES_EN = """You rewrite the author's description as plain prose that names on
   "serene", "striking".
 - Add no metaphor, no association, no interpretation. Bring in no object the
   description does not have.
-- Drop no object the description does have.
+- Drop no object the description does have. Name each one in turn, and give it
+  whatever the description settles: colour, position, direction, number, speed,
+  light or dark.
+- Nouns of time, season, weather and material (night, morning, snow, leaf,
+  cloth, rock) are things, not feelings. Keep the word; do not trade "night"
+  for "dark".
 - Output plain declarative sentences and nothing else: no heading, no list, no
   markup, no preamble, no closing remark."""
 
 _GRAIN_JA = {
     "fine": """# 区切り
 細かく区切る。1 文には 1 つのことだけを書く。
-1 文はおよそ 10 字。読点は使わない。文の数はおよそ 8〜10 文。""",
+1 文はおよそ 10〜15 字。読点は使わない。文の数はおよそ 9〜12 文。""",
     "coarse": """# 区切り
 大きく区切る。関係のあることを従属節で束ねて 1 文にする。
-1 文はおよそ 25 字。読点を使う。文の数はおよそ 3〜5 文。
+1 文はおよそ 25〜30 字。読点を使う。文の数はおよそ 4〜6 文。
 総量は変えない。変えるのは区切りの大きさだけである。""",
 }
 
 _GRAIN_EN = {
     "fine": """# Grain
 Cut fine. One sentence carries one fact.
-Keep sentences short, around eight words. Use no commas.
-Write around eight to ten sentences.""",
+Keep sentences short, around eight to twelve words. Use no commas.
+Write around nine to twelve sentences.""",
     "coarse": """# Grain
 Cut coarse. Bundle related facts into one sentence with subordinate clauses.
-Keep sentences long, around twenty words. Use commas.
-Write around three to five sentences.
+Keep sentences long, around twenty to twenty-five words. Use commas.
+Write around four to six sentences.
 Say the same amount. Only the size of the pieces changes.""",
 }
 

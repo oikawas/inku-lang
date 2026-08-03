@@ -296,6 +296,46 @@ def test_t9_the_grain_normalizer_falls_back_only_where_nothing_was_asked():
     assert normalize_sketch_grain("COARSE") == "coarse"
 
 
+def test_t7_the_stored_prose_survives_a_round_trip_through_the_database():
+    """The column is read back, not only written. Deleting the read makes the
+    redraw fall back to calling the layer again, which is not a replay."""
+    import uuid
+
+    from inku_server import db
+
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"sketch-{suffix}")
+    user = db.add_user(
+        username=f"sketch-{suffix}",
+        email=f"sketch-{suffix}@example.test",
+        password="password-123",
+        role="user",
+        group_id=group["id"],
+    )
+    try:
+        item_id = str(uuid.uuid4())
+        db.add_item(
+            {
+                "id": item_id,
+                "user_id": user["id"],
+                "input": req_description(),
+                "ddl": "黒い円を中心に置く。",
+                "score": SCORE.model_dump(by_alias=True),
+                "svg": "<svg/>",
+                "at": 1,
+                "sketch_text": "白い花びらが幾つも落ちる。影は薄い。",
+                "sketch_grain": "coarse",
+            }
+        )
+        stored = db.get_items(user["id"], [item_id])
+        assert stored, "the work was not saved"
+        assert stored[0].get("sketch_text") == "白い花びらが幾つも落ちる。影は薄い。"
+        assert stored[0].get("sketch_grain") == "coarse"
+    finally:
+        db.delete_user(user["id"], cascade=True)
+        db.delete_user_group(group["id"])
+
+
 # ------------------------------------------------------- the layer's own rules
 
 def test_the_prompt_forbids_the_vocabulary_of_feeling():

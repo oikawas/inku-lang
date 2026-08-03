@@ -153,6 +153,53 @@ def test_t2_with_the_layer_off_the_description_travels_as_before(wired):
     assert wired.stage2_description == [req_description()]
 
 
+def interpret(**overrides):
+    body = {
+        "description": req_description(),
+        "sketch": True,
+        "instruction_lang": "ja",
+        "expand_intermediate": True,
+    }
+    body.update(overrides)
+    return render_routes.InterpretRequest(**body)
+
+
+def test_t2_the_interpret_path_hands_the_prose_on_as_the_paint_path_does(wired):
+    """The second read point. render.py substitutes the prose for the description
+    twice -- once for /api/paint and once for /api/interpret -- and only the paint
+    one was gated. Perturbing the interpret one left the whole suite green, which
+    is the shape a single asserted call site hides (half_perturbation_masked_by_resnap)."""
+    render_routes.api_interpret(interpret(), {"id": "test-user"})
+
+    prose = "[fine] 円がある。円は黒い。"
+    assert wired.stage1_text == [prose]
+    assert wired.plugin_source == [prose]
+    assert wired.plugin_seed == [prose]
+    assert wired.stage15_context == [prose]
+
+
+def test_t2_the_interpret_path_with_the_layer_off_travels_as_before(wired):
+    render_routes.api_interpret(interpret(sketch=False), {"id": "test-user"})
+
+    assert wired.sketch_inputs == []
+    assert wired.stage1_text == [req_description()]
+    assert wired.plugin_source == [req_description()]
+    assert wired.stage15_context == [req_description()]
+
+
+def test_t2_an_injected_stage1_input_does_not_outrank_the_prose(wired):
+    """stage1_input is read at both points and used to win over the description.
+    If it still won, Stage 1 would read something the other consumers never saw,
+    and the layer would reach four consumers out of five."""
+    injected = "記述 [感情語をDDLに反映してください: 静か]"
+    render_routes.api_interpret(interpret(stage1_input=injected), {"id": "test-user"})
+    run_paint(paint(stage1_input=injected))
+
+    prose = "[fine] 円がある。円は黒い。"
+    assert wired.stage1_text == [prose, prose]
+    assert injected not in "".join(wired.plugin_source + wired.stage15_context)
+
+
 def test_t2_saving_and_display_keep_the_authors_own_words(wired):
     response = run_paint(paint())
 

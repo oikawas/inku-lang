@@ -412,6 +412,16 @@
 			: null;
 	}
 
+	/** What every request that begins at Stage 2 sends. Those paths never run
+	 *  0.5 -- they carry the prose the work already has, so the four consumers
+	 *  below Stage 1 read what a paint would have given them. */
+	function sketchPayloadFor(text: string): Record<string, string> {
+		const prose = sketchTextFor(text);
+		if (!prose) return {};
+		const grain = sketchGrainOf(sketchMode);
+		return { sketch_text: prose, ...(grain ? { sketch_grain: grain } : {}) };
+	}
+
 	/** Show the prose a run or a saved work was painted from, and select the
 	 *  grain it used so a redraw starts from the same place. A work with no
 	 *  prose (painted with the layer off, or made before it existed) turns the
@@ -2901,7 +2911,7 @@ if (unreadWords.length > 0) {
 				ddl: currentDdl,
 				model: resolvedStage2Model,
 				description: originalText,
-				...(sketchTextFor(originalText) ? { sketch_text: sketchTextFor(originalText), ...(sketchGrainOf(sketchMode) ? { sketch_grain: sketchGrainOf(sketchMode) } : {}) } : {}),
+				...sketchPayloadFor(originalText),
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
@@ -3420,6 +3430,7 @@ if (unreadWords.length > 0) {
 					ddl,
 					model: resolvedStage2Model,
 					description: replayInput,
+					...sketchPayloadFor(replayInput),
 					instruction_lang: instructionLang,
 					ui_lang: uiLang,
 					canvas_aspect: effectiveCanvasAspectId(),
@@ -5002,6 +5013,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			body: JSON.stringify({
 				ddl: baseDdl,
 				description: source,
+				...sketchPayloadFor(source),
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
@@ -5027,6 +5039,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			saveArtifacts: false,
 			countGeneration: false,
 			canvasAspectId: refinementCanvasAspectId(),
+			sketchText: sketchTextFor(source),
 			interpretationSeed,
 			signal,
 			renderOverrides: refinementRenderOverrides(),
@@ -5100,6 +5113,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			body: JSON.stringify({
 				ddl: baseDdl,
 				description: source,
+				...sketchPayloadFor(source),
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),

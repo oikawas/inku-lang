@@ -5,7 +5,9 @@
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
 	import DemoPanel from './DemoPanel.svelte';
 	import TenkeiSelect from './TenkeiSelect.svelte';
+	import SketchSelect from './SketchSelect.svelte';
 	import { tenkeiLabel } from '$lib/tenkei';
+	import { sketchModeLabel, type SketchMode } from '$lib/sketch';
 	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
@@ -79,6 +81,9 @@
 		canvasAspectMenuOpen: boolean;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
+		/** 写生 (Stage 0.5). Chosen per draw, not stored as a user setting. */
+		sketchMode: SketchMode;
+		onSelectSketchMode: (mode: SketchMode) => void;
 		nextStage1Model: string;
 		nextStage2Model: string;
 		nextCatalogName: string;
@@ -151,6 +156,8 @@
 		canvasAspectMenuOpen,
 		stage1ModelLabel,
 		stage2ModelLabel,
+		sketchMode,
+		onSelectSketchMode,
 		nextStage1Model,
 		nextStage2Model,
 		nextCatalogName,
@@ -254,6 +261,9 @@
 			<Tooltip text={t().tooltipInputTenkei}>
 				<TenkeiSelect value={tenkeiSettings.level} {isJapanese} onSelect={tenkeiSettings.set} />
 			</Tooltip>
+			<Tooltip text={t().tooltipInputSketch}>
+				<SketchSelect value={sketchMode} {isJapanese} onSelect={onSelectSketchMode} />
+			</Tooltip>
 			<Tooltip text={t().tooltipInputWild}>
 				<button
 					type="button"
@@ -317,6 +327,11 @@
 		<span class="cs-group">
 			<span class="cs-label">{isJapanese ? '添景' : 'Staffage'}</span>
 			<span class="cs-value">{tenkeiLabel(tenkeiSettings.level, isJapanese)}</span>
+		</span>
+		<span class="cs-divider"></span>
+		<span class="cs-group">
+			<span class="cs-label">{isJapanese ? '写生' : 'Sketch from life'}</span>
+			<span class="cs-value">{sketchModeLabel(sketchMode, isJapanese)}</span>
 		</span>
 		<span class="cs-divider"></span>
 		<span class="cs-group">

@@ -12,7 +12,9 @@ export type DerivationKind =
 	| 'description_edit'
 	| 'replay'
 	| 'canvas_aspect_change'
-	| 'variation';
+	| 'variation'
+	// 写生 (Stage 0.5, v2.10): redrawn at a different grain.
+	| 'sketch_grain_change';
 
 const JA: Record<string, string> = {
 	touch_change: 'タッチ',
@@ -25,7 +27,8 @@ const JA: Record<string, string> = {
 	description_edit: '記述編集',
 	replay: '再描画',
 	canvas_aspect_change: 'キャンバス変更',
-	variation: '変奏'
+	variation: '変奏',
+	sketch_grain_change: '写生の区切り'
 };
 
 const EN: Record<string, string> = {
@@ -39,9 +42,34 @@ const EN: Record<string, string> = {
 	description_edit: 'Description edit',
 	replay: 'Replay',
 	canvas_aspect_change: 'Canvas change',
-	variation: 'Variation'
+	variation: 'Variation',
+	sketch_grain_change: 'Sketch grain'
 };
 
 export function derivationKindLabel(kind: string | null | undefined, isJapanese: boolean): string {
 	return (isJapanese ? JA : EN)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
+}
+
+/** Which edge a redraw from the describe tab writes.
+ *
+ *  One edge, one cause (SPEC section 7): a changed description is a description
+ *  edit even if the grain moved with it, and a redraw that changed nothing at
+ *  all stays a replay. The 写生 (Stage 0.5) grain fires its own kind only when
+ *  it is the thing that differs from the parent -- the same shape
+ *  description_edit has always had.
+ *
+ *  Lives here rather than inline in the page so the rule has one home and can
+ *  be read on its own.
+ */
+export function submitDerivationKind(input: {
+	hasParent: boolean;
+	canvasAspectChanged: boolean;
+	textChanged: boolean;
+	grainChanged: boolean;
+}): DerivationKind | null {
+	if (input.canvasAspectChanged) return 'canvas_aspect_change';
+	if (!input.hasParent) return null;
+	if (input.textChanged) return 'description_edit';
+	if (input.grainChanged) return 'sketch_grain_change';
+	return 'replay';
 }

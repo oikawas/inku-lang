@@ -45,6 +45,10 @@ class HistoryPostBody(BaseModel):
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$")
     interpretation_seed: str | None = None
     seed_text: str | None = None
+    # Stage 0.5 (v2.10). Carried with the work so a redraw replays the same
+    # prose instead of asking a non-deterministic layer for it again.
+    sketch_text: str | None = None
+    sketch_grain: str | None = None
     source_text: str | None = None
     display_label: str | None = None
     batch_line_number: int | None = None

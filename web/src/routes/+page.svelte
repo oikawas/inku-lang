@@ -6,7 +6,7 @@
 
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { annotate, highlightDDL, interpretationFeedback } from '$lib/highlight';
+	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
@@ -396,15 +396,29 @@
 	// it. Editing and painting again sends the edited prose instead of calling
 	// the layer, so what the author reads is what Stage 1 reads.
 	let sketchText = $state<string | null>(null);
+	// Which description the prose was written for. Prose written for one text is
+	// not prose for another, and the description can be edited after a run.
+	let sketchSource = $state<string | null>(null);
 	let sketchDraft = $state('');
 	let sketchEditing = $state(false);
+
+	/** The prose to send for this description, or null to let the layer write it.
+	 *  Used by the paths that re-run one stage over a description already on
+	 *  screen (model and language comparison): holding the prose fixed is what
+	 *  makes those a comparison of models rather than of two different texts. */
+	function sketchTextFor(text: string): string | null {
+		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()
+			? sketchText
+			: null;
+	}
 
 	/** Show the prose a run or a saved work was painted from, and select the
 	 *  grain it used so a redraw starts from the same place. A work with no
 	 *  prose (painted with the layer off, or made before it existed) turns the
 	 *  control off rather than silently painting it at the default grain. */
-	function adoptSketch(text: string | null, grain: unknown): void {
+	function adoptSketch(text: string | null, grain: unknown, source: string | null = null): void {
 		sketchText = text;
+		sketchSource = source;
 		sketchDraft = text ?? '';
 		sketchEditing = false;
 		sketchMode = text ? sketchModeOf(normalizeSketchGrain(grain) ?? 'fine') : 'off';
@@ -2818,6 +2832,7 @@ if (unreadWords.length > 0) {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				description: text,
+				...(sketchTextFor(text) ? { sketch_text: sketchTextFor(text) } : {}),
 				model: resolvedStage1Model,
 				include_thinking: includeThinking,
 				instruction_lang: langOverride ?? instructionLang,
@@ -2886,7 +2901,7 @@ if (unreadWords.length > 0) {
 				ddl: currentDdl,
 				model: resolvedStage2Model,
 				description: originalText,
-				...(sketchText ? { sketch_text: sketchText, ...(sketchGrainOf(sketchMode) ? { sketch_grain: sketchGrainOf(sketchMode) } : {}) } : {}),
+				...(sketchTextFor(originalText) ? { sketch_text: sketchTextFor(originalText), ...(sketchGrainOf(sketchMode) ? { sketch_grain: sketchGrainOf(sketchMode) } : {}) } : {}),
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
@@ -3209,7 +3224,7 @@ if (unreadWords.length > 0) {
 				ddlGeneratedBaseline = ddl;
 				thinking = r.thinking;
 				result = r; outputTab = 'canvas';
-				adoptSketch(r.sketch_text ?? null, r.sketch_grain);
+				adoptSketch(r.sketch_text ?? null, r.sketch_grain, input);
 				fitCanvasZoom();
 				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
@@ -4511,7 +4526,7 @@ $effect(() => {
 		expandedDdl = it.expanded_ddl ?? null;
 		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; thinking = it.thinking ?? null;
 		stage1UserPrompt = sourceText;
-		adoptSketch(it.sketch_text ?? null, it.sketch_grain);
+		adoptSketch(it.sketch_text ?? null, it.sketch_grain, sourceText);
 		result = {
 			score: it.score,
 			svg: it.svg,

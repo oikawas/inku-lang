@@ -28,6 +28,7 @@ from inku_server.renderer import (
     _anchor,
     _expand_arrangement,
     _expand_arrangement_layout,
+    _quantise_instructions,
     render,
 )
 from inku_server.schema import Instruction, Score
@@ -100,9 +101,17 @@ def _placed(instruction: Instruction) -> list[tuple[float, float]]:
 
 
 def _laid_out(instruction: Instruction) -> list[tuple[float, float]]:
-    """Where the layout branch alone would put the marks (engine 19's answer)."""
+    """Where the layout branch alone would put the marks (engine 19's answer).
+
+    Quantised like the real expansion (engine 21), so that comparing the two
+    still measures what the fitting stage did rather than the rounding that
+    both sides go through.
+    """
     return [
-        _anchor(item) for item in _expand_arrangement_layout(instruction, RENDER_SEED)
+        _anchor(item)
+        for item in _quantise_instructions(
+            _expand_arrangement_layout(instruction, RENDER_SEED)
+        )
     ]
 
 

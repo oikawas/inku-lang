@@ -1480,8 +1480,12 @@ def _assert_centers(
     assert len(centers) == len(expected)
     for center, target in zip(centers, expected):
         assert center is not None
-        assert math.isclose(center[0], target[0])
-        assert math.isclose(center[1], target[1])
+        # An expanded arrangement is quantised to 9 decimals (engine 21), so an
+        # exact target like 7/30 is met to that many places and no further.
+        # Hardcoded rather than read from the renderer: if the quantum ever
+        # widens, this should be looked at rather than follow along.
+        assert math.isclose(center[0], target[0], abs_tol=1e-9)
+        assert math.isclose(center[1], target[1], abs_tol=1e-9)
 
 
 def _grid_circle(**arrangement: object) -> Instruction:
@@ -1634,7 +1638,11 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # 中心線に低周波のジェスチャが乗った分だけ値が動く。書き出される数値の個数は
     # engine 11 と同じ 1444 個で、動いたのは値だけである。
     # engine 10 まではこのダイジェストが素のバイト列だったため macOS でしか通らな
-    # かった。全数値がグリッドに載ったので、以後はどの OS でも同じ値になる。
+    # かった。全数値がグリッドに載ったので、印字される値はどの OS でも揃った。
+    # ただしそれで OS 差が消えたわけではなかった (I-111) — 演奏 seed は印字前の
+    # 座標を丸ごとハッシュするので、macOS libm と glibc の sin/cos の 1 ULP 差が
+    # seed ごと絵を変えていた。arrangement を通る経路だけが該当し、engine 21 の
+    # 量子化で塞いだ。
     # engine 15 (演奏 seed の allowlist 化 + 材質輪郭の距離是正) で再採取。
     # ここは既定 weight の pen を使うので、pen が材質輪郭を持った分も入っている。
     # engine 16 段 3 (太さの軸) で再採取。`thinness` が演奏 seed の allowlist に
@@ -1648,7 +1656,9 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # arrangement を持つので、展開された群れが宣言アンカー (0.5, 0.5) へ寄る。
     # horizontal と vertical は片軸を既に宣言から取っていたが、もう片方の軸が
     # 動く。数値の個数は engine 19 と同じ 1724 個で、動いたのは値だけである。
-    assert digest == "51894cf270949abff3330e3529dd5448119de86b9db763f4a1a95fc527ed3617"
+    # engine 21 (展開後の座標を 9 桁へ量子化) で再採取。4 つとも arrangement を
+    # 持つので座標が丸まり、演奏 seed が変わるぶん値が動く。
+    assert digest == "c445ca5901a918e559c2c05d8562be6ab9967015216a4fae911a6f9ebd4bcf17"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

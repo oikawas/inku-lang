@@ -13,6 +13,7 @@ import math
 import secrets
 import re
 import struct
+from typing import Any
 from xml.sax.saxutils import escape
 
 import svgwrite
@@ -1926,6 +1927,42 @@ def _fit_group_to_anchor(
     return result
 
 
+# engine 21: the expansion is the only place where a libm result reaches a
+# hash. `_seed_for_instruction` hashes the whole instruction dump, so the
+# one-ULP gap between macOS libm and glibc (measured: sin/cos disagree for
+# 7-10 of 60 arguments) turned into a completely different performance seed and
+# moved the drawing by 0.08-0.17px -- which is why the frozen corpus could not
+# be reproduced on Linux. Everywhere else a one-ULP difference is absorbed by
+# the six decimals the SVG prints; only the hash amplifies it.
+ARRANGEMENT_QUANTUM = 9
+
+
+def _quantise(value: Any) -> Any:
+    """Round every float under `value` to `ARRANGEMENT_QUANTUM` decimals."""
+    if isinstance(value, float):
+        return round(value, ARRANGEMENT_QUANTUM)
+    # Coordinate pairs come back as tuples, not lists; a list-only walk
+    # quantises nothing at all and does so silently.
+    if isinstance(value, (list, tuple)):
+        return type(value)(_quantise(item) for item in value)
+    if isinstance(value, dict):
+        return {key: _quantise(item) for key, item in value.items()}
+    return value
+
+
+def _quantise_instructions(items: list[Instruction]) -> list[Instruction]:
+    """Take the platform out of an expanded group.
+
+    1e-9 of a normalised coordinate is 1e-6 px on a 1000px canvas, under the
+    precision the SVG prints, so this cannot be seen; the one-ULP noise it
+    removes could be, because the seed reads the coordinate exactly.
+    """
+    return [
+        Instruction.model_validate(_quantise(item.model_dump(by_alias=True)))
+        for item in items
+    ]
+
+
 def _expand_arrangement(
     ins: Instruction,
     performance_seed: int | None = None,
@@ -1942,8 +1979,8 @@ def _expand_arrangement(
         # resolution instead of being folded into the anchor. Fitting here would
         # replace the region the description gave with the shape's own centre,
         # which for a tiling is the coordinate nobody stated.
-        return expanded
-    return _fit_group_to_anchor(ins, expanded)
+        return _quantise_instructions(expanded)
+    return _quantise_instructions(_fit_group_to_anchor(ins, expanded))
 
 
 def _inject_blur_filters(

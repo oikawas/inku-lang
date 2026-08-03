@@ -9,13 +9,11 @@ from __future__ import annotations
 import asyncio
 import os
 import platform
-import re
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 from .color_catalogs import render_color_map_for_catalog
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware
@@ -69,15 +67,6 @@ app = FastAPI(title="inku-server", version=_APP_VERSION, lifespan=_lifespan)
 _db.init_db()
 
 
-_DEFAULT_OUTPUT_DIR = Path.home() / ".local" / "share" / "inku" / "outputs"
-
-
-_OUTPUT_DIR = Path(os.getenv("INKU_OUTPUT_DIR", str(_DEFAULT_OUTPUT_DIR)))
-
-
-_OUTPUT_PNG_SIZE = int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160"))
-
-
 def _apply_stored_render_concurrency() -> None:
     """起動時に DB の設定を反映する。env は DB 未設定時の初期値でしかない。"""
     try:
@@ -107,9 +96,6 @@ def _log_rasterizer_backend() -> None:
 
 
 _log_rasterizer_backend()
-
-
-_HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 _MAX_REQUEST_BODY_BYTES = max(1024, int(os.getenv("INKU_MAX_REQUEST_BODY_BYTES", str(16 * 1024 * 1024))))
@@ -159,17 +145,6 @@ def _log_startup_banner() -> None:
 _log_startup_banner()
 
 
-def _validated_color_map(color_map: dict[str, str] | None) -> dict[str, str] | None:
-    if color_map is None:
-        return None
-    clean: dict[str, str] = {}
-    for key, value in color_map.items():
-        if not isinstance(key, str) or not isinstance(value, str) or not _HEX_COLOR_RE.fullmatch(value):
-            raise HTTPException(status_code=422, detail="color_map values must be #RRGGBB hex colors")
-        clean[key] = value
-    return clean
-
-
 def _catalog_render_color_map(catalog_id: str | None) -> dict[str, str]:
     color_map = render_color_map_for_catalog(catalog_id)
     if color_map is None:
@@ -210,36 +185,6 @@ app.include_router(history.router)
 app.include_router(lineage.router)
 app.include_router(render.router)
 app.include_router(feedback.router)
-
-
-class InterpretResponse(BaseModel):
-    ddl: str
-    plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
-    plugin_warnings: list[str] = Field(default_factory=list)
-    thinking: str | None = None
-    tokens_in: int | None = None
-    tokens_out: int | None = None
-
-
-def _bearer_token(authorization: str | None = Header(default=None)) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="authentication required")
-    return authorization.removeprefix("Bearer ").strip()
-
-
-def _can_manage_user(actor: dict, target: dict) -> bool:
-    if actor["role"] == "admin":
-        return True
-    return (
-        actor["role"] == "group_lead"
-        and actor.get("group_id")
-        and target.get("group_id") == actor.get("group_id")
-        and target.get("role") == "user"
-    )
-
-
-def _strip_anthropic_prefix(model: str) -> str:
-    return model.removeprefix("anthropic:")
 
 
 def main() -> None:

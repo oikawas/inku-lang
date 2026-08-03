@@ -138,6 +138,11 @@ export interface LangPack {
 	vocabInInputLabel: string;
 	thinkingLabel: string;
 	ddlLabel: string;
+	sketchLabel: string;
+	sketchGrainLabel: string;
+	sketchOffNote: string;
+	sketchFallbackNote: string;
+	sketchEditHint: string;
 	ddlExpandedLabel: string;
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
@@ -224,6 +229,7 @@ export interface LangPack {
 	tooltipInputModel: string;
 	tooltipInputClear: string;
 	tooltipInputTenkei: string;
+	tooltipInputSketch: string;
 	wildButton: string;
 	tooltipInputWild: string;
 	tooltipInputCanvas: string;

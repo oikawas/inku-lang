@@ -135,6 +135,12 @@ class HistoryRow(Base):
     interpret_fallback = Column(String, nullable=True)
     interpretation_seed = Column(String, nullable=True)
     seed_text = Column(Text, nullable=True)
+    # Stage 0.5 (v2.10). Both NULL = the work was painted straight from the
+    # description, which is every work made before the layer existed.
+    # sketch_text is stored so a redraw does not have to call 0.5 again --
+    # the layer is not deterministic, so re-running it would not replay.
+    sketch_text = Column(Text, nullable=True)
+    sketch_grain = Column(String, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -338,6 +344,8 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "history_visibility": "ALTER TABLE history ADD COLUMN history_visibility VARCHAR NOT NULL DEFAULT 'normal'",
     "lineage_node_id": "ALTER TABLE history ADD COLUMN lineage_node_id VARCHAR",
     "idempotency_key": "ALTER TABLE history ADD COLUMN idempotency_key VARCHAR",
+    "sketch_text": "ALTER TABLE history ADD COLUMN sketch_text TEXT",
+    "sketch_grain": "ALTER TABLE history ADD COLUMN sketch_grain VARCHAR",
 }
 _LINEAGE_NODE_COLUMN_MIGRATIONS = {
     "root_node_id": "ALTER TABLE lineage_nodes ADD COLUMN root_node_id VARCHAR",
@@ -1899,6 +1907,10 @@ def _row_to_dict(row: HistoryRow) -> dict:
         item["interpretation_seed"] = row.interpretation_seed
     if row.seed_text is not None:
         item["seed_text"] = row.seed_text
+    if row.sketch_text is not None:
+        item["sketch_text"] = row.sketch_text
+    if row.sketch_grain is not None:
+        item["sketch_grain"] = row.sketch_grain
     return item
 
 
@@ -2051,6 +2063,8 @@ def add_item(item: dict) -> dict:
         interpret_fallback=item.get("interpret_fallback"),
         interpretation_seed=str(item.get("interpretation_seed")) if item.get("interpretation_seed") is not None else None,
         seed_text=item.get("seed_text"),
+        sketch_text=item.get("sketch_text"),
+        sketch_grain=item.get("sketch_grain"),
         render_hash=render_hash, trashed=0, starred=0, for_revision=0, note=item.get("note"),
         source_text=source_text, display_label=item.get("display_label"),
         batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),

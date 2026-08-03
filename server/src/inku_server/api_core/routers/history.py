@@ -218,6 +218,8 @@ def api_history_post(
         derivation_kind=body.derivation_kind,
         derivation_metadata=body.derivation_metadata,
         idempotency_key=idempotency_key,
+        sketch_text=body.sketch_text,
+        sketch_grain=body.sketch_grain,
     )
     if body.count_generation and not item_dict.get("_idempotent_replay"):
         if _db.increment_user_generation_count(actor["id"]) is None:

@@ -62,6 +62,9 @@ export type HistoryItem = {
 	render_wild?: boolean | null;
 	composition_seed?: number | string | null;
 	interpretation_seed?: string | null;
+	// 写生 (Stage 0.5, v2.10). Absent on every work made before the layer.
+	sketch_text?: string | null;
+	sketch_grain?: string | null;
 	seed_text?: string | null;
 	trashed?: boolean;
 	starred?: boolean;

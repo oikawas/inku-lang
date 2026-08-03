@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SketchSelect from './SketchSelect.svelte';
+	import { DEFAULT_SKETCH_GRAIN, normalizeSketchGrain, sketchModeLabel, type SketchGrain, type SketchMode } from '$lib/sketch';
 	import { onMount, tick } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
@@ -62,6 +64,8 @@
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
+		/** 写生 (Stage 0.5): redraw a work at a different grain, as its child. */
+		onDrawSketchGrain: (node: LineageNode, grain: SketchGrain, signal?: AbortSignal) => Promise<void>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		visionModel: string;
@@ -77,7 +81,7 @@
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
 
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
 
 	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
 	// no natural-language instruction, so instruction-only refine paths are hidden.
@@ -109,6 +113,14 @@
 	let activeEditNode = $state<LineageNode | null>(null);
 	let editMode = $state<'description' | 'ddl' | null>(null);
 	let editDraft = $state('');
+	// 写生 (Stage 0.5): the grain lives on the edit shelf, next to editing the
+	// description and the instructions -- not on the refinement radio, because
+	// changing it re-runs 0.5 and Stage 1 and is not deterministic.
+	let activeSketchNode = $state<LineageNode | null>(null);
+	let sketchGrainChoice = $state<SketchGrain>(DEFAULT_SKETCH_GRAIN);
+	let sketchDrawing = $state(false);
+	let sketchError = $state<string | null>(null);
+	let sketchDrawController: AbortController | null = null;
 	let editDrawing = $state(false);
 	let editError = $state<string | null>(null);
 	let editElapsedMs = $state(0);
@@ -452,6 +464,39 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			: (node.history.ddl ?? '');
 		editError = null;
 		activeMenuNodeId = null;
+	}
+
+	function openSketchDialog(node: LineageNode): void {
+		if (!node.history) return;
+		activeSketchNode = node;
+		// Start from what the parent used, so the dialog opens on "no change".
+		sketchGrainChoice = normalizeSketchGrain(node.history.sketch_grain) ?? DEFAULT_SKETCH_GRAIN;
+		sketchError = null;
+		activeMenuNodeId = null;
+	}
+
+	function closeSketchDialog(): void {
+		if (sketchDrawing) return;
+		activeSketchNode = null;
+		sketchError = null;
+	}
+
+	async function drawSketchGrain(): Promise<void> {
+		if (!activeSketchNode || sketchDrawing) return;
+		sketchDrawing = true;
+		sketchError = null;
+		sketchDrawController = new AbortController();
+		try {
+			await onDrawSketchGrain(activeSketchNode, sketchGrainChoice, sketchDrawController.signal);
+			activeSketchNode = null;
+		} catch (cause) {
+			if (!(cause instanceof Error && cause.name === 'AbortError')) {
+				sketchError = cause instanceof Error ? cause.message : String(cause);
+			}
+		} finally {
+			sketchDrawController = null;
+			sketchDrawing = false;
+		}
 	}
 
 	function closeEditDialog(): void {
@@ -849,6 +894,11 @@ $effect(() => {
 				{isJapanese ? '指示書を編集' : 'Edit instructions'}
 			</button>
 			{#if !ddlOrigin}
+				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openSketchDialog(node); }}>
+					{isJapanese ? '写生の区切りを変える' : 'Change the sketch-from-life grain'}
+				</button>
+			{/if}
+			{#if !ddlOrigin}
 				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
 					{isJapanese ? '使用モデル変更' : 'Change models'}
 				</button>
@@ -969,6 +1019,52 @@ $effect(() => {
 	</div>
 {/if}
 
+{#if activeSketchNode}
+	<button type="button" class="lineage-edit-backdrop" aria-label={isJapanese ? '写生ダイアログを閉じる' : 'Close the dialog'} disabled={sketchDrawing} onclick={closeSketchDialog}></button>
+	<div class="lineage-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="lineage-sketch-title" tabindex="-1">
+		<header>
+			<div>
+				<h2 id="lineage-sketch-title">{isJapanese ? '写生の区切りを変える' : 'Change the sketch-from-life grain'}</h2>
+				<p>{isJapanese ? '写生をやり直して描画し、選択した作品の子として系譜へ保存します。' : 'The layer writes the prose again at the chosen grain, and the result is saved as a child of the chosen work.'}</p>
+			</div>
+			<button type="button" disabled={sketchDrawing} aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeSketchDialog}>×</button>
+		</header>
+		<div class="lineage-edit-body">
+			<SketchSelect
+				compact
+				value={sketchGrainChoice as SketchMode}
+				{isJapanese}
+				disabled={sketchDrawing}
+				onSelect={(mode: SketchMode) => { if (mode !== 'off') sketchGrainChoice = mode; }}
+			/>
+			{#if activeSketchNode.history?.sketch_text}
+				<p class="sketch-parent-prose">{activeSketchNode.history.sketch_text}</p>
+			{:else}
+				<p class="sketch-parent-prose empty">{isJapanese ? 'この作品は写生を通していません。' : 'This work was painted without the layer.'}</p>
+			{/if}
+			{#if sketchError}<div class="lineage-message error">{sketchError}</div>{/if}
+		</div>
+		<footer>
+			{#if sketchDrawing}
+				<RunStatus
+					variant="inline"
+					label={stageLabel || (isJapanese ? '生成中…' : 'Painting…')}
+					stage1Model={stage1ModelLabel}
+					stage2Model={stage2ModelLabel}
+					elapsedMs={editElapsedMs}
+					tokensIn={runTokensIn}
+					tokensOut={runTokensOut}
+					onStop={() => sketchDrawController?.abort()}
+				/>
+			{:else}
+				<span class="sketch-dialog-current">{isJapanese ? '親の区切り' : "Parent's grain"}: {activeSketchNode.history?.sketch_grain ? sketchModeLabel(normalizeSketchGrain(activeSketchNode.history.sketch_grain) as SketchMode, isJapanese) : (isJapanese ? '切' : 'Off')}</span>
+				<button type="button" onclick={closeSketchDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
+				<button type="button" class="edit-draw" onclick={drawSketchGrain}>{isJapanese ? '描画' : 'Draw'}</button>
+			{/if}
+		</footer>
+	</div>
+{/if}
+
 {#if okugakiOpen}
 	<div class="okugaki-backdrop" role="presentation">
 		<div class="okugaki-dialog" role="dialog" aria-modal="true" aria-labelledby="okugaki-title" tabindex="-1">
@@ -1010,6 +1106,9 @@ $effect(() => {
 
 
 <style>
+	.sketch-parent-prose { margin: 0; font-size: 12px; line-height: 1.7; color: var(--fg2); white-space: pre-wrap; }
+	.sketch-parent-prose.empty { color: var(--fg3); }
+	.sketch-dialog-current { font-size: 11px; color: var(--fg3); margin-right: auto; }
 	.lineage-panel { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; padding: 22px; overflow: hidden; display: flex; flex-direction: column; color: var(--fg); background: var(--bg); }
 	.lineage-panel.overview { position: fixed; inset: 14px; z-index: 1300; width: auto; height: auto; border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 18px 70px #000a; }
 	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import sys
 import time
@@ -25,6 +26,14 @@ from ...languages import expand_intermediate_for_lang
 from ...plugins import DOCUMENT_PLUGIN_MANAGER
 from ...carriage import carriage_warnings as _carriage_warnings
 from ...schema import Score
+from ...sketch import (
+    DEFAULT_SKETCH_GRAIN,
+    SketchDetail,
+    build_system_prompt as _sketch_system_prompt,
+    normalize_sketch_grain,
+    prompt_digest as _sketch_prompt_digest,
+    sketch_from_life,
+)
 from ... import db as _db
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user, _logger
@@ -178,6 +187,11 @@ class ComposeRequest(BaseModel):
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
+    # Stage 0.5: this endpoint starts at Stage 2, so it never runs 0.5 itself.
+    # A caller that already has a sketch text (a candidate, a replay) passes it
+    # here and it stands in for the description everywhere the description went.
+    sketch_text: str | None = Field(default=None, max_length=100_000, description="写生層 (Stage 0.5) の出力。与えられたら記述の代わりに後段へ渡る")
+    sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)")
 
 
 class ComposeResponse(BaseModel):
@@ -231,12 +245,17 @@ class ComposeResponse(BaseModel):
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
     coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
+    sketch_text: str | None = None
+    sketch_grain: str | None = None
     trace: dict | None = None
 
 
 class InterpretRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
     stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
+    sketch: bool = Field(default=False, description="写生層 (Stage 0.5) を通すか")
+    sketch_text: str | None = Field(default=None, max_length=100_000, description="既にある写生文。与えられたら 0.5 を呼び直さずこれを使う")
+    sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine (既定・細かく区切る) / coarse (大きく区切る)")
     model: str | None = Field(
         default=None, description="Stage 1 モデル名 (未指定時は利用者の Stage 1 既定)"
     )
@@ -284,6 +303,11 @@ class PaintRequest(BaseModel):
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
+    # Stage 0.5 (v2.10). Carried per request, the way render_seed is: it is an
+    # option of one drawing, not a setting of the user.
+    sketch: bool = Field(default=False, description="写生層 (Stage 0.5) を通すか")
+    sketch_text: str | None = Field(default=None, max_length=100_000, description="既にある写生文 (作者が直した / 保存済み作品の再演)。与えられたら 0.5 を呼び直さない")
+    sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine (既定・細かく区切る) / coarse (大きく区切る)")
 
 
 class PaintResponse(BaseModel):
@@ -356,6 +380,9 @@ class PaintResponse(BaseModel):
     coerce_relation_drop_rate: float | None = None
     coerce_warnings: list[str] = Field(default_factory=list)
     coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
+    sketch_text: str | None = None
+    sketch_grain: str | None = None
+    sketch_fallback_used: bool = False
     trace: dict | None = None
 
 
@@ -1052,10 +1079,113 @@ def _call_interpret_detail(
     )
 
 
+def _clean_sketch_text(raw: str) -> str:
+    """Trim what the model wrapped around the prose.
+
+    Some providers fence prose the same way they fence code; Stage 1 does the
+    same trimming for the DDL (see _interpret_openai_detail).
+    """
+    return re.sub(r"^```(?:\w+)?\s*\n?|\n?```$", "", (raw or "").strip(), flags=re.MULTILINE).strip()
+
+
+def _call_sketch_detail(
+    text: str,
+    *,
+    model: str | None = None,
+    lang: str = "ja",
+    grain: str = DEFAULT_SKETCH_GRAIN,
+    include_trace: bool = False,
+) -> SketchDetail:
+    """Run Stage 0.5. A failure here never stops a painting.
+
+    Provider error, hard timeout or empty output all mean the same thing: the
+    description itself travels on to Stage 1, so the picture still gets made.
+    This is the rule Stage 1 already follows for its own failures.
+    """
+    grain = normalize_sketch_grain(grain)
+    digest = _sketch_prompt_digest(_sketch_system_prompt(lang=lang, grain=grain))
+    try:
+        raw, tokens_in, tokens_out = _run_with_hard_timeout(
+            "sketch",
+            _hard_timeout_seconds("INKU_SKETCH_HARD_TIMEOUT_SECONDS"),
+            lambda: sketch_from_life(text, model=model, lang=lang, grain=grain),
+        )
+    except StageHardTimeoutError:
+        return SketchDetail(
+            text=text,
+            grain=grain,
+            fallback_used=True,
+            fallback_reasons=["sketch_hard_timeout"],
+            prompt_digest=digest,
+        )
+    except Exception as exc:  # noqa: BLE001 — 0.5 must never break generation
+        _logger.warning("stage 0.5 failed, painting from the description: %s", exc)
+        return SketchDetail(
+            text=text,
+            grain=grain,
+            fallback_used=True,
+            fallback_reasons=["sketch_failed"],
+            prompt_digest=digest,
+        )
+    rendered = _clean_sketch_text(raw)
+    if not rendered:
+        return SketchDetail(
+            text=text,
+            grain=grain,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            fallback_used=True,
+            fallback_reasons=["sketch_empty_output"],
+            raw=raw if include_trace else None,
+            prompt_digest=digest,
+        )
+    return SketchDetail(
+        text=rendered,
+        grain=grain,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        raw=raw if include_trace else None,
+        prompt_digest=digest,
+    )
+
+
+def _resolved_sketch(
+    req_sketch: bool,
+    req_sketch_text: str | None,
+    req_sketch_grain: str | None,
+    *,
+    description: str,
+    model: str | None,
+    lang: str,
+    include_trace: bool = False,
+) -> SketchDetail | None:
+    """Decide what Stage 0.5 contributes to this request.
+
+    Three cases, in order:
+      - a sketch text came with the request (the author edited it, or a saved
+        work is being redrawn): use it verbatim and DO NOT call the model;
+      - 0.5 is on: call the model at the requested grain;
+      - otherwise: None, and the description travels as it always did.
+    """
+    stored = (req_sketch_text or "").strip()
+    if stored:
+        return SketchDetail(text=stored, grain=normalize_sketch_grain(req_sketch_grain))
+    if not req_sketch:
+        return None
+    return _call_sketch_detail(
+        description,
+        model=model,
+        lang=lang,
+        grain=normalize_sketch_grain(req_sketch_grain),
+        include_trace=include_trace,
+    )
+
+
 def _assemble_trace(
     include_trace: bool,
     *,
     interpret_result: InterpretDetail | None = None,
+    sketch_result: SketchDetail | None = None,
     compose_detail: ComposeDetail,
     score_pre_coerce_dump: dict | None,
     coerce_report: dict,
@@ -1066,6 +1196,12 @@ def _assemble_trace(
         return None
     try:
         trace: dict = {}
+        if sketch_result is not None:
+            trace["sketch_raw"] = sketch_result.raw
+            trace["sketch_text"] = sketch_result.text
+            trace["sketch_grain"] = sketch_result.grain
+            trace["sketch_prompt_digest"] = sketch_result.prompt_digest
+            trace["sketch_fallback_used"] = sketch_result.fallback_used
         if interpret_result is not None:
             trace["stage1_raw"] = interpret_result.raw
             trace["stage1_thinking"] = interpret_result.thinking
@@ -1132,6 +1268,12 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         ui_lang=ui_lang,
     )
     resolved_stage2_model = _resolved_stage2_model(req.model, actor)
+    # This endpoint begins at Stage 2, so Stage 0.5 never runs here. When the
+    # caller carries a sketch text (a candidate, a redraw of a saved work) it
+    # stands in for the description for the plugin expansion, Stage 1.5,
+    # Stage 2 and coerce -- the same four places it stands in during a paint.
+    sketch_grain = normalize_sketch_grain(req.sketch_grain) if req.sketch_text else None
+    source_text = (req.sketch_text or "").strip() or req.description
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
     resolved_variation_amplitude = _validated_variation_amplitude(req.variation_amplitude)
     resolved_variation_seed = (
@@ -1141,7 +1283,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         compose_detail = _call_compose_detail(
             req.ddl,
             model=resolved_stage2_model,
-            original_description=req.description,
+            original_description=source_text,
             system_prompt=None,
             lang=instruction_lang_resolved,
             composition_seed=req.composition_seed,
@@ -1168,7 +1310,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             score = coerce_score(
                 score,
                 branch_report=branch_counts,
-                ddl=_coerce_context(compose_detail.ddl, req.description),
+                ddl=_coerce_context(compose_detail.ddl, source_text),
                 tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )
@@ -1238,6 +1380,8 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         retry_count=compose_detail.retry_count,
         retry_reasons=compose_detail.retry_reasons,
         fallback_used=compose_detail.fallback_used,
+        sketch_text=req.sketch_text or None,
+        sketch_grain=sketch_grain,
         **coerce_report,
         trace=_assemble_trace(
             req.include_trace,
@@ -1251,13 +1395,29 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 @router.post("/api/interpret")
 def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
-    source_text = req.description
+    ui_lang = _normalize_ui_lang(req.ui_lang)
+    # Settled on the author's own words: Stage 0.5 writes in the language it is
+    # told to, so reading its output back would be circular.
+    instruction_lang_resolved = _resolve_instruction_lang(
+        req.description, instruction_lang_requested, ui_lang=ui_lang
+    )
+    sketch_result = _resolved_sketch(
+        req.sketch,
+        req.sketch_text,
+        req.sketch_grain,
+        description=req.description,
+        model=_resolved_stage1_model(req.model, actor),
+        lang=instruction_lang_resolved,
+    )
+    # Stage 0.5 stands in for the description for Stage 1 and for the expansion
+    # below, the same two places it stands in during a paint.
+    source_text = sketch_result.text if sketch_result is not None else req.description
     # Stage 1 が読むのは、記述に文脈を注入したあとの文字列。注入しない client は
     # stage1_input を送ってこないので、そのときは記述そのものを読む。
-    stage1_text = req.stage1_input or req.description
-    ui_lang = _normalize_ui_lang(req.ui_lang)
-    instruction_lang_resolved = _resolve_instruction_lang(
-        source_text, instruction_lang_requested, ui_lang=ui_lang
+    stage1_text = (
+        sketch_result.text
+        if sketch_result is not None
+        else (req.stage1_input or req.description)
     )
     resolved_tenkei = req.tenkei or "auto"
     try:
@@ -1300,6 +1460,9 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
         "instruction_lang_resolved": instruction_lang_resolved,
         "ui_lang": ui_lang,
     }
+    if sketch_result is not None:
+        data["sketch_text"] = sketch_result.text
+        data["sketch_grain"] = sketch_result.grain
     if detail.stage1_prompt_digest is not None:
         data["stage1_prompt_digest"] = detail.stage1_prompt_digest
     if detail.stage1_prompt_base_digest is not None:
@@ -1451,18 +1614,37 @@ def _paint_events(
     complete PaintResponse).
     """
     t0 = time.perf_counter()
-    source_text = req.description
-    # Stage 1 が読むのは、記述に文脈を注入したあとの文字列 (api_interpret と同じ規約)。
-    stage1_text = req.stage1_input or req.description
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
+    # The language is settled on the author's own words: Stage 0.5 writes in the
+    # language it is told to, so reading it back would be circular.
     instruction_lang_resolved = _resolve_instruction_lang(
-        source_text, instruction_lang_requested, ui_lang=ui_lang
+        req.description, instruction_lang_requested, ui_lang=ui_lang
+    )
+    resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
+    sketch_result = _resolved_sketch(
+        req.sketch,
+        req.sketch_text,
+        req.sketch_grain,
+        description=req.description,
+        model=resolved_stage1_model,
+        lang=instruction_lang_resolved,
+        include_trace=req.include_trace,
+    )
+    # Stage 0.5 stands in for the description everywhere the description went:
+    # Stage 1, the plugin expansion, Stage 1.5, Stage 2 and coerce. Wiring it
+    # into stage1_input alone would leave the other four reading the raw
+    # description, and the range the layer exists to open would not appear
+    # (contract section 0.2). req.description is kept for saving and display.
+    source_text = sketch_result.text if sketch_result is not None else req.description
+    stage1_text = (
+        sketch_result.text
+        if sketch_result is not None
+        else (req.stage1_input or req.description)
     )
     catalog_id = _resolved_paint_catalog_id(
         req.catalog_id, mode=req.catalog_mode, source_text=source_text
     )
-    resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
@@ -1585,7 +1767,9 @@ def _paint_events(
         raise
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("render", 500) from e
-    artifact_input = req.history_input or source_text
+    # Saving and display keep the author's words: source_text is what the
+    # pipeline read, which is the sketch prose when Stage 0.5 ran.
+    artifact_input = req.history_input or req.description
     artifact_catalog_id = None if catalog_id == "default" else catalog_id
     render_metadata = {
         **render_metadata,
@@ -1598,6 +1782,9 @@ def _paint_events(
             render_metadata=render_metadata,
         ),
     }
+    sketch_recorded = sketch_result is not None and not sketch_result.fallback_used
+    stored_sketch_text = sketch_result.text if sketch_recorded else None
+    stored_sketch_grain = sketch_result.grain if sketch_recorded else None
     elapsed_stage1_ms = int((t1 - t0) * 1000)
     elapsed_stage2_ms = int((t2 - t1) * 1000)
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
@@ -1610,7 +1797,7 @@ def _paint_events(
         history_at = req.history_at or int(time.time() * 1000)
         item = _add_history_item(
             actor=actor,
-            input_text=req.history_input or source_text,
+            input_text=req.history_input or req.description,
             ddl=compose_detail.source_ddl or ddl,
             expanded_ddl=ddl,
             interpret_fallback=(
@@ -1629,7 +1816,7 @@ def _paint_events(
             catalog_id=artifact_catalog_id,
             save_artifacts=save_artifacts,
             render_metadata=render_metadata,
-            source_text=req.history_source_text or source_text,
+            source_text=req.history_source_text or req.description,
             display_label=req.history_display_label,
             batch_line_number=req.batch_line_number,
             batch_run_id=req.batch_run_id,
@@ -1642,6 +1829,12 @@ def _paint_events(
                 "plugin_warnings": compose_detail.plugin_warnings,
             },
             idempotency_key=idempotency_key,
+            # A work whose 0.5 failed was painted from the description, and is
+            # recorded that way: storing the fallback text would make it look
+            # like prose the layer wrote, and which works went through the layer
+            # is the thing these two columns exist to answer.
+            sketch_text=stored_sketch_text,
+            sketch_grain=stored_sketch_grain,
         )
         history_id = item["id"]
         idempotent_replay = bool(item.get("_idempotent_replay"))
@@ -1659,7 +1852,7 @@ def _paint_events(
             "id": item_id,
             "user_id": actor["id"],
             "output_path": str(_output_prefix(actor["id"], item_id, history_at)),
-            "input": req.history_input or source_text,
+            "input": req.history_input or req.description,
             "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
             "score": score_dict,
             "svg": svg,
@@ -1675,6 +1868,7 @@ def _paint_events(
             raise HTTPException(status_code=404, detail="user not found")
     paint_trace = _assemble_trace(
         req.include_trace,
+        sketch_result=sketch_result,
         interpret_result=interpret_detail_result,
         compose_detail=compose_detail,
         score_pre_coerce_dump=score_pre_coerce_dump,
@@ -1682,7 +1876,7 @@ def _paint_events(
     )
     _carriage = _carriage_warnings(compose_detail.ddl, score) or None
     response = PaintResponse(
-        description=source_text,
+        description=req.description,
         ddl=ddl,
         source_ddl=compose_detail.source_ddl or None,
         thinking=interpret_detail_result.thinking,
@@ -1710,6 +1904,9 @@ def _paint_events(
         compose_fallback_used=compose_detail.fallback_used,
         user_generation_count=user_generation_count,
         catalog_id=catalog_id,
+        sketch_text=sketch_result.text if sketch_result is not None else None,
+        sketch_grain=sketch_result.grain if sketch_result is not None else None,
+        sketch_fallback_used=sketch_result.fallback_used if sketch_result is not None else False,
         **coerce_report,
         trace=paint_trace,
     )

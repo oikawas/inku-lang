@@ -6,7 +6,7 @@
 
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { annotate, highlightDDL, interpretationFeedback } from '$lib/highlight';
+	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
@@ -14,6 +14,8 @@
 	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import TenkeiSelect from '$lib/components/TenkeiSelect.svelte';
+	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, sketchGrainOf, sketchModeLabel, sketchModeOf, type SketchMode } from '$lib/sketch';
+	import { submitDerivationKind as submitDerivationKindOf } from '$lib/derivation';
 	import { DEFAULT_TENKEI, normalizeTenkei, type TenkeiLevel } from '$lib/tenkei';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
@@ -124,6 +126,9 @@
 		composition_seed?: number | null;
 		interpretation_seed?: string | null;
 		seed_text?: string | null;
+		sketch_text?: string | null;
+		sketch_grain?: string | null;
+		sketch_fallback_used?: boolean;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -150,7 +155,7 @@
 		tokens_out_stage2: number | null;
 		user_generation_count?: number | null;
 	};
-	type DerivationKind = 'touch_change' | 'layout_change' | 'catalog_change' | 'reinterpretation' | 'model_comparison' | 'language_comparison' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'variation';
+	type DerivationKind = 'touch_change' | 'layout_change' | 'catalog_change' | 'reinterpretation' | 'model_comparison' | 'language_comparison' | 'ddl_edit' | 'description_edit' | 'replay' | 'canvas_aspect_change' | 'variation' | 'sketch_grain_change';
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
 	type VariationAmplitude = 'small' | 'medium' | 'large';
 
@@ -384,6 +389,50 @@
 	let ddlAutoRepairEnabled = $state(true);
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
+	// 写生 (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
+	// way a user setting like the staffage level is (contract section 0.3.1).
+	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
+	// The prose the layer wrote for the run on screen, and the author's edit of
+	// it. Editing and painting again sends the edited prose instead of calling
+	// the layer, so what the author reads is what Stage 1 reads.
+	let sketchText = $state<string | null>(null);
+	// Which description the prose was written for. Prose written for one text is
+	// not prose for another, and the description can be edited after a run.
+	let sketchSource = $state<string | null>(null);
+	let sketchDraft = $state('');
+	let sketchEditing = $state(false);
+
+	/** The prose to send for this description, or null to let the layer write it.
+	 *  Used by the paths that re-run one stage over a description already on
+	 *  screen (model and language comparison): holding the prose fixed is what
+	 *  makes those a comparison of models rather than of two different texts. */
+	function sketchTextFor(text: string): string | null {
+		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()
+			? sketchText
+			: null;
+	}
+
+	/** What every request that begins at Stage 2 sends. Those paths never run
+	 *  0.5 -- they carry the prose the work already has, so the four consumers
+	 *  below Stage 1 read what a paint would have given them. */
+	function sketchPayloadFor(text: string): Record<string, string> {
+		const prose = sketchTextFor(text);
+		if (!prose) return {};
+		const grain = sketchGrainOf(sketchMode);
+		return { sketch_text: prose, ...(grain ? { sketch_grain: grain } : {}) };
+	}
+
+	/** Show the prose a run or a saved work was painted from, and select the
+	 *  grain it used so a redraw starts from the same place. A work with no
+	 *  prose (painted with the layer off, or made before it existed) turns the
+	 *  control off rather than silently painting it at the default grain. */
+	function adoptSketch(text: string | null, grain: unknown, source: string | null = null): void {
+		sketchText = text;
+		sketchSource = source;
+		sketchDraft = text ?? '';
+		sketchEditing = false;
+		sketchMode = text ? sketchModeOf(normalizeSketchGrain(grain) ?? 'fine') : 'off';
+	}
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
@@ -2454,36 +2503,6 @@
 		}
 	}
 
-	// ── 感情語 → DDL ヒント ──────────────────────────────────
-	const EMOTION_DDL_MAP: Record<string, string> = {
-		'美しい':  '線は細く(pencil)、揺らぎは小さく(fine)、動きはゆっくり(slow)',
-		'美しく':  '線は細く(pencil)、揺らぎは小さく(fine)、動きはゆっくり(slow)',
-		'激しい':  '線は太く(brush_thick)、揺らぎは大きく(broad)、動きは速く(high)',
-		'激しく':  '線は太く(brush_thick)、揺らぎは大きく(broad)、動きは速く(high)',
-		'静かな':  '揺らぎなし(none)、線は細く(silverpoint)、密度を低く',
-		'静かに':  '揺らぎなし(none)、線は細く(silverpoint)、密度を低く',
-		'素敵':    '線は細く(pen)、揺らぎは小さく(fine)、配置は整然と',
-		'きれい':  '線は細く(pencil)、揺らぎは小さく(fine)、密度を低く',
-		'やさしい':'揺らぎは波(wave)、振幅は小さく(fine)、線は細く(pencil)',
-		'切ない':  '色は青(blue)か灰(gray)、線は細く(silverpoint)、揺らぎはゆっくり(slow)',
-		'哀しい':  '色は青(blue)、線は細く(silverpoint)、要素数は少なく',
-		'儚い':    '線は最細(silverpoint)、破線か点線(dashed/dotted)、要素は散らす(scatter)',
-		'神秘的':  '背景は黒(black)、円や弧を使う(circle/arc)、放射状(radial)',
-		'幻想的':  '揺らぎはperlin、振幅は大きく(broad)、複数色(color_cycle)',
-		'寂しい':  '要素数は少なく、間隔を広く、色は灰(gray)',
-		'爽やか':  '色は青(blue)か白(white)背景、線は細く(pen)、揺らぎなし(none)',
-	};
-
-	function buildEmotionHint(text: string): string {
-		const emotions = annotate(text).filter(p => p.kind === 'emotion').map(p => p.text);
-		if (emotions.length === 0) return '';
-		const hints = emotions.map(e => {
-			const h = EMOTION_DDL_MAP[e];
-			return h ? `「${e}」→ ${h}` : `「${e}」`;
-		});
-		return `\n\n[感情語をDDLに反映してください: ${hints.join('、')}]`;
-	}
-
 	// ── エクスポートファイル名 ────────────────────────────────
 	function exportFilename(ext: string, size?: number): string {
 		const now = new Date();
@@ -2651,6 +2670,11 @@
 		derivationMetadata?: Record<string, unknown>;
 		// null/undefined = omit the field so the server inherits from the parent.
 		tenkei?: TenkeiLevel | null;
+		// 写生 (Stage 0.5). `sketchMode` says whether the layer runs and at which
+		// grain; `sketchText` hands the server prose it already has, so a redraw
+		// of a saved work replays instead of asking a non-deterministic layer again.
+		sketchMode?: SketchMode;
+		sketchText?: string | null;
 		// Called when interpretation finishes, before rendering starts.
 		onStage1?: (event: PaintStage1Event) => void;
 	};
@@ -2732,15 +2756,18 @@ async function requestVisionRefineAdvice(historyId: string, model: string, instr
 		const resolvedStage1Model = qualifiedModelId(stage1Provider, stage1Model);
 		const resolvedStage2Model = qualifiedModelId(stage2Provider, stage2Model);
 
-		const augmented = text + buildEmotionHint(text);
-		stage1UserPrompt = augmented;
+		stage1UserPrompt = text;
+		const resolvedSketchMode = options.sketchMode ?? sketchMode;
+		const resolvedSketchGrain = sketchGrainOf(resolvedSketchMode);
 		const r = await apiFetch('/api/paint/stream', {
 			method: 'POST',
 			signal: options.signal,
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				description: text,
-				stage1_input: augmented,
+				sketch: resolvedSketchMode !== 'off',
+				...(resolvedSketchGrain ? { sketch_grain: resolvedSketchGrain } : {}),
+				...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 				stage1_model: resolvedStage1Model,
 				stage2_model: resolvedStage2Model,
 				include_thinking: includeThinking,
@@ -2807,8 +2834,7 @@ if (unreadWords.length > 0) {
 
 	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, tenkei?: TenkeiLevel | null): Promise<InterpretResult> {
 		const uiLang = getLang();
-		const augmented = text + buildEmotionHint(text);
-		stage1UserPrompt = augmented;
+		stage1UserPrompt = text;
 		const resolvedStage1Model = modelOverride ?? qualifiedModelId(stage1Provider, stage1Model);
 		const r = await apiFetch('/api/interpret', {
 			method: 'POST',
@@ -2816,7 +2842,7 @@ if (unreadWords.length > 0) {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				description: text,
-				stage1_input: augmented,
+				...(sketchTextFor(text) ? { sketch_text: sketchTextFor(text) } : {}),
 				model: resolvedStage1Model,
 				include_thinking: includeThinking,
 				instruction_lang: langOverride ?? instructionLang,
@@ -2872,6 +2898,8 @@ if (unreadWords.length > 0) {
 		elapsed_ms: number;
 		tokens_in: number | null;
 		tokens_out: number | null;
+		sketch_text?: string | null;
+		sketch_grain?: string | null;
 	}> {
 		const uiLang = getLang();
 		const resolvedStage2Model = modelOverride ?? qualifiedModelId(stage2Provider, stage2Model);
@@ -2883,6 +2911,7 @@ if (unreadWords.length > 0) {
 				ddl: currentDdl,
 				model: resolvedStage2Model,
 				description: originalText,
+				...sketchPayloadFor(originalText),
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
@@ -3126,9 +3155,27 @@ if (unreadWords.length > 0) {
 		const canvasAspectDerivation = submittedMode === 'single' ? pendingCanvasAspectDerivation : null;
 		const submitParentNodeId = canvasAspectDerivation?.parentNodeId ?? (lineageDetached ? null : (displayedHistoryItem?.lineage_node_id ?? result?.lineage_node_id ?? null));
 		const submitSource = displayedHistoryItem?.source_text ?? displayedHistoryItem?.input ?? input;
-		const submitDerivationKind: DerivationKind | null = canvasAspectDerivation
-			? 'canvas_aspect_change'
-			: submitParentNodeId ? (input.trim() === submitSource.trim() ? 'replay' : 'description_edit') : null;
+		const submitTextChanged = input.trim() !== submitSource.trim();
+		// 写生 (Stage 0.5). The grain edge fires only when the grain differs from
+		// the parent's, exactly as description_edit fires only when the text does;
+		// one edge, one cause, so a changed description stays a description edit.
+		const submitParentGrain = normalizeSketchGrain(displayedHistoryItem?.sketch_grain);
+		const submitGrain = sketchGrainOf(sketchMode);
+		const submitGrainChanged = submitGrain !== submitParentGrain;
+		const submitDerivationKind: DerivationKind | null = submitDerivationKindOf({
+			hasParent: submitParentNodeId !== null,
+			canvasAspectChanged: canvasAspectDerivation !== null,
+			textChanged: submitTextChanged,
+			grainChanged: submitGrainChanged
+		});
+		// A redraw at the same grain replays the prose it was painted from; the
+		// layer is not deterministic, so calling it again would not be a replay.
+		// An edited prose wins over the stored one, and a changed grain has to be
+		// written anew.
+		const sketchEdited = sketchDraft.trim() !== '' && sketchDraft.trim() !== (sketchText ?? '').trim();
+		const submitSketchText = sketchEdited
+			? sketchDraft.trim()
+			: (!submitTextChanged && !submitGrainChanged ? sketchText : null);
 		const submitDerivationMetadata = canvasAspectDerivation
 			? { from_canvas_aspect: canvasAspectDerivation.fromAspectId, to_canvas_aspect: canvasAspectDerivation.toAspectId }
 			: {};
@@ -3157,6 +3204,7 @@ if (unreadWords.length > 0) {
 					sourceText: input,
 					canvasAspectId: effectiveCanvasAspectId(),
 					lineageParentNodeId: submitParentNodeId,
+					sketchText: submitSketchText,
 					derivationKind: submitDerivationKind,
 					derivationMetadata: submitDerivationMetadata,
 					signal: abortController.signal,
@@ -3186,6 +3234,7 @@ if (unreadWords.length > 0) {
 				ddlGeneratedBaseline = ddl;
 				thinking = r.thinking;
 				result = r; outputTab = 'canvas';
+				adoptSketch(r.sketch_text ?? null, r.sketch_grain, input);
 				fitCanvasZoom();
 				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
@@ -3381,6 +3430,7 @@ if (unreadWords.length > 0) {
 					ddl,
 					model: resolvedStage2Model,
 					description: replayInput,
+					...sketchPayloadFor(replayInput),
 					instruction_lang: instructionLang,
 					ui_lang: uiLang,
 					canvas_aspect: effectiveCanvasAspectId(),
@@ -3759,7 +3809,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.selected, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.selected, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -4171,6 +4221,34 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
 
+/** 写生 (Stage 0.5): redraw a saved work at a different grain, as its child.
+ *  The prose is written again -- the grain is what changed, so replaying the
+ *  stored prose would leave the parameter dead. */
+async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal): Promise<void> {
+	if (!node.history) return;
+	const sourceText = node.history.source_text ?? node.history.input ?? '';
+	if (!sourceText.trim()) return;
+	const rendered = await paintOne(sourceText, {
+		sourceText,
+		historyInput: sourceText,
+		canvasAspectId: lineageCanvasAspectId(node),
+		lineageParentNodeId: node.id,
+		sketchMode: grain,
+		derivationKind: 'sketch_grain_change',
+		derivationMetadata: {
+			edited_from_history_id: node.history.id ?? null,
+			from_sketch_grain: node.history.sketch_grain ?? null,
+			to_sketch_grain: grain
+		},
+		signal,
+		renderOverrides: {
+			...colorCatalogOverride(lineageCatalogId(node)),
+			...wildOverride(node.history.render_wild === true)
+		},
+	});
+	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
+}
+
 async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = editedDdl.trim();
 	if (!nextDdl || !node.history) return;
@@ -4191,6 +4269,8 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		source_text: sourceText,
 		ddl: nextDdl,
 		expanded_ddl: composed.ddl,
+		sketch_text: composed.sketch_text ?? null,
+		sketch_grain: composed.sketch_grain ?? null,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4244,6 +4324,8 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		source_text: firstLine,
 		ddl: nextDdl,
 		expanded_ddl: composed.ddl,
+		sketch_text: composed.sketch_text ?? null,
+		sketch_grain: composed.sketch_grain ?? null,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4454,7 +4536,8 @@ $effect(() => {
 		const sourceText = it.source_text ?? it.input;
 		expandedDdl = it.expanded_ddl ?? null;
 		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; thinking = it.thinking ?? null;
-		stage1UserPrompt = sourceText ? sourceText + buildEmotionHint(sourceText) : '';
+		stage1UserPrompt = sourceText;
+		adoptSketch(it.sketch_text ?? null, it.sketch_grain, sourceText);
 		result = {
 			score: it.score,
 			svg: it.svg,
@@ -4930,6 +5013,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			body: JSON.stringify({
 				ddl: baseDdl,
 				description: source,
+				...sketchPayloadFor(source),
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
@@ -4955,6 +5039,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			saveArtifacts: false,
 			countGeneration: false,
 			canvasAspectId: refinementCanvasAspectId(),
+			sketchText: sketchTextFor(source),
 			interpretationSeed,
 			signal,
 			renderOverrides: refinementRenderOverrides(),
@@ -5028,6 +5113,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			body: JSON.stringify({
 				ddl: baseDdl,
 				description: source,
+				...sketchPayloadFor(source),
 				model: qualifiedModelId(stage2Provider, stage2Model),
 				instruction_lang: instructionLang,
 				ui_lang: getLang(),
@@ -5757,6 +5843,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			<div class="left-panel">
 				<div class="panel-scroll">
 					<InputPanel
+						{sketchMode}
+						onSelectSketchMode={(mode) => (sketchMode = mode)}
 						bind:inputMode
 						bind:input
 						bind:batchInput
@@ -5861,6 +5949,31 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							onStop={stopDdlRender}
 						/>
 					{/snippet}
+
+					<!-- 写生 (Stage 0.5). Above the instructions because it comes before
+					     them: the author reads the prose the layer wrote, and may
+					     rewrite it. What is left here is what Stage 1 reads. -->
+					{#if inputMode === 'single' && (sketchText !== null || result?.sketch_fallback_used)}
+						<section class="panel-section sketch-section">
+							<div class="sketch-head">
+								<span class="sketch-title">{t().sketchLabel}</span>
+								{#if sketchText !== null}
+									<span class="sketch-grain">{t().sketchGrainLabel}: {sketchModeLabel(sketchModeOf(result?.sketch_grain ?? sketchGrainOf(sketchMode)), getLang() === 'ja')}</span>
+									<button type="button" class="sketch-edit-btn" onclick={() => (sketchEditing = !sketchEditing)}>
+										{sketchEditing ? t().ddlDoneBtn : t().ddlEditBtn}
+									</button>
+								{/if}
+							</div>
+							{#if result?.sketch_fallback_used}
+								<p class="sketch-note">{t().sketchFallbackNote}</p>
+							{:else if sketchEditing}
+								<textarea class="sketch-editor" rows="7" bind:value={sketchDraft} spellcheck="true"></textarea>
+								<p class="sketch-note">{t().sketchEditHint}</p>
+							{:else}
+								<p class="sketch-body">{sketchDraft}</p>
+							{/if}
+						</section>
+					{/if}
 
 					<!-- 解釈 (正規化DDL・閲覧専用) -->
 					{#if ddl !== null && inputMode === 'single'}
@@ -6049,6 +6162,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDrawLineageDescription={drawLineageDescriptionEdit}
 				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}
+				onDrawLineageSketchGrain={drawLineageSketchGrain}
 				onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 				onCloseRefinement={refreshLineageAfterRefine}
 				statusDdlOrigin={statusDdlOrigin}
@@ -6909,6 +7023,36 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.app-info-vocab tbody tr:last-child td {
 		border-bottom: none;
 	}
+
+	/* 写生 (Stage 0.5). Reads as prose, not as code: the instructions below it
+	   are monospace because they are a score, this is the author's own language. */
+	.sketch-section { display: grid; gap: 6px; }
+	.sketch-head { display: flex; align-items: center; gap: 8px; }
+	.sketch-title { font-size: 11px; color: var(--fg3); }
+	.sketch-grain { font-size: 11px; color: var(--fg3); margin-left: auto; }
+	.sketch-edit-btn {
+		padding: var(--btn-sm-padding);
+		border: 1px solid var(--border2);
+		border-radius: var(--btn-sm-radius);
+		background: var(--panel);
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: var(--btn-sm-font-size);
+		cursor: pointer;
+	}
+	.sketch-edit-btn:hover { background: var(--bg2); }
+	.sketch-body, .sketch-editor {
+		padding: 8px 10px;
+		border: 1px solid var(--border);
+		background: color-mix(in srgb, var(--bg2) 68%, transparent);
+		font-size: 12px;
+		line-height: 1.7;
+		color: var(--fg2);
+		white-space: pre-wrap;
+		margin: 0;
+	}
+	.sketch-editor { font-family: inherit; width: 100%; resize: vertical; }
+	.sketch-note { margin: 0; font-size: 11px; color: var(--fg3); }
 
 	.interpretation-diff {
 		gap: 2px;

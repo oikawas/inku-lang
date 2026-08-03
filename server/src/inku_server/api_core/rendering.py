@@ -371,6 +371,8 @@ def _add_history_item(
     derivation_kind: str | None = None,
     derivation_metadata: dict[str, object] | None = None,
     idempotency_key: str | None = None,
+    sketch_text: str | None = None,
+    sketch_grain: str | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -416,6 +418,8 @@ def _add_history_item(
 "derivation_kind": derivation_kind,
 "derivation_metadata": derivation_metadata or {},
 "idempotency_key": idempotency_key,
+"sketch_text": sketch_text,
+"sketch_grain": sketch_grain,
 **metadata,
     })
     except ValueError as exc:

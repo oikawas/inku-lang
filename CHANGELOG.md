@@ -2834,3 +2834,25 @@ in place, `export-animation`, `/svg`, `/neighbors` and `/lineage` return **404**
 the listing that owns the trash. **The new checks were measured for discrimination**: removing the
 exclusion turns all three red, while a **control perturbation that keeps the property** (reordering
 the conditions and writing `!= 1` for `== 0`) leaves them **green**.
+
+### v2.9.37 — the trash view stops offering the buttons that make a file from a work (Build 841, 2026-08-03)
+
+**v2.9.36 made the server refuse a trashed work, but the buttons stayed on screen.** The two
+contact-sheet buttons and the animation export in the history panel carried no conditional block, so
+the trash view showed them and pressing one **only produced a 404**. **All three now sit behind the
+same `historyManagerView === 'active'` guard the move-to-trash button already used.** **What remains
+in the trash view is restore and permanent delete, and those are outside the guard.**
+
+**The contact sheet is built on the client and never reaches the server** (`findSelectedItem`
+resolves from the items already on screen). **It did not 404, and it was hidden anyway**: once the
+server has decided that a trashed work is not something to act on, leaving one way to make a file
+from it is not coherent. **The lineage panel's contact sheet is out of scope** — it resolves from
+the displayed graph and was measured not to go through `get_items`.
+
+**⚠ This web app has no component-rendering harness**: `test:unit` is `node --test` with no DOM.
+**So the new check reads the source and walks the `{#if}` nesting.** **Handling `{:else}` is the
+point**: restore and permanent delete live in the `{:else}` of that very guard, so a walk that
+ignores else reports them as guarded by it (**which happened while writing this**). **The assertion
+is paired with its control** — the three work tools inside the guard, restore and permanent delete
+outside it — and **its discrimination was measured** by removing the guard, which turns one red.
+**It does not see what a browser paints.**

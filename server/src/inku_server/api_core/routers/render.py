@@ -1782,6 +1782,9 @@ def _paint_events(
             render_metadata=render_metadata,
         ),
     }
+    sketch_recorded = sketch_result is not None and not sketch_result.fallback_used
+    stored_sketch_text = sketch_result.text if sketch_recorded else None
+    stored_sketch_grain = sketch_result.grain if sketch_recorded else None
     elapsed_stage1_ms = int((t1 - t0) * 1000)
     elapsed_stage2_ms = int((t2 - t1) * 1000)
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
@@ -1826,8 +1829,12 @@ def _paint_events(
                 "plugin_warnings": compose_detail.plugin_warnings,
             },
             idempotency_key=idempotency_key,
-            sketch_text=sketch_result.text if sketch_result is not None else None,
-            sketch_grain=sketch_result.grain if sketch_result is not None else None,
+            # A work whose 0.5 failed was painted from the description, and is
+            # recorded that way: storing the fallback text would make it look
+            # like prose the layer wrote, and which works went through the layer
+            # is the thing these two columns exist to answer.
+            sketch_text=stored_sketch_text,
+            sketch_grain=stored_sketch_grain,
         )
         history_id = item["id"]
         idempotent_replay = bool(item.get("_idempotent_replay"))

@@ -176,6 +176,27 @@ def test_t5_a_failing_stage05_still_paints_from_the_description(wired, monkeypat
     assert response.sketch_text == req_description()
 
 
+def test_t5_a_failed_layer_is_not_recorded_as_prose(wired, monkeypatch):
+    """Which works went through 0.5 is what the two columns answer. A work whose
+    layer failed was painted from the description and is stored as such."""
+    saved: dict = {}
+
+    def fake_add(**kwargs):
+        saved.update(kwargs)
+        return {"id": "h1", "description_hash": None, "lineage_node_id": None,
+                "lineage_parent_node_id": None, "derivation_kind": None}
+
+    def boom(text, **kwargs):
+        raise RuntimeError("the provider is down")
+
+    monkeypatch.setattr(render_routes, "_add_history_item", fake_add)
+    monkeypatch.setattr(render_routes, "sketch_from_life", boom)
+    run_paint(paint(sketch_grain="coarse", save_history=True))
+
+    assert saved["sketch_text"] is None
+    assert saved["sketch_grain"] is None
+
+
 def test_t5_an_empty_answer_counts_as_a_failure(wired, monkeypatch):
     monkeypatch.setattr(render_routes, "sketch_from_life", lambda text, **kwargs: ("   ", None, None))
     response = run_paint(paint())

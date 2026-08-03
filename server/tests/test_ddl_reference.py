@@ -41,19 +41,19 @@ def test_ddl_reference_versions_and_parts() -> None:
     # （manifest の `changed_from_previous` は空）。
     # Engine 4 (2026-07-30): coerce learns the yellow, orange, and purple DDL markers,
     # so four new cases move and the twenty-nine older ones stay byte-identical.
-    assert DDL_ENGINE_VERSION == "4"
+    # Engine 5 (2026-08-03): `thinness` moves off the tail to sit just before `surface`,
+    # giving the last declaration slot back. Same reason as engine 3 -- the declaration
+    # order reaches Stage 2, so the Score that gets written changes while this layer's
+    # output does not move by a byte. **The empty list below is the whole explanation
+    # of what this version did**, and it is the only thing that distinguishes it.
+    assert DDL_ENGINE_VERSION == "5"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
     assert len(manifest["cases"]) == 33
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 15
     assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 18
-    assert manifest["changed_from_previous"] == [
-        "B-orange-from-ddl",
-        "B-purple-from-ddl",
-        "B-yellow-from-ddl",
-        "B-yellow-from-ddl-en",
-    ]
+    assert manifest["changed_from_previous"] == []
 
 def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     generator = _generator()

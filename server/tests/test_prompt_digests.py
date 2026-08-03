@@ -136,8 +136,11 @@ def test_stage2_prompt_and_tool_expected_values():
     # 動くのは並びを見るようになった下の 2 行だけ (2026-07-29)。
     # 契約 background-color-openness (2026-08-02): 背景規則 3 行 (日英) が九色へ開いた。
     # **tool schema は動いていない** (18_492 / c1c1... のまま) — enum は既に九色だった。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "fed555f3c5257d4a"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "5ab8e4594daace0f"
+    # 契約 stage2-score-shrinkage (2026-08-03): `thinness` を末尾から `surface` の直前へ
+    # 移し、末尾を `surface` へ返した (surface の搬送 42% -> 92%)。**ここでも上の 2 行は
+    # 動かない** — sort_keys が並びを潰すため。動くのは並びを見る下の 2 行だけ。
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "5dc728550e37fac9"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "b75f99ebdfba659f"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -240,7 +243,9 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     system_only_digest = _digest(composer.SYSTEM_PROMPT)
     monkeypatch.setattr(composer, "_submit_tool", lambda: changed_tool)
     # The temporary schema change must remain visible after the nine-color update.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "1018ce144028a6b0"
+    # The digest reads declaration order too, so moving `thinness` before `surface`
+    # (contract stage2-score-shrinkage, 2026-08-03) moves this value as well.
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "6e4d1aa3c90ae251"
     assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "8b0c2559310f85e2"
 
 

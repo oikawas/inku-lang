@@ -2784,3 +2784,30 @@ started: 12 → 0.
 held a quantised expansion against an unquantised layout, so they **were reading the rounding
 rather than what the fitting stage did**, which is why they exist. `check_frozen_corpora.py` no
 longer prints "CI will be green.": **baking and comparing on one machine cannot promise it.**
+
+### v2.9.35 — the unreachable island in `api.py` is deleted (Build 839, 2026-08-03)
+
+**The nine symbols the v2.9.24 router split left behind as "outside a pure relocation" are gone:**
+`_DEFAULT_OUTPUT_DIR`, `_OUTPUT_DIR`, `_OUTPUT_PNG_SIZE`, `_HEX_COLOR_RE`, `_validated_color_map`,
+`InterpretResponse`, `_bearer_token`, `_can_manage_user` and `_strip_anthropic_prefix`.
+**Every reference to them across `src`, `tests`, `cli`, `web`, `scripts`, `shared` and `android` was
+its own definition line.**
+
+**They form one island and could only go as one piece** — the only reader of `_DEFAULT_OUTPUT_DIR`
+was `_OUTPUT_DIR`, and the only reader of `_HEX_COLOR_RE` was `_validated_color_map`. **Nothing
+outside the island referred to any of them.** `import re`, `Header` and the two `pydantic` names
+died with them and were removed too.
+
+**The environment door stays open.** `INKU_OUTPUT_DIR` and `INKU_OUTPUT_PNG_SIZE` are read by
+**`db.py:374-375`** with the same defaults; that is what the entries in `SETUP.md`,
+`manual/{ja,en}/server-configuration.md`, `SPEC.md` and `.env.example` have always rested on, and
+what was deleted was **a dead copy reading the same variables**. Stripping the `Bearer ` prefix also
+has a live counterpart elsewhere (`api_core/deps.py`).
+
+**`ruff` sees unused imports but not unused module-level definitions**, so nothing was stopping
+these, and **the next split will accumulate the same kind of residue**. **The checks were measured
+to have teeth**: deleting the *live* `_catalog_render_color_map` from api.py turns two tests red.
+
+**`_catalog_render_color_map` was kept.** It is a different kind of residue — referenced only from
+two tests — and removing it is a decision about those tests (the ledger holds it separately).
+`api.py` went from 251 lines to 196.

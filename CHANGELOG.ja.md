@@ -2745,3 +2745,26 @@ SVG が印字する精度より下なので見えない。**両プラットフ�
 量子化していない layout と突き合わせており、**目的である「寄せの段が何をしたか」ではなく丸めのほうを
 読んでいた**。`check_frozen_corpora.py` の「CI will be green.」も落とした — **同じ OS で焼いて同じ OS で
 照合している限り、CI の緑は約束できない。**
+
+### v2.9.35 — `api.py` の到達不能な島を落とす（Build 839、2026-08-03）
+
+**v2.9.24 のルーター分割が「純粋な再配置」の範囲外として残した 9 シンボルを消した。**
+`_DEFAULT_OUTPUT_DIR` / `_OUTPUT_DIR` / `_OUTPUT_PNG_SIZE` / `_HEX_COLOR_RE` / `_validated_color_map` /
+`InterpretResponse` / `_bearer_token` / `_can_manage_user` / `_strip_anthropic_prefix` である。
+**`src` `tests` `cli` `web` `scripts` `shared` `android` を通した参照が、どれも自分の定義行だけだった。**
+
+**9 つで 1 つの島を成すので、まとめてでなければ落とせない** — `_OUTPUT_DIR` の唯一の読み手は
+`_DEFAULT_OUTPUT_DIR` で、`_validated_color_map` の唯一の読み手は `_HEX_COLOR_RE` である。
+**島の外からの参照は 0。** `import re` と `Header` と `pydantic` の 2 名も道連れに死んだので落とした。
+
+**環境変数の口は塞がっていない。** `INKU_OUTPUT_DIR` と `INKU_OUTPUT_PNG_SIZE` を実際に読んでいるのは
+**`db.py:374-375`** で、同じ既定値を持つ。`SETUP.md`・`manual/{ja,en}/server-configuration.md`・
+`SPEC.md`・`.env.example` の記載はそちらが支えており、消したのは**同じ env を読む死んだ複製**である。
+`Bearer ` の除去にも生きた対応物が別に在る（`api_core/deps.py`）。
+
+**`ruff` は未使用 import は見るが、モジュール直下の未使用の定義は見ない。** いま誰も止めていないので、
+**この型の残置は次の分割でも同じように積まれる**。**検査に判別力があることは摂動で測った** —
+api.py から**生きている** `_catalog_render_color_map` を消すと 2 件が赤くなる。
+
+**`_catalog_render_color_map` は残した。** テスト 2 箇所からのみ参照される別の型の残置で、
+落とすならテストの側の判断が要る（台帳が別項目として持つ）。`api.py` は 251 行から 196 行になった。

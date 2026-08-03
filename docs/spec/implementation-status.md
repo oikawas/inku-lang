@@ -35,7 +35,8 @@ The reference implementation currently includes:
 - CLI version/build reporting and server-owned color catalog lookup
 - CLI benchmark diagnostics for color delivery, negated colors, motif hint
   arrival, and mathematical balance marker sample lines
-- shared kiwi progress mascot for single drawing and DDL replay
+- progress mascot chosen in settings from two, `Incu` and `Yuragi`; single
+  drawing, DDL replay, batch, and demo all share the selected one
 - integrated DDL interpretation editor with Saijiki drawer, expanded dialog,
   token/time display, and cancellable `/api/compose` replay
 - scene-tone color strategy, richer fallback Scores, sensory visibility

@@ -2878,3 +2878,7 @@ and the crab is one of the two selectable ones.  **That paragraph is deleted in 
 mascots** (author decision 2026-08-03; "cut it down to the bare fact" and "write it at the kiwi's
 density" were both offered, and the middle was taken).  **The same three places are fixed in both
 languages, and `check_docs.py` is green** (55 internal references).
+
+**The same claim was alive in `docs/spec/implementation-status`** (one line in each language),
+and was fixed too.  **`docs/history/changelog-v0.1-v1.71.md` is left alone** -- it records what was
+true at the time rather than describing the present.

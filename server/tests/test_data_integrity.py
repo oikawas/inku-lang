@@ -91,7 +91,8 @@ def test_delete_all_trash_requires_confirmation_header() -> None:
 
         rejected = client.delete("/api/history", headers=headers)
         assert rejected.status_code == 409
-        assert db.get_items(user["id"], [item["id"]])
+        # `get_items` skips the trash (I-094), so ask the listing that owns it.
+        assert db.list_items(user["id"], trashed=True)[1] == 1
 
         confirmed = client.delete(
             "/api/history",

@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **21** | v2.9.34 | 838 | 2026-08-03 | 525 | **32** | **493** |
 | **20** | v2.9.20 | 813 | 2026-08-01 | 525 | **32** | **493** |
 | **19** | v2.9.16 | 804 | 2026-08-01 | 493 | **227** | **266** |
 | **18** | v2.9.14 | 790 | 2026-07-31 | 493 | **70** | **423** |
@@ -118,14 +119,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `20` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `21` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `5` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.9.33 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.9.34 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 837 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 838 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -200,7 +201,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-20/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 525 (32 SVG) |
+| Drawing | `server/reference/render-engine-21/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 525 (32 SVG) |
 | Deterministic DDL layers | `server/reference/ddl-engine-5/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -392,6 +393,38 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 21 — the performance stops reading libm's last bit (v2.9.34)
+
+**The printed numbers agreed; the seed that reads them did not.**
+
+When engine 11 put every number on a six-decimal grid, this document said the drawing would from
+then on be the same on any OS. What agreed was the **printed number**, not the **performance seed,
+which hashes the coordinate before it is printed**.
+
+**macOS libm and glibc disagree by one ULP on `sin`/`cos`.** Of 60 identical arguments,
+`sin(t·2π)` differs for 9, `cos(radians(t·360))` for 7 and `sin(radians(t·360))` for 10 (Python is
+3.12.13 on both). That reaches group G's expanded coordinates as **1-8 ULP**, and
+`_fit_group_to_anchor` averages every point, so it spreads across the whole group. Since
+`_seed_for_instruction` hashes the entire instruction dump, **a difference of
+5.551115123125783e-17 turns the seed from 7178797595915484867 into 2693192989206796227**. A
+different seed is a different tremor, which is **0.08-0.17px** in the drawing.
+
+**Only the arrangement path amplified it.** Six decimals absorb the one-ULP difference everywhere
+else, and **the 493 cases of A-F were byte-identical across the two platforms before the change**:
+A-F never state an `arrangement`, never reach `_expand_arrangement`, and so never feed a coordinate
+to a hash.
+
+**The coordinates `_expand_arrangement` returns are now quantised to 9 decimals.** 1e-9 of a
+normalised coordinate is 1e-6 px on a 1000px canvas, below what the SVG prints, so it cannot be
+seen. **All 525 cases were measured to agree on both platforms** (6 differed before). **32 cases
+moved, all of them in group G**; not one of A-F did.
+
+**"identical on both platforms" cannot be the acceptance gate, because one machine cannot observe
+it.** `test_render_platform_stability.py` perturbs `sin`/`cos` by exactly one ULP locally and
+requires the drawing to stay put, **paired with a test that the same perturbation moves 12 cases
+once the quantiser is removed** — without it, a perturbation that stopped reaching the renderer
+would leave the first test green.
 
 ## engine 20 — a group's position returns to the description (v2.9.20)
 

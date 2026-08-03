@@ -2745,3 +2745,42 @@ after `surface`**.
 `ddl-engine-5/` is byte-identical to `ddl-engine-4/` across all 33 cases with an empty
 `changed_from_previous`. **That emptiness is what the declaration-order reason looks like**, and
 this is the second time the version history has recorded it.
+
+### v2.9.34 — the performance stops reading libm's last bit (render engine 21, Build 838, 2026-08-03)
+
+**CI, the only automatic check this repository has, had been red for 22 consecutive runs since
+2026-08-01.** Only the `render-engine` job of the `reference-corpus` workflow failed; `ddl-engine`
+stayed green. **Everything merged since 2026-08-01 went in without that backstop.**
+
+**The cause was that the performance seed hashes the coordinate before it is printed.**
+**macOS libm and glibc disagree by one ULP on `sin`/`cos`** — of 60 identical arguments,
+`sin(t·2π)` differs for 9, `cos(radians(t·360))` for 7 and `sin(radians(t·360))` for 10
+(Python is 3.12.13 on both). That reaches group G's expanded coordinates as 1-8 ULP, and
+`_fit_group_to_anchor` averages every point, so it spreads across the whole group.
+**`_seed_for_instruction` then hashes the entire instruction dump, so a difference of
+5.551115123125783e-17 turns the seed from 7178797595915484867 into 2693192989206796227.**
+A different seed is a different tremor, which is 0.08-0.17px in the drawing.
+
+**When engine 11 put every number on a six-decimal grid, the note said the drawing would from
+then on be the same on any OS. What agreed was the printed number, not the seed that reads it.**
+Six decimals do absorb the one-ULP difference everywhere else — **the 493 cases of A-F were
+byte-identical across the two platforms** — and only the arrangement path, which feeds a hash,
+amplified it.
+
+**The coordinates `_expand_arrangement` returns are now quantised to 9 decimals.** 1e-9 of a
+normalised coordinate is 1e-6 px on a 1000px canvas, below what the SVG prints, so it cannot be
+seen. **All 525 cases were measured to agree on both platforms** (6 differed before the change).
+**32 cases move, all of them in group G**; not one of the 493 A-F cases does.
+`render_engine_version` goes 20 → 21 and `render-engine-21/` re-freezes the 32.
+
+**"identical on both platforms" cannot be an acceptance gate, because one machine cannot observe
+it.** Instead the gate perturbs `sin`/`cos` by exactly one ULP locally and requires the drawing to
+stay put (`test_render_platform_stability.py`), **paired with a test that the same perturbation
+moves 12 cases once the quantiser is removed** — without it, a perturbation that stopped reaching
+the renderer would leave the first test green. The discrimination was measured before the work
+started: 12 → 0.
+
+**Three existing checks compared against unquantised expectations and were repaired.** Two of them
+held a quantised expansion against an unquantised layout, so they **were reading the rounding
+rather than what the fitting stage did**, which is why they exist. `check_frozen_corpora.py` no
+longer prints "CI will be green.": **baking and comparing on one machine cannot promise it.**

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.33 / Build 837**
+**Target version: v2.9.34 / Build 838**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -101,7 +101,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 20 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 21 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 5 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.2` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |

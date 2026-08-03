@@ -2811,3 +2811,26 @@ to have teeth**: deleting the *live* `_catalog_render_color_map` from api.py tur
 **`_catalog_render_color_map` was kept.** It is a different kind of residue — referenced only from
 two tests — and removing it is a decision about those tests (the ledger holds it separately).
 `api.py` went from 251 lines to 196.
+
+### v2.9.36 — a trashed work no longer reaches the operations that act on a work (Build 840, 2026-08-03)
+
+**`db.get_items` filtered on owner and id alone and carried no trash condition.** Its seven
+production callers — animation export, output-file rebuild, SVG fetch, neighbours, lineage and
+refine advice — **all handled trashed works as if they were current**. This was noticed during the
+v2.9.13 animation-export review and not fixed then (ledger I-094).
+
+**The ledger's "the UI cannot select them" was wrong.** The selection and the tool buttons in the
+history panel **carry no conditional block, so the trash view shows the same ones**. Measured:
+`/api/history/export-animation` with two trashed ids **returned 200 and a GIF**. This was never
+limited to hand-sent ids.
+
+**`get_items` now skips the trash, and no path is lost by it.** The trash view's listing is a
+separate query (`list_items(trashed=True)`), and **the UI already blocks loading a trashed work
+onto the canvas**: `loadItemAndClose` returns early unless the view is `active`. With the exclusion
+in place, `export-animation`, `/svg`, `/neighbors` and `/lineage` return **404**,
+`rebuild-output-files` reports **count 0**, and **the trash listing still returns 200 with total 2**.
+
+**One existing check used `get_items` to ask whether a row survived a rejected purge**, and now asks
+the listing that owns the trash. **The new checks were measured for discrimination**: removing the
+exclusion turns all three red, while a **control perturbation that keeps the property** (reordering
+the conditions and writing `!= 1` for `== 0`) leaves them **green**.

@@ -2702,3 +2702,46 @@ the order of the table — stays green**, because the drawing derives its positi
 
 Unit tests go from **118 to 127**. **Not one line of `web/`, `server/`, or `cli/` changed**, so
 there is no pentala deployment.
+
+### v2.9.33 — `thinness` gives up the tail, and `surface` takes its seat back (`ddl_engine_version` 5, Build 837, 2026-08-03)
+
+**Stage 2's output had halved.** The author's observation was that the same DDL now drew a picture
+whose fill was poor, whose shapes were small, and whose impression was faint. **The cause was
+v2.9.5, which moved `Instruction.thinness` to the end of the declaration.** The tool schema reaches
+the model with its property order intact, and **an optional field is filled more often the further
+back it sits** — that rule was already in the specification. **What was not written down is that
+there is only one seat at the tail.**
+
+**When `thinness` took it, `surface` lost it.** Calling production `compose()` and swapping nothing
+but the tool schema's order, across 168 runs, `surface`'s carry went **92% → 42%**, the median
+output fell from **172 tokens to 94.5**, and instructions per run from **2.45 to 1.43**. Because
+nobody wrote `surface.opacity` any more, **its schema default of 0.28 — unchanged since v1.71 —
+became the production value** (median 0.60 → 0.28 across 41 same-description groups in the
+production database). **The element count did not drop. The same number of marks came out thinner,
+fainter and smaller.**
+
+**`thinness` now sits immediately before `surface`, and the tail belongs to `surface` again.** The
+field itself — type, default, description — did not move by a character; only its position did.
+`thinness` carries 67% here rather than 89%, but **this is the position that does not shrink the
+rest of the Score**. **Making it `required` measured worse**: across 28 paired same-description
+runs, `surface` rose in none and fell in eleven, and the output shrank further.
+
+**The corpora cannot serve as the gate.** Neither `gen_render_reference.py` nor
+`gen_ddl_reference.py` imports `composer`, so **the reference corpora never traverse Stage 2**. The
+v2.9.5 commit message said in as many words that the frozen corpora stayed byte-identical: **the
+checks correctly reported "nothing changed" while the regression walked through.** The acceptance
+therefore watches **Stage 2's fill rate itself** — a probe that inspects the deployed declaration
+order before it runs, and refuses to run against the old one, measured 28 runs at **93.3%** surface
+presence (threshold 65%), **62.2%** thinness carry (40%), a median of **165** output tokens (130)
+and **2.25** instructions per run (2.0).
+
+**Four artifacts held the declaration order**: the server's `schema.py`, the port's copy of the tool
+schema, the port's fixture (both tables in `score_schema_contract.json`), and one Android test.
+**Of the three edges between them, only one was watched** — checks now cover `server ↔ Kotlin` and
+`server ↔ fixture`, together with an assertion that **turns red if a new optional field is appended
+after `surface`**.
+
+**`ddl_engine_version` rises from 4 to 5.** The deterministic layers did not change by a line, and
+`ddl-engine-5/` is byte-identical to `ddl-engine-4/` across all 33 cases with an empty
+`changed_from_previous`. **That emptiness is what the declaration-order reason looks like**, and
+this is the second time the version history has recorded it.

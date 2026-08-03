@@ -34,6 +34,16 @@ produced moves nothing in it.
 **The corpus frozen as `ddl-engine-3/` is byte-identical to `ddl-engine-2/` in all 29 cases, and
 `changed_from_previous` is empty.** **That emptiness is what this reason looks like.**
 
+**The second application was `ddl_engine_version` 4 → 5 (v2.9.33, 2026-08-03)** —
+`Instruction.thinness` moved off the tail to sit immediately before `surface`, **giving the last
+slot back to `surface`**. `ddl-engine-5/` is likewise byte-identical to `ddl-engine-4/` across all
+33 cases, with an empty `changed_from_previous`.
+**What the first application failed to teach is here**: the decision to move `thinness` to the tail
+watched only `thinness`'s own carry (18% → 89%), and **nobody measured that `surface`, which gave up
+the tail, fell from 92% to 42% and halved the whole Score**.
+**When the declaration order moves, measure the field that gives up its seat, not only the one that
+takes a new one.**
+
 **The block cannot be restored, but the prints can be kept.** Freezing is the proof print that makes
 that possible: the **actual output** from a fixed set of inputs (the SVG, its element counts,
 classes, and a coordinate digest) is stored, and CI fails if regenerating an existing case is not
@@ -109,13 +119,13 @@ but never asserts "the output will change"**.
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
 | `render_engine_version` | the drawing engine | `20` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `4` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `5` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.9.32 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.9.33 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 836 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 837 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -191,7 +201,7 @@ There are two instances as of v2.4.7.
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
 | Drawing | `server/reference/render-engine-20/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 525 (32 SVG) |
-| Deterministic DDL layers | `server/reference/ddl-engine-4/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
+| Deterministic DDL layers | `server/reference/ddl-engine-5/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
 adjacent** ("Deterministic and non-deterministic layers" in this document). Stage 2's LLM sits between Stage 1.5 (DDL→DDL) and coercion

@@ -492,9 +492,20 @@ therefore part of the specification, not a matter of readability. The rule for r
 when that order changes lives under "When the version goes up" in the
 [render engine version history](docs/spec/render-engine-history.md).
 
-**`thinness` moved to the tail in `ddl_engine_version` 3 (v2.9.5)**, where carry measures 89%.
+**`thinness` moved to sit immediately before `surface` in v2.9.33, giving the tail back to `surface`.**
+
+**There is only one seat at the tail.** While `thinness` held it, from v2.9.5 through v2.9.32,
+`surface` lost it and its carry fell **92% → 42%**, which **halved Stage 2's output**: the median
+dropped from 172 output tokens to 94.5 and from 2.45 instructions per run to 1.43, and because
+nobody wrote `surface.opacity` any more its schema default of 0.28 became the production value
+(168 runs, measured 2026-08-02). **"The further back, the more often filled" also means whatever
+gives up the back falls.** `thinness` itself carries 67% here rather than 89%, but this is the
+position that does not shrink the rest of the Score.
+
 **It must not be moved back beside `weight`**: as a word it belongs next to thickness, but
-**the position is the more binding specification**.
+**the position is the more binding specification** (beside `weight` it carries 3%).
+**The last slot in `Instruction` is reserved for `surface`** — appending a new optional field
+after it repeats the same regression.
 
 ### 5.2 What inku Adds to LeWitt
 

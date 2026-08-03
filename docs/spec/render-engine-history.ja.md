@@ -31,6 +31,13 @@ Score そのものの分布が動く変化は 1 件も動かさない。
 **焼いた `ddl-engine-3/` は 29 ケースが `ddl-engine-2/` とバイト一致で、`changed_from_previous` は空**。
 **その空白が、この条件がどういう条件なのかの実物である。**
 
+**2 度目は `ddl_engine_version` 4 → 5（v2.9.33・2026-08-03）である** — `Instruction.thinness` を
+末尾から `surface` の直前へ移し、**末尾を `surface` へ返した**。`ddl-engine-5/` も 33 ケースが
+`ddl-engine-4/` とバイト一致で `changed_from_previous` は空。
+**1 度目に学べなかったことがここにある** — 末尾へ移す判断は `thinness` の搬送（18% → 89%）だけを見ており、
+**末尾を明け渡した `surface` が 92% → 42% へ落ちて Score 全体が半分に縮んだことは誰も測っていなかった**。
+**宣言順を動かすときは、動かすフィールドだけでなく、席を譲る側も測る。**
+
 **版木は戻せないが、刷りは残せる。** 凍結はそのための校正刷りである — 決まった入力から得た出力の
 **実物**（SVG と、その要素数・class・座標の digest）を置き、既存ケースを再生成してバイト一致しなければ
 CI が落ちる。一致しないときは描画が変わったということで、版を上げる。**版数は「変わった」という 1 ビット
@@ -100,13 +107,13 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | 名前 | 何の版か | 現在 | 上げる条件 |
 |---|---|---|---|
 | `render_engine_version` | 描画エンジン | `20` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
-| `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `4` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
+| `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `5` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `3` | **語彙の追加・変更・廃止、または文法の追加・変更・廃止**（2026-07-30 作者裁定で明文化。v2 は太さの語で、v3 は黄・橙・紫で上げた） |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
 | `MODEL_CONFIG_VERSION` | モデルカタログの中身 | `2.5.0` | **計測値・推奨度・選択可否が変わったとき**。上げると保存済みカタログの同じ id へ組み込みのメタを貼り直す（保存済みのモデル一覧と有効/無効の選択は残る） |
-| `APP_VERSION` | アプリの版 | v2.9.32 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
+| `APP_VERSION` | アプリの版 | v2.9.33 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
 | `server/pyproject.toml` | 配布物の版 | 2.7.2 | **リリースのタグを打つときだけ**。`/api/info` の `release_version` が返す。リリース保留中はアプリの版から遅れる |
-| `web/BUILD_NUMBER` | ビルド通し番号 | 836 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
+| `web/BUILD_NUMBER` | ビルド通し番号 | 837 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
 
 **「現在」の列は書いた時点の値である。** 版を上げたら、この列も同じ commit で直す。
 
@@ -162,7 +169,7 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | コーパス | 置き場 | 何を凍結するか | ケース数 |
 |---|---|---|---|
 | 描画 | `server/reference/render-engine-20/` | `renderer.py` / `stroke_engine.py` の演奏結果（SVG） | 525（SVG 32） |
-| 決定的 DDL 層 | `server/reference/ddl-engine-4/` | **A** = `expand_intermediate_ddl` の展開後 DDL / **B** = `coerce_score` の補正後 Score + `branch_report` | 33（A 15 / B 18） |
+| 決定的 DDL 層 | `server/reference/ddl-engine-5/` | **A** = `expand_intermediate_ddl` の展開後 DDL / **B** = `coerce_score` の補正後 Score + `branch_report` | 33（A 15 / B 18） |
 
 **DDL 側が A と B の 2 部に分かれるのは、決定的な層が隣り合っていないからである**（本書の「決定的な層と非決定的な層」）。
 Stage 1.5（DDL→DDL）と coerce（Score→Score）のあいだに Stage 2 の LLM が挟まるため、

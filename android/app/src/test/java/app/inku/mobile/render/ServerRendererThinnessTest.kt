@@ -77,15 +77,26 @@ class ServerRendererThinnessTest {
     }
 
     @Test
-    fun testSchemaDeclaresThinnessAtTheEndOfInstruction() {
+    fun testSchemaDeclaresThinnessImmediatelyBeforeSurface() {
+        // Optional fields fill in more often the further back they are declared, and
+        // the last slot belongs to `surface`: while `thinness` held it, surface's
+        // carry fell 92% -> 42% and Stage 2's whole output halved (server contract
+        // stage2-score-shrinkage, 2026-08-03). That `surface` is genuinely last is
+        // held by ServerScoreVocabularyTest against the server-generated fixture;
+        // what this pins is that nothing gets wedged between the two.
         val schema = ServerScoreSchemaJson.parameters
-        val surface = schema.indexOf("\"surface\":")
-        val thinness = schema.indexOf("\"thinness\":")
-        assertTrue("surface must exist before thinness", surface >= 0 && surface < thinness)
-        val afterSurface = schema.substring(thinness)
-        assertTrue(afterSurface.contains("\"enum\":[\"fine\",\"extra_fine\"]"))
-        assertTrue(afterSurface.contains("\"default\":null"))
-        assertFalse("there is no thick thinness value", afterSurface.contains("\"thick\""))
+        val thinness = schema.indexOf("\"thinness\":{")
+        val surface = schema.indexOf("\"surface\":{")
+        assertTrue("both fields must exist", thinness >= 0 && surface >= 0)
+        assertTrue("thinness must be declared before surface", thinness < surface)
+        assertTrue(
+            "only the thinness object may sit between thinness and surface",
+            schema.substring(thinness, surface).endsWith("\"title\":\"Thinness\"},"),
+        )
+        val afterThinness = schema.substring(thinness)
+        assertTrue(afterThinness.contains("\"enum\":[\"fine\",\"extra_fine\"]"))
+        assertTrue(afterThinness.contains("\"default\":null"))
+        assertFalse("there is no thick thinness value", afterThinness.contains("\"thick\""))
     }
 
     @Test

@@ -516,21 +516,28 @@ class Instruction(BaseModel):
         default=None,
         description="直前 instruction への関係。DDL に exact previous-object phrase がある時だけ使う。1 instruction につき最大1つ。coerce は追加せず、invalid は drop",
     )
-    surface: Optional[SurfaceSpec] = Field(
-        default=None,
-        description="閉じた図形の面の質感。line/arc では安全に無視または近似される。SVG固有の pattern/filter は入れない",
-    )
-
-    # 宣言順は Stage 2 の tool schema に並びごと渡り、任意フィールドは後ろにあるほど
-    # 埋まる。`weight` の直後 (位置 14) では 4〜18% しか搬送されず、末尾で 84〜91%。
-    # 語としては weight の隣だが、**位置は仕様であって整理の対象ではない**。
-    # 隣へ戻さないこと (I-036 / SPEC.ja.md §5.1)。
+    # Declaration order rides along into the Stage 2 tool schema, and optional
+    # fields fill in more often the further back they sit. Position is spec here,
+    # not something to tidy up.
+    #
+    # `thinness` belongs immediately before `surface`, and no further back: when
+    # it took the last slot itself, `surface` lost it and `surface`'s carry fell
+    # 92% -> 42%, which halved Stage 2's whole output (168 runs, 2026-08-02).
+    # Do not move it back next to `weight` either -- there it carries 3%
+    # (I-036 / SPEC.ja.md §5.1).
+    #
+    # The last slot in `Instruction` is reserved for `surface`. Appending any new
+    # optional field after it repeats the same regression.
     thinness: Optional[Thinness] = Field(
         default=None,
         description=(
             "線の細さ。道具の既定より細く引く指定。fine=細い / extra_fine=極細。"
             "省略時は道具の既定。太くする指定は無い"
         ),
+    )
+    surface: Optional[SurfaceSpec] = Field(
+        default=None,
+        description="閉じた図形の面の質感。line/arc では安全に無視または近似される。SVG固有の pattern/filter は入れない",
     )
 
     @field_validator("weight", mode="before")

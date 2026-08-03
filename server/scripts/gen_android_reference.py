@@ -1680,7 +1680,8 @@ def score_schema_contract_fixture() -> None:
         "note": (
             "The port's schema is a subset by design. `instruction_property_order` "
             "is the server's order; the port's own fields must appear in the same "
-            "relative order, which is what puts `thinness` at the end."
+            "relative order, which is what puts `surface` at the end, with "
+            "`thinness` immediately before it."
         ),
         "instruction_property_order": list(instruction),
         "dump_property_order": list(

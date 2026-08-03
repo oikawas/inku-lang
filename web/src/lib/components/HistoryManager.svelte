@@ -621,6 +621,10 @@
 					<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
 				</Tooltip>
 			{/if}
+			<!-- The trash view restores or deletes; it does not produce work from a
+			     work. The server refuses a trashed id on these routes (I-094), so
+			     leaving the buttons here would only offer a 404. -->
+			{#if historyManagerView === 'active'}
 			<Tooltip placement="bottom-left" wide text={t().historyContactSheetHint}>
 				<button
 					class="ghost-btn"
@@ -655,6 +659,7 @@
 			</Tooltip>
 			{#if animationExportError}<span class="tool-error">{animationExportError}</span>{/if}
 			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
+			{/if}
 		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
 	</div>

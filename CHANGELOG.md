@@ -2856,3 +2856,25 @@ ignores else reports them as guarded by it (**which happened while writing this*
 is paired with its control** — the three work tools inside the guard, restore and permanent delete
 outside it — and **its discrimination was measured** by removing the guard, which turns one red.
 **It does not see what a browser paints.**
+
+### 2026-08-03 — The specification stops describing a mascot the web no longer has (**no version bump**, documentation only)
+
+**The specification described a kiwi mascot in three places** ([I-105]).  **Measured, `kiwi` appears
+0 times in `web/src` and `server/src`**; what exists is `IncuMascot.svelte` (a cube built from a 5x5
+pixel grid) and `YuragiMascot.svelte` (a crab).
+
+- **`Incu` turns slowly, once every fifteen seconds.  `Yuragi` raises its left claw every eleven
+  seconds and its right claw every eight**
+- **Which one appears is chosen in settings** (the default is `Incu`), through the radio buttons in
+  `SettingsModal.svelte`
+- **No screen has a mascot of its own** — `RunStatus.svelte` renders the selected one, and **seven
+  components use it**: single drawing, batch, demo, the DDL editor, the genealogy panel, and the
+  refinement modals
+
+**So "the batch mascot is a small crab" was wrong twice over** — there is no batch-specific mascot,
+and the crab is one of the two selectable ones.  **That paragraph is deleted in both languages.**
+
+**The paragraph enumerating the kiwi's behaviour is replaced by one sentence for each of the two
+mascots** (author decision 2026-08-03; "cut it down to the bare fact" and "write it at the kiwi's
+density" were both offered, and the middle was taken).  **The same three places are fixed in both
+languages, and `check_docs.py` is green** (55 internal references).

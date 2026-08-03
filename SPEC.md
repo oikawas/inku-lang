@@ -2838,18 +2838,18 @@ carries the same `PaintResponse` as before. `POST /api/paint` remains a wrapper
 over the same logic with an unchanged response shape, so the CLI and Android
 need no changes.
 
-DDL replay shows elapsed time, token information, a stop button, and the kiwi
+DDL replay shows elapsed time, token information, a stop button, and the
 progress mascot.  Stopping replay aborts the active `/api/compose` request.
 During single drawing and DDL replay, the single tab shows a running effect and
 the batch/demo start actions are suppressed.
 
-During single drawing and DDL replay, the progress bar can show a kiwi mascot.
-The kiwi faces left, walks slowly, pecks with a long beak, sniffs, blinks,
-occasionally opens its beak during a quick dash, and sometimes curls into a
-"kiwi ball".  In the curled state it keeps its head, body, and beak visible,
-stays in place for more than six seconds, closes its eye, and gently nods its
-head.  The legs are anchored at fixed body positions so the feet move without
-the leg roots drifting.
+Single drawing, DDL replay, batch, and demo all show **one progress mascot, the
+one chosen in settings**.  There are two, `Incu` and `Yuragi`, and the default is
+`Incu`; the names are proper nouns and are not translated.  `Incu` is a cube built
+from a 5x5 pixel grid that turns slowly, once every fifteen seconds.  `Yuragi` is
+a crab that raises its left claw every eleven seconds and its right claw every
+eight to greet you.  The mascot is switched in the settings dialog.  **No screen
+shows a mascot of its own.**
 
 ### Batch Drawing
 
@@ -2868,10 +2868,6 @@ catalog at random in the browser.**
 In the color catalog dialog, clicking outside the dialog confirms the current
 selection exactly like the save/confirm action. The cancel button still restores
 the selection snapshot from when the dialog was opened.
-
-The batch mascot is a small crab that walks slowly during progress, moves its
-claws, watches the process, and occasionally dives under a water surface while
-bubbles rise.
 
 ### Demo Drawing
 

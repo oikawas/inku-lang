@@ -60,7 +60,10 @@ def main() -> int:
     after = _dirty_paths()
 
     if not after and not guards_fired:
-        print("frozen corpora are byte-identical; CI will be green.")
+        # This bakes and compares on one machine, so it cannot speak for CI.
+        # Until engine 21 it claimed it could, and said so for the two days CI
+        # was red over a macOS/Linux libm difference (ledger I-111).
+        print(f"frozen corpora are byte-identical on this machine ({sys.platform}).")
         return 0
 
     print()

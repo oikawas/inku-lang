@@ -1780,6 +1780,31 @@ The DB stores only the `display` SVG in `history.svg`.  Editable and compatible
 SVG files are regenerated at download time rather than stored as additional DB
 payloads.
 
+### 12.15 The Sketch-from-Life Layer (Stage 0.5, v2.9.38)
+
+An **optional layer** between the description and Stage 1.  A description as dense as a tanka is
+more than Stage 1 can chew at once, so this layer rewrites it as **plain prose naming things** --
+a sketch from life -- before anything downstream reads it.
+
+The prose **stands in for the description at all five consumers**: Stage 1, the plugin expansion,
+Stage 1.5, Stage 2 and coerce.  If even one of them still read the description, the range this
+layer exists to open would not appear.  **The description itself is kept for saving and display.**
+The work is what the author wrote, not what the layer wrote.
+
+**The granularity (`sketch_grain`) has two values**, `fine` (many short sentences, the default)
+and `coarse` (fewer, longer ones), chosen per draw.  What differs is the cutting, not the total.
+Redrawing with a different grain writes a `sketch_grain_change` edge into the genealogy; the same
+grain stays a replay.
+
+**When the layer fails the description goes to Stage 1 unchanged and the paint still completes.**
+A failed attempt is not recorded as prose.  A saved work redraws from its stored prose without
+calling the layer again.
+
+The layer must not emit words of feeling (design principles 3 and 7, section 13.3).  Its prose
+names things, their placement and their state.  **It follows that meaning words absent from the
+normalized DDL are the design, not a carriage failure** -- "night" travels as "fill the background
+with black".  A gate that measures carriage by matching tokens reads that translation as loss.
+
 ---
 
 ## 13. The Design of Sway

@@ -2882,3 +2882,50 @@ languages, and `check_docs.py` is green** (55 internal references).
 **The same claim was alive in `docs/spec/implementation-status`** (one line in each language),
 and was fixed too.  **`docs/history/changelog-v0.1-v1.71.md` is left alone** -- it records what was
 true at the time rather than describing the present.
+
+### v2.9.38 (Build 843) — a sketch-from-life layer sits between the description and Stage 1
+
+**A description as dense as a tanka is more than Stage 1 can chew at once.** A new layer between
+the description and Stage 1 rewrites it as **plain prose naming things** -- a sketch from life --
+and hands that to everything downstream.
+
+**The same string reaches all five consumers** -- Stage 1, the plugin expansion, Stage 1.5,
+Stage 2 and coerce. **If even one of them still read the description, the range the layer exists
+to open would not appear.** **The description itself is kept for saving and display**: the work is
+what the author wrote, not what the layer wrote.
+
+**The granularity `sketch_grain` has two values** -- `fine` (many short sentences, the default)
+and `coarse` (fewer, longer ones). **The total length is about the same; only the cutting differs**
+(measured: fine 10 sentences of 9.6 characters, coarse 4 of 21.2). **It is chosen per draw and
+from the work menu.** **Redrawing with a different grain writes a `sketch_grain_change` edge**
+into the genealogy; the same grain stays a replay.
+
+**When the layer fails, the description goes to Stage 1 and the paint still completes.**
+**A failed attempt is not recorded as prose** (one occurred in 240 production-scale runs).
+**A saved work redraws from its stored prose** without calling the layer again.
+
+**`buildEmotionHint` is gone** (I-112). It detected 16 words of feeling and appended
+"reflect the emotional word in the DDL" to `stage1_input`. **It fired on 6.1% of 2,125 production
+works, 78% of those from the single rule for "quiet", and the `silverpoint` it named was never
+once chosen.** **It also could not coexist with the layer**: `stage1_input` outranks the
+description, so leaving it in would have let Stage 1 alone read something the other four never saw.
+**The `stage1_input` field itself stays** -- the CLI uses it for its own purpose.
+
+**The gates are T-1, T-2, T-3 and T-5 through T-10.** **T-3 (the sparse-to-dense range) measured
+2.40 pooled over four repetitions** against a threshold of 1.8.
+**T-4 (semantic carry) was replaced.** Counting marker words cannot tell **translated** from
+**lost**: for poem 06 the prose said "it is night" and the DDL said "fill the background with
+black", and because the `night` family holds only the two tokens `night` and 夜, the gate scored
+that a zero. **A DDL that carries no words of meaning is the design, not a failure**
+(SPEC section 13.3, design principles 3 and 7). **The replacement measures the picture instead,
+as a controlled experiment, and moved to stage 0 of the follow-on contract** (I-118).
+
+**Acceptance closed one hole of its own.** **The prose stands in for the description at two read
+points** (`/api/paint` and `/api/interpret`). **Removing the substitution from the interpret one
+left all 2163 tests green**, so three assertions were added on that path as well: the prose
+arrives, the layer-off control still travels as before, and `stage1_input` no longer outranks
+the prose.
+
+**The frozen corpora are byte-identical** (`render-engine-21` 525, `ddl-engine-5` 33).
+**No corpus case passes through Stage 0.5 at all**, so this is a regression guard, not evidence
+that the change works.

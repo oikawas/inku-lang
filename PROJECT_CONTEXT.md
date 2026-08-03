@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.37 / Build 842**
+**Target version: v2.9.38 / Build 843**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -43,6 +43,7 @@ Variation belongs to renderer performance and explicit user operations.
 
 ```text
 instruction
+  -> Stage 0.5: sketch from life (optional; rewrites the description as prose naming things)
   -> Stage 1: interpretation
   -> normalized DDL (which may contain namespaced plugin words)
   -> declarative plugin expansion: deterministic writing-down to core DDL
@@ -124,6 +125,12 @@ Vocabulary changes go through the table and its golden tests.
 
 ### Pipeline layers
 
+- **Stage 0.5 (sketch from life)** — an optional layer that rewrites the description as plain prose
+naming things. Its granularity is chosen per draw from two values, `fine` (many short sentences,
+the default) and `coarse` (fewer, longer ones).
+**The prose stands in for the description at all five consumers**
+(Stage 1, the plugin expansion, Stage 1.5, Stage 2 and coerce).
+The description itself is kept for saving and display, and when the layer fails it goes to Stage 1 unchanged.
 - **Stage 1 (interpretation)** — detects the language of the instruction and produces normalized DDL.
 The prompt is assembled from the saijiki table and holds no fixed vocabulary string of its own.
 - **Plugin expansion** — writes a validated `.inku-plugin.md` down into core DDL deterministically,

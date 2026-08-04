@@ -203,20 +203,38 @@ def test_t3_interpret_accepts_a_labelled_description_that_keeps_its_body(auth, w
     assert r.status_code == 200, description
 
 
-def test_t3_the_guard_reads_both_the_raw_text_and_the_cut(auth, wired):
-    """2 条件であることの表明。片方だけを見る実装は、ここで裏返る。
+def test_t3_the_second_condition_is_redundant_today_and_says_why(auth, wired):
+    """**この表明は判別しない。** 実測を書き留めるためにある。
 
-    `req.description` の非空を見ない実装 (削り後だけを見る) は、空白だけの記述を
-    「番号と括弧だけ」と答えて 400 にする -- 作者が書いていない札を名指しする文言
-    になる。削り後を見ない実装 (生だけを見る) は `[note]` を通してしまう。
+    契約 §1 の禁止 4 は「`req.description` が非空なのに削り後が空」の 2 条件を求めた。
+    測ると **その 2 条件は現行の `pipeline_description` では等価** だった --
+    削り後が空になるのは span が切られたときだけで、span が切られる入力は必ず非空白
+    の文字を含むので、「削り後が空」は「生が非空」を含意する。1 条件へ落とす摂動は
+    32 件すべて緑のまま通る (2026-08-04 実測)。
+
+    それでも 2 条件を残すのは、**等価なのは今の `pipeline_description` の下だけ**
+    だから -- 札が無くても行ごとに strip する側へ変われば、1 条件の実装は空白だけの
+    記述に「番号と括弧だけ」と答えることになる。番人は削りの実装に依存しない。
     """
-    # Raw non-empty + cut empty -> refused.
+    from inku_server.description_labels import excluded_spans, pipeline_description
+
+    for blank in ("   ", "\n\n", "　"):
+        assert excluded_spans(blank) == [], blank
+        assert pipeline_description(blank) == blank, "札の無い文字列は削られず通り抜ける"
+
+    for labelled in LABEL_ONLY:
+        assert labelled.strip(), labelled
+        assert not pipeline_description(labelled), labelled
+
+
+def test_t3_the_guard_refuses_only_what_the_cut_empties(auth, wired):
+    """境界。札だけは 400、札のついた本文は 200。"""
     assert client.post("/api/paint", json=_paint_body("[note]"), headers=auth).status_code == 400
-    # Raw whitespace only -> the cut is empty too, but no label was written, so
-    # this is not the condition the message describes and it is not refused here.
-    assert client.post("/api/paint", json=_paint_body("   "), headers=auth).status_code == 200
-    # Raw non-empty + cut non-empty -> painted.
     assert client.post("/api/paint", json=_paint_body("[note] 水面に光"), headers=auth).status_code == 200
+    # A description of nothing but whitespace is not what this guard is about:
+    # it carries no label, the cut leaves it alone, and it is still painted.
+    # The blank-description hole belongs to min_length=1, not here.
+    assert client.post("/api/paint", json=_paint_body("   "), headers=auth).status_code == 200
 
 
 # --------------------------------------------------------------------- T-5 / T-6

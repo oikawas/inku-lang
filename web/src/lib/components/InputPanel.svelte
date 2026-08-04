@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import LabelHighlight from './LabelHighlight.svelte';
+	import { pipelineDescription } from '$lib/description-labels';
 	import Tooltip from './Tooltip.svelte';
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
@@ -200,7 +202,9 @@
 	]);
 
 	const singleInputStats = $derived.by(() => {
-		const source = input.trim();
+		// The guide is about the description, so the meter counts what the
+		// drawing will read: the author's numbering and comments are not it.
+		const source = pipelineDescription(input).trim();
 		const asciiMostly = source.length > 0 && /^[\x00-\x7F\s.,;:!?()"-]+$/.test(source);
 		const hasJapanese = /[\u3040-\u30ff\u3400-\u9fff]/.test(source);
 		const useWords = !hasJapanese && (asciiMostly || (!source && t().code === 'en'));
@@ -338,13 +342,18 @@
 				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
 			</Tooltip>
 		</div>
-		<textarea
-			bind:value={input}
-			rows="5"
-			spellcheck="false"
-			placeholder={t().inputPlaceholder}
-			class="input-ta"
-		></textarea>
+		<!-- The grey ranges are painted behind the textarea, which cannot colour
+		     its own text. -->
+		<div class="input-ta-wrap">
+			<LabelHighlight text={input} />
+			<textarea
+				bind:value={input}
+				rows="5"
+				spellcheck="false"
+				placeholder={t().inputPlaceholder}
+				class="input-ta"
+			></textarea>
+		</div>
 		<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.useWords ? t().inputMeterWords(singleInputStats.count, singleInputStats.guide) : t().inputMeterChars(singleInputStats.count, singleInputStats.guide)}</div>
 
 		{@render inputSettings()}
@@ -565,10 +574,19 @@
 		background: var(--border2);
 		flex-shrink: 0;
 	}
+	.input-ta-wrap {
+		position: relative;
+		display: flex;
+		/* The mirror is inset to this box, so the box has to be the textarea's. */
+		background: var(--panel);
+		border-radius: var(--r);
+	}
 	.input-ta {
 		width: 100%; padding: 9px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);
-		background: var(--panel); color: var(--fg);
+		background: transparent; color: var(--fg);
+		position: relative;
+		z-index: 1;
 		font-family: inherit; font-size: 13px; line-height: 1.65;
 		resize: vertical; outline: none;
 	}

@@ -651,7 +651,13 @@ class DefaultSvgRenderer : SvgRenderer {
                         val cx = if (center != null && center.length() >= 2) center.optDouble(0, ax) else ax
                         val cy = if (center != null && center.length() >= 2) center.optDouble(1, ay) else ay
                         val a = Math.toRadians(t * 360.0)
-                        val r = arr.optDouble("radius", 0.3)
+                        // The server reads a falsy radius -- absent, null or an explicit 0.0 --
+                        // as "unstated" and turns the ring at 0.3 (renderer.py:1861,
+                        // `r = arr.radius if arr.radius else 0.3`). optDouble would keep a
+                        // declared 0.0 and collapse every mark onto the centre, so the zero
+                        // is folded into the default here to match.
+                        val declaredRadius = arr.optDouble("radius", 0.0)
+                        val r = if (declaredRadius != 0.0) declaredRadius else 0.3
                         (cx + r * cos(a)) to (cy - r * sin(a))
                     }
                     else -> (margin + t * (1.0 - margin * 2.0)) to 0.5

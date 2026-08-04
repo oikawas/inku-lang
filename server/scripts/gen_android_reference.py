@@ -1760,6 +1760,12 @@ def arrangement_cases() -> dict[str, dict]:
     for anchor in G_ANCHORS:
         g(f"G-radial-nocenter-{anchor}", anchor, layout="radial", count=12)
     g("G-radial-center-edge", "edge", layout="radial", count=12, center=[0.3, 0.3])
+    # A stated radius of zero is falsy, and the server reads falsy as unstated:
+    # `r = arr.radius if arr.radius else 0.3`. A port that fetches the radius with
+    # a default instead keeps the zero and collapses the whole ring onto its
+    # centre. No other case states a radius at all, so without this one the two
+    # readings are indistinguishable and every fixture stays green either way.
+    g("G-radial-zero-radius-edge", "edge", layout="radial", count=12, radius=0)
     for anchor in G_ANCHORS:
         g(f"G-grid-{anchor}", anchor, layout="grid", count=16, rows=4, cols=4)
     g("G-scatter-dense-edge", "edge", density="high")

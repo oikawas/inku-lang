@@ -6171,6 +6171,106 @@
       ]
     },
     {
+      "case_id": "G-radial-zero-radius-edge",
+      "instruction": {
+        "primitive": "circle",
+        "note": null,
+        "from_": null,
+        "to": null,
+        "center": [
+          0.85,
+          0.85
+        ],
+        "radius": 0.03,
+        "sides": null,
+        "position": null,
+        "size": null,
+        "angle_start": null,
+        "angle_end": null,
+        "rotation": null,
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "carve_depth": null,
+        "color": "black",
+        "color_hint": null,
+        "variation": null,
+        "arrangement": {
+          "count": 12,
+          "layout": "radial",
+          "rows": null,
+          "cols": null,
+          "jitter": 0.12,
+          "path": "none",
+          "color_cycle": [],
+          "margin": 0.1,
+          "center": null,
+          "radius": 0.0,
+          "density": "none",
+          "cluster_count": null,
+          "fade": "none",
+          "preserve_space": false,
+          "rhythm_spacing": "none"
+        },
+        "at": null,
+        "relation": null,
+        "thinness": null,
+        "surface": null
+      },
+      "count": 12,
+      "anchors": [
+        [
+          0.98,
+          0.85
+        ],
+        [
+          0.957486865,
+          0.687807755
+        ],
+        [
+          0.89709522,
+          0.577110401
+        ],
+        [
+          0.782305549,
+          0.553053567
+        ],
+        [
+          0.62854178,
+          0.623275128
+        ],
+        [
+          0.537152108,
+          0.765480233
+        ],
+        [
+          0.537152108,
+          0.887001858
+        ],
+        [
+          0.62854178,
+          0.949257745
+        ],
+        [
+          0.782305549,
+          0.98
+        ],
+        [
+          0.89709522,
+          0.969468173
+        ],
+        [
+          0.957486865,
+          0.921006045
+        ],
+        [
+          0.98,
+          0.85
+        ]
+      ]
+    },
+    {
       "case_id": "G-grid-center",
       "instruction": {
         "primitive": "circle",

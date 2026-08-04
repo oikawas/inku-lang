@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import os
 import re
@@ -76,6 +77,15 @@ def _provider_failure_detail(operation: str, exc: BaseException | None) -> dict 
             }
         exc = exc.__cause__ or exc.__context__
     return None
+
+
+# A description that is nothing but the author's numbering and bracketed
+# comments leaves the drawing nothing to read: the cut in description_labels
+# empties it, and every layer below -- Stage 0.5 included -- would then invent
+# its subject from an empty string.  A stable sentinel, not a sentence: the web
+# turns it into the localized message the way it does for "render capacity is
+# full", so the wording stays authored in ja.ts.
+_LABEL_ONLY_DESCRIPTION = "description is only labels"
 
 
 def _stage_http_error(operation: str, status_code: int) -> HTTPException:
@@ -1427,6 +1437,11 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
     # 0.5 included -- and no client can read them.  req.description stays whole
     # for saving and display (see description_labels).
     description = pipeline_description(req.description)
+    # Two conditions, never one.  An empty req.description is already refused by
+    # min_length=1, and judging the cut alone would answer "only labels" to a
+    # text that carried no label at all.
+    if req.description.strip() and not description:
+        raise HTTPException(status_code=400, detail=_LABEL_ONLY_DESCRIPTION)
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     # Settled on the author's own words: Stage 0.5 writes in the language it is
@@ -1653,6 +1668,12 @@ def _paint_events(
     # 0.5 included -- and no client can read them.  req.description stays whole
     # for saving and display (see description_labels).
     description = pipeline_description(req.description)
+    # Two conditions, never one.  An empty req.description is already refused by
+    # min_length=1, and judging the cut alone would answer "only labels" to a
+    # text that carried no label at all.  This is the last gate for a client
+    # that has no editor of its own: the CLI, Android, anything written later.
+    if req.description.strip() and not description:
+        raise HTTPException(status_code=400, detail=_LABEL_ONLY_DESCRIPTION)
     t0 = time.perf_counter()
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
@@ -1987,12 +2008,20 @@ def api_paint_stream(
 
     The response is already committed once the first event is written, so a
     failure after that point is reported as an in-band ``error`` event instead
-    of an HTTP status.
+    of an HTTP status.  Before that point nothing is committed, so the first
+    event is pulled here and a refusal reaches the client as the status it is
+    -- the guard on a label-only description raises before any event, and this
+    route answers 400 like the other two rather than 200 carrying an error.
     """
+    events = _paint_events(req, idempotency_key, actor)
+    try:
+        first = next(events)
+    except StopIteration:
+        raise _unexpected_http_error("paint", 500) from None
 
     def lines() -> Iterator[str]:
         try:
-            for event in _paint_events(req, idempotency_key, actor):
+            for event in itertools.chain([first], events):
                 if event["event"] == "done":
                     response = event["response"]
                     payload = {

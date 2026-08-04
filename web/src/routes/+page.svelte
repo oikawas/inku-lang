@@ -6,6 +6,7 @@
 
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import { pipelineDescription } from '$lib/description-labels';
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import AppRail from '$lib/components/AppRail.svelte';
@@ -782,6 +783,7 @@
 	 */
 	function describeApiError(detail: unknown, status: number): string {
 		if (detail === 'render capacity is full') return t().errorRenderBusy;
+		if (detail === 'description is only labels') return t().errorDescriptionOnlyLabels;
 		if (typeof detail === 'string' && detail) return detail;
 		if (detail && typeof detail === 'object' && 'code' in detail) {
 			const failure = detail as ProviderFailure;
@@ -2599,14 +2601,19 @@
 	// ── Batch derived ────────────────────────────────────────
 	const batchLines    = $derived(batchInput.split('\n'));
 	const lineNumbersText = $derived(batchLines.map((_, i) => String(i + 1)).join('\n'));
-	const batchNonEmpty = $derived(batchLines.filter((l) => l.trim()).length);
+	// Counted the way the server reads them: a line that is only its numbering
+	// and a bracketed note has nothing to draw, and would come back a 400.
+	const batchNonEmpty = $derived(batchLines.filter((l) => pipelineDescription(l).trim()).length);
 	const batchRunning = $derived(activeRunMode === 'batch' && loading);
 	const singleRunning = $derived((activeRunMode === 'single' && loading) || reloading);
 	const demoRunning = $derived(activeRunMode === 'demo' && loading);
 	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
 	const ddlEditedAfterGeneration = $derived(inputMode === 'single' && ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline);
+	// The gate reads what the drawing reads.  The meter already cut the text
+	// (InputPanel), so a description greyed out end to end must not be sendable:
+	// the same rule, moved to the door instead of a second rule written here.
 	const canSubmit     = $derived(
-		inputMode === 'single' ? !!input.trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
+		inputMode === 'single' ? !!pipelineDescription(input).trim() : inputMode === 'batch' ? batchNonEmpty > 0 : false
 	);
 	const currentInstructionText = $derived.by(() => {
 		if (displayedHistoryItem?.input) return displayedHistoryItem.input;
@@ -3281,9 +3288,12 @@ if (unreadWords.length > 0) {
 				const batchCanvasAspectId = effectiveCanvasAspectId();
 				const batchCatalogId = colorCatalogSettings.selected;
 				const batchRunId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`;
+				// The whole line is sent -- the server keeps the author's numbering
+				// for the record and cuts it for the pipeline -- but a line with
+				// nothing left after the cut is not a line to paint.
 				const lines = batchLines
 					.map((line, index) => ({ line: index + 1, input: line.trim() }))
-					.filter((item) => item.input);
+					.filter((item) => pipelineDescription(item.input).trim());
 				// The report's `total` is how many lines the batch had. batchTotal drives
 				// the progress readouts and is re-pointed at each retry round, so the
 				// report keeps its own copy.

@@ -525,7 +525,7 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 			stage2_model: item.stage2Model ?? null,
 			tokens_in: (item.tokensIn ?? 0) + (item.tokensInStage2 ?? 0) || null,
 			tokens_out: (item.tokensOut ?? 0) + (item.tokensOutStage2 ?? 0) || null,
-			catalog_id: item.renderColorCatalogId ?? colorCatalogSettings.selected,
+			catalog_id: item.renderColorCatalogId ?? colorCatalogSettings.effectiveId,
 			render_build_number: item.renderBuildNumber ?? null,
 			render_color_profile: item.renderColorProfile ?? null,
 			render_engine_id: item.renderEngineId ?? null,

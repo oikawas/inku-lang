@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from ... import db as _db
@@ -66,9 +65,6 @@ class DemoSettingsBody(BaseModel):
     seed_phrase: str = Field(default="日本の四季を感じさせる文章を40語以内で生成", min_length=1, max_length=1000)
     interval_seconds: int = Field(default=30, ge=1, le=3600)
     timeout_seconds: int = Field(default=3600, ge=60, le=86400)
-    # The demo toggle is two-valued: the draw it used to offer is gone, and
-    # "random" stays a refinement-only mode of /api/paint.
-    catalog_mode: Literal["fixed", "auto"] = "fixed"
 
 
 @router.get("/api/auth/me", response_model=UserAccountItem)

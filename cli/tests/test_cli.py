@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -1620,11 +1621,32 @@ def _readme_usage_block(command: str) -> str:
 
 @pytest.mark.parametrize("command", ["paint", "batch"])
 def test_the_manual_lists_the_layer_flags(command):
-    """The manual is part of the feature: an undocumented flag is an unused flag."""
+    """The manual is part of the feature: an undocumented flag is an unused flag.
+
+    Looking for the flag anywhere in the block is not enough. The usage synopsis
+    at the top of the block names every flag as `[--wild]`, so deleting the entry
+    that says what `--wild` DOES leaves the bare name behind and a whole-block
+    search stays green. Assert on the options entry, and on what it says.
+    """
     block = _readme_usage_block(command)
     assert "usage: inku-cli" in block
+    synopsis = " ".join(block[:block.index("\noptions:")].split())
+    flat = " ".join(block.split())
     for argv, key, _ in SENDER_PARITY_FLAGS:
-        assert argv[0] in block, f"cli/README.md の {command} usage に {argv[0]} が無い ({key})"
+        flag = argv[0]
+        assert re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", synopsis), \
+            f"cli/README.md の {command} usage の一行目の並びに {flag} が無い ({key})"
+        assert re.search(rf"^  {re.escape(flag)}\b", block, re.M), \
+            f"cli/README.md の {command} usage の options に {flag} の項目が無い ({key})"
+        action = next(
+            item for item in _subparser(command)._actions
+            if flag in (item.option_strings or [])
+        )
+        # The first words of the live help, so a manual that keeps the name but
+        # describes an older behaviour is a failure rather than a pass.
+        opening = " ".join((action.help or "").split()[:6])
+        assert opening and opening in flat, \
+            f"cli/README.md の {command} usage の {flag} の説明が help と食い違っている"
 
 
 def test_the_sketch_help_says_whose_default_it_is():
@@ -1666,3 +1688,27 @@ def test_sketch_fields_reach_the_artifact_summary():
     assert composed["sketch_text"] is None
     assert composed["sketch_grain"] is None
     assert composed["sketch_fallback_used"] is False
+
+
+def test_the_saved_artifact_names_the_sketch_fields_even_when_the_server_omits_them(tmp_path):
+    """Measured against the live server on 2026-08-04, not imagined.
+
+    `/api/paint` leaves null fields out of the response body, so a run WITHOUT
+    --sketch came back with no `sketch_text` key at all. Writing the response
+    through unchanged gave the two runs of one bench different key sets, and left
+    "Stage 0.5 did not run here" indistinguishable from an older CLI, an older
+    server, or a truncated file.
+    """
+    from_a_run_without_sketch = {"svg": "<svg />", "render_hash_short": "8F21"}
+    cli._write_paint_outputs(from_a_run_without_sketch, out_dir=tmp_path, prefix="quiet", png=False)
+    saved = json.loads((tmp_path / "quiet.json").read_text(encoding="utf-8"))
+    assert saved["sketch_text"] is None
+    assert saved["sketch_grain"] is None
+    assert saved["sketch_fallback_used"] is False
+
+    # What the server did say is kept as it said it.
+    from_a_run_with_sketch = {"svg": "<svg />", "sketch_text": "葉がある。", "sketch_grain": "fine"}
+    cli._write_paint_outputs(from_a_run_with_sketch, out_dir=tmp_path, prefix="sketched", png=False)
+    spoken = json.loads((tmp_path / "sketched.json").read_text(encoding="utf-8"))
+    assert spoken["sketch_text"] == "葉がある。"
+    assert spoken["sketch_grain"] == "fine"

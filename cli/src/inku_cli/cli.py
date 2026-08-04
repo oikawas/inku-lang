@@ -586,7 +586,14 @@ def _write_paint_outputs(
     paths: dict[str, Any] = {}
     json_path = out_dir / f"{prefix}.json"
     svg_path = out_dir / f"{prefix}.svg"
-    json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # The response drops null fields on the wire, so a drawing made without
+    # --sketch arrives with no `sketch_text` key at all rather than a null one.
+    # Written straight through, the artifacts of two runs of the same bench then
+    # have different key sets, and "was Stage 0.5 asked for here?" can only be
+    # answered by a key that is absent -- which is also what an older CLI, an
+    # older server, or a truncated file looks like. Say it explicitly instead.
+    record = {**result, **_sketch_response_summary(result)}
+    json_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     svg_path.write_text(str(result["svg"]), encoding="utf-8")
     paths["json"] = str(json_path)
     paths["svg"] = str(svg_path)

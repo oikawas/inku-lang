@@ -1,6 +1,7 @@
 package app.inku.mobile.render
 
 import app.inku.mobile.data.model.CanvasAspects
+import app.inku.mobile.data.model.CanvasSize
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.RenderRequest
@@ -16,6 +17,8 @@ import org.json.JSONObject
 
 internal const val FILL_DAB_SAMPLES = 5
 internal const val FILL_DAB_MIN_TRAVEL = 0.90
+internal const val FRAME_LO = 0.02
+internal const val FRAME_HI = 0.98
 
 class DefaultSvgRenderer : SvgRenderer {
     override fun render(request: RenderRequest): RenderResult {
@@ -53,7 +56,7 @@ class DefaultSvgRenderer : SvgRenderer {
             val colorKey = instruction.optString("color", "black")
             val weight = instruction.optString("weight", "pen")
             val insId = "instruction_${"%03d".format(i)}_${primitive}_${colorKey}_${weight}"
-            val expanded = expandArrangement(instruction)
+            val expanded = expandArrangement(instruction, renderSeed, canvas)
             val insSb = StringBuilder()
             for ((index, mark) in expanded.withIndex()) {
                 val markId = "mark_${"%03d".format(i)}_${"%03d".format(index)}_${primitive}"
@@ -446,8 +449,101 @@ class DefaultSvgRenderer : SvgRenderer {
         return if (blurId != null) """<g filter="url(#$blurId)">$rendered</g>""" else rendered
     }
 
-    private fun expandArrangement(ins: JSONObject): List<JSONObject> {
+    private fun quantizeValue(value: Double): Double {
+        return kotlin.math.round(value * 1_000_000_000.0) / 1_000_000_000.0
+    }
 
+    private fun quantizeJsonObject(obj: JSONObject): JSONObject {
+        val res = JSONObject()
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val v = obj.opt(key)
+            when (v) {
+                is Double -> res.put(key, quantizeValue(v))
+                is Float -> res.put(key, quantizeValue(v.toDouble()))
+                is JSONObject -> res.put(key, quantizeJsonObject(v))
+                is JSONArray -> res.put(key, quantizeJsonArray(v))
+                else -> res.put(key, v)
+            }
+        }
+        return res
+    }
+
+    private fun quantizeJsonArray(arr: JSONArray): JSONArray {
+        val res = JSONArray()
+        for (i in 0 until arr.length()) {
+            val v = arr.opt(i)
+            when (v) {
+                is Double -> res.put(quantizeValue(v))
+                is Float -> res.put(quantizeValue(v.toDouble()))
+                is JSONObject -> res.put(quantizeJsonObject(v))
+                is JSONArray -> res.put(quantizeJsonArray(v))
+                else -> res.put(v)
+            }
+        }
+        return res
+    }
+
+    private fun anchor(ins: JSONObject): Pair<Double, Double> {
+        val p = ins.optString("primitive", "line")
+        val from = ins.optJSONArray("from_") ?: ins.optJSONArray("from")
+        val to = ins.optJSONArray("to")
+        if (p == "line" && from != null && to != null) {
+            return ((from.optDouble(0, 0.5) + to.optDouble(0, 0.5)) / 2.0) to ((from.optDouble(1, 0.0) + to.optDouble(1, 1.0)) / 2.0)
+        }
+        val center = ins.optJSONArray("center")
+        if (p in setOf("circle", "ellipse", "arc", "polygon", "cloudform") && center != null) {
+            return center.optDouble(0, 0.5) to center.optDouble(1, 0.5)
+        }
+        val position = ins.optJSONArray("position")
+        val size = ins.optJSONArray("size")
+        if (p in setOf("square", "triangle") && position != null && size != null) {
+            return (position.optDouble(0, 0.0) + size.optDouble(0, 0.0) / 2.0) to (position.optDouble(1, 0.0) + size.optDouble(1, 0.0) / 2.0)
+        }
+        return 0.5 to 0.5
+    }
+
+    private fun fitAxisScales(anchorVal: Double, offsets: List<Double>): Pair<Double, Double> {
+        val positive = offsets.filter { it > 0.0 }
+        val negative = offsets.filter { it < 0.0 }
+        val forward = if (positive.isNotEmpty()) min(1.0, (FRAME_HI - anchorVal) / positive.maxOrNull()!!) else 1.0
+        val backward = if (negative.isNotEmpty()) min(1.0, (FRAME_LO - anchorVal) / negative.minOrNull()!!) else 1.0
+        return max(forward, 0.0) to max(backward, 0.0)
+    }
+
+    private fun fitGroupToAnchor(ins: JSONObject, expanded: List<JSONObject>): List<JSONObject> {
+        if (expanded.isEmpty()) return expanded
+        val (ax, ay) = anchor(ins)
+        val points = expanded.map { anchor(it) }
+        val cx = points.sumOf { it.first } / points.size.toDouble()
+        val cy = points.sumOf { it.second } / points.size.toDouble()
+        val offsets = points.map { (px, py) -> (px - cx) to (py - cy) }
+        val (xForward, xBackward) = fitAxisScales(ax, offsets.map { it.first })
+        val (yForward, yBackward) = fitAxisScales(ay, offsets.map { it.second })
+        return expanded.zip(offsets).map { (item, offset) ->
+            val (dx, dy) = offset
+            val tx = ax + dx * (if (dx > 0.0) xForward else xBackward)
+            val ty = ay + dy * (if (dy > 0.0) yForward else yBackward)
+            shiftTo(item, tx, ty)
+        }
+    }
+
+    private fun expandArrangement(ins: JSONObject, renderSeed: Long? = null, canvas: CanvasSize? = null): List<JSONObject> {
+        val arr = ins.optJSONObject("arrangement") ?: return listOf(ins)
+        val layout = arr.optString("layout", "horizontal")
+        val expanded = expandArrangementLayout(ins, renderSeed, canvas)
+        if (expanded.isEmpty()) return expanded
+        val hasAt = ins.has("at") && !ins.isNull("at")
+        val fitted = if (layout == "grid" && hasAt) {
+            expanded
+        } else {
+            fitGroupToAnchor(ins, expanded)
+        }
+        return fitted.map { quantizeJsonObject(it) }
+    }
+
+    private fun expandArrangementLayout(ins: JSONObject, renderSeed: Long? = null, canvas: CanvasSize? = null): List<JSONObject> {
         val arr = ins.optJSONObject("arrangement") ?: return listOf(ins)
         val count = arr.optInt("count", 1).coerceIn(1, 1000)
         val layout = arr.optString("layout", "horizontal")
@@ -463,7 +559,72 @@ class DefaultSvgRenderer : SvgRenderer {
         val clusterCount = arr.optInt("cluster_count", 0)
         val rhythmSpacing = arr.optString("rhythm_spacing", "none")
         val base = prepared
-        val seed = seedForInstruction(ins)
+        val seed = seedForInstruction(ins, renderSeed)
+
+        if (layout == "grid") {
+            val (x0, y0, x1, y1) = if (ins.has("at") && !ins.isNull("at")) {
+                val atObj = ins.getJSONObject("at")
+                val reg = atObj.optJSONArray("region")
+                if (reg != null && reg.length() >= 4) {
+                    listOf(reg.getDouble(0), reg.getDouble(1), reg.getDouble(2), reg.getDouble(3))
+                } else {
+                    listOf(margin, margin, 1.0 - margin, 1.0 - margin)
+                }
+            } else {
+                listOf(margin, margin, 1.0 - margin, 1.0 - margin)
+            }
+            val regionWidth = max(x1 - x0, 1e-9)
+            val regionHeight = max(y1 - y0, 1e-9)
+
+            var rows = if (arr.has("rows") && !arr.isNull("rows")) arr.getInt("rows") else null
+            var cols = if (arr.has("cols") && !arr.isNull("cols")) arr.getInt("cols") else null
+
+            if (rows != null && cols != null) {
+                // keep
+            } else if (rows != null) {
+                cols = minOf(64, maxOf(1, kotlin.math.ceil(count.toDouble() / rows).toInt()))
+            } else if (cols != null) {
+                rows = minOf(64, maxOf(1, kotlin.math.ceil(count.toDouble() / cols).toInt()))
+            } else {
+                var physicalAspect = regionWidth / regionHeight
+                if (canvas != null) {
+                    physicalAspect *= canvas.width.toDouble() / canvas.height.toDouble()
+                }
+                cols = minOf(64, maxOf(1, kotlin.math.ceil(kotlin.math.sqrt(count.toDouble() * physicalAspect)).toInt()))
+                rows = minOf(64, maxOf(1, kotlin.math.ceil(count.toDouble() / cols).toInt()))
+            }
+            val rCount = rows
+            val cCount = cols
+            val cellWidth = regionWidth / cCount.toDouble()
+            val cellHeight = regionHeight / rCount.toDouble()
+            val jitter = arr.optDouble("jitter", 0.12)
+
+            val seedULong = seed.toULongOrNull() ?: 0UL
+            val rowSeed = (seedULong xor 0xA53CUL).toString()
+            val colSeed = (seedULong xor 0xC3A5UL).toString()
+
+            val targets = mutableListOf<Pair<Double, Double>>()
+            for (r in 0 until rCount) {
+                val rowT = rhythmT(r, rCount, rowSeed, rhythmSpacing)
+                val cy = y0 + (0.5 + rowT * (rCount - 1)) * cellHeight
+                for (c in 0 until cCount) {
+                    val colT = rhythmT(c, cCount, colSeed, rhythmSpacing)
+                    val cx = x0 + (0.5 + colT * (cCount - 1)) * cellWidth
+                    val dx = (hash01(r * cCount + c, seed, "grid-jitter-x") - 0.5) * jitter * cellWidth
+                    val dy = (hash01(r * cCount + c, seed, "grid-jitter-y") - 0.5) * jitter * cellHeight
+                    targets.add(
+                        minOf(x1, maxOf(x0, cx + dx)) to minOf(y1, maxOf(y0, cy + dy))
+                    )
+                }
+            }
+            return targets.mapIndexed { i, (tx, ty) ->
+                val shifted = shiftTo(base, tx, ty)
+                shifted.remove("at")
+                shifted.remove("relation")
+                applyColorCycle(shifted, arr.optJSONArray("color_cycle"), i)
+            }
+        }
+
         return (0 until count).map { i ->
             val t = rhythmT(i, count, seed, rhythmSpacing)
             val target = if (clusterCount > 0 && layout in setOf("scatter", "horizontal", "vertical")) {
@@ -485,11 +646,13 @@ class DefaultSvgRenderer : SvgRenderer {
                     "vertical" -> margin to (margin + t * (1.0 - margin * 2.0))
                     "scatter" -> scatterPosition(i, margin, seed)
                     "radial" -> {
+                        val (ax, ay) = anchor(prepared)
                         val center = arr.optJSONArray("center")
-                        val cx = center?.optDouble(0, 0.5) ?: 0.5
-                        val cy = center?.optDouble(1, 0.5) ?: 0.5
+                        val cx = if (center != null && center.length() >= 2) center.optDouble(0, ax) else ax
+                        val cy = if (center != null && center.length() >= 2) center.optDouble(1, ay) else ay
                         val a = Math.toRadians(t * 360.0)
-                        (cx + cos(a) * arr.optDouble("radius", 0.3)) to (cy - sin(a) * arr.optDouble("radius", 0.3))
+                        val r = arr.optDouble("radius", 0.3)
+                        (cx + r * cos(a)) to (cy - r * sin(a))
                     }
                     else -> (margin + t * (1.0 - margin * 2.0)) to 0.5
                 }
@@ -668,7 +831,11 @@ class DefaultSvgRenderer : SvgRenderer {
         val ty = sin(axisAngle)
         val nx = -ty
         val ny = tx
-        val localT = rhythmT(localIndex, localTotal, seed, rhythmSpacing)
+        val localT = if (rhythmSpacing != "none" && localTotal > 1) {
+            rhythmT(localIndex, localTotal, seed, rhythmSpacing)
+        } else {
+            (localIndex + 0.5) / localTotal.toDouble()
+        }
         val centered = (localT - 0.5) * 2.0
         val radius = densityRadius(density, preserveSpace)
         val longSpan = radius * (1.45 + hash01(clusterIndex, seed, "cluster-long") * 0.95)
@@ -1470,8 +1637,8 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"arrangement\":"); append(arrangementJson(ins.optJSONObject("arrangement")))
             append(",\"at\":null")
             append(",\"relation\":null")
-            append(",\"surface\":"); append(dumpSurfaceJson(ins.optJSONObject("surface")))
             append(",\"thinness\":"); append(stringOrNull(ins, "thinness"))
+            append(",\"surface\":"); append(dumpSurfaceJson(ins.optJSONObject("surface")))
             append("}")
         }
         val key = "$dumpJson:surface:$insIdx:$markIdx:${renderSeed ?: "None"}"

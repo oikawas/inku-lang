@@ -83,11 +83,20 @@ class DescriptionPropagationCutTest {
      * to be the description.
      */
     @Test
-    fun `a background clause below the first line is read`() {
-        val ddl = "地: 生成りの紙、細かい紙目。\n背景を黒で塗りつぶす。白い小さな楕円を散らす。"
-        val background = backgroundOf(ddl, "静かな水面がある。")
+    fun `a surface word below the first line is read`() {
+        val ddl = "地: 生成りの紙、細かい紙目。\n夜空に白い細い弧を静かに散らす。"
+        val background = backgroundOf(ddl, "夜である。静かな気配がある。")
 
         assertEquals("black", background)
+    }
+
+    /** Control for the case above: the same two lines without the surface word. */
+    @Test
+    fun `a second line with no surface word is still governed`() {
+        val ddl = "地: 生成りの紙、細かい紙目。\n静かに白い細い弧を散らす。"
+        val background = backgroundOf(ddl, "夜である。静かな気配がある。")
+
+        assertEquals("white", background)
     }
 
     /**

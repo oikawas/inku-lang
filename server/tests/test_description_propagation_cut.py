@@ -199,19 +199,26 @@ def test_t2_the_user_message_the_provider_receives_is_the_ddl(monkeypatch, wired
 
 MULTILINE_DDL = (
     "地: 生成りの紙、細かい紙目。\n"
-    "背景を黒で塗りつぶす。白い右下がりの小さな楕円を百三十七個を散らす。"
+    "夜空に白い小さな楕円を静かに散らす。"
 )
 
 
-def test_t3_a_background_clause_on_the_second_line_is_read():
+def test_t3_a_surface_word_on_the_second_line_is_read():
     """13.6% of production works have a multi-line expanded_ddl. Reading only
     the first line -- which was the original description before the cut -- makes
-    the governor blind to everything the DDL wrote below it."""
+    the governor blind to everything the DDL wrote below it.
+
+    The surface word, not a fill clause: `_EXPLICIT_BACKGROUND_CLAUSE` is
+    searched against the whole ddl either way, so a clause on the second line
+    is found even by a first-line read and gates nothing. What passes through
+    `_source_context` is the marker path, and this case is the one that turns
+    red when the first-line read comes back -- measured, not assumed.
+    """
     score = Score.model_validate(
         {
             "background": "black",
             "instructions": [
-                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.05, "color": "white"}
+                {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.05, 0.03], "color": "white"}
             ],
         }
     )
@@ -219,17 +226,18 @@ def test_t3_a_background_clause_on_the_second_line_is_read():
     assert coerce_score(score, ddl=MULTILINE_DDL).background == "black"
 
 
-def test_t3_a_second_line_with_no_clause_is_still_governed():
-    """Control: the whole-string read is not "keep every background"."""
+def test_t3_a_second_line_with_no_surface_word_is_still_governed():
+    """Control: the whole-string read is not "keep every background". Same two
+    lines, with the surface word taken out."""
     score = Score.model_validate(
         {
             "background": "black",
             "instructions": [
-                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.05, "color": "white"}
+                {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.05, 0.03], "color": "white"}
             ],
         }
     )
-    ddl = "地: 生成りの紙、細かい紙目。\n静かな気配。白い小さな楕円を散らす。"
+    ddl = "地: 生成りの紙、細かい紙目。\n静かに白い小さな楕円を散らす。"
 
     assert coerce_score(score, ddl=ddl).background == "white"
 

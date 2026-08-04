@@ -65,6 +65,9 @@ export type HistoryItem = {
 	// 写生 (Stage 0.5, v2.10). Absent on every work made before the layer.
 	sketch_text?: string | null;
 	sketch_grain?: string | null;
+	// What the layer did. Absent means the work predates the record, which is a
+	// different thing from 'off'.
+	sketch_state?: string | null;
 	seed_text?: string | null;
 	trashed?: boolean;
 	starred?: boolean;

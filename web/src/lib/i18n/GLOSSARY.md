@@ -61,6 +61,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 写生（Stage 0.5） | **Sketch from life** | 名詞句。**短縮形 `Sketch` を単独で使わない**（2026-08-03 作者裁定 D-1）。英語版 Stage 1 プロンプトが `sketch` を「淡い鉛筆の筆致」という weight の語に使っているため、単独だと一語二義になる | ~~Sketch~~（単独）、~~sketching~~, ~~drawing from life~~ |
 | 区切りの大きさ | **grain** | 名詞。写生の 3 状態を選ぶ操作子の見出し語 | ~~granularity~~（工学的）、~~segmentation~~ |
 | 細かく区切る／大きく区切る | **Fine** / **Coarse** | 形容詞。**grain の値としてのみ**使う。揺らぎの振幅の `fine` / `broad` とは別の軸で、`Grain:` の直下にしか出さない | ~~Small / Large~~（量に読める） |
+| （推奨しない） | **(not recommended)** | 括弧付きの付記。**メニューの選択肢の隣にだけ出す**（札そのものには足さない。過去の作品の記録に付くと評価になる） | ~~deprecated~~（廃止に読める）、~~discouraged~~, ~~legacy~~ |
 | 歳時記 | **Saijiki** | 固有名詞・大文字 | ~~almanac~~ 単独 |
 | 詞書 | **headnote** | 名詞。**語彙ダイアログの行は v2.9.15 で消えたので "kotobagaki" の注記は許さない** | ~~caption~~, ~~Kotobagaki~~（ラベルとして） |
 | 奥書 | **colophon** | 名詞。**CLI サブコマンドと API パスも `colophon`**（§6 の例外・v2.8.0） | ~~Okugaki~~（ローマ字残しは不採用） |

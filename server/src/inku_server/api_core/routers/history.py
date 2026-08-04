@@ -11,6 +11,7 @@ from ...feature_analysis import composition_distance
 from ...coerce import coerce_score
 from ...ddl_expander import FOCUS_IDS
 from ...schema import Score
+from ...sketch import SketchDetail, normalize_sketch_grain, sketch_state_of
 from ... import db as _db
 from ..common import _unexpected_http_error
 from ..deps import _current_user
@@ -152,6 +153,26 @@ def api_history_svg(
     return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
 
 
+def _derived_sketch_state(body: HistoryPostBody) -> str:
+    """Name the state for a client that saved a drawing without naming one.
+
+    Read off the same two fields the row already carries, through the one
+    derivation function, so this writer cannot mean something different by
+    "off" than the paint route does.
+    """
+    prose = (body.sketch_text or "").strip()
+    detail = (
+        SketchDetail(text=prose, grain=normalize_sketch_grain(body.sketch_grain))
+        if prose
+        else None
+    )
+    return sketch_state_of(
+        detail,
+        requested=False,
+        has_description=bool((body.input or "").strip()),
+    )
+
+
 @router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_post(
     body: HistoryPostBody,
@@ -220,6 +241,11 @@ def api_history_post(
         idempotency_key=idempotency_key,
         sketch_text=body.sketch_text,
         sketch_grain=body.sketch_grain,
+        # The client knows its own path and may name the state (the field is
+        # pattern-checked, so an unknown value is already a 422). A client that
+        # says nothing still gets a state: leaving NULL here would record every
+        # work this endpoint saves as older than the column.
+        sketch_state=body.sketch_state or _derived_sketch_state(body),
     )
     if body.count_generation and not item_dict.get("_idempotent_replay"):
         if _db.increment_user_generation_count(actor["id"]) is None:

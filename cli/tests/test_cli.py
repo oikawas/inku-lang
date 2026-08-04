@@ -1663,24 +1663,29 @@ def test_the_sketch_help_says_whose_default_it_is():
 def test_sketch_fields_reach_the_artifact_summary():
     """Stage 0.5 is the only layer whose output is prose, and prose is not in the SVG.
 
-    Without carrying these three, a bench run through --sketch keeps the drawing
-    and loses the sentence the later stages actually read.
+    Without carrying these, a bench run through --sketch keeps the drawing and
+    loses the sentence the later stages actually read. sketch_state is the
+    fourth: it says which of the silences a missing prose is.
     """
     summary = cli._sketch_response_summary({
         "sketch_text": "黒い線が一本、紙の左から右へ走る。",
         "sketch_grain": "fine",
         "sketch_fallback_used": False,
+        "sketch_state": "fine",
     })
     assert summary == {
         "sketch_text": "黒い線が一本、紙の左から右へ走る。",
         "sketch_grain": "fine",
         "sketch_fallback_used": False,
+        "sketch_state": "fine",
     }
 
     # A compose (DDL-mode) result never runs Stage 0.5; the keys are still present
-    # so a reader does not have to know which route wrote the artifact.
+    # so a reader does not have to know which route wrote the artifact. The state
+    # travels from the response, because "the layer did not apply here" and "the
+    # layer was refused" are different facts about the drawing.
     composed = cli._compose_response_as_paint_result(
-        {"svg": "<svg />", "score": {}},
+        {"svg": "<svg />", "score": {}, "sketch_state": "not_applicable"},
         ddl="白い背景に黒い線を一本引く。",
         input_text="線",
         stage2_model="s2",
@@ -1688,6 +1693,48 @@ def test_sketch_fields_reach_the_artifact_summary():
     assert composed["sketch_text"] is None
     assert composed["sketch_grain"] is None
     assert composed["sketch_fallback_used"] is False
+    assert composed["sketch_state"] == "not_applicable"
+
+
+def test_the_cli_history_save_carries_what_the_layer_did():
+    """The CLI is a sender to POST /api/history, and a sender that says nothing
+    about the layer has its works recorded as older than the column."""
+    args = argparse.Namespace(
+        history_input=None, canvas_aspect=None, save_artifacts=None, save_history=True
+    )
+    payload = cli._history_payload_from_result(
+        args,
+        {
+            "score": {},
+            "svg": "<svg />",
+            "sketch_text": "円がある。円は黒い。",
+            "sketch_grain": "coarse",
+            "sketch_state": "coarse",
+        },
+        input_text="円",
+        ddl="円を置く。",
+        stage1_model=None,
+        stage2_model="s2",
+        color_catalog="default",
+        at=1,
+    )
+    assert payload["sketch_text"] == "円がある。円は黒い。"
+    assert payload["sketch_grain"] == "coarse"
+    assert payload["sketch_state"] == "coarse"
+
+    # Nothing to say is said by saying nothing: the key is dropped rather than
+    # sent as null, and the server derives the state from what the row carries.
+    quiet = cli._history_payload_from_result(
+        args,
+        {"score": {}, "svg": "<svg />"},
+        input_text="円",
+        ddl="円を置く。",
+        stage1_model=None,
+        stage2_model="s2",
+        color_catalog="default",
+        at=1,
+    )
+    assert "sketch_state" not in quiet
 
 
 def test_the_saved_artifact_names_the_sketch_fields_even_when_the_server_omits_them(tmp_path):

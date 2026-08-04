@@ -484,6 +484,9 @@ def _sketch_response_summary(result: dict[str, Any]) -> dict[str, Any]:
         "sketch_text": result.get("sketch_text"),
         "sketch_grain": result.get("sketch_grain"),
         "sketch_fallback_used": result.get("sketch_fallback_used", False),
+        # What the history row records for this drawing. Without it a bench run
+        # cannot tell a work the layer skipped from one it tried and lost.
+        "sketch_state": result.get("sketch_state"),
     }
 
 def _model_summary(
@@ -2043,6 +2046,12 @@ def _history_payload_from_result(
         "render_canvas_aspect_id": result.get("render_canvas_aspect_id"),
         "render_canvas_aspect_ratio": result.get("render_canvas_aspect_ratio"),
         "canvas_aspect": getattr(args, "canvas_aspect", None),
+        # The CLI is a sender to /api/history too, and it was dropping all three:
+        # a work it saved recorded nothing about the layer, and the server has to
+        # read "no state" as "drawn before the column existed".
+        "sketch_text": result.get("sketch_text"),
+        "sketch_grain": result.get("sketch_grain"),
+        "sketch_state": result.get("sketch_state"),
         "save_artifacts": args.save_artifacts if args.save_artifacts is not None else args.save_history,
         "count_generation": True,
     }

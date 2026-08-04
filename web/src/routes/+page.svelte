@@ -14,7 +14,7 @@
 	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import TenkeiSelect from '$lib/components/TenkeiSelect.svelte';
-	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, sketchGrainOf, sketchModeLabel, sketchModeOf, type SketchMode } from '$lib/sketch';
+	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
 	import { submitDerivationKind as submitDerivationKindOf } from '$lib/derivation';
 	import { DEFAULT_TENKEI, normalizeTenkei, type TenkeiLevel } from '$lib/tenkei';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
@@ -130,6 +130,7 @@
 		sketch_text?: string | null;
 		sketch_grain?: string | null;
 		sketch_fallback_used?: boolean;
+		sketch_state?: string | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -402,6 +403,10 @@
 	let sketchSource = $state<string | null>(null);
 	let sketchDraft = $state('');
 	let sketchEditing = $state(false);
+	// What the record says the layer did for the work on screen. `null` is a work
+	// whose record is absent -- drawn before the column existed -- and the note
+	// tells that apart from 'off', which is a choice the author made.
+	let sketchState = $state<SketchState | null>(null);
 
 	/** The prose to send for this description, or null to let the layer write it.
 	 *  Used by the paths that re-run one stage over a description already on
@@ -426,13 +431,25 @@
 	/** Show the prose a run or a saved work was painted from, and select the
 	 *  grain it used so a redraw starts from the same place. A work with no
 	 *  prose (painted with the layer off, or made before it existed) turns the
-	 *  control off rather than silently painting it at the default grain. */
-	function adoptSketch(text: string | null, grain: unknown, source: string | null = null): void {
+	 *  control off rather than silently painting it at the default grain.
+	 *
+	 *  The control still lands on 'off' for every work with no prose -- what the
+	 *  author is going to draw next is a separate question from what the work on
+	 *  screen was drawn through. The state is what keeps the two apart: it is
+	 *  carried whole, so the note can say "drawn without the layer" and "drawn
+	 *  before the layer was recorded" as the different things they are. */
+	function adoptSketch(
+		text: string | null,
+		grain: unknown,
+		source: string | null = null,
+		state: unknown = null
+	): void {
 		sketchText = text;
 		sketchSource = source;
 		sketchDraft = text ?? '';
 		sketchEditing = false;
 		sketchMode = text ? sketchModeOf(normalizeSketchGrain(grain) ?? 'fine') : 'off';
+		sketchState = normalizeSketchState(state);
 	}
 	let variationBusy = $state(false);
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
@@ -2914,6 +2931,7 @@ if (unreadWords.length > 0) {
 		tokens_out: number | null;
 		sketch_text?: string | null;
 		sketch_grain?: string | null;
+		sketch_state?: string | null;
 	}> {
 		const uiLang = getLang();
 		const resolvedStage2Model = modelOverride ?? qualifiedModelId(stage2Provider, stage2Model);
@@ -3249,7 +3267,7 @@ if (unreadWords.length > 0) {
 				ddlGeneratedBaseline = ddl;
 				thinking = r.thinking;
 				result = r; outputTab = 'canvas';
-				adoptSketch(r.sketch_text ?? null, r.sketch_grain, input);
+				adoptSketch(r.sketch_text ?? null, r.sketch_grain, input, r.sketch_state);
 				fitCanvasZoom();
 				if (r.history_id && submitAbortController === abortController && !submitStopRequested) {
 					if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
@@ -3824,7 +3842,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}), ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3868,6 +3886,12 @@ if (unreadWords.length > 0) {
 					instruction_lang_requested: result.instruction_lang_requested ?? instructionLang,
 					instruction_lang_resolved: result.instruction_lang_resolved ?? null,
 					ui_lang: result.ui_lang ?? getLang(),
+					// The second sender to this endpoint. It was dropping the prose
+					// as well as the state, so a demo work drawn through the layer
+					// was saved as though it had never been near it.
+					sketch_text: result.sketch_text ?? null,
+					sketch_grain: result.sketch_grain ?? null,
+					...(result.sketch_state ? { sketch_state: result.sketch_state } : {}),
 				})
 			});
 			if (!r.ok) {
@@ -4286,6 +4310,7 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		expanded_ddl: composed.ddl,
 		sketch_text: composed.sketch_text ?? null,
 		sketch_grain: composed.sketch_grain ?? null,
+		sketch_state: composed.sketch_state ?? null,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4341,6 +4366,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		expanded_ddl: composed.ddl,
 		sketch_text: composed.sketch_text ?? null,
 		sketch_grain: composed.sketch_grain ?? null,
+		sketch_state: composed.sketch_state ?? null,
 		score: composed.score,
 		svg: composed.svg,
 		at: Date.now(),
@@ -4552,7 +4578,7 @@ $effect(() => {
 		expandedDdl = it.expanded_ddl ?? null;
 		input = sourceText; ddl = itemDDL; ddlGeneratedBaseline = itemDDL; thinking = it.thinking ?? null;
 		stage1UserPrompt = sourceText;
-		adoptSketch(it.sketch_text ?? null, it.sketch_grain, sourceText);
+		adoptSketch(it.sketch_text ?? null, it.sketch_grain, sourceText, it.sketch_state);
 		result = {
 			score: it.score,
 			svg: it.svg,
@@ -5967,7 +5993,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<!-- 写生 (Stage 0.5). Above the instructions because it comes before
 					     them: the author reads the prose the layer wrote, and may
 					     rewrite it. What is left here is what Stage 1 reads. -->
-					{#if inputMode === 'single' && (sketchText !== null || result?.sketch_fallback_used)}
+					{#if inputMode === 'single' && (sketchText !== null || result !== null)}
 						<section class="panel-section sketch-section">
 							<div class="sketch-head">
 								<span class="sketch-title">{t().sketchLabel}</span>
@@ -5980,6 +6006,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							</div>
 							{#if result?.sketch_fallback_used}
 								<p class="sketch-note">{t().sketchFallbackNote}</p>
+							{:else if sketchText === null}
+								<!-- No prose. Which of the silences this is comes from the
+								     record, not from the absence: a work drawn with the
+								     layer off and a work drawn before the layer was
+								     recorded read the same here otherwise. -->
+								<p class="sketch-note">{sketchStateNote(sketchState, getLang() === 'ja')}</p>
 							{:else if sketchEditing}
 								<textarea class="sketch-editor" rows="7" bind:value={sketchDraft} spellcheck="true"></textarea>
 								<p class="sketch-note">{t().sketchEditHint}</p>

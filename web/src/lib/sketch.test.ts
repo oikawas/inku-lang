@@ -10,10 +10,17 @@ import { submitDerivationKind } from './derivation.ts';
 import {
 	DEFAULT_SKETCH_MODE,
 	normalizeSketchGrain,
+	normalizeSketchState,
 	sketchGrainOf,
+	sketchModeLabel,
+	sketchModeNote,
 	sketchModeOf,
-	SKETCH_MODES
+	sketchStateNote,
+	SKETCH_MODES,
+	type SketchMode
 } from './sketch.ts';
+
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 // ---------------------------------------------------------------- T-9 (grain)
 
@@ -123,4 +130,111 @@ test('T-2/T-9: every request body that starts at Stage 2 carries the prose', () 
 	// And the paint path says whether the layer runs at all.
 	const paint = page.slice(page.indexOf("apiFetch('/api/paint/stream'"));
 	assert.match(paint.slice(0, 900), /sketch: resolvedSketchMode !== 'off'/);
+});
+
+// ═══════════════════ 写生の状態 (sketch_state) — contract sketch-state-is-recorded
+//
+// T-6 (a work with no record is not a work drawn with the layer off) and
+// T-10 (the menu says "not recommended", and only the menu).
+
+// -------------------------------------------------------------------- T-6
+
+test('T-6: a work with no record does not read as a work drawn with the layer off', () => {
+	// The whole point of the column. If these two ever return the same string,
+	// four separate events have collapsed back into one silence.
+	assert.notEqual(sketchStateNote(null, true), sketchStateNote('off', true));
+	assert.notEqual(sketchStateNote(null, false), sketchStateNote('off', false));
+	assert.ok(sketchStateNote(null, true).length > 0);
+	assert.ok(sketchStateNote(null, false).length > 0);
+	assert.ok(sketchStateNote('off', true).length > 0);
+});
+
+test('T-6: a failed layer and a route that never runs it read apart from both', () => {
+	const notes = (['fallback', 'off', 'not_applicable'] as const).map((s) => sketchStateNote(s, true));
+	notes.push(sketchStateNote(null, true));
+	assert.equal(new Set(notes).size, 4, 'two of the four silences say the same thing');
+	// A work whose prose is on screen needs no note: the prose is the answer.
+	assert.equal(sketchStateNote('fine', true), '');
+	assert.equal(sketchStateNote('coarse', false), '');
+});
+
+test('T-6: an absent or unknown state is not rounded to a real one', () => {
+	assert.equal(normalizeSketchState(undefined), null);
+	assert.equal(normalizeSketchState(null), null);
+	assert.equal(normalizeSketchState(''), null);
+	assert.equal(normalizeSketchState('sketched'), null);
+	assert.equal(normalizeSketchState('off'), 'off');
+	assert.equal(normalizeSketchState('not_applicable'), 'not_applicable');
+});
+
+test('T-6: both places that put a work on screen carry its state, and the panel shows it', () => {
+	const page = read('../routes/+page.svelte');
+	assert.match(page, /sketchState = normalizeSketchState\(state\)/);
+	// A fresh run and a saved work reopened. Wiring one and not the other leaves
+	// half the works reading as though they predate the column.
+	assert.match(page, /adoptSketch\(r\.sketch_text \?\? null, r\.sketch_grain, input, r\.sketch_state\)/);
+	assert.match(page, /adoptSketch\(it\.sketch_text \?\? null, it\.sketch_grain, sourceText, it\.sketch_state\)/);
+	assert.match(page, /sketchStateNote\(sketchState, getLang\(\) === 'ja'\)/);
+});
+
+test('T-6/T-2: the one sender that saves a drawing carries the state too', () => {
+	const page = read('../routes/+page.svelte');
+	const bodies = page.split(/apiFetch\(\s*['"]\/api\/history['"]/).slice(1);
+	assert.ok(bodies.length >= 1, 'the /api/history sender is missing');
+	for (const [i, body] of bodies.entries()) {
+		assert.match(body.slice(0, 4000), /sketch_state/, `/api/history sender ${i + 1} drops the state`);
+	}
+	// And the two works saved from a compose response take the state from it
+	// rather than leaving the server to guess.
+	assert.equal((page.match(/sketch_state: composed\.sketch_state \?\? null/g) ?? []).length, 2);
+});
+
+// ------------------------------------------------------------------- T-10
+
+test('T-10: the menu marks off as not recommended, in both languages', () => {
+	assert.equal(sketchModeNote('off', true), '（推奨しない）');
+	assert.equal(sketchModeNote('off', false), '(not recommended)');
+	assert.equal(sketchModeNote('fine', true), '');
+	assert.equal(sketchModeNote('coarse', false), '');
+
+	const select = read('./components/SketchSelect.svelte');
+	const menu = select.slice(select.indexOf('{:else}'), select.indexOf('<style>'));
+	assert.match(menu, /sketchModeNote\(mode, isJapanese\)/);
+});
+
+test('T-10: and the three places that are not the menu do not say it', () => {
+	// Those three render sketchModeLabel. Folding the note into the label is the
+	// implementation that passes "it appears" while the note follows the label
+	// everywhere -- including the lineage panel, where it would attach itself to
+	// a work already drawn and read as a judgement of it.
+	const labels: [SketchMode, string, string][] = [
+		['off', '切', 'Off'],
+		['fine', '細かく', 'Fine'],
+		['coarse', '大きく', 'Coarse']
+	];
+	for (const [mode, ja, en] of labels) {
+		assert.equal(sketchModeLabel(mode, true), ja);
+		assert.equal(sketchModeLabel(mode, false), en);
+	}
+
+	// The compact toggle inside the same component is the fourth caller, and it
+	// is above the {:else} that starts the menu.
+	const select = read('./components/SketchSelect.svelte');
+	const compact = select.slice(select.indexOf('{#if compact}'), select.indexOf('{:else}'));
+	assert.ok(compact.length > 0);
+	assert.doesNotMatch(compact, /sketchModeNote/);
+
+	assert.doesNotMatch(read('./components/InputPanel.svelte'), /sketchModeNote/);
+	assert.doesNotMatch(read('./components/LineagePanel.svelte'), /sketchModeNote/);
+	// A fifth caller the contract's table did not list: the run summary in the
+	// describe panel, which reports the grain of the work on screen.
+	assert.doesNotMatch(read('../routes/+page.svelte'), /sketchModeNote/);
+});
+
+test('T-10: the note is its own element, not text joined onto the label', () => {
+	// Joined, it would be indistinguishable from the label's return value, and
+	// the gate above could no longer tell the two apart either.
+	const select = read('./components/SketchSelect.svelte');
+	assert.match(select, /<span class="option-label">\{sketchModeLabel\(mode, isJapanese\)\}<\/span/);
+	assert.match(select, /<span class="option-note"\s*>\{sketchModeNote\(mode, isJapanese\)\}<\/span/);
 });

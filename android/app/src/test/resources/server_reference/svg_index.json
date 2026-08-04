@@ -236,7 +236,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 99132,
+    "bytes": 99147,
     "counts": {
       "path": 42,
       "polyline": 0,
@@ -454,7 +454,7 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 112379,
+    "bytes": 112356,
     "counts": {
       "path": 42,
       "polyline": 0,
@@ -1180,6 +1180,248 @@
     "classes": [
       "arc-stroke-v1 controls-22 events-0",
       "arc-stroke-v1 controls-22 events-1",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "39_arrangement_scatter_small_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.85,
+            0.85
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 5,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 8269,
+    "counts": {
+      "path": 5,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 15,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 15
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "40_arrangement_radial_nocenter_corner": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.2,
+            0.2
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 12,
+            "layout": "radial",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 18567,
+    "counts": {
+      "path": 12,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 36,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 29
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "41_arrangement_grid_region_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.85,
+            0.85
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 16,
+            "layout": "grid",
+            "rows": 4,
+            "cols": 4,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          },
+          "at": {
+            "region": [
+              0.55,
+              0.05,
+              0.95,
+              0.45
+            ]
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 24834,
+    "counts": {
+      "path": 16,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 48,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 37
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "contour-stroke-v1 controls-17 events-1",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "42_arrangement_cluster_center": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.5,
+            0.5
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 60,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": 3,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 91569,
+    "counts": {
+      "path": 60,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 180,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 125
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "contour-stroke-v1 controls-17 events-1",
       "material-outline"
     ],
     "stroke_colors": [

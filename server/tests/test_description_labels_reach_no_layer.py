@@ -32,6 +32,7 @@ class Recorder:
         self.stage2_description: list[str | None] = []
         self.coerce_ddl: list[str] = []
         self.catalog_source: list[str] = []
+        self.plugin_seed: list[str | None] = []
 
 
 @pytest.fixture
@@ -54,6 +55,7 @@ def wired(monkeypatch):
 
     def fake_expand(ddl, *, source_text=None, lang="ja", seed_text=None, **kwargs):
         rec.plugin_source.append(source_text)
+        rec.plugin_seed.append(seed_text)
         return FakeExpansion()
 
     def fake_expand_intermediate(ddl, *, context_text=None, **kwargs):
@@ -114,9 +116,13 @@ def test_with_the_sketch_layer_off_no_later_layer_sees_them_either(wired):
     run_paint(paint(sketch=False))
 
     assert wired.sketch_inputs == []
-    for seen in (wired.stage1_text, wired.plugin_source, wired.stage15_context, wired.stage2_description):
+    for seen in (wired.stage1_text, wired.plugin_source, wired.stage15_context):
         assert seen == [CUT], seen
+    # Since the cut contract, Stage 2 is handed no description at all and coerce
+    # reads the DDL alone -- so the labels cannot arrive there by any route.
+    assert wired.stage2_description == [None]
     assert wired.coerce_ddl and "紀友則" not in wired.coerce_ddl[0]
+    assert wired.coerce_ddl and "01." not in wired.coerce_ddl[0]
 
 
 def test_the_catalog_selector_reads_the_cut_description_too(wired):
@@ -144,7 +150,8 @@ def test_a_description_with_no_labels_travels_exactly_as_before(wired):
 
     # The control: the rule must not touch a description that carries no label.
     assert wired.stage1_text == [plain]
-    assert wired.stage2_description == [plain]
+    assert wired.plugin_source == [plain]
+    assert wired.plugin_seed == [plain]
 
 
 def test_the_interpret_path_cuts_them_as_the_paint_path_does(wired):
@@ -154,3 +161,13 @@ def test_the_interpret_path_cuts_them_as_the_paint_path_does(wired):
     render_routes.api_interpret(req, {"id": "test-user"})
 
     assert wired.sketch_inputs == [CUT]
+
+
+def test_the_plugin_seed_is_the_cut_description_too(wired):
+    # The seed decides how many leaves a plugin resolves, so it is the
+    # description rather than the prose (the cut contract, stage 6).  It is
+    # still a layer: the author's numbering must not reach it either, or two
+    # works differing only in their label would resolve different counts.
+    run_paint(paint())
+
+    assert wired.plugin_seed == [CUT]

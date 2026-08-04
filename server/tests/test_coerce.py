@@ -1544,7 +1544,51 @@ def test_coerce_score_keeps_black_when_the_normalized_ddl_states_the_fill_clause
     assert fixed.background == "black"
 
 
-def test_coerce_score_governs_generated_background_plan_without_original_source_context():
+def test_coerce_score_governs_a_dark_background_no_clause_asked_for():
+    """契約 description-propagation-cut (2026-08-04) で裏返した表明。
+
+    旧名 `..._governs_generated_background_plan_without_original_source_context`。
+    旧版はこの同じ DDL で `white` を表明していた。判定していたのは
+    `_looks_like_generated_background_plan` で、「利用者が機械生成のプランを
+    **記述欄に貼った**」ことを見抜く番人だった。切断で記述は coerce へ届かなく
+    なり、番人に判ずる素性が残らなくなった。残せば本番の DDL の普通の形
+    （単一行・4 節以上・先頭が `背景を`）に誤爆して明示句の判定へ到達しない
+    ——濃色 604 件のうち 54 件が白へ落ちる。番人は撤去した。
+
+    ガバナ自体は残っている。この表明はその対照で、**明示句も marker も無い**
+    濃色は依然として白へ落ちる（上の
+    `test_coerce_score_keeps_black_when_the_normalized_ddl_states_the_fill_clause`
+    が逆向き）。
+    """
+    score = Score.model_validate(
+        {
+            "background": "blue",
+            "instructions": [
+                {
+                    "primitive": "line",
+                    "from": [0.5, 0.0],
+                    "to": [0.5, 1.0],
+                    "color": "white",
+                    "arrangement": {"count": 110, "layout": "vertical"},
+                }
+            ],
+        }
+    )
+
+    fixed = coerce_score(
+        score,
+        ddl=(
+            "静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす。"
+            "黒い細い余白線を存在の重心として右上の焦点へ二本引く。透明な膜を重ねる。境界が滲む。"
+        ),
+    )
+
+    assert fixed.background == "white"
+
+
+def test_coerce_score_keeps_the_fill_clause_of_a_production_shaped_ddl():
+    """The case the removed guard used to wash. Same shape as the one above with
+    the fill clause restored: a single line, five clauses, opening with 背景を."""
     score = Score.model_validate(
         {
             "background": "blue",
@@ -1568,7 +1612,7 @@ def test_coerce_score_governs_generated_background_plan_without_original_source_
         ),
     )
 
-    assert fixed.background == "white"
+    assert fixed.background == "blue"
 
 
 def test_coerce_score_keeps_explicit_black_background_in_direct_ddl():

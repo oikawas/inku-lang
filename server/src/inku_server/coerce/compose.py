@@ -218,9 +218,6 @@ SURFACE_TENSION_CONTEXT_MARKERS: tuple[str, ...] = _coerce_marker_values("surfac
 INTENTIONAL_LARGE_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("intentional_large_surface")
 
 
-GENERATED_BACKGROUND_PLAN_MARKERS: tuple[str, ...] = _coerce_marker_values("generated_background_plan")
-
-
 EXPLICIT_SURFACE_MARKERS: tuple[str, ...] = _coerce_marker_values("explicit_surface")
 
 
@@ -365,36 +362,35 @@ def _has_intentional_large_surface(ddl: str | None) -> bool:
 
 
 def _source_context(ddl: str | None) -> str:
+    """The whole context, not its first line.
+
+    Until the description-propagation cut the context was `原文\\nDDL`, so the
+    first line was the original description and reading only it was the point.
+    Coerce now receives the DDL alone, and 13.6% of production DDLs are
+    multi-line: keeping the first-line read would stop the markers below at
+    line 1 and never see a background clause that sits on line 2.
+    """
     if not ddl:
         return ""
-    return ddl.split("\n", 1)[0].strip()
-
-
-def _looks_like_generated_background_plan(context: str) -> bool:
-    if "\n" in context:
-        return False
-    clauses = [part.strip() for part in re.split(r"[。\n;；]+", context) if part.strip()]
-    if len(clauses) < 4:
-        return False
-    first = clauses[0].lower()
-    if not (
-        first.startswith("背景を")
-        or first.startswith("background")
-        or "fill background" in first
-    ):
-        return False
-    lower = context.lower()
-    return _any_marker_in_text(GENERATED_BACKGROUND_PLAN_MARKERS, context, lower)
+    return ddl.strip()
 
 
 def _has_explicit_background_intent(ddl: str | None) -> bool:
+    """Whether the DDL itself asked for the background it carries.
+
+    `_looks_like_generated_background_plan` used to guard the top of this
+    function: it spotted a machine-generated plan pasted into the DESCRIPTION
+    field and refused to read it as the author's own intent. That guard was a
+    judgement about provenance, and the cut removed the only text whose
+    provenance it could judge -- coerce no longer sees a description at all.
+    Left in place it misfired on the production DDL, whose ordinary shape
+    ("背景を黒で塗りつぶす。" plus four more clauses) satisfied every one of its
+    conditions, and returned early before the clause check below: 54 of 604 dark
+    production works washed to white, 1 with the guard gone.
+    """
     if not ddl:
         return False
     context = _source_context(ddl) or ddl
-    if _looks_like_generated_background_plan(context):
-        return False
-    # Match against the whole string: the fill clause lives in the normalized DDL,
-    # which sits after the newline, while `context` is only the original description.
     if _EXPLICIT_BACKGROUND_CLAUSE.search(ddl):
         return True
     lower = context.lower()

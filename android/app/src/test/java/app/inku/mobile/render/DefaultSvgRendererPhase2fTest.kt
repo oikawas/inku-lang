@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.data.model.CanvasSize
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -364,5 +365,67 @@ class DefaultSvgRendererPhase2fTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun testArrangementExactParity() {
+        val arrRefStr = readReferenceResource("renderer_arrangement.json")
+        val arrRefObj = JSONObject(arrRefStr)
+        val renderSeed = arrRefObj.getLong("render_seed")
+        val cases = arrRefObj.getJSONArray("cases")
+
+        val renderer = DefaultSvgRenderer()
+        val expandArrangementMethod = DefaultSvgRenderer::class.java.declaredMethods.first { it.name == "expandArrangement" && it.parameterCount == 3 }.apply { isAccessible = true }
+        var gridRegionEdgeAnchorInRegion = false
+        var gridEdgeAnchorInRegion = false
+
+        for (i in 0 until cases.length()) {
+            val caseObj = cases.getJSONObject(i)
+            val caseId = caseObj.getString("case_id")
+            val ins = caseObj.getJSONObject("instruction")
+            val expectedCount = caseObj.getInt("count")
+            val expectedAnchors = caseObj.getJSONArray("anchors")
+
+            @Suppress("UNCHECKED_CAST")
+            val expanded = expandArrangementMethod.invoke(renderer, ins, renderSeed, null) as List<JSONObject>
+
+            assertEquals("Case $caseId count must match", expectedCount, expanded.size)
+
+            val actualAnchors = expanded.map { mark ->
+                val p = mark.optString("primitive", "line")
+                val center = mark.optJSONArray("center")
+                if (p == "circle" && center != null) {
+                    listOf(center.getDouble(0), center.getDouble(1))
+                } else {
+                    val from = mark.optJSONArray("from_") ?: mark.optJSONArray("from")
+                    val to = mark.optJSONArray("to")
+                    if (p == "line" && from != null && to != null) {
+                        listOf((from.getDouble(0) + to.getDouble(0)) / 2.0, (from.getDouble(1) + to.getDouble(1)) / 2.0)
+                    } else {
+                        listOf(0.5, 0.5)
+                    }
+                }
+            }
+
+            assertEquals("Case $caseId anchors count must match", expectedAnchors.length(), actualAnchors.size)
+            for (j in 0 until expectedAnchors.length()) {
+                val expPt = expectedAnchors.getJSONArray(j)
+                val actPt = actualAnchors[j]
+                assertEquals("Case $caseId mark $j x must match exactly", expPt.getDouble(0), actPt[0], 0.0)
+                assertEquals("Case $caseId mark $j y must match exactly", expPt.getDouble(1), actPt[1], 0.0)
+            }
+
+            if (caseId == "G-grid-region-edge") {
+                val allInRegion = actualAnchors.all { (x, y) -> x in 0.55..0.95 && y in 0.05..0.45 }
+                gridRegionEdgeAnchorInRegion = allInRegion
+            }
+            if (caseId == "G-grid-edge") {
+                val allInRegion = actualAnchors.all { (x, y) -> x in 0.55..0.95 && y in 0.05..0.45 }
+                gridEdgeAnchorInRegion = allInRegion
+            }
+        }
+
+        assertTrue("G-grid-region-edge anchors must stay inside declared region", gridRegionEdgeAnchorInRegion)
+        assertFalse("G-grid-edge anchors must not stay inside declared region of grid-region-edge", gridEdgeAnchorInRegion)
     }
 }

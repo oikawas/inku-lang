@@ -3700,8 +3700,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           },
           {
             "primitive": "arc",
@@ -3730,8 +3730,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           }
         ]
       }
@@ -3810,8 +3810,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           },
           {
             "primitive": "arc",
@@ -3840,8 +3840,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           }
         ]
       }
@@ -3908,8 +3908,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           },
           {
             "primitive": "circle",
@@ -3938,8 +3938,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           }
         ]
       }
@@ -4012,8 +4012,8 @@
             "arrangement": null,
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           },
           {
             "primitive": "circle",
@@ -4058,8 +4058,8 @@
             },
             "at": null,
             "relation": null,
-            "surface": null,
-            "thinness": null
+            "thinness": null,
+            "surface": null
           }
         ]
       }

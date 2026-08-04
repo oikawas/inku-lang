@@ -34,6 +34,7 @@ the hatch spacing (`surface-stroke-v1 hatch-spacing-22.500`).
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -1708,10 +1709,130 @@ def score_schema_contract_fixture() -> None:
     )
 
 
+# The anchors group G is built on. "edge" is the one under which the frame
+# correction fires; "center" is the control, because a group whose centroid
+# already sits on the anchor has nothing to move.
+G_ANCHORS: dict[str, list[float]] = {
+    "center": [0.5, 0.5], "corner": [0.2, 0.2], "edge": [0.85, 0.85],
+}
+BASE_ARRANGEMENT: dict = {
+    "count": 60, "layout": "scatter", "rows": None, "cols": None, "jitter": 0.12,
+    "path": "none", "color_cycle": [], "margin": 0.1, "center": None,
+    "radius": None, "density": "none", "cluster_count": None, "fade": "none",
+    "preserve_space": False, "rhythm_spacing": "none",
+}
+
+
+def arrangement_cases() -> dict[str, dict]:
+    """The 32 cases of the server's group G, plus one that states a region.
+
+    These mirror `gen_render_reference.py` case for case, so the two corpora
+    move together; the extra `G-grid-region-edge` exists because engine 20's one
+    carve-out (a grid that tiles a stated region does NOT go through the second
+    stage) has no case in group G, and a port that runs every layout through the
+    fit would stay green without it.
+    """
+    cases: dict[str, dict] = {}
+
+    def g(case_id: str, anchor: str, **changes) -> None:
+        arrangement = copy.deepcopy(BASE_ARRANGEMENT)
+        arrangement.update(changes)
+        cases[case_id] = {
+            "primitive": "circle", "weight": "pen",
+            "center": list(G_ANCHORS[anchor]), "radius": 0.03,
+            "arrangement": arrangement,
+        }
+
+    for anchor in G_ANCHORS:
+        g(f"G-scatter-{anchor}", anchor)
+        g(f"G-scatter-small-{anchor}", anchor, count=5)
+    for anchor in G_ANCHORS:
+        g(f"G-cluster-{anchor}", anchor, cluster_count=3)
+    g("G-cluster-preserve-edge", "edge", cluster_count=3, preserve_space=True)
+    for path in ("wave", "diagonal", "top_to_bottom"):
+        g(f"G-path-{path}-edge", "edge", layout="vertical", path=path)
+    g("G-path-wave-center", "center", layout="vertical", path="wave")
+    g("G-path-wave-corner", "corner", layout="vertical", path="wave")
+    g("G-path-hwave-edge", "edge", layout="horizontal", path="wave")
+    for anchor in G_ANCHORS:
+        g(f"G-vertical-nopath-{anchor}", anchor, layout="vertical")
+        g(f"G-horizontal-nopath-{anchor}", anchor, layout="horizontal")
+    for anchor in G_ANCHORS:
+        g(f"G-radial-nocenter-{anchor}", anchor, layout="radial", count=12)
+    g("G-radial-center-edge", "edge", layout="radial", count=12, center=[0.3, 0.3])
+    # A stated radius of zero is falsy, and the server reads falsy as unstated:
+    # `r = arr.radius if arr.radius else 0.3`. A port that fetches the radius with
+    # a default instead keeps the zero and collapses the whole ring onto its
+    # centre. No other case states a radius at all, so without this one the two
+    # readings are indistinguishable and every fixture stays green either way.
+    g("G-radial-zero-radius-edge", "edge", layout="radial", count=12, radius=0)
+    for anchor in G_ANCHORS:
+        g(f"G-grid-{anchor}", anchor, layout="grid", count=16, rows=4, cols=4)
+    g("G-scatter-dense-edge", "edge", density="high")
+    g("G-scatter-fade-edge", "edge", fade="outward")
+    g("G-scatter-rhythm-edge", "edge", rhythm_spacing="loose")
+
+    g("G-grid-region-edge", "edge", layout="grid", count=16, rows=4, cols=4)
+    cases["G-grid-region-edge"]["at"] = {"region": [0.55, 0.05, 0.95, 0.45]}
+    return cases
+
+
+def arrangement_fixtures() -> None:
+    """Where each mark of an expanded group lands (engine 20 and 21).
+
+    `render()` resolves the performance score and then hands `render_seed` to
+    `_expand_arrangement` a second time, so the expansion is seeded; a port that
+    calls its own expansion without the seed produces a different scatter for 22
+    of these 33 cases while every other fixture here stays green.
+
+    The comparison surface is the anchor of each expanded mark -- for a circle
+    that is its `center` -- because that is the quantity both engines move.
+    Compare it EXACTLY, not within a tolerance: two cases
+    (`G-vertical-nopath-center`, `G-horizontal-nopath-center`) are moved by
+    nothing but engine 21's nine-decimal quantisation, 4.9e-10, and a tolerance
+    of 1e-6 lets a port skip engine 21 and stay green on all 33.
+    """
+    out: dict = {
+        "note": "anchors of every expanded mark; compare exactly, no tolerance",
+        "render_seed": RENDER_SEED,
+        "arrangement_quantum": renderer.ARRANGEMENT_QUANTUM,
+        "cases": [],
+    }
+    for case_id, raw in arrangement_cases().items():
+        ins = Instruction.model_validate(raw)
+        expanded = renderer._expand_arrangement(ins, RENDER_SEED, None)
+        out["cases"].append({
+            "case_id": case_id,
+            "instruction": ins.model_dump(mode="json"),
+            "count": len(expanded),
+            "anchors": [list(renderer._anchor(item)) for item in expanded],
+        })
+    (OUT / "renderer_arrangement.json").write_text(
+        json.dumps(out, ensure_ascii=False, indent=2)
+    )
+
+
+# Four of the cases above, drawn. The JSON fixture pins where the marks land;
+# these pin that the drawing follows -- a port can place the group correctly and
+# still lose it downstream, and the walk over `svg_index.json` reaches these the
+# day they exist. One per mechanism: the frame correction, the radial centre,
+# the grid carve-out, and a cluster (the second largest route in production).
+ARRANGEMENT_SCORES: dict[str, dict] = {
+    f"{name}": {"instructions": [arrangement_cases()[case_id]]}
+    for name, case_id in (
+        ("39_arrangement_scatter_small_edge", "G-scatter-small-edge"),
+        ("40_arrangement_radial_nocenter_corner", "G-radial-nocenter-corner"),
+        ("41_arrangement_grid_region_edge", "G-grid-region-edge"),
+        ("42_arrangement_cluster_center", "G-cluster-center"),
+    )
+}
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
     SCORES.update(CLOUDFORM_SCORES)
+    SCORES.update(ARRANGEMENT_SCORES)
     stroke_engine_fixtures()
     variation_fixtures()
     proportional_fixtures()
@@ -1723,6 +1844,7 @@ def main() -> None:
     prompt_fixtures()
     color_assignment_fixtures()
     score_schema_contract_fixture()
+    arrangement_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

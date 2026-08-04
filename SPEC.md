@@ -745,6 +745,17 @@ which to look inward.
    consult it actively
 3. **Interpretation feedback after writing**: the words written take on a color
    showing the degree of interpretation (§7.6)
+4. **What the writer notes for themselves is not description**: a **leading
+   number** (`1. `, `01. `, `０１．`, `１　`, `12）`, `3:`) and a **bracketed
+   comment** (`[疎  紀友則 / 古今和歌集（春下）]`; both `[]` and `［］`) are
+   **kept verbatim in the stored work and handed to no layer of the drawing**,
+   **Stage 0.5 included**.  The describe and batch editors grey the
+   **background of those characters** to say that they will not be drawn.
+   **The cut happens in one place on the server** (`description_labels.py`), so
+   it holds for the web, the CLI and Android alike.  Digits count as a number
+   only when a separator or an ideographic space follows, so `2026年` and
+   `3本の線` stay description; an **unclosed `[` is description** as well, and
+   does not swallow the rest of the line
 
 **What is rejected**
 

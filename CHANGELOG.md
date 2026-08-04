@@ -2962,3 +2962,29 @@ a catalog's colors, leave the transport alone) **stays green on all 12.**
 
 **The API surface lost exactly one field**, `catalog_mode` on `DemoSettingsBody` (endpoints 81,
 operations 81, schemas 80 unchanged). The frozen corpora are byte-identical.
+
+### v2.9.40 (Build 846) — a leading number and a bracketed comment are the writer's, not the drawing's
+
+**A batch numbers its lines, and a description often carries its source in brackets.** Both were
+travelling into Stage 0.5 and everything after it. They are now **cut once, at the three endpoints
+that read a description** (paint, interpret, compose), and **the stored work keeps them**: saving,
+display and the response still read `req.description`.
+
+**Digits count as a number only with a separator** (`.` `．` `、` `)` `）` `:` `：`, or an
+ideographic space), so `2026年` and `3本の線` stay description. An **unclosed `[` is description**
+too and does not swallow the rest of the line. Both `[]` and `［］` delimit a comment.
+
+**The describe and batch editors grey the background of those characters.** A textarea cannot
+colour a range of its own text, so **an identical copy sits behind it and paints only the
+backgrounds** (`LabelHighlight.svelte`: 9px 10px of padding, 13px, line-height 1.65 -- the same
+metrics as both editors -- and the batch layer follows the sideways scroll without wrapping).
+**Because the rule now exists in Python and in TypeScript, both are measured against one corpus**
+(20 cases in `server/tests/data/description-label-cases.json`; **drifting the web rule away from
+the server's turns 9 web tests red**).
+
+**The single-draw character meter counts what the drawing reads**, not the writer's numbering.
+
+**The gates were measured by perturbing production code**: not calling the rule on the paint path
+turns 3 server tests red; disabling the number rule, 23; narrowing the separator to `.`, 9; letting
+an unclosed `[` run to the end of the line, 6; drifting the web rule, 9 web tests; handing the
+layer no text, 1. **The control** (a darker grey) **leaves all 99 green.**

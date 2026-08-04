@@ -1835,6 +1835,32 @@ names things, their placement and their state.  **It follows that meaning words 
 normalized DDL are the design, not a carriage failure** -- "night" travels as "fill the background
 with black".  A gate that measures carriage by matching tokens reads that translation as loss.
 
+### 12.16 The Description Is Where the Work Comes From (v2.9.44)
+
+A description is not a record.  **It decides whether a plugin fires, what Stage 1.5 reads as
+context, what seeds the plugin expansion, and which language the instruction is written in --
+four things.**  A string that did not author the DDL is therefore never seated in the
+description's chair: the description is the text the author typed, and no entry point offers a
+way to paste a different one over it afterwards.  Redrawing an existing work with a rewritten
+description (refinement) is a different operation, not a change of origin.
+
+**A description the cut empties is not accepted.**  Leading numbers and bracketed notes belong
+to the author rather than to the drawing (v2.9.40), but **a description that is nothing but
+those** would leave the layers below inventing a subject from an empty string.  The three
+drawing routes (`/api/interpret`, `/api/paint`, `/api/paint/stream`) refuse it with 400, and
+**a description that is only whitespace with 422**.  **The judgement takes two conditions**: an
+empty raw description is already refused by another check, and judging the cut alone would
+answer "only labels" to a text that carried no label at all.
+
+**The route that draws an instruction sheet (`/api/compose`) carries no such guard.**  A work
+authored straight in DDL has no description, and drawing a sheet without one is that route's
+purpose.  **The description key is absent there rather than empty.**
+
+**The gate at the entrance reads what the drawing reads.**  The length guidance on the
+description field blocks no input (section 7.1), but **sending is judged on the text after the
+cut**: a description that is labels from end to end cannot be sent.  This is not a second rule;
+it is the drawing's own rule, moved to the door.
+
 ---
 
 ## 13. The Design of Sway

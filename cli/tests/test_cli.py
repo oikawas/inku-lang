@@ -1461,3 +1461,208 @@ def test_refine_color_asks_the_server_to_draw_a_different_catalog(monkeypatch):
         assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", kind])) == 0
         other = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
         assert other[0].get("catalog_mode") is None
+
+
+# --------------------------------------------------------------------------- #
+# The eight request keys the CLI never named                                    #
+#                                                                               #
+# `/api/paint` has always accepted them; the CLI simply left them out of the    #
+# request body, so every CLI run took the server default while the web UI sent  #
+# its own. The result was that no CLI drawing ever went through Stage 0.5, and  #
+# `--wild` / variation / `catalog_mode` were unreachable from the command line. #
+# --------------------------------------------------------------------------- #
+
+# (argv fragment, request key, the value the key must carry)
+SENDER_PARITY_FLAGS = [
+    (["--sketch"], "sketch", True),
+    (["--sketch-grain", "coarse"], "sketch_grain", "coarse"),
+    (["--sketch-text", "a wet black line"], "sketch_text", "a wet black line"),
+    (["--variation-amplitude", "large"], "variation_amplitude", "large"),
+    (["--variation-seed", "7"], "variation_seed", 7),
+    (["--wild"], "wild", True),
+    (["--catalog-mode", "auto"], "catalog_mode", "auto"),
+    (["--interpretation-seed", "reading-2"], "interpretation_seed", "reading-2"),
+]
+
+# What a bare `paint TEXT` puts on the wire today. Frozen deliberately: the whole
+# point of the change is that adding the eight keys must not alter the request of
+# a run that names none of them, or every past bench stops being comparable.
+PAYLOAD_KEYS_WITHOUT_FLAGS = {
+    "catalog_id",
+    "description",
+    "include_thinking",
+    "instruction_lang",
+    "save_history",
+    "stage1_input",
+}
+
+# Every key the payload dict could carry before the eight were added.
+PAYLOAD_KEYS_BEFORE = {
+    "canvas_aspect",
+    "catalog_id",
+    "composition_seed",
+    "description",
+    "history_input",
+    "include_thinking",
+    "include_trace",
+    "instruction_lang",
+    "render_seed",
+    "save_artifacts",
+    "save_history",
+    "seed_text",
+    "stage1_input",
+    "stage1_model",
+    "stage2_model",
+    "tenkei",
+    "ui_lang",
+}
+
+# Every pre-existing flag, so that the "all keys" count is measured and not assumed.
+ALL_PRIOR_FLAGS = [
+    "--stage1-model", "s1",
+    "--stage2-model", "s2",
+    "--include-thinking",
+    "--ui-lang", "ja",
+    "--save-history",
+    "--save-artifacts",
+    "--history-input", "history text",
+    "--catalog-id", "default",
+    "--canvas-aspect", "golden",
+    "--render-seed", "11",
+    "--composition-seed", "22",
+    "--staffage", "sparse",
+    "--seed-text", "seed",
+    "--trace",
+]
+
+
+@pytest.mark.parametrize("argv,key,value", SENDER_PARITY_FLAGS, ids=[key for _, key, _ in SENDER_PARITY_FLAGS])
+def test_paint_payload_carries_each_layer_flag(argv, key, value):
+    """One case per key, so a dropped line names the key it dropped.
+
+    Rolled into a single test, deleting one line from the payload dict would
+    still be one red, and the report would not say which layer stopped being
+    asked for.
+    """
+    parser = cli.build_parser()
+    payload = cli._paint_payload(parser.parse_args(["paint", "一滴の墨", *argv]), "一滴の墨")
+
+    assert key in payload, f"{key} は旗を立てても送られていない"
+    assert payload[key] == value
+
+
+def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
+    """Without this, an implementation that always sends all eight passes above.
+
+    `False` is not `None`, so a bare `"wild": args.wild` survives the drop-None
+    filter and puts an eighteenth key on the wire for every existing bench run.
+    """
+    parser = cli.build_parser()
+    payload = cli._paint_payload(parser.parse_args(["paint", "一滴の墨"]), "一滴の墨")
+
+    assert set(payload) == PAYLOAD_KEYS_WITHOUT_FLAGS
+    for _, key, _ in SENDER_PARITY_FLAGS:
+        assert key not in payload, f"{key} を渡していないのに送っている"
+
+
+def test_paint_payload_grows_by_exactly_the_eight_keys():
+    """17 keys before, 25 after -- and the 17 are the same 17."""
+    parser = cli.build_parser()
+    argv = ["paint", "一滴の墨", *ALL_PRIOR_FLAGS]
+    prior_only = cli._paint_payload(parser.parse_args(argv), "一滴の墨")
+    assert set(prior_only) == PAYLOAD_KEYS_BEFORE
+    assert len(prior_only) == 17
+
+    new_flags = [item for argv_fragment, _, _ in SENDER_PARITY_FLAGS for item in argv_fragment]
+    everything = cli._paint_payload(parser.parse_args([*argv, *new_flags]), "一滴の墨")
+    assert len(everything) == 25
+    assert set(everything) - PAYLOAD_KEYS_BEFORE == {key for _, key, _ in SENDER_PARITY_FLAGS}
+
+
+def _subparser(name: str) -> argparse.ArgumentParser:
+    parser = cli.build_parser()
+    action = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    return action.choices[name]
+
+
+@pytest.mark.parametrize("command", ["paint", "batch"])
+def test_both_drawing_commands_accept_the_layer_flags(command):
+    """`batch` is where the benches run. A flag on `paint` alone reaches no bench."""
+    flags = _all_option_strings(_subparser(command))
+    for argv, key, _ in SENDER_PARITY_FLAGS:
+        assert argv[0] in flags, f"{command} に {argv[0]} が無い ({key})"
+
+    base = ["paint", "一滴の墨"] if command == "paint" else ["batch", "--file", "-"]
+    every_flag = [item for argv, _, _ in SENDER_PARITY_FLAGS for item in argv]
+    parsed = cli.build_parser().parse_args([*base, *every_flag])
+    assert parsed.sketch is True
+    assert parsed.wild is True
+    assert parsed.catalog_mode == "auto"
+
+
+@pytest.mark.parametrize("argv,key,value", SENDER_PARITY_FLAGS, ids=[key for _, key, _ in SENDER_PARITY_FLAGS])
+def test_every_layer_flag_carries_help(argv, key, value):
+    """A flag nobody can find from `--help` is a flag nobody uses."""
+    for command in ("paint", "batch"):
+        action = next(
+            item for item in _subparser(command)._actions
+            if argv[0] in (item.option_strings or [])
+        )
+        assert (action.help or "").strip(), f"{command} {argv[0]} の help が空"
+
+
+def _readme_usage_block(command: str) -> str:
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    header = f"### `inku-cli {command}`\n\n```\n"
+    start = readme.index(header) + len(header)
+    return readme[start:readme.index("\n```\n", start)]
+
+
+@pytest.mark.parametrize("command", ["paint", "batch"])
+def test_the_manual_lists_the_layer_flags(command):
+    """The manual is part of the feature: an undocumented flag is an unused flag."""
+    block = _readme_usage_block(command)
+    assert "usage: inku-cli" in block
+    for argv, key, _ in SENDER_PARITY_FLAGS:
+        assert argv[0] in block, f"cli/README.md の {command} usage に {argv[0]} が無い ({key})"
+
+
+def test_the_sketch_help_says_whose_default_it_is():
+    """The whole contract started from the defaults differing per sender."""
+    action = next(
+        item for item in _subparser("paint")._actions
+        if "--sketch" in (item.option_strings or []) and item.option_strings == ["--sketch"]
+    )
+    help_text = (action.help or "").lower()
+    assert "server default is off" in help_text
+    assert "web" in help_text and "fine" in help_text
+
+
+def test_sketch_fields_reach_the_artifact_summary():
+    """Stage 0.5 is the only layer whose output is prose, and prose is not in the SVG.
+
+    Without carrying these three, a bench run through --sketch keeps the drawing
+    and loses the sentence the later stages actually read.
+    """
+    summary = cli._sketch_response_summary({
+        "sketch_text": "黒い線が一本、紙の左から右へ走る。",
+        "sketch_grain": "fine",
+        "sketch_fallback_used": False,
+    })
+    assert summary == {
+        "sketch_text": "黒い線が一本、紙の左から右へ走る。",
+        "sketch_grain": "fine",
+        "sketch_fallback_used": False,
+    }
+
+    # A compose (DDL-mode) result never runs Stage 0.5; the keys are still present
+    # so a reader does not have to know which route wrote the artifact.
+    composed = cli._compose_response_as_paint_result(
+        {"svg": "<svg />", "score": {}},
+        ddl="白い背景に黒い線を一本引く。",
+        input_text="線",
+        stage2_model="s2",
+    )
+    assert composed["sketch_text"] is None
+    assert composed["sketch_grain"] is None
+    assert composed["sketch_fallback_used"] is False

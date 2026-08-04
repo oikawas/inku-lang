@@ -177,28 +177,35 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--stage1-model STAGE1_MODEL]
                       [--stage2-provider {nvidia,anthropic,local}]
                       [--stage2-model STAGE2_MODEL]
-                      [--original-text ORIGINAL_TEXT]
+                      [--description DESCRIPTION]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
-                      [--render-seed RENDER_SEED] [--vary-seed VARY_SEED]
-                      [--seed-text SEED_TEXT]
+                      [--render-seed RENDER_SEED]
+                      [--composition-seed COMPOSITION_SEED]
+                      [--staffage {none,sparse,auto}] [--seed-text SEED_TEXT]
+                      [--sketch] [--sketch-grain {fine,coarse}]
+                      [--sketch-text SKETCH_TEXT]
+                      [--variation-amplitude {small,medium,large}]
+                      [--variation-seed VARIATION_SEED] [--wild]
+                      [--catalog-mode {fixed,auto,random}]
+                      [--interpretation-seed INTERPRETATION_SEED]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
                       [--include-thinking] [--save-history]
                       [--save-artifacts | --no-save-artifacts] [--no-progress]
-                      [--full-json]
+                      [--trace] [--full-json]
                       [text]
 
 positional arguments:
-  text                  prompt text
+  text                  the description to draw
 
 options:
   -h, --help            show this help message and exit
   --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
-  --file FILE, -f FILE  read prompt text from a UTF-8 file, or '-'
+  --file FILE, -f FILE  read the description from a UTF-8 file, or '-'
   --out-dir OUT_DIR, -o OUT_DIR
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix
@@ -206,13 +213,15 @@ options:
   --svg-profile {display,editable,compat}
                         SVG output profile for saved files
   --input-mode {paint,ddl}
-                        paint: natural-language prompt through Stage 1; ddl:
-                        normalized DDL directly through Stage 2/render
+                        paint: a natural-language description through Stage 1;
+                        ddl: normalized DDL directly through Stage 2/render
   --stage1-provider {nvidia,anthropic,local}
   --stage1-model STAGE1_MODEL
   --stage2-provider {nvidia,anthropic,local}
   --stage2-model STAGE2_MODEL
-  --original-text ORIGINAL_TEXT
+  --description DESCRIPTION
+                        the description the author wrote, when the positional
+                        text is not it
   --history-input HISTORY_INPUT
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
@@ -223,19 +232,49 @@ options:
                         canvas aspect id for paint, compose, and history
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
-  --vary-seed VARY_SEED
+  --composition-seed COMPOSITION_SEED
                         Stage 1.5 composition variation seed
+  --staffage {none,sparse,auto}
+                        staffage level (v1.96): none / sparse / auto
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
+  --sketch              run the description through the sketch-from-life layer
+                        (Stage 0.5) before Stage 1, so the later stages read
+                        the sketch instead of the description; server default
+                        is off, the web UI default is fine
+  --sketch-grain {fine,coarse}
+                        how finely Stage 0.5 breaks the description apart:
+                        fine (server default) or coarse
+  --sketch-text SKETCH_TEXT
+                        use this sketch text instead of calling Stage 0.5
+                        (replay of a saved or hand-edited sketch)
+  --variation-amplitude {small,medium,large}
+                        how far the variation layer moves the expansion axes;
+                        takes effect only together with --variation-seed
+  --variation-seed VARIATION_SEED
+                        which axes the variation layer moves and in which
+                        direction; takes effect only together with
+                        --variation-amplitude
+  --wild                remove the amplitude ceiling on the stroke
+                        performance, letting the renderer swing further
+  --catalog-mode {fixed,auto,random}
+                        how the color catalog is chosen: fixed (use --color-
+                        catalog), auto (the server reads the description and
+                        picks), random (draw one other than --color-catalog)
+  --interpretation-seed INTERPRETATION_SEED
+                        ask Stage 1 for an explicit re-interpretation under
+                        this identifier instead of reusing the previous
+                        reading
   --instruction-lang {auto,ja,en}
   --ui-lang UI_LANG
   --include-thinking
   --save-history
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
+  --trace               request RAW per-layer intermediates and save them as
+                        <prefix>-trace.json
   --full-json           print the full paint response
-
 ```
 
 ### `inku-cli batch`
@@ -250,25 +289,34 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--stage1-model STAGE1_MODEL]
                       [--stage2-provider {nvidia,anthropic,local}]
                       [--stage2-model STAGE2_MODEL]
-                      [--original-text ORIGINAL_TEXT]
+                      [--description DESCRIPTION]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
-                      [--render-seed RENDER_SEED] [--vary-seed VARY_SEED]
-                      [--seed-text SEED_TEXT]
+                      [--render-seed RENDER_SEED]
+                      [--composition-seed COMPOSITION_SEED]
+                      [--staffage {none,sparse,auto}] [--seed-text SEED_TEXT]
+                      [--sketch] [--sketch-grain {fine,coarse}]
+                      [--sketch-text SKETCH_TEXT]
+                      [--variation-amplitude {small,medium,large}]
+                      [--variation-seed VARIATION_SEED] [--wild]
+                      [--catalog-mode {fixed,auto,random}]
+                      [--interpretation-seed INTERPRETATION_SEED]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
                       [--include-thinking] [--save-history]
                       [--save-artifacts | --no-save-artifacts] [--no-progress]
-                      [--continue-on-error] [--summary-json SUMMARY_JSON]
-                      [--vary VARY]
+                      [--trace] [--continue-on-error]
+                      [--summary-json SUMMARY_JSON]
+                      [--composition-count COMPOSITION_COUNT]
 
 options:
   -h, --help            show this help message and exit
   --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
-  --file FILE, -f FILE  UTF-8 text file; one prompt per non-empty line, or '-'
+  --file FILE, -f FILE  UTF-8 text file; one description per non-empty line,
+                        or '-'
   --out-dir OUT_DIR, -o OUT_DIR
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix
@@ -276,13 +324,15 @@ options:
   --svg-profile {display,editable,compat}
                         SVG output profile for saved files
   --input-mode {paint,ddl}
-                        paint: natural-language prompt through Stage 1; ddl:
-                        normalized DDL directly through Stage 2/render
+                        paint: a natural-language description through Stage 1;
+                        ddl: normalized DDL directly through Stage 2/render
   --stage1-provider {nvidia,anthropic,local}
   --stage1-model STAGE1_MODEL
   --stage2-provider {nvidia,anthropic,local}
   --stage2-model STAGE2_MODEL
-  --original-text ORIGINAL_TEXT
+  --description DESCRIPTION
+                        the description the author wrote, when the positional
+                        text is not it
   --history-input HISTORY_INPUT
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
@@ -293,23 +343,54 @@ options:
                         canvas aspect id for paint, compose, and history
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
-  --vary-seed VARY_SEED
+  --composition-seed COMPOSITION_SEED
                         Stage 1.5 composition variation seed
+  --staffage {none,sparse,auto}
+                        staffage level (v1.96): none / sparse / auto
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
+  --sketch              run the description through the sketch-from-life layer
+                        (Stage 0.5) before Stage 1, so the later stages read
+                        the sketch instead of the description; server default
+                        is off, the web UI default is fine
+  --sketch-grain {fine,coarse}
+                        how finely Stage 0.5 breaks the description apart:
+                        fine (server default) or coarse
+  --sketch-text SKETCH_TEXT
+                        use this sketch text instead of calling Stage 0.5
+                        (replay of a saved or hand-edited sketch)
+  --variation-amplitude {small,medium,large}
+                        how far the variation layer moves the expansion axes;
+                        takes effect only together with --variation-seed
+  --variation-seed VARIATION_SEED
+                        which axes the variation layer moves and in which
+                        direction; takes effect only together with
+                        --variation-amplitude
+  --wild                remove the amplitude ceiling on the stroke
+                        performance, letting the renderer swing further
+  --catalog-mode {fixed,auto,random}
+                        how the color catalog is chosen: fixed (use --color-
+                        catalog), auto (the server reads the description and
+                        picks), random (draw one other than --color-catalog)
+  --interpretation-seed INTERPRETATION_SEED
+                        ask Stage 1 for an explicit re-interpretation under
+                        this identifier instead of reusing the previous
+                        reading
   --instruction-lang {auto,ja,en}
   --ui-lang UI_LANG
   --include-thinking
   --save-history
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
+  --trace               request RAW per-layer intermediates and save them as
+                        <prefix>-trace.json
   --continue-on-error
   --summary-json SUMMARY_JSON
                         write batch summary JSON to this path (default:
                         OUT_DIR/analysis-summary.json)
-  --vary VARY           generate N Stage 1.5 variations per prompt
-
+  --composition-count COMPOSITION_COUNT
+                        generate N Stage 1.5 variations per description
 ```
 
 ### `inku-cli contact-sheet`

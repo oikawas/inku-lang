@@ -472,6 +472,20 @@ def _render_response_summary(result: dict[str, Any]) -> dict[str, Any]:
         "coerce_branch_counts": result.get("coerce_branch_counts") or {},
     }
 
+def _sketch_response_summary(result: dict[str, Any]) -> dict[str, Any]:
+    """What Stage 0.5 wrote, carried into the artifacts.
+
+    The server has always returned these three, but until the CLI could ask for
+    the layer it had no reason to read them. Without this, a bench run through
+    --sketch keeps the drawing and loses what was sketched, so nobody can tell
+    which sentence the later stages actually read.
+    """
+    return {
+        "sketch_text": result.get("sketch_text"),
+        "sketch_grain": result.get("sketch_grain"),
+        "sketch_fallback_used": result.get("sketch_fallback_used", False),
+    }
+
 def _model_summary(
     stage1_model: str | None,
     stage2_model: str | None,
@@ -1890,6 +1904,18 @@ def _paint_payload(
         "tenkei": getattr(args, "staffage", None),
         "seed_text": getattr(args, "seed_text", None),
         "include_trace": getattr(args, "trace", False) or None,
+        # Layers the server has always accepted but the CLI never named. `or None`
+        # matters: the filter below drops None, not False, so a bare False would be
+        # sent explicitly on every run and change the request shape of every
+        # existing bench. `include_trace` above already uses this idiom.
+        "sketch": bool(getattr(args, "sketch", False)) or None,
+        "sketch_grain": getattr(args, "sketch_grain", None),
+        "sketch_text": getattr(args, "sketch_text", None),
+        "variation_amplitude": getattr(args, "variation_amplitude", None),
+        "variation_seed": getattr(args, "variation_seed", None),
+        "wild": bool(getattr(args, "wild", False)) or None,
+        "catalog_mode": getattr(args, "catalog_mode", None),
+        "interpretation_seed": getattr(args, "interpretation_seed", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -1969,6 +1995,10 @@ def _compose_response_as_paint_result(
         "coerce_relation_dropped_count": result.get("coerce_relation_dropped_count"),
         "coerce_warnings": result.get("coerce_warnings"),
         "catalog_id": result.get("render_color_catalog_id"),
+        # /api/compose never runs Stage 0.5, so these stay empty here. They are
+        # present so that a paint artifact and a ddl-mode artifact have the same
+        # key set and a reader does not have to know which route wrote the file.
+        **_sketch_response_summary(result),
     }
 
 def _history_payload_from_result(
@@ -2257,6 +2287,7 @@ def command_paint(args: argparse.Namespace) -> int:
         "compose_retry_count": result.get("compose_retry_count", 0),
         "compose_retry_reasons": result.get("compose_retry_reasons", []),
         "compose_fallback_used": result.get("compose_fallback_used", False),
+        **_sketch_response_summary(result),
         **_score_metrics(result.get("score")),
         "paths": paths,
     }
@@ -2397,6 +2428,7 @@ def command_batch(args: argparse.Namespace) -> int:
             "compose_retry_count": result.get("compose_retry_count", 0),
             "compose_retry_reasons": result.get("compose_retry_reasons", []),
             "compose_fallback_used": result.get("compose_fallback_used", False),
+            **_sketch_response_summary(result),
             **_score_metrics(result.get("score")),
             "paths": paths,
         }
@@ -3441,6 +3473,47 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     # 打鍵する名前は辞書の英語 (添景 = staffage)。要求の鍵と DB 列は `tenkei` のまま。
     parser.add_argument("--staffage", choices=["none", "sparse", "auto"], help="staffage level (v1.96): none / sparse / auto")
     parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
+    # Spelled straight from the server request keys (`sketch_grain` -> `--sketch-grain`).
+    # These layers have always been accepted by /api/paint; the CLI simply never named
+    # them, so every run so far took the server default rather than a chosen one.
+    parser.add_argument(
+        "--sketch",
+        action="store_true",
+        help="run the description through the sketch-from-life layer (Stage 0.5) before Stage 1, so the later stages read the sketch instead of the description; server default is off, the web UI default is fine",
+    )
+    parser.add_argument(
+        "--sketch-grain",
+        choices=["fine", "coarse"],
+        help="how finely Stage 0.5 breaks the description apart: fine (server default) or coarse",
+    )
+    parser.add_argument(
+        "--sketch-text",
+        help="use this sketch text instead of calling Stage 0.5 (replay of a saved or hand-edited sketch)",
+    )
+    parser.add_argument(
+        "--variation-amplitude",
+        choices=["small", "medium", "large"],
+        help="how far the variation layer moves the expansion axes; takes effect only together with --variation-seed",
+    )
+    parser.add_argument(
+        "--variation-seed",
+        type=int,
+        help="which axes the variation layer moves and in which direction; takes effect only together with --variation-amplitude",
+    )
+    parser.add_argument(
+        "--wild",
+        action="store_true",
+        help="remove the amplitude ceiling on the stroke performance, letting the renderer swing further",
+    )
+    parser.add_argument(
+        "--catalog-mode",
+        choices=["fixed", "auto", "random"],
+        help="how the color catalog is chosen: fixed (use --color-catalog), auto (the server reads the description and picks), random (draw one other than --color-catalog)",
+    )
+    parser.add_argument(
+        "--interpretation-seed",
+        help="ask Stage 1 for an explicit re-interpretation under this identifier instead of reusing the previous reading",
+    )
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")

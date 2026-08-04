@@ -130,6 +130,7 @@ export const en: LangPack = {
 	errorProviderRateLimit: (stage) => `The model provider rate-limited the ${stage} request. Retry after a while.`,
 	errorProviderOther: (stage, status) => `The model provider returned an error for ${stage} (HTTP ${status}).`,
 	errorRenderBusy: 'Every drawing slot is busy. Wait a moment and try again.',
+	errorDescriptionOnlyLabels: 'The description is only its numbering and bracketed notes, so nothing is left to draw. Write what you want drawn.',
 	stopBtn: 'Stop',
 	runStatusElapsed: (seconds) => `Elapsed ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

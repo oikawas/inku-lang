@@ -110,6 +110,7 @@ export interface LangPack {
 	errorProviderRateLimit: (stage: string) => string;
 	errorProviderOther: (stage: string, status: number) => string;
 	errorRenderBusy: string;
+	errorDescriptionOnlyLabels: string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusProgress: (done: number, total: number) => string;

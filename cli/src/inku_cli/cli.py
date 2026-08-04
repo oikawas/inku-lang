@@ -1895,9 +1895,11 @@ def _paint_payload(
         or DEFAULT_COLOR_CATALOG_ID
     )
     payload: dict[str, Any] = {
-        # description は作者が書いた記述。CLI は文脈を注入しないので、Stage 1 が読む
-        # 文字列は打った本文そのままになる。
-        "description": args.description or text,
+        # The description is where the work comes from, so it is the text the
+        # author typed -- nothing can be seated in its place. It decides whether
+        # a plugin fires, what Stage 1.5 reads as context, the seed and the
+        # language, none of which a text that did not author the work may move.
+        "description": text,
         "stage1_input": text,
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
         "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
@@ -1943,9 +1945,11 @@ def _compose_payload(
         or DEFAULT_COLOR_CATALOG_ID
     )
     payload: dict[str, Any] = {
+        # No description key at all: a work authored straight in DDL has no
+        # description, and this is the same shape the web sends when it draws a
+        # new instruction sheet. The seed falls to the DDL on both sides.
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
-        "description": args.description,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
@@ -2232,7 +2236,7 @@ def command_paint(args: argparse.Namespace) -> int:
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
     if input_mode == "ddl":
-        input_text = args.description or text
+        input_text = text
         raw_result, _ = _run_with_progress(
             "drawing from DDL",
             lambda: client.request("POST", "/api/compose", data=_compose_payload(
@@ -2369,7 +2373,7 @@ def command_batch(args: argparse.Namespace) -> int:
             else f"drawing {index}/{len(lines)}"
         )
         if input_mode == "ddl":
-            input_text = args.description or line
+            input_text = line
             raw_result, _ = _run_with_progress(
                 f"{progress_label} from DDL",
                 lambda line=line: client.request("POST", "/api/compose", data=_compose_payload(
@@ -3478,8 +3482,6 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--stage1-model")
     parser.add_argument("--stage2-provider", choices=PROVIDERS)
     parser.add_argument("--stage2-model")
-    # 埋める先の鍵と同じ綴りにする。位置引数は Stage 1 が読む文字列、こちらは作者が書いた記述。
-    parser.add_argument("--description", help="the description the author wrote, when the positional text is not it")
     parser.add_argument("--history-input")
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")

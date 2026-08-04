@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import os
 import re
@@ -15,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from ...color_catalogs import color_catalog_ids
 from ...color_selector import select_catalog_id
@@ -76,6 +77,15 @@ def _provider_failure_detail(operation: str, exc: BaseException | None) -> dict 
             }
         exc = exc.__cause__ or exc.__context__
     return None
+
+
+# A description that is nothing but the author's numbering and bracketed
+# comments leaves the drawing nothing to read: the cut in description_labels
+# empties it, and every layer below -- Stage 0.5 included -- would then invent
+# its subject from an empty string.  A stable sentinel, not a sentence: the web
+# turns it into the localized message the way it does for "render capacity is
+# full", so the wording stays authored in ja.ts.
+_LABEL_ONLY_DESCRIPTION = "description is only labels"
 
 
 def _stage_http_error(operation: str, status_code: int) -> HTTPException:
@@ -265,9 +275,23 @@ class InterpretRequest(BaseModel):
     expand_intermediate: bool = Field(default=False, description="Stage 1.5 の中間DDL拡張を適用するか")
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時 auto")
 
+    @field_validator("description")
+    @classmethod
+    def _validate_description_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("description cannot be blank")
+        return v
+
 
 class PaintRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
+
+    @field_validator("description")
+    @classmethod
+    def _validate_description_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("description cannot be blank")
+        return v
     stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")
@@ -1427,6 +1451,11 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
     # 0.5 included -- and no client can read them.  req.description stays whole
     # for saving and display (see description_labels).
     description = pipeline_description(req.description)
+    # Two conditions, never one.  An empty req.description is already refused by
+    # min_length=1, and judging the cut alone would answer "only labels" to a
+    # text that carried no label at all.
+    if req.description.strip() and not description:
+        raise HTTPException(status_code=400, detail=_LABEL_ONLY_DESCRIPTION)
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     # Settled on the author's own words: Stage 0.5 writes in the language it is
@@ -1653,6 +1682,12 @@ def _paint_events(
     # 0.5 included -- and no client can read them.  req.description stays whole
     # for saving and display (see description_labels).
     description = pipeline_description(req.description)
+    # Two conditions, never one.  An empty req.description is already refused by
+    # min_length=1, and judging the cut alone would answer "only labels" to a
+    # text that carried no label at all.  This is the last gate for a client
+    # that has no editor of its own: the CLI, Android, anything written later.
+    if req.description.strip() and not description:
+        raise HTTPException(status_code=400, detail=_LABEL_ONLY_DESCRIPTION)
     t0 = time.perf_counter()
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
@@ -1987,12 +2022,20 @@ def api_paint_stream(
 
     The response is already committed once the first event is written, so a
     failure after that point is reported as an in-band ``error`` event instead
-    of an HTTP status.
+    of an HTTP status.  Before that point nothing is committed, so the first
+    event is pulled here and a refusal reaches the client as the status it is
+    -- the guard on a label-only description raises before any event, and this
+    route answers 400 like the other two rather than 200 carrying an error.
     """
+    events = _paint_events(req, idempotency_key, actor)
+    try:
+        first = next(events)
+    except StopIteration:
+        raise _unexpected_http_error("paint", 500) from None
 
     def lines() -> Iterator[str]:
         try:
-            for event in _paint_events(req, idempotency_key, actor):
+            for event in itertools.chain([first], events):
                 if event["event"] == "done":
                     response = event["response"]
                     payload = {

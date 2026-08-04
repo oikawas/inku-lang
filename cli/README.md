@@ -177,7 +177,6 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--stage1-model STAGE1_MODEL]
                       [--stage2-provider {nvidia,anthropic,local}]
                       [--stage2-model STAGE2_MODEL]
-                      [--description DESCRIPTION]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
@@ -219,9 +218,6 @@ options:
   --stage1-model STAGE1_MODEL
   --stage2-provider {nvidia,anthropic,local}
   --stage2-model STAGE2_MODEL
-  --description DESCRIPTION
-                        the description the author wrote, when the positional
-                        text is not it
   --history-input HISTORY_INPUT
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
@@ -289,7 +285,6 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--stage1-model STAGE1_MODEL]
                       [--stage2-provider {nvidia,anthropic,local}]
                       [--stage2-model STAGE2_MODEL]
-                      [--description DESCRIPTION]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
@@ -330,9 +325,6 @@ options:
   --stage1-model STAGE1_MODEL
   --stage2-provider {nvidia,anthropic,local}
   --stage2-model STAGE2_MODEL
-  --description DESCRIPTION
-                        the description the author wrote, when the positional
-                        text is not it
   --history-input HISTORY_INPUT
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)

@@ -130,6 +130,7 @@ export const ja: LangPack = {
 	errorProviderRateLimit: (stage) => `${stage}のモデル提供元がレート制限を返しました。時間をおいて再試行してください。`,
 	errorProviderOther: (stage, status) => `${stage}のモデル提供元がエラーを返しました（HTTP ${status}）。`,
 	errorRenderBusy: '描画の同時実行が上限に達しました。少し待ってからもう一度実行してください。',
+	errorDescriptionOnlyLabels: '記述が通し番号と［　］の注記だけで、描くところが残っていません。描きたいことを書いてください。',
 	stopBtn: '停止',
 	runStatusElapsed: (seconds) => `経過 ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

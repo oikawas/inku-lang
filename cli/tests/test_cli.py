@@ -100,13 +100,19 @@ def test_paint_payload_drops_none_values():
     assert "history_input" not in payload
 
 
-def test_paint_payload_separates_the_description_from_what_stage1_reads():
+def test_paint_payload_makes_the_description_the_text_the_author_typed():
+    """記述は作品の出自なので、位置引数以外のものが記述の席に座ることはない。
+
+    以前は `--description` が位置引数と記述を切り離していたが、記述は記録ではなく
+    **プラグインの発火・Stage 1.5 の文脈・種・言語の 4 つを動かす**ので、その DDL を
+    生んでいない文字列を座らせられる旗ごと外した (2026-08-04 作者裁定)。
+    """
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--description", "一滴の墨"])
+    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か"])
 
     payload = cli._paint_payload(args, "一滴の墨\n\n感情: 静か")
 
-    assert payload["description"] == "一滴の墨"
+    assert payload["description"] == "一滴の墨\n\n感情: 静か"
     assert payload["stage1_input"] == "一滴の墨\n\n感情: 静か"
 
 
@@ -151,19 +157,25 @@ def test_paint_payload_includes_canvas_aspect():
 
 
 def test_compose_payload_for_ddl_input_mode():
+    """DDL で書き起こした作品に記述は無い。**鍵ごと欠落する**のが正しい姿。
+
+    web の「指示書を新規作成」が `description: ''` を送るのと同じ形で、どちらも種は
+    DDL に落ちる。空文字を送ることと鍵を送らないことの差は `ComposeRequest` の
+    `default=None` が吸収する。
+    """
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--description", "線"])
+    args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl"])
 
     payload = cli._compose_payload(args, "白い背景に黒い線を一本引く。", stage2_model="s2", color_catalog="default")
 
     assert payload == {
         "ddl": "白い背景に黒い線を一本引く。",
         "model": "s2",
-        "description": "線",
         "instruction_lang": "auto",
         "catalog_id": "default",
         "auto_repair": True,
     }
+    assert "description" not in payload
 
 
 def test_compose_payload_includes_canvas_aspect():
@@ -361,21 +373,37 @@ def test_no_cli_flag_is_spelled_tenkei():
     assert not [flag for flag in flags if "tenkei" in flag]
 
 
-def test_the_description_flag_replaced_original_text_outright():
-    """作者の記述を渡す旗は `--description`。**エイリアスは残していない。**
+@pytest.mark.parametrize("command", ["paint", "batch"])
+def test_the_drawing_commands_have_no_description_flag(command):
+    """**旗は削除であって改名ではない。** 一度も名指しでない綴りも一緒に落ちている。
 
-    埋める先の鍵が `description` なのに旗は `--original-text` で、**退役した第三の語
-    `text` を綴りに残していた**。奥書・添景と同じ方針 (2026-07-27 作者裁定)。
+    元は `--original-text` が `--description` へ改名されたことの番人だった
+    (2026-07-27 作者裁定)。その旗そのものが 2026-08-04 に外れたので、**消したのでは
+    なく退行の向きを裏返して残す** — 名前で数える棚卸しは改名と削除を取り違えるので、
+    旧綴りも新綴りも同時に見る ([[test_inventory_by_name_misreads_renames]])。
     """
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "一滴の墨\n\n感情: 静か", "--description", "一滴の墨"])
-    assert args.description == "一滴の墨"
-    with pytest.raises(SystemExit):
-        parser.parse_args(["paint", "x", "--original-text", "一滴の墨"])
+    base = ["paint", "一滴の墨"] if command == "paint" else ["batch", "--file", "-"]
+    for retired in ("--description", "--original-text"):
+        with pytest.raises(SystemExit):
+            parser.parse_args([*base, retired, "一滴の墨"])
+    assert "--description" not in _all_option_strings(_subparser(command))
 
-    payload = cli._paint_payload(args, "一滴の墨\n\n感情: 静か")
-    assert payload["description"] == "一滴の墨"
-    assert payload["stage1_input"] == "一滴の墨\n\n感情: 静か"
+
+def test_refine_perform_keeps_its_own_description_flag():
+    """同じ綴りの別定義。**巻き込んで消していないことの表明。**
+
+    `refine perform --description` は既存作品の記述を上書きして描き直す旗で、
+    出自を後から貼る旗ではない。読み手は `command_refine` の payload。
+    """
+    flags = _all_option_strings(_subparser("refine"))
+    assert "--description" in flags
+    action = next(
+        item
+        for item in _subparser("refine")._subparsers._group_actions[0].choices["perform"]._actions
+        if "--description" in (item.option_strings or [])
+    )
+    assert "override" in (action.help or "")
 
 
 def _all_help_strings(parser) -> list[str]:
@@ -388,9 +416,14 @@ def _all_help_strings(parser) -> list[str]:
 
 
 def test_no_cli_flag_says_original_text():
-    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。"""
+    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。
+
+    到達確認の目印は `--staffage`。**`--description` は目印に使えない** —
+    `paint` / `batch` から外れて `refine perform` にだけ残ったので、走査がサブパーサ
+    まで届いていなくても届いていても、どちらでも真になりうる。
+    """
     flags = _all_option_strings(cli.build_parser())
-    assert "--description" in flags, "走査がサブパーサまで届いていない"
+    assert "--staffage" in flags, "走査がサブパーサまで届いていない"
     assert not [flag for flag in flags if "original" in flag]
 
 

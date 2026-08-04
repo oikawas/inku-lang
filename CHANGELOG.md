@@ -3114,3 +3114,52 @@ perturbations, covering all five stages of the contract, were confirmed to go re
 (2,176 including the four drawn to verify), `sketch_text` is non-NULL on 23 rows as before, and
 **all 2,172 pre-existing rows have `sketch_state IS NULL`**. The migration runs when `inku-api`
 starts. `renderer` and `coerce` were untouched (frozen corpora byte-identical).
+
+### v2.9.44 (Build 851) — the description is where the work comes from
+
+**A description is not a record.** It decides whether a plugin fires, what Stage 1.5 reads as
+context, what seeds the plugin expansion, and which language the instruction is written in --
+**four things**. Yet the CLI carried a flag (`inku-cli paint --description`) that seated a
+string which had not authored the DDL in the description's chair. **The flag is gone, and the
+description is the text that was typed.** The positional argument is the legitimate one and the
+exception is what deserves a flag (`refine perform --description` stays: it overwrites an
+existing work's description, the same spelling for a different definition). A work authored
+straight in DDL has no description, so **the `compose` payload drops the key entirely** -- the
+same shape the web sends when it draws a new instruction sheet, and on both sides the seed
+falls to the DDL.
+
+**A description the cut empties is refused with 400.** v2.9.40 declared the author's leading
+numbers and bracketed notes theirs rather than the drawing's and cut them out, but **a
+description that is nothing but those** (`1. `, `[note]`, `３．`) still flowed down and **had
+its subject invented from an empty string**. `/api/interpret`, `/api/paint` and
+`/api/paint/stream` now guard it. **The judgement takes two conditions, not one**: an empty raw
+description is already refused by `min_length=1`, and judging the cut alone would answer "only
+labels" to a text that carried no label at all. **`/api/compose` is deliberately left
+unguarded** -- it is the route that draws a sheet with no description, and guarding it breaks
+the web's "new instruction sheet". **Across 2,023 production works, none hit this guard** (the
+14 with a `[demo]` prefix all keep a body after the cut).
+
+**A description that is only whitespace is refused with 422.** `min_length=1` counts
+characters, so `'   '` passed, and with no label present no cut happens either. **The web never
+reaches this -- its send gate stops it -- but the CLI and Android do.**
+
+**The web's send gate reads what the drawing reads.** The character meter already showed the
+count after the cut, while the send button and the batch line count still measured the raw
+text. **The same rule moved to the door**, so a description that is grey from end to end cannot
+be sent. **No second rule was written.**
+
+**The sketch prose left the seed chain.** When the plugin expansion got no seed, it fell back to
+the sketch prose. **Stage 0.5 rewrites that prose on every run**, so v2.9.41's property -- the
+same description draws the same counts -- **was being lost with nothing turning red** (SPEC
+§12.15 states the property). The fallback now lands on the DDL: an empty seed that produced 14
+elements (the prose's value) produces 16 (the DDL's), and **a seed that is given is the seed
+that is used** (asserted in the opposite direction as well).
+
+**42 tests across three surfaces** (36 server, 6 web, the CLI inversions). Perturbations were
+applied per stage: dropping the guard from `/api/interpret` reddens only that route's 5,
+dropping it from the shared generator reddens paint and stream's 10 plus the guard's own
+property, dropping the blank validator reddens 3, putting the prose back in the seed chain
+reddens 1, restoring the CLI flag reddens 2, and gating the page on the raw text reddens 1.
+**The two tests that watched `--description` were inverted rather than deleted** -- they now
+watch the retired spelling `--original-text` too, so an inventory taken by name cannot mistake
+a rename for a deletion.

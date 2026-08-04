@@ -3163,3 +3163,48 @@ reddens 1, restoring the CLI flag reddens 2, and gating the page on the raw text
 **The two tests that watched `--description` were inverted rather than deleted** -- they now
 watch the retired spelling `--original-text` too, so an inventory taken by name cannot mistake
 a rename for a deletion.
+
+### Android `2.1.4-android.6` — the drawing layer catches up to render engines 20 and 21 (who decides where a group goes; a performance that does not read the last digit) (android Build 148091 unchanged, 2026-08-05)
+
+**The port landed in seven stages.** (1) align the fourth copy of the declaration order
+with the server, (2) carry the render seed into the expansion, (3) port the `grid` layout,
+(4) turn a `radial` ring around the declared anchor, (5) bring a group's centre of mass to
+that anchor (per-axis shrink against the 0.02 / 0.98 frame), (6) quantise expanded
+coordinates to nine decimals, (7) declare the version as `"21"`. Android unit tests went
+from 133 to 134 with no failures; two were red at the start because stage 0 had baked the
+expectations first.
+
+**The expectations were baked by the issuing side before the work began.** The 33 cases in
+`renderer_arrangement.json` mirror the server's group G one for one, plus a grid that
+states a region — engine 20's single carve-out, where a lattice tiling a stated region does
+not go through the second stage. **The comparison is exact, with no tolerance:** two cases
+differ by nothing but engine 21's quantisation, 4.9e-10, so a tolerance of 1e-6 lets a port
+skip engine 21 and stay green on all 33.
+
+**Acceptance found one divergence — not in the values, but in how a condition was written.**
+The server reads `radius` for truthiness (`r = arr.radius if arr.radius else 0.3`), so a
+stated `0.0` means "unstated" and the ring turns at 0.3. The port fetched it as
+`optDouble("radius", 0.3)`, kept the declared zero, and collapsed all twelve marks onto a
+single point. `Arrangement.radius` is an unconstrained `Optional[float]`, so Stage 2 can
+emit that value. **No fixture stated a radius at all, so all 33 cases were green under
+either reading.** `G-radial-zero-radius-edge` was baked from the server and added, and a
+perturbation now turns one case red (34 cases; the other 33 are unchanged).
+
+**That single case produced a project-wide rule (author ruling, 2026-08-05):** outside of
+genuinely Android-specific concerns — OS features, hardware limits — both the decision and
+the implementation follow the server. **Accepting a port means reading the conditions one
+for one, not only comparing outputs.** Replacing a truthiness test with a defaulted getter
+sends `0` and the empty string down a different path, and inputs whose values agree will
+never show it.
+
+**Stage 4 still has no gate.** Moving the `radial` centre back to the middle of the canvas
+turns **0 of 134** tests red: that move translates the whole group, and stage 5 pulls the
+centre of mass back onto the anchor immediately afterwards. Stage 5's carve-out applies only
+to a grid with a stated `at`, which a radial layout never is. **A port that skipped stage 4
+entirely would stay green on all 34 cases** ([I-130]).
+
+**Perturbations were applied for all seven stages** (stage 1 turns `test06SurfaceHatchExactParity`
+and the SVG scan red; stages 2, 3, 5-1, 5-2 and 6 turn `testArrangementExactParity` and the
+SVG scan red; stage 4 turns nothing red). **Every perturbation targeted production code, and
+all tests returned to green after each was reverted.** **`server/` is unchanged** — both
+frozen corpora are byte-identical, and `APP_VERSION` and `web/BUILD_NUMBER` did not move.

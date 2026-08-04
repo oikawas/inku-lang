@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..limits import DEFAULT_LIMITS, Limits
 from ..schema import Instruction, Score
 from .compose import (
     _presence_from_ddl,
@@ -39,6 +40,7 @@ from .compose import (
 )
 from .normalize import (
     _coerce_instruction,
+    _enforce_hard_ceiling,
     _dedupe_instructions,
     _drop_invalid_relations,
     _repair_coerced_instruction,
@@ -59,6 +61,7 @@ def coerce_score(
     branch_report: dict[str, int] | None = None,
     tenkei: str = "auto",
     plugin_instructions_present: bool = False,
+    limits: Limits = DEFAULT_LIMITS,
 ) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。
 
@@ -86,7 +89,9 @@ def coerce_score(
         _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
         data = score.model_dump(by_alias=True)
         data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
-        return Score.model_validate(data)
+        # The ceiling holds on this exit too. It is a guard on drawing cost, so it
+        # must not be something INKU_COERCE_DISABLE can switch off.
+        return _enforce_hard_ceiling(Score.model_validate(data), limits)
     # v1.96 添景水準の挿入予算 (None = 無制限 = 現行挙動)
     scenery_budget: int | None
     if tenkei == "none":
@@ -131,7 +136,7 @@ def coerce_score(
     instructions = _dedupe_instructions(instructions)
     _record_branch_fire(branch_report, "dedupe_instructions", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background)
+    instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background, limits=limits)
     _record_branch_fire(branch_report, "with_ddl_coverage", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)
@@ -226,10 +231,10 @@ def coerce_score(
         _record_branch_fire(branch_report, "with_focal_event_floor", _branch_before, instructions)
         _scenery_spend(_branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_per_instruction_density_budget(instructions)
+    instructions = _with_per_instruction_density_budget(instructions, limits)
     _record_branch_fire(branch_report, "with_per_instruction_density_budget", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_total_density_budget(instructions)
+    instructions = _with_total_density_budget(instructions, limits)
     _record_branch_fire(branch_report, "with_total_density_budget", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
@@ -248,4 +253,6 @@ def coerce_score(
     if score.presence is None and effective_presence is not None:
         data["presence"] = effective_presence
     data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
-    return Score.model_validate(data)
+    # Last word. Every governor above has had its say; nothing after this may
+    # grow a count back, which is why it sits at the exit and not beside them.
+    return _enforce_hard_ceiling(Score.model_validate(data), limits)

@@ -78,7 +78,10 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     for case in generator.build_expand_inputs().values():
         assert set(case) == expand_fields
 
-    coerce_fields = set(inspect.signature(coerce_score).parameters) - {"branch_report"}
+    # `branch_report` is an out-parameter and `limits` is the injection seam the
+    # follow-up settings contract writes through -- neither describes a case, so
+    # neither belongs in a per-case input record.
+    coerce_fields = set(inspect.signature(coerce_score).parameters) - {"branch_report", "limits"}
     for case in generator.build_coerce_inputs().values():
         assert set(case) == coerce_fields
         score = case["score"]

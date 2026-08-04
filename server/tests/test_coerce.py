@@ -1,6 +1,8 @@
 import pytest
 
 from inku_server.coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
+from inku_server.coerce.normalize import _mark_count, _with_total_density_budget
+from inku_server.limits import DEFAULT_LIMITS
 from inku_server.schema import Score
 
 
@@ -3027,7 +3029,11 @@ def test_coerce_keeps_grid_for_literal_english_tiling_request():
     arr = fixed.instructions[0].arrangement
     assert arr is not None
     assert arr.layout == "grid"
-    assert arr.count == 400
+    # The literal count survives the grid restoration. It loses exactly one cell
+    # to the hard ceiling, because coerce adds a composition anchor of its own and
+    # 400 tiles plus one anchor is 401 marks -- one over the per-work total.
+    assert arr.count == DEFAULT_LIMITS.max_expanded_primitives - 1
+    assert sum(_mark_count(ins) for ins in fixed.instructions) <= DEFAULT_LIMITS.max_expanded_primitives
 
 
 def test_coerce_restores_literal_grid_count_and_full_field_margin():
@@ -3060,7 +3066,9 @@ def test_coerce_restores_literal_grid_count_and_full_field_margin():
     )
     arr = fixed.instructions[0].arrangement
     assert arr is not None
-    assert arr.count == 2000
+    # The restoration still reads 2000 out of the description and still clears the
+    # mismatched rows/cols; the hard ceiling is what brings the total back down.
+    assert arr.count == DEFAULT_LIMITS.max_expanded_primitives - 1
     assert arr.rows is None and arr.cols is None
     assert arr.margin == 0.08
     assert arr.density == "none"
@@ -3097,7 +3105,9 @@ def test_coerce_restores_missing_literal_grid_arrangement():
     grid = fixed.instructions[0].arrangement
     assert grid is not None
     assert grid.layout == "grid"
-    assert grid.count == 600
+    # 600 tiles were restored from the description and then met the ceiling; the
+    # three arcs beside them are small enough to come through whole.
+    assert grid.count == DEFAULT_LIMITS.max_expanded_primitives - 3
     assert grid.margin == 0.08
     assert grid.path == "none"
     assert grid.density == "none"
@@ -3125,7 +3135,8 @@ def test_coerce_restores_missing_literal_grid_with_default_count():
     grid = fixed.instructions[0].arrangement
     assert grid is not None
     assert grid.layout == "grid"
-    assert grid.count == 400
+    # Same one-cell toll as the explicit four-hundred case above.
+    assert grid.count == DEFAULT_LIMITS.max_expanded_primitives - 1
 
 
 def test_coerce_preserves_literal_grid_against_style_and_density_interventions():
@@ -3166,9 +3177,14 @@ def test_coerce_preserves_literal_grid_against_style_and_density_interventions()
     )
     arr = grid.arrangement
     assert arr is not None
-    assert arr.count == 2000
-    assert arr.rows == 40
-    assert arr.cols == 50
+    # Style and density interventions still leave the lattice alone. The hard
+    # ceiling does reach it -- deliberately, it is the one bound no layout is
+    # exempt from -- but it drops the lattice to a smaller lattice of the same
+    # shape rather than punching holes in it.
+    assert arr.rows is not None and arr.cols is not None
+    assert arr.rows * arr.cols <= DEFAULT_LIMITS.max_expanded_primitives
+    assert arr.count == arr.rows * arr.cols
+    assert abs((arr.rows / arr.cols) / (40 / 50) - 1) < 0.10
     assert arr.jitter == 0.2
     assert arr.path == "none"
     assert arr.margin == 0.08
@@ -3205,11 +3221,27 @@ def test_total_density_budget_does_not_charge_or_shrink_grid():
         }
     )
 
+    # The governor itself is what this test is about, so measure the governor.
+    governed = _with_total_density_budget(list(score.instructions))
+    governed_grid = next(i for i in governed if i.arrangement and i.arrangement.layout == "grid")
+    governed_scatter = next(i for i in governed if i.arrangement and i.arrangement.layout == "scatter")
+    assert governed_grid.arrangement is not None
+    assert governed_grid.arrangement.count == 2000
+    assert governed_grid.arrangement.rows == 40 and governed_grid.arrangement.cols == 50
+    assert governed_scatter.arrangement is not None
+    assert governed_scatter.arrangement.count < 500
+
+    # Through the entry point the grid is no longer untouchable: the hard ceiling
+    # runs after every governor and answers to no layout. The exemption above is
+    # about thinning, which would leave a lattice full of holes; the ceiling
+    # shrinks the lattice instead.
     fixed = coerce_score(score)
     grid = next(ins for ins in fixed.instructions if ins.arrangement and ins.arrangement.layout == "grid")
     scatter = next(ins for ins in fixed.instructions if ins.arrangement and ins.arrangement.layout == "scatter")
 
-    assert grid.arrangement is not None and grid.arrangement.count == 2000
-    assert grid.arrangement.rows == 40 and grid.arrangement.cols == 50
+    assert grid.arrangement is not None
+    assert grid.arrangement.rows is not None and grid.arrangement.cols is not None
+    assert abs((grid.arrangement.rows / grid.arrangement.cols) / (40 / 50) - 1) < 0.10
     assert scatter.arrangement is not None
     assert scatter.arrangement.count < 500
+    assert sum(_mark_count(ins) for ins in fixed.instructions) <= DEFAULT_LIMITS.max_expanded_primitives

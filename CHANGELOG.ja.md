@@ -2958,3 +2958,43 @@ DDL が唯一の**ルート**になっても、DDL が唯一の**作者**には�
 **マージ後に初めて落ちた 2 件**は、v2.9.40 のテストが切断前の前提（Stage 2 が記述を受け取る）を
 持っていたためで、性質を保ったまま現物へ合わせた。**消えたテストは 0 件**（main 側の 3 件は
 レポートが宣言した改名で、中身は裏返しと対照の新設）。
+
+### v2.9.42 (Build 848) — 黙っている送り手には、既定だけが描かれる
+
+**契約 `cli-feature-parity`（実装セッション・Opus 5）を受け入れた。**
+`/api/paint` は 1 つのリクエストモデルを受けるが、**送り手ごとに名指しする鍵の数が違う**。
+37 フィールドのうち **web は 33・CLI は 17**。**絵を変える 8 つ**を CLI へ足した —
+`sketch` / `sketch_grain` / `sketch_text` / `variation_amplitude` / `variation_seed` /
+`wild` / `catalog_mode` / `interpretation_seed`。綴りはサーバーの鍵名から機械的に導く。
+`paint` と `batch` の両方が受け取る。
+
+**CLI から描いた絵には、写生文が一度も存在しなかった。** 送らない鍵はエラーにならず、
+pydantic が既定で埋めて 200 を返す。**Stage 0.5 は web で既定 on・サーバー既定 off** なので、
+`cli/out2/` の 51 ラン・ベンチ・参照コーパスは**この層を一度も通っていない**。
+本版で `inku-cli` から初めて発火した（実描画 2 本・保存された作品の `sketch_text` は非空・
+`sketch_grain` は `fine`、旗なし側は `null`）。
+
+**既定は 1 つも変えていない。** 旗を渡さなければ送信本文は前の版と同一
+（実測: 旗なしの送信鍵は前版と同じ・辞書の 17 鍵は不変・8 本すべてを渡すと 25）。
+`False` は `None` ではないので、`or None` を外すと 18 鍵目が毎回の実行へ乗る。
+
+**成果物 JSON は 3 鍵を明示する** — `sketch_text` / `sketch_grain` / `sketch_fallback_used`。
+応答は null のフィールドを本文から落とすので、書き写しただけでは
+**「ここでは Stage 0.5 を頼まなかった」が、古い CLI・古いサーバー・切れたファイルと見分けられない**。
+
+**送り手の点呼を置いた**（`server/tests/test_cli_sender_census.py`）。
+`PaintRequest` のフィールドを列挙し、各フィールドが `_paint_payload` に現れるか、
+**理由つきの除外表 12 件**（履歴・系譜 9・`color_map`・`history_at`・`auto_repair`）に
+載っていることを表明する。**見た件数も表明する**ので、列挙が空になっても緑にはならない。
+CLI は別の venv に住むので `cli/src/inku_cli/cli.py` を**テキストとして読み `ast` で解く**。
+**`cli/` ディレクトリが無ければ skip**（pentala は部分木で `cli/` を持たない）。
+既存の `TestClient` 検査 14 ファイルがこれを捕まえられなかったのは、**どれも自分が試す鍵を
+明示送信するから**である。**送らない送り手に何が起きるかを見ている検査が 1 本も無かった。**
+
+**`cli/README.md` の usage は 3 世代ずれていた** — `--original-text`（現 `--description`）・
+`--vary-seed` / `--vary`（現 `--composition-seed` / `--composition-count`）・
+`--staffage` と `--trace` の欠落・位置引数が `prompt text`。パーサから生成し直した。
+**次に旗を足す人が README を忘れても赤くならない構造は残っている**（全数のゲートは [I-127] で裁定待ち）。
+
+**サーバーの製品コードは 1 バイトも動いていない**（凍結コーパス `ddl-engine-6` /
+`render-engine-21` はバイト一致。`server/` の変更はこの点呼テスト 1 本だけ）。

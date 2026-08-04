@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.41 / Build 847**
+**Target version: v2.9.42 / Build 848**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -205,6 +205,10 @@ stage default — and never guesses.
 `inku-cli` uses only the public HTTP API.
 It carries drawing, history, plugin, reference-dump, administrative, and benchmark commands, and does
 not import server internals.
+**Feature tests run through this CLI.**
+When a flag does not exist yet, it is implemented in the CLI first and tested there.
+**An unnamed key is not an error — it is filled with a default — so request fields are counted per
+sender** (`server/tests/test_cli_sender_census.py`).
 
 ### android
 
@@ -222,7 +226,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-20` (525 cases) and `ddl-engine-5` (33 cases) are current, and CI enforces
+`render-engine-21` (525 cases) and `ddl-engine-6` (36 cases) are current, and CI enforces
 byte-identical regeneration.
 - **`cli/tests`** — pytest.
 - **`npm run check`**, **`lint:i18n`**, **`lint:models`**, **`lint:recommendations`** — web types,

@@ -3027,3 +3027,48 @@ seed alone.** It now reads the cut description, and a gate watches the seed.
 that Stage 2 receives a description; they were moved to the current shape with the property intact.
 **No test was deleted** (the three names missing from main are the renames the report declared,
 rewritten as inversions with a new control).
+
+### v2.9.42 (Build 848) — a sender that stays quiet gets the defaults drawn
+
+**The `cli-feature-parity` contract (implementation session, Opus 5) is accepted.**
+`/api/paint` takes one request model, but **each sender names a different number of keys**:
+of its 37 fields the **web UI sent 33 and the CLI 17**. The **eight that change the drawing**
+are now named by the CLI -- `sketch`, `sketch_grain`, `sketch_text`, `variation_amplitude`,
+`variation_seed`, `wild`, `catalog_mode`, `interpretation_seed` -- spelled straight from the
+server's request keys, and accepted by both `paint` and `batch`.
+
+**No drawing made from the command line had ever had a sketch.** An unnamed field is not an
+error: pydantic fills the default and returns 200. Stage 0.5 is **on by default in the web UI
+and off by default on the server**, so the 51 runs under `cli/out2/`, the benches, and the
+reference corpora had **never once gone through that layer**. This version is the first time
+it fired from `inku-cli` (two real drawings: the saved work has a non-empty `sketch_text` and
+`sketch_grain` `fine`; without the flag both are `null`).
+
+**Not one default changed.** With no flags the request body is identical to the previous
+version (measured: same keys as before, the dict's 17 unchanged, 25 with all eight passed).
+`False` is not `None`, so dropping the `or None` would put an eighteenth key on the wire for
+every existing run.
+
+**The artifact JSON now names three keys explicitly** -- `sketch_text`, `sketch_grain`,
+`sketch_fallback_used`. The response omits null fields, so copying it through means
+**"Stage 0.5 was not asked for here" is indistinguishable from an older CLI, an older server,
+or a truncated file**.
+
+**A roll call of the senders is in place** (`server/tests/test_cli_sender_census.py`). It
+enumerates `PaintRequest` and asserts that every field either appears in `_paint_payload` or
+sits in an **excuse table of 12** (nine history/lineage fields, `color_map`, `history_at`,
+`auto_repair`), each with its reason. **It also states how many it looked at**, so an
+enumeration that silently empties out cannot pass. The CLI lives in its own virtualenv, so the
+census **reads `cli/src/inku_cli/cli.py` as text and parses it with `ast`**, and **skips when
+the `cli/` directory is absent** (pentala holds a partial tree). The 14 existing `TestClient`
+suites missed this because **every one of them names the fields it tests**: nothing was
+watching what happens to a client that stays quiet.
+
+**The usage block in `cli/README.md` was three generations stale** -- `--original-text` (now
+`--description`), `--vary-seed` / `--vary` (now `--composition-seed` / `--composition-count`),
+`--staffage` and `--trace` missing, the positional described as `prompt text`. It is
+regenerated from the parser. **Nothing yet goes red when the next flag skips the manual**; how
+to close that is [I-127].
+
+**No server production code moved** (frozen corpora `ddl-engine-6` and `render-engine-21` are
+byte-identical; the only change under `server/` is the census test itself).

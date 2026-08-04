@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.9.41 / Build 847**
+**対象バージョン: v2.9.42 / Build 848**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -169,6 +169,10 @@ localStorage への保存・server への永続・描画要求への同梱は、
 
 `inku-cli` は公開 HTTP API だけを使う。
 描画・履歴・プラグイン・参照 dump・管理コマンド・ベンチマーク補助を持ち、server の内部モジュールを import しない。
+**機能テストはこの CLI を通す。**
+旗が無ければ、まず CLI に実装してからテストする。
+**送らない鍵はエラーにならず既定で埋まるので、リクエストのフィールドは送り手ごとに数える**
+（`server/tests/test_cli_sender_census.py`）。
 
 ### android
 
@@ -181,7 +185,7 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
-現役は `render-engine-20`（525 件）と `ddl-engine-5`（33 件）で、再生成のバイト一致を CI が強制する。
+現役は `render-engine-21`（525 件）と `ddl-engine-6`（36 件）で、再生成のバイト一致を CI が強制する。
 - **`cli/tests`** — pytest。
 - **`npm run check`** と **`lint:i18n`** / **`lint:models`** / **`lint:recommendations`** — web の型と用語とモデル解決。
 - **`npm run test:unit`** — web の純関数の単体テスト（Node の `node:test`。依存を足していない）。

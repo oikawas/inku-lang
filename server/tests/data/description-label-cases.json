@@ -1,0 +1,125 @@
+{
+  "note": "Read by server/tests/test_description_labels.py and by web/src/lib/description-labels.test.ts. The rule lives in two languages because the editor has to paint exactly what the server drops; this file is what keeps them the same rule.",
+  "cases": [
+    {
+      "why": "a plain description is untouched",
+      "text": "花の色はうつりにけりないたづらに",
+      "pipeline": "花の色はうつりにけりないたづらに",
+      "spans": []
+    },
+    {
+      "why": "half-width number and full stop",
+      "text": "1. 花の色はうつりにけりな",
+      "pipeline": "花の色はうつりにけりな",
+      "spans": [[0, 3, "number"]]
+    },
+    {
+      "why": "a leading zero is still a number",
+      "text": "01. 花の色",
+      "pipeline": "花の色",
+      "spans": [[0, 4, "number"]]
+    },
+    {
+      "why": "full-width digits and a full-width stop",
+      "text": "０１．花の色",
+      "pipeline": "花の色",
+      "spans": [[0, 3, "number"]]
+    },
+    {
+      "why": "an ideographic space is how a numbered line is written in Japanese",
+      "text": "１　花の色",
+      "pipeline": "花の色",
+      "spans": [[0, 2, "number"]]
+    },
+    {
+      "why": "a closing parenthesis is a numbering too",
+      "text": "12） 花の色",
+      "pipeline": "花の色",
+      "spans": [[0, 4, "number"]]
+    },
+    {
+      "why": "a colon as well",
+      "text": "3: 花の色",
+      "pipeline": "花の色",
+      "spans": [[0, 3, "number"]]
+    },
+    {
+      "why": "a year is description, not a number label",
+      "text": "2026年の春の雪",
+      "pipeline": "2026年の春の雪",
+      "spans": []
+    },
+    {
+      "why": "a count is description: no separator follows the digit",
+      "text": "3本の線を引く",
+      "pipeline": "3本の線を引く",
+      "spans": []
+    },
+    {
+      "why": "a half-width space alone does not make a digit a label",
+      "text": "3 本の線を引く",
+      "pipeline": "3 本の線を引く",
+      "spans": []
+    },
+    {
+      "why": "a bracketed source is a comment",
+      "text": "花の色はうつりにけりな [疎  紀友則 / 古今和歌集（春下）]",
+      "pipeline": "花の色はうつりにけりな",
+      "spans": [[12, 32, "comment"]]
+    },
+    {
+      "why": "full-width brackets are comments too",
+      "text": "花の色［出典］",
+      "pipeline": "花の色",
+      "spans": [[3, 7, "comment"]]
+    },
+    {
+      "why": "a comment in the middle does not leave a double space",
+      "text": "春の雪 [出典] が降る",
+      "pipeline": "春の雪 が降る",
+      "spans": [[4, 8, "comment"]]
+    },
+    {
+      "why": "both rules at once",
+      "text": "01. 花の色はうつりにけりな [紀友則]",
+      "pipeline": "花の色はうつりにけりな",
+      "spans": [[0, 4, "number"], [16, 21, "comment"]]
+    },
+    {
+      "why": "an unclosed bracket is description: it must not swallow the rest",
+      "text": "花の色 [出典 が降る",
+      "pipeline": "花の色 [出典 が降る",
+      "spans": []
+    },
+    {
+      "why": "every line of a batch carries its own number",
+      "text": "1. 春の雪\n2. 夏の川\n3. 秋の月",
+      "pipeline": "春の雪\n夏の川\n秋の月",
+      "spans": [[0, 3, "number"], [7, 10, "number"], [14, 17, "number"]]
+    },
+    {
+      "why": "a comment may sit on a line of its own",
+      "text": "春の雪\n[古今和歌集]\n降る",
+      "pipeline": "春の雪\n\n降る",
+      "spans": [[4, 11, "comment"]]
+    },
+    {
+      "why": "two comments on one line",
+      "text": "[a]春の雪[b]",
+      "pipeline": "春の雪",
+      "spans": [[0, 3, "comment"], [6, 9, "comment"]]
+    },
+    {
+      "why": "an empty description stays empty",
+      "text": "",
+      "pipeline": "",
+      "spans": []
+    },
+    {
+      "why": "a line that is only a label becomes empty, and the break is kept",
+      "text": "1.\n春の雪",
+      "pipeline": "\n春の雪",
+      "spans": [[0, 2, "number"]]
+    }
+  ]
+}

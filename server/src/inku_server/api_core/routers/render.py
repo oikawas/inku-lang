@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from ...color_catalogs import color_catalog_ids
 from ...color_selector import select_catalog_id
+from ...description_labels import pipeline_description
 from ...coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from ...composer import _finalize_score, compose
 from ...interpreter import _sanitize_placement_words, interpret_detail
@@ -1258,12 +1259,17 @@ def api_variation_seeds(
 
 @router.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
 def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> ComposeResponse:
+    # The author's leading numbers and bracketed comments are their document,
+    # not their description: they are cut once, here, so that no layer -- Stage
+    # 0.5 included -- and no client can read them.  req.description stays whole
+    # for saving and display (see description_labels).
+    description = pipeline_description(req.description)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     t0 = time.perf_counter()
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     instruction_lang_resolved = _resolve_instruction_lang(
-        req.description or req.ddl,
+        description or req.ddl,
         instruction_lang_requested,
         ui_lang=ui_lang,
     )
@@ -1273,7 +1279,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     # stands in for the description for the plugin expansion, Stage 1.5,
     # Stage 2 and coerce -- the same four places it stands in during a paint.
     sketch_grain = normalize_sketch_grain(req.sketch_grain) if req.sketch_text else None
-    source_text = (req.sketch_text or "").strip() or req.description
+    source_text = (req.sketch_text or "").strip() or description
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
     resolved_variation_amplitude = _validated_variation_amplitude(req.variation_amplitude)
     resolved_variation_seed = (
@@ -1352,7 +1358,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     render_metadata = {
         **render_metadata,
         **_render_hash_metadata(
-            input_text=req.description or req.ddl,
+            input_text=description or req.ddl,
             ddl=compose_detail.ddl,
             score=score,
             svg=svg,
@@ -1394,30 +1400,35 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
 
 @router.post("/api/interpret")
 def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
+    # The author's leading numbers and bracketed comments are their document,
+    # not their description: they are cut once, here, so that no layer -- Stage
+    # 0.5 included -- and no client can read them.  req.description stays whole
+    # for saving and display (see description_labels).
+    description = pipeline_description(req.description)
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     # Settled on the author's own words: Stage 0.5 writes in the language it is
     # told to, so reading its output back would be circular.
     instruction_lang_resolved = _resolve_instruction_lang(
-        req.description, instruction_lang_requested, ui_lang=ui_lang
+        description, instruction_lang_requested, ui_lang=ui_lang
     )
     sketch_result = _resolved_sketch(
         req.sketch,
         req.sketch_text,
         req.sketch_grain,
-        description=req.description,
+        description=description,
         model=_resolved_stage1_model(req.model, actor),
         lang=instruction_lang_resolved,
     )
     # Stage 0.5 stands in for the description for Stage 1 and for the expansion
     # below, the same two places it stands in during a paint.
-    source_text = sketch_result.text if sketch_result is not None else req.description
+    source_text = sketch_result.text if sketch_result is not None else description
     # Stage 1 が読むのは、記述に文脈を注入したあとの文字列。注入しない client は
     # stage1_input を送ってこないので、そのときは記述そのものを読む。
     stage1_text = (
         sketch_result.text
         if sketch_result is not None
-        else (req.stage1_input or req.description)
+        else (pipeline_description(req.stage1_input) if req.stage1_input else description)
     )
     resolved_tenkei = req.tenkei or "auto"
     try:
@@ -1613,20 +1624,25 @@ def _paint_events(
     finished, its DDL and token counts are known) followed by ``done`` (the
     complete PaintResponse).
     """
+    # The author's leading numbers and bracketed comments are their document,
+    # not their description: they are cut once, here, so that no layer -- Stage
+    # 0.5 included -- and no client can read them.  req.description stays whole
+    # for saving and display (see description_labels).
+    description = pipeline_description(req.description)
     t0 = time.perf_counter()
     instruction_lang_requested = _normalize_instruction_lang(req.instruction_lang)
     ui_lang = _normalize_ui_lang(req.ui_lang)
     # The language is settled on the author's own words: Stage 0.5 writes in the
     # language it is told to, so reading it back would be circular.
     instruction_lang_resolved = _resolve_instruction_lang(
-        req.description, instruction_lang_requested, ui_lang=ui_lang
+        description, instruction_lang_requested, ui_lang=ui_lang
     )
     resolved_stage1_model = _resolved_stage1_model(req.stage1_model, actor)
     sketch_result = _resolved_sketch(
         req.sketch,
         req.sketch_text,
         req.sketch_grain,
-        description=req.description,
+        description=description,
         model=resolved_stage1_model,
         lang=instruction_lang_resolved,
         include_trace=req.include_trace,
@@ -1636,11 +1652,11 @@ def _paint_events(
     # into stage1_input alone would leave the other four reading the raw
     # description, and the range the layer exists to open would not appear
     # (contract section 0.2). req.description is kept for saving and display.
-    source_text = sketch_result.text if sketch_result is not None else req.description
+    source_text = sketch_result.text if sketch_result is not None else description
     stage1_text = (
         sketch_result.text
         if sketch_result is not None
-        else (req.stage1_input or req.description)
+        else (pipeline_description(req.stage1_input) if req.stage1_input else description)
     )
     catalog_id = _resolved_paint_catalog_id(
         req.catalog_id, mode=req.catalog_mode, source_text=source_text

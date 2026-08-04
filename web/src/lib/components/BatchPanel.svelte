@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import LabelHighlight from './LabelHighlight.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 
@@ -84,6 +85,7 @@
 
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let batchScrollTop = $state(0);
+	let batchScrollLeft = $state(0);
 	let selectedHistoryPrompt = $state('');
 	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
 	const batchActiveLineStyle = $derived(
@@ -145,6 +147,7 @@
 		{#if batchRunning && batchActiveLine !== null}
 			<div class="batch-active-line" style={batchActiveLineStyle}></div>
 		{/if}
+		<LabelHighlight text={batchInput} wrap={false} scrollTop={batchScrollTop} scrollLeft={batchScrollLeft} />
 		<textarea
 			class="batch-ta"
 			bind:this={batchTextareaEl}
@@ -154,7 +157,10 @@
 			wrap="off"
 			placeholder={t().batchPlaceholder}
 			readonly={batchRunning}
-			onscroll={() => (batchScrollTop = batchTextareaEl?.scrollTop ?? 0)}
+			onscroll={() => {
+				batchScrollTop = batchTextareaEl?.scrollTop ?? 0;
+				batchScrollLeft = batchTextareaEl?.scrollLeft ?? 0;
+			}}
 		></textarea>
 	</div>
 </div>

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.38 / Build 843**
+**Target version: v2.9.39 / Build 845**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -160,8 +160,9 @@ An authenticated single-page application with description, work, batch, demo, an
 
 - Description entry and reproducible refinement (touch, placement, reading), plus AI autonomous
 refinement and variation
-- 13 color catalogs (`color_catalogs.py`; every catalog carries all 9 colors), canvas ratios, tenkei
-level, and display mode
+- 13 color catalogs (`color_catalogs.py`; every catalog carries all 9 colors) plus "from the
+description", canvas ratios, tenkei level, and display mode. The catalog selection is stored per
+user on the server
 - Per-user history, stars, revision marks, comments, trash, search, lineage groups, and explicit lineage
 nodes and edges.
 The two marks are independent: filtering on both shows only the works that carry both

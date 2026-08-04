@@ -2883,16 +2883,28 @@ active line is highlighted and the current DDL interpretation is displayed
 read-only.  Batch execution keeps failure reports until the next batch run, and
 stores batch prompt history per user.
 
-Batch mode can optionally let the server choose a color catalog by reading each
-line. The request carries the selected catalog as `catalog_id` and sets
-`catalog_mode` to `auto`; `catalog_id` is then the fallback the server keeps when
-the model is unreachable or names a catalog that does not exist. History records
-store the catalog that was actually used. **Until v2.9.22 this option drew a
-catalog at random in the browser.**
+Letting the server choose a color catalog by reading each line is **not a batch
+option but the catalog selection itself** (below). **Until v2.9.39 the batch tab
+carried its own checkbox for it, and until v2.9.22 that checkbox drew a catalog
+at random in the browser.**
 
-In the color catalog dialog, clicking outside the dialog confirms the current
-selection exactly like the save/confirm action. The cancel button still restores
-the selection snapshot from when the dialog was opened.
+The color catalog dialog puts **"From the description" above the thirteen
+catalogs**.  It is a choice with no colors of its own: while it is selected, the
+server reads the description on every drawing and decides the catalog (the
+request sets `catalog_mode` to `auto` and carries the default catalog as
+`catalog_id`, which is the fallback the server keeps when the model is
+unreachable or names a catalog that does not exist).  History records store the
+catalog that was actually used, so **refinement and redrawing do not inherit the
+automatic choice: they draw with the artwork's own catalog**.
+
+**The catalog selection is stored per user on the server**
+(`model_settings.color_catalog_id`).  Drawing needs a session, so a browser-wide
+value would only ever be another user's selection.  Only a catalog that still
+exists, or `auto`, can be stored; a retired id falls back to the default.
+
+Clicking outside the dialog confirms the current selection exactly like the
+save/confirm action. The cancel button still restores the selection snapshot from
+when the dialog was opened.
 
 ### Demo Drawing
 
@@ -2901,11 +2913,10 @@ waits for the configured interval, and repeats.  Demo settings are stored per
 user.  Demo results are not saved by default; the user can explicitly save a
 current render to history.
 
-Demo mode can also let the server choose a color catalog by reading each
-description.  This option is part of the per-user demo settings, which hold it as
-`catalog_mode` (`fixed` or `auto`).  The status bar reflects the catalog reported
-by the render result, not only the current global catalog selection.
-**Until v2.9.22 this option drew a catalog at random.**
+Demo draws with the same selection.  The status bar reflects the catalog reported
+by the render result, not only the current catalog selection.  **Until v2.9.39 the
+per-user demo settings held a `catalog_mode` of their own, and until v2.9.22 that
+option drew a catalog at random.**
 
 `/api/paint` takes `catalog_mode` as one of `fixed`, `auto`, and `random`.
 `fixed` uses `catalog_id` as given, `auto` reads the description, and `random`

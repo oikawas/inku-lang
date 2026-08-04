@@ -2929,3 +2929,36 @@ the prose.
 **The frozen corpora are byte-identical** (`render-engine-21` 525, `ddl-engine-5` 33).
 **No corpus case passes through Stage 0.5 at all**, so this is a regression guard, not evidence
 that the change works.
+
+### v2.9.39 (Build 845) — "From the description" becomes one of the color catalogs, and the choice is the user's
+
+**The batch tab's "Choose a color catalog from each description" checkbox is gone; the color
+catalog dialog now offers "From the description" above the thirteen.** The demo panel's second
+copy of the same checkbox (the `catalog_mode` its per-user settings held) is folded in as well.
+**A single draw could not reach the automatic choice at all** -- it existed only in the batch and
+demo tabs, although the mechanism has been in `/api/paint` all along.
+
+**The selection is stored per user on the server** (`model_settings.color_catalog_id`), not in
+localStorage: **every render route requires a session, so nothing can be drawn while logged out**
+(`_current_user` has no anonymous mode, and all six unauthenticated routes serve the login
+screen). A browser-wide value would only ever be another user's selection. **No migration seed was
+kept**: it would leak one user's choice to the next user on the same browser, so existing users
+start again at inku Default.
+
+**The `auto` sentinel does not leave its module.** Sixteen places read the selection directly, and
+eight of them send or store it as a `catalog_id` (history payloads, lineage, refinement,
+comparison). The translation sits in the one render-payload contributor, so everything downstream
+receives a catalog that exists -- only `/api/paint` can carry `catalog_mode`, and the sentinel
+would be a 422 anywhere else. **Stored artworks do not inherit the automatic choice**: refinement
+and redrawing read the artwork's own catalog id.
+
+**The server stores only a catalog that still exists, or `auto`.** A retired id falls back to the
+default, since storing it would just answer 422 on the next drawing.
+
+**The gates were measured by perturbing production code**: not translating the sentinel turns 2
+web tests red, dropping the field from the patch path turns 3 server tests red, removing the
+allowlist turns 2 red, and taking the choice out of the modal turns 1 red. **The control** (change
+a catalog's colors, leave the transport alone) **stays green on all 12.**
+
+**The API surface lost exactly one field**, `catalog_mode` on `DemoSettingsBody` (endpoints 81,
+operations 81, schemas 80 unchanged). The frozen corpora are byte-identical.

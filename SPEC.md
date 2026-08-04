@@ -1821,6 +1821,15 @@ grain stays a replay.
 A failed attempt is not recorded as prose.  A saved work redraws from its stored prose without
 calling the layer again.
 
+**What the layer did is recorded on the work** (`sketch_state`, v2.9.43).  Absent prose can mean
+**four different things**, so the state is written down separately: `fine` / `coarse` (the layer
+ran and produced prose at that grain), **`fallback` (it ran and fell over)**, `off` (it was
+available and the caller chose not to route through it), and `not_applicable` (this route never
+calls the layer).  **`NULL` marks only a work drawn before this record existed; it is not a
+synonym for "off".**  The column carries no default and is never backfilled -- filling it would
+destroy the one fact it holds, that the work predates the layer's record.  **A single function
+names the state, and every save path and every response goes through it.**
+
 The layer must not emit words of feeling (design principles 3 and 7, section 13.3).  Its prose
 names things, their placement and their state.  **It follows that meaning words absent from the
 normalized DDL are the design, not a carriage failure** -- "night" travels as "fill the background

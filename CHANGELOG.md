@@ -3072,3 +3072,45 @@ to close that is [I-127].
 
 **No server production code moved** (frozen corpora `ddl-engine-6` and `render-engine-21` are
 byte-identical; the only change under `server/` is the census test itself).
+
+### v2.9.43 (Build 849) — the work writes down what the sketch layer did
+
+**An empty `sketch_text` meant four different things at once**: the work predates the layer,
+the author switched the layer off, the route never calls it, or **the layer ran and fell
+over**. The fourth was recorded nowhere, so **a layer that collapsed was stored exactly like a
+layer that never ran, and nobody could count how often Stage 0.5 fails in production.**
+
+`history.sketch_state` was added **with no default and no backfill**, so `NULL` keeps exactly
+one meaning: **this row was written before the column existed**. There are five values:
+
+| value | meaning | `sketch_text` |
+|---|---|---|
+| `fine` / `coarse` | the layer ran and produced sketch prose at that grain | not NULL |
+| `fallback` | **the layer ran, fell over, and the description was drawn as written** | NULL |
+| `off` | the layer was available and the caller chose not to route through it | NULL |
+| `not_applicable` | this route never calls the layer (no description: new from a plan, or DDL input) | NULL |
+
+**One function names the state** -- `sketch_state_of()` in `server/src/inku_server/sketch.py`.
+All three save paths and both responses go through it, so **"off" cannot mean different things
+in different writers.** `POST /api/history` takes a state from the client (pattern-checked, so
+an unknown value is a 422) and **derives one when the client says nothing**: a `NULL` written
+there would claim a row created today predates the column.
+
+**Two senders were dropping the prose entirely** -- the demo save in the web UI and the CLI's
+own `POST /api/history`. **Work saved by the CLI recorded nothing about the layer, and read
+back from the server as if it predated the column.** Both now carry all three keys.
+
+**The web UI tells the four silences apart.** The grain menu marks "off" as not recommended.
+**The note is a separate function from the label**, so it appears in the menu and nowhere else
+-- not on stored work, the collapsed toggle, the current-value summary, or a parent's grain in
+the lineage panel (five call sites, measured).
+
+**A roll call of the writers is in place** (`server/tests/test_sketch_state.py`). It counts
+**the syntax that writes `sketch_text`, via `ast`**, not line numbers, and **states the count
+it saw (8)**, so an implementation that adds the column and fixes one path is rejected. Fifteen
+perturbations, covering all five stages of the contract, were confirmed to go red.
+
+**No existing row moved**: production `history` held 2,172 rows before and after deployment
+(2,176 including the four drawn to verify), `sketch_text` is non-NULL on 23 rows as before, and
+**all 2,172 pre-existing rows have `sketch_state IS NULL`**. The migration runs when `inku-api`
+starts. `renderer` and `coerce` were untouched (frozen corpora byte-identical).

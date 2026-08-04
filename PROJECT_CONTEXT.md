@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.42 / Build 849**
+**Target version: v2.9.43 / Build 849**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -132,6 +132,10 @@ the default) and `coarse` (fewer, longer ones).
 (Stage 1, the plugin expansion's firing decision, and Stage 1.5).
 **Stage 2 and coerce read the DDL alone.** The plugin's seed -- what decides how many -- is the description.
 The description itself is kept for saving and display, and when the layer fails it goes to Stage 1 unchanged.
+**What the layer did is recorded on the work** (`sketch_state`, one of `fine`, `coarse`, `fallback`,
+`off`, `not_applicable`). **A run that fell over, a run the author switched off, and a route that
+never calls the layer are recorded separately.** `NULL` means only one thing: the work was drawn
+before the column existed.
 - **Stage 1 (interpretation)** — detects the language of the instruction and produces normalized DDL.
 The prompt is assembled from the saijiki table and holds no fixed vocabulary string of its own.
 - **Plugin expansion** — writes a validated `.inku-plugin.md` down into core DDL deterministically,

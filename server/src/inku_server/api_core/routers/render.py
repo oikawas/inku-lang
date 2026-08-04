@@ -34,6 +34,7 @@ from ...sketch import (
     normalize_sketch_grain,
     prompt_digest as _sketch_prompt_digest,
     sketch_from_life,
+    sketch_state_of,
 )
 from ... import db as _db
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
@@ -240,6 +241,10 @@ class ComposeResponse(BaseModel):
     coerce_branch_counts: dict[str, int] = Field(default_factory=dict)
     sketch_text: str | None = None
     sketch_grain: str | None = None
+    # This route saves nothing itself: the client saves what it drew through
+    # POST /api/history, so the state has to travel back with the drawing or
+    # the row it writes has no record of the layer at all.
+    sketch_state: str | None = None
     trace: dict | None = None
 
 
@@ -376,6 +381,10 @@ class PaintResponse(BaseModel):
     sketch_text: str | None = None
     sketch_grain: str | None = None
     sketch_fallback_used: bool = False
+    # What was written into the history row for this drawing (section 2.3 of the
+    # contract). sketch_fallback_used stays: the flag and the column have
+    # different readers, and the flag says nothing about the other four states.
+    sketch_state: str | None = None
     trace: dict | None = None
 
 
@@ -1276,6 +1285,19 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     # Stage 2 and coerce -- the same four places it stands in during a paint.
     sketch_grain = normalize_sketch_grain(req.sketch_grain) if req.sketch_text else None
     source_text = (req.sketch_text or "").strip() or description
+    # The same shape _resolved_sketch builds for a carried prose, so this route
+    # names its state through the one derivation function instead of its own
+    # rules. No description at all is a work authored straight in DDL.
+    sketch_detail = (
+        SketchDetail(text=(req.sketch_text or "").strip(), grain=sketch_grain)
+        if (req.sketch_text or "").strip()
+        else None
+    )
+    sketch_state = sketch_state_of(
+        sketch_detail,
+        requested=False,
+        has_description=bool((description or "").strip()),
+    )
     resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
     resolved_variation_amplitude = _validated_variation_amplitude(req.variation_amplitude)
     resolved_variation_seed = (
@@ -1387,6 +1409,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         fallback_used=compose_detail.fallback_used,
         sketch_text=req.sketch_text or None,
         sketch_grain=sketch_grain,
+        sketch_state=sketch_state,
         **coerce_report,
         trace=_assemble_trace(
             req.include_trace,
@@ -1804,6 +1827,14 @@ def _paint_events(
     sketch_recorded = sketch_result is not None and not sketch_result.fallback_used
     stored_sketch_text = sketch_result.text if sketch_recorded else None
     stored_sketch_grain = sketch_result.grain if sketch_recorded else None
+    # Three of the four events above used to be one NULL sketch_text. The state
+    # is derived once here and used by both the row and the response, so the
+    # record and what the author is shown cannot disagree.
+    sketch_state = sketch_state_of(
+        sketch_result,
+        requested=req.sketch,
+        has_description=bool((description or "").strip()),
+    )
     elapsed_stage1_ms = int((t1 - t0) * 1000)
     elapsed_stage2_ms = int((t2 - t1) * 1000)
     elapsed_total_ms = int((time.perf_counter() - t0) * 1000)
@@ -1854,6 +1885,7 @@ def _paint_events(
             # is the thing these two columns exist to answer.
             sketch_text=stored_sketch_text,
             sketch_grain=stored_sketch_grain,
+            sketch_state=sketch_state,
         )
         history_id = item["id"]
         idempotent_replay = bool(item.get("_idempotent_replay"))
@@ -1926,6 +1958,7 @@ def _paint_events(
         sketch_text=sketch_result.text if sketch_result is not None else None,
         sketch_grain=sketch_result.grain if sketch_result is not None else None,
         sketch_fallback_used=sketch_result.fallback_used if sketch_result is not None else False,
+        sketch_state=sketch_state,
         **coerce_report,
         trace=paint_trace,
     )

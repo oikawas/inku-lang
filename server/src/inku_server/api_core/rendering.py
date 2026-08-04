@@ -373,6 +373,7 @@ def _add_history_item(
     idempotency_key: str | None = None,
     sketch_text: str | None = None,
     sketch_grain: str | None = None,
+    sketch_state: str | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
     score_dict = score.model_dump(by_alias=True)
@@ -420,6 +421,7 @@ def _add_history_item(
 "idempotency_key": idempotency_key,
 "sketch_text": sketch_text,
 "sketch_grain": sketch_grain,
+"sketch_state": sketch_state,
 **metadata,
     })
     except ValueError as exc:

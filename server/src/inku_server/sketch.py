@@ -35,6 +35,10 @@ MAX_TOKENS = 1024
 SKETCH_GRAINS = ("fine", "coarse")
 DEFAULT_SKETCH_GRAIN = "fine"
 
+# What Stage 0.5 did for one drawing. Five values, and a sixth state that only
+# the database can hold: NULL, meaning the row predates the column.
+SKETCH_STATES = ("fine", "coarse", "fallback", "off", "not_applicable")
+
 
 def normalize_sketch_grain(value: str | None) -> str:
     """Resolve a requested grain. An absent or unknown value means the default."""
@@ -217,6 +221,42 @@ class SketchDetail:
     fallback_reasons: list[str] = field(default_factory=list)
     raw: str | None = None  # trace: the model's output before any trimming
     prompt_digest: str | None = None
+
+
+def sketch_state_of(
+    detail: SketchDetail | None, *, requested: bool, has_description: bool
+) -> str:
+    """The one place that names what 0.5 did, so the writers cannot disagree.
+
+    `None` is returned by no branch: a caller that has no opinion still has a
+    state. NULL in the column means the row is older than the column, and only
+    the migration may produce it.
+
+    `requested` is what the caller asked for, not what happened. When the layer
+    was asked for and nothing came back, the route did not run it, and the
+    record says so rather than "off": a wiring regression must not be written
+    down as a choice the author made.
+    """
+    if detail is not None:
+        if detail.fallback_used:
+            return "fallback"
+        return normalize_sketch_grain(detail.grain)
+    if not has_description:
+        # Nothing to sketch: a work authored straight in DDL, or any route that
+        # begins after Stage 1.
+        return "not_applicable"
+    if requested:
+        return "not_applicable"
+    return "off"
+
+
+def normalize_sketch_state(value: str | None) -> str | None:
+    """Accept a state a client claims for its own path. Unknown values are not
+    silently rewritten -- the caller turns them into a 422."""
+    if value is None:
+        return None
+    state = str(value).strip().lower()
+    return state if state in SKETCH_STATES else None
 
 
 def sketch_from_life(

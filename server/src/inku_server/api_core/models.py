@@ -49,6 +49,12 @@ class HistoryPostBody(BaseModel):
     # prose instead of asking a non-deterministic layer for it again.
     sketch_text: str | None = None
     sketch_grain: str | None = None
+    # What Stage 0.5 did. A client knows its own path, so it may say; an unknown
+    # value is a 422 rather than a quiet not_applicable, and an absent one is
+    # derived server-side. Only a row older than the column may end up NULL.
+    sketch_state: str | None = Field(
+        default=None, pattern="^(fine|coarse|fallback|off|not_applicable)$"
+    )
     source_text: str | None = None
     display_label: str | None = None
     batch_line_number: int | None = None

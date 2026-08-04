@@ -141,6 +141,12 @@ class HistoryRow(Base):
     # the layer is not deterministic, so re-running it would not replay.
     sketch_text = Column(Text, nullable=True)
     sketch_grain = Column(String, nullable=True)
+    # What Stage 0.5 did for this work. NULL is not "off": it means the row
+    # predates this column, i.e. the work was drawn before the layer recorded
+    # what it did. Four separate events used to collapse into a NULL
+    # sketch_text -- no layer yet, layer switched off, route that never calls
+    # it, and a run that failed -- and could not be told apart afterwards.
+    sketch_state = Column(String, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -346,6 +352,10 @@ _HISTORY_COLUMN_MIGRATIONS = {
     "idempotency_key": "ALTER TABLE history ADD COLUMN idempotency_key VARCHAR",
     "sketch_text": "ALTER TABLE history ADD COLUMN sketch_text TEXT",
     "sketch_grain": "ALTER TABLE history ADD COLUMN sketch_grain VARCHAR",
+    # No DEFAULT and no backfill: existing rows keep NULL, which is what "drawn
+    # before this column existed" means. Filling them with a guess would erase
+    # the distinction the column was added to make.
+    "sketch_state": "ALTER TABLE history ADD COLUMN sketch_state VARCHAR",
 }
 _LINEAGE_NODE_COLUMN_MIGRATIONS = {
     "root_node_id": "ALTER TABLE lineage_nodes ADD COLUMN root_node_id VARCHAR",
@@ -1907,6 +1917,10 @@ def _row_to_dict(row: HistoryRow) -> dict:
         item["sketch_text"] = row.sketch_text
     if row.sketch_grain is not None:
         item["sketch_grain"] = row.sketch_grain
+    # Absent, not null: a reader that receives no key is looking at a work drawn
+    # before the column existed, and that is not the same as "off".
+    if row.sketch_state is not None:
+        item["sketch_state"] = row.sketch_state
     return item
 
 
@@ -2061,6 +2075,9 @@ def add_item(item: dict) -> dict:
         seed_text=item.get("seed_text"),
         sketch_text=item.get("sketch_text"),
         sketch_grain=item.get("sketch_grain"),
+        # Carried through, never derived here: an import restores what the
+        # exporting database recorded, and an old export legitimately has none.
+        sketch_state=item.get("sketch_state"),
         render_hash=render_hash, trashed=0, starred=0, for_revision=0, note=item.get("note"),
         source_text=source_text, display_label=item.get("display_label"),
         batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),

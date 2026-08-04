@@ -7,7 +7,7 @@
 	  marks that nothing will be sent unless the author picks a state.
 -->
 <script lang="ts">
-	import { SKETCH_MODES, sketchModeLabel, sketchModeHint, type SketchMode } from '$lib/sketch';
+	import { SKETCH_MODES, sketchModeLabel, sketchModeHint, sketchModeNote, type SketchMode } from '$lib/sketch';
 
 	type Props = {
 		value: SketchMode;
@@ -72,7 +72,16 @@
 						aria-checked={mode === value}
 						onclick={() => choose(mode)}
 					>
-						<span class="option-label">{sketchModeLabel(mode, isJapanese)}</span>
+						<!-- The note is its own element, never joined onto the label:
+						     joined, it would be indistinguishable from what
+						     sketchModeLabel returns and would follow the label to
+						     the three places that must not carry it. -->
+						<span class="option-head"
+							><span class="option-label">{sketchModeLabel(mode, isJapanese)}</span
+							>{#if sketchModeNote(mode, isJapanese)}<span class="option-note"
+									>{sketchModeNote(mode, isJapanese)}</span
+								>{/if}</span
+						>
 						<span class="option-intent">{sketchModeHint(mode, isJapanese)}</span>
 					</button>
 				{/each}
@@ -133,7 +142,10 @@
 	}
 	.sketch-menu button:hover { background: var(--bg2); }
 	.sketch-menu button.selected { background: var(--bg2); box-shadow: inset 3px 0 0 var(--fg2); }
+	.option-head { display: inline-flex; align-items: baseline; gap: 4px; }
 	.option-label { font-size: 13px; font-weight: 500; }
+	/* Weaker than the label: a note about the option, not part of its name. */
+	.option-note { font-size: 11px; color: var(--fg3); font-weight: 400; }
 	.option-intent { font-size: 11px; line-height: 1.35; color: var(--fg3); }
 
 	/* compact variant (dialogs) */

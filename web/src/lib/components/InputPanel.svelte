@@ -54,7 +54,6 @@
 		generationDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
-		batchAutoColorCatalog: boolean;
 		demoSettings: DemoSettings;
 		demoModelProviderGroups: ProviderGroup[];
 		demoRunning: boolean;
@@ -129,7 +128,6 @@
 		generationDisabled,
 		error,
 		batchPromptHistory,
-		batchAutoColorCatalog = $bindable(false),
 		demoSettings = $bindable(),
 		demoModelProviderGroups,
 		demoRunning,
@@ -177,10 +175,6 @@
 	}: Props = $props();
 
 	const isJapanese = $derived(t().code === 'ja');
-	const autoCatalogActive = $derived(
-		(inputMode === 'batch' && batchAutoColorCatalog)
-		|| (inputMode === 'demo' && demoSettings.catalog_mode === 'auto')
-	);
 
 	// Progress sits on the tab only while the batch is running, so the tab returns
 	// to its plain label the moment the run stops. batchCurrent is 0 outside a run.
@@ -315,13 +309,9 @@
 		<span class="cs-divider"></span>
 		<span class="cs-group">
 			<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
-			<!-- Batch and demo can let the server read each description, in which
-			     case the picked catalog is not knowable in advance. -->
-			{#if autoCatalogActive}
-				<span class="cs-value">{t().batchAutoColorCatalog}</span>
-			{:else}
-				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
-			{/if}
+			<!-- Reads "from the description" when that is what is selected: the page
+			     names the choice, so this shows one value either way. -->
+			<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
 		</span>
 		<span class="cs-divider"></span>
 		<span class="cs-group">
@@ -402,7 +392,6 @@
 			actionDisabled={singleRunning || generationDisabled}
 			{error}
 			{batchPromptHistory}
-			bind:autoColorCatalog={batchAutoColorCatalog}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}

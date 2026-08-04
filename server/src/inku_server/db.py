@@ -408,11 +408,7 @@ _DEMO_DEFAULT_SETTINGS = {
     "seed_phrase": "日本の四季を感じさせる文章を40語以内で生成",
     "interval_seconds": 30,
     "timeout_seconds": 3600,
-    # 2026-08-01: the demo used to draw a catalog at random. It now either keeps
-    # the selected one ("fixed") or lets the server read the description ("auto").
-    "catalog_mode": "fixed",
 }
-_DEMO_CATALOG_MODES = ("fixed", "auto")
 _EXPORT_TEMPLATE_LIMIT = 20
 _EXPORT_TEMPLATE_DEFAULTS = [
     {
@@ -2645,11 +2641,6 @@ def _normalize_demo_settings(settings: dict) -> dict:
         clean["save_db"] = bool(settings["save_db"])
     if "save_files" in settings:
         clean["save_files"] = bool(settings["save_files"])
-    if "catalog_mode" in settings:
-        mode = settings["catalog_mode"]
-        if mode not in _DEMO_CATALOG_MODES:
-            raise ValueError("demo catalog mode must be fixed or auto")
-        clean["catalog_mode"] = mode
     if "prompt_provider" in settings:
         provider = settings["prompt_provider"]
         if not isinstance(provider, str) or not provider.strip():

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getLang, t } from '$lib/i18n/index.svelte';
 	import type { ColorCatalog } from '$lib/colors';
+	import { AUTO_CATALOG_ID } from '$lib/features/color-catalog/render';
 
 	type Props = {
 		catalogs: ColorCatalog[];
@@ -28,6 +29,8 @@
 		return (r * 299 + g * 587 + b * 114) / 1000 > 224;
 	}
 
+	const autoActive = $derived(selectedCatalog === AUTO_CATALOG_ID);
+
 	function catalogSub(catalog: ColorCatalog): string {
 		return getLang() === 'ja' ? (catalog.sub_ja ?? catalog.sub) : catalog.sub;
 	}
@@ -47,6 +50,22 @@
 	</div>
 	<div class="catalog-body">
 		<div class="catalog-scroll">
+			<!-- Above the catalogs, and not one of them: it has no palette to show
+			     because the server picks per drawing. -->
+			<button
+				class="catalog-item"
+				class:active={autoActive}
+				onclick={() => onSelectCatalog(AUTO_CATALOG_ID)}
+				aria-pressed={autoActive}
+			>
+				<div class="catalog-info">
+					<div class="catalog-name-row">
+						<div class="catalog-name">{t().colorCatalogAuto}</div>
+						{#if autoActive}<span class="catalog-check" aria-hidden="true">✓</span>{/if}
+					</div>
+					<div class="catalog-sub">{t().colorCatalogAutoSub}</div>
+				</div>
+			</button>
 			{#each catalogs as cat (cat.id)}
 				{@const active = selectedCatalog === cat.id}
 				<button

@@ -674,7 +674,9 @@ def test_current_user_demo_settings_are_persisted(auth_context):
     assert initial.status_code == 200
     assert initial.json()["save_db"] is False
     assert initial.json()["save_files"] is False
-    assert initial.json()["catalog_mode"] == "fixed"
+    # The demo no longer carries a catalog mode of its own: it draws with the
+    # user's own catalog choice, "from the description" included.
+    assert "catalog_mode" not in initial.json()
     assert initial.json()["interval_seconds"] == 30
     assert initial.json()["timeout_seconds"] == 3600
 
@@ -686,11 +688,15 @@ def test_current_user_demo_settings_are_persisted(auth_context):
         "seed_phrase": "短い冬の情景を生成",
         "interval_seconds": 45,
         "timeout_seconds": 7200,
-        "catalog_mode": "auto",
     }
     updated = client.put("/api/auth/me/demo-settings", headers=headers, json=body)
     assert updated.status_code == 200
     assert updated.json() == body
+
+    # A client still sending the retired mode is accepted and does not get it back.
+    legacy = client.put("/api/auth/me/demo-settings", headers=headers, json={**body, "catalog_mode": "auto"})
+    assert legacy.status_code == 200
+    assert legacy.json() == body
 
     persisted = client.get("/api/auth/me/demo-settings", headers=headers)
     assert persisted.status_code == 200

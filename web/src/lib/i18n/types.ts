@@ -71,7 +71,8 @@ export interface LangPack {
 	batchHistoryLabel: string;
 	batchHistoryPlaceholder: string;
 	batchHistoryApply: string;
-	batchAutoColorCatalog: string;
+	colorCatalogAuto: string;
+	colorCatalogAutoSub: string;
 	batchSummary: (success: number, failed: number, total: number) => string;
 	batchFailureTitle: string;
 	batchFailureLine: (line: number) => string;
@@ -82,7 +83,6 @@ export interface LangPack {
 	batchTokenTotal: (input: number, output: number) => string;
 	demoSaveDb: string;
 	demoSaveFiles: string;
-	demoAutoColorCatalog: string;
 	demoPromptModel: string;
 	demoSectionLabel: string;
 	demoSectionHint: string;

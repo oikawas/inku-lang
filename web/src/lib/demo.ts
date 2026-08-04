@@ -8,7 +8,6 @@ export type DemoSettings = {
 	seed_phrase: string;
 	interval_seconds: number;
 	timeout_seconds: number;
-	catalog_mode: 'fixed' | 'auto';
 };
 
 export const DEFAULT_DEMO_SETTINGS: DemoSettings = {
@@ -19,5 +18,4 @@ export const DEFAULT_DEMO_SETTINGS: DemoSettings = {
 	seed_phrase: '日本の四季を感じさせる文章を40語以内で生成',
 	interval_seconds: 30,
 	timeout_seconds: 3600,
-	catalog_mode: 'fixed',
 };

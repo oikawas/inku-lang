@@ -281,6 +281,9 @@ def default_user_model_settings() -> dict[str, Any]:
         "okugaki_model": "meta/llama-3.2-90b-vision-instruct",
         "model_inspection_selected_models": [],
         "instruction_caption_visible": True,
+        # The colour catalogue the user draws with. "auto" is not a catalogue:
+        # it asks the server to read each description (see color_selector).
+        "color_catalog_id": "default",
     }
 
 
@@ -410,6 +413,24 @@ def _normalize_selected_model_ids(value: Any) -> list[str]:
     return clean
 
 
+# "auto" sits in the same slot as a catalog id but is not one: it asks the paint
+# endpoint to read the description (catalog_mode=auto).  Anything else has to be
+# a catalog that still exists -- a retired id would be stored only to answer 422
+# on the next drawing.
+AUTO_COLOR_CATALOG_ID = "auto"
+
+
+def _normalize_catalog_choice(value: Any) -> str:
+    from .color_catalogs import DEFAULT_COLOR_CATALOG_ID, color_catalog_ids
+
+    if not isinstance(value, str):
+        return DEFAULT_COLOR_CATALOG_ID
+    choice = value.strip()
+    if choice == AUTO_COLOR_CATALOG_ID or choice in color_catalog_ids():
+        return choice
+    return DEFAULT_COLOR_CATALOG_ID
+
+
 _USER_PROVIDER_KEYS = ("stage1_provider", "stage2_provider", "vision_provider", "okugaki_provider")
 _USER_MODEL_KEYS = ("stage1_model", "stage2_model", "vision_model", "okugaki_model")
 
@@ -438,6 +459,7 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
         clean["okugaki_model"] = okugaki_bare
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
     clean["instruction_caption_visible"] = settings.get("instruction_caption_visible") is not False
+    clean["color_catalog_id"] = _normalize_catalog_choice(settings.get("color_catalog_id"))
     return clean
 
 
@@ -453,6 +475,8 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
         clean["instruction_caption_visible"] = bool(patch["instruction_caption_visible"])
     if "model_inspection_selected_models" in patch:
         clean["model_inspection_selected_models"] = _normalize_selected_model_ids(patch.get("model_inspection_selected_models"))
+    if "color_catalog_id" in patch:
+        clean["color_catalog_id"] = _normalize_catalog_choice(patch.get("color_catalog_id"))
     return normalize_user_model_settings(clean)
 
 

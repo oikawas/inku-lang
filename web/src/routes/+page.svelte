@@ -47,7 +47,8 @@
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
-	import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
 	import { colorCatalogOverride } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
 	import { loadPersistedSettings } from '$lib/features/persisted-settings';
@@ -271,6 +272,7 @@
 		okugaki_provider?: Provider;
 		okugaki_model?: string;
 		instruction_caption_visible?: boolean;
+		color_catalog_id?: string;
 	};
 	type ModelProviderSetting = {
 		label?: string;
@@ -340,7 +342,6 @@
 	let batchSuccess = $state(0);
 	let batchFailures = $state<BatchFailure[]>([]);
 	let batchPromptHistory = $state<string[]>([]);
-	let batchAutoColorCatalog = $state(false);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
 	let batchActiveTokensIn = $state<number | null>(null);
@@ -687,7 +688,7 @@
 	function setRefineWild(value: boolean | null) { refineWildOverride = value; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
-	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.selected) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
+	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.effectiveId) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 
 	// ── Settings tabs ────────────────────────────────────────
 	let settingsStatus = $state<SettingsStatus | null>(null);
@@ -1043,7 +1044,6 @@
 			seed_phrase: settings.seed_phrase.trim() || DEFAULT_DEMO_SETTINGS.seed_phrase,
 			interval_seconds: Math.max(1, Math.min(3600, Math.round(settings.interval_seconds || 30))),
 			timeout_seconds: Math.max(60, Math.min(86400, Math.round(settings.timeout_seconds || 3600))),
-			catalog_mode: settings.catalog_mode === 'auto' ? 'auto' : 'fixed',
 		};
 	}
 
@@ -1451,6 +1451,20 @@
 		colorCatalogSettings.save();
 	}
 
+	// The selection rides in the user's model_settings: a drawing needs a session,
+	// so a browser-wide value would only ever be the wrong user's.
+	async function persistColorCatalogSelection(selected: string) {
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: { color_catalog_id: selected } }) });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) { console.warn('failed to save color catalog selection', e); }
+	}
+	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
+	// Where `auto` lands when the server cannot read a description.
+	bindColorCatalogFallback(() => defaultCatalogId);
+
 	function confirmCatalogSelection() {
 		catalogSelectionSnapshot = null;
 		persistSelectedCatalog();
@@ -1474,7 +1488,7 @@
 			if (!Array.isArray(data.catalogs) || data.catalogs.length === 0) throw new Error('empty color catalog list');
 			colorCatalogs = data.catalogs;
 			defaultCatalogId = data.default_catalog_id || 'default';
-			if (!catalogById(colorCatalogs, colorCatalogSettings.selected)) colorCatalogSettings.selected = defaultCatalogId;
+			if (!colorCatalogSettings.isAuto && !catalogById(colorCatalogs, colorCatalogSettings.selected)) colorCatalogSettings.selected = defaultCatalogId;
 		} catch (e) {
 			console.warn('failed to load color catalogs', e);
 		}
@@ -3020,6 +3034,8 @@ if (unreadWords.length > 0) {
 				await saveDemoSettings(settings);
 				demoGeneratedPrompt = await generateDemoInstruction(settings);
 				if (demoRunId !== runId || !loading) break;
+				// The demo draws with whatever the catalog modal has selected, including
+				// "from the description": it used to carry a mode of its own.
 				const demoCatalogId = colorCatalogSettings.selected;
 				const r = await paintOne(demoGeneratedPrompt, {
 					saveHistory: settings.save_db,
@@ -3029,13 +3045,12 @@ if (unreadWords.length > 0) {
 					sourceText: demoGeneratedPrompt,
 					displayLabel: '[demo]',
 					renderOverrides: {
-						...colorCatalogOverride(demoCatalogId, settings.catalog_mode),
+						...colorCatalogOverride(demoCatalogId),
 						...wildOverride(false)
 					},
 				});
 				if (demoRunId !== runId || !loading) break;
 				demoGeneratedDdl = r.ddl;
-				if (settings.catalog_mode === 'auto' && r.render_color_catalog_id) colorCatalogSettings.selected = r.render_color_catalog_id;
 				demoCurrentSaved = !!r.history_id;
 				demoSaveStatus = null;
 				const demoSourceDdl = r.source_ddl ?? r.ddl;
@@ -3271,7 +3286,7 @@ if (unreadWords.length > 0) {
 							batchLineNumber: item.line,
 							batchRunId,
 							canvasAspectId: batchCanvasAspectId,
-							renderOverrides: colorCatalogOverride(batchCatalogId, batchAutoColorCatalog ? 'auto' : 'fixed'),
+							renderOverrides: colorCatalogOverride(batchCatalogId),
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) return null;
@@ -3510,7 +3525,7 @@ if (unreadWords.length > 0) {
 				stage2_model: savedStage2Model,
 				tokens_in: d.tokens_in,
 				tokens_out: d.tokens_out,
-				catalog_id: colorCatalogSettings.selected !== 'default' ? colorCatalogSettings.selected : null
+				catalog_id: colorCatalogSettings.effectiveId !== 'default' ? colorCatalogSettings.effectiveId : null
 			}, { selectSaved: true, sourceText: replayInput, lineageParentNodeId: replayParentNodeId, derivationKind: replayKind, derivationMetadata: replayDerivationMetadata });
 			if (savedHistory && result) {
 				if (canvasAspectDerivation) pendingCanvasAspectDerivation = null;
@@ -3809,7 +3824,7 @@ if (unreadWords.length > 0) {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.selected, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -3847,7 +3862,7 @@ if (unreadWords.length > 0) {
 					stage2_model: result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
 					tokens_in: (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0) || null,
-					catalog_id: result.render_color_catalog_id ?? (colorCatalogSettings.selected !== 'default' ? colorCatalogSettings.selected : null),
+					catalog_id: result.render_color_catalog_id ?? (colorCatalogSettings.effectiveId !== 'default' ? colorCatalogSettings.effectiveId : null),
 					save_artifacts: demoSettings.save_files,
 					canvas_aspect: effectiveCanvasAspectId(),
 					instruction_lang_requested: result.instruction_lang_requested ?? instructionLang,
@@ -4032,7 +4047,7 @@ if (unreadWords.length > 0) {
 		reloading = true;
 		reloadError = null;
 		try {
-			const catalogId = it.render_color_catalog_id ?? it.catalog_id ?? colorCatalogSettings.selected;
+			const catalogId = it.render_color_catalog_id ?? it.catalog_id ?? colorCatalogSettings.effectiveId;
 			const canvasId = it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? it.score?.canvas ?? effectiveCanvasAspectId();
 			const r = await apiFetch('/api/render-svg', {
 				method: 'POST',
@@ -4177,7 +4192,7 @@ async function toggleLineageForRevision(node: LineageNode, event?: Event): Promi
 }
 
 function lineageCatalogId(node: LineageNode): string {
-	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? colorCatalogSettings.selected;
+	return node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? colorCatalogSettings.effectiveId;
 }
 
 function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
@@ -4334,7 +4349,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		stage2_model: composed.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
 		tokens_in: composed.tokens_in,
 		tokens_out: composed.tokens_out,
-		catalog_id: colorCatalogSettings.selected,
+		catalog_id: colorCatalogSettings.effectiveId,
 		render_build_number: composed.render_build_number,
 		render_color_profile: composed.render_color_profile,
 		render_engine_id: composed.render_engine_id,
@@ -5297,7 +5312,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					stage2_model: candidate.result.stage2_model ?? null,
 					tokens_in: (candidate.result.tokens_in_stage1 ?? 0) + (candidate.result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
-					catalog_id: candidate.result.render_color_catalog_id ?? colorCatalogSettings.selected,
+					catalog_id: candidate.result.render_color_catalog_id ?? colorCatalogSettings.effectiveId,
 				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {}, tenkei: refineTenkeiOverride });
 				if (contextVersion !== targetContextVersion) return;
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
@@ -5443,7 +5458,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		: (result?.stage2_model ? statusModelName(result.stage2_model) : '-'));
 	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
 	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
-	const nextCatalogName = $derived(currentCatalog.name);
+	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? t().colorCatalogAuto : currentCatalog.name);
 	const statusCatalogName = $derived(displayedHistoryItem
 		? (displayedHistoryItem.render_color_catalog_name ?? catalogName(displayedHistoryItem.render_color_catalog_id ?? displayedHistoryItem.catalog_id))
 		: (result?.render_color_catalog_name ?? (result?.render_color_catalog_id ? catalogName(result.render_color_catalog_id) : '-')));
@@ -5866,7 +5881,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{liveMs}
 						batchFailureReport={batchFailureReportStore.report}
 						{batchPromptHistory}
-						bind:batchAutoColorCatalog
 						bind:demoSettings
 						demoModelProviderGroups={availableModelCatalog}
 						{demoRunning}

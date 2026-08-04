@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { renderContributorIds, renderSettingsPayload } from './render-payload.ts';
-import { bindColorCatalogRenderState, colorCatalogContributor, colorCatalogOverride } from './color-catalog/render.ts';
+import { AUTO_CATALOG_ID, bindColorCatalogFallback, bindColorCatalogRenderState, colorCatalogContributor, colorCatalogOverride } from './color-catalog/render.ts';
 import { bindTenkeiRenderState, tenkeiContributor, tenkeiOverride } from './tenkei/render.ts';
 import { bindWildRenderState, wildContributor, wildOverride } from './wild/render.ts';
 
@@ -79,4 +79,55 @@ test('contributors own disjoint fields, so order cannot decide the payload', () 
 		.map((contributor) => contributor.payload('paint', undefined));
 	const fieldTotal = slices.reduce((total, slice) => total + Object.keys(slice).length, 0);
 	assert.equal(Object.keys(renderSettingsPayload('paint')).length, fieldTotal);
+});
+
+// ── "From the description" ───────────────────────────────────────────────────
+// The selection can hold a sentinel that is not a catalog.  These assert both
+// directions: that it becomes a mode on the one endpoint that has one, and that
+// it never leaves as a catalog_id on the endpoints that have not.
+test('choosing "from the description" sends the mode, not the sentinel', () => {
+	bindColorCatalogFallback(() => 'fallback-catalog');
+	bindColorCatalogRenderState(() => AUTO_CATALOG_ID);
+	try {
+		assert.deepEqual(renderSettingsPayload('paint'), {
+			catalog_id: 'fallback-catalog',
+			catalog_mode: 'auto',
+			tenkei: 'sparse',
+			wild: true
+		});
+	} finally {
+		bindColorCatalogRenderState(() => 'live-catalog');
+		bindColorCatalogFallback(() => 'default');
+	}
+});
+
+test('the sentinel never reaches an endpoint that cannot carry a mode', () => {
+	bindColorCatalogFallback(() => 'fallback-catalog');
+	bindColorCatalogRenderState(() => AUTO_CATALOG_ID);
+	try {
+		for (const kind of ['compose', 'render-svg', 'render-score'] as const) {
+			assert.deepEqual(renderSettingsPayload(kind), { catalog_id: 'fallback-catalog' }, kind);
+		}
+		// A batch freezes the selection and hands it back as an override.
+		assert.deepEqual(renderSettingsPayload('render-svg', colorCatalogOverride(AUTO_CATALOG_ID)), {
+			catalog_id: 'fallback-catalog'
+		});
+	} finally {
+		bindColorCatalogRenderState(() => 'live-catalog');
+		bindColorCatalogFallback(() => 'default');
+	}
+});
+
+test('a real catalog is still sent as itself, in fixed mode', () => {
+	bindColorCatalogFallback(() => 'fallback-catalog');
+	try {
+		assert.deepEqual(renderSettingsPayload('paint', colorCatalogOverride('ink_season')), {
+			catalog_id: 'ink_season',
+			catalog_mode: 'fixed',
+			tenkei: 'sparse',
+			wild: true
+		});
+	} finally {
+		bindColorCatalogFallback(() => 'default');
+	}
 });

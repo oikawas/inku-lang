@@ -154,15 +154,6 @@
 			/>
 			<span>{t().demoSaveFiles}</span>
 		</label>
-		<label class="check-row wide">
-			<input
-				type="checkbox"
-				checked={settings.catalog_mode === 'auto'}
-				disabled={running}
-				onchange={(event) => updateSettings({ catalog_mode: (event.currentTarget as HTMLInputElement).checked ? 'auto' : 'fixed' })}
-			/>
-			<span>{t().demoAutoColorCatalog}</span>
-		</label>
 		<label>
 			<span>{t().demoInterval}</span>
 			<div class="interval-control">

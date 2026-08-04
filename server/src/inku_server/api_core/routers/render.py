@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from ...color_catalogs import color_catalog_ids
 from ...color_selector import select_catalog_id
@@ -275,9 +275,23 @@ class InterpretRequest(BaseModel):
     expand_intermediate: bool = Field(default=False, description="Stage 1.5 の中間DDL拡張を適用するか")
     tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時 auto")
 
+    @field_validator("description")
+    @classmethod
+    def _validate_description_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("description cannot be blank")
+        return v
+
 
 class PaintRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=100_000, description="作者が書いた記述")
+
+    @field_validator("description")
+    @classmethod
+    def _validate_description_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("description cannot be blank")
+        return v
     stage1_input: str | None = Field(default=None, max_length=100_000, description="Stage 1 が実際に読む文字列 (記述に文脈を注入したもの)。省略時は description")
     stage1_model: str | None = Field(default=None, description="Stage 1 モデル名")
     stage2_model: str | None = Field(default=None, description="Stage 2 モデル名")

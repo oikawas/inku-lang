@@ -231,10 +231,18 @@ def test_t3_the_guard_refuses_only_what_the_cut_empties(auth, wired):
     """境界。札だけは 400、札のついた本文は 200。"""
     assert client.post("/api/paint", json=_paint_body("[note]"), headers=auth).status_code == 400
     assert client.post("/api/paint", json=_paint_body("[note] 水面に光"), headers=auth).status_code == 200
-    # A description of nothing but whitespace is not what this guard is about:
-    # it carries no label, the cut leaves it alone, and it is still painted.
-    # The blank-description hole belongs to min_length=1, not here.
-    assert client.post("/api/paint", json=_paint_body("   "), headers=auth).status_code == 200
+
+
+@pytest.mark.parametrize("blank", ["   ", "\n\n", "　"])
+def test_blank_only_description_returns_422(auth, wired, blank):
+    """空白だけの記述は Pydantic の validator により 422 で拒否される。"""
+    assert client.post("/api/paint", json=_paint_body(blank), headers=auth).status_code == 422
+    assert (
+        client.post(
+            "/api/interpret", json={"description": blank, "sketch": False}, headers=auth
+        ).status_code
+        == 422
+    )
 
 
 # --------------------------------------------------------------------- T-5 / T-6

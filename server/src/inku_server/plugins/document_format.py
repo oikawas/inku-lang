@@ -972,7 +972,13 @@ def expand_plugin_ddl(
                 expansion, entry_instructions = _expand_entry(
                     entry,
                     lang=lang,
-                    seed_text=seed_text or source or result or qualified,
+                    # `source` is not a fallback seed.  It is the sketch prose,
+                    # which Stage 0.5 rewrites on every run, so falling back to
+                    # it would quietly cost "the same description draws the same
+                    # counts" -- and nothing would turn red.  A caller that
+                    # passes no seed lands on the DDL being expanded, which is
+                    # the fallback render.py already writes by hand.
+                    seed_text=seed_text or result or qualified,
                     warnings=warnings,
                 )
             except (KeyError, PluginFormatError) as exc:

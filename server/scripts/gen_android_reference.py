@@ -1828,6 +1828,91 @@ ARRANGEMENT_SCORES: dict[str, dict] = {
 }
 
 
+
+def coerce_governor_fixtures() -> None:
+    """What coerce decides about the background, and how it tempers a large shape.
+
+    Both mechanisms live in `LocalFallbackPipeline` on the port, and neither has
+    a baked expectation: the governor cases below are the only ones that tell a
+    marker list that is one word short from one that is complete, and the two
+    temperings the port never received change a shape's size without changing
+    the number of instructions, so a count-based comparison stays green.
+
+    The DDLs are chosen to REACH the branch. The governor only washes to white
+    when the density governor or a presence fires, so every dark case here
+    carries a density marker; without one the governor returns its input and the
+    case tells nothing apart.
+    """
+    from inku_server.coerce import compose as _c
+
+    background_cases = [
+        ("clause-black", "背景を黒で塗りつぶす。細い線を10本散らす。", "black"),
+        ("bare-word-black", "背景の前に円を描く。細い線を10本散らす。", "black"),
+        ("no-marker-black", "細い線を10本散らす。", "black"),
+        ("night-black", "夜の細い線を10本散らす。", "black"),
+        ("dawn-black", "夜明けの細い線を10本散らす。", "black"),
+        ("dark-field-black", "a dark field, ten thin lines scattered", "black"),
+        ("night-sky-black", "night sky, ten thin lines scattered", "black"),
+        ("fill-background-en", "fill the background with black. scatter ten thin lines.", "black"),
+        ("large-surface-red", "大きな布を広げる。細い線を5本引く。", "red"),
+        ("white-stays", "細い線を10本散らす。", "white"),
+        ("blue-no-marker", "静かな細い線を1本引く。", "blue"),
+        ("green-ground-color", "地色を緑にする。静かな線を1本引く。", "green"),
+    ]
+    temper_cases = [
+        ("square-filled-plain", "四角を描く", {"primitive": "square", "weight": "pen", "center": [0.5, 0.5], "size": [0.6, 0.5], "filled": True}),
+        ("square-open-plain", "四角を描く", {"primitive": "square", "weight": "pen", "center": [0.5, 0.5], "size": [0.6, 0.5], "filled": False}),
+        ("square-filled-quiet", "静かな一つの形", {"primitive": "square", "weight": "pen", "center": [0.5, 0.5], "size": [0.6, 0.5], "filled": True}),
+        ("triangle-open-plain", "三角を描く", {"primitive": "triangle", "weight": "pen", "center": [0.5, 0.5], "size": [0.7, 0.4], "filled": False}),
+        ("circle-filled-control", "円を描く", {"primitive": "circle", "weight": "pen", "center": [0.5, 0.5], "radius": 0.30, "filled": True}),
+        ("square-small-control", "四角を描く", {"primitive": "square", "weight": "pen", "center": [0.5, 0.5], "size": [0.2, 0.15], "filled": True}),
+        ("large-surface-exempt", "大きな布を広げる", {"primitive": "square", "weight": "pen", "center": [0.5, 0.5], "size": [0.6, 0.5], "filled": True}),
+    ]
+
+    out: dict = {
+        "note": "what coerce decides about the background and how it tempers a large shape",
+        "background_cases": [],
+        "tempering_cases": [],
+        "stage2_user_message": {
+            "note": "the DDL is the whole user message; the description is not prefixed (composer.py)",
+            "ddl": "背景を黒で塗りつぶす。細い線を10本散らす。",
+            "original_text": "夜の静けさ",
+            "expected": "背景を黒で塗りつぶす。細い線を10本散らす。",
+        },
+    }
+    for case_id, ddl, background in background_cases:
+        out["background_cases"].append({
+            "case_id": case_id,
+            "ddl": ddl,
+            "background_in": background,
+            "expected": _c._with_background_dominance_governor(background, ddl=ddl),
+            "explicit_background_intent": _c._has_explicit_background_intent(ddl),
+        })
+    for case_id, ddl, raw in temper_cases:
+        ins = Instruction.model_validate(raw)
+        # The real order, and it matters: the filled tempering runs first as a
+        # pass of its own (coerce/__init__.py:181), and only then does the
+        # density-governor pass run symbolic -> single -> filled
+        # (compose.py:2093-2095). Chaining single before filled instead makes the
+        # filled tempering unreachable -- its threshold (0.20) is above single's
+        # (0.14), so single always caps the shape below it first, and a fixture
+        # built that way cannot tell a port that skipped the filled pass.
+        stepped = _c._with_unintentional_filled_shape_tempering(ins, ddl=ddl)
+        stepped = _c._with_quiet_symbolic_shape_tempering(stepped, ddl=ddl)
+        stepped = _c._with_quiet_single_shape_tempering(stepped, ddl=ddl)
+        both = _c._with_unintentional_filled_shape_tempering(stepped, ddl=ddl)
+        out["tempering_cases"].append({
+            "case_id": case_id,
+            "ddl": ddl,
+            "instruction": ins.model_dump(mode="json", exclude_none=True),
+            "expected": both.model_dump(mode="json", exclude_none=True),
+            "changed": both.model_dump() != ins.model_dump(),
+        })
+    (OUT / "coerce_governors.json").write_text(
+        json.dumps(out, ensure_ascii=False, indent=2)
+    )
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
@@ -1845,6 +1930,7 @@ def main() -> None:
     color_assignment_fixtures()
     score_schema_contract_fixture()
     arrangement_fixtures()
+    coerce_governor_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

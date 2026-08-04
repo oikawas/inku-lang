@@ -1,0 +1,354 @@
+{
+  "note": "what coerce decides about the background and how it tempers a large shape",
+  "background_cases": [
+    {
+      "case_id": "clause-black",
+      "ddl": "背景を黒で塗りつぶす。細い線を10本散らす。",
+      "background_in": "black",
+      "expected": "black",
+      "explicit_background_intent": true
+    },
+    {
+      "case_id": "bare-word-black",
+      "ddl": "背景の前に円を描く。細い線を10本散らす。",
+      "background_in": "black",
+      "expected": "black",
+      "explicit_background_intent": true
+    },
+    {
+      "case_id": "no-marker-black",
+      "ddl": "細い線を10本散らす。",
+      "background_in": "black",
+      "expected": "white",
+      "explicit_background_intent": false
+    },
+    {
+      "case_id": "night-black",
+      "ddl": "夜の細い線を10本散らす。",
+      "background_in": "black",
+      "expected": "black",
+      "explicit_background_intent": true
+    },
+    {
+      "case_id": "dawn-black",
+      "ddl": "夜明けの細い線を10本散らす。",
+      "background_in": "black",
+      "expected": "white",
+      "explicit_background_intent": false
+    },
+    {
+      "case_id": "dark-field-black",
+      "ddl": "a dark field, ten thin lines scattered",
+      "background_in": "black",
+      "expected": "black",
+      "explicit_background_intent": true
+    },
+    {
+      "case_id": "night-sky-black",
+      "ddl": "night sky, ten thin lines scattered",
+      "background_in": "black",
+      "expected": "black",
+      "explicit_background_intent": true
+    },
+    {
+      "case_id": "fill-background-en",
+      "ddl": "fill the background with black. scatter ten thin lines.",
+      "background_in": "black",
+      "expected": "black",
+      "explicit_background_intent": true
+    },
+    {
+      "case_id": "large-surface-red",
+      "ddl": "大きな布を広げる。細い線を5本引く。",
+      "background_in": "red",
+      "expected": "red",
+      "explicit_background_intent": false
+    },
+    {
+      "case_id": "white-stays",
+      "ddl": "細い線を10本散らす。",
+      "background_in": "white",
+      "expected": "white",
+      "explicit_background_intent": false
+    },
+    {
+      "case_id": "blue-no-marker",
+      "ddl": "静かな細い線を1本引く。",
+      "background_in": "blue",
+      "expected": "white",
+      "explicit_background_intent": false
+    },
+    {
+      "case_id": "green-ground-color",
+      "ddl": "地色を緑にする。静かな線を1本引く。",
+      "background_in": "green",
+      "expected": "green",
+      "explicit_background_intent": true
+    }
+  ],
+  "tempering_cases": [
+    {
+      "case_id": "square-filled-plain",
+      "ddl": "四角を描く",
+      "instruction": {
+        "primitive": "square",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.6,
+          0.5
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "expected": {
+        "primitive": "square",
+        "note": "large filled shape tempered to avoid unintended surface dominance",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.36,
+          0.3
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "changed": true
+    },
+    {
+      "case_id": "square-open-plain",
+      "ddl": "四角を描く",
+      "instruction": {
+        "primitive": "square",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.6,
+          0.5
+        ],
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "expected": {
+        "primitive": "square",
+        "note": "quiet single large shape tempered to keep trace/space legible",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.288,
+          0.24
+        ],
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "changed": true
+    },
+    {
+      "case_id": "square-filled-quiet",
+      "ddl": "静かな一つの形",
+      "instruction": {
+        "primitive": "square",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.6,
+          0.5
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "expected": {
+        "primitive": "square",
+        "note": "quiet single large shape tempered to keep trace/space legible",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.288,
+          0.24
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "changed": true
+    },
+    {
+      "case_id": "triangle-open-plain",
+      "ddl": "三角を描く",
+      "instruction": {
+        "primitive": "triangle",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.7,
+          0.4
+        ],
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "expected": {
+        "primitive": "triangle",
+        "note": "quiet single large shape tempered to keep trace/space legible",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.34,
+          0.1942857142857143
+        ],
+        "filled": false,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "changed": true
+    },
+    {
+      "case_id": "circle-filled-control",
+      "ddl": "円を描く",
+      "instruction": {
+        "primitive": "circle",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "radius": 0.3,
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "expected": {
+        "primitive": "circle",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "radius": 0.3,
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "changed": false
+    },
+    {
+      "case_id": "square-small-control",
+      "ddl": "四角を描く",
+      "instruction": {
+        "primitive": "square",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.2,
+          0.15
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "expected": {
+        "primitive": "square",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.2,
+          0.15
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "changed": false
+    },
+    {
+      "case_id": "large-surface-exempt",
+      "ddl": "大きな布を広げる",
+      "instruction": {
+        "primitive": "square",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.6,
+          0.5
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "expected": {
+        "primitive": "square",
+        "center": [
+          0.5,
+          0.5
+        ],
+        "size": [
+          0.6,
+          0.5
+        ],
+        "filled": true,
+        "style": "solid",
+        "weight": "pen",
+        "mode": "additive",
+        "color": "black"
+      },
+      "changed": false
+    }
+  ],
+  "stage2_user_message": {
+    "note": "the DDL is the whole user message; the description is not prefixed (composer.py)",
+    "ddl": "背景を黒で塗りつぶす。細い線を10本散らす。",
+    "original_text": "夜の静けさ",
+    "expected": "背景を黒で塗りつぶす。細い線を10本散らす。"
+  }
+}

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.40 / Build 846**
+**Target version: v2.9.41 / Build 847**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -128,8 +128,9 @@ Vocabulary changes go through the table and its golden tests.
 - **Stage 0.5 (sketch from life)** — an optional layer that rewrites the description as plain prose
 naming things. Its granularity is chosen per draw from two values, `fine` (many short sentences,
 the default) and `coarse` (fewer, longer ones).
-**The prose stands in for the description at all five consumers**
-(Stage 1, the plugin expansion, Stage 1.5, Stage 2 and coerce).
+**The prose stands in for the description at three consumers**
+(Stage 1, the plugin expansion's firing decision, and Stage 1.5).
+**Stage 2 and coerce read the DDL alone.** The plugin's seed -- what decides how many -- is the description.
 The description itself is kept for saving and display, and when the layer fails it goes to Stage 1 unchanged.
 - **Stage 1 (interpretation)** — detects the language of the instruction and produces normalized DDL.
 The prompt is assembled from the saijiki table and holds no fixed vocabulary string of its own.

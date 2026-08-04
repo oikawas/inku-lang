@@ -1797,10 +1797,20 @@ An **optional layer** between the description and Stage 1.  A description as den
 more than Stage 1 can chew at once, so this layer rewrites it as **plain prose naming things** --
 a sketch from life -- before anything downstream reads it.
 
-The prose **stands in for the description at all five consumers**: Stage 1, the plugin expansion,
-Stage 1.5, Stage 2 and coerce.  If even one of them still read the description, the range this
-layer exists to open would not appear.  **The description itself is kept for saving and display.**
-The work is what the author wrote, not what the layer wrote.
+The prose **stands in for the description at three consumers**: Stage 1, the plugin expansion
+(deciding whether a plugin fires), and Stage 1.5.  **It does not reach Stage 2 or coerce**
+(v2.9.41): **those two read the DDL alone**, because showing prose to a layer that runs after the
+plan exists makes an addition traceable to something the author wrote indistinguishable from a
+delivery of the DDL.  **The plugin's seed** -- what decides how many leaves, how many lines -- **is
+the description**, not the prose: the same description resolves the same numbers however the prose
+changes.  **The description itself is kept for saving and display.**  The work is what the author
+wrote, not what the layer wrote.
+
+**One background guard was withdrawn** (v2.9.41).  It recognised "the user pasted a
+machine-generated plan into the description box", and what it judged was the *provenance of a
+string*; once the description no longer reaches coerce there is no provenance left to judge, and
+keeping it misfires on the ordinary shape of a production DDL -- **54 of 604 dark-background works
+fell to white with it, 1 without**.
 
 **The granularity (`sketch_grain`) has two values**, `fine` (many short sentences, the default)
 and `coarse` (fewer, longer ones), chosen per draw.  What differs is the cutting, not the total.

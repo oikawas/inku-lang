@@ -2988,3 +2988,42 @@ the server's turns 9 web tests red**).
 turns 3 server tests red; disabling the number rule, 23; narrowing the separator to `.`, 9; letting
 an unclosed `[` run to the end of the line, 6; drifting the web rule, 9 web tests; handing the
 layer no text, 1. **The control** (a darker grey) **leaves all 99 green.**
+
+### v2.9.41 (Build 847) — the layers that run after the plan exists read the DDL alone
+
+**The `description-propagation-cut` contract (implementation session, Opus 5) is accepted.**
+The prose from Stage 0.5 reached **all five consumers**; **two of them -- Stage 2 and coerce -- are
+cut**, leaving Stage 1, the plugin expansion's firing decision, and Stage 1.5.
+`ddl_engine_version` **5 -> 6**, frozen corpus `ddl-engine-6` (33 + 3 production-shaped cases).
+
+**One background guard was withdrawn.** What it judged was the *provenance of a string* (had the
+user pasted a machine-generated plan into the description box), and once the description no longer
+reaches coerce there is no provenance left to judge; keeping it misfires on the ordinary shape of a
+production DDL -- **54 of 604 dark-background works fell to white with it, 1 without** (a
+counterfactual over 2,023 production works, no model calls).
+
+**The plugin's seed is the description again.** With the prose as the seed, the same description
+resolved different counts whenever the prose changed. The gate measures **resolved numbers**, in
+**both directions and at every entry point** (same description x two proses -> alike; same prose x
+two descriptions -> apart).
+
+**The carriage instrument gained its other direction** ([I-107]): `carriage.py` only watched for
+what was dropped. **That direction could not be measured before the cut** -- while coerce read
+`prose\nDDL`, anything it added traced back to something the author wrote, and an addition was
+indistinguishable from a delivery.
+
+**Stage 2 did not shrink** (20 poems x 2 repetitions x 2 arms, 80 runs, 0 failures): median
+`tokens_out` 270 -> 273, and no field lost its seat. **What coerce authored fell from 87 to 74
+(-15%)**, which is the layer writing less now that it is given less. **Additions that answer no
+clause stayed at 6**: the DDL became the only *route*, not the only *author*.
+
+**Android took the same cut and the same withdrawal** (133 JVM tests, 5 on a Pixel 9).
+
+**One thing fixed during acceptance**: the merge left `plugin_seed_text=req.description`, so
+**v2.9.40's rule -- a leading number and a bracketed comment reach no layer -- was bypassed by the
+seed alone.** It now reads the cut description, and a gate watches the seed.
+
+**Two tests failed only after the merge**, because v2.9.40's gates carried the pre-cut assumption
+that Stage 2 receives a description; they were moved to the current shape with the property intact.
+**No test was deleted** (the three names missing from main are the renames the report declared,
+rewritten as inversions with a new control).

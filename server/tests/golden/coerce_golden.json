@@ -2,7 +2,7 @@
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches.",
  "frozen_at": "2026-07-26",
- "commit": "c68f23fdae67737cfe261aede1b93f92e3a4b298",
+ "commit": "cf4c4c17b44b66479f1eb1b811d9ad4718b75b02",
  "branches_reached": [
   "coerce_and_repair_instruction",
   "dedupe_instructions",
@@ -310,7 +310,7 @@
     "score": {
      "version": "0.1.0",
      "canvas": "square",
-     "background": "white",
+     "background": "black",
      "presence": null,
      "instructions": [
       {
@@ -372,6 +372,7 @@
        },
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "bleed",
         "density": 0.35,
@@ -382,12 +383,11 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "square",
-       "note": "coverage from DDL clause: 黄色いクレヨンの小さな四角を画面全体に点々と四十八個散らす; small focal mark kept compact with preserved negative space; quiet symbolic shape tempered to avoid fallback dominance; motion energy restored through trajectory and rotation; visual event preserved as compact focal accent; visual event counterweight preserved through opposing placement; white foreground made visible",
+       "note": "coverage from DDL clause: 黄色いクレヨンの小さな四角を画面全体に点々と四十八個散らす; small focal mark kept compact with preserved negative space; quiet symbolic shape tempered to avoid fallback dominance; motion energy restored through trajectory and rotation; visual event preserved as compact focal accent; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": null,
@@ -409,7 +409,7 @@
        "weight": "crayon",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -445,12 +445,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
-       "note": "coverage from DDL clause: 面: 滲む; motion energy restored through trajectory and rotation; material inferred from DDL: crayon; white foreground made visible",
+       "note": "coverage from DDL clause: 面: 滲む; motion energy restored through trajectory and rotation; material inferred from DDL: crayon",
        "from": [
         0.33999999999999997,
         0.5800000000000001
@@ -472,7 +472,7 @@
        "weight": "crayon",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -486,8 +486,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -549,8 +549,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -560,7 +560,7 @@
      "dedupe_instructions": 0,
      "drop_invalid_relations": 0,
      "presence_from_ddl": 0,
-     "with_background_dominance_governor": 1,
+     "with_background_dominance_governor": 0,
      "with_color_delivery_repair": 1,
      "with_complex_motif_repair": 0,
      "with_composition_diversity_repair": 0,
@@ -964,8 +964,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -1021,8 +1021,8 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -1062,8 +1062,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -1100,8 +1100,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -1161,8 +1161,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -1223,8 +1223,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -1663,6 +1663,7 @@
        },
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "wash",
         "density": 0.35,
@@ -1673,8 +1674,7 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "line",
@@ -1714,8 +1714,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -1771,8 +1771,8 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -1813,8 +1813,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -1852,8 +1852,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -1914,8 +1914,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -1976,8 +1976,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -2130,6 +2130,7 @@
        "arrangement": null,
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "bleed",
         "density": 0.35,
@@ -2140,8 +2141,7 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "ellipse",
@@ -2181,8 +2181,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -2352,8 +2352,8 @@
         ]
        },
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "square",
@@ -2403,8 +2403,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "square",
@@ -2454,8 +2454,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -2795,6 +2795,7 @@
         ]
        },
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "wash",
         "density": 0.35,
@@ -2805,8 +2806,7 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "arc",
@@ -2853,8 +2853,8 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -2901,8 +2901,8 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -2949,8 +2949,8 @@
         "type": "touching",
         "gap": "medium"
        },
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -3180,7 +3180,7 @@
     "score": {
      "version": "0.1.0",
      "canvas": "square",
-     "background": "white",
+     "background": "black",
      "presence": null,
      "instructions": [
       {
@@ -3243,12 +3243,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
-       "note": "black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; white foreground made visible",
+       "note": "black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "from": [
         0.5,
         0.5
@@ -3270,7 +3270,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "fine",
@@ -3305,6 +3305,7 @@
        },
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "grain",
         "density": 0.35,
@@ -3315,12 +3316,11 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "polygon",
-       "note": "polygon restored from DDL shape intent; motion energy restored through trajectory and rotation; white foreground made visible",
+       "note": "polygon restored from DDL shape intent; motion energy restored through trajectory and rotation",
        "from": null,
        "to": null,
        "center": [
@@ -3339,7 +3339,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -3353,18 +3353,18 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
     "instruction_count": 3,
     "branch_report": {
-     "coerce_and_repair_instruction": 2,
+     "coerce_and_repair_instruction": 0,
      "dedupe_instructions": 0,
      "drop_invalid_relations": 0,
      "presence_from_ddl": 0,
-     "with_background_dominance_governor": 1,
+     "with_background_dominance_governor": 0,
      "with_color_delivery_repair": 0,
      "with_complex_motif_repair": 0,
      "with_context_density_governor": 0,
@@ -3525,8 +3525,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -3588,8 +3588,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -3640,8 +3640,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -4062,8 +4062,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -4104,8 +4104,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -4163,8 +4163,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -4205,8 +4205,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -4244,8 +4244,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -4306,8 +4306,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -4368,8 +4368,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -4764,7 +4764,7 @@
     "score": {
      "version": "0.1.0",
      "canvas": "square",
-     "background": "white",
+     "background": "black",
      "presence": {
       "kind": "figure_like",
       "intensity": "low",
@@ -4776,7 +4776,7 @@
      "instructions": [
       {
        "primitive": "circle",
-       "note": "material inferred from DDL: brush_thin; blue/black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; white foreground made visible",
+       "note": "material inferred from DDL: brush_thin; blue/black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space",
        "from": null,
        "to": null,
        "center": [
@@ -4795,7 +4795,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "fine",
@@ -4829,12 +4829,12 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; white foreground made visible",
+       "note": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "from": [
         0.32999999999999996,
         0.5299999999999999
@@ -4856,7 +4856,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "fine",
@@ -4891,6 +4891,7 @@
        },
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "wash",
         "density": 0.35,
@@ -4901,12 +4902,11 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thin; black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; white foreground made visible",
+       "note": "material inferred from DDL: brush_thin; black foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
        "from": [
         0.5,
         0.6
@@ -4928,7 +4928,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "fine",
@@ -4963,6 +4963,7 @@
        },
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "grain",
         "density": 0.35,
@@ -4973,12 +4974,11 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; white foreground made visible",
+       "note": "material inferred from DDL: brush_thin; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space",
        "from": [
         0.4,
         0.3
@@ -5000,7 +5000,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "fine",
@@ -5036,6 +5036,7 @@
         ]
        },
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "bleed",
         "density": 0.35,
@@ -5046,12 +5047,11 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "arc",
-       "note": "surface tension restored as a quiet shadow trace; motion energy restored through trajectory and rotation; visual event counterweight preserved through opposing placement; white foreground made visible",
+       "note": "surface tension restored as a quiet shadow trace; motion energy restored through trajectory and rotation; visual event counterweight preserved through opposing placement",
        "from": null,
        "to": null,
        "center": [
@@ -5070,7 +5070,7 @@
        "weight": "silverpoint",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -5106,8 +5106,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -5133,7 +5133,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": null,
        "arrangement": {
@@ -5144,7 +5144,7 @@
         "jitter": 0.12,
         "path": "diagonal",
         "color_cycle": [
-         "black",
+         "white",
          "gray"
         ],
         "margin": 0.22,
@@ -5161,18 +5161,18 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
     "instruction_count": 6,
     "branch_report": {
-     "coerce_and_repair_instruction": 5,
+     "coerce_and_repair_instruction": 0,
      "dedupe_instructions": 0,
      "drop_invalid_relations": 0,
      "presence_from_ddl": 0,
-     "with_background_dominance_governor": 1,
+     "with_background_dominance_governor": 0,
      "with_color_delivery_repair": 0,
      "with_complex_motif_repair": 0,
      "with_composition_diversity_repair": 0,
@@ -5326,8 +5326,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -5359,8 +5359,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -5537,8 +5537,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -5600,8 +5600,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -5638,8 +5638,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -6017,6 +6017,7 @@
         ]
        },
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "wash",
         "density": 0.35,
@@ -6027,8 +6028,7 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": 1234567890
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "ellipse",
@@ -6091,6 +6091,7 @@
         ]
        },
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "wash",
         "density": 0.35,
@@ -6101,8 +6102,7 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": 1234567890
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "square",
@@ -6164,8 +6164,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -6227,8 +6227,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -6585,6 +6585,7 @@
        },
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "none",
         "density": 0.35,
@@ -6595,8 +6596,7 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "arc",
@@ -6652,6 +6652,7 @@
         "type": "touching",
         "gap": "medium"
        },
+       "thinness": null,
        "surface": {
         "texture": "none",
         "density": 0.35,
@@ -6662,8 +6663,7 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "line",
@@ -6725,8 +6725,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -6788,8 +6788,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -6947,8 +6947,8 @@
         ]
        },
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -6988,8 +6988,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -7040,8 +7040,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -7228,6 +7228,7 @@
        },
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "grain",
         "density": 0.35,
@@ -7238,8 +7239,7 @@
         "spacing_gradient": "none",
         "tone_steps": 3,
         "seed": null
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "square",
@@ -7289,8 +7289,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "square",
@@ -7340,8 +7340,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -7389,8 +7389,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -7679,8 +7679,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -7742,8 +7742,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "cloudform",
@@ -7799,8 +7799,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -7854,8 +7854,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -8099,8 +8099,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -8159,8 +8159,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -8447,6 +8447,7 @@
         ]
        },
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "grain",
         "density": 0.35,
@@ -8457,8 +8458,7 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "ellipse",
@@ -8498,6 +8498,7 @@
        "arrangement": null,
        "at": null,
        "relation": null,
+       "thinness": null,
        "surface": {
         "texture": "grain",
         "density": 0.35,
@@ -8508,8 +8509,7 @@
         "spacing_gradient": "none",
         "tone_steps": 2,
         "seed": 1234567890
-       },
-       "thinness": null
+       }
       },
       {
        "primitive": "arc",
@@ -8568,8 +8568,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -8623,8 +8623,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -8896,8 +8896,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "cloudform",
@@ -8953,8 +8953,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "line",
@@ -9010,8 +9010,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -9229,8 +9229,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "cloudform",
@@ -9270,8 +9270,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -9322,8 +9322,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -9463,8 +9463,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -9586,8 +9586,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -9619,8 +9619,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -9768,8 +9768,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -9801,8 +9801,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -9976,8 +9976,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "circle",
@@ -10028,8 +10028,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "triangle",
@@ -10086,8 +10086,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -10212,8 +10212,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -10245,8 +10245,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -10297,8 +10297,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -10424,8 +10424,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -10457,8 +10457,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -10487,8 +10487,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -10540,8 +10540,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -10657,8 +10657,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -10777,8 +10777,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -10917,8 +10917,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -11045,8 +11045,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -11179,8 +11179,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -11212,8 +11212,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -11456,8 +11456,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -11489,8 +11489,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -11519,8 +11519,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -11572,8 +11572,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -11684,8 +11684,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -11717,8 +11717,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -11832,8 +11832,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -11865,8 +11865,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -11995,8 +11995,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -12028,8 +12028,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -12156,8 +12156,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -12189,8 +12189,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -12297,8 +12297,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "triangle",
@@ -12330,8 +12330,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -12469,8 +12469,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -12510,8 +12510,8 @@
        "arrangement": null,
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       },
       {
        "primitive": "polygon",
@@ -12570,8 +12570,8 @@
        },
        "at": null,
        "relation": null,
-       "surface": null,
-       "thinness": null
+       "thinness": null,
+       "surface": null
       }
      ]
     },
@@ -12608,6 +12608,357 @@
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event": 0,
+     "with_visual_event_type_hints": 0,
+     "without_explicit_region_support": 0,
+     "without_spontaneous_grid": 0
+    }
+   }
+  },
+  "S-background-governor": {
+   "source": "synthetic",
+   "targets": "with_background_dominance_governor",
+   "note": "dark background with no fill clause and no surface marker. Added by 契約 description-propagation-cut: once coerce reads the DDL alone, the three production cases that used to fire this branch (H-01/H-07/H-10) keep the background their DDL asked for, and the branch lost its witness.",
+   "input": {
+    "score": {
+     "background": "black",
+     "instructions": [
+      {
+       "primitive": "line",
+       "from": [
+        0.5,
+        0.0
+       ],
+       "to": [
+        0.5,
+        1.0
+       ],
+       "color": "white",
+       "arrangement": {
+        "count": 110,
+        "layout": "vertical"
+       }
+      }
+     ]
+    },
+    "ddl": "静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす。境界が滲む。透明な膜を重ねる。",
+    "tenkei": "auto",
+    "plugin_instructions_present": false
+   },
+   "expected": {
+    "score": {
+     "version": "0.1.0",
+     "canvas": "square",
+     "background": "white",
+     "presence": null,
+     "instructions": [
+      {
+       "primitive": "line",
+       "note": "material inferred from DDL: brush_thin; white foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
+       "from": [
+        0.54,
+        0.035
+       ],
+       "to": [
+        0.4,
+        0.965
+       ],
+       "center": null,
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": false,
+       "style": "solid",
+       "weight": "brush_thin",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": null,
+       "variation": {
+        "amplitude": "medium",
+        "frequency": "medium",
+        "quality": "pink",
+        "dimensions": [
+         "position_x",
+         "position_y"
+        ]
+       },
+       "arrangement": {
+        "count": 110,
+        "layout": "vertical",
+        "rows": null,
+        "cols": null,
+        "jitter": 0.12,
+        "path": "wave",
+        "color_cycle": [
+         "black",
+         "gray"
+        ],
+        "margin": 0.22,
+        "center": [
+         0.787,
+         0.18
+        ],
+        "radius": null,
+        "density": "low",
+        "cluster_count": null,
+        "fade": "directional",
+        "preserve_space": true,
+        "rhythm_spacing": "syncopated"
+       },
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": null
+      },
+      {
+       "primitive": "arc",
+       "note": "coverage from DDL clause: 静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space",
+       "from": null,
+       "to": null,
+       "center": [
+        0.635,
+        0.39
+       ],
+       "radius": 0.11,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": 210.0,
+       "angle_end": 330.0,
+       "rotation": null,
+       "filled": false,
+       "style": "solid",
+       "weight": "brush_thin",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": null,
+       "variation": {
+        "amplitude": "medium",
+        "frequency": "slow",
+        "quality": "wave",
+        "dimensions": [
+         "position_x",
+         "position_y"
+        ]
+       },
+       "arrangement": {
+        "count": 120,
+        "layout": "scatter",
+        "rows": null,
+        "cols": null,
+        "jitter": 0.12,
+        "path": "diagonal",
+        "color_cycle": [
+         "black",
+         "white"
+        ],
+        "margin": 0.22,
+        "center": null,
+        "radius": null,
+        "density": "low",
+        "cluster_count": null,
+        "fade": "outward",
+        "preserve_space": true,
+        "rhythm_spacing": "loose"
+       },
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": null
+      },
+      {
+       "primitive": "line",
+       "note": "coverage from DDL clause: 境界が滲む; motion energy restored through trajectory and rotation",
+       "from": [
+        0.33999999999999997,
+        0.5800000000000001
+       ],
+       "to": [
+        0.78,
+        0.48
+       ],
+       "center": null,
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": 6.0,
+       "filled": false,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": null,
+       "variation": {
+        "amplitude": "medium",
+        "frequency": "slow",
+        "quality": "wave",
+        "dimensions": [
+         "position_x",
+         "position_y"
+        ]
+       },
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": null
+      },
+      {
+       "primitive": "ellipse",
+       "note": "coverage from DDL clause: 透明な膜を重ねる; motion energy restored through trajectory and rotation",
+       "from": null,
+       "to": null,
+       "center": [
+        0.545,
+        0.5700000000000001
+       ],
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": [
+        0.16,
+        0.09
+       ],
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": 9.0,
+       "filled": true,
+       "style": "solid",
+       "weight": "chalk",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": "membrane haze",
+       "variation": {
+        "amplitude": "medium",
+        "frequency": "slow",
+        "quality": "wave",
+        "dimensions": [
+         "position_x",
+         "position_y"
+        ]
+       },
+       "arrangement": {
+        "count": 5,
+        "layout": "scatter",
+        "rows": null,
+        "cols": null,
+        "jitter": 0.12,
+        "path": "diagonal",
+        "color_cycle": [],
+        "margin": 0.24,
+        "center": null,
+        "radius": null,
+        "density": "low",
+        "cluster_count": 3,
+        "fade": "outward",
+        "preserve_space": true,
+        "rhythm_spacing": "loose"
+       },
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": null
+      },
+      {
+       "primitive": "line",
+       "note": "visual event restored as a thin reflected cut; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
+       "from": [
+        0.54,
+        0.42
+       ],
+       "to": [
+        0.75,
+        0.38
+       ],
+       "center": null,
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": false,
+       "style": "solid",
+       "weight": "silverpoint",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "blue",
+       "color_hint": null,
+       "variation": null,
+       "arrangement": {
+        "count": 1,
+        "layout": "scatter",
+        "rows": null,
+        "cols": null,
+        "jitter": 0.12,
+        "path": "wave",
+        "color_cycle": [
+         "blue",
+         "black"
+        ],
+        "margin": 0.22,
+        "center": [
+         0.256,
+         0.689
+        ],
+        "radius": null,
+        "density": "low",
+        "cluster_count": null,
+        "fade": "outward",
+        "preserve_space": true,
+        "rhythm_spacing": "loose"
+       },
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": null
+      }
+     ]
+    },
+    "instruction_count": 5,
+    "branch_report": {
+     "coerce_and_repair_instruction": 1,
+     "dedupe_instructions": 0,
+     "drop_invalid_relations": 0,
+     "presence_from_ddl": 0,
+     "with_background_dominance_governor": 1,
+     "with_color_delivery_repair": 1,
+     "with_complex_motif_repair": 0,
+     "with_composition_diversity_repair": 0,
+     "with_context_density_governor": 0,
+     "with_context_energy_repair": 0,
+     "with_crescent_sensory_suppression": 0,
+     "with_ddl_coverage": 3,
+     "with_existing_event_counterweight": 2,
+     "with_explicit_constraint_enforcement": 0,
+     "with_focal_event_floor": 0,
+     "with_literal_grid_fidelity": 0,
+     "with_ma_pressure": 3,
+     "with_motion_energy": 4,
+     "with_motion_floor": 0,
+     "with_per_instruction_density_budget": 0,
+     "with_presence_auxiliary_shape_repair": 0,
+     "with_primary_color_delivery": 0,
+     "with_repetition_event_variation": 1,
+     "with_rhythm_variation": 0,
+     "with_semantic_visual_event_hints": 0,
+     "with_shape_delivery_repair": 0,
+     "with_structural_duplicate_repair": 0,
+     "with_surface_tension": 0,
+     "with_total_density_budget": 0,
+     "with_unintentional_filled_shape_tempering": 0,
+     "with_visual_event": 1,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
      "without_spontaneous_grid": 0

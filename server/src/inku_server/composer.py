@@ -856,14 +856,6 @@ def _current_model_settings() -> dict:
     return _db.get_model_settings()
 
 
-def _build_user_message(ddl: str, original_description: str | None, lang: str = "ja") -> str:
-    if original_description and original_description.strip() != ddl.strip():
-        if lang == "en":
-            return f"[original text]\n{original_description}\n\n[normalized DDL]\n{ddl}"
-        return f"[原文]\n{original_description}\n\n[正規化DDL]\n{ddl}"
-    return ddl
-
-
 _MOTION_OR_TEXTURE_TERMS = (
     "震える",
     "震え",
@@ -1319,7 +1311,6 @@ def compose(
     ddl: str,
     *,
     model: str | None = None,
-    original_description: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
     trace_sink: list[dict] | None = None,
@@ -1330,7 +1321,10 @@ def compose(
     trace_sink 指定時は、この呼び出しの Stage 2 生応答 {raw_text, parse_ok} を
     append する (観測のみ; retry/fallback の判定・挙動は変えない)。
     """
-    user_msg = _build_user_message(ddl, original_description, lang=lang)
+    # The DDL is the whole user message. It used to be prefixed with the
+    # original text under a [原文] heading; the description-propagation cut
+    # made the DDL the single route by which a description reaches Stage 2.
+    user_msg = ddl
     if system_prompt is not None:
         effective_prompt = system_prompt
     elif lang == "en":

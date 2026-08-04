@@ -20,11 +20,17 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-07-30"
+FROZEN_AT = "2026-08-04"
 REASON = (
-    "The abstract Score color vocabulary grows from six colors to nine. Coerce "
-    "now recognizes yellow, orange, and purple markers in Japanese and English "
-    "DDL, so four new cases freeze delivery of those colors."
+    "Coerce receives the DDL alone. The original description used to be "
+    "concatenated in front of it, which is why `_source_context` read only the "
+    "first line and why a guard judged that line's provenance; with the "
+    "description gone the guard had nothing to judge and only misfired on the "
+    "ordinary shape of a DDL, so it was removed and the context is read whole. "
+    "Three new cases freeze the production input shape -- a multi-clause plan "
+    "with a fill clause, one without, and a multi-line DDL whose clause sits on "
+    "the second line -- none of which the corpus carried while every production "
+    "input was a concatenation."
 )
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
 
@@ -139,6 +145,38 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
         "B-purple-from-ddl": _coerce_input(_score([line]), ddl="紫の菫が咲く。"),
         "B-yellow-from-ddl-en": _coerce_input(
             _score([line]), ddl="Scatter three yellow circles."
+        ),
+        # The shape production actually hands coerce. Before the
+        # description-propagation cut every b_coerce case passed a single short
+        # sentence, while 71.7% of production works passed `prose\nDDL` -- the
+        # corpus never traversed the real input. The cut made the production
+        # input the DDL alone, and these three cases freeze that shape: a
+        # multi-clause plan opening with a fill clause, the same plan without
+        # one, and a multi-line DDL whose fill clause sits on line 2.
+        "B-production-fill-clause": _coerce_input(
+            _score([_instruction(color="white", arrangement={
+                **copy.deepcopy(BASE_ARRANGEMENT), "count": 110, "layout": "vertical",
+            })], background="blue"),
+            ddl=(
+                "背景を青で塗りつぶす。画面全体に白い細筆の細い縦線を三百本、上から下へ散らす。"
+                "黒い細い余白線を存在の重心として右上の焦点へ二本引く。透明な膜を重ねる。境界が滲む。"
+            ),
+        ),
+        "B-production-no-fill-clause": _coerce_input(
+            _score([_instruction(color="white", arrangement={
+                **copy.deepcopy(BASE_ARRANGEMENT), "count": 110, "layout": "vertical",
+            })], background="blue"),
+            ddl=(
+                "静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす。"
+                "黒い細い余白線を存在の重心として右上の焦点へ二本引く。透明な膜を重ねる。境界が滲む。"
+            ),
+        ),
+        "B-production-multiline": _coerce_input(
+            _score([_instruction(color="white")], background="black"),
+            ddl=(
+                "地: 生成りの紙、細かい紙目。\n"
+                "背景を黒で塗りつぶす。白い右下がりの小さな楕円を百三十七個を散らす。"
+            ),
         ),
     }
     return cases

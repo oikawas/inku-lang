@@ -46,14 +46,24 @@ def test_ddl_reference_versions_and_parts() -> None:
     # order reaches Stage 2, so the Score that gets written changes while this layer's
     # output does not move by a byte. **The empty list below is the whole explanation
     # of what this version did**, and it is the only thing that distinguishes it.
-    assert DDL_ENGINE_VERSION == "5"
+    # Engine 6 (2026-08-04): coerce receives the DDL alone. The three new cases are
+    # the whole of `changed_from_previous`, and the thirty-three carried over are
+    # byte-identical: the guard this version removed was unreachable from every
+    # input the corpus already held. **That is the point of listing only three** --
+    # the corpus could not have caught the behaviour this version changed, because
+    # no case here ever had the shape production was passing.
+    assert DDL_ENGINE_VERSION == "6"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
-    assert len(manifest["cases"]) == 33
+    assert len(manifest["cases"]) == 36
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 15
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 18
-    assert manifest["changed_from_previous"] == []
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 21
+    assert manifest["changed_from_previous"] == [
+        "B-production-fill-clause",
+        "B-production-multiline",
+        "B-production-no-fill-clause",
+    ]
 
 def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     generator = _generator()
@@ -150,3 +160,84 @@ def test_ddl_reference_output_files_match_manifest() -> None:
         data = (MANIFEST_PATH.parent / case["output_path"]).read_bytes()
         assert len(data) == case["bytes"]
         assert hashlib.sha256(data).hexdigest()[:32] == case["digest"]
+
+def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> None:
+    """T-7 of 契約 description-propagation-cut, written as a property.
+
+    A regenerated expectation table is a record, not a gate: rebaking it hides
+    exactly the move it was meant to catch. What this asserts instead is the
+    relation between the corpus and production -- every b_coerce input is a
+    string production could hand `coerce_score`, and production hands it the
+    DDL alone. Re-concatenating the description on the product side turns the
+    first assertion red for every case at once, because production would then
+    hand over `prose\nDDL` for the very same DDL.
+
+    Before the cut this could not be written: 71.7% of production works passed
+    a concatenation and no case in the corpus had ever carried one.
+    """
+    # Importing the app is what creates the schema for the test database.
+    from inku_server.api import app as _app  # noqa: F401
+    from inku_server.api_core.routers import render as render_routes
+
+    cases = _generator().build_coerce_inputs()
+    handed: list[str] = []
+
+    class _Expansion:
+        provenance: list = []
+        warnings: list = []
+        instructions: list = []
+
+        def __init__(self, ddl: str) -> None:
+            self.ddl = ddl
+
+    def fake_expand(ddl, **kwargs):
+        return _Expansion(ddl)
+
+    def fake_compose(ddl, **kwargs):
+        return Score.model_validate({"instructions": []}), 1, 2
+
+    def fake_coerce(score, *, ddl="", **kwargs):
+        handed.append(ddl)
+        return score
+
+    monkeypatch.setattr(render_routes.DOCUMENT_PLUGIN_MANAGER, "expand", fake_expand)
+    monkeypatch.setattr(render_routes, "expand_intermediate_for_lang", lambda ddl, **kwargs: ddl)
+    monkeypatch.setattr(render_routes, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "coerce_score", fake_coerce)
+
+    checked = 0
+    for case_id, case in sorted(cases.items()):
+        if not case["ddl"]:
+            continue
+        handed.clear()
+        render_routes.api_compose(
+            render_routes.ComposeRequest(
+                ddl=case["ddl"],
+                description="ひさかたの光のどけき春の日にしづ心なく花の散るらむ",
+                sketch_text="円がある。円は黒い。",
+                instruction_lang="ja",
+            ),
+            {"id": "test-user"},
+        )
+        assert handed == [case["ddl"]], (
+            f"{case_id}: production hands coerce {handed!r}, the corpus freezes "
+            f"{case['ddl']!r}. The corpus is no longer measuring production's input."
+        )
+        checked += 1
+    # Say how many were looked at: a gate that silently checked nothing reads
+    # exactly like a gate that passed.
+    assert checked == 13
+
+
+def test_the_corpus_holds_a_case_of_the_production_shape() -> None:
+    """The property above is satisfied by an empty corpus too. These three cases
+    are what make it say something: a single-line multi-clause DDL opening with a
+    fill clause is the ordinary shape of production's input, and it is the shape
+    the removed guard misfired on."""
+    cases = _generator().build_coerce_inputs()
+    fill_clause = cases["B-production-fill-clause"]["ddl"]
+
+    assert "\n" not in fill_clause
+    assert fill_clause.startswith("背景を")
+    assert len([part for part in fill_clause.split("。") if part.strip()]) >= 4
+    assert "\n" in cases["B-production-multiline"]["ddl"]

@@ -125,22 +125,29 @@ def req_description() -> str:
 
 # --------------------------------------------------------------------- T-2
 
-def test_t2_the_same_text_reaches_all_five_consumers(wired):
+def test_t2_the_same_text_reaches_the_three_consumers_that_remain(wired):
+    """Rewritten by 契約 description-propagation-cut (T-10), not deleted.
+
+    This gate used to name five consumers: Stage 1, the plugin expansion twice
+    (source and seed), Stage 1.5, Stage 2 and coerce. The cut removed two of
+    them -- Stage 2 and coerce now read the DDL alone -- and moved a third: the
+    plugin's seed is the description, because it is hashed rather than read and
+    a seed has to be stable across repetitions. Three remain, and they are the
+    ones that decide what the DDL says; leaving the old five here would fail,
+    and deleting the file would stop anyone watching the layer at all.
+    """
     run_paint(paint())
 
     prose = "[fine] 円がある。円は黒い。"
-    # The five places the description used to go, asserted on what was passed:
-    # Stage 1, the plugin expansion (twice: source and seed), Stage 1.5, Stage 2
-    # and coerce. If 0.5 only reached Stage 1 the cut contract cannot be written
-    # and M1's range does not reproduce (contract section 0.2).
     assert wired.stage1_text == [prose]
     assert wired.plugin_source == [prose]
-    assert wired.plugin_seed == [prose]
     assert wired.stage15_context == [prose]
-    assert wired.stage2_description == [prose]
-    assert wired.coerce_ddl and wired.coerce_ddl[0].startswith(prose)
-    # None of them kept the raw description.
+    # The two the cut removed.
+    assert wired.stage2_description == [None]
+    assert wired.coerce_ddl and prose not in wired.coerce_ddl[0]
     assert req_description() not in wired.coerce_ddl[0]
+    # And the one it moved: the seed is the work's own identity.
+    assert wired.plugin_seed == [req_description()]
 
 
 def test_t2_with_the_layer_off_the_description_travels_as_before(wired):
@@ -150,7 +157,7 @@ def test_t2_with_the_layer_off_the_description_travels_as_before(wired):
     assert wired.stage1_text == [req_description()]
     assert wired.plugin_source == [req_description()]
     assert wired.stage15_context == [req_description()]
-    assert wired.stage2_description == [req_description()]
+    assert wired.stage2_description == [None]
 
 
 def interpret(**overrides):
@@ -174,7 +181,7 @@ def test_t2_the_interpret_path_hands_the_prose_on_as_the_paint_path_does(wired):
     prose = "[fine] 円がある。円は黒い。"
     assert wired.stage1_text == [prose]
     assert wired.plugin_source == [prose]
-    assert wired.plugin_seed == [prose]
+    assert wired.plugin_seed == [req_description()]
     assert wired.stage15_context == [prose]
 
 
@@ -258,13 +265,14 @@ def test_t6_an_edited_prose_is_what_gets_interpreted(wired):
     edited = "岩の面を水が速く流れ落ちる。濡れた岩は黒い。"
     run_paint(paint(sketch_text=edited))
 
-    # The author's own prose reached all five, and the model was not asked again.
+    # The author's own prose reached the three that read it, and the model was
+    # not asked again. Stage 2 and coerce read the DDL alone since the cut.
     assert wired.sketch_inputs == []
     assert wired.stage1_text == [edited]
     assert wired.plugin_source == [edited]
     assert wired.stage15_context == [edited]
-    assert wired.stage2_description == [edited]
-    assert wired.coerce_ddl[0].startswith(edited)
+    assert wired.stage2_description == [None]
+    assert edited not in wired.coerce_ddl[0]
 
 
 # --------------------------------------------------------------------- T-7
@@ -295,8 +303,8 @@ def test_t7_the_compose_path_carries_the_stored_prose_without_running_the_layer(
     assert wired.sketch_inputs == []
     assert wired.plugin_source == [stored]
     assert wired.stage15_context == [stored]
-    assert wired.stage2_description == [stored]
-    assert wired.coerce_ddl[0].startswith(stored)
+    assert wired.stage2_description == [None]
+    assert stored not in wired.coerce_ddl[0]
     assert response.sketch_text == stored
     assert response.sketch_grain == "coarse"
 
@@ -336,10 +344,12 @@ def test_t9_coarse_changes_the_prose_and_the_ddl_end_to_end(wired):
     assert fine.sketch_text != coarse.sketch_text
     # ...and the difference is what the downstream layers read, not a value
     # recorded and dropped. Ignoring the parameter inside the 0.5 call makes the
-    # two runs identical here.
+    # two runs identical here. Stage 2 and coerce are no longer among the layers
+    # that read it (T-10 of the description-propagation cut), so the three that
+    # still do are what the difference has to show up in.
     assert wired.stage1_text[0] != wired.stage1_text[1]
-    assert wired.stage2_description[0] != wired.stage2_description[1]
-    assert wired.coerce_ddl[0] != wired.coerce_ddl[1]
+    assert wired.plugin_source[0] != wired.plugin_source[1]
+    assert wired.stage15_context[0] != wired.stage15_context[1]
     assert coarse.sketch_grain == "coarse"
 
 

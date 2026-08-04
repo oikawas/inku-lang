@@ -318,7 +318,7 @@ class LocalFallbackPipeline(
         return ServerFallbackComposer.fallbackDdlFromText(text)
     }
 
-    private fun scoreFromWebRules(ddl: String, originalText: String, canvasAspect: String): JSONObject {
+    internal fun scoreFromWebRules(ddl: String, originalText: String, canvasAspect: String): JSONObject {
         val context = "$originalText\n$ddl"
         val background = detectBackground(context)
         val foreground = visibleForeground(detectColorKey(context, background), background)
@@ -336,8 +336,15 @@ class LocalFallbackPipeline(
             .put("version", "0.1.0")
             .put("canvas", canvasAspect)
             .put("background", background)
-            .put("instructions", JSONArray().put(coerceInstruction(instruction, "$ddl\n$originalText", background)))
-        return normalizeServerScore(score, "$ddl\n$originalText", canvasAspect)
+            // The DDL alone, on both calls. The concatenation used to reach the
+            // coercer here and, through normalizeServerScore below, every one of
+            // the thirty branches and the background governor -- so those branches
+            // could author a mark from a word the DDL never carried. The server
+            // side of this cut is 契約 description-propagation-cut; `context`
+            // above stays as it is, because that is this fallback's Stage 2, not
+            // its coerce.
+            .put("instructions", JSONArray().put(coerceInstruction(instruction, ddl, background)))
+        return normalizeServerScore(score, ddl, canvasAspect)
     }
 
     private fun fallbackInstruction(text: String, color: String, weight: String): JSONObject {
@@ -1508,25 +1515,25 @@ class LocalFallbackPipeline(
         )
     }
 
+    /**
+     * The twin of the server's `_has_explicit_background_intent`.
+     *
+     * Two things moved with 契約 description-propagation-cut, for the same reason
+     * they moved on the server. The context used to be `ddl\noriginalText`, so
+     * the first line was the DDL and the guard below judged whether the text it
+     * was handed had been machine-generated. Coerce is handed the DDL alone now:
+     * there is no other provenance left for the guard to judge, and a DDL of the
+     * ordinary shape -- one line, four or more clauses, opening with 背景を --
+     * satisfied every one of its conditions, so it only misfired. The guard is
+     * gone and the context is read whole.
+     */
     private fun hasExplicitBackgroundIntent(ddl: String): Boolean {
-        val context = ddl.substringBefore("\n").ifBlank { ddl }
+        val context = ddl.trim()
         val lower = context.lowercase()
-        if (looksLikeGeneratedBackgroundPlan(context)) return false
         if (listOf("背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness").any { it in context || it in lower }) return true
         if (listOf("夕焼け空", "夕暮れの空", "sunset sky", "dusk sky").any { it in context || it in lower }) return true
         if (listOf("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise").any { it in context || it in lower }) return false
         return listOf("夜", "night").any { it in context || it in lower }
-    }
-
-    private fun looksLikeGeneratedBackgroundPlan(context: String): Boolean {
-        if ("\n" in context) return false
-        val clauses = Regex("[。\\n;；]+").split(context).map { it.trim() }.filter { it.isNotBlank() }
-        if (clauses.size < 4) return false
-        val first = clauses.first().lowercase()
-        if (!(first.startsWith("背景を") || first.startsWith("background") || "fill background" in first)) return false
-        val lower = context.lowercase()
-        return listOf("気配", "透明な膜", "五感", "存在", "境界が滲", "画面全体", "presence", "transparent membrane", "five-sense", "boundary blur", "full canvas")
-            .any { it in context || it in lower }
     }
 
     private fun detectColorKey(text: String, background: String): String {

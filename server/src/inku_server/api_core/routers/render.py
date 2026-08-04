@@ -111,14 +111,6 @@ def _resolved_stage2_model(model: str | None, actor: dict | None = None) -> str:
     return _resolved_stage_model(model, actor, stage="stage2")
 
 
-def _coerce_context(ddl: str, original_description: str | None = None) -> str:
-    original = (original_description or "").strip()
-    normalized = ddl.strip()
-    if original and original != normalized:
-        return f"{original}\n{normalized}"
-    return normalized
-
-
 def _score_with_plugin_instructions(score: Score, instructions: list[dict]) -> Score:
     """展開層の決定的転写 instruction を coerce 後の Score へ合流させる (v1.94 輪1)。
 
@@ -821,6 +813,7 @@ def _call_compose_detail(
     *,
     model: str | None = None,
     original_description: str | None = None,
+    plugin_seed_text: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
     composition_seed: int | None = None,
@@ -831,11 +824,15 @@ def _call_compose_detail(
     variation_seed: int | None = None,
 ) -> ComposeDetail:
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
+    # Two arguments of one call with different jobs: `source_text` is the prose
+    # and decides WHETHER a plugin fires; `seed_text` is never read as language
+    # and is only hashed, so it has to be the description -- the one string that
+    # is stable across repetitions and bound to the identity of the work.
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
         ddl,
         source_text=original_description,
         lang=lang,
-        seed_text=original_description or ddl,
+        seed_text=plugin_seed_text or ddl,
     )
     plugin_expanded_ddl = plugin_expansion.ddl  # trace: after plugin expansion
     variation_report: dict = {}
@@ -892,7 +889,6 @@ def _call_compose_detail(
         def run_compose():
             kwargs: dict = {
                 "model": model,
-                "original_description": original_description,
                 "system_prompt": prompt,
                 "lang": lang,
                 "prompt_metadata": prompt_metadata,
@@ -1284,6 +1280,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             req.ddl,
             model=resolved_stage2_model,
             original_description=source_text,
+            plugin_seed_text=req.description,
             system_prompt=None,
             lang=instruction_lang_resolved,
             composition_seed=req.composition_seed,
@@ -1310,7 +1307,9 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
             score = coerce_score(
                 score,
                 branch_report=branch_counts,
-                ddl=_coerce_context(compose_detail.ddl, source_text),
+                # The DDL alone. Handing the prose along too let coerce's 30
+                # branches author instructions from words the DDL never carried.
+                ddl=compose_detail.ddl,
                 tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )
@@ -1442,7 +1441,9 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
             detail.ddl,
             source_text=source_text,
             lang=instruction_lang_resolved,
-            seed_text=source_text,
+            # The hash source, not language: the description, so that two runs
+            # of the same work resolve the same counts and rotations.
+            seed_text=req.description,
         )
         detail.ddl = expand_intermediate_for_lang(
             plugin_expansion.ddl,
@@ -1695,6 +1696,7 @@ def _paint_events(
             ddl,
             model=resolved_stage2_model,
             original_description=source_text,
+            plugin_seed_text=req.description,
             lang=instruction_lang_resolved,
             include_trace=req.include_trace,
             tenkei=resolved_tenkei,
@@ -1721,7 +1723,8 @@ def _paint_events(
             score = coerce_score(
                 score,
                 branch_report=branch_counts,
-                ddl=_coerce_context(ddl, source_text),
+                # The DDL alone -- see the note at the /api/compose call site.
+                ddl=ddl,
                 tenkei=resolved_tenkei,
                 plugin_instructions_present=bool(compose_detail.plugin_instructions),
             )

@@ -154,7 +154,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "21"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "5"
+    assert data["ddl_engine_version"] == "6"
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     enabled = client.get("/api/info")
@@ -1426,15 +1426,30 @@ def test_paint_keeps_the_augmented_text_out_of_the_history(monkeypatch, auth_con
     db.delete_items(user["id"], [data["history_id"]])
 
 
-def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_context):
-    headers, _, _ = auth_context
+def test_compose_hands_coerce_the_ddl_alone_over_http(monkeypatch, auth_context):
+    """旧名 `test_compose_uses_original_text_for_coerce_suppression`。
 
-    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja"):
+    契約 description-propagation-cut (2026-08-04) で裏返した表明。旧版は
+    「記述が coerce の分岐を抑える」ことを instruction 数で表明していた。
+    その経路が本契約の切る対象であり、いま記述は coerce へ届かない。
+    表明は同じ入口 (HTTP) で、coerce が受け取る文字列そのものへ移した。
+    """
+    headers, _, _ = auth_context
+    seen: list[str] = []
+
+    def fake_compose(ddl: str, model=None, system_prompt=None, lang="ja", **kwargs):
         return Score.model_validate(
             {"instructions": [{"primitive": "line", "from": [0.2, 0.5], "to": [0.8, 0.5], "color": "black"}]}
         )
 
+    real_coerce = render_routes.coerce_score
+
+    def recording_coerce(score, *, ddl="", **kwargs):
+        seen.append(ddl)
+        return real_coerce(score, ddl=ddl, **kwargs)
+
     monkeypatch.setattr(render_routes, "compose", fake_compose)
+    monkeypatch.setattr(render_routes, "coerce_score", recording_coerce)
 
     r = client.post(
         "/api/compose",
@@ -1446,8 +1461,9 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
     )
 
     assert r.status_code == 200
+    assert seen == ["黒い線を置く。"]
+    assert "白い余白" not in seen[0]
     instructions = r.json()["score"]["instructions"]
-    assert len(instructions) == 1
     assert instructions[0]["primitive"] == "line"
     assert r.json()["render_build_number"]
     assert r.json()["render_color_profile"] == {
@@ -1458,7 +1474,7 @@ def test_compose_uses_original_text_for_coerce_suppression(monkeypatch, auth_con
     assert r.json()["render_engine_id"] == "default"
     assert r.json()["render_engine_version"] == "21"
     assert r.json()["ddl_version"] == "3"
-    assert r.json()["ddl_engine_version"] == "5"
+    assert r.json()["ddl_engine_version"] == "6"
     assert r.json()["render_canvas_aspect"] == "square"
     assert r.json()["render_canvas_aspect_id"] == "square"
     assert r.json()["render_canvas_aspect_ratio"] == 1.0
@@ -1495,7 +1511,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "21"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "5"
+    assert data["ddl_engine_version"] == "6"
     assert data["render_canvas_aspect"] == "square"
     assert data["render_canvas_aspect_id"] == "square"
     assert data["render_canvas_aspect_ratio"] == 1.0
@@ -2188,7 +2204,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_engine_id"] == "default"
     assert item["render_engine_version"] == "21"
     assert item["ddl_version"] == "3"
-    assert item["ddl_engine_version"] == "5"
+    assert item["ddl_engine_version"] == "6"
     assert item["render_canvas_aspect"] == "wide"
     assert item["render_canvas_aspect_id"] == "wide"
     assert item["render_canvas_aspect_ratio"] == 2.35

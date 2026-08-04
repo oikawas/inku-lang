@@ -141,7 +141,6 @@ COERCE_MARKERS = {
     ),
     "surface_tension": ("cloth", "fabric", "fruit", "heavy", "weight", "shadow", "sink"),
     "intentional_large_surface": ("large", "huge", "wide", "broad surface", "cloth", "fabric"),
-    "generated_background_plan": ("presence", "transparent membrane", "five-sense", "boundary blur", "full canvas"),
     "explicit_surface": (
         "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "dark field",
     ),

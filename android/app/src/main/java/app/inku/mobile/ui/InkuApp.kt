@@ -1588,10 +1588,6 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             minLines = 5,
             maxLines = 8,
         )
-        TenkeiSelect(
-            selected = state.selectedTenkei,
-            onSelect = viewModel::setSelectedTenkei,
-        )
         DrawingActionButton(
             idleText = "▶  描画する",
             runningText = "■  描画中",
@@ -5232,34 +5228,3 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
 
 private data class Tuple5<A, B, C, D, E>(val a: A, val b: B, val c: C, val d: D, val e: E)
 
-
-@Composable
-internal fun TenkeiSelect(
-    selected: String,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "添景選択",
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("tenkei_select_row"),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            app.inku.mobile.data.model.TenkeiOptions.forEach { item ->
-                val isSelected = item.id == selected
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onSelect(item.id) },
-                    label = { Text(item.labelJa) },
-                    modifier = Modifier.testTag("tenkei_chip_${item.id}"),
-                )
-            }
-        }
-    }
-}

@@ -175,7 +175,9 @@ Not implemented yet:
   cases in `server/tests/fixtures/stage2/` plus exact `dh1` / `rh2` values; see the final
   section).
 - Catching up with the web/server v2 generation (renderer engine 2 → 10, variation,
-  plugins, lineage, tenkei). Only Phase 1 (Score schema / coerce / hash) is complete.
+  plugins, lineage). Only Phase 1 (Score schema / coerce / hash) is complete.
+  **The staffage level was folded away as an axis in v2.11.0, so it is no longer
+  something to catch up with** (see the 2026-08-05 section at the end).
 
 ## Verified Device State
 
@@ -2116,3 +2118,48 @@ is no UI that shows lineage either.
   **Under P2 (cut the wiring) all 143 JVM tests stayed green** and only five instrumented tests went
   red — **a suite of pure functions cannot be the acceptance for a save path.**
 
+
+## 2026-08-05 The staffage level folded away ([I-139] / android `2.1.4-android.8`, unchanged)
+
+Following the contract `android-folds-away-the-staffage-level.md`, the staffage level
+(tenkei) that the server **folded away as an axis** in v2.11.0 (`05c62206`) is gone from
+Android too. **The server is the source of truth and Android is the port**, so what was
+carried across is not the same *result* but the same *judgement*.
+
+### What was dropped
+
+- **`WebDdlExpander.kt`** — the `tenkei` parameter and the nine conditions counted in
+  section 2.2 of the contract. `expandJa` / `expandEn` now **resolve the focus, return
+  `reframeStaticCenter*`, and stop.** Focus is the only variation axis left; the six
+  others (type swap, count, touch, colour, composition family, type family) and the
+  structural / musical / painterly candidate sentences they wrote are gone.
+  `contextText` and `varySeed` **remain as parameters but no longer move the output**
+  (the server keeps them the same way).
+- **`InkuPipeline.kt` / `LocalFallbackPipeline.kt` / `InkuRepository.kt`** —
+  `PaintRequest.tenkei` and its hand-off, plus the three signatures of `paint`,
+  `interpret` and `composeFromDdl`. **The parameter was removed, not pinned to a default.**
+- **`InkuApp.kt` / `InkuViewModel.kt` / `data/model/Tenkei.kt`** — the picker and its
+  state. `Tenkei.kt` was deleted outright.
+
+**Android never had a stored column or a wire field for `tenkei`**, so nothing corresponds
+to the server-side ruling that keeps the DB column and shows it on old works in developer
+mode. No column and no screen were added for the port.
+
+### What was not dropped
+
+**Whatever the server kept was kept.** `DdlFilterProfile`, `DdlFilterCandidate` and `pick`
+have no caller after the fold, but the server still carries `_FilterProfile`,
+`_FilterCandidate` and `_pick`, so the shapes match. **The client does not decide that its
+own way is better.**
+
+### Verification Results
+
+- **JVM unit 156 / 0 failures** (37 classes, 0 skipped). The starting point was 143 with 4
+  red. The arithmetic is **143 − 3 (staffage-only tests deleted) + 16 (gates T-1..T-7) = 156**.
+- **Instrumented 20 / 0 failures** (Pixel 9; no emulator). One staffage test was removed
+  from the starting 21.
+- **The six tests named in section 1.3 of the contract were re-pointed, not deleted.** Each
+  now asserts something that is true after the fold and false before it, and says so in its name.
+- **All 30 reference cases match exactly — but that is a regenerated record, not a property
+  test.** The re-bake left only **14 distinct outputs (47%)**, so a port that ignored its
+  input would go green on 16 of the 30. **The discrimination is carried by T-2**, the focus control.

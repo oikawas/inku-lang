@@ -37,7 +37,6 @@ class WebDdlExpanderPhase3aTest {
         val varySeed = if (!input.has("composition_seed") || input.isNull("composition_seed")) null else input.getLong("composition_seed")
         val enablePlugins = input.optBoolean("enable_plugins", true)
         val pluginInstructionsPresent = input.optBoolean("plugin_instructions_present", false)
-        val tenkei = input.optString("tenkei", "auto")
         val focus = if (!input.has("focus") || input.isNull("focus")) null else input.getString("focus")
         val variationAmplitude = if (!input.has("variation_amplitude") || input.isNull("variation_amplitude")) null else input.getString("variation_amplitude")
         val variationSeed = if (!input.has("variation_seed") || input.isNull("variation_seed")) null else input.getLong("variation_seed")
@@ -49,7 +48,6 @@ class WebDdlExpanderPhase3aTest {
             varySeed = varySeed,
             enablePlugins = enablePlugins,
             pluginInstructionsPresent = pluginInstructionsPresent,
-            tenkei = tenkei,
             focus = focus,
             variationAmplitude = variationAmplitude,
             variationSeed = variationSeed,
@@ -77,7 +75,7 @@ class WebDdlExpanderPhase3aTest {
     }
 
     @Test
-    fun testContextTextUsageAndDefaults() {
+    fun testContextTextNoLongerMovesTheOutputButFocusDoes() {
         val corpus = readReferenceCorpus()
         val differsObj = getCase(corpus, "B-context-differs")
         val noneObj = getCase(corpus, "B-context-none")
@@ -94,18 +92,35 @@ class WebDdlExpanderPhase3aTest {
 
         assertEquals(differsObj.getString("output"), outputDiffers)
         assertEquals(noneObj.getString("output"), outputNone)
-        assertNotEquals(outputDiffers, outputNone)
+        // TRUE after the fold, FALSE before it: the context text fed the candidate
+        // filter, and that filter went away with the staffage level (v2.11.0).
+        assertEquals(outputDiffers, outputNone)
+
+        // The control: the same call still moves when the focus moves.
+        assertNotEquals(
+            outputNone,
+            WebDdlExpander.expandIntermediateDdl(
+                ddl = noneObj.getJSONObject("input").getString("ddl"),
+                contextText = null,
+                focus = "upper_left",
+            ),
+        )
     }
 
     @Test
-    fun testVarySeedModifiesSeedContext() {
+    fun testVarySeedNoLongerModifiesTheOutputButFocusDoes() {
         val ddl = "中心に黒い四角を置く。白い横線を三本引く。"
         val base = WebDdlExpander.expandIntermediateDdl(ddl, varySeed = null)
         val s0 = WebDdlExpander.expandIntermediateDdl(ddl, varySeed = 0L)
         val s12345 = WebDdlExpander.expandIntermediateDdl(ddl, varySeed = 12345L)
 
-        assertNotEquals(base, s0)
-        assertNotEquals(s0, s12345)
+        // TRUE after the fold, FALSE before it: varySeed only salted the candidate
+        // filter's seed context, and that filter is gone.
+        assertEquals(base, s0)
+        assertEquals(s0, s12345)
+
+        // The control: the focus still authors the output.
+        assertNotEquals(base, WebDdlExpander.expandIntermediateDdl(ddl, focus = "upper_edge"))
     }
 
     @Test

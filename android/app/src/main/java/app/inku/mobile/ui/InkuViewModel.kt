@@ -54,7 +54,6 @@ data class InkuUiState(
     val batchElapsedMs: Long = 0L,
     val batchLatestHashShort: String? = null,
     val demoSeed: String = DefaultDemoSeedPhrase,
-    val selectedTenkei: String = "auto",
     val demoIntervalSeconds: Int = 30,
     val demoGeneratedPrompt: String = "",
     val demoGeneratedDdl: String? = null,
@@ -513,10 +512,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
         persistSetting("litert_stage1_prompt_optimization", JSONObject().put("enabled", enabled).toString())
     }
 
-    fun setSelectedTenkei(tenkei: String) {
-        localState.value = localState.value.copy(selectedTenkei = tenkei)
-    }
-
     fun setUiMode(mode: String) {
         val normalized = if (mode == "simple") "simple" else "full"
         localState.value = localState.value.copy(uiMode = normalized, message = null)
@@ -664,7 +659,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
-                        current.selectedTenkei,
                     )
                 }
                 if (!isCurrentDrawingRun(runId)) return@launch
@@ -683,7 +677,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
-                        current.selectedTenkei,
                     )
                 }
             }.onSuccess { item ->
@@ -718,7 +711,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, current.selectedTenkei)
+                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -799,7 +792,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                             autoRepair = current.ddlAutoRepairEnabled,
                             historyInput = "#$lineNumber $prompt",
                             litertStage1PromptOptimization = current.litertStage1PromptOptimization,
-                            tenkei = current.selectedTenkei,
                         )
                     }
                 }.onSuccess { item ->
@@ -912,7 +904,6 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                                 autoRepair = cycle.ddlAutoRepairEnabled,
                                 historyInput = "[demo] $prompt",
                                 litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
-                                tenkei = cycle.selectedTenkei,
                             )
                         }
                     }.onSuccess { item ->

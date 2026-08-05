@@ -279,7 +279,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto", lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -292,13 +292,12 @@ class InkuRepository(
                 canvasAspect = canvasAspect,
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
-                tenkei = tenkei,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility)
     }
 
-    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto"): InterpretResult {
+    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false): InterpretResult {
         val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
@@ -310,12 +309,11 @@ class InkuRepository(
                 canvasAspect = canvasAspect,
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
-                tenkei = tenkei,
             ),
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto", lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -328,7 +326,6 @@ class InkuRepository(
                 canvasAspect = canvasAspect,
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
-                tenkei = tenkei,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility)

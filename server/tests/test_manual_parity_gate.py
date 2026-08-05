@@ -23,10 +23,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHECK_DOCS = ROOT / "server/scripts/check_docs.py"
 MANUAL = ROOT / "manual"
 
-# `manual/` is outside the rsync payload, so it is absent from the pentala tree.
 # Decide the skip on the directory, not on a file name: a file-level test turns
-# red on the machine that carries no manual at all. Reading `check_docs.py` needs
-# no such guard -- `server/scripts/` is synced.
+# red on a tree that carries no manual at all, where a directory-level skip stays
+# quiet. Reading `check_docs.py` needs no such guard, since it sits under
+# `server/`, which every tree has.
+#
+# This guard is defensive, not a description of pentala. The contract asserted
+# that `manual/` is outside the rsync payload and therefore absent there; that
+# was measured on 2026-08-05 and is false -- pentala carries `manual/` (a stale
+# v1.85 copy, with the two languages still matching each other, so `check_parity`
+# is green there rather than reporting seven missing originals).
 manual_tree_only = pytest.mark.skipif(not MANUAL.is_dir(), reason="manual/ is absent")
 
 # The seven pairs this contract adds, named one by one.

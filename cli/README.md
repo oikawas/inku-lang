@@ -36,6 +36,45 @@ The output directory contains:
 
 Hash suffixes are matched against `render_hash_short` or the trailing characters of `render_hash`. If a suffix is ambiguous, use more characters.
 
+## Adjust the render limits
+
+Nine numbers decide how many marks a work may carry. They are not performance
+tuning — they decide how many lines get drawn, so they change the picture. They
+are stored on the server, so `config` reads and writes them:
+
+```sh
+inku-cli config show
+inku-cli config update --limit-literal-count-threshold 480
+inku-cli config update --limit-max-expanded-primitives 900 --limit-max-expanded-per-instruction 480
+inku-cli config update --limits-reset
+```
+
+Only the flags given are sent; the server merges them over what is stored. A set
+that contradicts itself is **rounded down, not rejected** — asking for a
+represented band above the literal threshold lowers the band — and the response
+is the set that actually took effect, so read it rather than assuming the
+request was honoured.
+
+Three families, in the order `config show` reports them:
+
+| flag | what changes |
+|---|---|
+| `--limit-max-expanded-primitives` | marks per work; past it the whole work is scaled down |
+| `--limit-max-expanded-per-instruction` | marks one instruction may expand to |
+| `--limit-max-instructions` | instructions per work; the list is truncated past it |
+| `--limit-literal-count-threshold` | below it a stated number is drawn as stated; at or above it the group is shown as a band |
+| `--limit-represented-count-min` / `-max` | the two ends of that band |
+| `--limit-ddl-count-max` | ceiling on a numeral read out of the description, and the top of the density bands Stage 1 is told to use |
+| `--limit-ddl-count-max-grid` | the same ceiling for a literal grid |
+| `--limit-schema-count-max` | the only bound checked on Stage 2's own output |
+
+The effective values are written into the Stage 1 and Stage 2 prompts, so the
+model is told the rule the pipeline will actually apply, and `stage2_prompt_digest`
+moves with them. They are also recorded on every work in `history.render_limits`,
+so a drawing made under one configuration can still be told apart from the same
+description drawn under another. A work saved before this column existed carries
+no value at all, which is not the same as carrying the defaults.
+
 ## Command Line Help Reference
 
 <!-- HELP_START -->
@@ -1050,6 +1089,16 @@ usage: inku-cli config update [-h] [--google-auth {true,false}]
                               [--log-retention-days LOG_RETENTION_DAYS]
                               [--log-retention-enabled {true,false}]
                               [--log-compress {true,false}]
+                              [--limit-max-expanded-primitives LIMIT_MAX_EXPANDED_PRIMITIVES]
+                              [--limit-max-expanded-per-instruction LIMIT_MAX_EXPANDED_PER_INSTRUCTION]
+                              [--limit-max-instructions LIMIT_MAX_INSTRUCTIONS]
+                              [--limit-literal-count-threshold LIMIT_LITERAL_COUNT_THRESHOLD]
+                              [--limit-represented-count-min LIMIT_REPRESENTED_COUNT_MIN]
+                              [--limit-represented-count-max LIMIT_REPRESENTED_COUNT_MAX]
+                              [--limit-ddl-count-max LIMIT_DDL_COUNT_MAX]
+                              [--limit-ddl-count-max-grid LIMIT_DDL_COUNT_MAX_GRID]
+                              [--limit-schema-count-max LIMIT_SCHEMA_COUNT_MAX]
+                              [--limits-reset]
 
 options:
   -h, --help            show this help message and exit
@@ -1067,6 +1116,38 @@ options:
                         enable/disable log retention
   --log-compress {true,false}
                         compress log files
+
+render limits:
+  How many marks a work may carry. Raising these draws more; the effective
+  values are written into the Stage 1/2 prompts and recorded on every work.
+
+  --limit-max-expanded-primitives LIMIT_MAX_EXPANDED_PRIMITIVES
+                        marks per work; above this the whole work is scaled
+                        down to fit
+  --limit-max-expanded-per-instruction LIMIT_MAX_EXPANDED_PER_INSTRUCTION
+                        marks one instruction may expand to; a larger group is
+                        thinned
+  --limit-max-instructions LIMIT_MAX_INSTRUCTIONS
+                        instructions per work; the list is truncated past this
+  --limit-literal-count-threshold LIMIT_LITERAL_COUNT_THRESHOLD
+                        below this a stated number is drawn as stated; at or
+                        above it the group is shown as a band
+  --limit-represented-count-min LIMIT_REPRESENTED_COUNT_MIN
+                        low end of the band a too-large group is drawn as
+  --limit-represented-count-max LIMIT_REPRESENTED_COUNT_MAX
+                        high end of that band; rounded down to the literal
+                        threshold
+  --limit-ddl-count-max LIMIT_DDL_COUNT_MAX
+                        ceiling on a numeral read out of the description, and
+                        the top of the density bands Stage 1 is told to use
+  --limit-ddl-count-max-grid LIMIT_DDL_COUNT_MAX_GRID
+                        the same ceiling for a literal grid, which may go
+                        higher than an ordinary arrangement
+  --limit-schema-count-max LIMIT_SCHEMA_COUNT_MAX
+                        the only bound checked on Stage 2's own output; a
+                        larger count is clamped to it
+  --limits-reset        put every render limit back to its default, ignoring
+                        the other --limit-* flags
 
 ```
 

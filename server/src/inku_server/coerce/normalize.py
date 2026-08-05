@@ -574,7 +574,9 @@ def _grid_within(ins: Instruction, ceiling: int, note: str) -> Instruction:
     return _with_note(Instruction.model_validate(data), note)
 
 
-def _enforce_hard_ceiling(score: Score, limits: Limits = DEFAULT_LIMITS) -> Score:
+def _enforce_hard_ceiling(
+    score: Score, limits: Limits = DEFAULT_LIMITS, notes: list[str] | None = None
+) -> Score:
     """The last word on how many marks leave coerce, grid included.
 
     The density governors above deliberately spare grids: a lattice with holes in
@@ -588,10 +590,10 @@ def _enforce_hard_ceiling(score: Score, limits: Limits = DEFAULT_LIMITS) -> Scor
     if len(instructions) > limits.max_instructions:
         dropped = len(instructions) - limits.max_instructions
         instructions = instructions[: limits.max_instructions]
-        instructions[-1] = _with_note(
-            instructions[-1],
-            f"instruction list capped at {limits.max_instructions}; {dropped} dropped",
-        )
+        note = f"instruction list capped at {limits.max_instructions}; {dropped} dropped"
+        instructions[-1] = _with_note(instructions[-1], note)
+        if notes is not None:
+            notes.append(note)
         changed = True
 
     counts = [_mark_count(ins) for ins in instructions]
@@ -607,6 +609,8 @@ def _enforce_hard_ceiling(score: Score, limits: Limits = DEFAULT_LIMITS) -> Scor
             else:
                 break
         note = f"hard ceiling {limits.max_expanded_primitives} applied to the whole work"
+        if notes is not None:
+            notes.append(note)
         for index, ins in enumerate(instructions):
             if counts[index] <= ceiling or ins.arrangement is None:
                 continue

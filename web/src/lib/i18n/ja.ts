@@ -446,6 +446,41 @@ export const ja: LangPack = {
 	uiModeSaveFailed: 'UI設定を保存できませんでした。',
 	settingsTabServerMisc: 'その他（サーバー）',
 	settingsTabLogs: 'ログ保存',
+	settingsTabLimits: '制限値',
+	settingsRenderLimitsTitle: '制限値',
+	settingsRenderLimitsIntro:
+		'一枚の作品が何本の墨を持てるかを決める数です。速度の調整ではなく、描かれる線の数そのものが変わります。ここで決めた値は Stage 1 / Stage 2 のプロンプトへ書き込まれ、描いた作品ごとに記録されます。',
+	settingsRenderLimitsRounding:
+		'互いに矛盾する値は拒否せず丸めます（例: 代表化の上限が literal の閾値を超えていれば、閾値まで下げます）。表示されているのは丸めたあとの、実際に効いている値です。',
+	settingsRenderLimitsReset: '既定値へ戻す',
+	settingsRenderLimitsSaved: '制限値を保存しました',
+	settingsRenderLimitGroups: {
+		drawn: '実際に描かれる数',
+		stated: '述べた数の扱い',
+		ceiling: '読み取りと検証の天井'
+	},
+	settingsRenderLimitLabels: {
+		max_expanded_primitives: '一枚あたりの墨の数',
+		max_expanded_per_instruction: '一つの指示があたりの墨の数',
+		max_instructions: '一枚あたりの指示の数',
+		literal_count_threshold: 'そのまま描く上限',
+		represented_count_min: '代表化したときの下限',
+		represented_count_max: '代表化したときの上限',
+		ddl_count_max: '記述から読む数の天井',
+		ddl_count_max_grid: '格子のときの天井',
+		schema_count_max: 'Stage 2 の出力を検証する天井'
+	},
+	settingsRenderLimitHints: {
+		max_expanded_primitives: 'これを超えると作品全体を縮めて収めます',
+		max_expanded_per_instruction: '一つの指示がこれより多くを求めたら間引きます',
+		max_instructions: 'これを超えた指示は切り捨てます',
+		literal_count_threshold: 'これ未満なら述べた数をそのまま描きます。これ以上は数えられないので群れとして見せます',
+		represented_count_min: '群れとして見せるときの下の端',
+		represented_count_max: 'その上の端。そのまま描く上限を超えていれば、そこまで下げます',
+		ddl_count_max: '記述の中の数字をここまでに丸めます。Stage 1 に教える密度の帯の上端でもあります',
+		ddl_count_max_grid: '文字どおりの格子だけは、通常の配置より高いところまで許します',
+		schema_count_max: 'Stage 2 が返した数がこれを超えていたら、ここまで切り詰めます'
+	},
 	settingsTabUnreadWords: '未読語台帳',
 	settingsUnreadWordsTitle: '未読語台帳',
 	settingsUnreadWordsDescription: '記述からDDLへの解釈で直接対応を確認できなかった語の集計です。この台帳から辞書へ自動昇格することはありません。',

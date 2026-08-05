@@ -566,6 +566,32 @@ def test_composer_prompt_keeps_dynamic_quantity_guidance():
     assert "≈ 20" not in SYSTEM_PROMPT_EN
 
 
+def _tool_count_property() -> dict:
+    """The count node as the model receives it, after $defs are inlined."""
+    from inku_server.composer import _score_tool_schema
+
+    # Optional fields become anyOf wrappers once $defs are inlined, so the node
+    # is found by its own description rather than by a fixed path.
+    def walk(node):
+        if isinstance(node, dict):
+            if str(node.get("description", "")).startswith("配置数"):
+                return node
+            for value in node.values():
+                found = walk(value)
+                if found is not None:
+                    return found
+        elif isinstance(node, list):
+            for item in node:
+                found = walk(item)
+                if found is not None:
+                    return found
+        return None
+
+    node = walk(_score_tool_schema())
+    assert node is not None, "arrangement.count is missing from the tool schema"
+    return node
+
+
 def test_grid_schema_and_prompts_expose_literal_tiling_contract():
     from inku_server.composer import SYSTEM_PROMPT, SYSTEM_PROMPT_EN
 
@@ -573,7 +599,13 @@ def test_grid_schema_and_prompts_expose_literal_tiling_contract():
     properties = arrangement["properties"]
 
     assert "grid" in properties["layout"]["enum"]
-    assert properties["count"]["maximum"] == 2000
+    # The ceiling is NOT a static field bound any more. A `le=` here would be a
+    # second copy of schema_count_max that no setting can reach, and it would
+    # still admit a value the configured ceiling forbids -- so its absence is
+    # the assertion, and the number is checked where it actually reaches the
+    # model: the tool schema.
+    assert "maximum" not in properties["count"]
+    assert _tool_count_property()["maximum"] == 2000
     assert properties["rows"]["anyOf"][0]["minimum"] == 1
     assert properties["rows"]["anyOf"][0]["maximum"] == 64
     assert properties["cols"]["anyOf"][0]["minimum"] == 1

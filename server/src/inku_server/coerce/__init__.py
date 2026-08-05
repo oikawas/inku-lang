@@ -62,6 +62,7 @@ def coerce_score(
     tenkei: str = "auto",
     plugin_instructions_present: bool = False,
     limits: Limits = DEFAULT_LIMITS,
+    limit_notes: list[str] | None = None,
 ) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。
 
@@ -91,7 +92,7 @@ def coerce_score(
         data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
         # The ceiling holds on this exit too. It is a guard on drawing cost, so it
         # must not be something INKU_COERCE_DISABLE can switch off.
-        return _enforce_hard_ceiling(Score.model_validate(data), limits)
+        return _enforce_hard_ceiling(Score.model_validate(data), limits, limit_notes)
     # v1.96 添景水準の挿入予算 (None = 無制限 = 現行挙動)
     scenery_budget: int | None
     if tenkei == "none":
@@ -255,4 +256,4 @@ def coerce_score(
     data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
     # Last word. Every governor above has had its say; nothing after this may
     # grow a count back, which is why it sits at the exit and not beside them.
-    return _enforce_hard_ceiling(Score.model_validate(data), limits)
+    return _enforce_hard_ceiling(Score.model_validate(data), limits, limit_notes)

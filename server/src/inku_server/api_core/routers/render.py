@@ -25,6 +25,7 @@ from ...coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
 from ...composer import _finalize_score, compose
 from ...interpreter import _sanitize_placement_words, interpret_detail
 from ...languages import expand_intermediate_for_lang
+from ...limits import DEFAULT_LIMITS, Limits, limits_as_dict, using_limits
 from ...plugins import DOCUMENT_PLUGIN_MANAGER
 from ...carriage import carriage_warnings as _carriage_warnings
 from ...schema import Score
@@ -40,7 +41,7 @@ from ...sketch import (
 from ... import db as _db
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user, _logger
-from ..rendering import _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _resolved_tenkei, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude
+from ..rendering import _effective_limits, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _resolved_tenkei, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude
 from ..state import _increment_stage_stat, _stage_executor, _stage_slots
 
 
@@ -215,6 +216,13 @@ class ComposeResponse(BaseModel):
     render_color_profile: dict[str, str] | None = None
     render_engine_id: str | None = None
     render_engine_version: str | None = None
+    # The limits that governed this work. Present only when the row recorded
+    # them; absent means "drawn before they were recorded", not "the defaults".
+    render_limits: dict[str, int] | None = None
+    # What the hard ceiling did, when it fired. The first half applied it with
+    # nowhere to say so; a work silently reduced from 900 marks to 400 looked
+    # like a work that asked for 400.
+    render_limit_notes: list[str] | None = None
     render_hash: str | None = None
     render_hash_short: str | None = None
     render_color_catalog_id: str | None = None
@@ -374,6 +382,13 @@ class PaintResponse(BaseModel):
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
+    # The limits that governed this work. Present only when the row recorded
+    # them; absent means "drawn before they were recorded", not "the defaults".
+    render_limits: dict[str, int] | None = None
+    # What the hard ceiling did, when it fired. The first half applied it with
+    # nowhere to say so; a work silently reduced from 900 marks to 400 looked
+    # like a work that asked for 400.
+    render_limit_notes: list[str] | None = None
     render_hash: str | None = None
     render_hash_short: str | None = None
     history_id: str | None = None
@@ -457,6 +472,13 @@ class RenderScoreResponse(BaseModel):
     interpretation_seed: str | None = None
     seed_text: str | None = None
     render_hash: str
+    # The limits that governed this work. Present only when the row recorded
+    # them; absent means "drawn before they were recorded", not "the defaults".
+    render_limits: dict[str, int] | None = None
+    # What the hard ceiling did, when it fired. The first half applied it with
+    # nowhere to say so; a work silently reduced from 900 marks to 400 looked
+    # like a work that asked for 400.
+    render_limit_notes: list[str] | None = None
     render_hash_short: str
 
 
@@ -856,6 +878,7 @@ def _call_compose_detail(
     focus: str | None = None,
     variation_amplitude: str | None = None,
     variation_seed: int | None = None,
+    limits: Limits = DEFAULT_LIMITS,
 ) -> ComposeDetail:
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     # Two arguments of one call with different jobs: `source_text` is the prose
@@ -926,6 +949,9 @@ def _call_compose_detail(
                 "system_prompt": prompt,
                 "lang": lang,
                 "prompt_metadata": prompt_metadata,
+                # The prompt states these numbers, so it is built from the same
+                # limits coerce will apply to the answer.
+                "limits": limits,
             }
             if sink is not None:  # only when tracing: keep the no-trace call byte-identical
                 kwargs["trace_sink"] = sink
@@ -1036,6 +1062,7 @@ def _call_interpret_detail(
     lang: str = "ja",
     include_trace: bool = False,
     tenkei: str = "auto",
+    limits: Limits = DEFAULT_LIMITS,
 ) -> InterpretDetail:
     trace_sink: list[str] | None = [] if include_trace else None
     prompt_metadata: dict[str, str] = {}
@@ -1048,6 +1075,8 @@ def _call_interpret_detail(
             "lang": lang,
             "tenkei": tenkei,
             "prompt_metadata": prompt_metadata,
+            # Stage 1 names the same ceilings; same reason as Stage 2.
+            "limits": limits,
         }
         if trace_sink is not None:  # only when tracing: keep the no-trace call byte-identical
             kwargs["trace_sink"] = trace_sink
@@ -1327,20 +1356,26 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     resolved_variation_seed = (
         req.variation_seed if resolved_variation_amplitude is not None else None
     )
+    # Read once for this request and handed to every layer that states or
+    # applies a limit: the prompt, coerce, and the count clamp inside
+    # Score.model_validate (which reaches it through using_limits).
+    limits = _effective_limits()
     try:
-        compose_detail = _call_compose_detail(
-            req.ddl,
-            model=resolved_stage2_model,
-            original_description=source_text,
-            plugin_seed_text=description,
-            system_prompt=None,
-            lang=instruction_lang_resolved,
-            composition_seed=req.composition_seed,
-            include_trace=req.include_trace,
-            tenkei=resolved_tenkei,
-            variation_amplitude=resolved_variation_amplitude,
-            variation_seed=resolved_variation_seed,
-        )
+        with using_limits(limits):
+            compose_detail = _call_compose_detail(
+                req.ddl,
+                model=resolved_stage2_model,
+                original_description=source_text,
+                plugin_seed_text=description,
+                system_prompt=None,
+                lang=instruction_lang_resolved,
+                composition_seed=req.composition_seed,
+                include_trace=req.include_trace,
+                tenkei=resolved_tenkei,
+                variation_amplitude=resolved_variation_amplitude,
+                variation_seed=resolved_variation_seed,
+                limits=limits,
+            )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("compose", 502) from e
 
@@ -1350,21 +1385,26 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         else None
     )
     coerce_report: dict[str, object] = _coerce_relation_report(None, None)
+    limit_notes: list[str] = []
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
         if req.auto_repair:
             before_coerce = score
             branch_counts: dict[str, int] = {}
-            score = coerce_score(
-                score,
-                branch_report=branch_counts,
-                # The DDL alone. Handing the prose along too let coerce's 30
-                # branches author instructions from words the DDL never carried.
-                ddl=compose_detail.ddl,
-                tenkei=resolved_tenkei,
-                plugin_instructions_present=bool(compose_detail.plugin_instructions),
-            )
+            # Site 3 of 5.
+            with using_limits(limits):
+                score = coerce_score(
+                    score,
+                    branch_report=branch_counts,
+                    limit_notes=limit_notes,
+                    # The DDL alone. Handing the prose along too let coerce's 30
+                    # branches author instructions from words the DDL never carried.
+                    ddl=compose_detail.ddl,
+                    tenkei=resolved_tenkei,
+                    plugin_instructions_present=bool(compose_detail.plugin_instructions),
+                    limits=limits,
+                )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -1393,6 +1433,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "variation_seed": resolved_variation_seed,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
+        "render_limits": limits_as_dict(limits),
     }
     try:
         svg, render_metadata = _render_with_metadata(score, render_metadata)
@@ -1434,6 +1475,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         sketch_text=req.sketch_text or None,
         sketch_grain=sketch_grain,
         sketch_state=sketch_state,
+        render_limit_notes=limit_notes or None,
         **coerce_report,
         trace=_assemble_trace(
             req.include_trace,
@@ -1494,6 +1536,9 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
                 system_prompt_prefix=None,
                 lang=instruction_lang_resolved,
                 tenkei=resolved_tenkei,
+                # Stage 1 states the ceilings in its prompt even though this
+                # route never reaches coerce.
+                limits=_effective_limits(),
             )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("interpret", 502) from e
@@ -1614,7 +1659,13 @@ def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
 def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_user)) -> RenderScoreResponse:
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
     try:
-        score = coerce_score(Score.model_validate(req.score))
+        # Site 4 of 5.
+        limits = _effective_limits()
+        limit_notes: list[str] = []
+        with using_limits(limits):
+            score = coerce_score(
+                Score.model_validate(req.score), limits=limits, limit_notes=limit_notes
+            )
         canvas_aspect = _validated_canvas_aspect_override(req.canvas_aspect)
         if canvas_aspect is not None:
             score = _score_with_canvas(score, canvas_aspect)
@@ -1626,6 +1677,7 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
             "composition_seed": req.composition_seed,
             "interpretation_seed": req.interpretation_seed,
             "seed_text": seed_text,
+            "render_limits": limits_as_dict(limits),
         }
         svg, render_metadata = _render_with_metadata(score, render_metadata)
         render_metadata = {
@@ -1643,7 +1695,13 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
         raise
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("score render", 422) from e
-    return RenderScoreResponse(score=score, svg=svg, catalog_id=catalog_id, **render_metadata)
+    return RenderScoreResponse(
+        score=score,
+        svg=svg,
+        catalog_id=catalog_id,
+        render_limit_notes=limit_notes or None,
+        **render_metadata,
+    )
 
 
 @router.post("/api/render-svg")
@@ -1727,6 +1785,9 @@ def _paint_events(
     resolved_variation_seed = (
         req.variation_seed if resolved_variation_amplitude is not None else None
     )
+    # Read once for the whole paint: Stage 1, Stage 2 and coerce all state or
+    # apply these numbers, and they have to be the same numbers.
+    limits = _effective_limits()
     try:
         if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
             # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
@@ -1741,6 +1802,7 @@ def _paint_events(
                 lang=instruction_lang_resolved,
                 include_trace=req.include_trace,
                 tenkei=resolved_tenkei,
+                limits=limits,
             )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("interpret", 502) from e
@@ -1766,17 +1828,19 @@ def _paint_events(
         )
     yield stage1_event
     try:
-        compose_detail = _call_compose_detail(
-            ddl,
-            model=resolved_stage2_model,
-            original_description=source_text,
-            plugin_seed_text=description,
-            lang=instruction_lang_resolved,
-            include_trace=req.include_trace,
-            tenkei=resolved_tenkei,
-            variation_amplitude=resolved_variation_amplitude,
-            variation_seed=resolved_variation_seed,
-        )
+        with using_limits(limits):
+            compose_detail = _call_compose_detail(
+                ddl,
+                model=resolved_stage2_model,
+                original_description=source_text,
+                plugin_seed_text=description,
+                lang=instruction_lang_resolved,
+                include_trace=req.include_trace,
+                tenkei=resolved_tenkei,
+                variation_amplitude=resolved_variation_amplitude,
+                variation_seed=resolved_variation_seed,
+                limits=limits,
+            )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("compose", 502) from e
 
@@ -1788,20 +1852,25 @@ def _paint_events(
         else None
     )
     coerce_report: dict[str, object] = _coerce_relation_report(None, None)
+    limit_notes: list[str] = []
     try:
         score = compose_detail.score
         ensure_renderable_score(score)
         if req.auto_repair:
             before_coerce = score
             branch_counts: dict[str, int] = {}
-            score = coerce_score(
-                score,
-                branch_report=branch_counts,
-                # The DDL alone -- see the note at the /api/compose call site.
-                ddl=ddl,
-                tenkei=resolved_tenkei,
-                plugin_instructions_present=bool(compose_detail.plugin_instructions),
-            )
+            # Site 5 of 5.
+            with using_limits(limits):
+                score = coerce_score(
+                    score,
+                    branch_report=branch_counts,
+                    limit_notes=limit_notes,
+                    # The DDL alone -- see the note at the /api/compose call site.
+                    ddl=ddl,
+                    tenkei=resolved_tenkei,
+                    plugin_instructions_present=bool(compose_detail.plugin_instructions),
+                    limits=limits,
+                )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
@@ -1832,6 +1901,7 @@ def _paint_events(
         "variation_seed": resolved_variation_seed,
         "seed_text": seed_text,
         "interpretation_seed": req.interpretation_seed,
+        "render_limits": limits_as_dict(limits),
     }
     if compose_detail.plugin_provenance:
         render_metadata["plugin_provenance"] = compose_detail.plugin_provenance
@@ -1994,6 +2064,7 @@ def _paint_events(
         sketch_grain=sketch_result.grain if sketch_result is not None else None,
         sketch_fallback_used=sketch_result.fallback_used if sketch_result is not None else False,
         sketch_state=sketch_state,
+        render_limit_notes=limit_notes or None,
         **coerce_report,
         trace=paint_trace,
     )

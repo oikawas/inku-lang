@@ -18,6 +18,7 @@ import os
 import re
 import urllib.request
 
+from .limits import DEFAULT_LIMITS, Limits
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
@@ -26,9 +27,86 @@ from .saijiki import prompt_block, texture_material_enumeration
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
 MAX_TOKENS = 1024
 
+# Stage 1 names the same ceilings as Stage 2 and has to be built from the same
+# effective limits, for the same reason: a prompt that says "clamp above 1000"
+# while the reader clamps at 1500 teaches a rule the system does not follow.
+# Only the numbers move -- `.replace` rather than `.format`, because the body
+# contains literal braces.
+_COUNT_CLAMP_SLOT = "%%COUNT_CLAMP%%"
+_COUNT_RANGE_HEADING_SLOT = "%%COUNT_RANGE_HEADING%%"
+_COUNT_BANDS_SLOT = "%%COUNT_BANDS%%"
+_TILE_COUNT_SLOT = "%%TILE_COUNT%%"
+
+# The bands under the count ceiling, in the order the prompt lists them. Only
+# the last upper edge IS the ceiling; the interior edges are prose about density
+# and are clamped, never rescaled. The label pairs keep the two languages from
+# drifting apart.
+_STAGE1_BANDS: tuple[tuple[str, str, int, int | None], ...] = (
+    ("ひとつ、一本、一点、孤独、単独、ぽつんと", "one, single, solitary, alone", 1, 1),
+    ("ふたつ、対、向かい合う", "pair, two, facing each other", 2, 2),
+    ("少し、数個、まばら、控えめ", "a few, sparse, restrained", 3, 8),
+    ("いくつか、点々、ちらほら", "several, dotted, here and there", 8, 20),
+    ("並ぶ、列、リズム、反復", "row, rhythm, repetition", 12, 40),
+    ("たくさん、多数、いっぱい", "many, numerous, lots", 40, 120),
+    ("密集、びっしり、埋める、覆う", "dense, packed, fill, cover", 120, 350),
+    ("無数、満天、砂、雨、雪、群れ、ノイズ", "countless, starry sky, sand, rain, snow, swarm, noise", 300, 800),
+    ("画面を埋め尽くす、全面、非常に細かい粒子", "fill the whole canvas, all-over, extremely fine particles", 700, None),
+)
+
+
+def _stage1_bands(limits: Limits, *, lang: str) -> str:
+    cap = limits.ddl_count_max
+    lines = []
+    for label_ja, label_en, low, high in _STAGE1_BANDS:
+        label = label_en if lang == "en" else label_ja
+        top = cap if high is None else min(high, cap)
+        bottom = min(low, top)
+        if bottom == top:
+            lines.append(f"- {label} → {top}")
+        else:
+            dash = "–" if lang == "en" else "〜"
+            lines.append(f"- {label} → {bottom}{dash}{top}")
+    return "\n".join(lines)
+
+
+def _build_stage1_prefix(template: str, limits: Limits, *, lang: str) -> str:
+    if lang == "en":
+        clamp = f"- Explicit numbers (100, 200) → use as-is. Clamp only values above {limits.ddl_count_max} to {limits.ddl_count_max}."
+        heading = f"## Count Ranges — use the full 1–{limits.ddl_count_max} range"
+        tile = (
+            "- Use \"tile\" only when a literal wallpaper, pattern, textile, tile, brick, mat, blind, rain-curtain, "
+            "or tree-row surface makes regular repetition the subject. Use a concrete count from "
+            f"{min(200, limits.ddl_count_max_grid)} to {limits.ddl_count_max_grid} and always add a separate "
+            "fine-trembling or faint-swaying sentence. Add no unrequested support line, alternate arrangement, "
+            "or relation sentence (except preserving explicitly requested four directions)"
+        )
+    else:
+        clamp = f"- 100本・200個などの具体的な数 → そのまま記述する。{limits.ddl_count_max} を超える場合のみ {limits.ddl_count_max} に丸める。"
+        heading = f"## 数量レンジ — 1〜{limits.ddl_count_max} の振れ幅を使う"
+        tile = (
+            "- 壁紙、模様、織物、タイル、煉瓦、畳、簾、雨脚、木立の連なりなど、規則的な反復の質感が主題として"
+            "文字どおり指定された時だけ、正規化DDLに「（要素）を一面に敷き詰める」と書く。数量は"
+            f"{min(200, limits.ddl_count_max_grid)}〜{limits.ddl_count_max_grid}を使ってよく、"
+            "「細かく震える」または「かすかに揺れる」を別文で必ず添える。"
+            "原文にない補助線・別配置・関係文を追加しない（四方向の明示だけは四方向を保持する）"
+        )
+    return (
+        template.replace(_COUNT_CLAMP_SLOT, clamp)
+        .replace(_COUNT_RANGE_HEADING_SLOT, heading)
+        .replace(_COUNT_BANDS_SLOT, _stage1_bands(limits, lang=lang))
+        .replace(_TILE_COUNT_SLOT, tile)
+    )
+
+
+def build_stage1_prefix(lang: str, limits: Limits = DEFAULT_LIMITS) -> str:
+    """The Stage 1 prefix with the effective limits written into it."""
+    template = _SYSTEM_PROMPT_PREFIX_EN_TEMPLATE if lang == "en" else _SYSTEM_PROMPT_PREFIX_TEMPLATE
+    return _build_stage1_prefix(template, limits, lang=lang)
+
+
 # ルールのみ。例は EXAMPLE_POOL に分離。
 # 新機能追加 → EXAMPLE_POOL に例を追加するだけ。ここは変えない。
-SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリタ。
+_SYSTEM_PROMPT_PREFIX_TEMPLATE = ("""あなたは inku DDL の第一段階インタプリタ。
 
 入力: 作者の自由な記述 (詩的・比喩的・感情語を含むことがある)
 出力: **正規化DDL** (Saijiki 歳時記の語彙のみを使った簡潔な日本語指示)
@@ -121,21 +199,13 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 - 「三本の竹を縦に並べる」→「縦の実線を横に三本並べる。」
 - 「五つの赤い点を置く」→「赤い小さな楕円を中央付近に五つ散らす。」
 - 「背景を青のクレヨン線で埋め尽くす」→「青いクレヨンの縦線を横に百二十本並べる。」
-- 100本・200個などの具体的な数 → そのまま記述する。1000 を超える場合のみ 1000 に丸める。
+%%COUNT_CLAMP%%
 
-## 数量レンジ — 1〜1000 の振れ幅を使う
+%%COUNT_RANGE_HEADING%%
 
 曖昧な数量語を固定値に丸めてはいけない。語の強さ、対象の種類、画面密度から具体数を選ぶ。
 
-- ひとつ、一本、一点、孤独、単独、ぽつんと → 1
-- ふたつ、対、向かい合う → 2
-- 少し、数個、まばら、控えめ → 3〜8
-- いくつか、点々、ちらほら → 8〜20
-- 並ぶ、列、リズム、反復 → 12〜40
-- たくさん、多数、いっぱい → 40〜120
-- 密集、びっしり、埋める、覆う → 120〜350
-- 無数、満天、砂、雨、雪、群れ、ノイズ → 300〜800
-- 画面を埋め尽くす、全面、非常に細かい粒子 → 700〜1000
+%%COUNT_BANDS%%
 
 対象別の補正:
 - 大きな図形、太い線、主役になる形 → 少なめ
@@ -149,7 +219,7 @@ SYSTEM_PROMPT_PREFIX = ("""あなたは inku DDL の第一段階インタプリ�
 
 # 配置選択 — 必ず配置ガイダンスを与える
 
-- 壁紙、模様、織物、タイル、煉瓦、畳、簾、雨脚、木立の連なりなど、規則的な反復の質感が主題として文字どおり指定された時だけ、正規化DDLに「（要素）を一面に敷き詰める」と書く。数量は200〜2000を使ってよく、「細かく震える」または「かすかに揺れる」を別文で必ず添える。原文にない補助線・別配置・関係文を追加しない（四方向の明示だけは四方向を保持する）
+%%TILE_COUNT%%
 - 敷き詰めは規則的反復が主題の場合だけ使う。単に「たくさん」「無数」は従来どおり偏りのある「散らす」とし、「敷き詰める」を自発的に追加しない。通常経路の数量・余白規則は変更しない
 
 「散らす」は無配置ではない。常に **ばしょ・うごき・ゆらぎの軌跡** を使って配置を決める。
@@ -895,7 +965,7 @@ EXAMPLE_POOL_EN: list[dict] = [
     },
 ]
 
-SYSTEM_PROMPT_PREFIX_EN = ("""You are the Stage 1 interpreter of inku DDL.
+_SYSTEM_PROMPT_PREFIX_EN_TEMPLATE = ("""You are the Stage 1 interpreter of inku DDL.
 
 Input: Author's free-form description (may be poetic, metaphorical, or emotional)
 Output: **Normalized DDL** — concise English instructions using only Saijiki vocabulary
@@ -989,21 +1059,13 @@ When a count is present, put **color, material, direction, size in the same sent
 - "three bamboo poles" → "Line up three vertical solid lines horizontally."
 - "five red dots" → "Scatter five small red ellipses rising to the right near the center. Make them wide."
 - "fill with blue crayon lines" → "Line up one hundred twenty vertical blue crayon lines horizontally."
-- Explicit numbers (100, 200) → use as-is. Clamp only values above 1000 to 1000.
+%%COUNT_CLAMP%%
 
-## Count Ranges — use the full 1–1000 range
+%%COUNT_RANGE_HEADING%%
 
 Do not collapse vague quantity words to one fixed number. Choose a concrete count from wording strength, object type, and canvas density.
 
-- one, single, solitary, alone → 1
-- pair, two, facing each other → 2
-- a few, sparse, restrained → 3–8
-- several, dotted, here and there → 8–20
-- row, rhythm, repetition → 12–40
-- many, numerous, lots → 40–120
-- dense, packed, fill, cover → 120–350
-- countless, starry sky, sand, rain, snow, swarm, noise → 300–800
-- fill the whole canvas, all-over, extremely fine particles → 700–1000
+%%COUNT_BANDS%%
 
 Object-specific correction:
 - large shapes, thick lines, main subject → use fewer
@@ -1017,7 +1079,7 @@ Never output vague words such as "many" or "countless"; always convert them to a
 
 # Arrangement Choice — always provide placement guidance
 
-- Use "tile" only when a literal wallpaper, pattern, textile, tile, brick, mat, blind, rain-curtain, or tree-row surface makes regular repetition the subject. Use a concrete count from 200 to 2000 and always add a separate fine-trembling or faint-swaying sentence. Add no unrequested support line, alternate arrangement, or relation sentence (except preserving explicitly requested four directions)
+%%TILE_COUNT%%
 - Tiling is only for regular repetition as the subject. Mere "many" or "countless" keeps the existing biased scatter path; never introduce "tile" spontaneously, and do not change ordinary count or negative-space rules
 
 "scatter" is not placement by itself. Always choose placement from **place words, motion words, and movement traces**, and specify where, in which direction, or along what trace the objects are distributed.
@@ -1129,6 +1191,12 @@ Expand unknown words to the nearest Saijiki vocabulary using shape, texture, str
 # Output Format
 
 Normalized DDL text only. No preamble, explanation, tags, or code block markers.""")
+
+# The prefixes AT THE DEFAULTS. Tests, the golden saijiki checks and the
+# reference generators all read these, so the frozen records stay per-code and
+# not per-install. A request with a stored setting builds its own prefix.
+SYSTEM_PROMPT_PREFIX = build_stage1_prefix("ja", DEFAULT_LIMITS)
+SYSTEM_PROMPT_PREFIX_EN = build_stage1_prefix("en", DEFAULT_LIMITS)
 
 # api.py が import する SYSTEM_PROMPT — プレフィックスを公開する
 SYSTEM_PROMPT = (
@@ -1282,15 +1350,16 @@ def _build_system_prompt_parts(
     prefix_override: str | None = None,
     lang: str = "ja",
     tenkei: str = "auto",
+    limits: Limits = DEFAULT_LIMITS,
 ) -> tuple[str, str]:
     """Return the actual Stage 1 prompt and its example-free base."""
     examples = _select_examples(text, k=k, lang=lang)
     if prefix_override is not None:
         prefix = prefix_override
-    elif lang == "en":
-        prefix = SYSTEM_PROMPT_PREFIX_EN
     else:
-        prefix = SYSTEM_PROMPT_PREFIX
+        # Built here rather than read off the module constant, so the ceilings
+        # Stage 1 states are the ones the rest of the pipeline enforces.
+        prefix = build_stage1_prefix(lang, limits)
     section_header = "# Examples\n\n" if lang == "en" else "# 変換例\n\n"
     tenkei_norms = _TENKEI_NORMS_EN if lang == "en" else _TENKEI_NORMS_JA
     tenkei_section = tenkei_norms.get(tenkei, "")
@@ -1387,13 +1456,14 @@ def interpret_detail(
     trace_sink: list[str] | None = None,
     tenkei: str = "auto",
     prompt_metadata: dict[str, str] | None = None,
+    limits: Limits = DEFAULT_LIMITS,
 ) -> tuple[str, str | None, int | None, int | None]:
     """(ddl, thinking, tokens_in, tokens_out) を返す。
 
     trace_sink 指定時は、サニタイズ前の Stage 1 生 DDL を append する (観測のみ)。
     """
     system_prompt, base_prompt = _build_system_prompt_parts(
-        text, prefix_override=system_prompt_prefix, lang=lang, tenkei=tenkei
+        text, prefix_override=system_prompt_prefix, lang=lang, tenkei=tenkei, limits=limits
     )
     if prompt_metadata is not None:
         prompt_metadata["stage1_prompt_digest"] = _prompt_digest(system_prompt)

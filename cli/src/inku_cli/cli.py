@@ -38,6 +38,21 @@ from inku_analysis.rasterizer import (
 )
 
 SESSION_COOKIE_NAME = "inku_session"
+
+# The render limits, in the order `config show` reports them. Named here rather
+# than derived from the server so the CLI keeps working against a server that
+# has not been restarted yet; an unknown name is refused by the API.
+RENDER_LIMIT_FIELDS = (
+    "max_expanded_primitives",
+    "max_expanded_per_instruction",
+    "max_instructions",
+    "literal_count_threshold",
+    "represented_count_min",
+    "represented_count_max",
+    "ddl_count_max",
+    "ddl_count_max_grid",
+    "schema_count_max",
+)
 DEFAULT_BASE_URL = "http://127.0.0.1:8100"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 600
 SERVER_DEFAULT_MODEL_LABEL = "server default"
@@ -3297,6 +3312,7 @@ def command_config(args: argparse.Namespace) -> int:
             "db_backup": settings.get("db_backup"),
             "log_retention": settings.get("log_retention"),
             "output_save": settings.get("output_save"),
+            "render_limits": settings.get("render_limits"),
             "auth_settings": auth_config
         }
         _print_json(combined)
@@ -3345,6 +3361,21 @@ def command_config(args: argparse.Namespace) -> int:
             log_res, _ = client.request("PUT", "/api/settings/log-retention", data=body)
             print("Log retention settings updated:")
             _print_json(log_res)
+
+        # The server merges a partial body over what is stored and rounds the
+        # result, so only the flags that were given are sent. What comes back is
+        # what took effect, which is not always what was asked for.
+        limit_body = {
+            name: getattr(args, "limit_" + name)
+            for name in RENDER_LIMIT_FIELDS
+            if getattr(args, "limit_" + name, None) is not None
+        }
+        if args.limits_reset:
+            limit_body = {"reset_to_defaults": True}
+        if limit_body:
+            limit_res, _ = client.request("PUT", "/api/settings/limits", data=limit_body)
+            print("Render limit settings updated:")
+            _print_json(limit_res)
     return 0
 
 
@@ -3871,6 +3902,64 @@ def build_parser() -> argparse.ArgumentParser:
     config_update.add_argument("--log-retention-days", type=int, help="log retention days")
     config_update.add_argument("--log-retention-enabled", choices=("true", "false"), help="enable/disable log retention")
     config_update.add_argument("--log-compress", choices=("true", "false"), help="compress log files")
+    # Render limits. These change how many marks a work is drawn with, so they
+    # change the picture -- they are not performance tuning. Every value is
+    # recorded on each work drawn under it (history.render_limits).
+    limits_group = config_update.add_argument_group(
+        "render limits",
+        "How many marks a work may carry. Raising these draws more; the effective "
+        "values are written into the Stage 1/2 prompts and recorded on every work.",
+    )
+    limits_group.add_argument(
+        "--limit-max-expanded-primitives",
+        type=int,
+        help="marks per work; above this the whole work is scaled down to fit",
+    )
+    limits_group.add_argument(
+        "--limit-max-expanded-per-instruction",
+        type=int,
+        help="marks one instruction may expand to; a larger group is thinned",
+    )
+    limits_group.add_argument(
+        "--limit-max-instructions",
+        type=int,
+        help="instructions per work; the list is truncated past this",
+    )
+    limits_group.add_argument(
+        "--limit-literal-count-threshold",
+        type=int,
+        help="below this a stated number is drawn as stated; at or above it the group is shown as a band",
+    )
+    limits_group.add_argument(
+        "--limit-represented-count-min",
+        type=int,
+        help="low end of the band a too-large group is drawn as",
+    )
+    limits_group.add_argument(
+        "--limit-represented-count-max",
+        type=int,
+        help="high end of that band; rounded down to the literal threshold",
+    )
+    limits_group.add_argument(
+        "--limit-ddl-count-max",
+        type=int,
+        help="ceiling on a numeral read out of the description, and the top of the density bands Stage 1 is told to use",
+    )
+    limits_group.add_argument(
+        "--limit-ddl-count-max-grid",
+        type=int,
+        help="the same ceiling for a literal grid, which may go higher than an ordinary arrangement",
+    )
+    limits_group.add_argument(
+        "--limit-schema-count-max",
+        type=int,
+        help="the only bound checked on Stage 2's own output; a larger count is clamped to it",
+    )
+    limits_group.add_argument(
+        "--limits-reset",
+        action="store_true",
+        help="put every render limit back to its default, ignoring the other --limit-* flags",
+    )
 
     config_show.set_defaults(func=command_config)
     config_update.set_defaults(func=command_config)

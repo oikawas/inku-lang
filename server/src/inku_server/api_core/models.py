@@ -75,6 +75,9 @@ class HistoryPostBody(BaseModel):
 class HistoryItem(HistoryPostBody):
     id: str
     output_path: str | None = None
+    # The limits that governed this work. Present only when the row recorded
+    # them; absent means "drawn before they were recorded", not "the defaults".
+    render_limits: dict[str, int] | None = None
     render_hash: str | None = None
     render_hash_short: str | None = None
     trashed: bool = False

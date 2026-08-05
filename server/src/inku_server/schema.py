@@ -9,6 +9,26 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .limits import DEFAULT_LIMITS, Limits, current_limits
+
+
+def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
+    """The count field's description, which is ALSO sent to the model.
+
+    Field descriptions are the canonical field spec (the Stage 2 prompt says so)
+    and travel to the model inside the tool schema, so the numbers in them have
+    to follow the setting for the same reason the prompt body does. Pydantic
+    bakes a description at class-creation time, so this is the default text and
+    composer rewrites it from the effective limits when it builds the tool.
+    """
+    return (
+        f"配置数。通常配置は1-{limits.ddl_count_max}、gridは1-{limits.ddl_count_max_grid}。"
+        "同一図形・同一配置の反復に使い、反復を N 件の instruction へ展開しない"
+    )
+
+
+COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
+
 Coord = tuple[float, float]
 ScoreVersion = Literal["0.1.0"]
 
@@ -284,17 +304,23 @@ class Arrangement(BaseModel):
 
     """複数の同一図形を並べる指定。Renderer が展開し N 個 of SVG 要素を生成する。"""
 
+    # No `le=` here on purpose. A static bound is a second, invisible copy of
+    # schema_count_max that no setting can reach -- and it would still admit a
+    # value the configured ceiling forbids, so a test that clamps 1500 would
+    # pass for the wrong reason. The clamp below is the only bound.
     count: int = Field(
         ge=1,
-        le=2000,
-        description="配置数。通常配置は1-1000、gridは1-2000。同一図形・同一配置の反復に使い、反復を N 件の instruction へ展開しない",
+        description=COUNT_FIELD_DESCRIPTION,
     )
 
     @field_validator("count", mode="before")
     @classmethod
     def _clamp_count(cls, v: object) -> object:
+        # Still layout-blind, deliberately: "1-1000 for ordinary arrangements"
+        # is guidance in the prompt, not a checked bound, and making it one is a
+        # separate design decision.
         if isinstance(v, (int, float)):
-            return min(max(int(v), 1), 2000)
+            return min(max(int(v), 1), current_limits().schema_count_max)
         return v
 
     layout: Layout = Field(

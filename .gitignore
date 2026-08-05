@@ -58,6 +58,9 @@ data/history.json
 
 # Local CLI benchmark assets and generated outputs
 cli/tune_bench.md
+# The tune bench 2 family: record, procedure, and benchmark sets. Globbed so a
+# later file in the family cannot slip into the public repo unlisted.
+cli/tune_bench2*
 cli/bench/
 cli/out/
 cli/out2/

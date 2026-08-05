@@ -3601,3 +3601,34 @@ API.** The archive is tag `archive/tenkei-v1.97` and `no-git-sync/archive/tenkei
 **One correction made during acceptance**
 
 - **The contract asserted that the manual is outside the rsync payload and therefore absent from pentala, and the implementation copied that premise into a comment. Measured, it is false.** pentala carries the manual — a stale v1.85 copy whose two languages still match each other, so `check_parity` is green there too, and "seven missing originals turn it red" is false as well. **The `skipif` stays**: it guards any tree without a manual, and was never a description of pentala. **The comment was replaced with the measurement.**
+
+### 2026-08-05 — Android folds away the staffage level and follows the server (**no version**; Android only)
+
+**The staffage level (`tenkei`) that the server folded away in v2.11.0 is now folded away in Kotlin**
+([I-139]). The server is canonical and the client is the port, so the conditions were read one
+against one. **No version was stepped** — `web/APP_VERSION`, `web/BUILD_NUMBER`,
+`android/VERSION` and `android/BUILD_NUMBER` are all unchanged. **Nothing was deployed or restarted.**
+
+- **`WebDdlExpander.kt` went from 1,347 to 540 lines.** The `tenkei` parameter and the level
+  mapping are gone, and **the variation plan is down to the focus axis alone** — the same shape as
+  the server's `AXIS_FOCUS`. The six axes, the category plan, the composition family, the touch and
+  the colour machinery became unreachable and were deleted, as they were on the server
+- **`data/model/Tenkei.kt` and the picker are gone.** **Two pieces of the server's ruling had no
+  counterpart here**: Android never persisted `tenkei` to Room and never sent it over the wire, so
+  there was no column to keep and no developer-mode row to show
+- **The six tests whose claims the fold made false were re-pointed, not deleted.** They now assert
+  against focus, pinning the exact output with `assertEquals`
+- **Checks:** JVM **143 / 4 red → 156 / 0 red** (38 → 37 classes); instrumented **21 → 20 / 0 red**
+  on a real Pixel 9. On the merged tree, server **2335 passed / 31 skipped**, cli **111**,
+  ruff clean, `check_docs.py` green
+
+**Two things the acceptance turned up**
+
+- **One of the four red tests was misattributed in the ledger entry.**
+  `testContextTextUsageAndDefaults` was not red because Kotlin lagged behind: **the re-bake left two
+  cases with an identical `output`**, so the claim could not be made true by any change to Kotlin.
+  A perturbation run before the contract was issued caught it
+- **The reference corpus lost half its discriminating power** — the re-bake took it from
+  **39 cases / 28 distinct outputs (72%) to 30 cases / 14 (47%)**. **A port that ignored its input
+  would still pass 16 of the 30**, so the discrimination is carried by the focus control rather than
+  by the full-corpus comparison. Filed as **[I-141]**

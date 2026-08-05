@@ -8,7 +8,6 @@
 	import { type SheetVariant } from '$lib/contactSheet';
 	import { runContactSheet } from '$lib/features/contact-sheet/run';
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
-	import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
 
 	type HistoryItem = {
@@ -28,7 +27,6 @@
 		tokens_in?: number | null;
 		tokens_out?: number | null;
 		catalog_id?: string | null;
-		tenkei?: string | null;
 		render_hash?: string | null;
 		render_hash_short?: string | null;
 		render_build_number?: string | null;

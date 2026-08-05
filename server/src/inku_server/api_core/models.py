@@ -42,7 +42,6 @@ class HistoryPostBody(BaseModel):
     render_seed: int | None = None
     render_wild: bool | None = None
     composition_seed: int | None = None
-    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$")
     interpretation_seed: str | None = None
     seed_text: str | None = None
     # Stage 0.5 (v2.10). Carried with the work so a redraw replays the same
@@ -75,6 +74,11 @@ class HistoryPostBody(BaseModel):
 class HistoryItem(HistoryPostBody):
     id: str
     output_path: str | None = None
+    # The staffage level a work was drawn at. The axis was folded away in
+    # v2.11.0 and nothing writes this any more, so it is declared on the
+    # RESPONSE model and not on the post body: a work saved before the removal
+    # still reports the conditions it was drawn under, and no client can set it.
+    tenkei: str | None = None
     # The limits that governed this work. Present only when the row recorded
     # them; absent means "drawn before they were recorded", not "the defaults".
     render_limits: dict[str, int] | None = None

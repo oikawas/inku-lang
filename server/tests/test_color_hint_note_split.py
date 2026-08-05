@@ -62,8 +62,6 @@ def _replay(case: dict) -> Score:
     return coerce_score(
         Score.model_validate(case_input["score"]),
         ddl=case_input["ddl"],
-        tenkei=case_input["tenkei"],
-        plugin_instructions_present=case_input["plugin_instructions_present"],
     )
 
 
@@ -106,8 +104,6 @@ def test_all_coerce_golden_inputs_are_idempotent_after_one_ddl_pass() -> None:
         second = coerce_score(
             first,
             ddl=case_input["ddl"],
-            tenkei=case_input["tenkei"],
-            plugin_instructions_present=case_input["plugin_instructions_present"],
         )
         assert second.model_dump(mode="json", by_alias=True) == first.model_dump(
             mode="json", by_alias=True
@@ -159,17 +155,20 @@ def test_word_boundary_stops_restored_from_selecting_red_without_moving_the_seed
     assert _seed_for_instruction(before, 4242) == _seed_for_instruction(after, 4242)
 
 
-def test_the_93_write_sites_remain_split_by_role() -> None:
+def test_the_57_write_sites_remain_split_by_role() -> None:
     compose_source = COMPOSE_SOURCE.read_text()
     normalize_source = NORMALIZE_SOURCE.read_text()
     api_source = API_SOURCE.read_text()
 
-    # The compose inventory retains all 79 original sites. Seven fallback
-    # sites still write descriptive markers to color_hint; the others write
-    # machine notes. The carry site now preserves both fields.
+    # Folding away the staffage level (v2.11.0) deleted the six branches that
+    # authored an instruction of their own, and with them 36 of the 47 literal
+    # note fields -- every one of those sat in an instruction coerce invented.
+    # The split by role is what this asserts, not the size of the inventory:
+    # three fallback sites still write descriptive markers to color_hint, the
+    # rest write machine notes, and the carry site preserves both fields.
     assert len(re.findall(r'\["note"\]\s*=', compose_source)) == 4
-    assert len(re.findall(r"_append_note\(", compose_source)) - 1 == 21
-    assert len(re.findall(r'"note"\s*:', compose_source)) == 47
+    assert len(re.findall(r"_append_note\(", compose_source)) - 1 == 20
+    assert len(re.findall(r'"note"\s*:', compose_source)) == 11
     assert len(re.findall(r'\["color_hint"\]\s*=', compose_source)) == 3
     assert len(re.findall(r'"color_hint"\s*:', compose_source)) == 5
     # Four in normalize since the hard ceiling arrived: the fourth is `_with_note`,
@@ -184,8 +183,6 @@ def test_the_93_write_sites_remain_split_by_role() -> None:
     [
         (NORMALIZE_SOURCE, "_with_presence_auxiliary_shape_repair", "_is_atmospheric_effect_hint(ins.color_hint)"),
         (NORMALIZE_SOURCE, "_with_presence_auxiliary_shape_repair", "_is_plain_material_hint(ins.note)"),
-        (COMPOSE_SOURCE, "_with_motion_floor", '"motion floor restored" in (ins.note or "")'),
-        (COMPOSE_SOURCE, "_with_visual_event", '"visual event restored" in (ins.note or "")'),
         (COMPOSE_SOURCE, "_with_visual_event_type_hints", 'event_type in (ins.note or "")'),
         (COMPOSE_SOURCE, "_with_crescent_sensory_suppression", 'descriptive_hint = (ins.color_hint or "").lower()'),
         (COMPOSE_SOURCE, "_with_crescent_sensory_suppression", 'isinstance(data.get("note"), str)'),
@@ -195,17 +192,11 @@ def test_the_93_write_sites_remain_split_by_role() -> None:
         (COMPOSE_SOURCE, "_with_existing_event_counterweight", '"circle focal mark kept compact" in (ins.note or "").lower()'),
         (COMPOSE_SOURCE, "_with_existing_event_counterweight", 'candidate_hint = (candidate.note or "").lower()'),
         (COMPOSE_SOURCE, "_with_existing_event_counterweight", 'compact_mark = "small focal mark kept compact" in hint'),
-        (COMPOSE_SOURCE, "_with_minimum_focal_extent", 'if "small focal mark kept compact" in hint'),
-        (COMPOSE_SOURCE, "_has_adjacent_reaction", '"adjacent reaction" in (ins.note or "").lower()'),
-        (COMPOSE_SOURCE, "_has_context_energy", 'kind in (ins.note or "")'),
-        (COMPOSE_SOURCE, "_has_context_energy", 'marker in (ins.note or "")'),
-        (COMPOSE_SOURCE, "_has_surface_tension", '"surface tension restored" in (ins.note or "")'),
-        (COMPOSE_SOURCE, "_has_compensating_accent", '"quiet expression accent restored" in (ins.note or "")'),
         (COMPOSE_SOURCE, "_with_color_cycle_delivery", '"small focal mark kept compact" in (data.get("note") or "")'),
         (COMPOSE_SOURCE, "_score_contains_motif", 'motif in (ins.note or "")'),
     ],
 )
-def test_the_20_readback_guard_locations_use_their_ruled_field(
+def test_the_13_readback_guard_locations_use_their_ruled_field(
     source_path: Path, function_name: str, required: str
 ) -> None:
     source = source_path.read_text()

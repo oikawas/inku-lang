@@ -14,7 +14,6 @@
 export type ContactSheetNoteEntry = {
 	// Written in full. The on-sheet caption is truncated; this is not.
 	description: string;
-	staffage?: string | null;
 	colorCatalog?: string | null;
 	canvas?: string | null;
 	engine?: string | null;
@@ -64,7 +63,6 @@ export function buildContactSheetNotes(entries: ContactSheetNoteEntry[], options
 		lines.push('');
 		lines.push(`## No.${index + 1}`);
 		field(lines, 'description', entry.description);
-		field(lines, 'staffage', entry.staffage);
 		field(lines, 'color catalog', entry.colorCatalog);
 		field(lines, 'canvas', entry.canvas);
 		field(lines, 'engine', entry.engine);

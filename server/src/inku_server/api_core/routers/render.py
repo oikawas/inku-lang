@@ -41,7 +41,7 @@ from ...sketch import (
 from ... import db as _db
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user, _logger
-from ..rendering import _effective_limits, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _resolved_tenkei, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude
+from ..rendering import _effective_limits, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude
 from ..state import _increment_stage_stat, _stage_executor, _stage_slots
 
 
@@ -182,10 +182,8 @@ class ComposeRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
-    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
     variation_amplitude: str | None = Field(default=None, description="変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効")
     variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
-    lineage_parent_node_id: str | None = Field(default=None, description="添景水準の継承元 lineage ノード (v1.97)。保存には関与しない")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     composition_seed: int | None = Field(default=None, description="Stage 1.5 composition variation seed")
@@ -235,7 +233,6 @@ class ComposeResponse(BaseModel):
     render_seed: int | None = None
     render_wild: bool | None = None
     composition_seed: int | None = None
-    tenkei: str | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
     variation_seed: int | None = None
@@ -281,7 +278,6 @@ class InterpretRequest(BaseModel):
     instruction_lang: str = Field(default="auto", description="指示文言語 (auto / ja / en)")
     ui_lang: str | None = Field(default=None, description="UI表示言語")
     expand_intermediate: bool = Field(default=False, description="Stage 1.5 の中間DDL拡張を適用するか")
-    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時 auto")
 
     @field_validator("description")
     @classmethod
@@ -324,7 +320,6 @@ class PaintRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用する色カタログID。auto では失敗時の落とし先、random では除外する直前ID")
     catalog_mode: Literal["fixed", "auto", "random"] = Field(default="fixed", description="色カタログの決め方。fixed=catalog_id をそのまま使う / auto=記述を読んでサーバーが選ぶ / random=catalog_id 以外から抽選 (推敲専用)")
     auto_repair: bool = Field(default=True, description="Stage 2 Score の自動補正を適用するか")
-    tenkei: str | None = Field(default=None, pattern="^(none|sparse|auto)$", description="添景水準 (v1.97): none / sparse / auto。省略時は lineage_parent_node_id の作品から継承、無ければ auto")
     variation_amplitude: str | None = Field(default=None, description="変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効")
     variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
@@ -372,7 +367,6 @@ class PaintResponse(BaseModel):
     render_seed: int | None = None
     render_wild: bool | None = None
     composition_seed: int | None = None
-    tenkei: str | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
     variation_seed: int | None = None
@@ -874,7 +868,6 @@ def _call_compose_detail(
     lang: str = "ja",
     composition_seed: int | None = None,
     include_trace: bool = False,
-    tenkei: str = "auto",
     focus: str | None = None,
     variation_amplitude: str | None = None,
     variation_seed: int | None = None,
@@ -899,7 +892,6 @@ def _call_compose_detail(
         context_text=original_description,
         composition_seed=composition_seed,
         plugin_instructions_present=bool(plugin_expansion.instructions),
-        tenkei=tenkei,
         focus=focus,
         variation_amplitude=variation_amplitude,
         variation_seed=variation_seed,
@@ -1061,7 +1053,6 @@ def _call_interpret_detail(
     system_prompt_prefix: str | None = None,
     lang: str = "ja",
     include_trace: bool = False,
-    tenkei: str = "auto",
     limits: Limits = DEFAULT_LIMITS,
 ) -> InterpretDetail:
     trace_sink: list[str] | None = [] if include_trace else None
@@ -1073,7 +1064,6 @@ def _call_interpret_detail(
             "include_thinking": include_thinking,
             "system_prompt_prefix": system_prompt_prefix,
             "lang": lang,
-            "tenkei": tenkei,
             "prompt_metadata": prompt_metadata,
             # Stage 1 names the same ceilings; same reason as Stage 2.
             "limits": limits,
@@ -1351,7 +1341,6 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         requested=False,
         has_description=bool((description or "").strip()),
     )
-    resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
     resolved_variation_amplitude = _validated_variation_amplitude(req.variation_amplitude)
     resolved_variation_seed = (
         req.variation_seed if resolved_variation_amplitude is not None else None
@@ -1371,7 +1360,6 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
                 lang=instruction_lang_resolved,
                 composition_seed=req.composition_seed,
                 include_trace=req.include_trace,
-                tenkei=resolved_tenkei,
                 variation_amplitude=resolved_variation_amplitude,
                 variation_seed=resolved_variation_seed,
                 limits=limits,
@@ -1401,8 +1389,6 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
                     # The DDL alone. Handing the prose along too let coerce's 30
                     # branches author instructions from words the DDL never carried.
                     ddl=compose_detail.ddl,
-                    tenkei=resolved_tenkei,
-                    plugin_instructions_present=bool(compose_detail.plugin_instructions),
                     limits=limits,
                 )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
@@ -1427,7 +1413,6 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         "render_seed": render_seed,
         "render_wild": req.wild,
         "composition_seed": req.composition_seed,
-        "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
         "variation_amplitude": resolved_variation_amplitude,
         "variation_seed": resolved_variation_seed,
@@ -1523,10 +1508,12 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
         if sketch_result is not None
         else (pipeline_description(req.stage1_input) if req.stage1_input else description)
     )
-    resolved_tenkei = req.tenkei or "auto"
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
-            # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
+        # Pure-invocation bypass: an input made of nothing but qualified
+        # plugin terms is transcribed rather than interpreted. This is about
+        # transcription fidelity, not staffage, so it no longer asks a level:
+        # sending the term through Stage 1 risks the model rewriting it.
+        if DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
             detail = InterpretDetail(ddl=stage1_text.strip(), thinking=None, raw=None)
         else:
             detail = _call_interpret_detail(
@@ -1535,7 +1522,6 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
                 include_thinking=req.include_thinking,
                 system_prompt_prefix=None,
                 lang=instruction_lang_resolved,
-                tenkei=resolved_tenkei,
                 # Stage 1 states the ceilings in its prompt even though this
                 # route never reaches coerce.
                 limits=_effective_limits(),
@@ -1558,7 +1544,6 @@ def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -
             lang=instruction_lang_resolved,
             context_text=source_text,
             plugin_instructions_present=bool(plugin_expansion.instructions),
-            tenkei=resolved_tenkei,
         )
         plugin_provenance = list(plugin_expansion.provenance)
         plugin_warnings = list(plugin_expansion.warnings)
@@ -1780,7 +1765,6 @@ def _paint_events(
     )
     resolved_stage2_model = _resolved_stage2_model(req.stage2_model, actor)
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
-    resolved_tenkei = _resolved_tenkei(req.tenkei, actor, req.lineage_parent_node_id)
     resolved_variation_amplitude = _validated_variation_amplitude(req.variation_amplitude)
     resolved_variation_seed = (
         req.variation_seed if resolved_variation_amplitude is not None else None
@@ -1789,8 +1773,11 @@ def _paint_events(
     # apply these numbers, and they have to be the same numbers.
     limits = _effective_limits()
     try:
-        if resolved_tenkei == "none" and DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
-            # v1.96 純明示バイパス: プラグイン語だけの入力は Stage 1 を経ず転記する
+        # Pure-invocation bypass: an input made of nothing but qualified
+        # plugin terms is transcribed rather than interpreted. This is about
+        # transcription fidelity, not staffage, so it no longer asks a level:
+        # sending the term through Stage 1 risks the model rewriting it.
+        if DOCUMENT_PLUGIN_MANAGER.is_pure_invocation(stage1_text):
             interpret_detail_result = InterpretDetail(
                 ddl=stage1_text.strip(), raw=stage1_text.strip() if req.include_trace else None
             )
@@ -1801,7 +1788,6 @@ def _paint_events(
                 include_thinking=req.include_thinking,
                 lang=instruction_lang_resolved,
                 include_trace=req.include_trace,
-                tenkei=resolved_tenkei,
                 limits=limits,
             )
     except Exception as e:  # noqa: BLE001
@@ -1836,7 +1822,6 @@ def _paint_events(
                 plugin_seed_text=description,
                 lang=instruction_lang_resolved,
                 include_trace=req.include_trace,
-                tenkei=resolved_tenkei,
                 variation_amplitude=resolved_variation_amplitude,
                 variation_seed=resolved_variation_seed,
                 limits=limits,
@@ -1867,8 +1852,6 @@ def _paint_events(
                     limit_notes=limit_notes,
                     # The DDL alone -- see the note at the /api/compose call site.
                     ddl=ddl,
-                    tenkei=resolved_tenkei,
-                    plugin_instructions_present=bool(compose_detail.plugin_instructions),
                     limits=limits,
                 )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
@@ -1895,7 +1878,6 @@ def _paint_events(
         "render_seed": render_seed,
         "render_wild": req.wild,
         "composition_seed": req.composition_seed,
-        "tenkei": resolved_tenkei,
         "focus": compose_detail.resolved_focus,
         "variation_amplitude": resolved_variation_amplitude,
         "variation_seed": resolved_variation_seed,

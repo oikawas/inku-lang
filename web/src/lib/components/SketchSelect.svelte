@@ -1,6 +1,6 @@
 <!--
 	写生 (Stage 0.5) selector. Three states in one control: off, cut fine, cut
-	coarse. Same two shapes as TenkeiSelect, for the same reason -- it sits in
+	coarse. Same two shapes as WildToggle, for the same reason -- it sits in
 	the same rows.
 	- compact=false: dropdown trigger + menu, for the describe tab's control row.
 	- compact=true: inline segmented control for the dialogs, where `inherited`

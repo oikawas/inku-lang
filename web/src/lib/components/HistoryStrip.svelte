@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 
@@ -51,6 +50,7 @@
 		formatHistoryDate: (at: number) => string;
 		catalogName: (id: string | null | undefined) => string;
 		isJapanese: boolean;
+		developerMode: boolean;
 	};
 
 	let {
@@ -75,7 +75,8 @@
 		historyModelStage2Full,
 		formatHistoryDate,
 		catalogName,
-		isJapanese
+		isJapanese,
+		developerMode
 	}: Props = $props();
 
 	let historyCollapsed = $state(false);
@@ -152,7 +153,9 @@
 							<div class="tooltip-row"><span>Stage 2</span><strong>{historyModelStage2Full(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipSavedAt}</span><strong>{formatHistoryDate(it.at)}</strong></div>
 							<div class="tooltip-row"><span>{isJapanese ? '世代' : 'Gen.'}</span><strong>{lineageGenerationLabel(it)}</strong></div>
-							{#if normalizeTenkei(it.tenkei)}<div class="tooltip-row"><span>{isJapanese ? '添景' : 'Staffage'}</span><strong>{tenkeiLabel(normalizeTenkei(it.tenkei)!, isJapanese)}</strong></div>{/if}
+							<!-- Only a work saved before the staffage axis was folded away (v2.11.0)
+							     carries a level, and only a developer is shown it. -->
+							{#if developerMode && it.tenkei}<div class="tooltip-row"><span>{isJapanese ? '添景' : 'Staffage'}</span><strong>{it.tenkei}</strong></div>{/if}
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 							<div class="tooltip-row"><span>render engine</span><strong>{it.render_engine_id || it.render_engine_version ? [it.render_engine_id, it.render_engine_version].filter(Boolean).join(" / ") : t().historyVersionNotRecorded}</strong></div>

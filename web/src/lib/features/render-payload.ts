@@ -12,8 +12,8 @@
 
 /**
  * Which request is being built.  The endpoints do not carry the same slices:
- * only `paint` takes the catalog mode, and only `paint`/`compose` take the
- * tenkei level.  A contributor decides what it emits for each kind.
+ * only `paint` takes the catalog mode, and only `paint` takes the catalog
+ * id.  A contributor decides what it emits for each kind.
  */
 export type RenderRequestKind = 'paint' | 'compose' | 'render-svg' | 'render-score';
 

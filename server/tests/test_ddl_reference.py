@@ -52,18 +52,25 @@ def test_ddl_reference_versions_and_parts() -> None:
     # input the corpus already held. **That is the point of listing only three** --
     # the corpus could not have caught the behaviour this version changed, because
     # no case here ever had the shape production was passing.
-    assert DDL_ENGINE_VERSION == "6"
+    assert DDL_ENGINE_VERSION == "7"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
-    assert len(manifest["cases"]) == 36
-    assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 15
+    # Engine 7 (2026-08-05): the staffage level was folded away, so Stage 1.5
+    # appends nothing of its own and coerce runs no branch that invents. The six
+    # cases that existed only to separate the three levels became copies of one
+    # another and were replaced by one each (`A-scatter`, `B-trigger`); two new
+    # coerce cases freeze the silence of words that used to summon an invention.
+    # 32 of the 34 entries are listed as changed, which is expected and is NOT
+    # 32 cases whose Score moved: 9 of the b_coerce digests moved only because
+    # the branch report lost a name. The Score itself moved in 10 expand cases
+    # and 9 coerce ones (plus the merged-away B-trigger-auto / -sparse).
+    assert len(manifest["cases"]) == 34
+    assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
     assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 21
-    assert manifest["changed_from_previous"] == [
-        "B-production-fill-clause",
-        "B-production-multiline",
-        "B-production-no-fill-clause",
-    ]
+    assert len(manifest["changed_from_previous"]) == 32
+    assert "A-base-en" not in manifest["changed_from_previous"]
+    assert "A-plugin-enabled" not in manifest["changed_from_previous"]
 
 def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     generator = _generator()
@@ -115,8 +122,16 @@ def test_ddl_reference_expand_discriminators() -> None:
     assert cases["A-base-ja"]["input"]["lang"] == "ja"
     assert cases["A-base-en"]["input"]["lang"] == "en"
     assert cases["A-plugin-enabled"]["digest"] != cases["A-plugin-disabled"]["digest"]
-    assert cases["A-tenkei-auto"]["digest"] != cases["A-tenkei-none"]["digest"]
-    assert {cases[f"A-tenkei-{level}"]["input"]["tenkei"] for level in ("auto", "sparse", "none")} == {"auto", "sparse", "none"}
+    # No two inputs may be identical. The three A-tenkei-* cases differed in the
+    # staffage level alone, so folding the axis away turned them into copies of
+    # one another; one survives as A-scatter (v2.11.0).
+    seen: dict[str, str] = {}
+    for case_id, case in sorted(cases.items()):
+        key = json.dumps(case["input"], ensure_ascii=False, sort_keys=True)
+        assert key not in seen, f"{case_id} has the same input as {seen.get(key)}"
+        seen[key] = case_id
+    assert "A-scatter" in cases
+    assert not [case_id for case_id in cases if case_id.startswith("A-tenkei-")]
 
 def test_ddl_reference_coerce_discriminators() -> None:
     cases = _manifest()["cases"]
@@ -126,41 +141,48 @@ def test_ddl_reference_coerce_discriminators() -> None:
         "B-white-filled-circle": {"coerce_and_repair_instruction"},
         "B-invalid-touching": {"drop_invalid_relations"},
         "B-dedupe-three": {"dedupe_instructions"},
-        "B-trigger-auto": {"coerce_and_repair_instruction", "with_color_delivery_repair", "with_composition_diversity_repair", "with_existing_event_counterweight", "with_motion_energy", "with_motion_floor"},
-        "B-trigger-sparse": {"coerce_and_repair_instruction", "with_color_delivery_repair", "with_composition_diversity_repair", "with_motion_energy"},
-        "B-trigger-none": {"coerce_and_repair_instruction", "with_color_delivery_repair", "with_motion_energy"},
+        # The three B-trigger-* cases separated the staffage levels; with the axis
+        # folded away (v2.11.0) they are one case, and what fires on it is repair
+        # and delivery alone -- no composition anchor, no motion floor.
+        "B-trigger": {"coerce_and_repair_instruction", "with_color_delivery_repair", "with_motion_energy"},
         "B-quiet-water": {"with_color_delivery_repair"},
-        "B-presence-from-ddl": {"presence_from_ddl", "with_color_delivery_repair", "with_composition_diversity_repair"},
-        "B-grid": {"with_composition_diversity_repair", "with_literal_grid_fidelity"},
+        "B-presence-from-ddl": {"presence_from_ddl", "with_color_delivery_repair"},
+        "B-grid": {"with_literal_grid_fidelity"},
         "B-dense-forty": set(),
         "B-cloudform": set(),
         "B-presence-no-ddl": set(),
-        "B-yellow-from-ddl": {
-            "with_color_delivery_repair",
-            "with_composition_diversity_repair",
-        },
-        "B-orange-from-ddl": {
-            "with_color_delivery_repair",
-            "with_composition_diversity_repair",
-            "with_existing_event_counterweight",
-            "with_motion_energy",
-            "with_motion_floor",
-        },
-        "B-purple-from-ddl": {
-            "with_color_delivery_repair",
-            "with_composition_diversity_repair",
-        },
-        "B-yellow-from-ddl-en": {
-            "with_color_delivery_repair",
-            "with_composition_diversity_repair",
-        },
+        # 布 / 影 / 沈む used to summon a surface-tension mark of coerce's own.
+        # Nothing fires now: the description asked for one line and gets one line.
+        "B-surface-tension-words": set(),
+        # 落ち葉 / 森 used to summon a leaf-grain energy instruction AND a motif.
+        # The energy was invention and is gone; the motif is what the DDL asked
+        # for, so `with_complex_motif_repair` still delivers it.
+        "B-leaf-grain-words": {"with_color_delivery_repair", "with_complex_motif_repair"},
+        "B-yellow-from-ddl": {"with_color_delivery_repair"},
+        "B-orange-from-ddl": {"with_color_delivery_repair", "with_motion_energy"},
+        "B-purple-from-ddl": {"with_color_delivery_repair"},
+        "B-yellow-from-ddl-en": {"with_color_delivery_repair"},
     }
     for case_id, fired in expected.items():
-        assert set(cases[case_id]["fired_branches"]) == fired
-    assert [cases[f"B-trigger-{level}"]["instruction_count"] for level in ("auto", "sparse", "none")] == [3, 2, 1]
-    assert [len(cases[f"B-trigger-{level}"]["fired_branches"]) for level in ("auto", "sparse", "none")] == [6, 4, 3]
+        assert set(cases[case_id]["fired_branches"]) == fired, case_id
+    # The description hands coerce one line and leaves with one line.
+    assert cases["B-trigger"]["instruction_count"] == 1
+    assert cases["B-surface-tension-words"]["instruction_count"] == 1
     assert cases["B-baseline-no-ddl"]["instruction_count"] == 1
     assert cases["B-dense-forty"]["instruction_count"] == 40
+    # No branch that invents may fire anywhere in the corpus.
+    gone = {
+        "with_visual_event",
+        "with_composition_diversity_repair",
+        "with_context_energy_repair",
+        "with_motion_floor",
+        "with_surface_tension",
+        "with_focal_event_floor",
+    }
+    for case_id, case in cases.items():
+        if case["part"] != "b_coerce":
+            continue
+        assert not (set(case["fired_branches"]) & gone), case_id
 
 def test_ddl_reference_output_files_match_manifest() -> None:
     for case in _manifest()["cases"].values():

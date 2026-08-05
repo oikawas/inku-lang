@@ -1025,28 +1025,6 @@ def _descendant_edge_ids(
     ).scalars())
 
 
-def tenkei_for_node(user_id: str, node_id: str) -> str | None:
-    """派生元 lineage ノードの作品に記録された添景水準を返す (v1.97 継承)。
-
-    未記録 (保存開始前の作品・renderer 専用派生の欠損) は None。呼び出し側が
-    既定 "auto" へ落とす。
-    """
-    with SessionLocal() as session:
-        node = session.query(LineageNodeRow).filter(
-            LineageNodeRow.id == node_id,
-            LineageNodeRow.user_id == user_id,
-        ).first()
-        if node is None or not node.history_id:
-            return None
-        row = session.query(HistoryRow).filter(
-            HistoryRow.id == node.history_id,
-            HistoryRow.user_id == user_id,
-        ).first()
-        if row is None:
-            return None
-        return row.tenkei
-
-
 def _lineage_generations(session, user_id: str, node_ids: list[str]) -> dict[str, int]:
     """世代 (root=1, 主親エッジを辿って +1) をノード集合分まとめて計算する。
 

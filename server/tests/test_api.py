@@ -154,7 +154,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "21"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "6"
+    assert data["ddl_engine_version"] == "7"
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     enabled = client.get("/api/info")
@@ -1083,7 +1083,10 @@ def test_compose_sanitizes_random_ddl_before_stage2(monkeypatch, auth_context):
     r = client.post("/api/compose", json={"ddl": "赤い円をランダムに十二個散らす。"}, headers=headers)
     assert r.status_code == 200
     assert "赤い円を画面全体に点々と十二個散らす。" in captured["ddl"]
-    assert any(marker in captured["ddl"] for marker in EXPANSION_MARKERS)
+    # Stage 1.5 reframes and stops: the candidate sentences it used to append
+    # were staffage and went away with the level (v2.11.0), so what reaches
+    # Stage 2 is the sanitized DDL and nothing the author did not write.
+    assert not any(marker in captured["ddl"] for marker in EXPANSION_MARKERS)
 
 
 def test_compose_empty_ddl_rejected(auth_context):
@@ -1480,7 +1483,7 @@ def test_compose_hands_coerce_the_ddl_alone_over_http(monkeypatch, auth_context)
     assert r.json()["render_engine_id"] == "default"
     assert r.json()["render_engine_version"] == "21"
     assert r.json()["ddl_version"] == "3"
-    assert r.json()["ddl_engine_version"] == "6"
+    assert r.json()["ddl_engine_version"] == "7"
     assert r.json()["render_canvas_aspect"] == "square"
     assert r.json()["render_canvas_aspect_id"] == "square"
     assert r.json()["render_canvas_aspect_ratio"] == 1.0
@@ -1517,7 +1520,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "21"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "6"
+    assert data["ddl_engine_version"] == "7"
     assert data["render_canvas_aspect"] == "square"
     assert data["render_canvas_aspect_id"] == "square"
     assert data["render_canvas_aspect_ratio"] == 1.0
@@ -2103,7 +2106,8 @@ def test_paint_sanitizes_stage1_before_compose(monkeypatch, auth_context):
     r = client.post("/api/paint", json={"description": "赤い点を散らす"}, headers=headers)
     assert r.status_code == 200
     assert "赤い小さな円を画面全体に点々と十二個散らす。" in r.json()["ddl"]
-    assert any(marker in r.json()["ddl"] for marker in EXPANSION_MARKERS)
+    # Same as the compose route: no appended candidate sentence (v2.11.0).
+    assert not any(marker in r.json()["ddl"] for marker in EXPANSION_MARKERS)
     assert r.json()["ddl"] == captured["ddl"]
 
 
@@ -2210,7 +2214,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_engine_id"] == "default"
     assert item["render_engine_version"] == "21"
     assert item["ddl_version"] == "3"
-    assert item["ddl_engine_version"] == "6"
+    assert item["ddl_engine_version"] == "7"
     assert item["render_canvas_aspect"] == "wide"
     assert item["render_canvas_aspect_id"] == "wide"
     assert item["render_canvas_aspect_ratio"] == 2.35

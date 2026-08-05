@@ -1,6 +1,13 @@
 """Stage 1.5 変奏 (v2.0) の契約テスト。
 
 展開層は LLM を使わず決定的なので、変奏の契約はここで完結して検証できる。
+
+**v2.11.0 で軸は焦点ひとつになった。**それ以前の 7 軸のうち 6 つ（型の差し替え・
+採用本数・タッチ材質・主色/対比色・構図族・型の系統）は、いずれも Stage 1.5 が
+自分で足した文を振っていた。その候補プールは添景であり、添景水準を畳んだときに
+一緒に落ちた。**残る焦点は「記述をどこへ寄せて読むか」であって、足す文ではない。**
+強度は今も出力へ届く（オフセットの鍵の一部なので、同じ seed でも小・中・大で
+別の焦点に落ちる）。
 """
 
 from __future__ import annotations
@@ -8,13 +15,7 @@ from __future__ import annotations
 import pytest
 
 from inku_server.ddl_expander import (
-    AXIS_COLOR,
-    AXIS_COMPOSITION,
-    AXIS_COUNT,
     AXIS_FOCUS,
-    AXIS_TOUCH,
-    AXIS_TYPE_FAMILY,
-    AXIS_TYPE_SWAP,
     VARIATION_AMPLITUDES,
     _split_sentences,
     build_variation_plan,
@@ -32,12 +33,6 @@ _EN_TEXTS = (
     "Place one white circle near the center. Draw three black lines.",
     "Scatter countless small white dots across the whole canvas.",
 )
-# 小では絵の骨格が動かない。中では系統と構図族が動かない (契約 §3.2)。
-_FROZEN_AXES = {
-    "small": {AXIS_COMPOSITION, AXIS_FOCUS, AXIS_TOUCH, AXIS_TYPE_FAMILY},
-    "medium": {AXIS_COMPOSITION, AXIS_TYPE_FAMILY},
-    "large": set(),
-}
 _SWEEP = range(200)
 
 
@@ -101,39 +96,6 @@ def test_variation_off_reports_the_default_focus_and_no_moved_axes() -> None:
 
 
 @pytest.mark.parametrize("amplitude", VARIATION_AMPLITUDES)
-def test_amplitude_releases_axes_in_weight_order(amplitude: str) -> None:
-    frozen = _FROZEN_AXES[amplitude]
-    for text in _JA_TEXTS:
-        for seed in _SWEEP:
-            report: dict = {}
-            _expand(
-                text,
-                report=report,
-                variation_amplitude=amplitude,
-                variation_seed=seed,
-            )
-            moved = {entry["axis"] for entry in report["moved_axes"]}
-            assert not moved & frozen
-
-
-@pytest.mark.parametrize("amplitude", VARIATION_AMPLITUDES)
-def test_amplitude_releases_axes_in_weight_order_for_english(amplitude: str) -> None:
-    frozen = _FROZEN_AXES[amplitude]
-    for text in _EN_TEXTS:
-        for seed in _SWEEP:
-            report: dict = {}
-            _expand(
-                text,
-                lang="en",
-                report=report,
-                variation_amplitude=amplitude,
-                variation_seed=seed,
-            )
-            moved = {entry["axis"] for entry in report["moved_axes"]}
-            assert not moved & frozen
-
-
-@pytest.mark.parametrize("amplitude", VARIATION_AMPLITUDES)
 def test_a_moved_axis_always_shows_a_real_difference(amplitude: str) -> None:
     """レポートが空でないなら出力は必ず動いており、その逆も成り立つ。"""
     for text in _JA_TEXTS + _EN_TEXTS:
@@ -154,14 +116,18 @@ def test_a_moved_axis_always_shows_a_real_difference(amplitude: str) -> None:
 
 
 @pytest.mark.parametrize("amplitude", VARIATION_AMPLITUDES)
-def test_tenkei_none_moves_only_the_focus(amplitude: str) -> None:
+def test_the_focus_is_the_only_axis_left(amplitude: str) -> None:
+    """どの強度・どの seed でも、動く軸は焦点だけ (v2.11.0)。
+
+    以前は強度が軸のプールを開けていた。開ける先の 6 軸は Stage 1.5 が自分で
+    足した文を振るものだったので、候補プールと一緒に落ちている。
+    """
     for text in _JA_TEXTS:
         for seed in _SWEEP:
             report: dict = {}
             _expand(
                 text,
                 report=report,
-                tenkei="none",
                 variation_amplitude=amplitude,
                 variation_seed=seed,
             )
@@ -169,57 +135,23 @@ def test_tenkei_none_moves_only_the_focus(amplitude: str) -> None:
 
 
 @pytest.mark.parametrize("amplitude", VARIATION_AMPLITUDES)
-def test_variation_never_exceeds_the_tenkei_cap(amplitude: str) -> None:
-    """採用本数は cap 適用後の値に対して振り、cap を越えない (契約 §3.3)。"""
+def test_variation_never_adds_a_sentence(amplitude: str) -> None:
+    """対照。**軸が焦点だけであることと、文が増えないことは別の主張である。**
+
+    焦点は既存の文を書き換えるだけで、足さない。ここが赤くなるのは、展開層が
+    また自分の文を書き始めたときである。
+    """
     for text in _JA_TEXTS:
         for seed in range(60):
-            sparse: dict = {}
-            _expand(
-                text,
-                report=sparse,
-                tenkei="sparse",
-                variation_amplitude=amplitude,
-                variation_seed=seed,
-            )
-            assert sum(sparse["category_counts"]) <= 1
-            none: dict = {}
-            expanded = _expand(
-                text,
-                report=none,
-                tenkei="none",
-                variation_amplitude=amplitude,
-                variation_seed=seed,
-            )
-            assert sum(none["category_counts"]) == 0
-            assert _added_sentence_count(text, expanded, lang="ja") == 0
-
-
-@pytest.mark.parametrize("amplitude", VARIATION_AMPLITUDES)
-def test_the_report_names_every_axis_that_moved_and_no_other(amplitude: str) -> None:
-    """レポートにある軸は単独で動き、レポートにない軸は単独では動かない。"""
-    for text in _JA_TEXTS:
-        baseline = expand_intermediate_ddl(text)
-        for seed in range(40):
             report: dict = {}
-            _expand(
+            expanded = _expand(
                 text,
                 report=report,
                 variation_amplitude=amplitude,
                 variation_seed=seed,
             )
-            reported = {entry["axis"] for entry in report["moved_axes"]}
-            plan = build_variation_plan(amplitude, seed)
-            assert plan is not None
-            for axis in reported:
-                solo_report: dict = {}
-                solo = expand_intermediate_ddl(
-                    text,
-                    variation_report=solo_report,
-                    variation_amplitude=amplitude,
-                    variation_seed=seed,
-                )
-                assert solo != baseline
-                assert axis in {item["axis"] for item in solo_report["moved_axes"]}
+            assert _added_sentence_count(text, expanded, lang="ja") == 0
+            assert tuple(report["category_counts"]) == (0, 0, 0)
 
 
 def test_focus_axis_reports_the_focus_it_landed_on() -> None:
@@ -243,6 +175,31 @@ def test_focus_axis_reports_the_focus_it_landed_on() -> None:
             assert report["resolved_focus"] == default_focus
 
 
+def test_the_amplitude_still_reaches_the_output() -> None:
+    """強度は今も効く。**「軸が一つ」は「強度が死んだ」ではない。**
+
+    オフセットの鍵は `強度:seed:軸` なので、同じ seed でも強度が違えば別の焦点に
+    落ちる。ここが赤くなるのは、強度を鍵から外して選択が seed だけで決まる形へ
+    退行したときである。
+    """
+    text = "中心に黒い四角を置く。白い横線を三本引く。"
+    differing = 0
+    for seed in range(40):
+        resolved = set()
+        for amplitude in VARIATION_AMPLITUDES:
+            report: dict = {}
+            expand_intermediate_ddl(
+                text,
+                variation_report=report,
+                variation_amplitude=amplitude,
+                variation_seed=seed,
+            )
+            resolved.add(report["resolved_focus"])
+        if len(resolved) > 1:
+            differing += 1
+    assert differing >= 20, f"強度が焦点を動かした seed が {differing} / 40 しかない"
+
+
 def test_explicit_focus_still_wins_over_the_variation_axis() -> None:
     text = "中心に黒い四角を置く。白い横線を三本引く。"
     for seed in range(40):
@@ -264,25 +221,10 @@ def test_plan_is_none_unless_both_amplitude_and_seed_are_given() -> None:
     assert build_variation_plan("small", 3) is not None
 
 
-@pytest.mark.parametrize(
-    ("amplitude", "low", "high"),
-    [("small", 1, 1), ("medium", 1, 2), ("large", 2, 4)],
-)
-def test_plan_moves_the_documented_number_of_axes(
-    amplitude: str, low: int, high: int
-) -> None:
+@pytest.mark.parametrize("amplitude", VARIATION_AMPLITUDES)
+def test_the_plan_carries_the_focus_axis_and_nothing_else(amplitude: str) -> None:
     for seed in _SWEEP:
         plan = build_variation_plan(amplitude, seed)
         assert plan is not None
-        assert low <= len(plan.axes) <= high
-        assert len(set(plan.axes)) == len(plan.axes)
-
-
-def test_plan_axis_pool_respects_the_tier_order() -> None:
-    tier_one = {AXIS_TYPE_SWAP, AXIS_COUNT}
-    tier_two = tier_one | {AXIS_TOUCH, AXIS_FOCUS, AXIS_COLOR}
-    for seed in _SWEEP:
-        assert set(build_variation_plan("small", seed).axes) <= tier_one
-        assert set(build_variation_plan("medium", seed).axes) <= tier_two
-    assert build_variation_plan("small", 1, tenkei="none").axes == (AXIS_FOCUS,)
-    assert build_variation_plan("large", 1, tenkei="none").axes == (AXIS_FOCUS,)
+        assert plan.axes == (AXIS_FOCUS,)
+        assert plan.offset(AXIS_FOCUS) is not None

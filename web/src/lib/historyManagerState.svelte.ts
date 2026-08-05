@@ -17,7 +17,6 @@ export type HistoryItem = {
 	lineage_node_id?: string | null;
 	lineage_root_node_id?: string | null;
 	lineage_generation?: number | null;
-	tenkei?: string | null;
 	lineage_state?: 'active' | 'lineage_only' | 'tombstone' | null;
 	lineage_parent_node_id?: string | null;
 	derivation_kind?: string | null;
@@ -60,6 +59,10 @@ export type HistoryItem = {
 	render_hash_short?: string | null;
 	render_seed?: number | string | null;
 	render_wild?: boolean | null;
+	// The staffage level, on works saved before the axis was folded away
+	// (v2.11.0). Nothing sets it any more; it is read so a past work can still
+	// report the conditions it was drawn under.
+	tenkei?: string | null;
 	composition_seed?: number | string | null;
 	interpretation_seed?: string | null;
 	// 写生 (Stage 0.5, v2.10). Absent on every work made before the layer.

@@ -17,7 +17,7 @@ from ... import db as _db
 from ..common import _unexpected_http_error
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _effective_limits, _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _resolved_tenkei, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
+from ..rendering import _effective_limits, _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -204,8 +204,6 @@ def api_history_post(
             "ui_lang": body.ui_lang,
             "render_seed": render_seed,
             "composition_seed": body.composition_seed,
-            # v1.97: 保存時に水準を確定する（renderer 専用派生でも系統の水準が途切れない）
-            "tenkei": _resolved_tenkei(body.tenkei, actor, body.lineage_parent_node_id),
             "focus": body.focus if body.focus in FOCUS_IDS else None,
             "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
             "variation_seed": body.variation_seed,

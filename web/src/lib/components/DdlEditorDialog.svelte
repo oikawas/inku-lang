@@ -4,11 +4,9 @@
 	import { highlightDDL } from '$lib/highlight';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import RunStatus from './RunStatus.svelte';
-	import TenkeiSelect from './TenkeiSelect.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
-	import type { TenkeiLevel } from '$lib/tenkei';
 
 	type SaijikiPreview = {
 		categoryKey: string;
@@ -38,18 +36,15 @@
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
 		pluginEntries?: { qualified_name: string; note_ja: string; note_en: string }[];
-		showTenkei?: boolean;
-		tenkeiValue?: TenkeiLevel;
-		tenkeiInherited?: boolean;
+		showSettings?: boolean;
 		wildValue?: boolean;
 		wildInherited?: boolean;
 		onSelectWild?: (value: boolean) => void;
-		onSelectTenkei?: (level: TenkeiLevel) => void;
 		onDraw: (ddl: string, signal?: AbortSignal) => void | Promise<void>;
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showTenkei = false, tenkeiValue = 'auto', tenkeiInherited = true, onSelectTenkei, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showSettings = false, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -227,12 +222,11 @@
 						onSelect={onSelectDrawingModel}
 					/>
 				</div>
-				{#if showTenkei && onSelectTenkei}
-					<!-- One box: the left-aligning margin belongs to the pair, not to
-					     staffage alone, or the switch drifts toward the buttons. -->
+				{#if showSettings && onSelectWild}
+					<!-- One box: the left-aligning margin belongs to the settings, or
+					     the switch drifts toward the buttons. -->
 					<div class="ddled-settings">
-						<TenkeiSelect compact value={tenkeiValue} {isJapanese} inherited={tenkeiInherited} onSelect={onSelectTenkei} />
-						{#if onSelectWild}<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />{/if}
+						<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />
 					</div>
 				{/if}
 				<button type="button" class="ddled-cancel" onclick={requestClose}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>

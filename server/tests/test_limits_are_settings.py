@@ -288,14 +288,14 @@ def test_t4_digests_hold_at_the_defaults_and_move_under_a_setting():
     prompt are really the setting's and not a copy of it.
     """
     _, base_ja = interpreter._build_system_prompt_parts(
-        "入力文は不変部へ入らない。", lang="ja", tenkei="auto", limits=DEFAULT_LIMITS
+        "入力文は不変部へ入らない。", lang="ja", limits=DEFAULT_LIMITS
     )
     assert _digest16(base_ja) == "1430ea03025e3f8c"
     assert len(base_ja.encode("utf-8")) == 18_981
 
     altered = Limits(**{**limits_as_dict(DEFAULT_LIMITS), "ddl_count_max": 1500})
     _, base_alt = interpreter._build_system_prompt_parts(
-        "入力文は不変部へ入らない。", lang="ja", tenkei="auto", limits=altered
+        "入力文は不変部へ入らない。", lang="ja", limits=altered
     )
     assert _digest16(base_alt) != "1430ea03025e3f8c"
     assert "1〜1500 の振れ幅" in base_alt

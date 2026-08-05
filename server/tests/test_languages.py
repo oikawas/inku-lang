@@ -25,18 +25,23 @@ def test_language_registry_preserves_existing_expander_behavior():
     assert expand_intermediate_for_lang(en_ddl, lang="en") == expand_intermediate_ddl(en_ddl, lang="en")
 
 
-def test_english_language_support_adds_language_specific_taste_without_touching_ja():
+def test_english_language_support_adds_no_taste_of_its_own():
+    """The English support used to append sentences the DDL never asked for.
+
+    `jazz`, `quilt`, `subway`, `billboard`, `prairie`, `coastal fog` and
+    `warehouse` each summoned a line of their own -- but only at the `auto`
+    staffage level, which is what shows they were staffage. The level was folded
+    away (v2.11.0) and so were they: the registry path is now the plain expander
+    in both languages.
+    """
     ja_ddl = "中心に黒い四角を置く。白い横線を三本引く。"
     en_ddl = "Draw three blue lines with jazz syncopation near a city corner."
 
-    ja_before = expand_intermediate_ddl(ja_ddl, lang="ja")
-    ja_after = expand_intermediate_for_lang(ja_ddl, lang="ja")
-    en_base = expand_intermediate_ddl(en_ddl, lang="en")
+    assert expand_intermediate_for_lang(ja_ddl, lang="ja") == expand_intermediate_ddl(ja_ddl, lang="ja")
     en_after = expand_intermediate_for_lang(en_ddl, lang="en")
-
-    assert ja_after == ja_before
-    assert en_after != en_base
-    assert "syncopated city rhythm" in en_after or "blue-note value" in en_after
+    assert en_after == expand_intermediate_ddl(en_ddl, lang="en")
+    assert "syncopated city rhythm" not in en_after
+    assert "blue-note value" not in en_after
 
 
 def test_language_support_owns_coerce_marker_sets():

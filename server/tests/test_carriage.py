@@ -78,9 +78,13 @@ def test_an_instruction_the_ddl_never_declared_is_counted_as_authored():
     one: coerce read `prose\\nDDL`, so anything it authored could be traced back
     to some word the author wrote, and an addition was indistinguishable from a
     delivery.
+
+    Since the staffage level was folded away (v2.11.0) every addition answers to
+    a clause -- the branches that answered to nothing are gone -- so the input
+    here is a DDL whose second clause the Score never delivered.
     """
     report = _replay(
-        "赤い円を三つ散らす。ゆっくり波打つ。",
+        "赤い円を三つ散らす。黒い細筆の細い線を右端に一本引く。",
         _score([{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1, "color": "red"}]),
     )
 
@@ -121,12 +125,12 @@ def test_the_ground_of_an_addition_is_recorded():
     different facts. Collapsing them makes coerce's own composition invisible --
     which is the whole of what this direction is for."""
     report = _replay(
-        "赤い円を三つ散らす。ゆっくり波打つ。",
+        "赤い円を三つ散らす。黒い細筆の細い線を右端に一本引く。",
         _score([{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1, "color": "red"}]),
     )
 
-    assert report.declared_colors == frozenset({"red"})
-    assert report.declared_primitives == frozenset({"circle"})
+    assert report.declared_colors == frozenset({"red", "black"})
+    assert report.declared_primitives == frozenset({"circle", "line"})
     grounds = {(addition.grounded_primitive, addition.grounded_color) for addition in report.additions}
     assert grounds, "no addition to attribute"
     assert all(isinstance(addition.grounded, bool) for addition in report.additions)

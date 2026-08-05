@@ -795,28 +795,6 @@ def test_coerce_score_limits_compound_motifs_to_two_per_work():
     assert not any("mountain_sign motif restored from DDL intent" in hint for hint in motif_hints)
 
 
-def test_coerce_score_adds_generic_anchor_for_line_only_warm_scene():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.2, 0.5],
-                    "to": [0.8, 0.5],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="夏祭りの灯りが遠くで揺れる。")
-
-    anchors = [ins for ins in fixed.instructions if "composition anchor restored for shape/color diversity" in (ins.note or "")]
-    assert len(anchors) == 1
-    assert anchors[0].primitive == "ellipse"
-    assert anchors[0].color == "red"
-
-
 def test_coerce_score_does_not_add_generic_anchor_for_minimal_quiet_scene():
     score = Score.model_validate(
         {
@@ -980,38 +958,6 @@ def test_coerce_score_suppresses_plain_large_shape_duplicate_when_presence_is_ac
     assert len(fixed.instructions) == 1
     assert fixed.instructions[0].color_hint is not None
     assert "透明な膜" in fixed.instructions[0].color_hint
-
-
-def test_coerce_score_governs_quiet_high_density_scatter():
-    score = Score.model_validate(
-        {
-            "background": "black",
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.5, 0.5],
-                    "size": [0.02, 0.05],
-                    "color": "white",
-                    "color_hint": "ネオンの滲み",
-                    "arrangement": {
-                        "count": 180,
-                        "layout": "scatter",
-                        "density": "high",
-                    },
-                },
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="夜のガラス越しに、街のネオンが涙のように滲んでいる。")
-
-    arr = fixed.instructions[0].arrangement
-    assert arr is not None
-    assert arr.count == 24
-    assert arr.preserve_space is True
-    assert arr.fade == "outward"
-    assert "neon blur density governed" in (fixed.instructions[0].note or "")
-    assert any("quiet expression accent restored" in (ins.note or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_governs_neon_blur_vertical_density_more_strictly():
@@ -1195,30 +1141,6 @@ def test_coerce_score_restores_motion_energy_without_increasing_count():
     assert "motion energy restored" in (ins.note or "")
 
 
-def test_coerce_score_adds_motion_floor_when_motion_context_has_no_path():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "circle",
-                    "center": [0.45, 0.45],
-                    "radius": 0.03,
-                    "color": "black",
-                }
-            ]
-        }
-    )
-
-    fixed = coerce_score(score, ddl="黒い点が震える。")
-
-    floor = [ins for ins in fixed.instructions if "motion floor restored" in (ins.note or "")]
-    assert floor
-    assert floor[0].arrangement is not None
-    assert floor[0].arrangement.count == 3
-    assert floor[0].arrangement.path == "diagonal"
-    assert floor[0].arrangement.preserve_space is True
-
-
 def test_coerce_score_drops_support_shape_for_explicit_numeric_regions():
     score = Score.model_validate(
         {
@@ -1260,26 +1182,6 @@ def test_coerce_score_drops_support_shape_for_explicit_numeric_regions():
     )
 
 
-def test_coerce_score_adds_motion_floor_when_existing_path_is_too_small():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.45, 0.45],
-                    "size": [0.06, 0.03],
-                    "color": "gray",
-                    "arrangement": {"count": 2, "layout": "scatter", "path": "wave"},
-                }
-            ]
-        }
-    )
-
-    fixed = coerce_score(score, ddl="一滴の水が丸く震える。")
-
-    assert any("motion floor restored" in (ins.note or "") for ins in fixed.instructions)
-
-
 def test_coerce_score_promotes_requested_cycle_color_to_primary_stroke():
     score = Score.model_validate(
         {
@@ -1299,91 +1201,6 @@ def test_coerce_score_promotes_requested_cycle_color_to_primary_stroke():
 
     assert fixed.instructions[0].color == "red"
     assert "red promoted to primary stroke from DDL color intent" in (fixed.instructions[0].note or "")
-
-
-def test_coerce_score_restores_context_energy_for_regressed_scenes_without_touching_good_presence_scene():
-    base = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.2, 0.5],
-                    "to": [0.8, 0.5],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    leaf = coerce_score(base, ddl="秋の森で、落ち葉が湿った土に深い赤を沈めている。")
-    assert any("leaf/grain energy restored" in (ins.note or "") for ins in leaf.instructions)
-
-    corridor = coerce_score(base, ddl="廃校の廊下に、夕方の光が長い沈黙を置いていく。")
-    assert any("silence/layer energy restored" in (ins.note or "") for ins in corridor.instructions)
-
-    factory = coerce_score(base, ddl="静かな工場跡で、錆びた鉄骨が空を細かく分けている。")
-    assert any(ins.primitive == "polygon" and "hard edge visual event restored" in (ins.note or "") for ins in factory.instructions)
-
-    warehouse = coerce_score(base, ddl="Warehouse grid cuts hold dust and late afternoon shadow.")
-    assert any(ins.primitive == "polygon" and "hard edge visual event restored" in (ins.note or "") for ins in warehouse.instructions)
-
-    parking_lot = coerce_score(base, ddl="Parking-lot light cuts a rectangle with a falling diagonal.")
-    assert any(ins.primitive == "polygon" and "hard edge visual event restored" in (ins.note or "") for ins in parking_lot.instructions)
-
-    bicycle = coerce_score(base, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
-    assert any("playful motion energy restored as a small moving color cluster" in (ins.note or "") for ins in bicycle.instructions)
-
-    red_scene = Score.model_validate(
-        {
-            "background": "red",
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.5, 0.5],
-                    "size": [0.05, 0.02],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-    red_bicycle = coerce_score(red_scene, ddl="夕暮れの坂道で、自転車の影だけが先に帰っていく。")
-    playful = [ins for ins in red_bicycle.instructions if "playful motion energy restored as a small moving color cluster" in (ins.note or "")]
-    assert red_bicycle.background == "white"
-    assert playful
-    assert playful[0].primitive == "ellipse"
-    assert playful[0].color == "red"
-    assert playful[0].arrangement is not None
-    assert playful[0].arrangement.count == 5
-    assert "red" in playful[0].arrangement.color_cycle
-
-    bus_stop = coerce_score(base, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
-    assert not any("energy restored" in (ins.note or "") for ins in bus_stop.instructions)
-
-
-def test_coerce_score_restores_visual_events_for_english_handmade_and_sensory_contexts():
-    base = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.5, 0.5],
-                    "size": [0.06, 0.03],
-                    "color": "green",
-                }
-            ],
-        }
-    )
-
-    patchwork = coerce_score(
-        base,
-        ddl="Quilt-like patchwork drifts across a porch shadow in red, blue, green, and gray.",
-    )
-    assert any("visual event restored as a small handmade rhythm offset" in (ins.note or "") for ins in patchwork.instructions)
-    assert any("rhythm variation restored without increasing count" in (ins.note or "") for ins in patchwork.instructions)
-
-    scent = coerce_score(base, ddl="The scent of grass after rain drifts as small green ellipses.")
-    assert any("visual event restored as a small sensory drift" in (ins.note or "") for ins in scent.instructions)
-    assert any("motion floor restored" in (ins.note or "") for ins in scent.instructions)
 
 
 def test_coerce_score_enforces_explicit_shape_and_count_constraints_after_repairs():
@@ -1437,32 +1254,6 @@ def test_coerce_score_enforces_color_only_constraints_after_repairs():
     assert ins.arrangement is not None
     assert set(ins.arrangement.color_cycle) <= {"red", "blue"}
     assert "explicit color-only constraint enforced" in (ins.note or "")
-
-
-def test_coerce_score_does_not_treat_motif_only_as_color_only_constraint():
-    score = Score.model_validate(
-        {
-            "background": "red",
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.2, 0.6],
-                    "to": [0.8, 0.4],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="夕暮れの坂道で、黒い影だけが先に帰っていく。")
-
-    playful = [ins for ins in fixed.instructions if "playful motion energy restored as a small moving color cluster" in (ins.note or "")]
-    assert fixed.background == "white"
-    assert playful
-    assert playful[0].color == "red"
-    assert playful[0].arrangement is not None
-    assert "red" in playful[0].arrangement.color_cycle
-    assert not any("explicit color-only constraint enforced" in (ins.note or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_tempers_single_large_shape_in_quiet_trace_context():
@@ -1815,135 +1606,6 @@ def test_coerce_score_restores_ma_for_thin_planar_drift_without_count_growth():
     assert "ma pressure restored" in (ins.note or "")
 
 
-def test_coerce_score_adds_surface_tension_for_heavy_surface_context():
-    score = Score.model_validate(
-        {
-            "background": "red",
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.5, 0.22],
-                    "size": [0.24, 0.14],
-                    "color": "black",
-                    "filled": True,
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="赤い布の上で、熟した果実が重く静かな影を落とす。")
-
-    assert len(fixed.instructions) == 2
-    assert fixed.instructions[1].primitive == "arc"
-    assert fixed.instructions[1].weight == "silverpoint"
-    assert "surface tension restored" in (fixed.instructions[1].note or "")
-
-
-def test_coerce_score_adds_visual_event_for_quiet_reflection_context():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.5],
-                    "to": [0.75, 0.5],
-                    "color": "red",
-                    "arrangement": {
-                        "count": 12,
-                        "layout": "vertical",
-                        "path": "right_half",
-                        "density": "low",
-                    },
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="雨上がりの路地で、濡れた石畳が夕焼けを細く映している。")
-
-    assert any("visual event restored as a thin reflected cut" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_adds_visual_event_for_vanishing_footprint_context():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.67],
-                    "to": [0.78, 0.39],
-                    "color": "blue",
-                    "arrangement": {
-                        "count": 7,
-                        "layout": "scatter",
-                        "path": "diagonal",
-                    },
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
-
-    event = next(ins for ins in fixed.instructions if "visual event restored as a compact off-center mark" in (ins.note or ""))
-    assert event.primitive == "line"
-    assert event.arrangement is not None
-    assert event.arrangement.path == "diagonal"
-    assert event.arrangement.color_cycle
-    assert event.arrangement.center is not None
-    assert not any("visual event restored as a small angular pulse" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_adds_arrival_departure_event_for_landing_and_leaving():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.20, 0.62],
-                    "to": [0.82, 0.38],
-                    "color": "gray",
-                    "arrangement": {"count": 3, "layout": "scatter"},
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(
-        score,
-        ddl="The first snow fell on a cemetery. A crow landed, looked around, and left.",
-    )
-
-    event = next(ins for ins in fixed.instructions if "brief_arrival_departure" in (ins.note or ""))
-    assert event.primitive == "arc"
-    assert event.arrangement is not None
-    assert event.arrangement.color_cycle
-    assert tuple(event.arrangement.center) == (0.33, 0.67)
-
-
-def test_coerce_score_adds_broken_line_event_for_quiet_negative_space():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.15, 0.52],
-                    "to": [0.85, 0.52],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="A quiet black pencil line holds a wide field of negative space.")
-
-    event = next(ins for ins in fixed.instructions if "visual event restored as a small broken line" in (ins.note or ""))
-    assert event.arrangement is not None
-    assert event.arrangement.preserve_space is True
-    assert event.arrangement.fade == "outward"
-    assert not any("visual event restored as a small angular pulse" in (ins.note or "") for ins in fixed.instructions)
-
-
 def test_coerce_score_adds_ma_pressure_to_prairie_horizon_line():
     score = Score.model_validate(
         {
@@ -1975,70 +1637,6 @@ def test_coerce_score_adds_ma_pressure_to_prairie_horizon_line():
     assert horizon.arrangement.fade == "outward"
 
 
-def test_coerce_score_adds_offbeat_arc_for_jazz_context():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.22, 0.48],
-                    "to": [0.78, 0.48],
-                    "color": "blue",
-                    "arrangement": {"count": 3, "layout": "horizontal"},
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="Three blue lines swing like jazz syncopation near a city corner.")
-
-    assert any("visual event restored as a small offbeat arc" in (ins.note or "") for ins in fixed.instructions)
-    assert not any("visual event restored as a small angular pulse" in (ins.note or "") for ins in fixed.instructions)
-    assert not any("hard edge visual event restored" in (ins.note or "") for ins in fixed.instructions)
-    assert any("ma pressure restored through spacing and preserved negative space" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_does_not_read_horizontal_as_horizon():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.22, 0.48],
-                    "to": [0.78, 0.48],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="Backbeat rhythm makes seven short black horizontal lines skip unevenly.")
-
-    assert any("visual event restored as a small offbeat arc" in (ins.note or "") for ins in fixed.instructions)
-    assert not any("visual event restored as a small broken line" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_does_not_read_english_verb_leaves_as_leaf_motif():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.5],
-                    "to": [0.75, 0.5],
-                    "color": "blue",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="Rain on a bus-stop window leaves transparent reflections.")
-
-    assert not any("leaf_cluster motif restored from DDL intent" in (ins.note or "") for ins in fixed.instructions)
-    assert not any("leaf/grain energy restored" in (ins.note or "") for ins in fixed.instructions)
-    assert any("visual event restored as a thin reflected cut" in (ins.note or "") for ins in fixed.instructions)
-
-
 def test_coerce_score_marks_existing_reflection_as_visual_event():
     score = Score.model_validate(
         {
@@ -2058,27 +1656,6 @@ def test_coerce_score_marks_existing_reflection_as_visual_event():
     fixed = coerce_score(score, ddl="Rain on a bus-stop window leaves transparent reflections.")
 
     assert any("visual event preserved as a reflected accent" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_does_not_read_english_verb_leaves_empty_page_as_leaf_grain():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.5],
-                    "to": [0.75, 0.5],
-                    "color": "black",
-                    "arrangement": {"count": 1, "preserve_space": True, "fade": "outward"},
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="A quiet black pencil line leaves most of the page empty.")
-
-    assert not any("leaf/grain energy restored" in (ins.note or "") for ins in fixed.instructions)
-    assert any("visual event restored as a small broken line" in (ins.note or "") for ins in fixed.instructions)
 
 
 def test_coerce_score_adds_ma_pressure_for_sparse_chalk_wall():
@@ -2186,27 +1763,6 @@ def test_coerce_score_does_not_read_crescent_as_scent_or_green():
     assert all("green" not in (ins.arrangement.color_cycle if ins.arrangement else []) for ins in fixed.instructions)
 
 
-def test_coerce_score_keeps_visual_event_as_arc_when_angular_anchor_exists():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "square",
-                    "position": [0.42, 0.42],
-                    "size": [0.12, 0.12],
-                    "color": "gray",
-                    "rotation": -18,
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="一滴のインクが紙の上で震える。")
-
-    assert any("visual event restored as a small focal pulse" in (ins.note or "") for ins in fixed.instructions)
-    assert not any("visual event restored as a small angular pulse" in (ins.note or "") for ins in fixed.instructions)
-
-
 def test_coerce_score_shapes_repeated_lines_as_event_without_adding_density():
     score = Score.model_validate(
         {
@@ -2235,33 +1791,6 @@ def test_coerce_score_shapes_repeated_lines_as_event_without_adding_density():
     assert "visual event shaped with syncopated gaps" in (line.note or "")
 
 
-def test_coerce_score_adds_edge_light_event_for_dark_light_context():
-    score = Score.model_validate(
-        {
-            "background": "black",
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.24, 0.12],
-                    "to": [0.24, 0.88],
-                    "color": "blue",
-                    "weight": "silverpoint",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="真夜中の港で、遠い灯台の光だけが黒い海を切っている。")
-
-    edge = [ins for ins in fixed.instructions if "edge light event restored" in (ins.note or "")]
-    assert edge
-    assert edge[0].primitive == "line"
-    assert edge[0].arrangement is not None
-    assert edge[0].arrangement.count == 2
-    assert edge[0].arrangement.preserve_space is True
-    assert edge[0].arrangement.color_cycle
-
-
 def test_coerce_score_adds_motion_to_open_road_pull_focus():
     score = Score.model_validate(
         {
@@ -2286,446 +1815,6 @@ def test_coerce_score_adds_motion_to_open_road_pull_focus():
     assert road.arrangement.rhythm_spacing != "none"
     assert "motion energy restored through trajectory and rotation" in (road.note or "")
     assert "visual event preserved as a road-pull focus accent" in (road.note or "")
-
-
-def test_coerce_score_adds_visible_japanese_focal_event_and_reaction():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "circle",
-                    "center": [0.50, 0.50],
-                    "radius": 0.008,
-                    "color": "red",
-                    "color_hint": "小さな赤い点",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
-
-    assert any("visual event restored" in (ins.note or "") for ins in fixed.instructions)
-    assert any("visual event adjacent reaction added to hold focal event" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_keeps_english_action_residue_visible():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.48, 0.50],
-                    "to": [0.52, 0.50],
-                    "color": "gray",
-                    "weight": "silverpoint",
-                    "color_hint": "bow",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="A fisherman on the Mekong bows to the river each morning.")
-
-    bow = next(ins for ins in fixed.instructions if "bow" in (ins.color_hint or ""))
-    assert bow.from_ is not None
-    assert bow.to is not None
-    assert abs(bow.to[0] - bow.from_[0]) >= 0.14
-    assert "visual event preserved as action residue" in (bow.note or "")
-    assert "focal event visibility floor applied" in (bow.note or "")
-    assert not any("visual event adjacent reaction added to hold focal event" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_turns_english_repetition_time_into_focal_event():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.48, 0.55],
-                    "size": [0.05, 0.02],
-                    "color": "blue",
-                    "color_hint": "small sounds",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="In a thawing stream, small sounds were born under the stones and vanished again and again.")
-
-    assert any("visual event restored" in (ins.note or "") for ins in fixed.instructions)
-    assert not any("visual event adjacent reaction added to hold focal event" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_restores_pre_bell_light_hinge():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.20, 0.60],
-                    "to": [0.80, 0.60],
-                    "color": "gray",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="夜明け前の駅で、発車ベルの前に青い案内板だけが明るくなった。")
-
-    event = next(ins for ins in fixed.instructions if "pre-bell light hinge" in (ins.note or ""))
-    assert event.primitive == "square"
-    assert event.color == "blue"
-    assert event.size is not None
-    assert event.size[0] >= 0.16
-    assert event.arrangement is not None
-    assert event.arrangement.preserve_space is True
-
-
-def test_coerce_score_restores_inherited_bow_sequence():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.30, 0.50],
-                    "to": [0.70, 0.50],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="メコン川の漁師は毎朝、川に向かって礼をする。父もそうしていた。父の父もそうしていた。")
-
-    event = next(ins for ins in fixed.instructions if "inherited_memory" in (ins.note or ""))
-    assert event.primitive == "arc"
-    assert event.arrangement is not None
-    assert event.arrangement.count == 3
-    assert event.arrangement.rhythm_spacing == "loose"
-
-
-def test_coerce_score_restores_english_chain_reaction_event():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.50, 0.50],
-                    "size": [0.08, 0.035],
-                    "color": "gray",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(
-        score,
-        ddl="A shepherd in the Pyrenees whistled once. The dog moved. The flock moved. The mountain seemed to listen.",
-    )
-
-    event = next(ins for ins in fixed.instructions if "chain reaction" in (ins.note or ""))
-    assert event.primitive == "line"
-    assert event.arrangement is not None
-    assert event.arrangement.count == 3
-    assert event.arrangement.rhythm_spacing == "syncopated"
-
-
-def test_coerce_score_adds_japanese_rusty_door_reaction():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "square",
-                    "position": [0.42, 0.42],
-                    "size": [0.10, 0.12],
-                    "color": "gray",
-                    "color_hint": "錆びた扉",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="港の倉庫で、錆びた扉が開く音だけが広い空間を測っていた。")
-
-    assert any("sound_in_space" in (ins.note or "") for ins in fixed.instructions)
-    assert any("visual event adjacent reaction added to hold focal event" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_detects_japanese_sound_in_space_holdout():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.34, 0.50],
-                    "to": [0.62, 0.42],
-                    "color": "gray",
-                    "color_hint": "古い扉",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="古い扉のきしみが、倉庫の奥行きを静かに示した。")
-
-    event = next(ins for ins in fixed.instructions if "sound_in_space" in (ins.note or ""))
-    assert event.arrangement is not None
-    assert event.arrangement.preserve_space is True
-    assert event.arrangement.path == "wave"
-    assert any("visual event adjacent reaction added to hold focal event" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_detects_english_inherited_memory_holdout():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "circle",
-                    "center": [0.50, 0.50],
-                    "radius": 0.05,
-                    "color": "green",
-                    "color_hint": "old tree",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(
-        score,
-        ddl="An old woman sold fruit from a tree her grandmother had planted; it still held the market's shade.",
-    )
-
-    event = next(ins for ins in fixed.instructions if "inherited_memory" in (ins.note or ""))
-    assert event.arrangement is not None
-    assert event.arrangement.count == 3
-    assert event.arrangement.preserve_space is True
-
-
-def test_coerce_score_detects_english_vanishing_outline_holdout():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.50, 0.50],
-                    "size": [0.08, 0.03],
-                    "color": "gray",
-                    "color_hint": "fog",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="A figure ahead dissolved into fog, returned, and dissolved again.")
-
-    event = next(ins for ins in fixed.instructions if "vanishing_outline" in (ins.note or ""))
-    assert event.primitive == "line"
-    assert event.arrangement is not None
-    assert event.arrangement.fade == "outward"
-
-
-def test_coerce_score_detects_japanese_temporal_chain_holdout():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "arc",
-                    "center": [0.50, 0.50],
-                    "radius": 0.05,
-                    "color": "black",
-                    "color_hint": "笛の短い音",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="笛の短い音が路地を渡り、猫、洗濯物、開いた窓の順に揺れた。")
-
-    event = next(ins for ins in fixed.instructions if "temporal_chain" in (ins.note or ""))
-    assert event.primitive == "line"
-    assert event.arrangement is not None
-    assert event.arrangement.count == 3
-    assert event.arrangement.rhythm_spacing == "syncopated"
-
-
-def test_coerce_score_detects_english_shared_object_holdout():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.50],
-                    "to": [0.75, 0.50],
-                    "color": "black",
-                    "color_hint": "same map",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="Without speaking, two hands held opposite edges of the same map.")
-
-    event = next(ins for ins in fixed.instructions if "shared_object" in (ins.note or ""))
-    assert event.primitive == "square"
-    assert event.arrangement is not None
-    assert event.arrangement.path == "left_to_right"
-    assert event.arrangement.rhythm_spacing == "syncopated"
-
-
-def test_coerce_score_maps_single_before_event_to_anticipatory_shift():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "square",
-                    "position": [0.55, 0.35],
-                    "size": [0.18, 0.09],
-                    "color": "white",
-                    "color_hint": "white cloth lifted before applause",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="At a seaside wedding, a piece of white cloth rose in the wind before the applause.")
-
-    assert not any("temporal_chain" in (ins.note or "") for ins in fixed.instructions)
-    event = next(ins for ins in fixed.instructions if "anticipatory_shift" in (ins.note or ""))
-    assert event.primitive == "arc"
-    assert event.arrangement is not None
-    assert event.arrangement.path == "wave"
-    assert event.arrangement.rhythm_spacing == "syncopated"
-
-
-def test_coerce_score_restores_tilted_room_drop_event():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.50],
-                    "to": [0.75, 0.50],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(
-        score,
-        ddl="A single drop of water on the tatami in a tea room tilted the quiet of the whole room slightly.",
-    )
-
-    event = next(ins for ins in fixed.instructions if "tilted-room drop" in (ins.note or ""))
-    assert event.primitive == "ellipse"
-    assert event.size is not None
-    assert event.size[0] >= 0.11
-    assert event.arrangement is not None
-    assert event.arrangement.path == "wave"
-
-
-def test_coerce_score_restores_shared_newspaper_hinge():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.50],
-                    "to": [0.75, 0.50],
-                    "color": "black",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="リスボンのカフェで、見知らぬ二人が同じ新聞に手を伸ばした。二人は一言も交わさず、それを分け合った。")
-
-    event = next(ins for ins in fixed.instructions if "shared_object" in (ins.note or ""))
-    assert event.primitive == "square"
-    assert event.size is not None
-    assert event.size[0] >= 0.18
-    assert event.arrangement is not None
-    assert event.arrangement.count == 2
-    assert event.arrangement.rhythm_spacing == "syncopated"
-
-
-def test_coerce_score_restores_diagonal_afternoon_light():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "square",
-                    "position": [0.40, 0.55],
-                    "size": [0.10, 0.05],
-                    "color": "gray",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="古い図書館の高い窓から、午後の光が誰も読まない本へ斜めに落ちた。")
-
-    event = next(ins for ins in fixed.instructions if "diagonal afternoon light" in (ins.note or ""))
-    assert event.primitive == "line"
-    assert event.from_ is not None
-    assert event.to is not None
-    assert event.to[0] > event.from_[0]
-    assert event.to[1] > event.from_[1]
-    assert event.arrangement is not None
-    assert event.arrangement.preserve_space is True
-
-
-def test_coerce_score_restores_hidden_english_foot_rhythm():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.25, 0.50],
-                    "to": [0.75, 0.50],
-                    "color": "gray",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(
-        score,
-        ddl="At a festival in Rajasthan, an old man watched the dancers and quietly moved his feet under the table.",
-    )
-
-    event = next(ins for ins in fixed.instructions if "hidden foot rhythm" in (ins.note or ""))
-    assert event.primitive == "arc"
-    assert event.arrangement is not None
-    assert event.arrangement.count == 3
-    assert event.arrangement.rhythm_spacing == "syncopated"
-
-
-def test_coerce_score_restores_doubled_river_road():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.20, 0.50],
-                    "to": [0.80, 0.50],
-                    "color": "blue",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(
-        score,
-        ddl="On an evening bridge, a line of birds returning home made another road on the river surface.",
-    )
-
-    event = next(ins for ins in fixed.instructions if "doubled river road" in (ins.note or ""))
-    assert event.primitive == "line"
-    assert event.arrangement is not None
-    assert event.arrangement.count == 2
-    assert event.arrangement.path == "diagonal"
 
 
 def test_coerce_score_marks_shared_footstep_beat_as_visual_event():
@@ -2789,72 +1878,6 @@ def test_coerce_score_does_not_add_edge_light_for_dark_context_without_cutting_l
     fixed = coerce_score(score, ddl="遠雷の前、低い黒い雲が街の屋根を押し沈めている。")
 
     assert not any("edge light event restored" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_prefers_vanishing_trace_over_weak_edge_light_context():
-    score = Score.model_validate(
-        {
-            "background": "black",
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.2, 0.5],
-                    "to": [0.8, 0.5],
-                    "color": "white",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="黒い夜の窓辺で、指で描いた円がすぐに消えかけている。")
-
-    assert not any("edge light event restored" in (ins.note or "") for ins in fixed.instructions)
-    assert any("vanishing trace restored" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_uses_edge_light_over_vanishing_trace_for_strong_light_cut():
-    score = Score.model_validate(
-        {
-            "background": "black",
-            "instructions": [
-                {
-                    "primitive": "line",
-                    "from": [0.2, 0.5],
-                    "to": [0.8, 0.5],
-                    "color": "white",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="真夜中の港で、灯台の一筋の光が黒い海を切って消えていく。")
-
-    assert any("edge light event restored" in (ins.note or "") for ins in fixed.instructions)
-    assert not any("vanishing trace restored" in (ins.note or "") for ins in fixed.instructions)
-
-
-def test_coerce_score_adds_vanishing_trace_for_fading_context():
-    score = Score.model_validate(
-        {
-            "instructions": [
-                {
-                    "primitive": "ellipse",
-                    "center": [0.42, 0.50],
-                    "size": [0.10, 0.04],
-                    "color": "gray",
-                }
-            ],
-        }
-    )
-
-    fixed = coerce_score(score, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
-
-    trace = [ins for ins in fixed.instructions if "vanishing trace restored" in (ins.note or "")]
-    assert trace
-    assert trace[0].primitive == "arc"
-    assert trace[0].arrangement is not None
-    assert trace[0].arrangement.fade == "directional"
-    assert trace[0].arrangement.rhythm_spacing == "loose"
 
 
 def test_fallback_score_preserves_explicit_count_circle_and_polygon():
@@ -2923,51 +1946,6 @@ def test_coerce_disable_keeps_structural_repair_but_skips_style_repairs(monkeypa
 
 
 
-def test_coerce_score_limits_adjacent_reaction_to_isolated_focal_event():
-    isolated = Score.model_validate(
-        {
-            "instructions": [
-                {"primitive": "circle", "center": [0.50, 0.50], "radius": 0.01, "color": "red"},
-            ],
-        }
-    )
-    crowded = Score.model_validate(
-        {
-            "instructions": [
-                {"primitive": "circle", "center": [0.50, 0.50], "radius": 0.01, "color": "red"},
-                {"primitive": "line", "from": [0.48, 0.47], "to": [0.62, 0.51], "color": "black"},
-                {"primitive": "ellipse", "center": [0.56, 0.54], "size": [0.12, 0.05], "color": "gray"},
-            ],
-        }
-    )
-
-    isolated_fixed = coerce_score(isolated, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
-    crowded_fixed = coerce_score(crowded, ddl="大きな美術館の白い部屋で、小さな赤い点だけが見る人の足を止めた。")
-
-    assert any("visual event adjacent reaction added to hold focal event" in (ins.note or "") for ins in isolated_fixed.instructions)
-    assert not any("visual event adjacent reaction added to hold focal event" in (ins.note or "") for ins in crowded_fixed.instructions)
-
-
-def test_coerce_score_varies_repair_part_coordinates_by_input():
-    base = Score.model_validate(
-        {
-            "instructions": [
-                {"primitive": "line", "from": [0.25, 0.67], "to": [0.78, 0.39], "color": "blue"},
-            ],
-        }
-    )
-
-    fixed_a = coerce_score(base, ddl="雪原の端で、小さな足跡が遠くの青へ消えていく。")
-    fixed_b = coerce_score(base, ddl="広い駅の白い壁で、小さな青い点だけが見る人の足を止めた。")
-    mark_a = next(ins for ins in fixed_a.instructions if "compact off-center mark" in (ins.note or ""))
-    mark_b = next(ins for ins in fixed_b.instructions if "compact off-center mark" in (ins.note or ""))
-
-    assert mark_a.from_ is not None and mark_a.to is not None
-    assert mark_b.from_ is not None and mark_b.to is not None
-    assert mark_a.from_ != mark_b.from_
-    assert mark_a.to != mark_b.to
-
-
 def test_count_hint_allows_2000_only_for_literal_grid_request():
     assert count_hint_from_ddl("黒い線を2000本格子状に敷き詰める。") == 2000
     assert count_hint_from_ddl("灰色の線を二千本、一面に敷き詰める。") == 2000
@@ -3029,10 +2007,11 @@ def test_coerce_keeps_grid_for_literal_english_tiling_request():
     arr = fixed.instructions[0].arrangement
     assert arr is not None
     assert arr.layout == "grid"
-    # The literal count survives the grid restoration. It loses exactly one cell
-    # to the hard ceiling, because coerce adds a composition anchor of its own and
-    # 400 tiles plus one anchor is 401 marks -- one over the per-work total.
-    assert arr.count == DEFAULT_LIMITS.max_expanded_primitives - 1
+    # The literal count survives the grid restoration whole. It used to lose one
+    # cell to the hard ceiling, because coerce added a composition anchor of its
+    # own and 400 tiles plus one anchor is 401 marks; that anchor was staffage and
+    # went away with the level (v2.11.0), so the description now gets all 400.
+    assert arr.count == DEFAULT_LIMITS.max_expanded_primitives
     assert sum(_mark_count(ins) for ins in fixed.instructions) <= DEFAULT_LIMITS.max_expanded_primitives
 
 
@@ -3068,7 +2047,7 @@ def test_coerce_restores_literal_grid_count_and_full_field_margin():
     assert arr is not None
     # The restoration still reads 2000 out of the description and still clears the
     # mismatched rows/cols; the hard ceiling is what brings the total back down.
-    assert arr.count == DEFAULT_LIMITS.max_expanded_primitives - 1
+    assert arr.count == DEFAULT_LIMITS.max_expanded_primitives
     assert arr.rows is None and arr.cols is None
     assert arr.margin == 0.08
     assert arr.density == "none"
@@ -3135,8 +2114,8 @@ def test_coerce_restores_missing_literal_grid_with_default_count():
     grid = fixed.instructions[0].arrangement
     assert grid is not None
     assert grid.layout == "grid"
-    # Same one-cell toll as the explicit four-hundred case above.
-    assert grid.count == DEFAULT_LIMITS.max_expanded_primitives - 1
+    # The whole ceiling, as in the explicit four-hundred case above.
+    assert grid.count == DEFAULT_LIMITS.max_expanded_primitives
 
 
 def test_coerce_preserves_literal_grid_against_style_and_density_interventions():

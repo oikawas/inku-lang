@@ -332,24 +332,20 @@ def test_the_colophon_subcommand_replaced_okugaki_outright():
         parser.parse_args(["okugaki", "node-1"])
 
 
-def test_the_staffage_flag_replaced_tenkei_outright():
+def test_the_staffage_flag_is_gone_in_both_spellings():
+    """T-10 of 契約 fold-away-the-staffage-level: 添景の旗は無い。
 
-    """添景の旗は `--staffage`。**ローマ字は残していない。**
-
-    辞書 (`web/src/lib/i18n/GLOSSARY.md`) が 添景 = staffage と定めており、web は
-    既にその語で表示している。ローマ字が残っていたのは打鍵する側だけだった。
-    エイリアスを残さないのは奥書と同じ方針 (2026-07-27 作者裁定)。
-
-    **要求の鍵と DB 列は `tenkei` のまま**なので、送る payload の側も併せて見る。
+    `--tenkei` は 2026-07-27 に `--staffage` へ改名された。**v2.11.0 で軸ごと
+    畳んだので、両方の綴りが落ちている。**綴りを 1 つずつ見るのは、改名の履歴が
+    ある旗では「片方だけ残す」が一番起きやすい失敗だからである。
     """
     parser = cli.build_parser()
-    args = parser.parse_args(["paint", "一滴の墨", "--staffage", "sparse"])
-    assert args.staffage == "sparse"
-    with pytest.raises(SystemExit):
-        parser.parse_args(["paint", "一滴の墨", "--tenkei", "sparse"])
+    for spelling in ("--staffage", "--tenkei"):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["paint", "一滴の墨", spelling, "sparse"])
 
-    # 打鍵する名前は動いたが、API の鍵は動いていない。
-    assert cli._paint_payload(args, "一滴の墨")["tenkei"] == "sparse"
+    args = parser.parse_args(["paint", "一滴の墨"])
+    assert "tenkei" not in cli._paint_payload(args, "一滴の墨")
 
 
 def _all_option_strings(parser) -> set[str]:
@@ -366,11 +362,16 @@ def _all_option_strings(parser) -> set[str]:
     return flags
 
 
-def test_no_cli_flag_is_spelled_tenkei():
-    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。"""
+def test_no_cli_flag_is_spelled_tenkei_or_staffage():
+    """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。
+
+    到達確認の目印は `--canvas-aspect` — サブコマンド側にだけ在る旗で、これが
+    見えていなければ走査がサブパーサまで届いていない（`--staffage` を目印に
+    していたが、その旗ごと無くなった）。
+    """
     flags = _all_option_strings(cli.build_parser())
-    assert "--staffage" in flags, "走査がサブパーサまで届いていない"
-    assert not [flag for flag in flags if "tenkei" in flag]
+    assert "--canvas-aspect" in flags, "走査がサブパーサまで届いていない"
+    assert not [flag for flag in flags if "tenkei" in flag or "staffage" in flag]
 
 
 @pytest.mark.parametrize("command", ["paint", "batch"])
@@ -418,12 +419,12 @@ def _all_help_strings(parser) -> list[str]:
 def test_no_cli_flag_says_original_text():
     """走査は旗の一覧そのものに当てる。名指しの一覧は穴を残す。
 
-    到達確認の目印は `--staffage`。**`--description` は目印に使えない** —
+    到達確認の目印は `--canvas-aspect`。**`--description` は目印に使えない** —
     `paint` / `batch` から外れて `refine perform` にだけ残ったので、走査がサブパーサ
     まで届いていなくても届いていても、どちらでも真になりうる。
     """
     flags = _all_option_strings(cli.build_parser())
-    assert "--staffage" in flags, "走査がサブパーサまで届いていない"
+    assert "--canvas-aspect" in flags, "走査がサブパーサまで届いていない"
     assert not [flag for flag in flags if "original" in flag]
 
 
@@ -1547,7 +1548,6 @@ PAYLOAD_KEYS_BEFORE = {
     "stage1_input",
     "stage1_model",
     "stage2_model",
-    "tenkei",
     "ui_lang",
 }
 
@@ -1564,7 +1564,6 @@ ALL_PRIOR_FLAGS = [
     "--canvas-aspect", "golden",
     "--render-seed", "11",
     "--composition-seed", "22",
-    "--staffage", "sparse",
     "--seed-text", "seed",
     "--trace",
 ]
@@ -1600,16 +1599,20 @@ def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
 
 
 def test_paint_payload_grows_by_exactly_the_eight_keys():
-    """17 keys before, 25 after -- and the 17 are the same 17."""
+    """16 keys before, 24 after -- and the 16 are the same 16.
+
+    It was 17 and 25 until the staffage level was folded away (v2.11.0) and
+    `tenkei` left the request body with the `--staffage` flag.
+    """
     parser = cli.build_parser()
     argv = ["paint", "一滴の墨", *ALL_PRIOR_FLAGS]
     prior_only = cli._paint_payload(parser.parse_args(argv), "一滴の墨")
     assert set(prior_only) == PAYLOAD_KEYS_BEFORE
-    assert len(prior_only) == 17
+    assert len(prior_only) == 16
 
     new_flags = [item for argv_fragment, _, _ in SENDER_PARITY_FLAGS for item in argv_fragment]
     everything = cli._paint_payload(parser.parse_args([*argv, *new_flags]), "一滴の墨")
-    assert len(everything) == 25
+    assert len(everything) == 24
     assert set(everything) - PAYLOAD_KEYS_BEFORE == {key for _, key, _ in SENDER_PARITY_FLAGS}
 
 

@@ -80,31 +80,6 @@ EN_TECHNIQUE_MARKERS = [
 ]
 
 
-def test_expand_intermediate_ddl_selects_focused_layers():
-    ddl = "背景を灰で塗りつぶす。赤い小さな円をランダムに十二個散らす。青い小さな円をランダムに八個散らす。白い細筆の細い線を水平に三本引く。"
-
-    expanded = expand_intermediate_ddl(ddl)
-    selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in expanded]
-
-    assert "ランダム" not in expanded
-    # 契約 background-color-openness 段 2 で `_avoid_gray_background` を落としたので、
-    # 灰背景の文はそのまま運ばれる（旧表明は「背景を白で埋める」への書き換え）
-    assert "背景を灰で塗りつぶす。" in expanded
-    assert "背景を白で埋める" not in expanded
-    assert "画面全体に点々と十二個" in expanded
-    assert "正五角形" not in expanded
-    assert "中心から" not in expanded
-    assert "中央へ" not in expanded
-    assert len(selected) <= 3
-    assert len(selected) < len(JA_TECHNIQUE_MARKERS)
-    assert expanded.count("。") <= ddl.count("。") + 8
-    assert expanded.count("小さな円") <= ddl.count("小さな円")
-    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角", "斜め線", "細い弧"))
-    # 「寄り」= 端寄りの焦点。背景文の文言変更で expander の seed が動き、
-    # この入力では角度語ではなく端寄り配置が選ばれるようになった (2026-07-27)
-    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "焦点", "寄り"))
-
-
 def test_gray_background_survives_stage_15_in_both_wordings():
     """灰背景は Stage 1.5 を素通りする（契約 background-color-openness・段 2）。
 
@@ -122,106 +97,6 @@ def test_expand_intermediate_ddl_is_idempotent_after_expansion():
     ddl = "赤い小さな円を中央付近に五つ散らす。灰色の小さな円を右上の黄金比の位置に一点置く。半径は0.025。"
 
     assert expand_intermediate_ddl(ddl) == ddl
-
-
-def test_expand_intermediate_ddl_varies_by_input():
-    first = expand_intermediate_ddl("中心に黒い四角を置く。白い横線を三本引く。")
-    second = expand_intermediate_ddl("満天の星空に白い小さな円を画面全体に点々と六百十個散らす。")
-
-    assert first != second
-    assert "中心" not in first
-    assert "中央" not in first
-    assert "焦点に黒い四角を置く" in first
-    assert any(marker in first for marker in ("遠近法の奥行き", "一点透視法", "パッチワーク", "水彩", "素描の下線", "点描"))
-    assert any(marker in second for marker in ("左下の焦点から三つ", "波打つ軌跡に沿って七個", "左下から右上へ三本", "画面全体へ三本", "前の線に沿って"))
-
-
-def test_expand_intermediate_ddl_uses_context_to_control_filter_amount():
-    quiet = expand_intermediate_ddl(
-        "黒い円を左上の焦点に一点置く。",
-        context_text="余白の多い静かな一滴の墨",
-    )
-    dense = expand_intermediate_ddl(
-        "白い小さな円を画面全体に点々と八十個散らす。",
-        context_text="満天の星が複雑なリズムで重なる",
-    )
-
-    quiet_selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in quiet]
-    dense_selected = [marker for marker in JA_TECHNIQUE_MARKERS if marker in dense]
-
-    assert len(quiet_selected) == 0
-    assert len(dense_selected) >= 2
-    assert len(quiet_selected) < len(dense_selected)
-
-
-def test_expand_intermediate_ddl_carries_atmospheric_context():
-    expanded = expand_intermediate_ddl(
-        "白い短い線を上から下へ九本散らす。",
-        context_text="透明な膜と雨の反射が残るバス停",
-    )
-
-    assert "透明な膜" in expanded
-    assert "薄い反射" in expanded
-
-
-def test_expand_intermediate_ddl_carries_sensory_context_without_overloading():
-    expanded = expand_intermediate_ddl(
-        "緑の三角を三つ置く。赤い楕円を三つ置く。",
-        context_text="柔らかな陽光と沈丁花の香り、桜の蕾が開花を待つ春の五感",
-    )
-
-    markers = ("柔らかな光", "香りの層", "開花を待つ蕾", "五感の気配")
-    selected = [marker for marker in markers if marker in expanded]
-
-    assert len(selected) >= 2
-    assert expanded.count("。") <= 8
-
-
-def test_expand_intermediate_ddl_does_not_add_true_circles_for_particles():
-    expanded = expand_intermediate_ddl(
-        "背景を黒で塗りつぶす。白い小さな四角を画面全体に点々と六百十個散らす。",
-        context_text="満天の星空",
-    )
-
-    assert "小さな円" not in expanded
-    assert any(word in expanded for word in ("小さな楕円", "短い線", "小さな四角"))
-    assert any(word in expanded for word in ("右上がり", "右下がり", "回転した", "画面全体へ"))
-
-
-def test_expand_intermediate_ddl_abstracts_presence_without_body_symbols():
-    expanded = expand_intermediate_ddl(
-        "青い横線を下端に三十本並べる。",
-        context_text="川岸で人と熊が並んで待っている",
-    )
-
-    assert any(marker in expanded for marker in ("存在の重心", "輪郭の密度"))
-    assert "縦線" not in expanded
-    assert "小さな楕円" not in expanded
-
-
-def test_expand_intermediate_ddl_does_not_invent_gaze_for_city_context():
-    expanded = expand_intermediate_ddl(
-        "夜のガラス越しに、街のネオンが涙のように滲んでいる。",
-    )
-
-    assert "視線の切片" not in expanded
-    assert "余白の切片" in expanded
-
-
-def test_expand_intermediate_ddl_en_selects_focused_layers():
-    ddl = "Scatter five small red circles randomly. Draw three thin white horizontal lines."
-
-    expanded = expand_intermediate_ddl(ddl, lang="en")
-    selected = [marker for marker in EN_TECHNIQUE_MARKERS if marker in expanded]
-
-    assert "random" not in expanded.lower()
-    assert "dotted across the whole canvas" in expanded
-    assert "regular pentagon" not in expanded
-    assert "from center" not in expanded
-    assert "toward the center" not in expanded
-    assert len(selected) <= 2
-    assert len(selected) < len(EN_TECHNIQUE_MARKERS)
-    assert "rising to the right" in expanded
 
 
 def test_expand_intermediate_ddl_en_keeps_gray_background():
@@ -281,55 +156,11 @@ def test_expand_intermediate_ddl_en_does_not_read_crescent_as_scent():
     assert "five-sense presence" not in expanded.lower()
 
 
-def test_expand_intermediate_ddl_emits_relation_phrases_for_stage2_copy():
-    expanded = expand_intermediate_ddl(
-        "白い小さな円を画面全体に点々と八十個散らす。",
-        context_text="満天の星が複雑なリズムで重なる",
-    )
-
-    assert any(phrase in expanded for phrase in ("前の線に沿って", "前の線を切る", "前の形に触れない"))
-
-
-def test_line_music_profile_does_not_default_to_diagonal_band():
-    outputs = [
-        expand_intermediate_ddl("青い線を三本引く。", context_text="リズムのある水面"),
-        expand_intermediate_ddl("黒い線を左から右へ五本並べる。", context_text="反復する音"),
-    ]
-
-    joined = "\n".join(outputs)
-    assert "右半分の斜めの帯" not in joined
-    assert any(phrase in joined for phrase in ("上から下への縦の帯", "左から右への横の帯", "画面全体へ", "上端寄り", "倍音列", "右下の焦点"))
-
-
-def test_expand_intermediate_ddl_composition_family_rewrites_diagonal_bias():
-    outputs = [
-        expand_intermediate_ddl("赤い小さな円を画面全体に点々と二十個散らす。", context_text="満天の星"),
-        expand_intermediate_ddl("青い線を三本引く。", context_text="リズムのある水面"),
-        expand_intermediate_ddl("白い四角を三つ置く。", context_text="静かな部屋と余白"),
-    ]
-
-    joined = "\n".join(outputs)
-    assert any(phrase in joined for phrase in ("上から下への縦の帯", "左から右への横の帯", "画面全体へ", "上端寄り"))
-
-
-
 def test_expand_intermediate_ddl_composition_seed_default_is_backward_compatible():
     ddl = "青い線を三本引く。"
     context = "リズムのある水面に反復する音が広がる"
 
     assert expand_intermediate_ddl(ddl, context_text=context, composition_seed=None) == expand_intermediate_ddl(ddl, context_text=context)
-
-
-def test_expand_intermediate_ddl_composition_seed_is_deterministic_and_diverse():
-    ddl = "青い線を三本引く。"
-    context = "リズムのある水面に反復する音が広がる"
-
-    first = expand_intermediate_ddl(ddl, context_text=context, composition_seed=3)
-    second = expand_intermediate_ddl(ddl, context_text=context, composition_seed=3)
-    variants = {expand_intermediate_ddl(ddl, context_text=context, composition_seed=seed) for seed in range(10)}
-
-    assert first == second
-    assert len(variants) >= 3
 
 
 def test_nature_plugin_expands_only_explicit_namespace():
@@ -395,3 +226,41 @@ def test_numeric_regions_are_already_structurally_expanded_in_english():
 
     assert expanded == ddl
     assert "ellipse" not in expanded.lower()
+
+
+# ── Stage 1.5 adds nothing of its own (v2.11.0) ──────────────────────────────
+# The candidate pool that used to append structural, musical and painterly
+# sentences here was staffage: it wrote lines no description asked for. It was
+# governed by the staffage level, and folding that axis away took the pool with
+# it. These assert the property that replaced it -- for the very inputs that
+# used to draw the most candidates, the expansion is the focus reframing alone.
+
+
+def test_expand_intermediate_ddl_appends_nothing_for_a_dense_context() -> None:
+    ddl = "白い小さな円を画面全体に点々と八十個散らす。"
+    expanded = expand_intermediate_ddl(ddl, context_text="満天の星が複雑なリズムで重なる")
+
+    assert not [marker for marker in JA_TECHNIQUE_MARKERS if marker in expanded]
+    assert len(re.findall(r"。", expanded)) == len(re.findall(r"。", ddl))
+
+
+def test_expand_intermediate_ddl_context_cannot_add_a_sentence() -> None:
+    """The context used to decide how many candidates were appended.
+
+    Two contexts that used to produce different amounts now produce the same
+    expansion, because neither produces any. The DDL is the whole contract.
+    """
+    ddl = "黒い円を左上の焦点に一点置く。"
+    quiet = expand_intermediate_ddl(ddl, context_text="余白の多い静かな一滴の墨")
+    dense = expand_intermediate_ddl(ddl, context_text="満天の星が複雑なリズムで重なる")
+
+    assert quiet == dense
+    assert not [marker for marker in JA_TECHNIQUE_MARKERS if marker in quiet]
+
+
+def test_expand_intermediate_ddl_en_appends_nothing_either() -> None:
+    ddl = "Place one black square near the center. Draw three white horizontal lines."
+    expanded = expand_intermediate_ddl(ddl, lang="en", context_text="a jazz club, swing and syncopation")
+
+    assert not [marker for marker in EN_TECHNIQUE_MARKERS if marker in expanded]
+    assert expanded.count(".") == ddl.count(".")

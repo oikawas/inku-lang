@@ -2079,3 +2079,40 @@ constant, **`LITERAL_COUNT_THRESHOLD`**.
 - `gradle :app:compileDebugKotlin` **BUILD SUCCESSFUL** (zero `^e: ` lines).
   **No visual check was made on the Pixel 9.**
 
+## 2026-08-05 A caller that writes to the lineage tables ([I-068] / v2.10.0 / android `2.1.4-android.8`)
+
+The node and edge tables had been ported, but **nothing on the save path ever wrote to them**.
+`InkuRepository.saveResult` now writes **one node per save** and **one edge only when a derivation
+was declared**.
+
+- **`LineagePlanner.kt` (new) is the pure function that decides what to write**, copied one
+  condition at a time from `db.py:2030-2138`. **The decision is made before any row is created, so a
+  refusal leaves no history row either.**
+- **Three things were added only to copy the conditions**: ① `isTruthy` (Python truthiness; `or {}`
+  turns an empty list into `{}`); ② a save that declares a parent but no kind is refused as
+  **`invalid lineage derivation kind`**, not as "a parent is required"; ③ `canonicalJson` (the
+  recursion of `sort_keys=True`, separators without spaces, `ensure_ascii=False`, and sorting by
+  **code point**).
+- **The write is node then edge in one transaction** (SQLite's foreign key requires the child node
+  first — the same order as the server).
+- **The derivation kinds now match the server's sixteen** (they were eleven, in declaration order).
+  **The list is read out of the baked fixture.**
+- **Two things the server has and Android does not**: the `history_visibility` column (the judgment
+  is ported, but **only the `normal` path is reachable on the device**) and a `user_id` column on the
+  lineage tables (**one device, one user**, so the server's same-user condition has no counterpart).
+
+### Not yet wired (for whoever touches this next)
+
+**The UI call sites were not wired to pass a parent.** The three entry points on `InkuRepository`
+merely have the `LineageDeclaration` parameter; `InkuViewModel` and `InkuApp` still call with the
+default. **On a real device today a node is written every time and no edge is ever written.** There
+is no UI that shows lineage either.
+
+### Verification Results
+
+- **JVM unit 143 / 0 failures** (38 classes) and **instrumented 21 / 0 failures** (Pixel 9; no
+  emulator).
+- **All five perturbations aimed at production code, and no stage came out at zero.**
+  **Under P2 (cut the wiring) all 143 JVM tests stayed green** and only five instrumented tests went
+  red — **a suite of pure functions cannot be the acceptance for a save path.**
+

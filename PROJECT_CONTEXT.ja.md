@@ -91,7 +91,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
 | Render Engine | 21 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 6 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.7` | `android/VERSION`（web / server とは別の名前空間） |
+| Android | `2.1.4-android.8` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
 
 ### 語彙
@@ -159,7 +159,7 @@ localStorage への保存・server への永続・描画要求への同梱は、
 
 ### server（FastAPI）
 
-- エンドポイント 81 本は `server/src/inku_server/api_core/routers/` の 10 ファイルに在る（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）。
+- エンドポイント 82 本は `server/src/inku_server/api_core/routers/` の 10 ファイルに在る（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）。
 共有される定義は `api_core/{state,models,deps,common,rendering}.py` に置く。
 - `api.py` が持つのは `app` の組み立て・`_lifespan`・ミドルウェア・起動時の呼び出し・`include_router` だけである。
 **依存の向きは `api.py` → routers → 共有の一方向**で、router から `api.py` を import しない。

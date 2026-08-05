@@ -3456,3 +3456,56 @@ the two together decide the behaviour. `history.render_limits` has **no DEFAULT 
 - **Ledger:** **[I-136]** (the bare 240 in `_cluster_count`) and **[I-137]** (web sends
   `sketch_grain_change`, which the server does not know and rejects with 422; filed by the
   `android-lineage-wiring` session) were numbered.
+
+### Android `2.1.4-android.8` — the lineage tables get a caller that writes to them (android Build 148092, 2026-08-05)
+
+**[I-068].** The node and edge tables had been ported, but **nothing on the save path ever wrote to
+them**. `InkuRepository.saveResult` now writes one node per save and **one edge only when a
+derivation was declared**. **The server is canonical; Android is the port.**
+
+- **Stage 1: a pure function that decides what to write** (new `LineagePlanner.kt`), **read against
+  `db.py` one condition at a time** (the table is in §2 of the report). **Three things were added
+  only to copy the conditions, none of them a "this is better" judgment**: ① **Python's
+  truthiness** (`isTruthy`) — `or {}` **turns an empty list into `{}`**, so
+  `["not","an","object"]` is refused while `[]` is accepted; branching on the Kotlin type instead
+  would refuse both and split the judgment (the same shape as the `optDouble` case in §2-4 of the
+  conventions); ② **a save that declares a parent but no kind is refused as an invalid kind** —
+  `None not in LINEAGE_DERIVATION_KINDS` is true on the server, so the message is
+  `invalid lineage derivation kind`, not "a parent is required" or "a kind is required";
+  ③ **`_canonical_json` was written out by hand** — `JSONObject.toString()` preserves insertion
+  order, so the recursion of `sort_keys=True`, the separators without spaces, `ensure_ascii=False`,
+  and **sorting by code point** were reproduced (Kotlin's natural `String` order is UTF-16 code
+  unit order and splits from Python on supplementary-plane keys).
+- **Stage 2: called from the save path** (the point of the contract). **The decision is made before
+  any row is created, so a refusal leaves no history row either.** Node then edge, **in one
+  transaction** (SQLite's foreign key requires the child node first — the same order as the server).
+- **Stage 3: the derivation kinds now match the server's sixteen** (they were eleven, in declaration
+  order). **The list is read out of the baked fixture**, so a kind added on the server turns this
+  red instead of passing silently. **The five new Japanese labels had no existing wording** in web
+  or server (`derivation.ts`'s `JA` has twelve and none of these five), so they follow the existing
+  habit of short nouns: `render_engine_change`=描画エンジン, `age_change`=経年,
+  `hacho_change`=破調, `renga_reply`=連歌の付句, `external_seed_change`=外部の種.
+- **Five perturbations, all aimed at production code** (no test was rewritten). **No stage came out
+  at zero.** **Under P2 (cut the wiring) all 143 JVM tests stayed green** and only **five
+  instrumented tests** went red — exactly the warning in §2 of the contract: **a suite of pure
+  functions cannot be the acceptance for stage 2.** **P5 (move the edge insert outside the
+  transaction) is invisible to P2**: both rows are still written, and only the transaction check
+  splits.
+- **Verification (on the merged tree, re-run here on the device):** **JVM unit 143 / 0 failures**
+  (38 classes), **instrumented 21 / 0 failures** (Pixel 9 `54100DLAQ0028F`; no emulator), and the
+  server `pytest` run has `test_android_reference_fixtures_are_current.py` **rebaking
+  `lineage_wiring.json` and comparing it against the checked-in bytes**. `APP_VERSION` and
+  `web/BUILD_NUMBER` are unchanged, and nothing was deployed to pentala.
+- **Explicitly not done:** **the UI call sites were not wired to pass a parent** — the three
+  entry points on `InkuRepository` merely have the parameter, and `InkuViewModel` / `InkuApp` still
+  call with the default. **So on a real device today a node is written every time and no edge is
+  ever written.** **There is no UI that shows lineage.** [I-067] (colophon, `unread_words`) was
+  excluded from this contract. **The `history_visibility` column was not added** (it would be a Room
+  version 6 migration and is not one of the contract's stages; the judgment is ported and measured,
+  but **on the device only the `normal` path is reachable**). **The lineage tables have no `user_id`
+  column** (one device, one user), so the server's "the parent belongs to the same user" has no
+  counterpart.
+- **Ledger:** **[I-068] moved to decided.** The server-side divergence found while implementing it
+  is filed as **[I-137]** (web sends `sketch_grain_change`, which the server does not know and
+  rejects with 422); **the sixteen kinds in `lineage_wiring.json` will not be rebaked until that is
+  ruled on**.

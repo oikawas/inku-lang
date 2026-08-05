@@ -104,7 +104,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 21 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 6 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.7` | `android/VERSION` (a namespace separate from web and server) |
+| Android | `2.1.4-android.8` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -191,7 +191,7 @@ so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 
-- The 81 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
+- The 82 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
 `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`).
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
 - `api.py` holds only the `app` assembly, `_lifespan`, middleware, startup calls, and `include_router`

@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from inku_server import db
 from inku_server.api import app
+from inku_server.api_core.routers import render as render_routes
 from inku_server.coerce import coerce_score
 from inku_server.ddl_expander import expand_intermediate_ddl
 from inku_server.plugins import DOCUMENT_PLUGIN_MANAGER
@@ -422,6 +423,41 @@ def test_t11_the_interpret_route_bypasses_stage1_with_no_level_in_the_request(
     )
     assert response.status_code == 200
     assert response.json()["ddl"] == "Sketch.双弧"
+
+
+def test_t11_the_paint_route_bypasses_stage1_too(monkeypatch, plugin_dir, user_headers) -> None:
+    """T-11 の **2 つ目の強制点**。
+
+    The bypass is enforced in two places: `/api/interpret` and the paint path
+    (`_paint_events`, which serves `/api/paint` and `/api/paint/stream`). A gate
+    on the interpret route alone leaves the paint one unguarded -- cutting it
+    left all 2312 tests green (measured 2026-08-05 on the merged tree, at
+    acceptance). Assert the property where the second point enforces it: Stage 1
+    is never reached, so the plugin term cannot be rewritten.
+    """
+    reached_stage1: list[str] = []
+
+    def _record_stage1(text, **kwargs):
+        reached_stage1.append(text)
+        return ("中心に黒い円を置く。", None)
+
+    monkeypatch.setattr(render_routes, "interpret_detail", _record_stage1)
+    monkeypatch.setattr(
+        render_routes,
+        "compose",
+        lambda ddl, model=None: Score.model_validate(
+            {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
+        ),
+    )
+
+    response = client.post(
+        "/api/paint",
+        headers=user_headers,
+        json={"description": "Sketch.双弧"},
+    )
+    assert response.status_code == 200
+    assert reached_stage1 == []
+    assert response.json()["source_ddl"] == "Sketch.双弧"
 
 
 def test_t11_the_request_no_longer_validates_a_level(plugin_dir, user_headers) -> None:

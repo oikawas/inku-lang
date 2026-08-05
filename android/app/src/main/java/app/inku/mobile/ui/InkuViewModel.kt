@@ -12,6 +12,7 @@ import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.model.CanvasAspects
+import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlin.random.Random
 
 const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。"
 const val DemoCanvasAspectId = "pixel9_landscape_safe"
@@ -143,8 +143,16 @@ enum class HistorySelectionBehavior {
     Current,
 }
 
-class InkuViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = InkuRepository(application.applicationContext, (application as? InkuApplication)?.database ?: app.inku.mobile.data.db.InkuDatabase.open(application))
+class InkuViewModel(
+    application: Application,
+    // Injectable so an instrumented test can drive the drawing paths against a
+    // repository it built itself, with a throwaway database and no language
+    // model. The server stubs `_ask_model` for the same reason: what is under
+    // test is which catalogue the run reaches, not what the models write.
+    repositoryOverride: InkuRepository? = null,
+) : AndroidViewModel(application) {
+    private val repository = repositoryOverride
+        ?: InkuRepository(application.applicationContext, (application as? InkuApplication)?.database ?: app.inku.mobile.data.db.InkuDatabase.open(application))
     private val localState = MutableStateFlow(InkuUiState())
     private val history = repository.history()
     private val modelAssets = repository.modelAssets()
@@ -653,7 +661,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                 val interpreted = withContext(Dispatchers.IO) {
                     repository.interpret(
                         current.prompt,
-                        current.selectedCatalogId,
+                        CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId),
                         current.selectedCanvasAspect,
                         current.selectedModelId,
                         current.selectedStage2ModelId,
@@ -671,7 +679,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     repository.composeFromDdl(
                         current.prompt,
                         interpreted.ddlForDisplay,
-                        current.selectedCatalogId,
+                        CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId),
                         current.selectedCanvasAspect,
                         current.selectedModelId,
                         current.selectedStage2ModelId,
@@ -711,7 +719,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
+                    repository.composeFromDdl(current.prompt, ddl, CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId), current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -781,7 +789,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                     message = "Batch running: ${index + 1}/${lines.size}",
                 )
                 runCatching {
-                    val catalogId = current.selectedCatalogId
+                    val catalogId = CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId)
                     withContext(Dispatchers.IO) {
                         repository.paint(
                             description = prompt,
@@ -884,7 +892,7 @@ class InkuViewModel(application: Application) : AndroidViewModel(application) {
                         repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
                     }
                     if (!isCurrentDrawingRun(runId)) return@launch
-                    val catalogId = cycle.selectedCatalogId
+                    val catalogId = CatalogSelection.resolvedCatalogIdForRun(cycle.selectedCatalogId)
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
                         demoGeneratedDdl = null,

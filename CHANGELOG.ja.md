@@ -3117,3 +3117,62 @@ Stage 2 はこの値を出せる。**`radius` を述べた fixture が 1 つも�
 **すべて製品コードへ当て、戻したあと全件緑に復することを確かめた。**
 **`server/` は 1 行も変わっていない**（凍結コーパス 2 群ともバイト一致・`APP_VERSION` と
 `web/BUILD_NUMBER` は不動）。
+
+### Android `2.1.4-android.7` — server の判定へ揃える 5 件（感情ヒント・Stage 2 の連結・背景ガバナ・temper 2 本・版フォールバック）（android Build 148091 据え置き、2026-08-05）
+
+**5 件はどれも「Android に機能が無い」ではなく「同じ場所に別の判定が書いてある」だった。**
+2026-08-05 の全体ルール（Android 固有の事情以外は server に合わせる）が 5 件すべての向きを決めており、
+**どちらへ揃えるかを実装が考える余地は無い**。受け入れは「同じ結果か」ではなく
+**server の条件式と Kotlin の条件式を 1 対 1 で読む**形で行った。
+
+- **感情ヒントの撤去（[I-114]）:** `InkuRepository` が 16 語の感情辞書を引いて
+  `[感情語をDDLに反映してください: …]` を作り、**`description` 自体へ連結してから** Stage 1 へ渡していた。
+  server と web はこの機構を持たない。**web は `stage1_input` へ足していたので、Android の撤去は影響範囲が広い**
+  （プラグインの発火・Stage 1.5 の文脈・種・言語がこの文字列を見る）。撤去後の `stage1Text` は `description` そのもの。
+  木全体で `emotionHint` / `emotionDdlMap` / `感情語をDDL` の残りは 0 件。
+- **Stage 2 への記述の連結を切った（[I-125]）:** server は v2.9.41 で `user_msg = ddl` の 1 行にしている。
+  Android は `[原文]…[正規化DDL]…` を組む `buildStage2UserMessage` と、`context = "$originalText\n$ddl"` を作る
+  `scoreFromWebRules` の **2 経路**（呼び出しは 3 箇所）で原文を運んでいた。両方を落とし、
+  `scoreFromWebRules` からは引数ごと外した。`originalText` は Stage 1.5 の展開と記録では引き続き使う。
+- **背景ガバナの語彙と 4 つ目の条件（[I-126]）:** `EXPLICIT_SURFACE_MARKERS` の 14 語目 `dark field` が
+  Android にだけ無かった。**1 語だが絵が変わる** — `dark field of thin lines` は server が黒地を保ち、
+  Android は `細い` が密度ガバナを発火させて白へ洗っていた。4 つ目の条件も割れており、
+  Android の「色が在って図形が無い」は限定句のない `青と赤で塗る` にも真を返していた。
+  server の `_color_only_constraint_from_ddl`（`だけ` / `のみ` / `に限定` / `only` / `limited to` を要求する）を
+  `colorOnlyConstraintFromDdl` として移した。**明示句の正規表現は移していない** —
+  語の一覧に包含されるので、単独で効く入力が存在しない。
+- **未移植だった temper 2 本（[I-009]）:** `_with_quiet_single_shape_tempering` と
+  `_with_unintentional_filled_shape_tempering` を移した。定数は server の値をそのまま写している
+  （単体 0.34 / 0.24 / 0.17 / 0.14、塗り 0.42 / 0.30 / 0.20 / 0.20）。
+  **塗りの一巡は密度ガバナの中では決して発火しない** — 塗りの閾値（面積 0.20）は単体の閾値（0.14）より高く、
+  単体が先に寸法を丸めて必ず下回らせる。したがって server と同じく
+  `withPresenceAuxiliaryShapeRepair` と `withContextDensityGovernor` の **間に独立した一巡**として置いた。
+- **`renderHash` の版フォールバックを外した（[I-011]）:** `render_engine_id` / `render_engine_version` が
+  metadata に無いとき `"21"` で埋めていたのをやめ、JSON `null` を置く（server は「無ければ無いまま」）。
+  既存テストは削除ではなく**裏返して**残した（`testRenderHashDefaultsMissingAndBlankMetadataToEngine21` →
+  `testRenderHashPreservesNullEngineVersionWhenMissingInMetadata`。欠落と明示 `"21"` が別の hash になることを見る）。
+- **契約が名指ししていない共有関数 2 つも割れていた。** `closedShapeArea` は Android が π を掛けており
+  （`arc` は ×0.35、`triangle` は ×0.5、`cloudform` も面積を持っていた）、server は `radius * radius` と
+  `size[0] * size[1]` の素の積で、`arc` と `cloudform` を 0 と読む。`capSize` は Android が軸ごとに独立して
+  切り詰め、server は**縦横比を保った比例縮小**で下限 0.01 を置く。**どちらも temper 3 本だけでなく
+  背景・大形・雰囲気の判定にも効く**（Android 6 箇所・server 5 箇所）。揃えた結果、比例縮小が効いて
+  `triangle-open-plain` の期待値は `[0.34, 0.1942857…]` になる。
+- **受け入れで検査面の穴を 1 つ埋めた。** 段 0 で焼いた 19 ケースは reflection で temper 3 本を**直接**呼ぶので、
+  **`normalizeServerScore` から独立した一巡の結線を外しても 135 件が全部緑だった** — 期待値は
+  機構の中身を見ているが、**製品がそれを呼んでいるかは誰も見ていなかった**。`normalizeServerScore` を通す
+  `FilledShapeTemperingWiringTest` を足して 136 件へ。期待値 `[0.36, 0.30]` は同じ入力を server の
+  `coerce_score` へ通して実測した値で、結線を外すと `[0.6, 0.5]`（丸めが一切かからない姿）へ割れる。
+- **摂動は 7 件当てた。** 段 2 = Stage 2 メッセージ 1 件、段 3 = `dark-field-black` 1 件、
+  段 4 = `square-open-plain` 1 件、段 5 = `Engine19VersionTest` 1 件、共有関数を旧実装へ戻すと
+  `triangle-open-plain` 1 件、結線を切ると新しいゲート 1 件。**段 1 は 0 件で、ゲートが無い** —
+  単体テストは `pipeline.paint()` を直接呼び、`InkuRepository` を通らないため、感情ヒントを戻しても何も落ちない。
+  すべて製品コードへ当て、戻したあと全件緑に復することを確かめた。
+- **`server/` は実装の 3 commit で 1 行も変わっていない**（枝に載っている生成器 86 行は段 0 で発注側が置いたもの）。
+  期待値 `server_reference/` も実装は書き換えていない。**全 59 ファイルは今日の木が焼き直すものと 1 バイト違わない**
+  （`test_android_reference_fixtures_are_current.py` が全件を焼き直して比較する）。
+- **検証:** Android 単体 **136 件 / 失敗 0 / skipped 0**、server pytest **2341 passed / 31 skipped**、
+  cli **106 passed**、ruff clean、`npm run check` **245 files / 0 errors / 2 warnings**。
+  `APP_VERSION` と `web/BUILD_NUMBER` は不動、`android/BUILD_NUMBER` は単体テストのみのため 148091 据え置き。
+- **積み残さなかったもの（明示）:** [I-008]（埋め込み Stage 2 スキーマの乖離）・[I-067] / [I-068]（系譜データ層）・
+  [I-064]（実機 espresso）は契約の対象外で触れていない。`android/ANDROID_SPEC.ja.md` は更新していない。
+  実機 Pixel 9 での確認は行っていない（JVM 単体のみ）。pentala へは配備していない（`android/` は全経路から恒久除外）。

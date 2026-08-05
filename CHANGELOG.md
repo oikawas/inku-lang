@@ -3208,3 +3208,82 @@ and the SVG scan red; stages 2, 3, 5-1, 5-2 and 6 turn `testArrangementExactPari
 SVG scan red; stage 4 turns nothing red). **Every perturbation targeted production code, and
 all tests returned to green after each was reverted.** **`server/` is unchanged** — both
 frozen corpora are byte-identical, and `APP_VERSION` and `web/BUILD_NUMBER` did not move.
+
+### Android `2.1.4-android.7` — five judgments realigned with the server (emotion hint, Stage 2 concatenation, background governor, two temperings, version fallback) (android Build 148091 unchanged, 2026-08-05)
+
+**None of the five was a missing feature; each was a different judgment written in the same
+place.** The project-wide rule of 2026-08-05 — outside genuinely Android-specific concerns,
+both the decision and the implementation follow the server — fixed the direction for all five,
+so **which way to align was not the implementation's to decide**. Acceptance read the server's
+condition against the Kotlin condition one for one rather than comparing outputs.
+
+- **The emotion hint is gone ([I-114]).** `InkuRepository` looked up sixteen emotion words,
+  built `[感情語をDDLに反映してください: …]`, and **appended it to `description` itself** before
+  Stage 1. Neither the server nor the web client has this. **The web client fed `stage1_input`,
+  so removing it on Android reaches further** — plugin firing, the Stage 1.5 context, the seed
+  and the language all read that string. `stage1Text` is now `description` unchanged, and
+  `emotionHint` / `emotionDdlMap` / `感情語をDDL` appear nowhere in the tree.
+- **Stage 2 no longer carries the description ([I-125]).** The server cut this in v2.9.41:
+  `user_msg = ddl`, one line. Android carried the original text down **two paths** —
+  `buildStage2UserMessage`, which built `[原文]…[正規化DDL]…`, and `scoreFromWebRules`, whose
+  context was `"$originalText\n$ddl"` — reached from three call sites. Both are cut, and
+  `scoreFromWebRules` lost the parameter. `originalText` still feeds Stage 1.5 expansion and
+  the records.
+- **The background governor's vocabulary and its fourth condition ([I-126]).** The fourteenth
+  surface marker, `dark field`, was missing on Android alone. **One word, but the picture
+  changes**: for `dark field of thin lines` the server keeps the black ground while Android
+  washed it white, because `細い` fires the density governor. The fourth condition had also
+  drifted — Android's "colours present and no shapes" returned true for `青と赤で塗る`, which
+  states no restriction at all. The server's `_color_only_constraint_from_ddl`, which requires
+  `だけ` / `のみ` / `に限定` / `only` / `limited to`, was ported as `colorOnlyConstraintFromDdl`.
+  **The explicit-clause regex was deliberately not ported** — the word list subsumes it, so no
+  input exists for which it decides anything on its own.
+- **The two temperings that had never been ported ([I-009]).**
+  `_with_quiet_single_shape_tempering` and `_with_unintentional_filled_shape_tempering` moved
+  across with the server's constants verbatim (single 0.34 / 0.24 / 0.17 / 0.14, filled
+  0.42 / 0.30 / 0.20 / 0.20). **The filled tempering can never fire inside the density
+  governor**: its area threshold (0.20) sits above the single-shape one (0.14), and the
+  single-shape pass always shrinks the shape below it first. It is therefore wired where the
+  server has it — as a standalone pass between `withPresenceAuxiliaryShapeRepair` and
+  `withContextDensityGovernor`.
+- **`renderHash` no longer defaults the engine version ([I-011]).** A missing
+  `render_engine_id` / `render_engine_version` used to be filled with `"21"`; it now writes JSON
+  `null`, because the server leaves an absent value absent. The existing test was **inverted
+  rather than deleted** (`testRenderHashDefaultsMissingAndBlankMetadataToEngine21` →
+  `testRenderHashPreservesNullEngineVersionWhenMissingInMetadata`, asserting that an absent
+  version and an explicit `"21"` now hash differently).
+- **Two shared helpers the contract had not named were also divergent.** Android's
+  `closedShapeArea` multiplied by π (`arc` by ×0.35, `triangle` by ×0.5, and `cloudform` had an
+  area at all); the server takes the plain products `radius * radius` and `size[0] * size[1]`
+  and reads `arc` and `cloudform` as zero. Android's `capSize` clamped each axis independently;
+  the server scales **proportionally, preserving the aspect ratio**, with a floor of 0.01.
+  **Both feed more than the three temperings** — the background, large-shape and atmospheric
+  judgments read them too (six call sites on Android, five on the server). With the scaling
+  aligned, `triangle-open-plain` is expected at `[0.34, 0.1942857…]`.
+- **Acceptance closed one hole in the gates.** The nineteen cases baked in stage 0 invoke the
+  three temperings **directly through reflection**, so **unwiring the standalone pass from
+  `normalizeServerScore` left all 135 tests green** — the expectations watched what the
+  mechanism does, and nobody watched whether production calls it.
+  `FilledShapeTemperingWiringTest` now goes through `normalizeServerScore`, taking the suite to
+  136. Its expectation `[0.36, 0.30]` was measured by running the same input through the
+  server's `coerce_score`; without the wiring the size reads `[0.6, 0.5]`, untempered.
+- **Seven perturbations were applied.** Stage 2 turns the Stage 2 message red (1), stage 3
+  `dark-field-black` (1), stage 4 `square-open-plain` (1), stage 5 `Engine19VersionTest` (1),
+  restoring the old shared helpers `triangle-open-plain` (1), and unwiring the standalone pass
+  the new gate (1). **Stage 1 turns nothing red: it has no gate** — the unit tests call
+  `pipeline.paint()` directly and never pass through `InkuRepository`, so restoring the emotion
+  hint costs nothing. Every perturbation targeted production code, and all tests returned to
+  green after each was reverted.
+- **`server/` is untouched by the three implementation commits** (the 86 lines of generator on
+  the branch were placed in stage 0 by the issuing session), and the implementation did not
+  edit `server_reference/`. **All 59 fixtures are byte-identical to what today's tree bakes**,
+  which `test_android_reference_fixtures_are_current.py` checks by rebaking the whole corpus.
+- **Verification:** Android unit tests **136 / 0 failed / 0 skipped**, server pytest **2341
+  passed / 31 skipped**, cli **106 passed**, ruff clean, `npm run check` **245 files / 0 errors
+  / 2 warnings**. `APP_VERSION` and `web/BUILD_NUMBER` did not move; `android/BUILD_NUMBER`
+  stays at 148091 because only unit tests were run.
+- **Explicitly not done:** [I-008] (the embedded Stage 2 schema divergence), [I-067] / [I-068]
+  (the lineage data layer) and [I-064] (on-device espresso) are outside this contract and were
+  not touched. `android/ANDROID_SPEC.ja.md` was not updated. Nothing was verified on the Pixel 9
+  (JVM unit tests only), and nothing was deployed to pentala (`android/` is permanently excluded
+  from every sync path).

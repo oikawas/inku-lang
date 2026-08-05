@@ -3509,3 +3509,64 @@ derivation was declared**. **The server is canonical; Android is the port.**
   is filed as **[I-137]** (web sends `sketch_grain_change`, which the server does not know and
   rejects with 422); **the sixteen kinds in `lineage_wiring.json` will not be rebaked until that is
   ruled on**.
+
+### v2.11.0 — folding away the staffage level: the machinery that added what was never asked for (Build 854, 2026-08-05)
+
+**The description is the whole contract** (author's ruling, 2026-08-05). **The staffage level
+(`tenkei`) decided how much a layer was allowed to add, which made it the permission to invent
+elements the description never named.** The axis is folded away, and **the folded behaviour matches
+the old `tenkei="none"` exactly** — measured at zero difference across 61 coerce cases, 15 Stage 1.5
+cases and 3 inputs through the English taste path. **This is a minor release because keys leave the
+API.** The archive is tag `archive/tenkei-v1.97` and `no-git-sync/archive/tenkei/`.
+
+- **The insertion budget and the six inventing branches are gone from coerce** —
+  `_with_visual_event`, `_with_composition_diversity_repair`, `_with_context_energy_repair`,
+  `_with_motion_floor`, `_with_surface_tension` and **`_with_focal_event_floor`**.
+  **The contract listed five; the measurement found six** (the same section wrote "9 / 31", and this
+  was the difference). **Keeping the sixth does not reproduce the old `none`.** **The three
+  delivering branches stay**: `with_ddl_coverage`, `with_complex_motif_repair` and
+  `with_shape_delivery_repair`. Reachability analysis removed **41 definitions and 1,236 lines**
+  (`compose.py` 3,646 → 2,410).
+- **The level mapping is gone from Stage 1 and Stage 1.5.** `_expand_ja` and `_expand_en` now **end
+  at the focus rewrite**; the candidate pools, category plans, composition families and colour/touch
+  selection became unreachable, removing **35 definitions and 467 lines** (`ddl_expander.py`
+  1,081 → 594). **Variation moved from seven axes to one (focus).** The other six shook sentences
+  that Stage 1.5 had added itself, so they share the fate of the pools. **Amplitude still reaches the
+  output** — across 40 seeds, small, medium and large land on different foci in all 40.
+  `_english_taste_additions` in `language_support/en.py` (jazz, quilt, subway and four more word
+  groups) **only ever fired at `auto`**, so it was staffage too and is deleted.
+- **The flag left the API, the UI and the CLI; the database record stays.** The `tenkei` column, its
+  migration, its read and its write site are untouched, so **a work saved before the removal still
+  reports the conditions it was drawn under**. **The declaration moved from `HistoryPostBody` to the
+  response model `HistoryItem`** — deleting it outright drops the key from past works' responses,
+  which acceptance test T-4 caught. **The staffage row in the provenance list now appears only in
+  developer mode, and only for a past work that has a value.** The web tree deleted
+  `TenkeiSelect.svelte` and four more files and followed through **sixteen call sites**; the CLI lost
+  `--staffage`, its two send sites and two usage lines in its README.
+- **`ComposeRequest.lineage_parent_node_id` is gone too** — a flag that existed only to inherit the
+  level. **Seven fields left the API surface** (`tenkei` from six models plus this one); endpoints,
+  operations and schemas stay at **82 / 82 / 82**.
+- **`ddl_engine_version` 6 → 7.** The frozen corpora were rebuilt with the discriminating cases
+  folded together, and **two cases were added that freeze the absence of invention**
+  (`B-surface-tension-words` and `B-leaf-grain-words`). `changed_from_previous` reports 32 of 34, but
+  **only 10 a_expand and 9 b_coerce Scores actually moved**; the rest changed their branch report
+  alone.
+- **In pytest, the expand corpus was a record and not a gate.**
+  `test_ddl_reference_output_files_match_manifest` **only compares the files on disk against the
+  manifest**, so the two move together unless both are rebaked (only CI regenerates them).
+  **Restoring a candidate sentence turned nothing red**, so a gate was added that rebakes the 13
+  a_expand cases inside pytest and compares digests — **and states how many it looked at**.
+- **The pure-invocation bypass and the plugin transcription guard were kept, cut loose from the
+  level.** Neither is staffage: the first is transcription fidelity (a qualified plugin term must not
+  be rewritten by the model), the second prevents delivering the same subject twice. **Acceptance
+  measured two enforcement points for the bypass** (`/api/interpret` and the shared paint generator)
+  and found that **cutting the paint one left all 2,312 tests green**, so a gate now covers it.
+- **The Android reference fixture `ddl_expand.json` was rebaked** (39 → 30 cases: thirteen
+  `*-tenkei-*` leave, four arrive). **No Kotlin line was touched**, so **4 of the 143 Android JVM unit
+  tests are red** (the reference comparisons in `WebDdlExpanderPhase3a/3b/3d`: Kotlin reads
+  `input.optString("tenkei", "auto")`, so a missing key runs at the `auto` default). **Per the
+  author's ruling of 2026-08-05, showing the red is preferred over staying green against an
+  expectation the server no longer holds.** The Kotlin port belongs to the Android track.
+- **Checks:** server **2373 → 2313** (`def test_` 1312 → 1261; 88 removed, 37 added), cli unchanged
+  at 111, `npm run check` **245 → 241 FILES / 0 errors**, `test:unit` unchanged at 113, `lint:i18n`
+  1017 → 1004, and **the frozen corpora are byte-identical**.

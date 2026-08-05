@@ -3363,3 +3363,57 @@ Stage 2 はこの値を出せる。**`radius` を述べた fixture が 1 つも�
 - **台帳:** **[I-068] を既決へ移した。** 本版の実装中に見つけた server 側の乖離は **[I-137]**
   （web が送る `sketch_grain_change` を server が知らず 422 になる）として起票済みで、
   **裁定が出るまで期待値 `lineage_wiring.json` の 16 種は焼き直さない**
+
+### v2.11.0 — 添景水準を畳む: 記述に無いものを足す機構を落とした（Build 854、2026-08-05）
+
+**記述が契約のすべてである**（2026-08-05 作者裁定）。**添景水準 (tenkei) は「どれだけ足してよいか」を
+決める軸で、記述に無い要素を層が発明する許可そのものだった。**軸ごと畳み、**畳んだ後の挙動は
+旧 `tenkei="none"` と一致する**ことを実測で確かめた（coerce 61 件・Stage 1.5 15 件・
+英語 taste の経路 3 件で**差分 0**）。**API から鍵が消えるので minor である。**
+控えはタグ `archive/tenkei-v1.97` と `no-git-sync/archive/tenkei/`。
+
+- **coerce から挿入予算と発明する 6 分岐を落とした** — `_with_visual_event` /
+  `_with_composition_diversity_repair` / `_with_context_energy_repair` / `_with_motion_floor` /
+  `_with_surface_tension` / **`_with_focal_event_floor`**。
+  **契約は 5 本を挙げていたが実測は 6 本だった**（同じ節が「9 / 31」と書いており、その差の 1 本）。
+  **6 本目を残すと旧 `none` と一致しない。****配達する 3 分岐は残る** —
+  `with_ddl_coverage` / `with_complex_motif_repair` / `with_shape_delivery_repair`。
+  到達性解析で **41 定義・1,236 行**を削除（`compose.py` 3,646 → 2,410 行）
+- **Stage 1 / Stage 1.5 の水準写像を落とした。** `_expand_ja` / `_expand_en` は**焦点の書き換えで
+  終わる**ようになり、候補プール・カテゴリ計画・構図族・色/タッチの選択が到達不能になって
+  **35 定義・467 行**が消えた（`ddl_expander.py` 1,081 → 594 行）。
+  **変奏の軸は 7 → 1（焦点のみ）**。残る 6 軸は Stage 1.5 が自分で足した文を振るもので、
+  候補プールと運命を共にする。**強度は今も効く**（40 seed 中 40 seed で小・中・大が別の焦点に落ちる）。
+  `language_support/en.py` の `_english_taste_additions`（jazz / quilt / subway ほか 7 語群）も
+  **`auto` のときだけ出ていた**ので添景であり、削除した
+- **API・UI・CLI から旗を落とし、DB の記録は残した。** `tenkei` 列・migration・読み出し・
+  書き込み側の 4 点はそのままで、**撤去前に保存された作品は描画条件を報告し続ける**。
+  **宣言は `HistoryPostBody` から応答模型 `HistoryItem` へ移した** — そのまま消すと
+  過去作の応答から鍵が落ちる（受入 T-4 が捕まえた）。**生成情報の「添景」行は開発者モードで
+  値がある過去作にだけ出る。**web は `TenkeiSelect.svelte` ほか 4 ファイルを削除して
+  **使い手 16 ファイル**を追随、cli は `--staffage` と送信 2 箇所・README の usage 2 箇所
+- **`ComposeRequest.lineage_parent_node_id` も落とした**（水準の継承のためだけに在った旗）。
+  **API 表面から落ちたフィールドは 7 個** — 6 模型の `tenkei` とこの 1 個で、
+  endpoints・operations・schemas は **82 / 82 / 82** のまま
+- **`ddl_engine_version` 6 → 7。** 凍結コーパスは弁別 case を畳んで焼き直し、
+  **無発明を凍らせる case を 2 件新設**（`B-surface-tension-words` / `B-leaf-grain-words`）。
+  `changed_from_previous` は 34 中 32 だが、**Score が動いたのは a_expand 10 / b_coerce 9** で、
+  残りは branch_report だけが動いた
+- **展開層の凍結コーパスは pytest では記録しか持っていなかった。**
+  `test_ddl_reference_output_files_match_manifest` は**ディスクのファイルと manifest を
+  突き合わせるだけ**なので、両方を焼き直さない限り一緒に動く（再生成するのは CI だけ）。
+  **候補文を戻す摂動で 1 件も赤くならなかった**ため、a_expand 13 件を pytest 内で焼き直して
+  digest を突き合わせる門を足した（**何件見たかも表明する**）
+- **純明示バイパスとプラグイン転写ガードは水準から切り離して残した。** どちらも添景ではなく、
+  前者は名前空間付き語を LLM に書き換えさせない転記の忠実性、後者は二重配達の防止である。
+  **受け入れでバイパスの強制点が 2 箇所あることを実測し**（`/api/interpret` と paint 側の
+  共通生成器）、**paint 側を切っても 2312 件が全部緑だった**ので、そちらにもゲートを足した
+- **Android の参照 fixture `ddl_expand.json` を焼き直した**（39 → 30 case。`*-tenkei-*` 13 件が
+  消え 4 件が入る）。**Kotlin は 1 行も触っていない**ので、**Android の JVM 単体は 143 件中
+  4 件が赤い**（`WebDdlExpanderPhase3a/3b/3d` の参照突き合わせ。Kotlin が
+  `input.optString("tenkei", "auto")` で読むため、鍵が消えると既定 `auto` で走る）。
+  **作者裁定 2026-08-05 により、古い期待値に対して緑であり続けるより赤を出す側を採った。**
+  Kotlin の移植は Android トラックで行う
+- **検査:** server **2373 → 2313**（`def test_` 1312 → 1261。削除 88 / 新設 37）・
+  cli 111 据え置き・`npm run check` **245 → 241 FILES / 0 errors**・`test:unit` 113 据え置き・
+  `lint:i18n` 1017 → 1004・**凍結コーパスはバイト一致**

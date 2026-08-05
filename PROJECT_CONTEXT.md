@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.10.0 / Build 853**
+**Target version: v2.11.0 / Build 854**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -143,8 +143,8 @@ immediately after Stage 1.
 Only a `fires_on` term that is namespace-qualified or named as an explicit subject fires; it never
 widens to metaphor or unknown subjects.
 - **Stage 1.5** — deterministic expansion and relation assignment.
-It carries variation (three strengths) and a tenkei level (`none` / `sparse` / `auto`), both stored
-per work.
+It carries variation (three strengths), stored per work. **One axis moves — the focus — and this
+layer adds no sentence the description did not ask for.**
 - **Stage 2** — Score construction as JSON.
 The fill rate of an optional field **depends on its declaration order** in the tool schema; fields
 declared last are filled more often.
@@ -167,7 +167,7 @@ An authenticated single-page application with description, work, batch, demo, an
 refinement and variation. A leading number and a bracketed comment stay in the stored work, reach
 no layer of the drawing, and are greyed in the editors
 - 13 color catalogs (`color_catalogs.py`; every catalog carries all 9 colors) plus "from the
-description", canvas ratios, tenkei level, and display mode. The catalog selection is stored per
+description", canvas ratios, and display mode. The catalog selection is stored per
 user on the server
 - Per-user history, stars, revision marks, comments, trash, search, lineage groups, and explicit lineage
 nodes and edges.

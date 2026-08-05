@@ -2233,10 +2233,16 @@ inferred downstream.
 | **under 240** | **literal. The requested value goes straight into `arrangement.count`** |
 | **240 and over** | represented. `count` becomes 80-120, and `density` / `cluster_count` / `fade` / `preserve_space` keep the appearance of the group |
 
-The threshold of 240 matches `MAX_EXPANDED_PER_INSTRUCTION`. Putting it at 300
-would create a band from 241 to 299 that is structurally impossible to honor —
-declared literal while coerce cuts at 240. **"Two hundred thirty-three lines"
-draws 233 lines.**
+The threshold's default of 240 matches the default of
+`max_expanded_per_instruction`. Raising the threshold alone to 300 would create a
+band from 241 to 299 that is structurally impossible to honor — declared literal
+while coerce cuts at 240 — so **normalization forces the two into agreement**
+(v2.10.0). **A number the description states is drawn as stated up to the
+threshold of its configuration** — at the defaults, "two hundred thirty-three
+lines" draws 233 lines. **The threshold is a limit setting: move it and the band
+that is drawn as stated moves with it. Which values a work was drawn under is
+recorded on the work** (`history.render_limits`), so the configuration carries
+reproducibility on the same footing as the version.
 
 **The treatments that reduce density in quiet, membrane, or memory contexts are
 not applied to a group whose count was stated.** Quietness is a reading of the
@@ -2244,8 +2250,8 @@ scene; a written number is not a reading. Those treatments act only on groups
 with no stated count. Treatments that adjust size (symbolic forms, lone forms,
 unintended fills) touch no counts and act as before.
 
-**When the literal totals of several groups exceed 400
-(`MAX_EXPANDED_PRIMITIVES`), the groups are tipped into representation starting
+**When the literal totals of several groups exceed 400 (the default of
+`max_expanded_primitives`), the groups are tipped into representation starting
 with the largest request, stopping as soon as the total is 400 or under. Small
 groups are not cut first.** A number that can be counted and a number that
 cannot are different things, and proportional shrinking breaks the countable
@@ -2258,7 +2264,7 @@ density, and it deliberately exempts `grid`: a lattice with holes in it is not a
 lattice. **That exemption is right for thinning and wrong for a ceiling, so the
 ceiling counts grids too** — it counts the marks actually drawn, `rows × cols`
 rather than `count`, and drops an oversized lattice to a smaller one that keeps
-its proportions. The instruction list is bounded as well, at 64. **Production has
+its proportions. The instruction list is bounded as well, at 64 by default. **Production has
 never exceeded 27, so no real work is touched.** What the ceiling bounds is a
 request that passed validation and nothing else. **It lives in the deterministic
 layer and does not depend on the prompt asking for one to five instructions.**
@@ -2804,17 +2810,20 @@ Important score concepts:
 - `relation`: optional observable relation to the previous instruction: `along`, `not_touching`, `cutting`, `between`, or `touching`; a touching relation pins both endpoints
 
 A count the description states outright outranks any later reading of it. Below
-240 the count is literal: the requested value is used unchanged. At 240 and above
-it is represented by a count of 80-120 plus `arrangement.density`,
-`cluster_count`, `fade`, and `preserve_space`, so that negative space remains
-part of the composition. The threshold matches `MAX_EXPANDED_PER_INSTRUCTION`;
-putting it at 300 would leave 241-299 defined as literal and yet cut at 240.
-**Two hundred thirty-three strokes are two hundred thirty-three.**
+the threshold (240 by default) the count is literal: the requested value is used
+unchanged. At the threshold and above it is represented by a count of 80-120 plus
+`arrangement.density`, `cluster_count`, `fade`, and `preserve_space`, so that
+negative space remains part of the composition. The threshold matches
+`max_expanded_per_instruction`; raising it alone to 300 would leave 241-299
+defined as literal and yet cut at 240, so normalization forces them into
+agreement. **A number the description states is drawn as stated up to the
+threshold of its configuration: at the defaults, two hundred thirty-three strokes
+are two hundred thirty-three. The threshold is recorded on the work** (v2.10.0).
 
 The quiet-density governor, which thins repetition for still, membranous, or
 remembered scenes, does not apply to a group whose count was stated: quiet is a
 reading of the scene, and a stated number is not a reading. When the literal
-groups together exceed `MAX_EXPANDED_PRIMITIVES` (400), the largest is
+groups together exceed `max_expanded_primitives` (400 by default), the largest is
 represented first and the budget is rechecked before the next one gives way, so
 the small groups a reader could have counted stay literal.
 

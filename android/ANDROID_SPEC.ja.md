@@ -1599,5 +1599,23 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
 
 - `app/build/test-results/testDebugUnitTest/*.xml` の集計により、全 71 件の単体テストが **100% 成功 (PASS 71 / Failures 0 / Errors 0 / Skipped 0)**。
 
+## 2026-08-05 制限値が設定になったことへの追随 段 5 (v2.10.0 / android `2.1.4-android.7`)
 
+`LocalFallbackPipeline.kt` の `clusterCount()` が裸で持っていた `240` を、
+**`LITERAL_COUNT_THRESHOLD` という名前つきの定数へ寄せた。**
+
+- **`MAX_EXPANDED_PER_INSTRUCTION` へは向けていない。** 既定ではどちらも 240 だが、
+  **server では別のフィールド**（`literal_count_threshold` と `max_expanded_per_instruction`）であり、
+  そこへ向けると実在しない同一性を主張することになる。
+- **同じ関数の `120` と `500` は裸のまま残した。** `120` は server の `represented_count_max` と
+  同値だが同じ規則ではない。**同じ数であることは、同じ規則であることを意味しない。**
+- **Android に設定 UI は作っていない。** 端末のパイプラインは設定経路を持たないので、
+  制限値は既定値で走る。**server 側の `render_limits` を送りも受けもしない**（これは決定であって欠落ではない）。
+- server 側の `_cluster_count` も同じく裸の 240 / 500 / 120 を持ったままである（**[I-136]**）。
+  **Android だけ先に寄せたので、この 1 点は server とクライアントで形が違う。**
+
+### 検証結果
+
+- `gradle :app:compileDebugKotlin` **BUILD SUCCESSFUL**（`^e: ` 0 件）。
+  **実機 Pixel 9 での目視は行っていない。**
 

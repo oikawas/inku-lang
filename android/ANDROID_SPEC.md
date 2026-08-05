@@ -2057,3 +2057,25 @@ In accordance with contract `antigravity-android-engine14.md`, completed Android
 
 - All 71 unit tests passed cleanly via `gradle :app:testDebugUnitTest` (**PASS 71 / Failures 0 / Errors 0 / Skipped 0**).
 
+## 2026-08-05 Catch-up for the limits becoming settings, Stage 5 (v2.10.0 / android `2.1.4-android.7`)
+
+The bare `240` that `clusterCount()` carried in `LocalFallbackPipeline.kt` now points at a named
+constant, **`LITERAL_COUNT_THRESHOLD`**.
+
+- **It was deliberately not pointed at `MAX_EXPANDED_PER_INSTRUCTION`.** Both are 240 at the
+  defaults, but they are **different fields on the server** (`literal_count_threshold` and
+  `max_expanded_per_instruction`), and aiming at one would assert an identity that does not exist.
+- **The `120` and `500` in the same function stay bare.** The `120` equals the server's
+  `represented_count_max` but is not the same rule. **Being the same number does not make it the
+  same rule.**
+- **Android has no settings UI for this.** The on-device pipeline has no settings route, so the
+  limits run at their defaults, and it neither sends nor reads the server's `render_limits` — a
+  decision, not an omission.
+- The server's own `_cluster_count` still carries a bare 240 / 500 / 120 (**[I-136]**). **Android
+  went first here, so on this one point the two sides have different shapes.**
+
+### Verification Results
+
+- `gradle :app:compileDebugKotlin` **BUILD SUCCESSFUL** (zero `^e: ` lines).
+  **No visual check was made on the Pixel 9.**
+

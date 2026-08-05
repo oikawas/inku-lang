@@ -3365,3 +3365,94 @@ deterministic layer. **Not one default value changed.**
   single byte. **[I-132]** (three of these numbers still inline outside `limits.py`) was left
   alone because the behaviour is identical while the values do not change. `ANDROID_SPEC` was not
   touched, and resvg rasterisation time was not measured (SVG generation only).
+
+### v2.10.0 — the limits become settings, and the values a work was drawn under stay with it (Build 853, 2026-08-05)
+
+**v2.9.45 gathered the nine limits into one place; this version makes them settable.**
+**A per-install setting does not break reproducibility because the effective values are recorded on
+the work** — the version identifies the code, the recorded limits identify the configuration, and
+the two together decide the behaviour. `history.render_limits` has **no DEFAULT and no backfill**:
+`NULL` on an existing row means "drawn before this column existed", not "drawn at the defaults"
+(the same discipline as `sketch_state`).
+
+- **The setting is read once per request** (`_effective_limits()`), with no in-process cache (it
+  would go stale across workers). **All five call sites of `coerce_score` were given `limits=`** —
+  redrawing a history SVG, `POST /api/history`, `POST /api/compose`, `POST /api/render-score`, and
+  the generator shared by `/api/paint` and `/api/paint/stream`. **Only the count rounding inside
+  `Score.model_validate` cannot take an argument** (it is a pydantic validator), so the five paths
+  raise both an explicit argument and a context variable from the same single `Limits`. **Code
+  outside a request — the generators, most of the tests — runs on the defaults.**
+- **The effective values are injected into the prompts.** The contract counted ten places where the
+  text carries a number; **the measurement found 12 + 8 + 1**: the 400 of
+  `max_expanded_primitives` twice per language in `composer.py`, `ddl_count_max` and
+  `ddl_count_max_grid` in four places per language in `interpreter.py`, and **the description of
+  `count` in `schema.py`**, which reaches the model as tool schema and enters
+  `stage2_prompt_digest`. **Leaving the 400 alone would have let the prompt lie the moment
+  `max_expanded_primitives` moved**, so ruling A added it. **Nothing is generated wholesale — only
+  the numbers are substituted.** A density band such as `40-120` has a ceiling only at its upper
+  end; the inner edge is prose about density, so the values are clamped rather than scaled (scaling
+  would invent a number nobody chose).
+- **`Field(le=2000)` was removed from `schema.py`.** Removing it drops `maximum` from the JSON
+  schema, which changes the tool JSON and **moved the digest at the defaults** (`5dc72855…` →
+  `73e56ff2…`). The two were reconciled by having **`_score_tool_schema()` put the effective
+  `maximum` back at the same key position pydantic used**; key order is untouched because of
+  [I-038] (declaration order moves how much is carried).
+- **A Limits tab in the settings** (admin only, all nine editable, three families, a reset control).
+  **The family names and their order come from the server** (`LIMIT_GROUPS`), so the UI cannot
+  invent a fourth. **A rounded value is shown as it came back**, not as it was typed.
+- **Android points the bare 240 in `clusterCount()` at `LITERAL_COUNT_THRESHOLD`.**
+  **`MAX_EXPANDED_PER_INSTRUCTION` was deliberately not used** — it is 240 at the defaults but a
+  different field on the server, and aiming at it would assert an identity that does not exist. The
+  `120` in the same function stays bare.
+- **The CLI got full control (ruling B)**: `config show` returns `render_limits`, and `config
+  update` carries all nine flags plus `--limits-reset`, **sending only the flags that were given**.
+  The help block in `cli/README.md` is the generator's output, not hand-written.
+- **Two assertions in the contract turned out to be false.** The parenthetical "invalid values are
+  rounded, not refused (the same manner as the existing normalizers)" is wrong: **both normalizers
+  it named raise `ValueError` out of range**. Since §2.4 asks for the rounded value to be displayed,
+  **rounding was kept and this setting now differs in manner from the other four**. And
+  `DEFAULT_LIMITS` has **13** default arguments, not the contract's 14 (an import line was counted).
+- **The acceptance is `server/tests/test_limits_are_settings.py` (15 checks, T-1..T-12); the frozen
+  corpora are not used as evidence.** All six perturbations hit production code only. **The
+  acceptance was strengthened twice during them**: a Japanese-only revert left T-2 green because the
+  English side still moved and "something moved" was enough, so it was rewritten as an exact set of
+  which prompt in which language must move; and the same threshold was enforced by two lines of the
+  Japanese prompt, so the enforcement points were counted and both were hit. **T-2's reverse leg was
+  rewritten away from the contract**: ruling A made "same threshold, different budget → the text is
+  unchanged" vacuously false, so the leg now uses **`max_instructions`, the one limit that appears
+  in no prompt at all**.
+- **Added on acceptance: four gates for the CLI** (`cli/tests/test_cli.py`). **The nine flags and
+  the new `PUT /api/settings/limits` that ruling B introduced were watched only by "the four-area
+  count finds at least one hit in cli", and a misspelled key would stay silent at 200.** The gates
+  pass a distinct value per flag and match the request body one for one, assert the update is
+  partial, and keep a control (no flag, no request). **Three perturbations** were applied — send
+  every field, rename one key, make `--limits-reset` merge instead of replace — and **the third
+  found nothing**: passed on its own, `--limits-reset` produces `{"reset_to_defaults": True}` under
+  both implementations, so replacing and merging are indistinguishable. **It was rewritten to pass a
+  value alongside the reset, and then it went red.**
+- **Specification:** that the threshold is a configuration is now stated in **four places in each
+  language**. **The two the contract named (`:1502-1505` / `:1806`) were stale line numbers; there
+  were four.** References to the constants `MAX_EXPANDED_PRIMITIVES` and
+  `MAX_EXPANDED_PER_INSTRUCTION` are down to **zero** — they no longer exist in the product, and
+  only the specification still called them by name. "233 lines are 233 lines" is kept, with **"up to
+  the threshold of its configuration"** added.
+- **Verification (on the merged tree):** pytest **2373 passed / 31 skipped**, `def test_` on the
+  server **1203 → 1218 with none deleted**, cli **106 → 111 passed**, ruff clean (server and cli),
+  `npm run check` **245 files / 0 errors / 2 warnings**, `lint:i18n` **1017 / 47 / 0 / 0**, `npm run
+  test:unit` **113**, `check_frozen_corpora.py` **byte-identical**, `check_docs.py` green (55
+  internal references). The API surface baseline was refrozen (the disappearance of
+  `Arrangement.maximum: 2000` and the intended additions only, with no field dropped); the route
+  count goes **81 → 82**.
+- **Why minor:** a column was added to stored data (`history.render_limits`), a route was added to
+  the API, and the static `maximum` is gone from Stage 2's tool schema. **The engine version was not
+  raised** (the frozen corpora move by zero at the defaults).
+- **Explicitly not done:** **the bare 240 / 500 / 120 in `_cluster_count` were left alone** — that
+  240 is the same boundary as `literal_count_threshold`, so moving the threshold pulls the two
+  apart, but the contract does not name it as a target and it was **filed as [I-136]** with three
+  options. **Android was not inspected on the Pixel 9** (compilation only). **No round trip was made
+  from the CLI to a live server** (the flag-to-body mapping was measured instead). **No default was
+  changed, `renderer.py` was not touched by a single byte, and Android has no settings UI.** Stage 5
+  is not yet written into `ANDROID_SPEC`.
+- **Ledger:** **[I-136]** (the bare 240 in `_cluster_count`) and **[I-137]** (web sends
+  `sketch_grain_change`, which the server does not know and rejects with 422; filed by the
+  `android-lineage-wiring` session) were numbered.

@@ -3587,3 +3587,17 @@ API.** The archive is tag `archive/tenkei-v1.97` and `no-git-sync/archive/tenkei
 **One thing learned**
 
 - **`check_docs.py` does not look at `manual/` at all** — its thirteen pairs are the repository root and `docs/`. With no gate enforcing bilingual parity, the Japanese and English README files under the manual directory had drifted eleven days apart in last-modified time. **The 25/25 and 20/20 agreement reached here is the result of hand work, not of a check.**
+
+### 2026-08-05 — the manual's language pairs come under the gate (**no version**; checks only)
+
+**`check_docs.py` compared thirteen pairs and the manual was in none of them.** Ledger item [I-140].
+
+- **Added seven pairs to `PAIRS`** (13 → **20**), all under `shape`. **The manual index has no counterpart and stays out**
+- **Added `server/tests/test_manual_parity_gate.py`** (three `def test_`, 22 checks). **`PAIRS` is read from the syntax tree** — `grep '"shape"'` also matches the word inside the comment documenting the three modes and **counts thirteen pairs as fourteen** (the issuing side walked into it). **The seven pairs are asserted one at a time**, since asserting only the total would pass on six manual pairs plus one other. The declared exception is asserted to be `None` as well: **declaring a reason turns the failure into a printed note, leaving the row listed while it checks nothing**
+- **Why stage two exists: `PAIRS` is a configuration table, not product code.** Delete the seven rows and **`check_docs.py` still exits 0**, with nobody reporting that the number of things looked at fell from 20 to 13 — the same shape as the dependency upgrade that emptied `app.routes` from 81 to 0 while two checks stayed green
+- **Discriminating power** (measured before issuing, after implementing, and again on the merged tree): a heading added to the Japanese side alone goes from **0/7 red to 7/7 red**. Deleting the seven rows leaves the new test at **8 failed / 14 passed**
+- **Checks:** server **2313 → 2335 passed / 31 skipped** (`def test_` **1262 → 1265**, none removed), ruff clean, `check_docs.py` green (55 internal references). Not one file under `web`, `cli`, `android`, or `server/src` moved
+
+**One correction made during acceptance**
+
+- **The contract asserted that the manual is outside the rsync payload and therefore absent from pentala, and the implementation copied that premise into a comment. Measured, it is false.** pentala carries the manual — a stale v1.85 copy whose two languages still match each other, so `check_parity` is green there too, and "seven missing originals turn it red" is false as well. **The `skipif` stays**: it guards any tree without a manual, and was never a description of pentala. **The comment was replaced with the measurement.**

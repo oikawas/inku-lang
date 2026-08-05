@@ -21,7 +21,7 @@ class DescriptionPropagationCutDeviceTest {
     private val pipeline = LocalFallbackPipeline()
 
     private fun backgroundOf(ddl: String, originalText: String): String =
-        pipeline.scoreFromWebRules(ddl, originalText, "square").optString("background")
+        pipeline.scoreFromWebRules(ddl, "square").optString("background")
 
     @Test
     fun theGovernorNoLongerReadsANightTheDdlNeverWrote() {

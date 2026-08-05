@@ -3287,3 +3287,81 @@ condition against the Kotlin condition one for one rather than comparing outputs
   not touched. `android/ANDROID_SPEC.ja.md` was not updated. Nothing was verified on the Pixel 9
   (JVM unit tests only), and nothing was deployed to pentala (`android/` is permanently excluded
   from every sync path).
+
+### v2.9.45 — the limits gathered in one place, and a ceiling the model cannot raise (Build 852, 2026-08-05)
+
+**This came out of the author's question of 2026-08-04: is it not dangerous, as a program, to
+rely on the LLM for the upper bound on how many things get placed?** The numbers that bound a
+count were spread across four files, and the same 240 had been borrowed four times under
+different names. This version gathers them into `limits.py` and puts a ceiling in the
+deterministic layer. **Not one default value changed.**
+
+- **The limits moved into `limits.py`.** A frozen `Limits` dataclass holds eight values and every
+  reader in `coerce/` now comes through it. **All the values were read off the tree as it shipped
+  and none of them moved** (400 / 240 / 240 / 80 / 120 / 1000 / 2000 / 2000). **The one addition
+  is `max_instructions = 64`.** The aesthetic governors (`MAX_QUIET_*` and the rest) deliberately
+  stayed where they were: **they are not other names for these numbers, they are different
+  numbers with a different purpose.**
+- **Two bare literals were breaking the stated policy ([I-110]).** `min(count, 120)` in
+  `compose.py` used **the top of the representation band as an unconditional cap**. The
+  specification says a count under 240 is literal and names the case — "two hundred thirty-three
+  lines" are drawn as 233 — yet the clause route cut that 233 to 120. Counting 2,172 works and
+  6,419 arrangements in production, **6 of the 92 that landed exactly on the cap were this
+  violation** (two distinct inputs, 233 and 137). The call now goes through `_budgeted_count`,
+  which passes anything under the threshold and, above it, **defers to the same
+  `_clustered_visual_count` the density governor uses** — so a count arriving by either route
+  lands on the **same** number, not merely inside the same band.
+- **There was no deterministic ceiling on the total (author ruling 2).** Both density governors
+  exempt `grid` explicitly and **do not even add it to the total**. The instruction list had no
+  bound at all (`schema.py` declares a bare `list[Instruction]`), and a single arrangement may
+  reach 2000. **Five instructions at 2000 each is 10,000 marks — about 42 seconds on the Mac and
+  roughly 35 MB of SVG** — and the only thing preventing it was **the prompt asking for one to
+  five instructions**. **The hole is not hypothetical**: a work from 2026-07-18, well after the
+  governors were introduced, totals 409 marks (400 from a grid, 9 not), and the governors never
+  noticed, because they do not count the grid.
+- **`_enforce_hard_ceiling` now runs last, on both exits from coerce, and answers to no layout.**
+  A grid is counted by the marks actually drawn, `rows × cols` rather than `count`, and an
+  oversized lattice drops to a smaller one **that keeps its proportions**. The instruction list is
+  cut at 64 and the number dropped is recorded in the note. **A work already under the ceiling
+  comes out byte-identical**, which T-6 watches as the control.
+- **Eleven existing tests failed and every one was read before it was changed.** **Six of them
+  recorded the old policy that a grid is excluded from the total**, which collides head-on with
+  ruling 2. **The governors' exemption is still true**, so those assertions were kept by applying
+  `_with_total_density_budget` directly, and a separate assertion now says the ceiling does reach
+  a grid through the entry point. **Golden H-12 and H-16 moved from 48 → 233 and 64 → 233: the
+  production violation itself had been baked into the golden file.**
+- **Both frozen corpora are byte-identical** (`ddl-engine-6` 36 cases and `render-engine-21` 525
+  cases, zero changed), so **the engine version does not move**. **That is a regression net and
+  not evidence the change works** — the contract forbids using the corpora as acceptance and sets
+  T-1 through T-9 instead.
+- **Ten perturbations were applied, all to production code**, and acceptance reproduced two.
+  **P4 (fixing everything above the threshold at 120) turns only T-4 red** — an implementation
+  that stays inside the band while the two routes land on different numbers passes T-2 and T-3
+  untouched, exactly the discriminating case the contract predicted. **P9 (applying the ceiling
+  unconditionally) turns T-6 red**, which is what stops "just clamp everything to 400" from
+  passing T-5.
+- **Nine `inku-cli` runs reached none of the changed paths** (byte-identical between the base and
+  HEAD). The clause route sits behind the `len(instructions) != 1` gate in `_with_ddl_coverage`
+  and opens only when Stage 2 emits exactly one instruction. **As a control**, a shape that does
+  open the gate splits **120 at the base and 233 at HEAD** — **the apparatus can detect the
+  difference; the nine agreed because they never reached the branch.**
+- **Three findings the contract had not anticipated:** three identical grids collapse to one under
+  `_dedupe_instructions`, so T-5's fixture has to be three structurally distinct grids or it goes
+  green without touching the hole; a literal request for four hundred becomes 401 because coerce
+  adds a composition anchor of its own, and the ceiling then takes one cell off the grid; and a
+  grid's real mark count is `rows × cols`, not `count`.
+- **Specification:** a paragraph on the ceiling was added in both languages right after the
+  paragraph on the total in §13.10 (that the total and the instruction count are bounded, grids
+  included, and that this does not depend on what the prompt asks for). The existing passages were
+  left as they were.
+- **Verification (on the merged tree):** pytest **2358 passed / 31 skipped** (2338 → 2355 on the
+  branch; 2341 → 2358 counting the three Android tests already on main), `def test_` **1189 →
+  1200 with none deleted** (the three that exist only on main are the Android stage 0, because the
+  branch was cut from an older main), cli **106 passed**, ruff clean, `npm run check` **245 files
+  / 0 errors / 2 warnings**, and `check_frozen_corpora.py` byte-identical.
+- **Explicitly not done:** **making the values configurable belongs to the follow-up contract
+  `limits-are-settings.md`** (settings, records, UI, Android). This version has no setting and no
+  UI, and does not touch `renderer.py`, `schema.py`, the prompt text, `web` or `android` by a
+  single byte. **[I-132]** (three of these numbers still inline outside `limits.py`) was left
+  alone because the behaviour is identical while the values do not change. `ANDROID_SPEC` was not
+  touched, and resvg rasterisation time was not measured (SVG generation only).

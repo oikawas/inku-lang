@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.9.44 / Build 852**
+**Target version: v2.9.45 / Build 852**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -150,7 +150,7 @@ The fill rate of an optional field **depends on its declaration order** in the t
 declared last are filled more often.
 - **coerce** — split into `normalize` and `compose`.
 Invalid values prefer drop-only handling, and no house style is injected.
-- **Render Engine 20** — the SVG performance.
+- **Render Engine 21** — the SVG performance.
 It carries closed-shape outlines and fills, arcs, the material layer, ground resistance, and master
 grid quantization of coordinates.
 

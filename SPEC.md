@@ -2252,6 +2252,17 @@ cannot are different things, and proportional shrinking breaks the countable
 side first. Only when representing every group still exceeds the ceiling do the
 large groups share one limit between them.
 
+**A ceiling that answers to no layout sits at the end of coerce, over both the
+total and the number of instructions.** The representation above is a reading of
+density, and it deliberately exempts `grid`: a lattice with holes in it is not a
+lattice. **That exemption is right for thinning and wrong for a ceiling, so the
+ceiling counts grids too** — it counts the marks actually drawn, `rows × cols`
+rather than `count`, and drops an oversized lattice to a smaller one that keeps
+its proportions. The instruction list is bounded as well, at 64. **Production has
+never exceeded 27, so no real work is touched.** What the ceiling bounds is a
+request that passed validation and nothing else. **It lives in the deterministic
+layer and does not depend on the prompt asking for one to five instructions.**
+
 When `path` is `none`, placement uses `layout` alone as before. When a `path` is
 given, the renderer uses a deterministic hash and a sequence number, so the same
 JSON Score reproduces the same traced placement.

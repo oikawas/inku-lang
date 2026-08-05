@@ -8,10 +8,11 @@ import re
 from typing import Any
 
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
+from ..limits import DEFAULT_LIMITS, Limits
 from ..schema import Instruction
 from .normalize import (
-    MAX_EXPANDED_PER_INSTRUCTION,
     VISIBLE_ON_BACKGROUND,
+    _budgeted_count,
     _closed_shape_area,
     _coerce_marker_values,
     _cluster_count,
@@ -2858,7 +2859,9 @@ def _sensory_kind(clause: str) -> str | None:
     return None
 
 
-def _fallback_instruction_from_clause(clause: str, *, index: int, background: str) -> Instruction:
+def _fallback_instruction_from_clause(
+    clause: str, *, index: int, background: str, limits: Limits = DEFAULT_LIMITS
+) -> Instruction:
     lower = clause.lower()
     primitive = _primitive_from_clause(clause)
     sensory_kind = _sensory_kind(clause)
@@ -2942,19 +2945,27 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
     elif any(marker in clause or marker in lower for marker in ("上端", "upper edge", "top edge")) and "center" in common:
         common["center"] = [common["center"][0], 0.22]
 
-    count = count_hint_from_ddl(clause)
+    count = count_hint_from_ddl(clause, limits)
     cycle = _color_cycle_from_clause(clause, background)
     if count and _is_literal_grid_request(clause):
         common["arrangement"] = {
-            "count": min(count, 2000),
+            "count": min(count, limits.schema_count_max),
             "layout": "grid",
             "jitter": 0.12,
             "margin": 0.08,
         }
     elif count and (("散らす" in clause) or ("scatter" in lower)):
-        common["arrangement"] = {"count": min(count, 120), "layout": "scatter", "margin": 0.18}
+        common["arrangement"] = {
+            "count": _budgeted_count(count, limits),
+            "layout": "scatter",
+            "margin": 0.18,
+        }
     elif count and (("並べる" in clause) or ("line up" in lower)):
-        common["arrangement"] = {"count": min(count, 80), "layout": "horizontal", "margin": 0.1}
+        common["arrangement"] = {
+            "count": _budgeted_count(count, limits),
+            "layout": "horizontal",
+            "margin": 0.1,
+        }
     elif _is_small_mark_clause(clause):
         pass
     elif primitive == "circle" and _radius_hint_from_clause(clause) is not None:
@@ -3080,7 +3091,13 @@ def _fallback_instruction_from_clause(clause: str, *, index: int, background: st
     return Instruction.model_validate(common)
 
 
-def _with_ddl_coverage(instructions: list[Instruction], *, ddl: str | None, background: str) -> list[Instruction]:
+def _with_ddl_coverage(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+    limits: Limits = DEFAULT_LIMITS,
+) -> list[Instruction]:
     clauses = _ddl_clauses(ddl)
     if len(instructions) != 1 or len(clauses) <= 1:
         return instructions
@@ -3096,7 +3113,9 @@ def _with_ddl_coverage(instructions: list[Instruction], *, ddl: str | None, back
     for clause in clauses:
         if len(augmented) >= 5:
             break
-        fallback = _fallback_instruction_from_clause(clause, index=len(augmented), background=background)
+        fallback = _fallback_instruction_from_clause(
+            clause, index=len(augmented), background=background, limits=limits
+        )
         key = (fallback.primitive, fallback.color, fallback.weight)
         if key in existing:
             continue
@@ -3189,7 +3208,7 @@ def _without_spontaneous_grid(
     return adjusted
 
 
-def count_hint_from_ddl(ddl: str) -> int | None:
+def count_hint_from_ddl(ddl: str, limits: Limits = DEFAULT_LIMITS) -> int | None:
     """Extract a conservative count hint from a normalized DDL fragment."""
     literal_grid = _is_literal_grid_request(ddl)
     clauses = re.split(r"[。.!?]+", ddl)
@@ -3201,9 +3220,9 @@ def count_hint_from_ddl(ddl: str) -> int | None:
             continue
         value = _parse_small_japanese_number(match.group(1))
         if value is not None:
-            maximum = 2000 if literal_grid else 1000
+            maximum = limits.ddl_count_max_grid if literal_grid else limits.ddl_count_max
             return min(max(value, 1), maximum)
-    return _english_count_hint(ddl)
+    return _english_count_hint(ddl, limits)
 
 
 ENGLISH_SMALL_NUMBERS: dict[str, int] = {
@@ -3242,7 +3261,7 @@ ENGLISH_COUNT_UNITS: dict[str, int] = {
 }
 
 
-def _english_count_hint(ddl: str) -> int | None:
+def _english_count_hint(ddl: str, limits: Limits = DEFAULT_LIMITS) -> int | None:
     literal_grid = _is_literal_grid_request(ddl)
     clauses = re.split(r"[.!?]+", ddl)
     candidates = [clause for clause in clauses if _is_literal_grid_request(clause)] if literal_grid else [ddl]
@@ -3276,7 +3295,9 @@ def _english_count_hint(ddl: str) -> int | None:
                 current += ENGLISH_COUNT_UNITS[token]
         value = total + current
         if value:
-            maximum = 2000 if _is_literal_grid_request(ddl) else 1000
+            maximum = (
+                limits.ddl_count_max_grid if _is_literal_grid_request(ddl) else limits.ddl_count_max
+            )
             return min(max(value, 1), maximum)
     return None
 
@@ -3301,11 +3322,9 @@ COUNTED_OBJECT_WORDS: frozenset[str] = frozenset(
 
 JAPANESE_COUNT_PATTERN = re.compile(r"(\d{1,4}|[一二三四五六七八九十百千]{1,8})(?:本|個|つ(?!の方向)|点|枚)")
 
-# The description asked for a number, so the number is not a guess to be second-guessed.
-# 240 is where coerce itself stops expanding (MAX_EXPANDED_PER_INSTRUCTION); above it the
-# prompt asks Stage 2 for a representative 80-120 instead of the literal value.
-LITERAL_COUNT_THRESHOLD = MAX_EXPANDED_PER_INSTRUCTION
-REPRESENTED_COUNT_RANGE = (80, 120)
+# LITERAL_COUNT_THRESHOLD and REPRESENTED_COUNT_RANGE used to be defined here, a
+# second name for the band `..limits` already holds. Both readers now go through
+# Limits, so the band exists under one name only.
 
 
 def _explicit_counts_from_ddl(ddl: str | None) -> frozenset[int]:
@@ -3353,13 +3372,14 @@ def _explicit_counts_from_ddl(ddl: str | None) -> frozenset[int]:
     return frozenset(counts)
 
 
-def _count_follows_ddl_request(count: int, requested: frozenset[int]) -> bool:
+def _count_follows_ddl_request(
+    count: int, requested: frozenset[int], limits: Limits = DEFAULT_LIMITS
+) -> bool:
     """Is this count the one the description asked for, literally or as its stand-in?"""
     if count in requested:
         return True
-    low, high = REPRESENTED_COUNT_RANGE
-    if low <= count <= high:
-        return any(value >= LITERAL_COUNT_THRESHOLD for value in requested)
+    if limits.represented_count_min <= count <= limits.represented_count_max:
+        return any(value >= limits.literal_count_threshold for value in requested)
     return False
 
 

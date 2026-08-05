@@ -159,7 +159,7 @@ def test_word_boundary_stops_restored_from_selecting_red_without_moving_the_seed
     assert _seed_for_instruction(before, 4242) == _seed_for_instruction(after, 4242)
 
 
-def test_the_92_write_sites_remain_split_by_role() -> None:
+def test_the_93_write_sites_remain_split_by_role() -> None:
     compose_source = COMPOSE_SOURCE.read_text()
     normalize_source = NORMALIZE_SOURCE.read_text()
     api_source = API_SOURCE.read_text()
@@ -172,7 +172,10 @@ def test_the_92_write_sites_remain_split_by_role() -> None:
     assert len(re.findall(r'"note"\s*:', compose_source)) == 47
     assert len(re.findall(r'\["color_hint"\]\s*=', compose_source)) == 3
     assert len(re.findall(r'"color_hint"\s*:', compose_source)) == 5
-    assert len(re.findall(r'\["note"\]\s*=', normalize_source)) == 3
+    # Four in normalize since the hard ceiling arrived: the fourth is `_with_note`,
+    # the single helper both ceiling sites go through rather than writing the field
+    # themselves.
+    assert len(re.findall(r'\["note"\]\s*=', normalize_source)) == 4
     assert len(re.findall(r'(?:\["note"\]\s*=|"note"\s*:)', api_source)) == 10
 
 

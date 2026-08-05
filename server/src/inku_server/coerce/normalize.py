@@ -7,6 +7,7 @@ from dataclasses import dataclass, field as dc_field
 from typing import Any, Callable
 
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
+from ..limits import DEFAULT_LIMITS, Limits
 from ..schema import Instruction, Score
 
 
@@ -141,17 +142,10 @@ VISIBLE_ON_BACKGROUND: dict[str, str] = {
 }
 
 
-MAX_EXPANDED_PRIMITIVES = 400
-
-
-MAX_EXPANDED_PER_INSTRUCTION = 240
-
-
-# The two ends of the representative band the prompt and SPEC name: a request too
-# large to count is shown as 80-120 marks. Both ends belong to the same rule, so
-# they are written as a pair.
-MIN_VISUAL_CLUSTERED_COUNT = 80
-MAX_VISUAL_CLUSTERED_COUNT = 120
+# The four constants that used to live here -- the per-work total, the
+# per-instruction total, and the two ends of the representative band -- now come
+# from `..limits`. Read them off a Limits instance so the follow-up contract can
+# swap the source in one place.
 
 
 def _shape_extent(ins: Instruction) -> float:
@@ -223,13 +217,13 @@ def _with_visible_particle(ins: Instruction) -> Instruction:
     return Instruction.model_validate(data)
 
 
-def _with_density_budget(ins: Instruction) -> Instruction:
+def _with_density_budget(ins: Instruction, limits: Limits = DEFAULT_LIMITS) -> Instruction:
     arr = ins.arrangement
-    if arr is None or arr.layout != "scatter" or arr.count <= 240:
+    if arr is None or arr.layout != "scatter" or arr.count <= limits.max_expanded_per_instruction:
         return ins
     if _shape_extent(ins) > 0.018:
         return ins
-    return _with_clustered_density(ins, "scatter density clustered to preserve negative space")
+    return _with_clustered_density(ins, "scatter density clustered to preserve negative space", limits)
 
 
 def _dedupe_instructions(instructions: list[Instruction]) -> list[Instruction]:
@@ -384,6 +378,13 @@ def _with_arrangement_count(ins: Instruction, count: int, note: str) -> Instruct
     return Instruction.model_validate(data)
 
 
+def _with_note(ins: Instruction, note: str) -> Instruction:
+    data = ins.model_dump(by_alias=True)
+    machine_note = data.get("note")
+    data["note"] = f"{machine_note}; {note}" if machine_note else note
+    return Instruction.model_validate(data)
+
+
 def _density_label(original_count: int) -> str:
     if original_count >= 180:
         return "high"
@@ -402,20 +403,40 @@ def _cluster_count(original_count: int) -> int:
     return 3
 
 
-def _clustered_visual_count(original_count: int) -> int:
-    if original_count <= MAX_VISUAL_CLUSTERED_COUNT:
+def _clustered_visual_count(original_count: int, limits: Limits = DEFAULT_LIMITS) -> int:
+    if original_count <= limits.represented_count_max:
         return original_count
-    return min(MAX_VISUAL_CLUSTERED_COUNT, max(MIN_VISUAL_CLUSTERED_COUNT, int(original_count * 0.42)))
+    return min(
+        limits.represented_count_max,
+        max(limits.represented_count_min, int(original_count * 0.42)),
+    )
 
 
-def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
+def _budgeted_count(count: int, limits: Limits = DEFAULT_LIMITS) -> int:
+    """A stated count is literal below the threshold and represented above it.
+
+    The description asked for a number; below the threshold the number is not a
+    guess to be second-guessed. Above it the number cannot be counted by eye, so
+    the group is shown as a band instead of a tally.
+
+    Above the threshold this defers to _clustered_visual_count -- the same
+    function the density governor applies to Stage 2's own output -- so that a
+    count arriving by either route lands on the SAME number, not merely inside
+    the same band.
+    """
+    if count < limits.literal_count_threshold:
+        return count
+    return _clustered_visual_count(count, limits)
+
+
+def _with_clustered_density(ins: Instruction, note: str, limits: Limits = DEFAULT_LIMITS) -> Instruction:
     arr = ins.arrangement
     if arr is None or arr.layout == "grid":
         return ins
     original_count = arr.count
     data = ins.model_dump(by_alias=True)
     arr_data = dict(data["arrangement"])
-    arr_data["count"] = _clustered_visual_count(original_count)
+    arr_data["count"] = _clustered_visual_count(original_count, limits)
     existing_density = arr_data.get("density", "none")
     arr_data["density"] = existing_density if existing_density != "none" else _density_label(original_count)
     arr_data["cluster_count"] = arr_data.get("cluster_count") or _cluster_count(original_count)
@@ -430,21 +451,29 @@ def _with_clustered_density(ins: Instruction, note: str) -> Instruction:
     return Instruction.model_validate(data)
 
 
-def _with_per_instruction_density_budget(instructions: list[Instruction]) -> list[Instruction]:
+def _with_per_instruction_density_budget(
+    instructions: list[Instruction], limits: Limits = DEFAULT_LIMITS
+) -> list[Instruction]:
     adjusted: list[Instruction] = []
     for ins in instructions:
         if (
             ins.arrangement is None
             or ins.arrangement.layout == "grid"
-            or ins.arrangement.count <= MAX_EXPANDED_PER_INSTRUCTION
+            or ins.arrangement.count <= limits.max_expanded_per_instruction
         ):
             adjusted.append(ins)
             continue
-        adjusted.append(_with_clustered_density(ins, "single arrangement density clustered to preserve negative space"))
+        adjusted.append(
+            _with_clustered_density(
+                ins, "single arrangement density clustered to preserve negative space", limits
+            )
+        )
     return adjusted
 
 
-def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruction]:
+def _with_total_density_budget(
+    instructions: list[Instruction], limits: Limits = DEFAULT_LIMITS
+) -> list[Instruction]:
     """Bring the total back under budget by representing the largest groups first.
 
     Counted and uncountable are different things. Twelve squares can be counted by
@@ -459,23 +488,23 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
     adjusted = list(instructions)
     movable = [index for index, ins in enumerate(adjusted) if not is_grid(ins) and ins.arrangement is not None]
     total = sum(_expanded_count(ins) for ins in adjusted if not is_grid(ins))
-    if total <= MAX_EXPANDED_PRIMITIVES:
+    if total <= limits.max_expanded_primitives:
         return instructions
 
     # Represent the largest group, check the budget, and only then reach for the next.
     for index in sorted(movable, key=lambda i: _expanded_count(adjusted[i]), reverse=True):
-        if total <= MAX_EXPANDED_PRIMITIVES:
+        if total <= limits.max_expanded_primitives:
             break
         before = _expanded_count(adjusted[index])
         candidate = _with_clustered_density(
-            adjusted[index], "largest group represented to fit the total density budget"
+            adjusted[index], "largest group represented to fit the total density budget", limits
         )
         after = _expanded_count(candidate)
         if after < before:
             adjusted[index] = candidate
             total -= before - after
 
-    if total <= MAX_EXPANDED_PRIMITIVES or not movable:
+    if total <= limits.max_expanded_primitives or not movable:
         return adjusted
 
     # Representing every group is not always enough. What is left is a ceiling the
@@ -485,7 +514,7 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
     fixed = sum(_expanded_count(ins) for ins in adjusted if not is_grid(ins)) - sum(counts)
     ceiling = 1
     for candidate in range(1, max(counts) + 1):
-        if fixed + sum(min(count, candidate) for count in counts) <= MAX_EXPANDED_PRIMITIVES:
+        if fixed + sum(min(count, candidate) for count in counts) <= limits.max_expanded_primitives:
             ceiling = candidate
         else:
             break
@@ -495,6 +524,103 @@ def _with_total_density_budget(instructions: list[Instruction]) -> list[Instruct
                 adjusted[index], ceiling, "expanded density capped to preserve negative space"
             )
     return adjusted
+
+
+def _mark_count(ins: Instruction) -> int:
+    """How many marks this instruction actually puts on the page.
+
+    `_expanded_count` reads `arrangement.count`, which is what the two density
+    governors budget against. A grid is drawn differently: when rows and cols are
+    both declared the renderer lays out rows*cols cells and ignores count, so a
+    grid of rows=40 cols=50 draws 2000 marks whatever count says. The ceiling has
+    to answer for what is drawn, not for what was declared.
+    """
+    arr = ins.arrangement
+    if arr is None:
+        return 1
+    if arr.layout == "grid" and arr.rows is not None and arr.cols is not None:
+        return max(1, arr.rows * arr.cols)
+    return max(1, int(arr.count))
+
+
+def _grid_within(ins: Instruction, ceiling: int, note: str) -> Instruction:
+    """Drop a grid to the largest lattice under the ceiling that keeps its shape.
+
+    Thinning a lattice is not an option -- a lattice with holes in it is not a
+    lattice -- so the rows-to-cols ratio is what survives and the cell count is
+    what gives way.
+    """
+    arr = ins.arrangement
+    assert arr is not None
+    if arr.rows is None or arr.cols is None:
+        return _with_arrangement_count(ins, ceiling, note)
+    rows, cols = arr.rows, arr.cols
+    # Derive cols from rows at the original ratio, so the shape is preserved by
+    # construction rather than by trimming whichever side happens to be larger,
+    # and take the largest such lattice that fits.
+    new_rows, new_cols = 1, 1
+    for candidate_rows in range(1, rows + 1):
+        candidate_cols = max(1, min(cols, round(candidate_rows * cols / rows)))
+        if candidate_rows * candidate_cols > ceiling:
+            continue
+        if candidate_rows * candidate_cols > new_rows * new_cols:
+            new_rows, new_cols = candidate_rows, candidate_cols
+    data = ins.model_dump(by_alias=True)
+    arrangement = dict(data["arrangement"])
+    arrangement["rows"] = new_rows
+    arrangement["cols"] = new_cols
+    arrangement["count"] = new_rows * new_cols
+    data["arrangement"] = arrangement
+    return _with_note(Instruction.model_validate(data), note)
+
+
+def _enforce_hard_ceiling(score: Score, limits: Limits = DEFAULT_LIMITS) -> Score:
+    """The last word on how many marks leave coerce, grid included.
+
+    The density governors above deliberately spare grids: a lattice with holes in
+    it is not a lattice. That exemption is right for *thinning* and wrong for the
+    ceiling -- a work is still a work, and 10,000 marks is not a drawing anyone
+    waited for. This runs after every governor and answers to no layout.
+    """
+    instructions = list(score.instructions)
+    changed = False
+
+    if len(instructions) > limits.max_instructions:
+        dropped = len(instructions) - limits.max_instructions
+        instructions = instructions[: limits.max_instructions]
+        instructions[-1] = _with_note(
+            instructions[-1],
+            f"instruction list capped at {limits.max_instructions}; {dropped} dropped",
+        )
+        changed = True
+
+    counts = [_mark_count(ins) for ins in instructions]
+    total = sum(counts)
+    if total > limits.max_expanded_primitives:
+        # The ceiling the large groups share: the highest one under which the
+        # total fits. Groups already below it are untouched, so a small group
+        # still comes through whole.
+        ceiling = 1
+        for candidate in range(1, max(counts) + 1):
+            if sum(min(count, candidate) for count in counts) <= limits.max_expanded_primitives:
+                ceiling = candidate
+            else:
+                break
+        note = f"hard ceiling {limits.max_expanded_primitives} applied to the whole work"
+        for index, ins in enumerate(instructions):
+            if counts[index] <= ceiling or ins.arrangement is None:
+                continue
+            if ins.arrangement.layout == "grid":
+                instructions[index] = _grid_within(ins, ceiling, note)
+            else:
+                instructions[index] = _with_arrangement_count(ins, ceiling, note)
+            changed = True
+
+    if not changed:
+        return score
+    data = score.model_dump(by_alias=True)
+    data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
+    return Score.model_validate(data)
 
 
 def _repair_visibility(ins: Instruction, background: str) -> Instruction:

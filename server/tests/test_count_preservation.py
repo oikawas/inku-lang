@@ -24,12 +24,10 @@ import pytest
 
 from inku_server.coerce import coerce_score
 from inku_server.coerce.normalize import (
-    MAX_EXPANDED_PRIMITIVES,
-    MAX_VISUAL_CLUSTERED_COUNT,
-    MIN_VISUAL_CLUSTERED_COUNT,
     _clustered_visual_count,
     _with_total_density_budget,
 )
+from inku_server.limits import DEFAULT_LIMITS
 from inku_server.schema import Instruction, Score
 
 FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "count_preservation_cases.json"
@@ -108,7 +106,7 @@ def test_a_represented_count_lands_in_the_band_the_specification_names(requested
     Before v2.7.7 the floor was 48, so a group of 180 knocked down by the total
     budget came out at 75 — outside the band its own documentation promised.
     """
-    assert MIN_VISUAL_CLUSTERED_COUNT <= _clustered_visual_count(requested) <= MAX_VISUAL_CLUSTERED_COUNT
+    assert DEFAULT_LIMITS.represented_count_min <= _clustered_visual_count(requested) <= DEFAULT_LIMITS.represented_count_max
 
 
 def test_the_total_budget_gives_way_from_the_largest_group() -> None:
@@ -116,8 +114,8 @@ def test_the_total_budget_gives_way_from_the_largest_group() -> None:
     out = _with_total_density_budget([_line(180), _line(150), _line(130)])
     counts = [ins.arrangement.count for ins in out]
     assert counts[1:] == [150, 130]
-    assert MIN_VISUAL_CLUSTERED_COUNT <= counts[0] < 180
-    assert sum(counts) <= MAX_EXPANDED_PRIMITIVES
+    assert DEFAULT_LIMITS.represented_count_min <= counts[0] < 180
+    assert sum(counts) <= DEFAULT_LIMITS.max_expanded_primitives
 
 
 def test_the_total_budget_shares_one_ceiling_rather_than_emptying_groups() -> None:
@@ -126,7 +124,7 @@ def test_the_total_budget_shares_one_ceiling_rather_than_emptying_groups() -> No
     counts = [ins.arrangement.count for ins in out]
     assert len(set(counts)) == 1
     assert min(counts) > 1
-    assert sum(counts) <= MAX_EXPANDED_PRIMITIVES
+    assert sum(counts) <= DEFAULT_LIMITS.max_expanded_primitives
 
 
 def test_the_total_budget_never_inflates_a_group_to_spend_the_budget() -> None:

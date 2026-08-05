@@ -2,7 +2,7 @@
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches.",
  "frozen_at": "2026-07-26",
- "commit": "cf4c4c17b44b66479f1eb1b811d9ad4718b75b02",
+ "commit": "396452836116b2b082a2a3e0d1f2241693c992bd",
  "branches_reached": [
   "coerce_and_repair_instruction",
   "dedupe_instructions",
@@ -315,7 +315,7 @@
      "instructions": [
       {
        "primitive": "square",
-       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent",
+       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; hard ceiling 400 applied to the whole work",
        "from": null,
        "to": null,
        "center": null,
@@ -349,7 +349,7 @@
         ]
        },
        "arrangement": {
-        "count": 400,
+        "count": 390,
         "layout": "grid",
         "rows": null,
         "cols": null,
@@ -5542,7 +5542,7 @@
       },
       {
        "primitive": "line",
-       "note": "coverage from DDL clause: 白い鉛筆の細い線を上から下へ二百三十三本散らす; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
+       "note": "coverage from DDL clause: 白い鉛筆の細い線を上から下へ二百三十三本散らす; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
        "from": [
         0.29,
         0.635
@@ -5576,7 +5576,7 @@
         ]
        },
        "arrangement": {
-        "count": 48,
+        "count": 233,
         "layout": "scatter",
         "rows": null,
         "cols": null,
@@ -5593,7 +5593,7 @@
         ],
         "radius": null,
         "density": "low",
-        "cluster_count": 5,
+        "cluster_count": null,
         "fade": "directional",
         "preserve_space": true,
         "rhythm_spacing": "syncopated"
@@ -5652,7 +5652,7 @@
      "with_background_dominance_governor": 0,
      "with_color_delivery_repair": 0,
      "with_complex_motif_repair": 0,
-     "with_context_density_governor": 1,
+     "with_context_density_governor": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 2,
      "with_existing_event_counterweight": 1,
@@ -7345,7 +7345,7 @@
       },
       {
        "primitive": "ellipse",
-       "note": "coverage from DDL clause: 白い鉛筆の小さな楕円を画面全体に点々と二百三十三個散らす; small focal mark kept compact with preserved negative space; quiet density governed to preserve lightness; original count 120",
+       "note": "coverage from DDL clause: 白い鉛筆の小さな楕円を画面全体に点々と二百三十三個散らす; small focal mark kept compact with preserved negative space; ma pressure restored through spacing and preserved negative space",
        "from": null,
        "to": null,
        "center": [
@@ -7371,7 +7371,7 @@
        "color_hint": null,
        "variation": null,
        "arrangement": {
-        "count": 64,
+        "count": 233,
         "layout": "scatter",
         "rows": null,
         "cols": null,
@@ -7381,8 +7381,8 @@
         "margin": 0.22,
         "center": null,
         "radius": null,
-        "density": "medium",
-        "cluster_count": 5,
+        "density": "low",
+        "cluster_count": null,
         "fade": "outward",
         "preserve_space": true,
         "rhythm_spacing": "none"
@@ -7404,7 +7404,7 @@
      "with_color_delivery_repair": 1,
      "with_complex_motif_repair": 0,
      "with_composition_diversity_repair": 0,
-     "with_context_density_governor": 3,
+     "with_context_density_governor": 2,
      "with_context_energy_repair": 0,
      "with_crescent_sensory_suppression": 0,
      "with_ddl_coverage": 3,
@@ -7412,7 +7412,7 @@
      "with_explicit_constraint_enforcement": 0,
      "with_focal_event_floor": 0,
      "with_literal_grid_fidelity": 0,
-     "with_ma_pressure": 1,
+     "with_ma_pressure": 2,
      "with_motion_energy": 0,
      "with_motion_floor": 0,
      "with_per_instruction_density_budget": 0,

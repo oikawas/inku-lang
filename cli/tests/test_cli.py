@@ -1867,9 +1867,17 @@ def test_every_render_limit_flag_reaches_the_body_under_its_own_name(monkeypatch
 
 
 def test_limits_reset_replaces_the_body_instead_of_adding_to_it(monkeypatch):
+    """A value passed alongside --limits-reset must not survive it.
+
+    Asserted WITH another flag on the same line: on its own the body is empty
+    either way, so replacing and merging look identical and the assertion is
+    vacuous (half_perturbation_masked_by_resnap).
+    """
     calls = _fake_client_recording(monkeypatch)
     parser = cli.build_parser()
-    args = parser.parse_args(["config", "update", "--limits-reset"])
+    args = parser.parse_args(
+        ["config", "update", "--limits-reset", "--limit-max-instructions", "60"]
+    )
     assert cli.command_config(args) == 0
     assert calls == [("PUT", "/api/settings/limits", {"reset_to_defaults": True})]
 

@@ -1,0 +1,130 @@
+{
+  "note": "What the server writes to lineage_nodes / lineage_edges when a work is saved. Baked by running db.add_item on a throwaway SQLite file.",
+  "derivation_kinds": [
+    "age_change",
+    "canvas_aspect_change",
+    "catalog_change",
+    "ddl_edit",
+    "description_edit",
+    "external_seed_change",
+    "hacho_change",
+    "language_comparison",
+    "layout_change",
+    "model_comparison",
+    "reinterpretation",
+    "render_engine_change",
+    "renga_reply",
+    "replay",
+    "touch_change",
+    "variation"
+  ],
+  "cases": [
+    {
+      "case_id": "root-work-writes-one-node-and-no-edge",
+      "given": {
+        "parent": null,
+        "derivation_kind": null,
+        "history_visibility": null
+      },
+      "expected": {
+        "node_written": true,
+        "state": "active",
+        "root_is_self": true,
+        "edge_written": false,
+        "description_hash_present": true,
+        "render_hash_present": true,
+        "node_at_equals_item_at": true
+      }
+    },
+    {
+      "case_id": "declared-derivation-writes-an-edge-and-inherits-the-root",
+      "given": {
+        "parent": "<the root node>",
+        "derivation_kind": "touch_change",
+        "derivation_metadata": {
+          "b": 1,
+          "a": 2
+        }
+      },
+      "expected": {
+        "node_written": true,
+        "edge_written": true,
+        "derivation_kind": "touch_change",
+        "root_is_self": false,
+        "child_root_equals_parent_root": true,
+        "metadata_json": "{\"a\":2,\"b\":1}",
+        "edge_at_equals_item_at": true
+      }
+    },
+    {
+      "case_id": "grandchild-keeps-the-original-root",
+      "given": {
+        "parent": "<the child node>",
+        "derivation_kind": "variation"
+      },
+      "expected": {
+        "root_equals_the_root_of_the_first_work": true,
+        "root_equals_the_parent": false,
+        "edge_parent_is_the_child_node": true
+      }
+    },
+    {
+      "case_id": "lineage-only-visibility-sets-the-node-state",
+      "given": {
+        "history_visibility": "lineage_only"
+      },
+      "expected": {
+        "node_written": true,
+        "state": "lineage_only"
+      }
+    },
+    {
+      "case_id": "unknown-derivation-kind-is-rejected",
+      "given": {
+        "lineage_parent_node_id": "<the root node>",
+        "derivation_kind": "not_a_kind"
+      },
+      "expected": {
+        "rejected": true,
+        "message": "invalid lineage derivation kind"
+      }
+    },
+    {
+      "case_id": "derivation-kind-without-a-parent-is-rejected",
+      "given": {
+        "derivation_kind": "touch_change"
+      },
+      "expected": {
+        "rejected": true,
+        "message": "lineage parent is required for a derivation"
+      }
+    },
+    {
+      "case_id": "missing-parent-is-rejected",
+      "given": {
+        "lineage_parent_node_id": "00000000-0000-0000-0000-000000000000",
+        "derivation_kind": "replay"
+      },
+      "expected": {
+        "rejected": true,
+        "message": "lineage parent not found"
+      }
+    },
+    {
+      "case_id": "non-object-derivation-metadata-is-rejected",
+      "given": {
+        "lineage_parent_node_id": "<the root node>",
+        "derivation_kind": "replay",
+        "derivation_metadata": [
+          "not",
+          "an",
+          "object"
+        ]
+      },
+      "expected": {
+        "rejected": true,
+        "message": "lineage derivation metadata must be an object"
+      }
+    }
+  ]
+}

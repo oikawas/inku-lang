@@ -1913,6 +1913,150 @@ def coerce_governor_fixtures() -> None:
     )
 
 
+def lineage_wiring_fixtures() -> None:
+    """Bake what the server writes to the lineage tables when a work is saved.
+
+    The Android port owns the same two tables, the same DAO and the same
+    migration, and nothing calls them: `LineageDao` is reachable only from
+    `InkuDatabase`, so no row is ever written ([I-068]). This is the decision
+    table that wiring has to reproduce.
+
+    Every case runs the real `db.add_item` against a throwaway SQLite file, so
+    the expectations come from the implementation and not from a reading of it.
+    `db` is imported here rather than at module scope: the URL is read at import
+    time, and the rest of the generator never pulls `db` in.
+    """
+    import os
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["INKU_DB_URL"] = f"sqlite:///{tmp}/lineage.db"
+        os.environ["INKU_DB_BACKUP_DIR"] = f"{tmp}/backups"
+        from inku_server import db
+
+        db.init_db()
+        user = db.add_user("baker", "baker@example.invalid", "pw-not-used", "admin", None)
+        uid = user["id"]
+
+        def item(item_id, *, at=1000, **extra):
+            base = {
+                "id": item_id, "user_id": uid, "at": at,
+                "input": "円を描く", "source_text": "円を描く", "ddl": "円を描く。",
+                "score": {"version": "0.1.0", "canvas": "square",
+                          "background": "white", "instructions": []},
+                "svg": "<svg/>", "elapsed_ms": 1,
+            }
+            base.update(extra)
+            return base
+
+        def written(history_id):
+            with db.SessionLocal() as session:
+                row = session.query(db.HistoryRow).filter(
+                    db.HistoryRow.id == history_id).first()
+                if row is None or row.lineage_node_id is None:
+                    return None, None
+                node = session.get(db.LineageNodeRow, row.lineage_node_id)
+                edge = session.query(db.LineageEdgeRow).filter(
+                    db.LineageEdgeRow.child_node_id == node.id).first()
+                return node, edge
+
+        cases = []
+
+        db.add_item(item("h-root"))
+        root, root_edge = written("h-root")
+        cases.append({
+            "case_id": "root-work-writes-one-node-and-no-edge",
+            "given": {"parent": None, "derivation_kind": None, "history_visibility": None},
+            "expected": {
+                "node_written": True,
+                "state": root.state,
+                "root_is_self": root.root_node_id == root.id,
+                "edge_written": root_edge is not None,
+                "description_hash_present": bool(root.description_hash),
+                "render_hash_present": bool(root.render_hash),
+                "node_at_equals_item_at": root.at == 1000,
+            },
+        })
+
+        db.add_item(item("h-child", at=2000, lineage_parent_node_id=root.id,
+                         derivation_kind="touch_change",
+                         derivation_metadata={"b": 1, "a": 2}))
+        child, child_edge = written("h-child")
+        cases.append({
+            "case_id": "declared-derivation-writes-an-edge-and-inherits-the-root",
+            "given": {"parent": "<the root node>", "derivation_kind": "touch_change",
+                      "derivation_metadata": {"b": 1, "a": 2}},
+            "expected": {
+                "node_written": True,
+                "edge_written": child_edge is not None,
+                "derivation_kind": None if child_edge is None else child_edge.derivation_kind,
+                "root_is_self": child.root_node_id == child.id,
+                "child_root_equals_parent_root": child.root_node_id == root.root_node_id,
+                "metadata_json": None if child_edge is None else child_edge.metadata_json,
+                "edge_at_equals_item_at": child_edge is not None and child_edge.at == 2000,
+            },
+        })
+
+        db.add_item(item("h-grand", at=3000, lineage_parent_node_id=child.id,
+                         derivation_kind="variation"))
+        grand, grand_edge = written("h-grand")
+        cases.append({
+            "case_id": "grandchild-keeps-the-original-root",
+            "given": {"parent": "<the child node>", "derivation_kind": "variation"},
+            "expected": {
+                "root_equals_the_root_of_the_first_work": grand.root_node_id == root.id,
+                "root_equals_the_parent": grand.root_node_id == child.id,
+                "edge_parent_is_the_child_node": (
+                    grand_edge is not None and grand_edge.parent_node_id == child.id),
+            },
+        })
+
+        db.add_item(item("h-hidden", at=4000, history_visibility="lineage_only"))
+        hidden, _ = written("h-hidden")
+        cases.append({
+            "case_id": "lineage-only-visibility-sets-the-node-state",
+            "given": {"history_visibility": "lineage_only"},
+            "expected": {"node_written": True, "state": hidden.state},
+        })
+
+        def rejects(case_id, given, **extra):
+            try:
+                db.add_item(item(f"h-{case_id}", at=5000, **extra))
+            except ValueError as exc:
+                cases.append({"case_id": case_id, "given": given,
+                              "expected": {"rejected": True, "message": str(exc)}})
+            else:
+                cases.append({"case_id": case_id, "given": given,
+                              "expected": {"rejected": False, "message": None}})
+
+        # Node ids are uuid4, so `given` carries a label: a rebake has to
+        # reproduce these bytes exactly.
+        rejects("unknown-derivation-kind-is-rejected",
+                {"lineage_parent_node_id": "<the root node>", "derivation_kind": "not_a_kind"},
+                lineage_parent_node_id=root.id, derivation_kind="not_a_kind")
+        rejects("derivation-kind-without-a-parent-is-rejected",
+                {"derivation_kind": "touch_change"}, derivation_kind="touch_change")
+        rejects("missing-parent-is-rejected",
+                {"lineage_parent_node_id": "00000000-0000-0000-0000-000000000000",
+                 "derivation_kind": "replay"},
+                lineage_parent_node_id="00000000-0000-0000-0000-000000000000",
+                derivation_kind="replay")
+        rejects("non-object-derivation-metadata-is-rejected",
+                {"lineage_parent_node_id": "<the root node>", "derivation_kind": "replay",
+                 "derivation_metadata": ["not", "an", "object"]},
+                lineage_parent_node_id=root.id, derivation_kind="replay",
+                derivation_metadata=["not", "an", "object"])
+
+        (OUT / "lineage_wiring.json").write_text(json.dumps({
+            "note": (
+                "What the server writes to lineage_nodes / lineage_edges when a work "
+                "is saved. Baked by running db.add_item on a throwaway SQLite file."
+            ),
+            "derivation_kinds": sorted(db.LINEAGE_DERIVATION_KINDS),
+            "cases": cases,
+        }, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
@@ -1931,6 +2075,7 @@ def main() -> None:
     score_schema_contract_fixture()
     arrangement_fixtures()
     coerce_governor_fixtures()
+    lineage_wiring_fixtures()
     svg_fixtures()
     print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
 

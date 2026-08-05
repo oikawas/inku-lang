@@ -62,7 +62,7 @@ class LocalFallbackPipeline(
         val scoreJson = generatedScore ?: if (request.stage2Model.isExplicitProviderModelId()) {
             error("Stage 2 explicit provider returned no usable Score.")
         } else {
-            scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect).toString()
+            scoreFromWebRules(expandedDdl, request.canvasAspect).toString()
         }
         val renderStarted = System.currentTimeMillis()
         Log.i(
@@ -178,7 +178,7 @@ class LocalFallbackPipeline(
         val provider = modelProvider ?: return null
         val started = System.currentTimeMillis()
         return runCatching {
-            val userPrompt = buildStage2UserMessage(expandedDdl, request.originalText)
+            val userPrompt = buildStage2UserMessage(expandedDdl)
             val systemPrompt = stage2SystemPromptFor(request.stage2Model)
             Log.i(
                 PERF_TAG,
@@ -250,7 +250,7 @@ class LocalFallbackPipeline(
         }.getOrNull()
         if (retryScore != null && WebScoreTool.hasRenderableInstructions(retryScore)) return retryScore
         Log.w(TAG, "Stage 2 returned no drawable instructions after retry; rebuilding renderable score from DDL.")
-        return scoreFromWebRules(expandedDdl, request.originalText, request.canvasAspect)
+        return scoreFromWebRules(expandedDdl, request.canvasAspect)
     }
 
     private fun logStage2InvalidResponse(modelId: String, response: String, error: Throwable?, score: JSONObject?) {
@@ -318,8 +318,8 @@ class LocalFallbackPipeline(
         return ServerFallbackComposer.fallbackDdlFromText(text)
     }
 
-    internal fun scoreFromWebRules(ddl: String, originalText: String, canvasAspect: String): JSONObject {
-        val context = "$originalText\n$ddl"
+    internal fun scoreFromWebRules(ddl: String, canvasAspect: String): JSONObject {
+        val context = ddl
         val background = detectBackground(context)
         val foreground = visibleForeground(detectColorKey(context, background), background)
         val colorCycle = detectColorCycle(context, foreground)
@@ -355,13 +355,7 @@ class LocalFallbackPipeline(
         return ServerFallbackComposer.arrangementFrom(text)
     }
 
-    private fun buildStage2UserMessage(ddl: String, originalText: String): String {
-        return if (originalText.isNotBlank() && originalText.trim() != ddl.trim()) {
-            "[原文]\n$originalText\n\n[正規化DDL]\n$ddl"
-        } else {
-            ddl
-        }
-    }
+    private fun buildStage2UserMessage(ddl: String): String = ddl
 
     private fun normalizeServerScore(score: JSONObject, ddl: String, canvasAspect: String): JSONObject {
         val background = backgroundDominanceGovernor(visibleBackground(score.optString("background", "white")), ddl)
@@ -387,6 +381,7 @@ class LocalFallbackPipeline(
             .withContextEnergy(ddl, background)
             .withSurfaceTension(ddl, background)
             .withPresenceAuxiliaryShapeRepair(presence)
+            .withUnintentionalFilledShapeTempering(ddl)
             .withContextDensityGovernor(ddl, background)
             .withMotionEnergy(ddl)
             .withRhythmVariation(ddl)
@@ -903,7 +898,9 @@ class LocalFallbackPipeline(
                 adjusted += item
                 continue
             }
-            val copy = temperQuietSymbolicShape(copyJsonObject(item), ddl)
+            val copy1 = temperQuietSymbolicShape(copyJsonObject(item), ddl)
+            val copy2 = temperQuietSingleShape(copy1, ddl)
+            val copy = temperUnintentionalFilledShape(copy2, ddl)
             val arrangement = copy.optJSONObject("arrangement")
             if (arrangement == null) {
                 adjusted += copy
@@ -1444,6 +1441,54 @@ class LocalFallbackPipeline(
         return copy
     }
 
+    private fun temperQuietSingleShape(item: JSONObject, ddl: String): JSONObject {
+        if (hasIntentionalLargeSurface(ddl)) return item
+        if (item.has("arrangement") && !item.isNull("arrangement")) return item
+        val primitive = item.optString("primitive")
+        if (primitive !in setOf("circle", "ellipse", "square", "triangle", "polygon")) return item
+        if (closedShapeArea(item) < MAX_QUIET_SINGLE_SHAPE_AREA) return item
+
+        val copy = copyJsonObject(item)
+        if (primitive in setOf("circle", "polygon")) {
+            val radius = if (item.has("radius") && !item.isNull("radius")) item.optDouble("radius") else MAX_QUIET_SINGLE_SHAPE_RADIUS
+            copy.put("radius", minOf(radius, MAX_QUIET_SINGLE_SHAPE_RADIUS))
+        } else if (item.has("size") && !item.isNull("size")) {
+            val size = item.optJSONArray("size")
+            if (size != null) {
+                copy.put("size", capSize(size, MAX_QUIET_SINGLE_SHAPE_WIDTH, MAX_QUIET_SINGLE_SHAPE_HEIGHT))
+            }
+        }
+        copy.put("color_hint", appendHint(copy.optString("color_hint"), "quiet single large shape tempered to keep trace/space legible"))
+        return copy
+    }
+
+    private fun temperUnintentionalFilledShape(item: JSONObject, ddl: String): JSONObject {
+        if (hasIntentionalLargeSurface(ddl)) return item
+        if (contextHasDensityGovernor(ddl)) return item
+        if (!item.optBoolean("filled", false)) return item
+        if (item.has("arrangement") && !item.isNull("arrangement")) return item
+        val primitive = item.optString("primitive")
+        if (primitive !in setOf("circle", "ellipse", "square", "triangle", "polygon")) return item
+        if (closedShapeArea(item) < MAX_UNINTENTIONAL_FILLED_SHAPE_AREA) return item
+
+        val copy = copyJsonObject(item)
+        if (primitive in setOf("circle", "polygon")) {
+            val radius = if (item.has("radius") && !item.isNull("radius")) item.optDouble("radius") else MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS
+            copy.put("radius", minOf(radius, MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS))
+        } else if (item.has("size") && !item.isNull("size")) {
+            val size = item.optJSONArray("size")
+            if (size != null) {
+                copy.put("size", capSize(size, MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH, MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT))
+            }
+        }
+        copy.put("color_hint", appendHint(copy.optString("color_hint"), "large filled shape tempered to avoid unintended surface dominance"))
+        return copy
+    }
+
+    private fun List<JSONObject>.withUnintentionalFilledShapeTempering(ddl: String): List<JSONObject> {
+        return map { temperUnintentionalFilledShape(copyJsonObject(it), ddl) }
+    }
+
     private fun capSize(size: JSONArray, maxWidth: Double, maxHeight: Double): JSONArray {
         return JSONArray(
             listOf(
@@ -1504,8 +1549,22 @@ class LocalFallbackPipeline(
     private fun backgroundDominanceGovernor(background: String, ddl: String): String {
         if (background !in setOf("black", "red", "blue", "green")) return background
         if (hasExplicitBackgroundIntent(ddl) || hasIntentionalLargeSurface(ddl)) return background
-        if (requestedColors(ddl).isNotEmpty() && requestedShapes(ddl).isEmpty()) return background
+        if (colorOnlyConstraintFromDdl(ddl).isNotEmpty()) return background
         return if (contextHasDensityGovernor(ddl) || presenceFromDdl(ddl) != null) "white" else background
+    }
+
+    private fun colorOnlyConstraintFromDdl(ddl: String?): List<String> {
+        if (ddl.isNullOrBlank()) return emptyList()
+        val lower = ddl.lowercase()
+        val japaneseColor = "(?:白|黒|青|赤|緑|灰)(?:色)?"
+        val japaneseList = "$japaneseColor(?:\\s*(?:と|、|・|,|/)\\s*$japaneseColor)*"
+        val englishColor = "(?:white|black|blue|red|green|gray|grey)"
+        val englishList = "$englishColor(?:\\s*(?:and|,|/)\\s*$englishColor)*"
+        val hasColorOnlyPhrase = Regex("$japaneseList\\s*(?:だけ|のみ|に限定|で限定)").containsMatchIn(ddl) ||
+            Regex("(?:$englishList)\\s+only\\b").containsMatchIn(lower) ||
+            Regex("limited to\\s+(?:$englishList)").containsMatchIn(lower)
+        if (!hasColorOnlyPhrase) return emptyList()
+        return requestedColors(ddl)
     }
 
     private fun hasIntentionalLargeSurface(ddl: String): Boolean {
@@ -1530,7 +1589,7 @@ class LocalFallbackPipeline(
     private fun hasExplicitBackgroundIntent(ddl: String): Boolean {
         val context = ddl.trim()
         val lower = context.lowercase()
-        if (listOf("背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness").any { it in context || it in lower }) return true
+        if (listOf("背景", "地色", "画面全体", "塗りつぶ", "一面", "夜空", "暗闇", "background", "ground color", "full canvas", "fill the canvas", "night sky", "darkness", "dark field").any { it in context || it in lower }) return true
         if (listOf("夕焼け空", "夕暮れの空", "sunset sky", "dusk sky").any { it in context || it in lower }) return true
         if (listOf("夜明け", "明け方", "朝焼け", "dawn", "daybreak", "sunrise").any { it in context || it in lower }) return false
         return listOf("夜", "night").any { it in context || it in lower }
@@ -1611,15 +1670,19 @@ class LocalFallbackPipeline(
         val metadata = JSONObject(renderMetadataJson)
         val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
         val renderSeed = canonicalSeed(metadata.opt("render_seed") ?: metadata.opt("seed"))
-        val engineId = metadata.optString("render_engine_id", CompatibilityConstants.renderEngineId).ifBlank { CompatibilityConstants.renderEngineId }
-        val engineVersion = metadata.optString("render_engine_version", CompatibilityConstants.renderEngineVersion).ifBlank { CompatibilityConstants.renderEngineVersion }
+        val engineId = if (metadata.has("render_engine_id") && !metadata.isNull("render_engine_id")) {
+            metadata.optString("render_engine_id").takeIf { it.isNotBlank() }
+        } else null
+        val engineVersion = if (metadata.has("render_engine_version") && !metadata.isNull("render_engine_version")) {
+            metadata.optString("render_engine_version").takeIf { it.isNotBlank() }
+        } else null
         val colorCatalogId = metadata.optString("render_color_catalog_id", catalogId).ifBlank { catalogId }
         val wild = metadata.optBoolean("render_wild", metadata.optBoolean("wild", false))
 
         val payload = JSONObject()
             .put("render_color_catalog_id", colorCatalogId)
-            .put("render_engine_id", engineId)
-            .put("render_engine_version", engineVersion)
+            .put("render_engine_id", engineId ?: JSONObject.NULL)
+            .put("render_engine_version", engineVersion ?: JSONObject.NULL)
             .put("render_seed", renderSeed ?: JSONObject.NULL)
             .put("render_wild", wild)
             .put("score", scoreObj)
@@ -1675,6 +1738,14 @@ class LocalFallbackPipeline(
         private const val MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
         private const val MAX_QUIET_SYMBOLIC_SHAPE_WIDTH = 0.12
         private const val MAX_QUIET_SYMBOLIC_SHAPE_HEIGHT = 0.09
+        private const val MAX_QUIET_SINGLE_SHAPE_WIDTH = 0.34
+        private const val MAX_QUIET_SINGLE_SHAPE_HEIGHT = 0.24
+        private const val MAX_QUIET_SINGLE_SHAPE_RADIUS = 0.17
+        private const val MAX_QUIET_SINGLE_SHAPE_AREA = 0.14
+        private const val MAX_UNINTENTIONAL_FILLED_SHAPE_WIDTH = 0.42
+        private const val MAX_UNINTENTIONAL_FILLED_SHAPE_HEIGHT = 0.30
+        private const val MAX_UNINTENTIONAL_FILLED_SHAPE_RADIUS = 0.20
+        private const val MAX_UNINTENTIONAL_FILLED_SHAPE_AREA = 0.20
         private val motionOrTextureTerms = listOf(
             "震える", "震え", "揺れる", "揺らぐ", "揺れ", "小刻み", "滲む", "にじむ", "太い", "細い",
             "trembling", "tremble", "swaying", "sway", "wobble", "wobbly", "blurring", "blurred", "thick", "thin",

@@ -23,7 +23,7 @@ class DescriptionPropagationCutTest {
     private val pipeline = LocalFallbackPipeline()
 
     private fun backgroundOf(ddl: String, originalText: String): String {
-        return pipeline.scoreFromWebRules(ddl, originalText, "square").optString("background")
+        return pipeline.scoreFromWebRules(ddl, "square").optString("background")
     }
 
     private fun instructionsOf(score: JSONObject): List<JSONObject> {
@@ -121,5 +121,5 @@ class DescriptionPropagationCutTest {
     }
 
     private fun LocalFallbackPipeline.scoreFromWebRules(ddl: String, originalText: String): JSONObject =
-        scoreFromWebRules(ddl, originalText, "square")
+        scoreFromWebRules(ddl, "square")
 }

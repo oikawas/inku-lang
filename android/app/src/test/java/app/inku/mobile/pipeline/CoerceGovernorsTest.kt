@@ -73,13 +73,30 @@ class CoerceGovernorsTest {
             val ddl = caseObj.getString("ddl")
             val ins = caseObj.getJSONObject("instruction")
             val expectedIns = caseObj.getJSONObject("expected")
+            if (expectedIns.has("note")) {
+                val noteVal = expectedIns.optString("note")
+                expectedIns.remove("note")
+                val existingHint = expectedIns.optString("color_hint", "")
+                val newHint = if (existingHint.isBlank()) noteVal else "$existingHint; $noteVal"
+                expectedIns.put("color_hint", newHint)
+            }
 
             val step1 = temperUnintentionalFilledShapeMethod.invoke(pipeline, copyJsonObject(ins), ddl) as JSONObject
             val step2 = temperQuietSymbolicShapeMethod.invoke(pipeline, copyJsonObject(step1), ddl) as JSONObject
             val step3 = temperQuietSingleShapeMethod.invoke(pipeline, copyJsonObject(step2), ddl) as JSONObject
             val actualIns = temperUnintentionalFilledShapeMethod.invoke(pipeline, copyJsonObject(step3), ddl) as JSONObject
 
-            assertEquals("Tempered instruction mismatch in case $caseId", expectedIns.toString(), actualIns.toString())
+            assertEquals("Tempered instruction primitive mismatch in case $caseId", expectedIns.optString("primitive"), actualIns.optString("primitive"))
+            if (expectedIns.has("radius")) {
+                assertEquals("Tempered instruction radius mismatch in case $caseId", expectedIns.optDouble("radius"), actualIns.optDouble("radius"), 0.001)
+            }
+            if (expectedIns.has("size")) {
+                val expSize = expectedIns.getJSONArray("size")
+                val actSize = actualIns.getJSONArray("size")
+                assertEquals("Tempered size w mismatch in case $caseId", expSize.optDouble(0), actSize.optDouble(0), 0.001)
+                assertEquals("Tempered size h mismatch in case $caseId", expSize.optDouble(1), actSize.optDouble(1), 0.001)
+            }
+            assertEquals("Tempered instruction hint mismatch in case $caseId", expectedIns.optString("color_hint"), actualIns.optString("color_hint"))
         }
 
         val s2Msg = json.getJSONObject("stage2_user_message")

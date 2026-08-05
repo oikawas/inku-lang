@@ -86,26 +86,12 @@ internal object ServerScoreSemantics {
     fun closedShapeArea(item: JSONObject): Double {
         return when (item.optString("primitive")) {
             "circle", "polygon" -> {
-                val radius = item.optDouble("radius", 0.0)
-                PI * radius * radius
+                val radius = if (item.has("radius") && !item.isNull("radius")) item.optDouble("radius") else 0.1
+                radius * radius
             }
-            "arc" -> {
-                val radius = item.optDouble("radius", 0.0)
-                PI * radius * radius * 0.35
-            }
-            "ellipse", "cloudform" -> {
+            "ellipse", "square", "triangle" -> {
                 val size = item.optJSONArray("size")
-                val width = size?.optDouble(0, 0.0) ?: 0.0
-                val height = size?.optDouble(1, 0.0) ?: 0.0
-                PI * (width / 2.0) * (height / 2.0)
-            }
-            "square" -> {
-                val size = item.optJSONArray("size")
-                (size?.optDouble(0, 0.0) ?: 0.0) * (size?.optDouble(1, 0.0) ?: 0.0)
-            }
-            "triangle" -> {
-                val size = item.optJSONArray("size")
-                (size?.optDouble(0, 0.0) ?: 0.0) * (size?.optDouble(1, 0.0) ?: 0.0) * 0.5
+                if (size != null) size.optDouble(0, 0.0) * size.optDouble(1, 0.0) else 0.0
             }
             else -> 0.0
         }

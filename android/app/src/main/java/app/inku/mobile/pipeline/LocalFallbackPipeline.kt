@@ -1490,10 +1490,15 @@ class LocalFallbackPipeline(
     }
 
     private fun capSize(size: JSONArray, maxWidth: Double, maxHeight: Double): JSONArray {
+        val width = size.optDouble(0, maxWidth)
+        val height = size.optDouble(1, maxHeight)
+        val scaleW = if (width > 0.0) maxWidth / width else 1.0
+        val scaleH = if (height > 0.0) maxHeight / height else 1.0
+        val scale = minOf(1.0, scaleW, scaleH)
         return JSONArray(
             listOf(
-                minOf(size.optDouble(0, maxWidth), maxWidth),
-                minOf(size.optDouble(1, maxHeight), maxHeight),
+                maxOf(0.01, width * scale),
+                maxOf(0.01, height * scale),
             )
         )
     }

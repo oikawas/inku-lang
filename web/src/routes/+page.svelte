@@ -249,6 +249,13 @@
 			max_limit: number;
 			note: string;
 		};
+		render_limits: {
+			limits: Record<string, number>;
+			defaults: Record<string, number>;
+			groups: Record<string, string[]>;
+			absolute_max: number;
+			note: string;
+		};
 		log_retention: {
 			enabled: boolean;
 			retention_days: number;
@@ -263,7 +270,7 @@
 	};
 
 	type UserRole = 'admin' | 'group_lead' | 'user';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs' | 'limits';
 	type UserModelSettings = {
 		stage1_provider: Provider;
 		stage1_model: string;
@@ -731,6 +738,7 @@
 	let dbBackupStatus = $state<string | null>(null);
 	let outputSaveStatus = $state<string | null>(null);
 	let logRetentionStatus = $state<string | null>(null);
+	let renderLimitsStatus = $state<string | null>(null);
 	let users = $state<UserItem[]>([]);
 	let groups = $state<UserGroup[]>([]);
 	let newUserName = $state('');
@@ -1957,6 +1965,7 @@
 			dbBackupStatus = null;
 			outputSaveStatus = null;
 			logRetentionStatus = null;
+			renderLimitsStatus = null;
 		} catch (e) {
 			settingsStatus = null;
 			settingsStatusError = e instanceof Error ? e.message : String(e);
@@ -2181,6 +2190,31 @@
 			if (Number.isFinite(data.render_fanout_limit)) renderFanoutLimit = Number(data.render_fanout_limit);
 		} catch (error) {
 			console.warn('failed to load client config', error);
+		}
+	}
+
+	// A null patch means "restore the defaults". Only the changed field is sent;
+	// the server merges it over the stored set, rounds the result, and returns
+	// what took effect -- so the panel is refreshed from the RESPONSE, never
+	// from what was typed.
+	async function updateRenderLimits(patch: Record<string, number> | null) {
+		renderLimitsStatus = null;
+		try {
+			const r = await apiFetch('/api/settings/limits', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(patch === null ? { reset_to_defaults: true } : patch)
+			});
+			if (!r.ok) {
+				const d = await r.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(describeApiError(d.detail, r.status));
+			}
+			const nextLimits = await r.json() as SettingsStatus['render_limits'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, render_limits: nextLimits };
+			renderLimitsStatus = t().settingsRenderLimitsSaved;
+		} catch (e) {
+			renderLimitsStatus = e instanceof Error ? e.message : String(e);
+			console.warn('failed to update render limits', e);
 		}
 	}
 
@@ -6346,6 +6380,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{dbBackupStatus}
 			{outputSaveStatus}
 			{logRetentionStatus}
+			{renderLimitsStatus}
 			{currentUser}
 			{uiMode}
 			{uiCustom}
@@ -6413,6 +6448,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{renderConcurrencyStatus}
 			onUpdateRenderConcurrencySettings={updateRenderConcurrencySettings}
 			onUpdateLogRetentionSettings={updateLogRetentionSettings}
+			onUpdateRenderLimits={updateRenderLimits}
 			onLoadUserSettings={loadUserSettings}
 			onLogin={login}
 			onLogout={logout}

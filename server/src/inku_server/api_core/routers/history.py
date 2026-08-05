@@ -10,13 +10,14 @@ from ...animation_export import build_animation
 from ...feature_analysis import composition_distance
 from ...coerce import coerce_score
 from ...ddl_expander import FOCUS_IDS
+from ...limits import limits_as_dict, using_limits
 from ...schema import Score
 from ...sketch import SketchDetail, normalize_sketch_grain, sketch_state_of
 from ... import db as _db
 from ..common import _unexpected_http_error
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _resolved_tenkei, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
+from ..rendering import _effective_limits, _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _resolved_tenkei, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -185,7 +186,10 @@ def api_history_post(
         requested_seed_text = metadata_seed_text
     render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
     try:
-        score = coerce_score(Score.model_validate(body.score))
+        # Site 2 of 5.
+        limits = _effective_limits()
+        with using_limits(limits):
+            score = coerce_score(Score.model_validate(body.score), limits=limits)
         catalog_id = _resolved_catalog_id(body.catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:
@@ -207,6 +211,10 @@ def api_history_post(
             "variation_seed": body.variation_seed,
             "seed_text": seed_text,
             "interpretation_seed": body.interpretation_seed,
+            # What actually governed this work. Without it a per-install setting
+            # would make the same description a different work with nothing on
+            # the row to say why.
+            "render_limits": limits_as_dict(limits),
         }
         svg, render_metadata = _render_with_metadata(score, render_metadata)
     except HTTPException:

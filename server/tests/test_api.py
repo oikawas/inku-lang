@@ -865,7 +865,7 @@ def test_compose_resolves_english_instruction_language(monkeypatch, auth_context
     headers, _, _ = auth_context
     captured: dict[str, str] = {}
 
-    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja"):
+    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja", **kwargs):
         captured["lang"] = lang
         return Score.model_validate(
             {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
@@ -891,7 +891,7 @@ def test_compose_uses_ui_language_when_text_has_no_language_signal(monkeypatch, 
     headers, _, _ = auth_context
     captured: dict[str, str] = {}
 
-    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja"):
+    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja", **kwargs):
         captured["lang"] = lang
         return Score.model_validate(
             {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}
@@ -1108,7 +1108,7 @@ def test_compose_empty_instruction_result_is_retried(monkeypatch, auth_context):
     headers, _, _ = auth_context
     calls: list[str | None] = []
 
-    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja"):
+    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja", **kwargs):
         calls.append(system_prompt)
         if len(calls) == 1:
             return Score(instructions=[])
@@ -1149,7 +1149,7 @@ def test_compose_empty_instruction_result_uses_fallback_after_retry(monkeypatch,
 def test_compose_can_skip_auto_repair(monkeypatch, auth_context):
     headers, _, _ = auth_context
 
-    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja"):
+    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja", **kwargs):
         return Score.model_validate(
             {"instructions": [{"primitive": "line", "from": [0.5, 0.0], "to": [0.5, 1.0], "color": "green"}]}
         )
@@ -2048,7 +2048,7 @@ def test_paint_stage1_hard_timeout_uses_fallback_ddl(monkeypatch, auth_context):
 
     captured: dict[str, str] = {}
 
-    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja"):
+    def fake_compose(ddl: str, model=None, original_description=None, system_prompt=None, lang="ja", **kwargs):
         captured["ddl"] = ddl
         return Score.model_validate(
             {"instructions": [{"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]}]}

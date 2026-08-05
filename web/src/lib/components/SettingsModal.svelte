@@ -84,6 +84,13 @@
 			max_limit: number;
 			note: string;
 		};
+		render_limits: {
+			limits: Record<string, number>;
+			defaults: Record<string, number>;
+			groups: Record<string, string[]>;
+			absolute_max: number;
+			note: string;
+		};
 		log_retention: {
 			enabled: boolean;
 			retention_days: number;
@@ -114,7 +121,7 @@
 		at: number;
 	};
 	type SettingsMode = 'model' | 'settings';
-	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs';
+	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs' | 'limits';
 	type ModelProviderSetting = {
 		label?: string;
 		kind?: string;
@@ -161,6 +168,7 @@
 		dbBackupStatus: string | null;
 		outputSaveStatus: string | null;
 		logRetentionStatus: string | null;
+		renderLimitsStatus: string | null;
 		currentUser: UserItem | null;
 		uiMode: UiMode;
 		uiCustom: UiCustomVisibility;
@@ -227,6 +235,7 @@
 		renderConcurrencyStatus: string | null;
 		onUpdateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => void | Promise<void>;
 		onUpdateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => void | Promise<void>;
+		onUpdateRenderLimits: (patch: Record<string, number> | null) => void | Promise<void>;
 		onLoadUserSettings: () => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
@@ -271,6 +280,7 @@
 		dbBackupStatus,
 		outputSaveStatus,
 		logRetentionStatus,
+		renderLimitsStatus,
 		currentUser,
 		uiMode,
 		uiCustom,
@@ -337,6 +347,7 @@
 		renderConcurrencyStatus,
 		onUpdateRenderConcurrencySettings,
 		onUpdateLogRetentionSettings,
+		onUpdateRenderLimits,
 		onLoadUserSettings,
 		onLogin,
 		onLogout,
@@ -370,6 +381,24 @@
 	let pluginEditorLoading = $state(false);
 	let pluginEditorSaving = $state(false);
 	let pluginEditorReasons = $state<string[]>([]);
+
+	// The nine limits are addressed by their server-side field names. The label,
+	// the hint and the group heading all come from i18n by that name, so the
+	// panel does not carry a second, drifting copy of the vocabulary.
+	function renderLimitLabel(field: string): string {
+		const labels = t().settingsRenderLimitLabels as Record<string, string>;
+		return labels[field] ?? field;
+	}
+
+	function renderLimitHint(field: string): string {
+		const hints = t().settingsRenderLimitHints as Record<string, string>;
+		return hints[field] ?? '';
+	}
+
+	function renderLimitGroupLabel(group: string): string {
+		const groups = t().settingsRenderLimitGroups as Record<string, string>;
+		return groups[group] ?? group;
+	}
 
 	function pluginId(plugin: PluginItem): string {
 		return plugin.id ?? plugin.path ?? `${plugin.namespace ?? ''}.${plugin.name}`;
@@ -750,6 +779,7 @@
 				<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
 				<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
 				<button class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
+				<button class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
 			{/if}
 			<button class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
 			<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
@@ -1194,6 +1224,45 @@
 			</div>
 			<div class="settings-inline-actions">
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReloadSettings}</button>
+			</div>
+		{:else if settingsTab === 'limits'}
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsRenderLimitsTitle}</div>
+				{#if settingsStatusLoading}
+					<div class="inline-message">{t().settingsLoading}</div>
+				{:else if settingsStatus}
+					<div class="db-test-result">{t().settingsRenderLimitsIntro}</div>
+					{#each Object.entries(settingsStatus.render_limits.groups) as [groupName, fields]}
+						<div class="limits-group">
+							<div class="limits-group-label">{renderLimitGroupLabel(groupName)}</div>
+							<div class="limits-grid">
+								{#each fields as field}
+									<label>
+										<span>{renderLimitLabel(field)}</span>
+										<input
+											type="number"
+											min="1"
+											max={settingsStatus.render_limits.absolute_max}
+											value={settingsStatus.render_limits.limits[field]}
+											onchange={(e) => onUpdateRenderLimits({ [field]: Number((e.currentTarget as HTMLInputElement).value) })}
+										/>
+										<small>{renderLimitHint(field)}</small>
+									</label>
+								{/each}
+							</div>
+						</div>
+					{/each}
+					<div class="db-test-result">{t().settingsRenderLimitsRounding}</div>
+					{#if renderLimitsStatus}
+						<div class="inline-message">{renderLimitsStatus}</div>
+					{/if}
+				{:else}
+					<div class="inline-message">{settingsStatusError ?? t().settingsLoadFailed}</div>
+				{/if}
+			</div>
+			<div class="settings-inline-actions">
+				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReloadSettings}</button>
+				<button class="ghost-btn" onclick={() => onUpdateRenderLimits(null)} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsRenderLimitsReset}</button>
 			</div>
 		{:else if settingsTab === 'plugins'}
 			<div class="popover-group">
@@ -1992,6 +2061,22 @@
 		margin-top: 10px;
 		margin-bottom: 0;
 	}
+	.limits-group { margin-top: 12px; }
+	.limits-group-label {
+		font-size: var(--btn-sm-font-size); color: var(--fg2); font-weight: 600; margin-bottom: 6px;
+	}
+	.limits-grid {
+		display: grid;
+		/* Wide enough that a nine-digit ceiling and its hint stay on one card. */
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 10px;
+	}
+	.limits-grid label {
+		display: flex; flex-direction: column; gap: 4px; min-width: 0;
+		font-size: var(--btn-sm-font-size);
+	}
+	.limits-grid label > span { color: var(--fg2); }
+	.limits-grid label > small { color: var(--fg3); line-height: 1.4; }
 	.db-backup-grid {
 		display: grid;
 		/* The time takes two number fields, so it claims two of these tracks. */

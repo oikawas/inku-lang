@@ -7,7 +7,8 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from ...limits import DEFAULT_LIMITS, LIMIT_ABSOLUTE_MAX, LIMIT_GROUPS, limits_as_dict
 from ...plugins import plugin_status_items
 from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
 from ... import db as _db
@@ -216,6 +217,14 @@ class RenderConcurrencyStatus(BaseModel):
     note: str
 
 
+class RenderLimitsStatus(BaseModel):
+    limits: dict[str, int]
+    defaults: dict[str, int]
+    groups: dict[str, list[str]]
+    absolute_max: int
+    note: str
+
+
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
     db_backup: DbBackupStatus
@@ -224,6 +233,7 @@ class SettingsStatusResponse(BaseModel):
     log_retention: LogRetentionStatus
     stage_execution: StageExecutionStatus
     render_concurrency: RenderConcurrencyStatus
+    render_limits: RenderLimitsStatus
 
 
 @router.get("/api/settings/status", response_model=SettingsStatusResponse)
@@ -267,6 +277,7 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             note="Log retention policy is stored in the application DB. Applying systemd and logrotate files requires server OS privileges.",
         ),
         render_concurrency=_render_concurrency_status(),
+        render_limits=_render_limits_status(),
         stage_execution=StageExecutionStatus(
             workers=_STAGE_WORKERS,
             queue_limit=_STAGE_QUEUE_LIMIT,
@@ -500,6 +511,56 @@ def _render_concurrency_status() -> RenderConcurrencyStatus:
             "INKU_RENDER_CONCURRENCY / INKU_CLIENT_FANOUT_LIMIT only seed the first value."
         ),
     )
+
+
+def _render_limits_status() -> RenderLimitsStatus:
+    return RenderLimitsStatus(
+        limits=_db.get_render_limit_settings(),
+        defaults=limits_as_dict(DEFAULT_LIMITS),
+        groups={name: list(fields) for name, fields in LIMIT_GROUPS},
+        absolute_max=LIMIT_ABSOLUTE_MAX,
+        note=(
+            "These govern how many marks a work may carry. They are stored per install and "
+            "recorded on every work drawn under them (history.render_limits), so a work made "
+            "here can still be told apart from the same description drawn elsewhere. "
+            "Values that contradict each other are rounded down, not rejected; the stored set "
+            "is what comes back."
+        ),
+    )
+
+
+class RenderLimitsBody(BaseModel):
+    # Every field optional: the panel sends what it changed, and the stored set
+    # is merged and re-normalized, so a partial update cannot drop the rest.
+    model_config = ConfigDict(extra="forbid")
+
+    max_expanded_primitives: int | None = None
+    max_expanded_per_instruction: int | None = None
+    max_instructions: int | None = None
+    literal_count_threshold: int | None = None
+    represented_count_min: int | None = None
+    represented_count_max: int | None = None
+    ddl_count_max: int | None = None
+    ddl_count_max_grid: int | None = None
+    schema_count_max: int | None = None
+    reset_to_defaults: bool = False
+
+
+@router.put("/api/settings/limits", response_model=RenderLimitsStatus)
+def api_settings_update_limits(
+    body: RenderLimitsBody,
+    actor: dict = Depends(_admin_user),
+) -> RenderLimitsStatus:
+    if body.reset_to_defaults:
+        requested = limits_as_dict(DEFAULT_LIMITS)
+    else:
+        requested = {
+            key: value
+            for key, value in body.model_dump(exclude={"reset_to_defaults"}).items()
+            if value is not None
+        }
+    _db.update_render_limit_settings(requested)
+    return _render_limits_status()
 
 
 class RenderConcurrencyBody(BaseModel):

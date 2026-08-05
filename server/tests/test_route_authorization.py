@@ -29,7 +29,7 @@ PUBLIC = {  # every entry needs a reason
 
 # The count is part of the contract: a split that loses an endpoint is a
 # regression that no per-route assertion would notice.
-EXPECTED_ROUTE_COUNT = 81
+EXPECTED_ROUTE_COUNT = 82
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

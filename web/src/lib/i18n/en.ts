@@ -446,6 +446,41 @@ export const en: LangPack = {
 	uiModeSaveFailed: 'The UI settings could not be saved.',
 	settingsTabServerMisc: 'Other (server)',
 	settingsTabLogs: 'Log retention',
+	settingsTabLimits: 'Limits',
+	settingsRenderLimitsTitle: 'Limits',
+	settingsRenderLimitsIntro:
+		'These decide how many marks a single work may carry. They are not speed tuning: they change how many lines get drawn. The values set here are written into what Stage 1 and Stage 2 tell the model, and recorded on every work drawn under them.',
+	settingsRenderLimitsRounding:
+		'Values that contradict each other are rounded, not rejected (a represented band above the literal threshold is lowered to it). What is shown is the rounded set that actually took effect.',
+	settingsRenderLimitsReset: 'Restore defaults',
+	settingsRenderLimitsSaved: 'Limits saved',
+	settingsRenderLimitGroups: {
+		drawn: 'How much is actually drawn',
+		stated: 'How a stated number is honoured',
+		ceiling: 'Ceilings on reading and validation'
+	},
+	settingsRenderLimitLabels: {
+		max_expanded_primitives: 'Marks per work',
+		max_expanded_per_instruction: 'Marks per instruction',
+		max_instructions: 'Instructions per work',
+		literal_count_threshold: 'Drawn as stated below',
+		represented_count_min: 'Represented band, low end',
+		represented_count_max: 'Represented band, high end',
+		ddl_count_max: 'Ceiling on a number read from the description',
+		ddl_count_max_grid: 'The same ceiling for a grid',
+		schema_count_max: "Ceiling checked on Stage 2's output"
+	},
+	settingsRenderLimitHints: {
+		max_expanded_primitives: 'Past this the whole work is scaled down to fit',
+		max_expanded_per_instruction: 'An instruction asking for more than this is thinned',
+		max_instructions: 'Instructions past this are dropped',
+		literal_count_threshold: 'Below this the stated number is drawn as stated; at or above it the group is shown as a band, because it cannot be counted by eye',
+		represented_count_min: 'Low end of the band a too-large group is drawn as',
+		represented_count_max: 'High end of that band. Lowered to the literal threshold if it sits above it',
+		ddl_count_max: 'A numeral in the description is clamped to this. It is also the top of the density bands Stage 1 is told to use',
+		ddl_count_max_grid: 'Only a literal grid may reach higher than an ordinary arrangement',
+		schema_count_max: "A count Stage 2 returns above this is clamped down to it"
+	},
 	settingsTabUnreadWords: 'Unread-word ledger',
 	settingsUnreadWordsTitle: 'Unread-word ledger',
 	settingsUnreadWordsDescription: 'Words whose direct correspondence could not be confirmed in the interpretation from description to DDL. This ledger never promotes words into the dictionary automatically.',

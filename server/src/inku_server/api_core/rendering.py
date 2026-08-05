@@ -13,6 +13,7 @@ from ..coerce import coerce_score
 from ..ddl_expander import VARIATION_AMPLITUDES
 from ..interpreter import _sanitize_placement_words
 from ..layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
+from ..limits import Limits, limits_from_settings, using_limits
 from ..plugins import canvas_aspect_ids, canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from ..renderer import SVG_PROFILES, new_render_seed
 from ..render_engines import current_render_engine
@@ -28,6 +29,17 @@ _SRGB_COLOR_PROFILE = {
     "name": "sRGB IEC61966-2.1",
     "standard": "IEC 61966-2-1:1999",
 }
+
+
+def _effective_limits() -> Limits:
+    """Read the stored limits ONCE for this request.
+
+    Every route that coerces a score calls this and passes the result down by
+    name. `coerce_score`'s `limits=` defaults to DEFAULT_LIMITS, so a route that
+    forgets would run at the defaults silently rather than fail -- which is why
+    the count of routes that pass it is a stated number, not an assumption.
+    """
+    return limits_from_settings(_db.get_render_limit_settings())
 
 
 def _output_save_settings() -> dict:
@@ -145,7 +157,11 @@ def _render_score_svg(
     render_seed: int | None = None,
     wild: bool = False,
 ) -> str:
-    score = coerce_score(Score.model_validate(score_payload))
+    # Site 1 of 5. `using_limits` covers Score.model_validate, whose count clamp
+    # cannot take an argument; `limits=` covers coerce. Both come from one read.
+    limits = _effective_limits()
+    with using_limits(limits):
+        score = coerce_score(Score.model_validate(score_payload), limits=limits)
     canvas = _validated_canvas_aspect_override(canvas_aspect)
     if canvas is not None:
         score = _score_with_canvas(score, canvas)

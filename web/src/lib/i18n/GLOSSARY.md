@@ -79,6 +79,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 版木・版 | **block** / **state** | 版画の文脈のみ。engine の版数は **engine version** | — |
 | 暴れる | **Wild** | トグルラベル。実装名 `WILD_GAIN` と一致 | ~~Unleashed~~ |
 | 筆致制限 | **Stroke limit** | 暴れるトグルの見出し語。何を切り替えるかを名指す | ~~Brush limit~~ |
+| 制限値 | **Limits** | 設定タブ名。一枚が持てる墨の数を決める九つの数。`limit` 系で筆致制限と揃う | ~~Caps~~・~~Quotas~~・~~Thresholds~~ |
 | 生成情報 | **provenance** | 名詞。モデル・seed・版数のドロワー | ~~Generation Info~~ |
 | 履歴 | **history** | 名詞 | — |
 | ごみ箱 | **trash** | 名詞 | — |

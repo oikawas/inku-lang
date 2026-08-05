@@ -451,6 +451,15 @@ export interface LangPack {
 	uiModeSaveFailed: string;
 	settingsTabServerMisc: string;
 	settingsTabLogs: string;
+	settingsTabLimits: string;
+	settingsRenderLimitsTitle: string;
+	settingsRenderLimitsIntro: string;
+	settingsRenderLimitsRounding: string;
+	settingsRenderLimitsReset: string;
+	settingsRenderLimitsSaved: string;
+	settingsRenderLimitGroups: Record<string, string>;
+	settingsRenderLimitLabels: Record<string, string>;
+	settingsRenderLimitHints: Record<string, string>;
 	settingsTabUnreadWords: string;
 	settingsUnreadWordsTitle: string;
 	settingsUnreadWordsDescription: string;

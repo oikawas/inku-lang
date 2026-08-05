@@ -21,11 +21,12 @@ import urllib.request
 from copy import deepcopy
 from typing import Any, get_args
 
+from .limits import DEFAULT_LIMITS, Limits, current_limits
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from .saijiki import relation_literal_markers
-from .schema import Score, ScoreVersion, Variation
+from .schema import Score, ScoreVersion, Variation, count_field_description
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 2048
@@ -33,9 +34,107 @@ MAX_TOKENS = 2048
 SCORE_VERSION = get_args(ScoreVersion)[0]
 _logger = logging.getLogger(__name__)
 
+# The prompt states the limits as literal numbers, so it has to be built from the
+# effective ones. A prompt that says "below 240 is literal" while coerce honours
+# 480 teaches the model a rule the system does not follow.
+#
+# Only the numbers move. The prompt is a template with two substitution points,
+# not a dynamically generated document, and `.replace` is used rather than
+# `.format` because the body is full of literal braces (at={"region":[...]}).
+_COUNT_DENSITY_SLOT = "%%COUNT_DENSITY%%"
+_GRID_COUNT_SLOT = "%%GRID_COUNT%%"
+
+# The density bands under the count ceiling. The final upper edge IS the ceiling;
+# the interior edges are prose about density, so they are kept as written and
+# only clamped, never rescaled -- rescaling them would invent numbers nobody
+# chose. Written once and rendered in both languages so the two cannot drift.
+_VAGUE_QUANTITY_BANDS: tuple[tuple[int, int | None], ...] = (
+    (3, 8),
+    (8, 20),
+    (40, 120),
+    (120, 350),
+    (300, 800),
+    (700, None),
+)
+_VAGUE_QUANTITY_LABELS_JA = ("少し", "点々", "たくさん", "密集/埋める", "無数/満天/砂/雨/雪", "全面/埋め尽くす")
+_VAGUE_QUANTITY_LABELS_EN = (
+    "a few",
+    "several/dotted",
+    "many",
+    "dense/fill",
+    "countless/starry/sand/rain/snow",
+    "all-over/fill whole canvas",
+)
+
+
+def _vague_quantity_bands(labels: tuple[str, ...], *, cap: int, dash: str, sep: str) -> str:
+    parts = []
+    for label, (low, high) in zip(labels, _VAGUE_QUANTITY_BANDS):
+        top = cap if high is None else min(high, cap)
+        parts.append(f"{label}={min(low, top)}{dash}{top}")
+    return sep.join(parts)
+
+
+def _count_density_block_ja(limits: Limits) -> str:
+    bands = _vague_quantity_bands(_VAGUE_QUANTITY_LABELS_JA, cap=limits.ddl_count_max, dash="〜", sep="、")
+    return "\n".join(
+        (
+            f"- **count は 1〜{limits.ddl_count_max} の整数**",
+            f"- **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: {bands}**",
+            f"- **明示数量は、後述する grid を除き、{limits.literal_count_threshold} 未満なら literal。要求値をそのまま arrangement.count に使う。110 / 64 / 48 などの代表値へ置換せず、密度や余白を理由に縮小しない**",
+            f"- **明示数量が {limits.literal_count_threshold} 以上なら代表化する。count を {limits.represented_count_min}〜{limits.represented_count_max} とし、density=\"high\", cluster_count=5〜9, fade=\"outward\" または \"directional\", preserve_space=true で群の見え方と配置語を保持する**",
+            f"- **複数群の literal 対象の合計が {limits.max_expanded_primitives} を超える場合は、要求値の大きい群から順に代表化し、literal 合計が {limits.max_expanded_primitives} 以下になった時点で止める。小さい群を先に削らず、比例縮小や群の統合をしない**",
+        )
+    )
+
+
+def _grid_count_line_ja(limits: Limits) -> str:
+    return (
+        f"- **grid の count だけは1〜{limits.ddl_count_max_grid}を許可し、代表数への縮小、cluster_count、fade、preserve_space を適用しない。"
+        f"通常配置の count は従来どおり1〜{limits.ddl_count_max}**"
+    )
+
+
+def _count_density_block_en(limits: Limits) -> str:
+    bands = _vague_quantity_bands(_VAGUE_QUANTITY_LABELS_EN, cap=limits.ddl_count_max, dash="–", sep=", ")
+    return "\n".join(
+        (
+            f"- **count is an integer from 1–{limits.ddl_count_max}**",
+            f"- **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: {bands}**",
+            f"- **Except for grid described below, an explicit quantity below {limits.literal_count_threshold} is literal. Use the requested value unchanged as arrangement.count. Do not replace it with a representative value such as 110, 64, or 48, and do not reduce it for density or negative space**",
+            f"- **Represent an explicit quantity of {limits.literal_count_threshold} or more with count {limits.represented_count_min}–{limits.represented_count_max} plus density=\"high\", cluster_count=5–9, fade=\"outward\" or \"directional\", and preserve_space=true. Preserve the visible group behavior and placement phrase**",
+            f"- **When the sum of literal groups exceeds {limits.max_expanded_primitives}, convert the largest requested groups to representation one by one and stop as soon as the remaining literal sum is {limits.max_expanded_primitives} or less. Do not reduce smaller groups first, scale groups proportionally, or merge groups**",
+        )
+    )
+
+
+def _grid_count_line_en(limits: Limits) -> str:
+    return (
+        f"- **Only grid may use count 1–{limits.ddl_count_max_grid}. Do not reduce it to a representative count and do not add cluster_count, fade, or preserve_space. "
+        f"Ordinary arrangements remain limited to 1–{limits.ddl_count_max}**"
+    )
+
+
+def build_system_prompt(lang: str, limits: Limits = DEFAULT_LIMITS) -> str:
+    """The Stage 2 prompt with the effective limits written into it."""
+    if lang == "en":
+        template, block, grid = (
+            _SYSTEM_PROMPT_EN_TEMPLATE,
+            _count_density_block_en(limits),
+            _grid_count_line_en(limits),
+        )
+    else:
+        template, block, grid = (
+            _SYSTEM_PROMPT_TEMPLATE,
+            _count_density_block_ja(limits),
+            _grid_count_line_ja(limits),
+        )
+    return template.replace(_COUNT_DENSITY_SLOT, block).replace(_GRID_COUNT_SLOT, grid)
+
+
 # 手順のみ。フィールド仕様は submit_score スキーマの description を参照。
 # 例は「最も非自明なパターン」に絞る — 追加は EXAMPLE_POOL (interpreter.py) と同じ方針で。
-SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
+_SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイラ。
 正規化DDL を解析し submit_score を呼び出せ。
 フィールド仕様は submit_score スキーマの description フィールドが正典。
 「原文」が付いている場合は正規化DDL を主とし、原文は省略された属性（色・素材・数量など）の補完に使え。
@@ -75,11 +174,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 ## 数量と密度
 
-- **count は 1〜1000 の整数**
-- **曖昧数量が残っている場合は固定値に丸めず、密度語と対象語から具体数を選ぶ: 少し=3〜8、点々=8〜20、たくさん=40〜120、密集/埋める=120〜350、無数/満天/砂/雨/雪=300〜800、全面/埋め尽くす=700〜1000**
-- **明示数量は、後述する grid を除き、240 未満なら literal。要求値をそのまま arrangement.count に使う。110 / 64 / 48 などの代表値へ置換せず、密度や余白を理由に縮小しない**
-- **明示数量が 240 以上なら代表化する。count を 80〜120 とし、density="high", cluster_count=5〜9, fade="outward" または "directional", preserve_space=true で群の見え方と配置語を保持する**
-- **複数群の literal 対象の合計が 400 を超える場合は、要求値の大きい群から順に代表化し、literal 合計が 400 以下になった時点で止める。小さい群を先に削らず、比例縮小や群の統合をしない**
+%%COUNT_DENSITY%%
 
 ## 対象物化の禁止と抽象化
 
@@ -128,7 +223,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 - **「敷き詰める」「格子状に敷き詰める」「壁一面に並べる」と文字どおり指定された時だけ layout="grid" を使う。通常の「並べる」「散らす」「全面」は grid にしない**
 - **grid は指定領域全体をセルで覆う。at.region があればその領域、なければ margin 内を使う。壁一面・画面全体では margin=0.02〜0.08 とし、0.12を超えるmarginを使わない。部分領域は大きいmarginではなく at.region で指定する。rows/cols が明示されれば rows×cols を count より優先し、省略時は count を目安に行列数を推定する**
-- **grid の count だけは1〜2000を許可し、代表数への縮小、cluster_count、fade、preserve_space を適用しない。通常配置の count は従来どおり1〜1000**
+%%GRID_COUNT%%
 - **grid の jitter はセル内のわずかな位置差で、0=厳密格子、0.05〜0.2=手作業の揺れ、0.2〜0.5=雨や壁紙の不均一さ。間隔のリズムは rhythm_spacing を使う**
 - **「四つの方向を壁一面に重ねる」は方向ごとに最大4 instructions とし、各 instruction を grid にする。同じ方向を要素ごとに複製しない。この場合に限り「主技法は一つ」の圧縮規則より明示された層を優先する**
 
@@ -427,7 +522,7 @@ SYSTEM_PROMPT = """あなたは inku DDL の第二段階コンパイラ。
 
 説明・前置き禁止。submit_score 呼び出しのみ。"""
 
-SYSTEM_PROMPT_EN = """You are the Stage 2 compiler of inku DDL.
+_SYSTEM_PROMPT_EN_TEMPLATE = """You are the Stage 2 compiler of inku DDL.
 Parse the normalized DDL and call submit_score.
 Field specifications in the submit_score schema descriptions are authoritative.
 If "original text" is provided, use normalized DDL as primary; use original text to fill missing attributes (color, material, count, etc.).
@@ -467,11 +562,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 ## Count and density
 
-- **count is an integer from 1–1000**
-- **If vague quantity words remain, do not collapse them to a fixed number. Choose a concrete count from density and object type: a few=3–8, several/dotted=8–20, many=40–120, dense/fill=120–350, countless/starry/sand/rain/snow=300–800, all-over/fill whole canvas=700–1000**
-- **Except for grid described below, an explicit quantity below 240 is literal. Use the requested value unchanged as arrangement.count. Do not replace it with a representative value such as 110, 64, or 48, and do not reduce it for density or negative space**
-- **Represent an explicit quantity of 240 or more with count 80–120 plus density="high", cluster_count=5–9, fade="outward" or "directional", and preserve_space=true. Preserve the visible group behavior and placement phrase**
-- **When the sum of literal groups exceeds 400, convert the largest requested groups to representation one by one and stop as soon as the remaining literal sum is 400 or less. Do not reduce smaller groups first, scale groups proportionally, or merge groups**
+%%COUNT_DENSITY%%
 
 ## De-objectification and abstraction
 
@@ -520,7 +611,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 - **Use layout="grid" only for literal tiling instructions such as "tile", "tiled in a grid", or "cover the wall with a grid". Ordinary "line up", "scatter", or "all-over" does not imply grid**
 - **A grid covers its requested region with cells: use at.region when present, otherwise the area inside margin. For a whole wall or whole canvas use margin=0.02–0.08 and never a margin above 0.12; use at.region, not a large margin, for a smaller region. Explicit rows/cols take priority as rows×cols; otherwise estimate rows and columns from count**
-- **Only grid may use count 1–2000. Do not reduce it to a representative count and do not add cluster_count, fade, or preserve_space. Ordinary arrangements remain limited to 1–1000**
+%%GRID_COUNT%%
 - **grid jitter is a within-cell offset: 0=strict grid, 0.05–0.2=handmade variation, 0.2–0.5=uneven rain or wallpaper. Use rhythm_spacing for spacing rhythm**
 - **For "four directions superimposed across the wall", emit at most four instructions, one grid per direction. Do not duplicate each direction into separate element instructions. Only here, explicit directional layers take priority over the one-dominant-technique compression rule**
 
@@ -805,10 +896,44 @@ Output: {"instructions":[{"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"we
 
 No explanation. Call submit_score only."""
 
+# The prompts AT THE DEFAULTS. Everything that reads a module-level prompt --
+# tests, the reference generators, the snapshot callers -- keeps reading the
+# default configuration, which is what makes the frozen corpora stay per-code
+# and not per-install. A request that has a stored setting builds its own.
+SYSTEM_PROMPT = build_system_prompt("ja", DEFAULT_LIMITS)
+SYSTEM_PROMPT_EN = build_system_prompt("en", DEFAULT_LIMITS)
 
-def _score_tool_schema() -> dict[str, Any]:
+
+def _count_node(node: dict[str, Any], limits: Limits) -> dict[str, Any]:
+    """The count property with the effective ceiling, in pydantic's key order."""
+    rebuilt: dict[str, Any] = {}
+    for key, value in node.items():
+        if key == "minimum":
+            rebuilt["maximum"] = limits.schema_count_max
+        rebuilt[key] = count_field_description(limits) if key == "description" else value
+    if "maximum" not in rebuilt:
+        rebuilt["maximum"] = limits.schema_count_max
+    return rebuilt
+
+
+def _score_tool_schema(limits: Limits | None = None) -> dict[str, Any]:
     schema = Score.model_json_schema()
     defs = schema.pop("$defs", {})
+    # `count` carries the ceiling twice, and both copies travel to the model:
+    # the numeric `maximum` and the description text. They used to come from a
+    # static `le=2000` on the field, which no setting could reach. They are
+    # written in here instead, from the effective limits.
+    #
+    # Key order is not cosmetic -- the declaration order reaches the LLM and
+    # moves how often optional fields are carried (I-038), which is why the
+    # digest does not sort. `maximum` is reinserted where pydantic put it, so
+    # the default configuration produces byte-identical tool JSON.
+    effective = limits if limits is not None else current_limits()
+    arrangement = defs.get("Arrangement")
+    if isinstance(arrangement, dict):
+        properties = arrangement.get("properties")
+        if isinstance(properties, dict) and isinstance(properties.get("count"), dict):
+            properties["count"] = _count_node(properties["count"], effective)
 
     def inline(node: Any, seen: set[str] | None = None) -> Any:
         if seen is None:
@@ -1315,6 +1440,7 @@ def compose(
     lang: str = "ja",
     trace_sink: list[dict] | None = None,
     prompt_metadata: dict[str, str] | None = None,
+    limits: Limits = DEFAULT_LIMITS,
 ) -> tuple[Score, int | None, int | None]:
     """(score, tokens_in, tokens_out) を返す。system_prompt 指定時はスナップショット使用。
 
@@ -1327,10 +1453,10 @@ def compose(
     user_msg = ddl
     if system_prompt is not None:
         effective_prompt = system_prompt
-    elif lang == "en":
-        effective_prompt = SYSTEM_PROMPT_EN
     else:
-        effective_prompt = SYSTEM_PROMPT
+        # Built here, not read off the module constant: the limits the model is
+        # told about must be the ones coerce will apply to its answer.
+        effective_prompt = build_system_prompt(lang, limits)
     if prompt_metadata is not None:
         prompt_metadata["stage2_prompt_digest"] = _stage2_prompt_digest(effective_prompt)
     settings = _current_model_settings()

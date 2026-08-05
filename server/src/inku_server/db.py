@@ -21,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .identity import description_hash
+from .limits import normalize_limits
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 
 _DEFAULT_DB = "sqlite:///" + str(Path.home() / ".local" / "share" / "inku" / "inku.db")
@@ -147,6 +148,12 @@ class HistoryRow(Base):
     # sketch_text -- no layer yet, layer switched off, route that never calls
     # it, and a run that failed -- and could not be told apart afterwards.
     sketch_state = Column(String, nullable=True)
+    # The limits that actually governed this work, as JSON. Per-install settings
+    # would otherwise make the same description a different work with nothing to
+    # say why -- the same problem the chosen model and the colour catalogue solve
+    # by being recorded here. NULL means the row predates the column, not
+    # "the defaults".
+    render_limits = Column(Text, nullable=True)
     render_hash = Column(String, nullable=True, index=True)
     trashed      = Column(Integer,    nullable=False, default=0)
     starred      = Column(Integer,    nullable=False, default=0)
@@ -356,6 +363,9 @@ _HISTORY_COLUMN_MIGRATIONS = {
     # before this column existed" means. Filling them with a guess would erase
     # the distinction the column was added to make.
     "sketch_state": "ALTER TABLE history ADD COLUMN sketch_state VARCHAR",
+    # Same rule as sketch_state: no DEFAULT and no backfill. Filling old rows
+    # with today's defaults would claim a configuration nobody recorded.
+    "render_limits": "ALTER TABLE history ADD COLUMN render_limits TEXT",
 }
 _LINEAGE_NODE_COLUMN_MIGRATIONS = {
     "root_node_id": "ALTER TABLE lineage_nodes ADD COLUMN root_node_id VARCHAR",
@@ -401,6 +411,7 @@ _RENDER_CONCURRENCY_DEFAULT_SETTINGS = {
 }
 RENDER_CONCURRENCY_MIN = 1
 RENDER_CONCURRENCY_MAX = 16
+_RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
 _LOG_RETENTION_SETTINGS_KEY = "log_retention_settings"
 _LOG_RETENTION_DEFAULT_SETTINGS = {
     "enabled": True,
@@ -1527,6 +1538,26 @@ def update_render_concurrency_settings(server_limit: int, client_limit: int) -> 
     return _write_app_setting(_RENDER_CONCURRENCY_SETTINGS_KEY, clean)
 
 
+def get_render_limit_settings() -> dict:
+    return normalize_limits(_read_app_setting(_RENDER_LIMIT_SETTINGS_KEY))
+
+
+def update_render_limit_settings(settings: dict) -> dict:
+    """Merge a partial update over what is stored and normalize the result.
+
+    Rounding happens before the write, so what comes back is what took effect --
+    a caller that sent a self-contradicting set gets the corrected one, not its
+    own input echoed.
+    """
+    current = get_render_limit_settings()
+    if isinstance(settings, dict):
+        current.update(
+            {key: value for key, value in settings.items() if key in current}
+        )
+    clean = normalize_limits(current)
+    return _write_app_setting(_RENDER_LIMIT_SETTINGS_KEY, clean)
+
+
 def get_output_save_settings() -> dict:
     return _normalize_output_save_settings(_read_app_setting(_OUTPUT_SAVE_SETTINGS_KEY))
 
@@ -1921,6 +1952,15 @@ def _row_to_dict(row: HistoryRow) -> dict:
     # before the column existed, and that is not the same as "off".
     if row.sketch_state is not None:
         item["sketch_state"] = row.sketch_state
+    # Absent, not null, for the same reason: no key means "drawn before the
+    # limits were recorded", which is not "drawn at the defaults".
+    if row.render_limits is not None:
+        try:
+            stored = json.loads(row.render_limits)
+        except json.JSONDecodeError:
+            stored = None
+        if isinstance(stored, dict):
+            item["render_limits"] = stored
     return item
 
 
@@ -2078,6 +2118,7 @@ def add_item(item: dict) -> dict:
         # Carried through, never derived here: an import restores what the
         # exporting database recorded, and an old export legitimately has none.
         sketch_state=item.get("sketch_state"),
+        render_limits=json.dumps(item.get("render_limits"), ensure_ascii=False, sort_keys=True) if isinstance(item.get("render_limits"), dict) else None,
         render_hash=render_hash, trashed=0, starred=0, for_revision=0, note=item.get("note"),
         source_text=source_text, display_label=item.get("display_label"),
         batch_line_number=item.get("batch_line_number"), batch_run_id=item.get("batch_run_id"),

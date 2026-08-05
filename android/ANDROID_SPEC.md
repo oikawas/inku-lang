@@ -4,13 +4,19 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-07-25.
+Last updated: 2026-08-05.
 
-**Catch-up status**: Android sits at generation `2.0.0-android.1` with **render engine
-version `11`**. The master web/server implementation has moved on to v2.5.0 with **engine 12**,
-so the drawing layer is **one engine version behind**. The Stage 1.5 expander is ported through
-Phase 3d and **has caught up**. The port proceeds in phases; see the phase sections at the end of
-this document.
+**Catch-up status**: Android sits at generation `2.1.4-android.8` with **render engine
+version `21`** (the version is declared in `data/model/CompatibilityConstants.kt`). The master
+web/server implementation is at v2.11.0 with **render engine `21`** and **`ddl_engine_version` 7**,
+so **the drawing layer versions match**. The Stage 1.5 expander followed the staffage level being
+folded away on 2026-08-05 (see the 2026-08-05 section at the end of this document).
+
+**Matching layer versions is not the same as a finished port.** The version number asserts that
+drawing is identical; it says nothing about the UI, storage, or vocabulary. **The gaps that remain
+are held by the issue ledger under the `android` area** — they are deliberately not copied here,
+because a copy goes stale. The port proceeds in phases; see the phase sections at the end of this
+document.
 
 ## Specification Update Workflow
 
@@ -174,8 +180,10 @@ Not implemented yet:
   **Score-level parity started on 2026-07-23** (`ServerScoreParityTest.kt` checks the 15
   cases in `server/tests/fixtures/stage2/` plus exact `dh1` / `rh2` values; see the final
   section).
-- Catching up with the web/server v2 generation (renderer engine 2 → 10, variation,
-  plugins, lineage). Only Phase 1 (Score schema / coerce / hash) is complete.
+- Catching up with the web/server v2 generation (renderer engine 2 → 21, variation,
+  plugins, lineage). **The drawing layer has reached engine 21** (measured 2026-08-05).
+  Lineage is ported as far as the data layer; **the UI does not yet declare a parent**
+  (see the `android` area of the issue ledger).
   **The staffage level was folded away as an axis in v2.11.0, so it is no longer
   something to catch up with** (see the 2026-08-05 section at the end).
 

@@ -3,11 +3,17 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-07-25。
+最終更新: 2026-08-05。
 
-**追随状況**: Android は `2.0.0-android.1` / **render engine version `11`** の世代にある。
-master の web/server は v2.5.0 / **engine 12** に進んでいるため、**描画層は 1 版遅れている**。
-Stage 1.5 展開層は Phase 3d まで移植済みで、**展開層は追いついている**。
+**追随状況**: Android は `2.1.4-android.8` / **render engine version `21`** の世代にある
+（版は `data/model/CompatibilityConstants.kt` が名乗る）。
+master の web/server は v2.11.0 / **render engine `21`** / **`ddl_engine_version` 7** なので、
+**描画層の版は一致している**。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
+（末尾の 2026-08-05 の節を参照）。
+
+**ただし「層の版が同じ」は「移植が終わった」ではない。**
+版の数字は描画の同一性を主張するものであって、UI・保存・語彙の差までは覆わない。
+**残っている差は台帳の領域 `android` の項目が持つ**（本書には写さない。写すと古びる）。
 差分の追随は段階的に行う（末尾の各 Phase 節を参照）。
 
 ## 更新ルール
@@ -138,8 +144,9 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
 - SVG / render metadata レベルの reference compatibility tests。
   **Score レベルは 2026-07-23 に着手済み**（`ServerScoreParityTest.kt` が
   `server/tests/fixtures/stage2/` の 15 ケースと `dh1` / `rh2` の値一致を検証する。末尾の節を参照）。
-- web/server v2 世代への追随（Renderer engine 2 → 10、変奏、プラグイン、系譜）。
-  Phase 1（Score schema / coerce / hash）のみ完了。
+- web/server v2 世代への追随（Renderer engine 2 → 21、変奏、プラグイン、系譜）。
+  **描画層は engine 21 まで到達している**（2026-08-05 実測）。
+  系譜はデータ層まで移植済みで、**UI が親を宣言する部分は未着手**（台帳の領域 `android` を参照）。
   **添景水準は v2.11.0 で軸ごと畳まれたので、追随の対象から外れた**（末尾の 2026-08-05 の節を参照）。
 
 ## 実機検証状態

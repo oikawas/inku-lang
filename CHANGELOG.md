@@ -3632,3 +3632,24 @@ against one. **No version was stepped** — `web/APP_VERSION`, `web/BUILD_NUMBER
   **39 cases / 28 distinct outputs (72%) to 30 cases / 14 (47%)**. **A port that ignored its input
   would still pass 16 of the 30**, so the discrimination is carried by the focus control rather than
   by the full-corpus comparison. Filed as **[I-141]**
+
+### 2026-08-05 — the ANDROID_SPEC catch-up status now matches measurement (**no version**; documentation only)
+
+Addresses **[I-013]** (`ANDROID_SPEC` had not followed the engine). **Only the live prose was
+changed; not one line of the dated history sections was touched** — those record what was ported
+on the day they carry.
+
+- **The catch-up header was 51 versions out of date.** It read `2.0.0-android.1` with render engine
+  `11`, a master at v2.5.0 with engine 12, and a drawing layer one version behind.
+  **Measured today: Android `2.1.4-android.8` with render engine `21`** (declared in
+  `CompatibilityConstants.kt`) against a master at **v2.11.0 with render engine `21` and
+  `ddl_engine_version` 7** — **the drawing layer versions match**
+- **One bullet under the implementation status was stale too** — `renderer engine 2 → 10` and
+  "only Phase 1 complete". It now records reaching engine 21, and that lineage is ported as far as
+  the data layer
+- **Stated explicitly that matching layer versions is not a finished port.** The remaining gaps are
+  held by the issue ledger and deliberately not copied into the document, because a copy goes stale.
+  The ledger's `android` area holds nine other items
+- **Last-updated date moved from `2026-07-25` to `2026-08-05`**
+- **Checks:** `check_docs.py` green. **This pair is checked in `sections` mode** (the number of `##`
+  sections only), and both languages still hold 62

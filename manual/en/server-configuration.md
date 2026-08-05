@@ -1,16 +1,18 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v1.85. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.11.0 (Web Build 854). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
 Settings belong to three boundaries.
 
 1. OS and service: `/etc/inku/inku-api.env`, systemd, reverse proxy, and filesystem permissions
-2. Administrator: provider connections, published models, DB backups, artifacts, log policy, and users
-3. User: Stage 1/2 models, UI language, theme, canvas, color catalog, and history-selection behavior
+2. Administrator: provider connections, published models, limits, DB backups, artifacts, log policy, and users
+3. User: Stage 1/2 models, UI language, UI mode, theme, canvas, color catalog, sketch, Wild, download folder, and history-selection behavior
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
+
+**Some settings are only seeded by the environment.** Painting concurrency and the limits take their initial values from environment variables at first start; after that the DB settings are canonical. Changing an environment variable does not change a setting already stored. Use the admin UI or `inku-cli config update`.
 
 ## 2. Backend Environment Variables
 
@@ -31,8 +33,17 @@ Provider API key environment variables are initial values. A provider key saved 
 | `INKU_LOGIN_RATE_ATTEMPTS` | Login failures allowed per window | 10 |
 | `INKU_LOGIN_RATE_WINDOW_SECONDS` | Login rate window in seconds | 60 |
 | `INKU_CORS_ORIGINS` | Comma-separated allowed origins | localhost only |
+| `INKU_LISTEN_HOST` | uvicorn listen host | `0.0.0.0` |
+| `INKU_LISTEN_PORT` | uvicorn listen port | `INKU_SERVER_PORT`, else `8100` |
+| `INKU_ENV` | Run mode, shown at start and branched on in development | `development` |
+| `INKU_TIMEZONE` | Timezone used for DB backup scheduling and similar | `Asia/Tokyo` |
+| `INKU_REDIS_URL` | When set, shared state such as rate limiting moves to Redis | unset, in-process |
 
 When both encryption variables are set, direct key material has priority. A persistent key file is recommended for production.
+
+`INKU_LISTEN_HOST` and `INKU_LISTEN_PORT` are read by uvicorn directly; `INKU_SERVER_HOST` and `INKU_SERVER_PORT` belong to the `inku-server` CLI. The names are close, so do not swap them.
+
+`INKU_REDIS_URL` takes effect only when redis-py is installed. Without it, shared state lives in the process, so set it for any configuration that runs the backend in more than one process.
 
 ### 2.2 Bootstrap Administrator
 
@@ -41,6 +52,9 @@ When both encryption variables are set, direct key material has priority. A pers
 | `INKU_BOOTSTRAP_ADMIN_USERNAME` | Initial administrator name |
 | `INKU_BOOTSTRAP_ADMIN_EMAIL` | Initial administrator email |
 | `INKU_BOOTSTRAP_ADMIN_PASSWORD` | Initial administrator password |
+| `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN` | Permit a password shorter than eight characters. **Do not set this in production** |
+| `INKU_AUTH_LOCAL_ENABLED` | Sign-in with username and password (default `true`) |
+| `INKU_AUTH_GOOGLE_ENABLED` | Sign-in with Google (default `false`) |
 
 The account is created only when a password is set and the DB contains no users. Passwords shorter than eight characters are rejected. Remove the secret from the environment after initial creation.
 
@@ -58,9 +72,13 @@ inku has no self-service registration. Accounts are created only through `POST /
 | `INKU_OUTPUT_SAVE_QUEUE_LIMIT` | Artifact queue limit | `32` |
 | `INKU_STAGE_WORKERS` | LLM pipeline workers | `4` |
 | `INKU_STAGE_QUEUE_LIMIT` | Pipeline queue limit | twice the worker count |
-| `INKU_RENDER_CONCURRENCY` | Concurrent renderer limit | 2 |
+| `INKU_RENDER_CONCURRENCY` | Initial value for the concurrent renderer limit | 2 |
+| `INKU_CLIENT_FANOUT_LIMIT` | Initial value for the browser's concurrent painting requests | `4` |
+| `INKU_DB_BACKUP_SCHEDULER` | Set to `0` to leave the periodic backup scheduler unstarted | `1` |
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
+
+`INKU_RENDER_CONCURRENCY` and `INKU_CLIENT_FANOUT_LIMIT` **seed the first value only**. After that the DB settings are canonical; change them from `Other (server)` in the admin UI or with `inku-cli config update`. Requests beyond the server limit are refused with 503 rather than queued, and the client retries at a short interval.
 
 ### 2.4 LLM Retry and Timeout
 
@@ -71,12 +89,32 @@ When the artifact queue is full, DB history remains the priority and only artifa
 | `INKU_LLM_RETRY_BASE_DELAY` | Initial delay in seconds | `2.0` |
 | `INKU_LLM_RETRY_MAX_DELAY` | Maximum delay | `20.0` |
 | `INKU_LLM_RETRY_JITTER` | Jitter | `0.25` |
-| `INKU_STAGE1_HARD_TIMEOUT_SECONDS` | Stage 1 hard timeout | endpoint default |
-| `INKU_STAGE2_HARD_TIMEOUT_SECONDS` | Stage 2 hard timeout | endpoint default |
+| `INKU_STAGE1_HARD_TIMEOUT_SECONDS` | Stage 1 hard timeout | `120` |
+| `INKU_STAGE2_HARD_TIMEOUT_SECONDS` | Stage 2 hard timeout | `120` |
+| `INKU_SKETCH_HARD_TIMEOUT_SECONDS` | Hard timeout for Sketch from life, Stage 0.5 | `120` |
 
 The distributed environment template explicitly sets operational example values. Be aware of the difference between template values and implementation defaults.
 
-### 2.5 Providers
+The hard timeout also applies when a stage cannot acquire an execution slot. If Stage 1 does not answer in time, a stock set of instructions is performed and the work records that. If the sketch layer does not answer in time, the description goes to interpretation unchanged.
+
+### 2.5 Layers and Plugins
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `INKU_LLM_BACKEND` | Which LLM backend family to use | `anthropic` |
+| `INKU_DOCUMENT_PLUGIN_DIR` | Where declarative plugin documents live | `server/plugins/` |
+| `INKU_OKUGAKI_MODEL` | Default reader model for the colophon | a vision-capable model |
+| `INKU_OKUGAKI_CACHE_TTL_SECONDS` | Colophon cache lifetime | `1800` |
+| `INKU_OKUGAKI_CACHE_MAX_ENTRIES` | Colophon cache size | `256` |
+| `INKU_LEARNED_FILE` | Where learned words are stored | `/tmp/inku-learned.json` |
+| `INKU_COERCE_DISABLE` | Switch off coerce, the auto-repair pass. **Diagnostic only** | unset |
+| `INKU_DEVELOPER_MODE` | Extra developer-facing output | unset |
+
+The default for `INKU_LEARNED_FILE` is under `/tmp`, so it does not survive a restart. Give it a stable path to persist it.
+
+`INKU_COERCE_DISABLE` turns off auto-repair entirely: neither invisible-color correction nor overcrowding damping applies. **Do not set it in production.** It exists for isolating a problem.
+
+### 2.6 Providers
 
 | Provider | API key | Base URL |
 |---|---|---|
@@ -114,9 +152,11 @@ Restrict the environment file containing the DB URL to root and the service grou
 The DB keeps these identities separate.
 
 - Description hash: identity of the normalized description (`dh1:`)
-- Render hash: identity of a Renderer output edition (`rh2:`)
+- Render hash: identity of a Renderer output edition (`rh3:`; `rh2:` is the earlier version, kept for stored works)
 - History ID: regular-history item
 - Lineage node ID: node in the creative process
+
+The canonical payload of `rh3` is the score, `render_seed`, `render_wild`, the render engine id and version, and the color catalog id. It does not include `composition_seed` or the build number. **The key names in that payload are identity material; never rename them for presentation reasons.** A rename recomputes the hash of every stored work.
 
 Lineage connects only explicit creation operations. It is never inferred from similarity, identical descriptions, or timestamps. Permanent removal of a regular-history work may leave a content-free tombstone so the lineage path remains recorded.
 
@@ -134,18 +174,47 @@ Generation, history, lineage, and settings APIs enforce authentication and user 
 
 | Stage | Role |
 |---|---|
-| Stage 1 | Interpret free-form text as normalized DDL |
-| Stage 1.5 | Deterministically expand DDL; not an LLM |
+| Stage 0.5 | Restate the description as prose in the language of things. Optional, and it uses an LLM |
+| Stage 1 | Interpret the description, or the sketch, as instructions (normalized DDL) |
+| Plugin expansion | Deterministically write namespaced plugin words down into core DDL |
+| Stage 1.5 | Deterministically expand DDL and give it relations; not an LLM |
 | Stage 2 | Structure DDL as JSON Score |
-| Renderer | Draw Score as SVG |
+| coerce | Boundary handling that prefers dropping to inventing |
+| Renderer | Perform the Score as SVG |
+
+When Stage 0.5 runs, **the sketch reaches three consumers in place of the description**: Stage 1, the decision whether plugin expansion fires, and Stage 1.5. If the layer does not answer, the description is passed on unchanged and `sketch_state` records `fallback`. A work painted with the layer off records `off`, and works predating the column hold no value at all. **No value is not `off`.**
 
 The Web UI always sends `instruction_lang: auto` for normal generation. The server detects Japanese or English from the text and falls back to `ui_lang` only when no language signal is present. The API retains `auto`, `ja`, and `en` for compatibility and explicit comparison runs.
 
-Resolved values are recorded as `instruction_lang_requested`, `instruction_lang_resolved`, and `ui_lang`. Works using different per-stage languages through Language comparison store them in lineage metadata. These language fields are not part of the current canonical render-hash payload.
+Resolved values are recorded as `instruction_lang_requested`, `instruction_lang_resolved`, and `ui_lang`. These language fields are not part of the current canonical render-hash payload.
+
+### 5.1 Limits
+
+Nine numbers decide how many marks one work may hold. They are not a speed control: the number of lines actually drawn changes. Set them from the `Limits` tab in the admin UI or with `inku-cli config update`. **They are written into the Stage 1 and Stage 2 prompts and recorded on every work painted.**
+
+| Group | Value | Default | Contents |
+|---|---|---|---|
+| Marks actually drawn | `max_expanded_primitives` | 400 | Marks per work. Beyond this the whole work is shrunk to fit |
+| | `max_expanded_per_instruction` | 240 | Marks per instruction. An instruction asking for more is thinned |
+| | `max_instructions` | 64 | Instructions per work. Any beyond this are dropped |
+| Stated counts | `literal_count_threshold` | 240 | Below this a stated count is drawn as stated; at or above it the work is shown as a crowd |
+| | `represented_count_min` | 80 | Lower end when shown as a crowd |
+| | `represented_count_max` | 120 | Upper end |
+| Reading and validation ceilings | `ddl_count_max` | 1000 | Numbers in the description are rounded down to this. It is also the top of the density band taught to Stage 1 |
+| | `ddl_count_max_grid` | 2000 | A literal grid alone is allowed higher than ordinary composition |
+| | `schema_count_max` | 2000 | A count returned by Stage 2 above this is trimmed |
+
+Mutually inconsistent values are rounded rather than rejected — if the representation ceiling exceeds the literal threshold, it is lowered to that threshold. What the admin UI shows is the rounded, effective value.
+
+**The limits are constant guards for stability, data size, and device performance.** They exist neither to add what the description does not ask for nor to remove what it does.
 
 ## 6. Renderer and Replay
 
-`render_seed` controls touch, `composition_seed` supports layout variation, and `interpretation_seed` supports reading variation. `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or layout.
+`render_seed` controls touch, `composition_seed` supports composition variation, `variation_seed` supports the variation layer, and `interpretation_seed` supports reading variation. `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or composition.
+
+`variation_seed` takes effect only together with `variation_amplitude`. Either one alone moves no axis of the expansion layer.
+
+`render_wild` applies to the whole work and is part of the `rh3` material. The same score and the same seed with a different Wild setting is a different edition.
 
 History replay uses the saved Score, color catalog, canvas, seeds, and render-engine version. Engine version is recorded for audit; bit-identical output across different engine versions is not assumed.
 
@@ -250,6 +319,10 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 | A work appears but artifacts do not | Queue skip, output permissions, and worker count |
 | Provider key cannot decrypt | Confirm the same recovery-point `INKU_SECRET_KEY_FILE` |
 | DB fails after startup | Migration logs, DB backup, and concurrent mixed backend versions |
+| Painting is refused with 503 | The server concurrency setting. The DB setting is canonical, not the environment variable |
+| A stated count comes out smaller | `literal_count_threshold` and `represented_count_*` under the limits |
+| The sketch layer seems not to run | The work's `sketch_state`. `fallback` points at the Stage 0.5 timeout and the provider |
+| Plugin words are not expanded | Rejection reasons from `plugin list`, `INKU_DOCUMENT_PLUGIN_DIR`, and `plugin reload` |
 
 ## 14. Security Baseline
 

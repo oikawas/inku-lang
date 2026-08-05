@@ -1,6 +1,8 @@
 # inku-cli AI自律運転・テスト用リファレンス
 
-本ドキュメントは、AIエージェント（CodexやAntigravity等）が `inku-server` をコマンドラインから操作し、自律的に作品の生成、評価、および「系譜（Lineage）」を駆使した「推敲（Refine/Vary）」の品質向上プロセスをテスト・実行するためのガイドラインです。
+本ドキュメントは、AIエージェントが `inku-server` をコマンドラインから操作し、自律的に作品の生成、評価、および「系譜（Lineage）」を駆使した「推敲（Refine/Vary）」の品質向上プロセスをテスト・実行するためのガイドラインです。
+
+対象はinku v2.11.0（Web Build 854）です。旗の全一覧は`inku-cli リファレンス`が持ちます。
 
 ---
 
@@ -38,11 +40,13 @@ uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。
 uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **パラメータ `--kind` の選択基準**:
-  * `touch`: 画の質感（筆圧や掠れ）のみを変更したいとき（LLM呼び出しなし / 高速）
-  * `layout`: 線の位置や大きさを再構築したいとき（Stage 2 LLMが再配置を実行）
-  * `reading`: 指示文のテキスト解釈からやり直したいとき（Stage 1.5 LLMが再構成）
-  * `color`: 他のカラーカタログを適用したいとき（LLM呼び出しなし）
+  * `touch`: 画の質感（筆圧や掠れ）のみを変更したいとき。新しい `render_seed` だけを置き、他のseedは親から引き継ぐ（LLM呼び出しなし / 高速）
+  * `layout`: 線の位置や大きさを再構築したいとき。新しい `composition_seed` を置き、Stage 2が再配置する
+  * `reading`: 記述の解釈からやり直したいとき。新しい `interpretation_seed` を置き、**Stage 1** が読み直す
+  * `color`: 他の色カタログを適用したいとき（LLM呼び出しなし）
 * **期待される出力**: 新しい派生作品の JSON メタデータ。
+
+`--kind` はサーバーへ `derivation_kind` として記録されます（順に `touch_change` / `layout_change` / `reinterpretation` / `catalog_change`）。系譜のedgeを検証するときはこの値を読みます。
 
 ### ステップ 4: 作品系譜の探索と状態確認
 追加した派生作品が、親作品のツリーに対して正しくエッジ（派生タイプ）で連結されているかをコンソール上で探索します。
@@ -98,6 +102,22 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * trace 収録: `stage1_raw`／`stage1_thinking`／`stage1_ddl`（プラグイン展開前）、`plugin_expanded_ddl`、`stage15_ddl`（= Stage 2 入力）、`stage2_raw_attempts`（retry・fallback を含む全試行の生テキストと parse 可否）、`score_pre_coerce`、coerce／plugin 集約値。利き目監査（境界逐次検証）とベンチの精度向上に使う「鏡」であり、生成挙動は一切変えません。
 * 旧サーバ（trace 非対応）では警告のみでエラーにしません。`include_trace` 未指定時の応答は現行と完全同一です。
 
+### 0.8 沈黙する送り手に注意する
+
+**`paint` / `batch` は、書かなかった旗についてサーバーの既定で描きます。**そしてサーバーの既定はWeb UIの既定と同じとは限りません。自律運転の結果をWeb UIの結果と比べる場合は、次の三つを明示してください。
+
+| 旗 | サーバー既定 | Web UI既定 |
+|---|---|---|
+| `--sketch` / `--sketch-grain` | 切 | 細かく（`fine`） |
+| `--wild` | 切 | ユーザー設定（既定は切） |
+| `--catalog-mode` | `fixed` | ユーザー設定 |
+
+```sh
+uv run inku-cli paint "TEXT" --sketch --sketch-grain fine --catalog-mode auto -o ./out --png
+```
+
+変奏は `--variation-amplitude` と `--variation-seed` の**両方が揃ったときだけ**効きます。片方だけ渡しても展開層の軸は動かず、応答は既定のまま返るので、旗を渡したこと自体は成功の証拠になりません。**動いたかどうかは作品の`variation`と`variation_seed`を読んで確かめてください。**
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * 指定したIDを基点とする系譜ツリーを表示します。
@@ -106,8 +126,8 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
   * 中間ノード（通常履歴に表示されない `lineage_only`）を通常履歴に昇格させます。
 
 ### 2. `refine`
-* **`refine perform <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png]`**
-  * ターゲットID of the work from局所変種を自動生成し、系譜を繋いで履歴に保存します。
+* **`refine perform <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png] [--description TEXT]`**
+  * 対象作品から局所的な別案を自動生成し、系譜を繋いで履歴に保存します。`--description` は構図・解釈の推敲で使う記述を差し替えます。
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * ローカルで編集・生成した Score JSON を、任意の親ノードに接続する子ノードとして直接インポートします。
 

@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade of the unreleased inku v1.85 on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
+This guide describes a standard new installation or upgrade of the unreleased inku v2.11.0 (Web Build 854) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
 
 ## 1. Components
 
@@ -24,7 +24,7 @@ inku-lang/
 ## 2. Requirements
 
 - Linux with systemd
-- Python 3.10 or newer
+- Python 3.12 or newer (both `server` and `cli` declare `requires-python = ">=3.12"`)
 - uv
 - Node.js and npm
 - Git or a deployment mechanism such as rsync
@@ -192,12 +192,14 @@ curl -sS -I --max-time 5 http://127.0.0.1:5173/
 Check in the Web UI:
 
 - Sign-in and sign-out
-- Japanese and English description generation
-- Color catalog, model, and canvas selection
-- Refine adjustments, Model comparison, and Language comparison
+- Painting from Japanese and English descriptions
+- Painting with Sketch from life set to `Fine`, and the sketch appearing on the left
+- Color catalog, model, canvas, and Wild selection
+- All five refinement elements (Another composition, Another reading, Another catalog, Variation, Another performance) and model comparison
 - Provenance Details, Prompts, and JSON
-- Timeline and By lineage history modes
-- SVG and PNG export
+- Timeline and By lineage history modes, and search by the last four hash characters
+- SVG and PNG export, contact sheets, and animation
+- Administrators see the `Limits` settings tab and can save it
 
 ## 13. Upgrade Procedure
 

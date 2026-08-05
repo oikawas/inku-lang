@@ -1,6 +1,8 @@
 # inku-cli AI Autonomous Operation & Testing Reference
 
-This document serves as a guideline for AI agents (e.g., Codex, Antigravity) to operate the `inku-server` via command line and paint works autonomously, evaluate them visually, and refine them (Vary/Refine) while tracking lineage nodes.
+This document serves as a guideline for AI agents to operate the `inku-server` via command line and paint works autonomously, evaluate them visually, and refine them while tracking lineage nodes.
+
+It covers inku v2.11.0 (Web Build 854). The full flag list lives in the `inku-cli Reference`.
 
 ---
 
@@ -38,11 +40,13 @@ Create a localized variation of the work and attach it as a child node in the li
 uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **Choosing the `--kind` parameter**:
-  * `touch`: Refine only line textures and weights (very fast; no LLM call).
-  * `layout`: Reconstruct coordinates and size balance (Stage 2 LLM reconstruction).
-  * `reading`: Re-interpret the original description (Stage 1.5 LLM re-interpretation).
+  * `touch`: Refine only line textures and weights. It sets a new `render_seed` and inherits every other seed from the parent (very fast; no LLM call).
+  * `layout`: Reconstruct coordinates and size balance. It sets a new `composition_seed` and Stage 2 recomposes.
+  * `reading`: Read the description anew. It sets a new `interpretation_seed` and **Stage 1** interprets again.
   * `color`: Apply a different color catalog (very fast; no LLM call).
 * **Expected Output**: A JSON object containing the refined child work's metadata.
+
+`--kind` is recorded on the server as `derivation_kind`, in the same order: `touch_change`, `layout_change`, `reinterpretation`, and `catalog_change`. Read that value when verifying a lineage edge.
 
 ### Step 4: Traverse and Verify the Lineage Tree
 Verify that the newly generated child node is correctly connected to the parent node.
@@ -98,6 +102,22 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 * The trace contains `stage1_raw` / `stage1_thinking` / `stage1_ddl` (before plugin expansion), `plugin_expanded_ddl`, `stage15_ddl` (the Stage 2 input), `stage2_raw_attempts` (every attempt including retry/fallback, with raw text and parse status), `score_pre_coerce`, and the coerce/plugin aggregates. It is a mirror for the intent-audit harness and benchmark precision; it changes no generation behavior.
 * An older server without trace support is a warning, not an error. Without `include_trace`, the response is identical to the current one.
 
+### 0.8 Beware the silent sender
+
+**`paint` and `batch` paint under the server default for every flag you omit**, and the server default is not always the Web UI default. When comparing autonomous runs against Web UI results, state these three explicitly.
+
+| Flag | Server default | Web UI default |
+|---|---|---|
+| `--sketch` / `--sketch-grain` | off | fine |
+| `--wild` | off | user setting, off by default |
+| `--catalog-mode` | `fixed` | user setting |
+
+```sh
+uv run inku-cli paint "TEXT" --sketch --sketch-grain fine --catalog-mode auto -o ./out --png
+```
+
+Variation takes effect **only when both** `--variation-amplitude` and `--variation-seed` are given. Passing one alone moves no axis of the expansion layer, and the response comes back under the defaults, so having passed a flag is not evidence it took effect. **Read the work's `variation` and `variation_seed` to confirm.**
+
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
   * Displays the parent-child derivation tree of the work.
@@ -106,8 +126,8 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
   * Promotes a hidden intermediate work (`lineage_only` visibility) to standard history.
 
 ### 2. `refine`
-* **`refine perform <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png]`**
-  * Generates a variation of the target work and connects it to the parent.
+* **`refine perform <ITEM_ID> --kind {touch|layout|reading|color} [-o DIR] [--png] [--description TEXT]`**
+  * Generates an option from the target work and connects it to the parent. `--description` replaces the description used for composition and reading refinements.
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * Manually imports a Score JSON as a child node connected to a parent.
 

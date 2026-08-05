@@ -3570,3 +3570,20 @@ API.** The archive is tag `archive/tenkei-v1.97` and `no-git-sync/archive/tenkei
 - **Checks:** server **2373 → 2313** (`def test_` 1312 → 1261; 88 removed, 37 added), cli unchanged
   at 111, `npm run check` **245 → 241 FILES / 0 errors**, `test:unit` unchanged at 113, `lint:i18n`
   1017 → 1004, and **the frozen corpora are byte-identical**.
+
+### 2026-08-05 — the manuals catch up with v2.11.0 (**no version**; documentation only)
+
+**The seven manual documents, in both languages, had stood at v1.85 / Build 564 for 51 versions.** Ledger item [I-003].
+
+- Corrected the **eleven places that name a version** to v2.11.0 / Build 854. **the index at the top of the manual directory was older still**, at v1.82 / Build 563
+- **Rewrote Creating Images**, from fifteen sections to twenty. **Sketch from life (Stage 0.5), Variation, Wild, `From the description` for the color catalog, UI mode, the revision mark, Replay, contact sheets, animation export, search by the last four hash characters, and the ten settings tabs** were all undocumented. **Language comparison was dropped, being absent from the current UI** (`language_variation` survives as a derivation kind on stored works)
+- **Added six commands to the inku-cli Reference** — `plugin`, `reference`, `colophon`, `user`, `group`, and `config`. **Only four of `paint`'s thirty flags were documented**, so they were regrouped into six tables by purpose (three sketch flags, two variation flags, `--wild`, `--catalog-mode`, `--interpretation-seed`, and more: **twenty-six were missing**)
+- **Added nineteen environment variables to Server Configuration** (52 in code against 33 documented, now **52 / 52**). **Nothing documented had been retired.** Added §2.5 for layers and plugins, moving providers to §2.6, and **added §5.1 for the limits**: the nine values, their defaults, the rounding rule, and the fact that **the environment variables only seed the first value while the DB settings are canonical thereafter**
+- **Corrected the render hash from `rh2:` to `rh3:`**, with the canonical payload (score, `render_seed`, `render_wild`, engine, catalog) and the reason a renamed key recomputes the hash of every stored work
+- **Corrected the Application Installation prerequisite from Python 3.10 to 3.12** (`requires-python` is `>=3.12`). **That single line was an error on the side that makes an install fail**
+- **Corrected `--kind reading` in the AI reference** — it is **Stage 1, not Stage 1.5**, and Stage 1.5 is not an LLM at all. Also repaired a sentence in which Japanese and English had been spliced together, in `refine perform`
+- **Added §0.8, "Beware the silent sender."** An omitted flag paints under the server default, and **the server default differs from the Web UI default** (sketch is off on the server, fine in the UI). **Variation takes effect only when both flags are given, so having passed a flag is not evidence it took effect**
+
+**One thing learned**
+
+- **`check_docs.py` does not look at `manual/` at all** — its thirteen pairs are the repository root and `docs/`. With no gate enforcing bilingual parity, the Japanese and English README files under the manual directory had drifted eleven days apart in last-modified time. **The 25/25 and 20/20 agreement reached here is the result of hand work, not of a check.**

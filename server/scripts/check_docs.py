@@ -98,6 +98,17 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         "shape",
         None,
     ),
+    # manual/ was outside this check until 2026-08-05, and the two languages
+    # drifted eleven days apart in last-modified time before anyone noticed.
+    # Each document is translated as one text and corresponds section for
+    # section, so "shape" is the right level here, as it is for the README.
+    ("manual/ja/README.md", "manual/en/README.md", "shape", None),
+    ("manual/ja/image-creation.md", "manual/en/image-creation.md", "shape", None),
+    ("manual/ja/cli-reference.md", "manual/en/cli-reference.md", "shape", None),
+    ("manual/ja/cli-reference-for-ai.md", "manual/en/cli-reference-for-ai.md", "shape", None),
+    ("manual/ja/application-install.md", "manual/en/application-install.md", "shape", None),
+    ("manual/ja/server-configuration.md", "manual/en/server-configuration.md", "shape", None),
+    ("manual/ja/revision-history.md", "manual/en/revision-history.md", "shape", None),
     # Split on 2026-07-28. The current file carries v2.5.0 onward and the two
     # languages hold the same 30 entries, so this pair needs no exception any
     # more: every new version must land in both. The backlog did not vanish --

@@ -48,7 +48,6 @@ class WebDdlExpanderPhase3bTest {
         val varySeed = parseSeed(input, "composition_seed")
         val enablePlugins = input.optBoolean("enable_plugins", true)
         val pluginInstructionsPresent = input.optBoolean("plugin_instructions_present", false)
-        val tenkei = input.optString("tenkei", "auto")
         val focus = if (!input.has("focus") || input.isNull("focus")) null else input.getString("focus")
         val variationAmplitude = if (!input.has("variation_amplitude") || input.isNull("variation_amplitude")) null else input.getString("variation_amplitude")
         val variationSeed = parseSeed(input, "variation_seed")
@@ -61,7 +60,6 @@ class WebDdlExpanderPhase3bTest {
             varySeed = varySeed,
             enablePlugins = enablePlugins,
             pluginInstructionsPresent = pluginInstructionsPresent,
-            tenkei = tenkei,
             focus = focus,
             variationAmplitude = variationAmplitude,
             variationSeed = variationSeed,

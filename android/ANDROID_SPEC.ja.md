@@ -138,8 +138,9 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
 - SVG / render metadata レベルの reference compatibility tests。
   **Score レベルは 2026-07-23 に着手済み**（`ServerScoreParityTest.kt` が
   `server/tests/fixtures/stage2/` の 15 ケースと `dh1` / `rh2` の値一致を検証する。末尾の節を参照）。
-- web/server v2 世代への追随（Renderer engine 2 → 10、変奏、プラグイン、系譜、添景）。
+- web/server v2 世代への追随（Renderer engine 2 → 10、変奏、プラグイン、系譜）。
   Phase 1（Score schema / coerce / hash）のみ完了。
+  **添景水準は v2.11.0 で軸ごと畳まれたので、追随の対象から外れた**（末尾の 2026-08-05 の節を参照）。
 
 ## 実機検証状態
 
@@ -1647,3 +1648,42 @@ Score は上記フィールドを受理・保持するが、**Renderer は描か
   **P2（結線を外す）では JVM 143 件が全部緑のまま**で、赤くなるのは実機の 5 件だけだった —
   **純関数の検査は保存経路の受入にならない。**
 
+
+## 2026-08-05 添景水準の畳み込みへの追随（[I-139] / android `2.1.4-android.8` 据え置き）
+
+契約 `android-folds-away-the-staffage-level.md` に基づき、server が v2.11.0（`05c62206`）で
+**軸ごと畳んだ添景水準（tenkei）を Android からも落とした。**
+**server が正本で Android は移植先**なので、写したのは「同じ結果」ではなく**同じ判定**である。
+
+### 何を落としたか
+
+- **`WebDdlExpander.kt`** — 引数 `tenkei` と、契約 §2.2 が数えた 9 つの条件式。
+  `expandJa` / `expandEn` は**焦点を決めて `reframeStaticCenter*` を返したところで終わる**。
+  変奏の軸は**焦点 1 本だけ**が残り、型の差し替え・採用本数・タッチ・色・構図族・型の系統の
+  6 軸と、それらが書いていた構造／音楽／絵画の候補文はすべて消えた。
+  `contextText` と `varySeed` は**引数としては残るが出力を動かさない**（server も同じ形）。
+- **`InkuPipeline.kt` / `LocalFallbackPipeline.kt` / `InkuRepository.kt`** —
+  `PaintRequest.tenkei` と受け渡し、`paint` / `interpret` / `composeFromDdl` の 3 署名。
+  **既定値へ固定して残すのではなく、引数ごと落とした。**
+- **`InkuApp.kt` / `InkuViewModel.kt` / `data/model/Tenkei.kt`** — 添景選択の UI と state。
+  `Tenkei.kt` はファイルごと削除した。
+
+**Android には元から `tenkei` の保存列も送信経路も無かった**ので、
+server 側の裁定「DB の列は残す・開発者モードで過去作にだけ出す」に対応するものは作っていない。
+
+### 何を落とさなかったか
+
+**server が残したものは残した** — `DdlFilterProfile` / `DdlFilterCandidate` / `pick` は
+畳んだ後は誰も呼ばないが、server 側の `_FilterProfile` / `_FilterCandidate` / `_pick` が
+残っているので同じ形にしてある。**クライアント側で「こちらが良い」と判断しない。**
+
+### 検証結果
+
+- **JVM 単体 156 / 失敗 0**（37 クラス・skip 0）。起点は 143 / 赤 4。
+  内訳は **143 −3（添景専用テストの削除）+16（受入 T-1〜T-7）= 156**。
+- **計装 20 / 失敗 0**（実機 Pixel 9・エミュレータは使っていない）。起点 21 から添景の 1 件を削除。
+- **契約 §1.3 の 6 件は削除せず測定点を焦点へ張り替えた。**
+  いずれも「畳んだ後に真・畳む前に偽」を表明し、その性質をテスト名に書いてある。
+- **参照コーパス 30 件は全件一致。ただしこれは焼き直された記録であって性質の検査ではない** —
+  焼き直しで**異なる出力は 14 種（47%）**しか残っておらず、
+  **入力を無視する移植でも 30 件中 16 件が緑になる。判別力を担っているのは T-2 の焦点の対照**である。

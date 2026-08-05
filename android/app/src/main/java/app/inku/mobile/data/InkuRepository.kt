@@ -3,6 +3,7 @@ package app.inku.mobile.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.room.withTransaction
 import app.inku.mobile.data.db.AppSettingEntity
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -10,6 +11,8 @@ import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
+import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.LocalLiteRtLmProvider
@@ -38,6 +41,11 @@ import org.json.JSONObject
 class InkuRepository(
     private val context: Context,
     private val database: InkuDatabase,
+    // Injectable so a test can hand out a node id it already knows. Real ids
+    // are uuid4, and a test that cannot name one in advance cannot make the
+    // edge insert collide, which is the only way to observe whether the node
+    // and the edge are really one transaction.
+    private val newLineageId: () -> String = { java.util.UUID.randomUUID().toString() },
 ) {
     private val providerModelCandidatePrefix = "provider_model_candidates:"
     private val localLiteRtProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao())
@@ -271,7 +279,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto"): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto", lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -287,7 +295,7 @@ class InkuRepository(
                 tenkei = tenkei,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility)
     }
 
     suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto"): InterpretResult {
@@ -307,7 +315,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto"): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto", lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -323,7 +331,7 @@ class InkuRepository(
                 tenkei = tenkei,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility)
     }
 
     suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
@@ -346,7 +354,7 @@ class InkuRepository(
             ?: error("デモ指示文生成が空でした。")
     }
 
-    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String): HistoryItemEntity {
+    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.renderFromScore(
             scoreJson,
@@ -360,20 +368,38 @@ class InkuRepository(
                 autoRepair = false,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility)
     }
 
-    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null): HistoryItemEntity {
+    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
         val renderMetadataJson = JSONObject(result.renderMetadataJson)
             .put("render_hash", result.renderHash)
             .put("render_hash_short", result.renderHashShort)
             .toString()
+        val historyId = pipeline.newHistoryId()
+        val originalInput = historyInput ?: result.originalInput
+        val nodeId = newLineageId()
+        // The server decides all of this before it creates any row, so a
+        // rejected declaration leaves the history table untouched too.
+        val write = LineagePlanner.plan(
+            nodeId = nodeId,
+            edgeId = newLineageId(),
+            historyId = historyId,
+            at = now,
+            descriptionHash = pipeline.descriptionHash(originalInput),
+            renderHash = result.renderHash,
+            historyVisibility = historyVisibility,
+            declaration = lineage,
+            parentNode = lineage.parentNodeId
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { database.lineageDao().getNodeById(it) },
+        )
         val item = HistoryItemEntity(
-            id = pipeline.newHistoryId(),
+            id = historyId,
             createdAt = now,
             updatedAt = now,
-            originalInput = historyInput ?: result.originalInput,
+            originalInput = originalInput,
             normalizedDdl = result.normalizedDdl,
             expandedDdl = result.expandedDdl,
             scoreJson = result.scoreJson,
@@ -392,8 +418,16 @@ class InkuRepository(
             thumbnailPath = null,
             thumbnailWidth = null,
             thumbnailHeight = null,
+            lineageNodeId = nodeId,
         )
-        database.historyDao().upsert(item)
+        // One transaction, and the edge after the node: the edge points at a
+        // child that has to exist first. A failing edge takes the node and the
+        // history row down with it, the way the server's rollback does.
+        database.withTransaction {
+            database.historyDao().upsert(item)
+            database.lineageDao().insertNode(write.node)
+            write.edge?.let { database.lineageDao().insertEdge(it) }
+        }
         scheduleThumbnailGeneration(item.id, result.displaySvg, result.renderHash)
         return item
     }

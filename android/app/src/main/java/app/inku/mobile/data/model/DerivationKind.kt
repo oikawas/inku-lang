@@ -6,31 +6,45 @@ data class DerivationKindInfo(
 )
 
 object DerivationKindRegistry {
+    // The server's `LINEAGE_DERIVATION_KINDS` (db.py:49), sorted, exactly as
+    // the baked `lineage_wiring.json` carries it. The five kinds no screen
+    // here reaches yet are still listed: which operations exist is the
+    // server's judgment, not the client's.
     val KINDS: List<String> = listOf(
-        "touch_change",
-        "layout_change",
+        "age_change",
+        "canvas_aspect_change",
         "catalog_change",
-        "reinterpretation",
-        "model_comparison",
-        "language_comparison",
         "ddl_edit",
         "description_edit",
+        "external_seed_change",
+        "hacho_change",
+        "language_comparison",
+        "layout_change",
+        "model_comparison",
+        "reinterpretation",
+        "render_engine_change",
+        "renga_reply",
         "replay",
-        "canvas_aspect_change",
+        "touch_change",
         "variation",
     )
 
     private val LABELS_JA: Map<String, String> = mapOf(
-        "touch_change" to "タッチ",
-        "layout_change" to "構図",
+        "age_change" to "経年",
+        "canvas_aspect_change" to "キャンバス変更",
         "catalog_change" to "色",
-        "reinterpretation" to "解釈",
-        "model_comparison" to "モデル",
-        "language_comparison" to "言語",
         "ddl_edit" to "DDL編集",
         "description_edit" to "記述編集",
+        "external_seed_change" to "外部の種",
+        "hacho_change" to "破調",
+        "language_comparison" to "言語",
+        "layout_change" to "構図",
+        "model_comparison" to "モデル",
+        "reinterpretation" to "解釈",
+        "render_engine_change" to "描画エンジン",
+        "renga_reply" to "連歌の付句",
         "replay" to "再描画",
-        "canvas_aspect_change" to "キャンバス変更",
+        "touch_change" to "タッチ",
         "variation" to "変奏",
     )
 

@@ -1792,3 +1792,112 @@ def test_the_saved_artifact_names_the_sketch_fields_even_when_the_server_omits_t
     spoken = json.loads((tmp_path / "sketched.json").read_text(encoding="utf-8"))
     assert spoken["sketch_text"] == "葉がある。"
     assert spoken["sketch_grain"] == "fine"
+
+
+# ---------------------------------------------------------------------------
+# The render limit flags (`config update --limit-*`)
+#
+# The CLI is the only sender that can reach PUT /api/settings/limits: web has
+# the Limits tab, android has no settings route at all. Nothing else watches
+# what these nine flags put in the request body, and a receiver that drops
+# unknown keys keeps a misspelled name at 200
+# (silent_sender_is_never_tested / api_field_rename_count_all_senders).
+# ---------------------------------------------------------------------------
+
+
+def _fake_client_recording(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            return {}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    return calls
+
+
+def test_config_update_sends_only_the_render_limit_flags_that_were_given(monkeypatch):
+    """A partial update carries the flags that were passed and nothing else.
+
+    The server merges the body over what is stored, so sending the untouched
+    fields as well would overwrite a value the author set from the web tab.
+    """
+    calls = _fake_client_recording(monkeypatch)
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        [
+            "config",
+            "update",
+            "--limit-literal-count-threshold",
+            "480",
+            "--limit-max-instructions",
+            "60",
+        ]
+    )
+    assert cli.command_config(args) == 0
+    assert calls == [
+        (
+            "PUT",
+            "/api/settings/limits",
+            {"literal_count_threshold": 480, "max_instructions": 60},
+        )
+    ]
+
+
+def test_every_render_limit_flag_reaches_the_body_under_its_own_name(monkeypatch):
+    """Each of the nine flags carries its own value, one for one.
+
+    Distinct values per field, so a flag wired to the wrong key -- or to the
+    same key twice -- cannot pass (invariance_gate_misses_the_binding).
+    """
+    calls = _fake_client_recording(monkeypatch)
+    parser = cli.build_parser()
+    argv = ["config", "update"]
+    expected = {}
+    for offset, name in enumerate(cli.RENDER_LIMIT_FIELDS):
+        value = 101 + offset
+        argv += ["--limit-" + name.replace("_", "-"), str(value)]
+        expected[name] = value
+    assert cli.command_config(parser.parse_args(argv)) == 0
+    assert calls == [("PUT", "/api/settings/limits", expected)]
+
+
+def test_limits_reset_replaces_the_body_instead_of_adding_to_it(monkeypatch):
+    calls = _fake_client_recording(monkeypatch)
+    parser = cli.build_parser()
+    args = parser.parse_args(["config", "update", "--limits-reset"])
+    assert cli.command_config(args) == 0
+    assert calls == [("PUT", "/api/settings/limits", {"reset_to_defaults": True})]
+
+
+def test_config_update_without_a_limit_flag_sends_no_limits_request(monkeypatch):
+    """The control for the three tests above: no flag, no request.
+
+    Without this a handler that always PUT the full set would still pass them.
+    """
+    calls = _fake_client_recording(monkeypatch)
+    parser = cli.build_parser()
+    assert cli.command_config(parser.parse_args(["config", "update"])) == 0
+    assert calls == []
+
+
+def test_the_cli_limit_names_match_the_server_dataclass():
+    """The names are written out here, so they can drift from the server's.
+
+    Skips on the ABSENCE OF THE server DIRECTORY rather than a missing file --
+    the CLI is installed on its own in some checkouts
+    (server_tests_reading_client_sources_fail_on_pentala).
+    """
+    repo_root = Path(cli.__file__).resolve().parents[3]
+    server_dir = repo_root / "server"
+    if not server_dir.is_dir():
+        pytest.skip("server/ is not present in this checkout")
+    source = (server_dir / "src" / "inku_server" / "limits.py").read_text(encoding="utf-8")
+    body = source.split("class Limits:", 1)[1].split("DEFAULT_LIMITS", 1)[0]
+    declared = set(re.findall(r"^    ([a-z_]+): int = ", body, flags=re.MULTILINE))
+    assert declared, "no fields read off the server dataclass"
+    assert declared == set(cli.RENDER_LIMIT_FIELDS)

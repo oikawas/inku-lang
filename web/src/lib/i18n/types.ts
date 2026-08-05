@@ -229,7 +229,6 @@ export interface LangPack {
 	tooltipInputLang: string;
 	tooltipInputModel: string;
 	tooltipInputClear: string;
-	tooltipInputTenkei: string;
 	tooltipInputSketch: string;
 	wildButton: string;
 	tooltipInputWild: string;
@@ -813,7 +812,6 @@ export interface LangPack {
 	provenanceHintRenderSeed: string;
 	provenanceHintSeedText: string;
 	provenanceHintWild: string;
-	provenanceHintStaffage: string;
 	provenanceHintCatalog: string;
 	provenanceHintCatalogSub: string;
 	provenanceHintCanvas: string;

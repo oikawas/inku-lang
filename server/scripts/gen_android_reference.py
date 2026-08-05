@@ -20,7 +20,7 @@ Outputs land in `android/app/src/test/resources/server_reference/`:
 - `renderer_fill_and_arc.json`            fill scanlines, hatch line geometry and arc centerlines
 - `renderer_cloudform_and_relations.json` cloudform contours per tool grammar, minor-arc
                                           reconstruction, and region-before-relation resolution
-- `ddl_expand.json`                       Stage 1.5 expansion: variation, tenkei, plugin expansion
+- `ddl_expand.json`                       Stage 1.5 expansion: variation and plugin expansion
                                           and `variation_report`, with every argument written out
 - `<name>.svg`                            full renders at the current engine version
 - `svg_index.json`                        the Score, seed, byte size, element counts,
@@ -1290,7 +1290,7 @@ def cloudform_and_relation_fixtures() -> None:
 
 DDL_EXPAND_JA = "中心に黒い四角を置く。白い横線を三本引く。"
 DDL_EXPAND_EN = "Place one black square near the center. Draw three white horizontal lines."
-DDL_EXPAND_TENKEI = "赤い円を三つ置く。小さな点を画面全体に散らす。"
+DDL_EXPAND_SCATTER = "赤い円を三つ置く。小さな点を画面全体に散らす。"
 DDL_EXPAND_PLUGIN = "黒い線を三本引く。Nature.うねり。"
 DDL_EXPAND_SENSORY = "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。"
 DDL_EXPAND_MUSIC = "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。"
@@ -1306,7 +1306,6 @@ def _expand_case(name, ddl, **overrides):
         "composition_seed": None,
         "enable_plugins": False,
         "plugin_instructions_present": False,
-        "tenkei": "auto",
         "focus": None,
         "variation_amplitude": None,
         "variation_seed": None,
@@ -1347,11 +1346,6 @@ def ddl_expand_fixtures() -> None:
                 f"A-variation-{amplitude}-{seed}", DDL_EXPAND_JA,
                 variation_amplitude=amplitude, variation_seed=seed,
             ))
-    for tenkei in ("auto", "sparse", "none"):
-        cases.append(_expand_case(
-            f"A-tenkei-{tenkei}", DDL_EXPAND_TENKEI,
-            context_text=DDL_EXPAND_TENKEI, tenkei=tenkei,
-        ))
     # Beyond the server corpus: the discriminators this port needs.
     for seed in (2 ** 63 + 1, 2 ** 64 - 1):
         cases.append(_expand_case(
@@ -1363,8 +1357,8 @@ def ddl_expand_fixtures() -> None:
         variation_amplitude="large", variation_seed=12345,
     ))
     cases.append(_expand_case(
-        "B-tenkei-none-varied", DDL_EXPAND_TENKEI, context_text=DDL_EXPAND_TENKEI,
-        tenkei="none", variation_amplitude="large", variation_seed=12345,
+        "B-scatter-varied", DDL_EXPAND_SCATTER, context_text=DDL_EXPAND_SCATTER,
+        variation_amplitude="large", variation_seed=12345,
     ))
     # Four real focus ids give four distinct expansions; an unknown one has to fall
     # back to the same output as no focus at all, which is a spec, not an accident.
@@ -1373,29 +1367,22 @@ def ddl_expand_fixtures() -> None:
             f"B-focus-{focus}", DDL_EXPAND_JA,
             focus=focus, variation_amplitude="medium", variation_seed=12345,
         ))
-    # `sparse` only bites where the category plan has more than one non-zero entry.
-    # DDL_EXPAND_TENKEI does not, so on its own it lets a port that ignores `sparse`
-    # pass. These three do bite, through the two different branches of
-    # `_cap_category_plan`: the sensory plan (2, 0, 1) and the music plan (1, 1, 0).
-    for tenkei in ("auto", "sparse", "none"):
-        cases.append(_expand_case(
-            f"B-tenkei-sensory-{tenkei}", DDL_EXPAND_SENSORY,
-            context_text=DDL_EXPAND_SENSORY, tenkei=tenkei,
-        ))
-        cases.append(_expand_case(
-            f"B-tenkei-music-{tenkei}", DDL_EXPAND_MUSIC,
-            context_text=DDL_EXPAND_MUSIC, tenkei=tenkei,
-        ))
-        cases.append(_expand_case(
-            f"B-tenkei-en-{tenkei}", DDL_EXPAND_SENSORY_EN, lang="en",
-            context_text=DDL_EXPAND_SENSORY_EN, tenkei=tenkei,
-        ))
+    # Inputs whose context used to drive the candidate pool. The pool went away
+    # with the staffage level (v2.11.0), so what these now pin is that a rich
+    # context adds nothing of its own -- the expansion is the focus reframing.
+    cases.append(_expand_case(
+        "B-sensory", DDL_EXPAND_SENSORY, context_text=DDL_EXPAND_SENSORY))
+    cases.append(_expand_case(
+        "B-music", DDL_EXPAND_MUSIC, context_text=DDL_EXPAND_MUSIC))
+    cases.append(_expand_case(
+        "B-sensory-en", DDL_EXPAND_SENSORY_EN, lang="en",
+        context_text=DDL_EXPAND_SENSORY_EN))
     for composition_seed in (0, 12345, 2 ** 63 + 1):
         cases.append(_expand_case(f"B-vary-seed-{composition_seed}", DDL_EXPAND_JA, composition_seed=composition_seed))
     cases.append(_expand_case("B-plugin-instructions-present", DDL_EXPAND_PLUGIN,
                               context_text=DDL_EXPAND_PLUGIN, enable_plugins=True,
                               plugin_instructions_present=True))
-    cases.append(_expand_case("B-context-differs", DDL_EXPAND_JA, context_text=DDL_EXPAND_TENKEI))
+    cases.append(_expand_case("B-context-differs", DDL_EXPAND_JA, context_text=DDL_EXPAND_SCATTER))
     cases.append(_expand_case("B-context-none", DDL_EXPAND_JA, context_text=None))
 
     from inku_server.plugins import DOCUMENT_PLUGIN_MANAGER

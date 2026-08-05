@@ -25,27 +25,23 @@ def empty_plugin_vocabulary(monkeypatch):
 
 @pytest.mark.usefixtures("empty_plugin_vocabulary")
 @pytest.mark.parametrize(
-    ("lang", "tenkei", "expected_bytes", "expected_digest"),
+    ("lang", "expected_bytes", "expected_digest"),
     [
-        # 契約 background-color-openness (2026-08-02): Stage 1 の背景 3 行が動いた
-        ("ja", "auto", 18_981, "1430ea03025e3f8c"),
-        ("ja", "sparse", 19_291, "7859b78d348816ca"),
-        ("ja", "none", 19_363, "adcac628762f93da"),
-        ("en", "auto", 18_020, "b056eb26fc3748ef"),
-        ("en", "sparse", 18_249, "de337b52c8816a04"),
-        ("en", "none", 18_385, "f78abdbfd8c7fa39"),
+        # 契約 background-color-openness (2026-08-02): Stage 1 の背景 3 行が動いた。
+        # 添景水準の 3 行 (v2.11.0 で廃止) が抜けたので、残るのは水準なしの 1 行ずつ。
+        # 値は旧 auto と同一 — auto は規範文を足していなかった。
+        ("ja", 18_981, "1430ea03025e3f8c"),
+        ("en", 18_020, "b056eb26fc3748ef"),
     ],
 )
 def test_stage1_prompt_base_digest_expected_values(
     lang: str,
-    tenkei: str,
     expected_bytes: int,
     expected_digest: str,
 ):
     _, base_prompt = interpreter._build_system_prompt_parts(
         "入力文は不変部へ入らない。",
         lang=lang,
-        tenkei=tenkei,
     )
     assert len(base_prompt.encode("utf-8")) == expected_bytes
     assert _digest(base_prompt) == expected_digest

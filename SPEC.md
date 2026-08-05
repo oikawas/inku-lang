@@ -1655,67 +1655,69 @@ An expansion after the intermediate filter:
 白い小さな円を右上の黄金比の位置に一点置く。
 ```
 
-### 12.12 Staffage Level (tenkei, v1.97)
+### 12.12 Folding Away the Staffage Level (v2.11.0)
 
-Staffage — the minor accompanying elements each layer adds around the subject
-on its own — has a level the user chooses at generation time.  Like vary
-(§12.11) it is **an explicit operation by the user**, not a governor that
-thins a work out afterwards.
+**The staffage level was removed as an axis, not retuned.**
 
-- **Three levels**: `none`, `sparse`, and `auto` (leave it to the system, the
-  behavior as it always was).  It is not a continuous value (principle 6)
-- **A deterministic mapping onto the three layers**, switched before
-  generation: Stage 1 gets a norm sentence per level (under `none`, an input
-  made only of plugin words takes a **pure-explicit bypass** that does not
-  pass through Stage 1 at all); Stage 1.5 contracts its candidate pool
-  (`none` = nothing added, only the focus rewrite; `sparse` = one candidate);
-  and coerce gets an insertion budget for the branches that add staffage on
-  their own (`none` = 0, `sparse` = 1).  Repair, mutation, and the rescue of
-  explicitly stated content run regardless of level
-- **Saved per work and inherited along a lineage**: the level is saved to the
-  work (history), and a derived generation resolves it in the order **explicit
-  request value > inheritance from the parent work > auto**.  Because the
-  inheritance resolves on the server, a lineage keeps its level unstated
-  through refinement, autonomous refinement and the CLI, and a
-  renderer-only derivation (a touch change) does not break the chain, since
-  the resolution happens at save time.  A child work whose level was changed
-  explicitly in the refinement UI becomes the branch point for the lineage
-  that follows
-- For the measurements that ground the suppression of staffage — that any one
-  of the three layers can dominate the picture on its own — and for how each
-  branch corresponds, see CHANGELOG v1.96-v1.97.  The level is not an
-  ingredient of `rh2`, so a replay from a saved Score and seed is invariant
-  with respect to it
+From v1.97 to v2.10, staffage — the minor accompanying elements each layer
+added around the subject on its own — had a level the user chose at generation
+time: `none`, `sparse`, or `auto`. It mapped deterministically onto three
+layers (a norm sentence in Stage 1, the candidate pool in Stage 1.5, an
+insertion budget in coerce), was saved per work, and was inherited along a
+lineage.
 
-For an input whose plugin expansion returned deterministic transcription
-instructions, the addition of finished recipes by Stage 1.5 is suppressed
-regardless of level (extending the boundary of §4.6 to what follows the
-transcription; Build 605).
+**What was wrong was the dial, not its granularity.** The purpose of this
+application is to generate DDL that follows the description and to render that
+DDL faithfully, and **adding — or subtracting — what the description does not
+ask for and cannot be inferred from works against that purpose** (design
+principle, §3). A painter places staffage in relation to the subject; there is
+no dial for "how much of this to leave to the machine".
+
+**The behaviour that remains is exactly what `none` did.** Stage 1.5 rewrites
+the focus and appends nothing. The six coerce branches that invented an
+instruction — a visual event, a composition anchor, context energy, a motion
+floor, a surface tension mark, a focal-event reaction — were deleted. **The
+three delivering branches (`with_ddl_coverage`, `with_complex_motif_repair`,
+`with_shape_delivery_repair`) stay**: they do not add, they deliver what the
+description stated and the Score failed to carry.
+
+**The record on past works is kept.** The `history.tenkei` column and the
+`tenkei` field of the history response were not removed, so each of the 2,176
+works saved before the removal can still report the level it was drawn under
+(shown in developer mode only). Nothing new carries a value.
+
+Two behaviours that used to sit under the level were kept, decoupled from it,
+because neither is staffage: the **plugin transcription guard** (Stage 1.5 adds
+no finished recipe to an input whose plugin expansion returned transcription
+instructions — the boundary of §4.6 extended past the transcription) and the
+**pure-invocation bypass** (an input made only of qualified plugin terms is
+transcribed rather than passed through Stage 1). The first prevents delivering
+one subject twice; the second keeps an explicitly named term from being
+rewritten by a model.
 
 ### 12.13 Variation (Stage 1.5, v2.0)
 
 Stage 1.5 is the application's own layer: it is deterministic, uses no LLM,
 and the author does not intervene in its individual parameters — by design
 principle, not by implementation convenience. The author's handles are the
-input text, `composition_seed`, `tenkei`, and **variation** (強度/amplitude + seed).
+input text, `composition_seed`, and **variation** (強度/amplitude + seed).
 The author writes, the application shakes, the author chooses.
 
 Variation (v2.0, "hensou") shakes the expansion layer as a whole in one
 explicit operation. Amplitude is discrete — small, medium, large. Which axes
 move is decided by the seed; the same (amplitude, seed) always reproduces the
-same expansion, and variation is never inherited along a lineage. The seven
-official axis names are: focus, composition family, touch material, adopted
-count, main/contrast colors, type swap, and type family. Axes are released by
-weight: small moves one light axis (type swap, count); medium up to two
-mid-weight axes (touch, focus, colors); large two to four including the heavy
-axes (composition family, type family). Small never changes the picture's
-skeleton (composition family, focus). An axis reported as moved is guaranteed
-to produce a real difference in the expansion (visibility over axis count when
-the description offers too few movable axes). Candidates come in ones or fours (same
-amplitude, distinct server-issued seeds), each card showing what moved
-(from → to in the official vocabulary). Variation is orthogonal to tenkei and
-never exceeds its cap (under `none` only the focus axis moves). The four
-existing refinement kinds keep their one-axis-chisel meaning; variation is a
+same expansion, and variation is never inherited along a lineage. **There is
+one official axis: focus.** It was seven until v2.11.0; the other six
+(composition family, touch material, adopted count, main/contrast colors, type
+swap, type family) all shook sentences Stage 1.5 had appended on its own, and
+they went away with the candidate pool when staffage was folded away (§12.12).
+Focus stays because it decides where the description is read toward, not what
+is added to it. The amplitude still reaches the output: it is part of the
+offset key, so the same seed resolves a different focus at small, medium and
+large. An axis reported as moved is guaranteed to produce a real difference in
+the expansion. Candidates come in ones or fours (same amplitude, distinct
+server-issued seeds), each card showing what moved (from → to in the official
+vocabulary). The four existing refinement kinds keep their one-axis-chisel meaning; variation is a
 distinct operation that shakes several axes at once, presented in the UI as
 the fifth refinement radio. Terminology: variation (hensou) belongs to Stage 1.5 — a
 deterministic variation of the score; yuragi (sway) belongs to the renderer's

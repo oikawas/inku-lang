@@ -17,7 +17,6 @@ import {
 	type SheetVariant,
 } from '$lib/contactSheet';
 import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
-import { normalizeTenkei, tenkeiLabel } from '$lib/tenkei';
 
 /** Only the fields the sheet and its notes read. */
 export type ContactSheetWork = {
@@ -29,7 +28,6 @@ export type ContactSheetWork = {
 	display_label?: string | null;
 	ddl?: string | null;
 	catalog_id?: string | null;
-	tenkei?: string | null;
 	stage1_model?: string | null;
 	stage2_model?: string | null;
 	render_hash?: string | null;
@@ -73,7 +71,6 @@ export function noteEntryFor(work: ContactSheetWork, deps: ContactSheetDeps): Co
 	const aspect = work.render_canvas_aspect ?? work.render_canvas_aspect_id ?? '';
 	const ratio = work.render_canvas_aspect_ratio;
 	const engineName = [work.render_engine_id, work.render_engine_version].filter(Boolean).join(' ');
-	const level = normalizeTenkei(work.tenkei);
 	const models = [work.stage1_model, work.stage2_model].filter(Boolean).join(' -> ');
 	const variation = work.variation_amplitude
 		? work.variation_seed == null
@@ -82,7 +79,6 @@ export function noteEntryFor(work: ContactSheetWork, deps: ContactSheetDeps): Co
 		: '';
 	return {
 		description: work.source_text || work.input || '',
-		staffage: level ? tenkeiLabel(level, false) : '',
 		colorCatalog: catalog,
 		canvas: aspect ? (ratio ? `${aspect} (${ratio.toFixed(3)})` : aspect) : '',
 		engine: engineName

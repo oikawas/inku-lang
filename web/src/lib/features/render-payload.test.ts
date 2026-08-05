@@ -11,18 +11,16 @@ import { test } from 'node:test';
 
 import { renderContributorIds, renderSettingsPayload } from './render-payload.ts';
 import { AUTO_CATALOG_ID, bindColorCatalogFallback, bindColorCatalogRenderState, colorCatalogContributor, colorCatalogOverride } from './color-catalog/render.ts';
-import { bindTenkeiRenderState, tenkeiContributor, tenkeiOverride } from './tenkei/render.ts';
 import { bindWildRenderState, wildContributor, wildOverride } from './wild/render.ts';
 
 // Stand in for the runes the settings modules own, so the live-value path is
 // exercised with values distinguishable from the defaults.
 bindColorCatalogRenderState(() => 'live-catalog');
-bindTenkeiRenderState(() => 'sparse');
 bindWildRenderState(() => true);
 
 // Every feature that reaches the server.  Sorted, because the collected payload
 // must not depend on the order the features registered in.
-const EXPECTED_CONTRIBUTORS = ['color-catalog', 'tenkei', 'wild'];
+const EXPECTED_CONTRIBUTORS = ['color-catalog', 'wild'];
 
 test('every feature that reaches the server is contributing', () => {
 	assert.deepEqual([...renderContributorIds()].sort(), EXPECTED_CONTRIBUTORS);
@@ -33,16 +31,15 @@ test('a fresh paint states every feature, from the live settings', () => {
 	assert.deepEqual(renderSettingsPayload('paint'), {
 		catalog_id: 'live-catalog',
 		catalog_mode: 'fixed',
-		tenkei: 'sparse',
 		wild: true
 	});
 });
 
-test('a compose inherits the level and the switch unless told otherwise', () => {
+test('a compose inherits the catalog unless told otherwise', () => {
 	assert.deepEqual(renderSettingsPayload('compose'), { catalog_id: 'live-catalog' });
 });
 
-test('a re-render of a stored score carries no level and no mode', () => {
+test('a re-render of a stored score carries no mode', () => {
 	assert.deepEqual(renderSettingsPayload('render-svg'), { catalog_id: 'live-catalog' });
 	assert.deepEqual(renderSettingsPayload('render-score'), { catalog_id: 'live-catalog' });
 });
@@ -51,13 +48,12 @@ test('an override replaces the live value without naming a request field', () =>
 	assert.deepEqual(renderSettingsPayload('paint', colorCatalogOverride('frozen', 'auto')), {
 		catalog_id: 'frozen',
 		catalog_mode: 'auto',
-		tenkei: 'sparse',
 		wild: true
 	});
 });
 
 test('a null override omits the field, which is how inheriting is expressed', () => {
-	assert.deepEqual(renderSettingsPayload('paint', { ...tenkeiOverride(null), ...wildOverride(false) }), {
+	assert.deepEqual(renderSettingsPayload('paint', wildOverride(false)), {
 		catalog_id: 'live-catalog',
 		catalog_mode: 'fixed',
 		wild: false
@@ -75,7 +71,7 @@ test('a stored score can be re-rendered with the switch it was drawn with', () =
 test('contributors own disjoint fields, so order cannot decide the payload', () => {
 	// If two features claimed the same field, whichever registered last would
 	// win and the order would start to matter.  Counting the slices catches it.
-	const slices = [colorCatalogContributor, tenkeiContributor, wildContributor]
+	const slices = [colorCatalogContributor, wildContributor]
 		.map((contributor) => contributor.payload('paint', undefined));
 	const fieldTotal = slices.reduce((total, slice) => total + Object.keys(slice).length, 0);
 	assert.equal(Object.keys(renderSettingsPayload('paint')).length, fieldTotal);
@@ -92,8 +88,7 @@ test('choosing "from the description" sends the mode, not the sentinel', () => {
 		assert.deepEqual(renderSettingsPayload('paint'), {
 			catalog_id: 'fallback-catalog',
 			catalog_mode: 'auto',
-			tenkei: 'sparse',
-			wild: true
+				wild: true
 		});
 	} finally {
 		bindColorCatalogRenderState(() => 'live-catalog');
@@ -124,8 +119,7 @@ test('a real catalog is still sent as itself, in fixed mode', () => {
 		assert.deepEqual(renderSettingsPayload('paint', colorCatalogOverride('ink_season')), {
 			catalog_id: 'ink_season',
 			catalog_mode: 'fixed',
-			tenkei: 'sparse',
-			wild: true
+				wild: true
 		});
 	} finally {
 		bindColorCatalogFallback(() => 'default');

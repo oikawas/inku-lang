@@ -115,21 +115,6 @@ def _render_hash_metadata(
     }
 
 
-def _resolved_tenkei(requested: str | None, actor: dict, lineage_parent_node_id: str | None) -> str:
-    """添景水準の解決 (v1.97): 明示値 > 派生元作品からの継承 > auto。
-
-    継承をサーバー側で解決することで、AI 自律推敲・CLI・全クライアントの派生生成が
-    系統の水準を無指定のまま維持する（作者裁定 2026-07-19: 親作品から継承）。
-    """
-    if requested:
-        return requested
-    if lineage_parent_node_id:
-        inherited = _db.tenkei_for_node(actor["id"], lineage_parent_node_id)
-        if inherited in {"none", "sparse", "auto"}:
-            return inherited
-    return "auto"
-
-
 def _validated_variation_amplitude(value: str | None) -> str | None:
     """変奏 (v2.0): 未指定・未知の強度は None にして変奏なしへ戻す。
 

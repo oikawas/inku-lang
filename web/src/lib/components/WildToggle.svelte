@@ -1,10 +1,8 @@
 <!--
 	「暴れる」 (wild) toggle for the refine dialogs.
 
-	Mirrors TenkeiSelect's compact form: the parent artwork's setting is
-	preselected and `inherited` marks that nothing will be sent unless the user
-	picks. Staffage and wild are the two things a refine dialog can override, so
-	they read the same way and sit next to each other.
+	The parent artwork's setting is preselected and `inherited` marks that
+	nothing will be sent unless the user picks.
 
 	The button styling follows InputPanel's .wild-btn -- ghost-btn with an accent
 	fill when on -- so the same control looks the same wherever it appears.
@@ -24,8 +22,8 @@
 </script>
 
 <div class="wild-inline" role="group" aria-label={t().wildButton}>
-	<!-- Named like TenkeiSelect's compact label so the two controls read as one
-	     row: what the switch governs, then whether it is inherited. -->
+	<!-- The label reads as one row: what the switch governs, then whether it
+	     is inherited. -->
 	<span class="wild-inline-label"
 		>{isJapanese ? '筆致制限' : 'Stroke limit'}{#if inherited}<span class="wild-inherit"
 				>{isJapanese ? '（継承）' : '(inherited)'}</span

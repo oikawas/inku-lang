@@ -5,9 +5,7 @@
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import RunStatus from './RunStatus.svelte';
-	import TenkeiSelect from './TenkeiSelect.svelte';
 	import WildToggle from './WildToggle.svelte';
-	import { normalizeTenkei, DEFAULT_TENKEI, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
 	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
@@ -48,7 +46,7 @@
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare' | 'language') => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null, wild?: boolean | null) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
@@ -125,8 +123,7 @@
 	let editError = $state<string | null>(null);
 	let editElapsedMs = $state(0);
 	let editDrawController: AbortController | null = null;
-	let editTenkeiOverride = $state<TenkeiLevel | null>(null);
-	// null = inherit the parent work's setting, the same rule staffage follows.
+	// null = inherit the parent work's setting (field omitted).
 	let editWildOverride = $state<boolean | null>(null);
 
 	// While the edit dialog is drawing, tick an elapsed timer for the status element.
@@ -455,7 +452,6 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	function openEditDialog(node: LineageNode, mode: 'description' | 'ddl'): void {
 		if (!node.history) return;
-		editTenkeiOverride = null;
 		editWildOverride = null;
 		activeEditNode = node;
 		editMode = mode;
@@ -513,7 +509,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		editError = null;
 		editDrawController = new AbortController();
 		try {
-			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editTenkeiOverride, editWildOverride);
+			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editWildOverride);
 			else await onDrawDdl(activeEditNode, editDraft);
 			activeEditNode = null;
 			editMode = null;
@@ -1010,7 +1006,6 @@ $effect(() => {
 						onStop={stopEditDraw}
 					/>
 				{:else}
-					<TenkeiSelect compact value={editTenkeiOverride ?? normalizeTenkei(activeEditNode?.history?.tenkei) ?? DEFAULT_TENKEI} {isJapanese} inherited={editTenkeiOverride === null} onSelect={(level) => (editTenkeiOverride = level)} />
 					<WildToggle value={editWildOverride ?? (activeEditNode?.history?.render_wild === true)} {isJapanese} inherited={editWildOverride === null} onSelect={(next) => (editWildOverride = next)} />
 					<button type="button" onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
 					<button type="button" class="edit-draw" disabled={!editDraft.trim()} onclick={drawEditedArtwork}>{isJapanese ? '描画' : 'Draw'}</button>
@@ -1168,7 +1163,7 @@ $effect(() => {
 	.lineage-edit-body label { color: var(--fg2); font-size: .78rem; font-weight: 700; }
 	.lineage-edit-body textarea { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--border2); border-radius: 8px; padding: 12px 14px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.65; }
 	.lineage-edit-body textarea.ddl-editor { min-height: 390px; tab-size: 2; white-space: pre; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.55; }
-	.lineage-edit-dialog > footer :global(.tenkei-inline) { margin-right: auto; }
+	.lineage-edit-dialog > footer :global(.wild-inline) { margin-right: auto; }
 	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	/* Same shell as the main paint button (no ▶ mark: footer buttons carry none). */

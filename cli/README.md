@@ -228,7 +228,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
-                      [--staffage {none,sparse,auto}] [--seed-text SEED_TEXT]
+                      [--seed-text SEED_TEXT]
                       [--sketch] [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -275,8 +275,6 @@ options:
                         renderer performance seed for reproducible replay
   --composition-seed COMPOSITION_SEED
                         Stage 1.5 composition variation seed
-  --staffage {none,sparse,auto}
-                        staffage level (v1.96): none / sparse / auto
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
@@ -337,7 +335,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
-                      [--staffage {none,sparse,auto}] [--seed-text SEED_TEXT]
+                      [--seed-text SEED_TEXT]
                       [--sketch] [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -383,8 +381,6 @@ options:
                         renderer performance seed for reproducible replay
   --composition-seed COMPOSITION_SEED
                         Stage 1.5 composition variation seed
-  --staffage {none,sparse,auto}
-                        staffage level (v1.96): none / sparse / auto
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed

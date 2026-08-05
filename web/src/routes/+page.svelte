@@ -14,10 +14,8 @@
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/components/LineagePanel.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import TenkeiSelect from '$lib/components/TenkeiSelect.svelte';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
 	import { submitDerivationKind as submitDerivationKindOf } from '$lib/derivation';
-	import { DEFAULT_TENKEI, normalizeTenkei, type TenkeiLevel } from '$lib/tenkei';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
@@ -57,8 +55,6 @@
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import { dropFailedLine, planRetryRound } from '$lib/features/batch/retry';
-	import { tenkeiSettings } from '$lib/features/tenkei/settings.svelte';
-	import { tenkeiOverride } from '$lib/features/tenkei/render';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
@@ -400,7 +396,7 @@
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
 	// 写生 (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
-	// way a user setting like the staffage level is (contract section 0.3.1).
+	// way a user setting like the color catalog is (contract section 0.3.1).
 	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
 	// The prose the layer wrote for the run on screen, and the author's edit of
 	// it. Editing and painting again sends the edited prose instead of calling
@@ -493,7 +489,6 @@
 	let ddlDialogInitial = $state('');
 	let ddlDialogDrawing = $state(false);
 	let ddlDialogError = $state<string | null>(null);
-	let ddlDialogTenkeiOverride = $state<TenkeiLevel | null>(null);
 	let ddlDialogWildOverride = $state<boolean | null>(null);
 	// DDL-authored (standalone) artworks carry the display_label marker 'DDL'.
 	const DDL_ORIGIN_LABEL = 'DDL';
@@ -706,9 +701,6 @@
 
 	// ── Color catalog ────────────────────────────────────────
 	// Refine dialogs: null = inherit from the parent artwork (field omitted).
-	let refineTenkeiOverride = $state<TenkeiLevel | null>(null);
-	function setRefineTenkei(level: TenkeiLevel | null) { refineTenkeiOverride = level; }
-	// null = inherit the displayed work's setting, the same rule staffage follows.
 	let refineWildOverride = $state<boolean | null>(null);
 	function setRefineWild(value: boolean | null) { refineWildOverride = value; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
@@ -2740,8 +2732,6 @@
 		lineageParentNodeId?: string | null;
 		derivationKind?: DerivationKind | null;
 		derivationMetadata?: Record<string, unknown>;
-		// null/undefined = omit the field so the server inherits from the parent.
-		tenkei?: TenkeiLevel | null;
 		// 写生 (Stage 0.5). `sketchMode` says whether the layer runs and at which
 		// grain; `sketchText` hands the server prose it already has, so a redraw
 		// of a saved work replays instead of asking a non-deterministic layer again.
@@ -2904,7 +2894,7 @@ if (unreadWords.length > 0) {
 		tokens_out: number | null;
 	};
 
-	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, tenkei?: TenkeiLevel | null): Promise<InterpretResult> {
+	async function interpretOne(text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang): Promise<InterpretResult> {
 		const uiLang = getLang();
 		stage1UserPrompt = text;
 		const resolvedStage1Model = modelOverride ?? qualifiedModelId(stage1Provider, stage1Model);
@@ -2920,7 +2910,6 @@ if (unreadWords.length > 0) {
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				expand_intermediate: true,
-				...(tenkei ? { tenkei } : {}),
 			})
 		});
 		if (!r.ok) {
@@ -3879,14 +3868,14 @@ if (unreadWords.length > 0) {
 		}
 	}
 
-	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown>; tenkei?: TenkeiLevel | null } = {}): Promise<Iteration | null> {
+	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown> } = {}): Promise<Iteration | null> {
 		if (!authToken) return null;
 		let saved: Iteration | null = null;
 		try {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}), ...(options.tenkei ? { tenkei: options.tenkei } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -4090,7 +4079,6 @@ if (unreadWords.length > 0) {
 		stage2Model: () => stage2Model,
 		loading: () => loading,
 		input: () => input,
-		refineTenkeiOverride: () => refineTenkeiOverride,
 		currentUser: () => currentUser,
 		setCurrentUser: (user) => { currentUser = user as UserItem; },
 		targetContextVersion: () => targetContextVersion,
@@ -4283,7 +4271,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	await fetchLineage(nodeId, true);
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null, wild?: boolean | null): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history) return;
 	const rendered = await paintOne(sourceText, {
@@ -4297,7 +4285,6 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 		// null override = inherit the parent work's setting.
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...tenkeiOverride(tenkei),
 			...wildOverride(wild ?? node.history.render_wild === true)
 		},
 	});
@@ -4341,7 +4328,6 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		lineageParentNodeId: node.id,
 		renderOverrides: {
 			...colorCatalogOverride(lineageCatalogId(node)),
-			...tenkeiOverride(ddlDialogTenkeiOverride),
 			...wildOverride(ddlDialogWildOverride ?? node.history.render_wild === true)
 		},
 	});
@@ -4389,7 +4375,6 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 		lineageParentNodeId: node.id,
 		derivationKind: 'ddl_edit',
 		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
-		tenkei: ddlDialogTenkeiOverride,
 	});
 	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
 }
@@ -4401,7 +4386,6 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 	const firstLine = (nextDdl.split('\n').find((line) => line.trim().length > 0) ?? nextDdl).trim().slice(0, 80);
 	const composed = await composeOne(nextDdl, '', signal, undefined, undefined, {
 		canvasAspectId: effectiveCanvasAspectId(),
-		renderOverrides: tenkeiOverride(tenkeiSettings.level),
 	});
 	const saved = await pushHistory({
 		input: '',
@@ -4443,13 +4427,11 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 		countGeneration: true,
 		sourceText: firstLine,
 		displayLabel: 'DDL',
-		tenkei: tenkeiSettings.level,
 	});
 	await showNewLineageChild(saved?.id, saved?.lineage_node_id);
 }
 
 function openNewDdlDialog(): void {
-	ddlDialogTenkeiOverride = null;
 	ddlDialogWildOverride = null;
 	ddlDialogMode = 'new';
 	ddlDialogNode = null;
@@ -4472,7 +4454,6 @@ async function openCurrentDdlEditor(): Promise<void> {
 }
 
 function openLineageDdlEditor(node: LineageNode): void {
-	ddlDialogTenkeiOverride = null;
 	ddlDialogWildOverride = null;
 	ddlDialogMode = 'edit';
 	ddlDialogNode = node;
@@ -5029,7 +5010,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function inPlaceRedrawOverrides(): RenderOverrides {
 		return {
 			...colorCatalogOverride(refinementCatalogId()),
-			...tenkeiOverride(null),
 			...wildOverride(false)
 		};
 	}
@@ -5039,7 +5019,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function refinementRenderOverrides(): RenderOverrides {
 		return {
 			...colorCatalogOverride(refinementCatalogId()),
-			...tenkeiOverride(refineTenkeiOverride),
 			...wildOverride(effectiveRefineWild)
 		};
 	}
@@ -5383,7 +5362,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					tokens_in: (candidate.result.tokens_in_stage1 ?? 0) + (candidate.result.tokens_in_stage2 ?? 0) || null,
 					tokens_out: (candidate.result.tokens_out_stage1 ?? 0) + (candidate.result.tokens_out_stage2 ?? 0) || null,
 					catalog_id: candidate.result.render_color_catalog_id ?? colorCatalogSettings.effectiveId,
-				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {}, tenkei: refineTenkeiOverride });
+				}, { countGeneration: true, sourceText: input.trim(), lineageParentNodeId: candidate.result.lineage_parent_node_id ?? null, derivationKind: candidate.result.derivation_kind ?? null, derivationMetadata: candidate.result.derivation_metadata ?? {} });
 				if (contextVersion !== targetContextVersion) return;
 				variationCandidates = variationCandidates.map((item) => item.id === candidate.id ? { ...item, saved: true, selected: false } : item);
 				if (saved?.id && result === candidate.result) {
@@ -5567,7 +5546,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			? statusHistoryItem as Iteration
 			: null
 	);
-	const targetTenkei = $derived(normalizeTenkei(displayedHistoryItem?.tenkei) ?? DEFAULT_TENKEI);
 	// What a refine inherits when nothing is overridden: the work on screen, or
 	// the global setting when nothing is on screen.
 	const targetWild = $derived(displayedHistoryItem?.render_wild ?? result?.render_wild ?? wildSettings.enabled);
@@ -6256,16 +6234,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 				onCloseRefinement={refreshLineageAfterRefine}
 				statusDdlOrigin={statusDdlOrigin}
-				statusTenkei={normalizeTenkei(displayedHistoryItem?.tenkei)}
-				refineTenkeiValue={refineTenkeiOverride ?? targetTenkei}
-				refineTenkeiInherited={refineTenkeiOverride === null}
+				statusTenkei={displayedHistoryItem?.tenkei ?? null}
+				{developerMode}
 				refineDrawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
 				refineDrawingModelGroups={availableModelCatalog}
 				onSelectRefineDrawingModel={selectDdlDialogDrawingModel}
 				refineWildValue={effectiveRefineWild}
 				refineWildInherited={refineWildOverride === null}
 				onSetRefineWild={setRefineWild}
-				onSetRefineTenkei={setRefineTenkei}
 				onSaveOkugakiModel={persistOkugakiModel}
 				onSaveVisionModel={persistVisionModel}
 				onPromoteLineageNode={promoteLineageNode}
@@ -6306,6 +6282,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{formatHistoryDate}
 			{catalogName}
 			isJapanese={getLang() === 'ja'}
+			{developerMode}
 		/>
 			{/if}
 	</div><!-- /main-shell -->
@@ -6341,10 +6318,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			error={ddlDialogError}
 			previewForWord={saijikiPreview}
 			{pluginEntries}
-			showTenkei={ddlDialogMode === 'edit'}
-			tenkeiValue={ddlDialogTenkeiOverride ?? normalizeTenkei(ddlDialogNode?.history?.tenkei) ?? DEFAULT_TENKEI}
-			tenkeiInherited={ddlDialogTenkeiOverride === null}
-			onSelectTenkei={(level) => (ddlDialogTenkeiOverride = level)}
+			showSettings={ddlDialogMode === 'edit'}
 			wildValue={ddlDialogWildOverride ?? (ddlDialogNode?.history?.render_wild === true)}
 			wildInherited={ddlDialogWildOverride === null}
 			onSelectWild={(next) => (ddlDialogWildOverride = next)}

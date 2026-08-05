@@ -20,18 +20,19 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-04"
+FROZEN_AT = "2026-08-05"
 REASON = (
-    "Coerce receives the DDL alone. The original description used to be "
-    "concatenated in front of it, which is why `_source_context` read only the "
-    "first line and why a guard judged that line's provenance; with the "
-    "description gone the guard had nothing to judge and only misfired on the "
-    "ordinary shape of a DDL, so it was removed and the context is read whole. "
-    "Three new cases freeze the production input shape -- a multi-clause plan "
-    "with a fill clause, one without, and a multi-line DDL whose clause sits on "
-    "the second line -- none of which the corpus carried while every production "
-    "input was a concatenation."
+    "The staffage level was folded away. Stage 1.5 no longer appends candidate "
+    "sentences of its own, and coerce no longer runs the six branches that "
+    "invented an instruction -- a visual event, a composition anchor, context "
+    "energy, a motion floor, a surface tension mark, a focal-event reaction. "
+    "Both layers behave the way `tenkei=none` behaved, so 12 of the 15 expand "
+    "cases and 11 of the 21 coerce cases moved. The six cases that existed only "
+    "to separate the three levels became copies of one another: A-tenkei-* is "
+    "now the single A-scatter and B-trigger-* the single B-trigger. Two new "
+    "coerce cases freeze the silence of words that used to summon an invention."
 )
+
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
 
 BASE_INSTRUCTION: dict[str, Any] = {
@@ -73,21 +74,21 @@ def _score(instructions: list[dict[str, Any]], **changes: Any) -> dict[str, Any]
 
 def _expand_input(ddl: str, *, lang: str = "ja", context_text: str | None = None,
                   composition_seed: int | None = None, enable_plugins: bool = True,
-                  plugin_instructions_present: bool = False, tenkei: str = "auto",
+                  plugin_instructions_present: bool = False,
                   focus: str | None = None, variation_amplitude: str | None = None,
                   variation_seed: int | None = None) -> dict[str, Any]:
     return {
         "ddl": ddl, "lang": lang, "context_text": context_text,
         "composition_seed": composition_seed, "enable_plugins": enable_plugins,
         "plugin_instructions_present": plugin_instructions_present,
-        "tenkei": tenkei, "focus": focus,
+        "focus": focus,
         "variation_amplitude": variation_amplitude, "variation_seed": variation_seed,
     }
 
 def build_expand_inputs() -> dict[str, dict[str, Any]]:
     variation_ddl = "中心に黒い四角を置く。白い横線を三本引く。"
     en_ddl = "Place one black square near the center. Draw three white horizontal lines."
-    tenkei_ddl = "赤い円を三つ置く。小さな点を画面全体に散らす。"
+    scatter_ddl = "赤い円を三つ置く。小さな点を画面全体に散らす。"
     plugin_ddl = "黒い線を三本引く。Nature.うねり。"
     cases = {
         "A-base-ja": _expand_input(variation_ddl, context_text=variation_ddl),
@@ -103,23 +104,26 @@ def build_expand_inputs() -> dict[str, dict[str, Any]]:
                 variation_ddl, context_text=variation_ddl,
                 variation_amplitude=amplitude, variation_seed=seed,
             )
-    for tenkei in ("auto", "sparse", "none"):
-        cases[f"A-tenkei-{tenkei}"] = _expand_input(tenkei_ddl, context_text=tenkei_ddl, tenkei=tenkei)
+    # One input where the expander used to append candidate sentences of its
+    # own. The staffage level that governed them is gone (v2.11.0), so what this
+    # freezes now is that a scatter-heavy DDL comes back reframed and no longer.
+    cases["A-scatter"] = _expand_input(scatter_ddl, context_text=scatter_ddl)
     return cases
 
-def _coerce_input(score: dict[str, Any], *, ddl: str | None = None,
-                  tenkei: str = "auto", plugin_instructions_present: bool = False) -> dict[str, Any]:
-    return {"score": copy.deepcopy(score), "ddl": ddl, "tenkei": tenkei,
-            "plugin_instructions_present": plugin_instructions_present}
+def _coerce_input(score: dict[str, Any], *, ddl: str | None = None) -> dict[str, Any]:
+    return {"score": copy.deepcopy(score), "ddl": ddl}
 
 def build_coerce_inputs() -> dict[str, dict[str, Any]]:
     line = _instruction()
     trigger = "赤い円を三つ散らす。ゆっくり波打つ。"
     cases = {
         "B-baseline-no-ddl": _coerce_input(_score([line])),
-        "B-trigger-auto": _coerce_input(_score([line]), ddl=trigger, tenkei="auto"),
-        "B-trigger-sparse": _coerce_input(_score([line]), ddl=trigger, tenkei="sparse"),
-        "B-trigger-none": _coerce_input(_score([line]), ddl=trigger, tenkei="none"),
+        # Words that used to summon instructions of coerce's own -- motion,
+        # a visual event, an accent for the diversity of the composition. The
+        # three cases that separated the staffage levels collapsed into this one
+        # when the axis was folded away (v2.11.0); what it freezes now is that
+        # such a description leaves with the one line it came in with.
+        "B-trigger": _coerce_input(_score([line]), ddl=trigger),
         "B-white-line": _coerce_input(_score([_instruction(color="white")])),
         "B-white-filled-circle": _coerce_input(_score([_instruction(
             primitive="circle", **{"from": None}, to=None, center=[0.5, 0.5], radius=0.2,
@@ -171,6 +175,15 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
                 "黒い細い余白線を存在の重心として右上の焦点へ二本引く。透明な膜を重ねる。境界が滲む。"
             ),
         ),
+        # Two descriptions whose words used to reach a branch that invented:
+        # `影`/`沈む` summoned a surface-tension mark, `落ち葉`/`森` a leaf-grain
+        # energy. Both branches are gone (v2.11.0) and these freeze their silence.
+        "B-surface-tension-words": _coerce_input(
+            _score([line]), ddl="布の影が机に落ちて沈む。"
+        ),
+        "B-leaf-grain-words": _coerce_input(
+            _score([line]), ddl="森の落ち葉が湿った土に重なる。"
+        ),
         "B-production-multiline": _coerce_input(
             _score([_instruction(color="white")], background="black"),
             ddl=(
@@ -206,8 +219,7 @@ def _render_cases() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     for case_id, input_data in sorted(build_coerce_inputs().items()):
         report: dict[str, int] = {}
         score = coerce_score(Score.model_validate(input_data["score"]), ddl=input_data["ddl"],
-                             branch_report=report, tenkei=input_data["tenkei"],
-                             plugin_instructions_present=input_data["plugin_instructions_present"])
+                             branch_report=report)
         text = _canonical_output({"score": score.model_dump(by_alias=True, mode="json"), "branch_report": report})
         path = f"b_coerce/{case_id}.json"
         outputs[path] = text

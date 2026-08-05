@@ -1310,36 +1310,6 @@ def _select_examples(text: str, k: int = 5, lang: str = "ja") -> str:
     return "\n\n".join(f"入力: {ex['input']}\n出力: {ex['output']}" for _, ex in top)
 
 
-_TENKEI_NORMS_JA = {
-    "none": (
-        "\n\n# 添景の抑制（この生成の指定: なし）\n"
-        "入力に書かれた要素だけを正規化する。入力にない補助図形・散布・背景・装飾の文を追加してはいけない。"
-        "名前空間付き語（例: Nature.紅葉）が入力にある場合は、その語と入力に明示された属性だけをそのまま転記し、"
-        "周囲に文を足さない。"
-    ),
-    "sparse": (
-        "\n\n# 添景の抑制（この生成の指定: 控えめ）\n"
-        "入力に書かれた要素を主題とし、追加する補助の文は最大 1 文までにする。"
-        "追加する場合は主題より小さく・薄くする。名前空間付き語が入力にある場合は、その語をそのまま転記する。"
-    ),
-}
-
-_TENKEI_NORMS_EN = {
-    "none": (
-        "\n\n# Scenery suppression (this generation: none)\n"
-        "Normalize only the elements written in the input. Do not add auxiliary shapes, scatters, "
-        "backgrounds, or decorative sentences that are not in the input. When the input contains a "
-        "qualified plugin term (e.g. Nature.autumn leaves), transcribe the term and its explicit "
-        "attributes as-is and add no surrounding sentences."
-    ),
-    "sparse": (
-        "\n\n# Scenery suppression (this generation: sparse)\n"
-        "Treat the written elements as the subject and add at most one auxiliary sentence. "
-        "Any addition must be smaller and paler than the subject. Transcribe qualified plugin terms as-is."
-    ),
-}
-
-
 def _prompt_digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
@@ -1349,7 +1319,6 @@ def _build_system_prompt_parts(
     k: int = 5,
     prefix_override: str | None = None,
     lang: str = "ja",
-    tenkei: str = "auto",
     limits: Limits = DEFAULT_LIMITS,
 ) -> tuple[str, str]:
     """Return the actual Stage 1 prompt and its example-free base."""
@@ -1361,8 +1330,6 @@ def _build_system_prompt_parts(
         # Stage 1 states are the ones the rest of the pipeline enforces.
         prefix = build_stage1_prefix(lang, limits)
     section_header = "# Examples\n\n" if lang == "en" else "# 変換例\n\n"
-    tenkei_norms = _TENKEI_NORMS_EN if lang == "en" else _TENKEI_NORMS_JA
-    tenkei_section = tenkei_norms.get(tenkei, "")
     from .plugins import DOCUMENT_PLUGIN_MANAGER
 
     vocabulary = DOCUMENT_PLUGIN_MANAGER.prompt_vocabulary(lang)
@@ -1384,7 +1351,7 @@ def _build_system_prompt_parts(
                 "名前空間付き語が明示された場合、または列挙された発火語が指示対象として明示された"
                 "場合だけ名前空間付き語へ解決する。比喩や未知対象から推測せず、プラグイン語を創作しない。"
             )
-    base_prompt = prefix + plugin_section + tenkei_section
+    base_prompt = prefix + plugin_section
     return base_prompt + "\n\n" + section_header + examples, base_prompt
 
 
@@ -1393,7 +1360,6 @@ def _build_system_prompt(
     k: int = 5,
     prefix_override: str | None = None,
     lang: str = "ja",
-    tenkei: str = "auto",
 ) -> str:
     """推論ごとのシステムプロンプトを構築する (PREFIX + 動的例 k 件)。"""
     prompt, _ = _build_system_prompt_parts(
@@ -1401,7 +1367,6 @@ def _build_system_prompt(
         k=k,
         prefix_override=prefix_override,
         lang=lang,
-        tenkei=tenkei,
     )
     return prompt
 
@@ -1454,7 +1419,6 @@ def interpret_detail(
     system_prompt_prefix: str | None = None,
     lang: str = "ja",
     trace_sink: list[str] | None = None,
-    tenkei: str = "auto",
     prompt_metadata: dict[str, str] | None = None,
     limits: Limits = DEFAULT_LIMITS,
 ) -> tuple[str, str | None, int | None, int | None]:
@@ -1463,7 +1427,7 @@ def interpret_detail(
     trace_sink 指定時は、サニタイズ前の Stage 1 生 DDL を append する (観測のみ)。
     """
     system_prompt, base_prompt = _build_system_prompt_parts(
-        text, prefix_override=system_prompt_prefix, lang=lang, tenkei=tenkei, limits=limits
+        text, prefix_override=system_prompt_prefix, lang=lang, limits=limits
     )
     if prompt_metadata is not None:
         prompt_metadata["stage1_prompt_digest"] = _prompt_digest(system_prompt)

@@ -30,8 +30,6 @@ def replay(case_input: dict) -> tuple[dict, dict[str, int], int]:
         Score.model_validate(case_input["score"]),
         ddl=case_input["ddl"],
         branch_report=report,
-        tenkei=case_input["tenkei"],
-        plugin_instructions_present=case_input["plugin_instructions_present"],
     )
     return score.model_dump(mode="json", by_alias=True), dict(sorted(report.items())), len(score.instructions)
 

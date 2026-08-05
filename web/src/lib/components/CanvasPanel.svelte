@@ -10,10 +10,8 @@
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
-	import TenkeiSelect from './TenkeiSelect.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
-	import { tenkeiLabel, type TenkeiLevel } from '$lib/tenkei';
 	import { derivationKindLabel, type DerivationKind } from '$lib/derivation';
 	import type { ModelOption } from '$lib/models';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
@@ -141,15 +139,17 @@
 		onOpenLineageNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleLineageStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleLineageForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
-		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, tenkei?: TenkeiLevel | null) => void | Promise<void>;
+		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal) => void | Promise<void>;
 		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
 		onDrawLineageSketchGrain: (node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal) => Promise<void>;
 		onToggleSaijiki: () => void;
 		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;
-		statusTenkei: TenkeiLevel | null;
-		refineTenkeiValue: TenkeiLevel;
+		developerMode: boolean;
+		// The staffage level a work was drawn at, for works saved before the axis
+		// was folded away (v2.11.0). Developer mode only, and only when set.
+		statusTenkei: string | null;
 		// The drawing (Stage 2) model, the same one DdlEditorDialog offers and with
 		// the same effect: choosing here rewrites the default and persists it.
 		refineDrawingModelId: string;
@@ -158,8 +158,6 @@
 		refineWildValue: boolean;
 		refineWildInherited: boolean;
 		onSetRefineWild: (value: boolean | null) => void;
-		refineTenkeiInherited: boolean;
-		onSetRefineTenkei: (level: TenkeiLevel | null) => void;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteLineageNode: (node: LineageNode) => void | Promise<void>;
@@ -282,16 +280,14 @@
 		onToggleSaijiki,
 		onCloseRefinement,
 		statusDdlOrigin,
+		developerMode,
 		statusTenkei,
-		refineTenkeiValue,
 		refineDrawingModelId,
 		refineDrawingModelGroups,
 		onSelectRefineDrawingModel,
 		refineWildValue,
 		refineWildInherited,
 		onSetRefineWild,
-		refineTenkeiInherited,
-		onSetRefineTenkei,
 		onSaveOkugakiModel,
 		onSaveVisionModel,
 		onPromoteLineageNode,
@@ -345,7 +341,6 @@
 	}
 	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare' | 'language'): Promise<void> {
 		await onOpenLineageNode(node);
-		onSetRefineTenkei(null);
 		refineView = view;
 		refineModalOpen = true;
 		outputTab = 'refine';
@@ -808,7 +803,7 @@
 												onSelect={onSelectRefineDrawingModel}
 											/>
 										</div>
-										<div class="refine-tenkei-row"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
+										<div class="refine-settings-row"><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
 
 									{#if variationBusy || variationGridBusy}
 										<RunStatus
@@ -883,7 +878,7 @@
 					<div class="compare-head">
 						<!-- One box, so `space-between` puts the settings at the left and the
 						     action at the right instead of stranding the switch between them. -->
-						<div class="compare-head-settings"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
+						<div class="compare-head-settings"><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
 						<div class="compare-action-wrap" class:running={modelInspection.busy}>
 							{#if modelInspection.busy}
 								<RunStatus
@@ -961,7 +956,7 @@
 					{:else}
 					<div class="compare-panel">
 						<div class="compare-head">
-							<div class="compare-head-settings"><TenkeiSelect compact value={refineTenkeiValue} {isJapanese} inherited={refineTenkeiInherited} onSelect={(level) => onSetRefineTenkei(level)} /><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
+							<div class="compare-head-settings"><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
 							<div class="compare-action-wrap" class:running={modelInspection.languageBusy}>
 								{#if modelInspection.languageBusy}
 									<RunStatus
@@ -1081,7 +1076,12 @@
 								{@render term('render seed', t().provenanceHintRenderSeed)}<dd>{detailRenderSeed ?? '-'}</dd>
 								{@render term(t().provenanceLabelSeedText, t().provenanceHintSeedText)}<dd>{detailSeedText || '-'}</dd>
 								{@render term(t().provenanceLabelWild, t().provenanceHintWild)}<dd>{detailWild == null ? t().historyVersionNotRecorded : detailWild ? t().provenanceWildOn : t().provenanceWildOff}</dd>
-								{@render term(isJapanese ? '添景' : 'Staffage', t().provenanceHintStaffage)}<dd>{statusTenkei ? tenkeiLabel(statusTenkei, isJapanese) : '-'}</dd>
+								<!-- Works drawn before the staffage axis was folded away carry the
+								     level they were drawn at. Nothing new records one, so this only
+								     ever shows for a past work, and only to a developer. -->
+								{#if developerMode && statusTenkei}
+									<dt><span>{isJapanese ? '添景' : 'Staffage'}</span></dt><dd>{statusTenkei}</dd>
+								{/if}
 								{@render term(isJapanese ? '色カタログ' : 'Color catalog', t().provenanceHintCatalog)}<dd>{statusCatalogName}</dd>
 								{#if detailCatalogSub}
 									{@render term(t().provenanceLabelCatalogSub, t().provenanceHintCatalogSub)}<dd>{detailCatalogSub}</dd>
@@ -1745,7 +1745,7 @@
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover :global(.model-hover-card),
 	.model-metadata-hover:focus-within :global(.model-hover-card) { display: block; }
-	.refine-tenkei-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+	.refine-settings-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 	.refine-model-row { margin-top: 6px; }
 
 	.compare-mode-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }

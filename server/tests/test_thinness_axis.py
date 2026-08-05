@@ -164,7 +164,7 @@ def test_t5_coerce_does_not_put_thinness_on_what_it_invents() -> None:
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
     score = Score.model_validate(fixture["score_stage2"])
     original = len(score.instructions)
-    coerced = coerce_score(score, ddl=fixture["ddl"], tenkei="auto")
+    coerced = coerce_score(score, ddl=fixture["ddl"])
     added = coerced.instructions[original:]
     assert all(ins.thinness is None for ins in added)
 

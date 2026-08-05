@@ -52,7 +52,6 @@ def _replay(case: dict) -> str:
     score = coerce_score(
         Score.model_validate(payload),
         ddl=_coerce_context(case["stage2_input"], case.get("source_text")),
-        tenkei=case.get("tenkei") or "auto",
     )
     return score.background
 

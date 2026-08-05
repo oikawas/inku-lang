@@ -3,9 +3,7 @@ import { t, getLang } from '$lib/i18n/index.svelte';
 import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 import { type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import { type RenderOverrides } from '$lib/features/render-payload';
-import { tenkeiOverride } from '$lib/features/tenkei/render';
 import { registerUserSettingsContributor } from '$lib/features/user-settings';
-import { type TenkeiLevel } from '$lib/tenkei';
 import { type Score } from '$lib/historyManagerState.svelte';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 
@@ -60,7 +58,6 @@ export type ModelInspectionDeps = {
 	stage2Model: () => string;
 	loading: () => boolean;
 	input: () => string;
-	refineTenkeiOverride: () => TenkeiLevel | null;
 	currentUser: () => { username: string } | null;
 	setCurrentUser: (user: unknown) => void;
 	/**
@@ -70,7 +67,7 @@ export type ModelInspectionDeps = {
 	targetContextVersion: () => number;
 	/** Page collaborators, taken as-is. */
 	apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-	interpretOne: (text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: 'ja' | 'en', tenkei?: TenkeiLevel | null) => Promise<PaintedStage1>;
+	interpretOne: (text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: 'ja' | 'en') => Promise<PaintedStage1>;
 	composeOne: (currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: 'ja' | 'en', renderOptions?: { canvasAspectId?: CanvasAspectId; lineageParentNodeId?: string | null; renderOverrides?: RenderOverrides }) => Promise<PaintedStage2>;
 	ensureVisibleLineageParentId: () => Promise<string | null>;
 	pushHistory: (it: Record<string, unknown>, options?: Record<string, unknown>) => Promise<{ id?: string; starred?: boolean; note?: string | null } | null>;
@@ -94,7 +91,6 @@ export function createModelInspection(deps: ModelInspectionDeps) {
 	const stage2Model = $derived(deps.stage2Model());
 	const loading = $derived(deps.loading());
 	const input = $derived(deps.input());
-	const refineTenkeiOverride = $derived(deps.refineTenkeiOverride());
 	const currentUser = $derived(deps.currentUser());
 type ModelInspectionResult = {
 	id: string;
@@ -302,11 +298,11 @@ async function runModelInspection() {
 			modelInspectionCurrentModel = jobStage1Name === jobStage2Name ? jobStage1Name : `${jobStage1Name} / ${jobStage2Name}`;
 			try {
 				const started = Date.now();
-				const interpreted = await interpretOne(source, abortController.signal, job.stage1, undefined, refineTenkeiOverride);
+				const interpreted = await interpretOne(source, abortController.signal, job.stage1);
 				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
 				modelInspectionTokensIn = addTokens(modelInspectionTokensIn, interpreted.tokens_in);
 				modelInspectionTokensOut = addTokens(modelInspectionTokensOut, interpreted.tokens_out);
-				const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2, undefined, { renderOverrides: tenkeiOverride(refineTenkeiOverride), lineageParentNodeId: modelParentNodeId });
+				const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2, undefined, { lineageParentNodeId: modelParentNodeId });
 				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
 				modelInspectionTokensIn = addTokens(modelInspectionTokensIn, composed.tokens_in);
 				modelInspectionTokensOut = addTokens(modelInspectionTokensOut, composed.tokens_out);
@@ -433,10 +429,10 @@ async function runLanguageInspection() {
 			languageInspectionCurrentLabel = `${langLabel(job.stage1Lang)} / ${langLabel(job.stage2Lang)}`;
 			try {
 				const started = Date.now();
-				const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang, refineTenkeiOverride);
+				const interpreted = await interpretOne(source, abortController.signal, undefined, job.stage1Lang);
 				languageInspectionTokensIn = addTokens(languageInspectionTokensIn, interpreted.tokens_in);
 				languageInspectionTokensOut = addTokens(languageInspectionTokensOut, interpreted.tokens_out);
-				const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang, { renderOverrides: tenkeiOverride(refineTenkeiOverride), lineageParentNodeId: parentNodeId });
+				const composed = await composeOne(interpreted.ddl, source, abortController.signal, undefined, job.stage2Lang, { lineageParentNodeId: parentNodeId });
 				if (abortController.signal.aborted || languageInspectionRunId !== runId) return;
 				languageInspectionTokensIn = addTokens(languageInspectionTokensIn, composed.tokens_in);
 				languageInspectionTokensOut = addTokens(languageInspectionTokensOut, composed.tokens_out);

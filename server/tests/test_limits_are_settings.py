@@ -187,13 +187,18 @@ def test_t2_reverse_each_stated_limit_is_separately_bound():
     Without the reverse leg a builder that hashed the whole Limits, or ignored
     it, would pass (invariance_gate_misses_the_binding).
     """
+    # Which prompts each limit is stated in, EXACTLY. "at least one moved" is
+    # not enough: reverting only the Japanese copy of a rule leaves the English
+    # one moving, the set stays non-empty, and the check passes while the two
+    # languages now teach the model different rules -- the failure §2.2 names
+    # (half_perturbation_masked_by_resnap).
     stated = {
-        "literal_count_threshold": 480,
-        "represented_count_min": 40,
-        "represented_count_max": 90,
-        "ddl_count_max": 1500,
-        "ddl_count_max_grid": 3000,
-        "max_expanded_primitives": 900,
+        "literal_count_threshold": (480, {"s2ja", "s2en"}),
+        "represented_count_min": (40, {"s2ja", "s2en"}),
+        "represented_count_max": (90, {"s2ja", "s2en"}),
+        "ddl_count_max": (1500, {"s2ja", "s2en", "s1ja", "s1en"}),
+        "ddl_count_max_grid": (3000, {"s2ja", "s2en", "s1ja", "s1en"}),
+        "max_expanded_primitives": (900, {"s2ja", "s2en"}),
     }
     baseline = {
         "s2ja": composer.build_system_prompt("ja", DEFAULT_LIMITS),
@@ -202,7 +207,7 @@ def test_t2_reverse_each_stated_limit_is_separately_bound():
         "s1en": interpreter.build_stage1_prefix("en", DEFAULT_LIMITS),
     }
 
-    for field, value in stated.items():
+    for field, (value, expected) in stated.items():
         altered = Limits(**{**limits_as_dict(DEFAULT_LIMITS), field: value})
         moved = {
             key
@@ -214,7 +219,7 @@ def test_t2_reverse_each_stated_limit_is_separately_bound():
                 else interpreter.build_stage1_prefix(key[-2:], altered)
             )
         }
-        assert moved, f"{field} is stated in a prompt but changing it moved nothing"
+        assert moved == expected, f"{field}: expected {sorted(expected)} to move, got {sorted(moved)}"
 
     # max_instructions is the negative control: it governs coerce and is named
     # in no prompt, so every prompt must come back byte-identical.

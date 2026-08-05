@@ -450,3 +450,39 @@ def test_t12_the_plugin_transcription_guard_still_suppresses_stage15() -> None:
     assert "中央" not in plain
     # ただし文は 1 つも増えない（v2.11.0）。
     assert len(re.findall("。", plain)) == len(re.findall("。", ddl))
+
+
+# ── T-9 の続き: 記録ではなく門にする ────────────────────────────────────────
+
+def test_t9_the_expand_corpus_is_regenerated_not_merely_read_back() -> None:
+    """凍結コーパスの digest 検査は**記録**であって門ではない。
+
+    `test_ddl_reference_output_files_match_manifest` はディスク上のファイルと
+    manifest を突き合わせるだけなので、展開層を書き換えても pytest では赤く
+    ならない（再生成するのは CI だけ）。実測 (2026-08-05): 展開層へ候補文を 1 つ
+    戻す摂動で、expander の性質検査は 5 本赤くなったが、コーパス検査は 0 本だった。
+    ここで実際に焼き直して突き合わせる。
+    """
+    import hashlib
+    import importlib.util
+
+    from inku_server.layer_versions import DDL_ENGINE_VERSION
+
+    generator_path = ROOT / "server/scripts/gen_ddl_reference.py"
+    spec = importlib.util.spec_from_file_location("gen_ddl_reference", generator_path)
+    assert spec is not None and spec.loader is not None
+    generator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(generator)
+
+    manifest = json.loads(
+        (ROOT / "server/reference" / f"ddl-engine-{DDL_ENGINE_VERSION}" / "manifest.json").read_text()
+    )
+    baked = 0
+    for case_id, case_input in generator.build_expand_inputs().items():
+        output = generator.expand_intermediate_ddl(**case_input)
+        text = output + ("" if output.endswith("\n") else "\n")
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+        assert digest == manifest["cases"][case_id]["digest"], case_id
+        baked += 1
+    # 何件見たかを述べる。黙って 0 件を見た検査は、何も悪くない検査と同じ顔をする。
+    assert baked == 13, f"a_expand を {baked} 件しか焼き直していない"

@@ -83,17 +83,17 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,version,lineage,refine,inspect,review,user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,version,lineage,refine,inspect,review,user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
-    models              show or set CLI default Stage 1 / Stage 2 models
+    models              show or set CLI default LLM and Vision models
     paint               generate one drawing
     batch               generate drawings from a prompt list
     contact-sheet       create a contact sheet from PNG files in a directory
@@ -109,9 +109,14 @@ positional arguments:
     history-export      export history items by hash for benchmark review
     api                 call any public inku HTTP API endpoint with the stored
                         session
+    plugin              inspect and reload declarative DDL plugins
+    reference           dump implementation vocabulary and constant tables
+                        (read-only mirror)
     version             show CLI and server version/build information
-    lineage             show or control artwork lineage
-    refine              generate refined options from an existing work
+    lineage             show or control the lineage of a work
+    colophon            recite one root-to-target lineage branch as an append-
+                        only reading
+    refine              refine an existing work
     inspect             parallel model inspection comparison
     review              evaluate drawings and submit feedback
     user                manage user accounts
@@ -197,7 +202,8 @@ options:
   --vision-provider {nvidia,anthropic,local}
                         save the default Vision provider
   --vision-model VISION_MODEL
-                        save the default Vision model for image-reading operations
+                        save the default Vision model for image-reading
+                        operations
   --color-catalog COLOR_CATALOG
                         save the default server color catalog for paint and
                         batch
@@ -310,6 +316,7 @@ options:
   --trace               request RAW per-layer intermediates and save them as
                         <prefix>-trace.json
   --full-json           print the full paint response
+
 ```
 
 ### `inku-cli batch`
@@ -422,6 +429,7 @@ options:
                         OUT_DIR/analysis-summary.json)
   --composition-count COMPOSITION_COUNT
                         generate N Stage 1.5 variations per description
+
 ```
 
 ### `inku-cli contact-sheet`
@@ -503,7 +511,9 @@ options:
 ### `inku-cli vision-review`
 
 ```
-usage: inku-cli vision-review [-h] [--vision-model VISION_MODEL] [--model MODEL] [--output OUTPUT] input_dir
+usage: inku-cli vision-review [-h] [--vision-model VISION_MODEL]
+                              [--model MODEL] [--output OUTPUT]
+                              input_dir
 
 positional arguments:
   input_dir
@@ -526,7 +536,8 @@ usage: inku-cli render-score [-h] [--base-url BASE_URL]
                              [--svg-profile {display,editable,compat}]
                              [--canvas-aspect CANVAS_ASPECT]
                              [--render-seed RENDER_SEED]
-                             [--vary-seed VARY_SEED] [--catalog-id CATALOG_ID]
+                             [--composition-seed COMPOSITION_SEED]
+                             [--catalog-id CATALOG_ID]
                              [--color-catalog COLOR_CATALOG] [--full-json]
                              [score]
 
@@ -547,7 +558,7 @@ options:
   --canvas-aspect CANVAS_ASPECT
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
-  --vary-seed VARY_SEED
+  --composition-seed COMPOSITION_SEED
                         record Stage 1.5 composition variation seed in output
                         metadata
   --catalog-id CATALOG_ID
@@ -588,6 +599,7 @@ options:
 usage: inku-cli history [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--offset OFFSET]
                         [--limit LIMIT] [--query QUERY] [--starred]
+                        [--for-revision]
 
 options:
   -h, --help            show this help message and exit
@@ -598,6 +610,7 @@ options:
   --limit LIMIT
   --query QUERY, -q QUERY
   --starred
+  --for-revision
 
 ```
 
@@ -626,7 +639,7 @@ usage: inku-cli history-export [-h] [--base-url BASE_URL]
                                [--from FROM_HASH] [--to TO_HASH] --out-dir
                                OUT_DIR [--columns COLUMNS]
                                [--thumb-size THUMB_SIZE] [--query QUERY]
-                               [--starred]
+                               [--starred] [--for-revision]
                                [hashes ...]
 
 positional arguments:
@@ -647,6 +660,8 @@ options:
                         filter history before resolving hashes
   --starred             filter history to starred items before resolving
                         hashes
+  --for-revision        filter history to items marked for revision before
+                        resolving hashes
 
 ```
 
@@ -676,6 +691,79 @@ options:
   --no-auth             omit the stored session for public endpoints
   --output OUTPUT, -o OUTPUT
                         write the raw response body to a file
+
+```
+
+### `inku-cli plugin`
+
+```
+usage: inku-cli plugin [-h] [--base-url BASE_URL]
+                       [--timeout-seconds TIMEOUT_SECONDS]
+                       {list,validate,reload} ...
+
+positional arguments:
+  {list,validate,reload}
+    list                list loaded and rejected plugin documents
+    validate            validate one local plugin document on the server
+    reload              reload the server plugin directory without restart
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+
+```
+
+### `inku-cli plugin list`
+
+```
+usage: inku-cli plugin list [-h]
+
+options:
+  -h, --help  show this help message and exit
+
+```
+
+### `inku-cli plugin validate`
+
+```
+usage: inku-cli plugin validate [-h] file
+
+positional arguments:
+  file        UTF-8 .inku-plugin.md file
+
+options:
+  -h, --help  show this help message and exit
+
+```
+
+### `inku-cli plugin reload`
+
+```
+usage: inku-cli plugin reload [-h]
+
+options:
+  -h, --help  show this help message and exit
+
+```
+
+### `inku-cli reference`
+
+```
+usage: inku-cli reference [-h] [--base-url BASE_URL]
+                          [--timeout-seconds TIMEOUT_SECONDS] [--md | --json]
+                          [--output OUTPUT]
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+  --md                  Markdown output (default)
+  --json                JSON output
+  --output OUTPUT, -o OUTPUT
+                        write to FILE instead of stdout
 
 ```
 
@@ -743,6 +831,36 @@ options:
 
 ```
 
+### `inku-cli colophon`
+
+```
+usage: inku-cli colophon [-h] [--base-url BASE_URL]
+                         [--timeout-seconds TIMEOUT_SECONDS]
+                         [--vision-model VISION_MODEL] [--model MODEL]
+                         [--language {ja,en}] [--dry-run] [--json]
+                         [--output OUTPUT]
+                         target
+
+positional arguments:
+  target                history item ID or lineage node ID
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+  --vision-model VISION_MODEL
+                        Vision reader model (defaults to CLI/server Vision
+                        setting)
+  --model MODEL         compatibility alias for --vision-model
+  --language {ja,en}
+  --dry-run             generate and print without saving
+  --json                print the complete response as JSON
+  --output OUTPUT, -o OUTPUT
+                        also write the recitation body to a UTF-8 file
+
+```
+
 ### `inku-cli refine`
 
 ```
@@ -768,8 +886,33 @@ options:
 
 ```
 usage: inku-cli refine perform [-h] --kind {touch,layout,reading,color}
-                               [--description DESCRIPTION] [--save-history] [--no-save]
-                                [-o OUT_DIR] [--png]
+                               [--description DESCRIPTION] [--save-history]
+                               [--no-save] [-o OUT_DIR] [--png]
+                               item_id
+
+positional arguments:
+  item_id               target history item ID to refine
+
+options:
+  -h, --help            show this help message and exit
+  --kind {touch,layout,reading,color}
+                        refinement element type
+  --description DESCRIPTION
+                        override the description for layout/reading variations
+  --save-history        automatically save the result to history
+  --no-save             do not save the result to history
+  -o OUT_DIR, --out-dir OUT_DIR
+                        save outputs (svg/json) to this directory
+  --png                 perform PNG rendering in output directory
+
+```
+
+### `inku-cli refine generate`
+
+```
+usage: inku-cli refine generate [-h] --kind {touch,layout,reading,color}
+                                [--description DESCRIPTION] [--save-history]
+                                [--no-save] [-o OUT_DIR] [--png]
                                 item_id
 
 positional arguments:
@@ -861,16 +1004,19 @@ options:
 ### `inku-cli review evaluate`
 
 ```
-usage: inku-cli review evaluate [-h] [--model MODEL] [--prompt PROMPT]
+usage: inku-cli review evaluate [-h] [--vision-model VISION_MODEL]
+                                [--model MODEL] [--prompt PROMPT]
                                 png_file
 
 positional arguments:
-  png_file         path to PNG image file of the drawing
+  png_file              path to PNG image file of the drawing
 
 options:
-  -h, --help       show this help message and exit
-  --model MODEL    NVIDIA NIM vision model name
-  --prompt PROMPT  override vision review prompt
+  -h, --help            show this help message and exit
+  --vision-model VISION_MODEL
+                        Vision model (defaults to the CLI Vision setting)
+  --model MODEL         compatibility alias for --vision-model
+  --prompt PROMPT       override vision review prompt
 
 ```
 

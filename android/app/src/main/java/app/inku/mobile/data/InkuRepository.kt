@@ -273,7 +273,7 @@ class InkuRepository(
 
     suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto"): HistoryItemEntity {
         val started = System.currentTimeMillis()
-        val stage1Text = description + emotionHint(description)
+        val stage1Text = description
         val result = pipeline.paint(
             PaintRequest(
                 description = stage1Text,
@@ -291,7 +291,7 @@ class InkuRepository(
     }
 
     suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, tenkei: String = "auto"): InterpretResult {
-        val stage1Text = description + emotionHint(description)
+        val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
                 description = stage1Text,
@@ -444,33 +444,6 @@ class InkuRepository(
         return DefaultModelDownloads.all.firstOrNull { it.modelId == modelId }
             ?: error("Unknown model: $modelId")
     }
-
-    private fun emotionHint(text: String): String {
-        val hints = emotionDdlMap.mapNotNull { (word, hint) ->
-            if (text.contains(word)) "「$word」→ $hint" else null
-        }
-        if (hints.isEmpty()) return ""
-        return "\n\n[感情語をDDLに反映してください: ${hints.joinToString("、")}]"
-    }
-
-    private val emotionDdlMap: Map<String, String> = linkedMapOf(
-        "美しい" to "線は細く(pencil)、揺らぎは小さく(fine)、動きはゆっくり(slow)",
-        "美しく" to "線は細く(pencil)、揺らぎは小さく(fine)、動きはゆっくり(slow)",
-        "激しい" to "線は太く(brush_thick)、揺らぎは大きく(broad)、動きは速く(high)",
-        "激しく" to "線は太く(brush_thick)、揺らぎは大きく(broad)、動きは速く(high)",
-        "静かな" to "揺らぎなし(none)、線は細く(silverpoint)、密度を低く",
-        "静かに" to "揺らぎなし(none)、線は細く(silverpoint)、密度を低く",
-        "素敵" to "線は細く(pen)、揺らぎは小さく(fine)、配置は整然と",
-        "きれい" to "線は細く(pencil)、揺らぎは小さく(fine)、密度を低く",
-        "やさしい" to "揺らぎは波(wave)、振幅は小さく(fine)、線は細く(pencil)",
-        "切ない" to "色は青(blue)か灰(gray)、線は細く(silverpoint)、揺らぎはゆっくり(slow)",
-        "哀しい" to "色は青(blue)、線は細く(silverpoint)、要素数は少なく",
-        "儚い" to "線は最細(silverpoint)、破線か点線(dashed/dotted)、要素は散らす(scatter)",
-        "神秘的" to "背景は黒(black)、円や弧を使う(circle/arc)、放射状(radial)",
-        "幻想的" to "揺らぎはperlin、振幅は大きく(broad)、複数色(color_cycle)",
-        "寂しい" to "要素数は少なく、間隔を広く、色は灰(gray)",
-        "爽やか" to "色は青(blue)か白(white)背景、線は細く(pen)、揺らぎなし(none)",
-    )
 
     private fun defaultProviderSettings(): List<ProviderSettingEntity> {
         fun models(vararg ids: String): String = JSONArray(ids.toList()).toString()

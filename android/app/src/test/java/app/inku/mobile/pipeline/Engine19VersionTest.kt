@@ -21,7 +21,7 @@ class Engine19VersionTest {
     }
 
     @Test
-    fun testRenderHashDefaultsMissingAndBlankMetadataToEngine21() {
+    fun testRenderHashPreservesNullEngineVersionWhenMissingInMetadata() {
         val pipeline = LocalFallbackPipeline()
         val method = LocalFallbackPipeline::class.java.getDeclaredMethod(
             "renderHash",
@@ -44,9 +44,10 @@ class Engine19VersionTest {
                 "default",
             ) as String
 
-        val explicit21 = hash(JSONObject().put("render_engine_version", "21"))
-        assertEquals(explicit21, hash(JSONObject()))
-        assertEquals(explicit21, hash(JSONObject().put("render_engine_version", "")))
+        val missing = hash(JSONObject())
+        val blank = hash(JSONObject().put("render_engine_version", ""))
+        assertEquals(missing, blank)
+        org.junit.Assert.assertNotEquals(hash(JSONObject().put("render_engine_version", "21")), missing)
     }
 
     // The version the UI shows is pinned to a literal so that leaving it stale fails here.

@@ -13,6 +13,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DRIVER = REPO_ROOT / "scripts" / "git" / "build-number-merge.sh"
 
+# The development server carries only what the two services need, so `scripts/`
+# is not there (ledger I-059). Skip on the DIRECTORY, never on the driver file:
+# a rename would otherwise turn this suite into a silent skip instead of a red.
+git_scripts_only = pytest.mark.skipif(
+    not DRIVER.parent.is_dir(), reason="scripts/git/ is absent from this checkout"
+)
+
 
 def run_driver(tmp_path: Path, ours: str, base: str, theirs: str) -> tuple[int, str]:
     a = tmp_path / "A"
@@ -25,6 +32,7 @@ def run_driver(tmp_path: Path, ours: str, base: str, theirs: str) -> tuple[int, 
     return r.returncode, a.read_text()
 
 
+@git_scripts_only
 def test_driver_is_executable():
     assert DRIVER.is_file(), f"missing driver: {DRIVER}"
     assert DRIVER.stat().st_mode & 0o111, "driver must be executable for git to run it"
@@ -39,6 +47,7 @@ def test_driver_is_executable():
         ("\n", "817\n", "817\n"),  # non-numeric ours counts as 0
     ],
 )
+@git_scripts_only
 def test_driver_keeps_the_larger_side(tmp_path, ours, theirs, expected):
     rc, result = run_driver(tmp_path, ours, "800\n", theirs)
     # git treats a non-zero exit as a conflict, so the driver must never fail.

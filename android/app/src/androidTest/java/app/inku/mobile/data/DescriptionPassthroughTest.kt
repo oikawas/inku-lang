@@ -139,7 +139,7 @@ class DescriptionPassthroughTest {
     fun t2_interpretGivesStage1TheDescriptionVerbatim() = runBlocking {
         val description = "T-2 雨のあとの石畳がひかる"
 
-        repository.interpret(
+        val result = repository.interpret(
             description = description,
             catalogId = CATALOG,
             canvasAspect = ASPECT,
@@ -151,6 +151,15 @@ class DescriptionPassthroughTest {
             "the Stage 1 prompt is the description itself, with nothing added",
             description,
             firstPrompt(),
+        )
+        // This path saves nothing, so its `originalText` is observable only in
+        // what it returns. Without this the field would be ungated here while
+        // the other three entry points have it covered -- and it is not inert:
+        // it becomes the expander's context text.
+        assertEquals(
+            "the returned originalInput is the description itself, with nothing added",
+            description,
+            result.originalInput,
         )
     }
 

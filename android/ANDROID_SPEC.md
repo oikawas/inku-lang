@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-08-06.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.9` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.10` with **render engine
 version `21`** (the version is declared in `data/model/CompatibilityConstants.kt`). The master
 web/server implementation is at v2.11.2 with **render engine `21`** and **`ddl_engine_version` 7**,
 so **the drawing layer versions match**. The Stage 1.5 expander followed the staffage level being
@@ -2215,3 +2215,68 @@ same field, so **putting the random pick back into production code left all 118 
 
 - **JVM unit 159 / 0 failures** (37 classes), from a baseline of 156.
 - **Instrumented 25 / 0 failures** (physical Pixel 9), from a baseline of 20.
+
+
+## 2026-08-06 Seeing that the description travels untouched ([I-134] / android `2.1.4-android.10`)
+
+**[I-114]** removed the `emotionHint` concatenated onto `description`, **but nothing watched the
+removal**. **No JVM unit test constructs an `InkuRepository`** (it needs a context and a
+database), so **putting the concatenation back into production code turned only 0 of 136 tests
+red** (measured 2026-08-05).
+
+### Where it is observable
+
+`description` and `originalText` leave as two fields of one `PaintRequest`, but **they surface in
+different places**.
+
+- **`description` becomes the Stage 1 prompt itself** — `LocalFallbackPipeline` sets
+  `prompt = request.description` and **wraps it in no template**, so the assertion can be
+  **exact equality against the recorded prompt**.
+- **`originalText` travels through `PaintResult.originalInput` into
+  `history_items.originalInput`.**
+
+### The gate (`DescriptionPassthroughTest`, instrumented)
+
+A **real Room database and a real `InkuRepository`**, with **only the model replaced** — matching
+the server, whose description gates are written to run **through the routes, not through the
+predicates**.
+
+| | Entry point | What it reads |
+|---|---|---|
+| T-1 | `paint` | the Stage 1 prompt |
+| T-2 | `interpret` | the Stage 1 prompt and **the returned `originalInput`** |
+| T-3 | `paint` | the stored `originalInput` |
+| T-4 | `composeFromDdl` | the stored `originalInput` |
+| T-5 | `renderFromScore` | the stored `originalInput` and `normalizedDdl` |
+| T-6 | `paint` × 2 | **the other way round** — two descriptions arrive as two texts, so a constant cannot pass |
+
+### One gate was deliberately not placed
+
+**`composeFromDdl`'s `description` is not gated.** That entry point **takes the DDL as its own
+argument and reads `request.description` nowhere**, so **any assertion about it would be green
+whatever the repository did** (the shape of **[I-142]**: an argument with no consumption point).
+Its `originalText` is observable and T-4 covers it.
+
+### Discriminating power, measured by perturbation
+
+**Four entry points × two fields = eight enforcement points, each perturbed on its own.**
+
+| Enforcement point perturbed | Red |
+|---|---|
+| `paint.description` | **2** (T-1, T-6) |
+| `paint.originalText` | **2** (T-3, T-6) |
+| `interpret.description` | **1** (T-2) |
+| `interpret.originalText` | **1** (T-2) |
+| `composeFromDdl.description` | **0** (no consumption point, as above) |
+| `composeFromDdl.originalText` | **1** (T-4) |
+| `renderFromScore.description` | **1** (T-5) |
+| `renderFromScore.originalText` | **1** (T-5) |
+
+**⚠ `interpret.originalText` was zero at first** — that entry point saves nothing, so the field
+surfaces **only in what it returns**. **The perturbation that hit nothing is what exposed the gap
+in the acceptance**, and T-2 was extended to cover it.
+
+### Results
+
+- **Instrumented 31 / 0 failures** (physical Pixel 9, from 25).
+- **JVM unit 159 / 0 failures** (37 classes, unchanged). **No production code changed.**

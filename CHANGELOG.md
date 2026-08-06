@@ -3730,3 +3730,36 @@ asserted against a **private helper of the test's own** that returned the same f
   ruff green.
 - **`android/VERSION` is `2.1.4-android.9`.** No drawing layer version moved (render engine `21`
   and `ddl_engine_version` 7 are unchanged).
+
+### Android `2.1.4-android.10` — Seeing that the description travels untouched (android Build 148092 unchanged, 2026-08-06)
+
+**[I-134].** [I-114] removed the `emotionHint` Android concatenated onto `description`,
+**but nothing watched the removal** — **no JVM unit test constructs an `InkuRepository`**
+(it needs a context and a database), so **putting the concatenation back into production code
+turned only 0 of 136 tests red** (measured 2026-08-05). `DescriptionPassthroughTest` on the
+device closes it.
+
+- **This follows the server.** Its description gates are written to run **through the routes,
+  not through the predicates**: the whole run is real except the language model. The same holds
+  here — a real Room database and a real `InkuRepository`, with **the description read back out
+  of what was saved**.
+- **There are two observation points.** `description` becomes **the Stage 1 prompt itself**
+  (`LocalFallbackPipeline` sets `prompt = request.description` with **no template around it**,
+  so the assertion can be exact equality). `originalText` travels through
+  `PaintResult.originalInput` into `history_items.originalInput`.
+- **Six assertions** (T-1 the Stage 1 prompt of `paint`; T-2 the prompt and the returned value of
+  `interpret`; T-3 what `paint` stored; T-4 what `composeFromDdl` stored; T-5 both places
+  `renderFromScore` stores it; **T-6 the other way round**, so that two descriptions arrive as
+  two texts — **an implementation returning a constant cannot pass**).
+- **⚠ `composeFromDdl`'s `description` is deliberately not gated.** That entry point takes the
+  DDL as its own argument and **reads `request.description` nowhere**, so any assertion about it
+  **would be green whatever the repository did** (the shape of [I-142]). Its `originalText` is
+  observable and T-4 covers it.
+- **The discriminating power was measured by perturbation** — four entry points × two fields =
+  **eight enforcement points, each perturbed on its own**. **Seven went red**; the only one that
+  did not is the `composeFromDdl.description` above. **T-2 at first missed
+  `interpret.originalText`** (that entry point saves nothing, so the field surfaces only in what
+  it returns) — **the zero-red perturbation is what exposed it**, and it was added.
+- **Checks:** Android instrumented **31 / 0 failures** (physical Pixel 9, from 25), JVM **159 /
+  0 failures** (37 classes, unchanged). **Only `android/VERSION` moved** — `APP_VERSION` and
+  `web/BUILD_NUMBER` are untouched and nothing was deployed to the development server.

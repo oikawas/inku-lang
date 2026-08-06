@@ -2,6 +2,12 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-06 — v2.11.2 unreleased baseline (Web Build 857)
+
+The thirteen places that name a version now read v2.11.2 (Build 857). No prose changed.
+
+- The only thing this version moved is the internal structure of the Android app (the place that decides a run's colour catalogue is now a single one). Nothing visible to creators or administrators changed in the Web UI, the CLI, or server configuration.
+
 ## 2026-08-06 — v2.11.1 unreleased baseline (Web Build 856)
 
 The thirteen places that name a version now read v2.11.1 (Build 856). No prose changed.

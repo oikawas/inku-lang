@@ -3697,3 +3697,36 @@ identical across the two tabs.
 - **`manual/`: thirteen version markers updated and one section added to the revision history in
   both languages. No prose changed** -- how the numbers are changed (the administration UI or
   `inku-cli config update`) is unaffected, so section 5.1 of `Server Configuration` still holds
+
+### v2.11.2 — The run's colour catalogue is decided in one place on Android (Build 857, 2026-08-06)
+
+**Five places on Android decided which colour catalogue a run used.** The draw, DDL, demo, batch
+and repeated-run paths each read `InkuUiState.selectedCatalogId` on their own, so "nothing but
+the setting decides the catalogue" was a statement about five places at once and **no test could
+stand on it** -- the acceptance that shipped with the removal of the demo path's random pick
+asserted against a **private helper of the test's own** that returned the same field, so
+**putting the random pick back into production code left all 118 tests green**.
+
+- **This follows the server.** There, a paint resolves its catalogue through a single helper
+  called once, and the acceptance **drives the real drawing API with only the model call
+  replaced**. Both halves were copied. In line with the rule that **the client follows the
+  server**, nothing was invented on this side.
+- **The decider is now `CatalogSelection.resolvedCatalogIdForRun`**, and the five call sites go
+  through it. The random-number import that became unused went with them. **The server's three
+  modes do not exist in this client**, and the implementation comment records that should one
+  arrive, it belongs inside this function.
+- **One difference from the server is kept on purpose:** given a catalogue id that is not in the
+  list, **the server answers 422 while this client falls back to the default catalogue**, so a
+  setting saved by an older build cannot stop the app from drawing. That is **an
+  Android-specific circumstance -- backward compatibility of stored settings**.
+- **The wiring is now gated on a physical device.** A new instrumented test drives all five
+  paths against a real repository and **reads the catalogue back out of what was saved**.
+  **⚠ Four of the five are covered** -- the draw path's `interpret` argument **reaches nothing
+  but a log line**, so perturbing it changes no drawing at all. That gap is recorded in the
+  issue ledger.
+- **Checks:** Android JVM **159 / 0 failures** (37 classes, from 156), **instrumented 25 / 0
+  failures** (physical Pixel 9, from 20), server **2336 passed / 31 skipped**, cli **111
+  passed**, `npm run check` 241 files / 0 errors / 2 warnings (the two pre-existing a11y ones),
+  ruff green.
+- **`android/VERSION` is `2.1.4-android.9`.** No drawing layer version moved (render engine `21`
+  and `ddl_engine_version` 7 are unchanged).

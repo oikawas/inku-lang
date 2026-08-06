@@ -4,11 +4,11 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-05.
+Last updated: 2026-08-06.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.8` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.9` with **render engine
 version `21`** (the version is declared in `data/model/CompatibilityConstants.kt`). The master
-web/server implementation is at v2.11.0 with **render engine `21`** and **`ddl_engine_version` 7**,
+web/server implementation is at v2.11.2 with **render engine `21`** and **`ddl_engine_version` 7**,
 so **the drawing layer versions match**. The Stage 1.5 expander followed the staffage level being
 folded away on 2026-08-05 (see the 2026-08-05 section at the end of this document).
 
@@ -2171,3 +2171,47 @@ own way is better.**
 - **All 30 reference cases match exactly — but that is a regenerated record, not a property
   test.** The re-bake left only **14 distinct outputs (47%)**, so a port that ignored its
   input would go green on 16 of the 30. **The discrimination is carried by T-2**, the focus control.
+
+
+## 2026-08-06 The run's colour catalogue is decided in one place ([I-103] / android `2.1.4-android.9`)
+
+**Five places decided which catalogue a run used** — the draw, DDL, demo, batch and
+repeated-run paths each read `InkuUiState.selectedCatalogId` on their own. That is why
+**the acceptance that shipped with [I-081]** (the removal of the demo path's random pick)
+**held nothing**: it asserted against a **private helper of the test's own** that returned the
+same field, so **putting the random pick back into production code left all 118 tests green**
+([I-103]).
+
+**This follows the server** (§2-4). There, a paint resolves its catalogue through
+`_resolved_paint_catalog_id` (`api_core/routers/render.py`) called **once**, and the acceptance
+**drives the real `/api/paint` with only `_ask_model` replaced**. Both halves were copied.
+
+### The decider
+
+- **`data/model/CatalogSelection.kt` (new)** — `resolvedCatalogIdForRun` is the one decider, and
+  the five call sites in `InkuViewModel` go through it. **The now-unused `kotlin.random.Random`
+  import went with them.**
+- **One difference from the server is kept**: given an id that is not in the list, **the server
+  answers 422 while this client falls back to the default catalogue**, so a setting saved by an
+  older build cannot stop the app from drawing. **This is an Android-specific circumstance
+  (backward compatibility of stored settings), not a client-side invention.**
+- **The server's three modes (`fixed`, `auto`, `random`) do not exist here** — the catalogue is
+  the setting, and the demo path's random pick was removed in [I-081]. The KDoc records that
+  **should a mode arrive, it belongs inside this function** rather than at a call site.
+
+### Acceptance
+
+- **`ColorCatalogSelectionDeterminismTest`** now drives `resolvedCatalogIdForRun` instead of a
+  helper of its own.
+- **`CatalogSelectionWiringTest` (new, instrumented)** drives the draw, DDL, demo, batch and
+  repeated-run paths **on the device against a real repository**, and **reads the catalogue back
+  out of what was saved**. The model provider echoes the prompt it is given: what the server gets
+  by monkeypatching a module, this client gets by taking the collaborator as an argument.
+- **⚠ Four of the five call sites are covered** — **the draw path's `interpret` argument reaches
+  nothing but a log line**, so perturbing it changes no drawing at all (**an argument with no
+  consumption point is invisible to any test**; see [I-142]).
+
+### Results
+
+- **JVM unit 159 / 0 failures** (37 classes), from a baseline of 156.
+- **Instrumented 25 / 0 failures** (physical Pixel 9), from a baseline of 20.

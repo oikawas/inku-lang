@@ -3676,3 +3676,24 @@ describing: they read `android/`, `cli/`, `docs/` or `scripts/`, and those are n
   red on a partial tree too**
 - **Checks:** server on the Mac **2336 passed / 31 skipped** (+1 from the split), ruff green.
   **The development server's full pytest went from 13 failed to 0** (2276 passed / 91 skipped)
+
+### v2.11.1 — The nine limit fields get the `-` / `+` the DB tab already had (Build 856, 2026-08-06)
+
+**Settings > Limits** held bare number inputs -- no stepper, just the browser's own spinner.
+**The DB backup tab already uses `NumberStepper`**, so the fields now use the same component:
+button sizing, the disabled `-` at the lower bound, and the rounding of a typed value are
+identical across the two tabs.
+
+- **`<label>` became `<div>`.** A stepper's first labelable child is the `-` button, so a
+  wrapping label points at the button rather than the field. The accessible name comes from
+  the stepper's own `aria-label` -- the shape the DB tab already used
+- **The input no longer stretches to the full width of its card.** The card is 220px or wider
+  because of the **hint sentence**, not because of the number. The stepper is now fixed at
+  `min(136px, 100%)` and the hint keeps the card width. 136px leaves room for the largest
+  value that can be typed, the absolute ceiling of `100000`
+- **Checks:** `npm run check` 241 files / 0 errors / 2 warnings (the two pre-existing a11y
+  ones), `npm run test:unit` 113, `lint:i18n` 1004/47/0/0, `lint:models` 68,
+  `lint:recommendations` 37, server **2336 passed / 31 skipped**, cli **111 passed**, ruff green
+- **`manual/`: thirteen version markers updated and one section added to the revision history in
+  both languages. No prose changed** -- how the numbers are changed (the administration UI or
+  `inku-cli config update`) is unaffected, so section 5.1 of `Server Configuration` still holds

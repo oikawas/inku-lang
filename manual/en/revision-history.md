@@ -2,6 +2,12 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-06 — v2.11.1 unreleased baseline (Web Build 856)
+
+The thirteen places that name a version now read v2.11.1 (Build 856). No prose changed.
+
+- The nine numbers on the `Limits` tab now use the same **stepper with `-` and `+`** as the DB backup tab. **How they are changed is unaffected** (the administration UI or `inku-cli config update`), so section 5.1 of `Server Configuration` still holds.
+
 ## 2026-08-05 — Unreleased v2.11.0 Baseline (Web Build 854)
 
 Caught up across 51 versions from v1.85 (Build 564). Both languages were brought onto the same chapter structure.

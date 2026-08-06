@@ -472,9 +472,14 @@ def test_t7_all_four_areas_are_counted_for_the_new_field():
     # server produces it, cli and web read it back. android is a local-only
     # pipeline with no settings of its own, so it deliberately carries none --
     # stated here so a future reader sees a decision, not an omission.
+    #
+    # An area that is not in this checkout is not counted: the development server
+    # carries only what its two services need (ledger I-059). `server` is the one
+    # area that must be here, since these tests live inside it.
     assert carrying["server"] and carrying["server"] > 0
-    assert carrying["cli"] and carrying["cli"] > 0
-    assert carrying["web"] and carrying["web"] > 0
+    for area in ("cli", "web"):
+        if carrying[area] is not None:
+            assert carrying[area] > 0, f"{area} stopped carrying the field"
     if carrying["android"] is not None:
         assert carrying["android"] == 0, "android has no settings route; see §2.5"
 

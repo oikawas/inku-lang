@@ -75,6 +75,12 @@ def test_installing_cairosvg_does_not_bring_a_fallback_back(monkeypatch):
     ["shared/pyproject.toml", "server/pyproject.toml", "cli/pyproject.toml"],
 )
 def test_cairosvg_is_not_a_declared_dependency(pyproject):
+    package = REPO / Path(pyproject).parent
+    if not package.is_dir():
+        # The development server carries only what the two services need, so
+        # `cli/` is not there (ledger I-059). The skip is on the package
+        # directory, not on the toml: a renamed manifest must stay a red.
+        pytest.skip(f"{package.name}/ is absent from this checkout")
     data = tomllib.loads((REPO / pyproject).read_text(encoding="utf-8"))
     declared = " ".join(data.get("project", {}).get("dependencies", []))
     assert "cairosvg" not in declared, f"{pyproject} still declares cairosvg"
@@ -103,15 +109,15 @@ _UNSCANNED_DIRS = frozenset(
 )
 
 
-def _repo_python_files():
+def _repo_python_files(root: Path = REPO):
     """Every .py we own, found by exclusion rather than by a list of roots.
 
     The first version of this named its four roots, which is why `android/scripts`
     kept an `import cairosvg` through v2.7.10: a named list cannot fail to be
     incomplete, it can only fail to say so.
     """
-    for path in REPO.rglob("*.py"):
-        if _UNSCANNED_DIRS.isdisjoint(path.relative_to(REPO).parts):
+    for path in root.rglob("*.py"):
+        if _UNSCANNED_DIRS.isdisjoint(path.relative_to(root).parts):
             yield path
 
 
@@ -126,14 +132,48 @@ def test_no_source_file_imports_cairosvg():
     assert not hits, f"cairosvg is imported by {hits}"
 
 
-def test_the_scan_reaches_outside_the_python_packages():
-    """The guard above is only worth what it covers.
+def test_the_scan_is_by_exclusion_and_not_by_a_list_of_roots(tmp_path):
+    """The guard above is only worth what it covers, so check the mechanism.
 
-    `android/scripts/` is the directory the named-roots version missed, so it is
-    named here -- not as the scope, but as proof the scope is wider than it was.
+    This used to be checked by requiring `android` in the result -- the very
+    directory the named-roots version had missed. That made the test a statement
+    about one checkout: the development server carries only what its two services
+    need, so `android/` is not there and the assertion failed for being right
+    (ledger I-059). Here every directory is placed on purpose, so the property
+    holds on any tree, including a partial one.
+    """
+    (tmp_path / "server" / "src").mkdir(parents=True)
+    (tmp_path / "server" / "src" / "app.py").write_text("")
+    # The case that actually bit: a root no hand-written list would think of.
+    (tmp_path / "an_unlisted_root" / "scripts").mkdir(parents=True)
+    (tmp_path / "an_unlisted_root" / "scripts" / "tool.py").write_text("")
+    # And one the exclusions must keep out even though it is full of .py.
+    (tmp_path / "node_modules" / "pkg").mkdir(parents=True)
+    (tmp_path / "node_modules" / "pkg" / "setup.py").write_text("")
+
+    found = {path.relative_to(tmp_path).parts[0] for path in _repo_python_files(tmp_path)}
+    assert found == {"server", "an_unlisted_root"}, found
+
+
+def test_the_scan_reaches_every_directory_of_this_checkout_that_holds_python():
+    """And on the real tree: whatever is here and not excluded is scanned.
+
+    Derived from the directory listing rather than from a written-down list, so a
+    return to named roots shows up as a directory the scan no longer reaches --
+    on whichever checkout it is run.
     """
     scanned = {path.relative_to(REPO).parts[0] for path in _repo_python_files()}
-    assert {"android", "cli", "server", "shared"} <= scanned, scanned
+    holding_python = {
+        entry.name
+        for entry in REPO.iterdir()
+        if entry.is_dir()
+        and entry.name not in _UNSCANNED_DIRS
+        and any(
+            _UNSCANNED_DIRS.isdisjoint(path.relative_to(REPO).parts)
+            for path in entry.rglob("*.py")
+        )
+    }
+    assert holding_python <= scanned, holding_python - scanned
 
 
 @pytest.mark.parametrize(

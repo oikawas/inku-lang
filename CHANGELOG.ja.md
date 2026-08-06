@@ -3572,3 +3572,31 @@ Stage 2 はこの値を出せる。**`radius` を述べた fixture が 1 つも�
   `npm run check` 241 files / 0 errors / 2 warnings（既存の a11y 2 件）・ruff 緑。
 - **`android/VERSION` は `2.1.4-android.9`。** 描画層の版は動いていない
   （render engine `21` / `ddl_engine_version` 7 のまま）。
+
+### Android `2.1.4-android.10` — 記述が手つかずで渡ることを見る（android Build 148092 据え置き、2026-08-06）
+
+**[I-134]。** [I-114] は Android 独自の `emotionHint` の連結を `description` から落としたが、
+**その撤去を守る検査が 1 つも無かった** — **JVM の単体テストは `InkuRepository` を 1 つも作らない**
+（context と DB が要る）ので、**連結を製品コードへ戻しても 0 / 136 件しか赤くならなかった**
+（2026-08-05 の実測）。**実機の計装に `DescriptionPassthroughTest` を置いて塞いだ。**
+
+- **server に合わせた。** server の記述のゲートは
+  「述語ではなくルートを通す」形で書かれており、**モデルだけを差し替えて残りは実物**である。
+  ここも同じく、**実物の Room DB と実物の `InkuRepository`** を通し、
+  **使われた記述は保存されたものから読み戻す**。
+- **観測点は 2 つある。** `description` は **Stage 1 のプロンプトそのもの**になる
+  （`LocalFallbackPipeline` が `prompt = request.description` と書いており、
+  **テンプレートで包まない**ので表明は厳密に一致で書ける）。`originalText` は
+  `PaintResult.originalInput` を経て `history_items.originalInput` に入る。
+- **受入は 6 件**（T-1 `paint` の Stage 1 プロンプト／T-2 `interpret` のプロンプトと戻り値／
+  T-3 `paint` の保存／T-4 `composeFromDdl` の保存／T-5 `renderFromScore` の保存 2 か所／
+  **T-6 は逆向き**で、2 つの記述が 2 つの本文として届くことを見る＝**定数を返す実装が通らない**）。
+- **⚠ `composeFromDdl` の `description` にはゲートを置いていない。** その入口は DDL を
+  別の引数で受け取り、**`request.description` を 1 か所も読まない**ので、
+  **何を表明しても緑になる**（[I-142] と同じ形）。`originalText` のほうは観測でき、T-4 が見ている。
+- **摂動で判別力を測った** — 4 つの入口 × 2 つのフィールド = **強制点 8 つに 1 つずつ**当てた。
+  **7 つが赤くなり、赤くならなかったのは上の `composeFromDdl.description` の 1 つだけ**。
+  **T-2 は最初 `interpret.originalText` を見落としており**（この入口は何も保存しないので
+  戻り値にしか現れない）、**摂動が 0 件だったことで分かって足した**。
+- **検査:** Android 計装 **31 / 失敗 0**（実機 Pixel 9・起点 25）・JVM **159 / 失敗 0**（37 クラス・不変）。
+  **`android/VERSION` だけを上げた** — `APP_VERSION`・`web/BUILD_NUMBER` は不動、pentala 反映も無し。

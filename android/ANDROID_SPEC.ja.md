@@ -5,7 +5,7 @@
 
 最終更新: 2026-08-06。
 
-**追随状況**: Android は `2.1.4-android.9` / **render engine version `21`** の世代にある
+**追随状況**: Android は `2.1.4-android.10` / **render engine version `21`** の世代にある
 （版は `data/model/CompatibilityConstants.kt` が名乗る）。
 master の web/server は v2.11.2 / **render engine `21`** / **`ddl_engine_version` 7** なので、
 **描画層の版は一致している**。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
@@ -1735,3 +1735,64 @@ server 側の裁定「DB の列は残す・開発者モードで過去作にだ�
 
 - **JVM 単体 159 / 失敗 0**（37 クラス）。起点 156。
 - **計装 25 / 失敗 0**（実機 Pixel 9）。起点 20。
+
+
+## 2026-08-06 記述が手つかずで渡ることを見る（[I-134] / android `2.1.4-android.10`）
+
+**[I-114]** で `description` への `emotionHint` の連結は落ちたが、**それを守る検査が無かった。**
+**JVM の単体テストは `InkuRepository` を 1 つも作らない**（context と DB が要る）ので、
+**連結を製品コードへ戻しても 0 / 136 件しか赤くならなかった**（2026-08-05 の実測）。
+
+### どこで観測できるか
+
+`description` と `originalText` は 1 つの `PaintRequest` の 2 つのフィールドとして出ていくが、
+**現れる場所が違う**。
+
+- **`description` は Stage 1 のプロンプトそのものになる** — `LocalFallbackPipeline` が
+  `prompt = request.description` と書いており、**テンプレートで包まない**。
+  だから**記録したプロンプトとの厳密一致**で表明できる。
+- **`originalText` は `PaintResult.originalInput` を経て `history_items.originalInput` に入る。**
+
+### ゲート（`DescriptionPassthroughTest`・実機の計装）
+
+**実物の Room DB と実物の `InkuRepository`** を通し、**モデルだけを差し替える**
+（server の記述のゲートが「述語ではなくルートを通す」形で書かれているのに合わせた）。
+
+| | 入口 | 見るもの |
+|---|---|---|
+| T-1 | `paint` | Stage 1 のプロンプト |
+| T-2 | `interpret` | Stage 1 のプロンプトと**戻り値の `originalInput`** |
+| T-3 | `paint` | 保存された `originalInput` |
+| T-4 | `composeFromDdl` | 保存された `originalInput` |
+| T-5 | `renderFromScore` | 保存された `originalInput` と `normalizedDdl` |
+| T-6 | `paint` × 2 | **逆向き** — 2 つの記述が 2 つの本文として届く（定数を返す実装が通らない） |
+
+### 置かなかったゲートが 1 つある
+
+**`composeFromDdl` の `description` にはゲートを置いていない。**
+その入口は **DDL を別の引数で受け取り、`request.description` を 1 か所も読まない**ので、
+**何を表明しても緑になる**（**[I-142]** と同じ形＝消費点が無い引数）。
+`originalText` のほうは観測でき、T-4 が見ている。
+
+### 摂動で測った判別力
+
+**4 つの入口 × 2 つのフィールド = 強制点 8 つに 1 つずつ**当てた。
+
+| 摂動した強制点 | 赤 |
+|---|---|
+| `paint.description` | **2**（T-1・T-6） |
+| `paint.originalText` | **2**（T-3・T-6） |
+| `interpret.description` | **1**（T-2） |
+| `interpret.originalText` | **1**（T-2） |
+| `composeFromDdl.description` | **0**（上記のとおり消費点が無い） |
+| `composeFromDdl.originalText` | **1**（T-4） |
+| `renderFromScore.description` | **1**（T-5） |
+| `renderFromScore.originalText` | **1**（T-5） |
+
+**⚠ `interpret.originalText` は最初 0 件だった** — この入口は何も保存しないので、
+**戻り値にしか現れない**。**摂動が空振りしたことで受入の穴が分かり、T-2 に足した。**
+
+### 検証結果
+
+- **計装 31 / 失敗 0**（実機 Pixel 9・起点 25）。
+- **JVM 単体 159 / 失敗 0**（37 クラス・不変）。**製品コードは 1 行も変えていない。**

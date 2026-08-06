@@ -1,6 +1,6 @@
 # アプリケーションインストール
 
-この文書は、未リリース版inku v2.11.2（Web Build 857）をLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。
+この文書は、未リリース版inku v2.11.3（Web Build 858）をLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。
 
 ## 1. 構成
 

@@ -3763,3 +3763,46 @@ device closes it.
 - **Checks:** Android instrumented **31 / 0 failures** (physical Pixel 9, from 25), JVM **159 /
   0 failures** (37 classes, unchanged). **Only `android/VERSION` moved** — `APP_VERSION` and
   `web/BUILD_NUMBER` are untouched and nothing was deployed to the development server.
+
+### v2.11.3 — A redraw at a different sketch grain can be saved (Build 858, 2026-08-06)
+
+**The web client was sending `sketch_grain_change`, the server did not know the name, and the
+whole save was lost** ([I-137]). Redrawing from the describe tab makes the client name the
+operation by comparing the work with its parent. When the 写生 (Stage 0.5) grain differs from the
+parent's it sends this kind, **the server's `LINEAGE_DERIVATION_KINDS` did not carry the name**,
+`db.add_item` raised `invalid lineage derivation kind`, and **the 422 left no work, no history
+entry and no lineage edge**. The client has sent the kind since v2.9.37 (2026-08-03); **the server
+stayed at sixteen kinds.**
+
+- **It is not only a change of grain that fires it.** The grain is `fine`, `coarse` or **absent**,
+  and **absent means the layer is switched off**. Since the test is a difference from the parent,
+  **switching the layer on or off produces the same kind.**
+- **It stood directly in front of the busiest path.** The branches run canvas change → description
+  edit → **sketch grain** → replay, and **replay is 73 of the 196 edges in production (37%)**.
+  Regular use of the sketch layer would have stopped there.
+- **Nobody had hit it yet.** Twenty-five of the 2,748 works in production carry a grain (23
+  `fine`, 2 `coarse`), and **all of them were saved on 2026-08-04 as roots with no edge**.
+- **The server was not treated as right here.** The kind was added deliberately by the client to
+  keep one edge to one cause, so **it was added to the server as a seventeenth kind** (author's
+  ruling, 2026-08-06). **No row carries the value, so the rename table needed nothing.**
+- **The existing acceptance test could not see the disagreement.** `test_lineage_acceptance.py`
+  **iterates `LINEAGE_DERIVATION_KINDS` itself**, so it is green whatever the set holds.
+  **Nothing compared the two lists.**
+- **`test_derivation_kind_parity.py` was added** (4 tests). It **writes the seventeen names out**
+  and **parses the client's `DerivationKind` union from the client's own source**, comparing them
+  **in both directions** (a kind the client sends and the server rejects; a kind the server names
+  and no screen sends). The fourth goes **through the save route** and checks that a regrained
+  child is saved with 200 and that the edge is written.
+- **Perturbation measured the discrimination.** One perturbation each at the five points that
+  enforce this (the server set, the client union, the Kotlin list, the baked fixture, the save
+  route), and **all five went red**: removing the name from the server turns **3 red** (the older
+  acceptance test stays green); removing it from the client union turns **the reverse gate red**;
+  adding a kind the server does not know turns **1 red** (the shape of [I-137]); removing it from
+  the Kotlin list turns **2 red**; removing it from the baked fixture turns **1 red**.
+- **Android only follows.** There is no sketch layer on that client, but **it carries the server's
+  list**, so `lineage_wiring.json` was rebaked and `DerivationKindRegistry` follows to seventeen.
+- **The lineage section of the manual names the sketch grain in both languages.**
+- **Checks:** server **2340 / 31 skipped** (2336 at the branch point; the 4 new ones are this
+  entry), cli **111**, `npm run check` **241 FILES / 0 errors / 2 warnings**, `npm run test:unit`
+  **113**, `lint:i18n` **1004/47/0/0**, ruff clean, Android JVM **159 / 0 failures** (37 classes;
+  the count is unchanged and two existing assertions moved from 16 to 17).

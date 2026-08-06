@@ -2,6 +2,12 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-06 — v2.11.3 unreleased baseline (Web Build 858)
+
+The thirteen places that name a version now read v2.11.3 (Build 858).
+
+- Section 12 of `Creating Images` (Follow the Lineage) now names the **sketch grain**. Redrawing at a grain different from the parent's used to **fail to save at all** -- the server did not know the derivation kind, so no work, no history entry and no lineage edge was written. From this version the save succeeds and the relation is recorded. **The same kind covers switching the sketch layer on or off, not only changing the grain.**
+
 ## 2026-08-06 — v2.11.2 unreleased baseline (Web Build 857)
 
 The thirteen places that name a version now read v2.11.2 (Build 857). No prose changed.

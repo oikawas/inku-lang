@@ -1237,17 +1237,20 @@
 							<div class="limits-group-label">{renderLimitGroupLabel(groupName)}</div>
 							<div class="limits-grid">
 								{#each fields as field}
-									<label>
+									<!-- A div, not a label: the stepper's first labelable child is a
+									     button, so a wrapping label would target that instead of the
+									     field. The stepper carries its own aria-label. -->
+									<div class="limits-field">
 										<span>{renderLimitLabel(field)}</span>
-										<input
-											type="number"
-											min="1"
+										<NumberStepper
+											label={renderLimitLabel(field)}
+											min={1}
 											max={settingsStatus.render_limits.absolute_max}
 											value={settingsStatus.render_limits.limits[field]}
-											onchange={(e) => onUpdateRenderLimits({ [field]: Number((e.currentTarget as HTMLInputElement).value) })}
+											onChange={(value) => onUpdateRenderLimits({ [field]: value })}
 										/>
 										<small>{renderLimitHint(field)}</small>
-									</label>
+									</div>
 								{/each}
 							</div>
 						</div>
@@ -2067,16 +2070,20 @@
 	}
 	.limits-grid {
 		display: grid;
-		/* Wide enough that a nine-digit ceiling and its hint stay on one card. */
+		/* The hint sets the card width, not the control: the stepper is fixed
+		   below and every hint is a sentence. */
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 10px;
 	}
-	.limits-grid label {
+	.limits-field {
 		display: flex; flex-direction: column; gap: 4px; min-width: 0;
 		font-size: var(--btn-sm-font-size);
 	}
-	.limits-grid label > span { color: var(--fg2); }
-	.limits-grid label > small { color: var(--fg3); line-height: 1.4; }
+	.limits-field > span { color: var(--fg2); }
+	.limits-field > small { color: var(--fg3); line-height: 1.4; }
+	/* The largest value that can be typed is the absolute ceiling, 100000 -- six
+	   digits. The stepper is sized for that and does not stretch to the card. */
+	.limits-field :global(.number-stepper) { width: min(136px, 100%); }
 	.db-backup-grid {
 		display: grid;
 		/* The time takes two number fields, so it claims two of these tracks. */

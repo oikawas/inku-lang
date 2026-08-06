@@ -6,10 +6,11 @@ data class DerivationKindInfo(
 )
 
 object DerivationKindRegistry {
-    // The server's `LINEAGE_DERIVATION_KINDS` (db.py:49), sorted, exactly as
-    // the baked `lineage_wiring.json` carries it. The five kinds no screen
+    // The server's `LINEAGE_DERIVATION_KINDS` (db.py:50), sorted, exactly as
+    // the baked `lineage_wiring.json` carries it. The six kinds no screen
     // here reaches yet are still listed: which operations exist is the
-    // server's judgment, not the client's.
+    // server's judgment, not the client's. (`sketch_grain_change` is the
+    // sixth -- there is no 写生 layer on this client.)
     val KINDS: List<String> = listOf(
         "age_change",
         "canvas_aspect_change",
@@ -25,6 +26,7 @@ object DerivationKindRegistry {
         "render_engine_change",
         "renga_reply",
         "replay",
+        "sketch_grain_change",
         "touch_change",
         "variation",
     )
@@ -44,6 +46,7 @@ object DerivationKindRegistry {
         "render_engine_change" to "描画エンジン",
         "renga_reply" to "連歌の付句",
         "replay" to "再描画",
+        "sketch_grain_change" to "写生の区切り",
         "touch_change" to "タッチ",
         "variation" to "変奏",
     )

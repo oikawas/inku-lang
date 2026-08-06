@@ -64,6 +64,11 @@ LINEAGE_DERIVATION_KINDS = {
     "external_seed_change",
     "canvas_aspect_change",
     "variation",  # v2.0 変奏 (Stage 1.5 の展開をまとめて振る)。v2.8.0 で hensou から改名
+    # 写生 (Stage 0.5, v2.10). Fires when the grain differs from the parent's,
+    # which includes switching the layer on or off (the grain is fine, coarse
+    # or absent). The web client has sent this since v2.9.37; until v2.11.3 the
+    # server did not know the name and the whole save was lost ([I-137]).
+    "sketch_grain_change",
 }
 
 # v2.8.0 の改名表。**保存済みの行はこの表で書き換える**（`_migrate_columns`）。

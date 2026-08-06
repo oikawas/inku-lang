@@ -3653,3 +3653,26 @@ on the day they carry.
 - **Last-updated date moved from `2026-07-25` to `2026-08-05`**
 - **Checks:** `check_docs.py` green. **This pair is checked in `sections` mode** (the number of `##`
   sections only), and both languages still hold 62
+
+### 2026-08-06 — Shape checks now hold on a checkout that carries only the server (**no version**, tests only)
+
+**The development server was corrected to carry only what its two services need.**
+Eight tests in `server/tests` then failed for being right about a machine they were not
+describing: they read `android/`, `cli/`, `docs/` or `scripts/`, and those are not there.
+
+- **Four now skip on the absence of the directory they read** (the five assertions in
+  `test_merge_driver.py`, the `cli/pyproject.toml` case in `test_rasterizer.py`, and the
+  four-area count in `test_limits_are_settings.py`). **The skip is on the directory, never on
+  the file** -- on the file, a rename becomes silence instead of a red
+- **The breadth proof for the `cairosvg` scan could not simply skip.** It proved itself by
+  **requiring `android` in the result**, and that proof is exactly what the development server
+  cannot supply. **It is now two tests**: one checks **the mechanism on a tree built for the
+  purpose** (an unlisted root and an excluded one, both placed deliberately, so it holds on any
+  tree), and one checks **on the real tree that the set derived from the directory listing is
+  reached** -- not compared against a written-down list. **Neither names a client app**
+- **Perturbation:** returning the scan to a list of named roots turns **two red on the Mac and
+  one red on the development server**. **The old assertion could not catch that regression
+  there at all**, since requiring `android` was already failing. **The new mechanism check goes
+  red on a partial tree too**
+- **Checks:** server on the Mac **2336 passed / 31 skipped** (+1 from the split), ruff green.
+  **The development server's full pytest went from 13 failed to 0** (2276 passed / 91 skipped)

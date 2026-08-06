@@ -15,6 +15,7 @@
     "render_engine_change",
     "renga_reply",
     "replay",
+    "sketch_grain_change",
     "touch_change",
     "variation"
   ],

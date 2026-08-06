@@ -261,7 +261,7 @@ If Stage 1 does not answer in time, returns an empty answer, or fails, a stock s
 
 ## 12. Follow the Lineage
 
-The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, variation, model, language, instruction edits, description edits, repaints, and canvas changes are recorded as parent-child relations.
+The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, variation, model, language, instruction edits, description edits, repaints, canvas changes, and changes of sketch-from-life grain are recorded as parent-child relations.
 
 - Parentage is never inferred from visual similarity, an identical description, or timing alone.
 - Intermediate works stay in the lineage as `lineage_only` and do not appear in ordinary history. Promoting one moves it into ordinary history.

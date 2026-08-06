@@ -21,10 +21,10 @@ class DerivationKindTest {
      * here as a failure instead of as silence.
      */
     @Test
-    fun derivationKindRegistry_matchesTheServersSixteenKinds() {
+    fun derivationKindRegistry_matchesTheServersSeventeenKinds() {
         val kinds = serverKinds()
 
-        assertEquals(16, kinds.size)
+        assertEquals(17, kinds.size)
         assertEquals(kinds, DerivationKindRegistry.KINDS)
     }
 
@@ -35,7 +35,7 @@ class DerivationKindTest {
             assertTrue("$kind has an empty label", label.isNotEmpty())
             assertNotEquals("$kind has no label of its own", "不明", label)
         }
-        assertEquals(16, DerivationKindRegistry.ALL_INFOS.size)
+        assertEquals(17, DerivationKindRegistry.ALL_INFOS.size)
 
         // The eleven that were already labelled keep their wording.
         assertEquals("タッチ", DerivationKindRegistry.labelJa("touch_change"))
@@ -56,6 +56,9 @@ class DerivationKindTest {
         assertEquals("破調", DerivationKindRegistry.labelJa("hacho_change"))
         assertEquals("連歌の付句", DerivationKindRegistry.labelJa("renga_reply"))
         assertEquals("外部の種", DerivationKindRegistry.labelJa("external_seed_change"))
+
+        // 写生 (Stage 0.5). The wording is the web client's ([I-137]).
+        assertEquals("写生の区切り", DerivationKindRegistry.labelJa("sketch_grain_change"))
 
         assertEquals("起点", DerivationKindRegistry.labelJa(null))
         assertEquals("起点", DerivationKindRegistry.labelJa(""))

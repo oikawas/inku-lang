@@ -28,21 +28,29 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-01"
+FROZEN_AT = "2026-08-07"
 REASON = (
-    "The position of a group came back to the description. Until engine 19 every "
-    "layout branch invented its own place: scatter and cluster read only the seed "
-    "and the margin, a path pinned its cross axis to 0.5, and radial without a "
-    "stated centre turned around the middle of the canvas. 77.8% of the expanded "
-    "marks in production never consulted the coordinates the description had "
-    "given, so moving every declared coordinate by y+0.2 moved the ink's centroid "
-    "by a median of 0.0000 while changing the seed alone moved 4.06% of the "
-    "pixels. The layout branches still decide how a group scatters; a common "
-    "post-stage now decides where it is, by moving the group onto the declared "
-    "anchor and shrinking only the side that overflows the frame, so the anchor "
-    "is met and the spread away from the edge survives. The A-F cases are "
-    "byte-identical -- none of them states an arrangement, which is why this "
-    "version brings group G, the 32 cases where placement can be decided at all."
+    "A fill got an underlay, and what goes on top of it got a branch. Until "
+    "engine 21 a stroke WAS the fill, so every scan line had to be cut at its "
+    "intersection with the outline or the paint would spill outside the shape. "
+    "That cut is one of three regularities the eye reads as a raster: measured "
+    "across the eleven filled shapes of the three works the author named as "
+    "striped, the scan angle varied by 0.1 degrees inside one shape, the pitch "
+    "by 6.1%, and the endpoints not at all. A real element now holds the field, "
+    "so the marks are free to leave the contour: the angle moves per stroke, "
+    "the pitch is drawn far wider, and each end overshoots or falls short. All "
+    "three amplitudes come from ToolGrammar.fill_hand and are zero for a "
+    "machine, so a computer fill keeps the exact repetition that is its "
+    "signature. Above the threshold the marks are scan lines packed to coverage "
+    "0.9; below it they are scattered rubbings, because closing the gaps at "
+    "pencil width would take eight times the lines and that is not how the tool "
+    "is used. The threshold is coverage -- width over pitch -- and not a list "
+    "of tool names: the two cut the engine-21 corpus identically, which is why "
+    "C-fill-circle-crayon-extra_fine is added to send one tool across the "
+    "branch on thinness alone. A fill stroke also ends the way paint ends, "
+    "heavy where the tool lands, instead of tapering like a drawn line. Tiny "
+    "shapes still degrade to one dab and rotring still degrades to a region "
+    "fill; neither gets an underlay."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -187,6 +195,25 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         for tool in ("pencil", "crayon", "brush_thick"):
             _case(cases, f"C-fill-{primitive}-{tool}",
                   _instruction(primitive, weight=tool, filled=True))
+
+    # Engine 22 branches a fill on coverage, and the engine-21 corpus could not
+    # tell that rule from a hand-written list of tool names: it carried zero
+    # filled instructions with a thinness modifier, no filled computer and no
+    # filled silverpoint, so three of the acceptance gates had nothing to run on
+    # (run 857 §2). The crayon pair is the deciding one -- same tool, thinness
+    # alone, coverage 0.333 to 0.117, one on each side of the threshold. Do not
+    # substitute crayon+fine: its coverage is 0.200, exactly on the line. The
+    # brush_thick pair is the control for it: thinness moves the coverage
+    # (0.667 to 0.233) without moving the branch.
+    _case(cases, "C-fill-circle-computer",
+          _instruction("circle", weight="computer", filled=True))
+    _case(cases, "C-fill-circle-silverpoint",
+          _instruction("circle", weight="silverpoint", filled=True))
+    _case(cases, "C-fill-circle-crayon-extra_fine",
+          _instruction("circle", weight="crayon", filled=True, thinness="extra_fine"))
+    _case(cases, "C-fill-circle-brush_thick-extra_fine",
+          _instruction("circle", weight="brush_thick", filled=True,
+                       thinness="extra_fine"))
 
     for texture in ("stipple", "hatch", "crosshatch", "aquatint", "grain", "wash", "bleed", "paper_grain"):
         for tool in ("pen", "pencil"):
@@ -402,9 +429,12 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _g("G-scatter-fade-edge", "edge", fade="outward")
     _g("G-scatter-rhythm-edge", "edge", rhythm_spacing="loose")
 
-    expected = {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128, "G": 32}
+    # C gained 4 in engine 22: a filled computer and a filled silverpoint, which
+    # the corpus had never carried, and the crayon / brush_thick thinness pair
+    # that tells a coverage rule from a list of tool names.
+    expected = {"A": 88, "B": 72, "C": 62, "D": 28, "E": 119, "F": 128, "G": 32}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 525:
+    if actual != expected or len(cases) != 529:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

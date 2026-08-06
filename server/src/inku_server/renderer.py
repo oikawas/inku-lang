@@ -4663,6 +4663,41 @@ FILL_SPACING_JITTER = 0.24
 FILL_MIN_SCANLINES = 3
 FILL_MIN_STROKE_WIDTHS = 1.2
 
+# --- render engine 22: the underlay, and the branch above it ----------------
+# The one threshold. Which marks go on top of the underlay is decided by how
+# much of the field one pass of scan lines would cover -- the stroke width over
+# the scan pitch -- and by nothing else. Listing tool names here would cut the
+# frozen corpus identically today and diverge the moment a description asks for
+# a thin crayon, which is why `C-fill-circle-crayon-extra_fine` exists.
+FILL_COVERAGE_BRANCH = 0.2
+# What the scan branch packs to once it has an underlay under it (author, 2026-08-06).
+FILL_COVERAGE_TARGET = 0.9
+# The underlay's opacity as a ratio of the marks' own, never an absolute: a work
+# whose description asked for a pale fill has to keep a pale underlay.
+FILL_UNDERLAY_OPACITY_RATIO = 0.5
+
+# The three amplitudes that turn a raster into a hand. Each is a band the author
+# set (DESIGN-01-FILL 7) and the tool picks its place in the band through
+# `ToolGrammar.fill_hand`, so no description ever names them. `fill_hand` is 0
+# for the machines, and all three collapse to nothing there.
+FILL_ANGLE_MIN_DEG = 2.2
+FILL_ANGLE_SPAN_DEG = 1.6
+FILL_PITCH_CV_MIN = 0.24
+FILL_PITCH_CV_SPAN = 0.10
+# How far each end of a scan stroke reaches past the contour, or falls short of
+# it, as a fraction of the stroke's length. The sign is drawn per end, so one
+# stroke can overshoot at the landing and undershoot at the lift.
+FILL_REACH_MIN = 0.10
+FILL_REACH_SPAN = 0.05
+
+# The texture branch. Below the threshold the tool is too thin for parallel
+# lines to become a field -- at pencil width it would take eight times the lines
+# -- and that is not how the tool is used: a pencil rubs a tone. The underlay
+# already holds the field, so these marks only have to give it grain.
+FILL_TEXTURE_MARK_LENGTH = 6.0  # in scan pitches
+FILL_TEXTURE_DENSITY = 0.5  # 1.0 lays the same ink the classic scan laid
+FILL_TEXTURE_ANGLE_SPREAD_DEG = 12.0
+
 
 def _fill_scan_angle(seed: int) -> float:
     """塗りの走査角 (0〜π)。固定角だと作品内で揃って機械的に見える。"""
@@ -4677,6 +4712,88 @@ def _fill_scan_spacing(ins: Instruction, canvas: CanvasSize) -> float:
     )
 
 
+def _fill_coverage(ins: Instruction, canvas: CanvasSize) -> float:
+    """How much of the field one pass of scan lines covers: width over pitch.
+
+    A ratio of two lengths, so it does not move with the canvas: the same
+    instruction reaches the same branch on every aspect.
+    """
+    return _stroke_width_px(ins.weight, canvas, ins.thinness) / _fill_scan_spacing(
+        ins, canvas
+    )
+
+
+def _fill_takes_scan_branch(ins: Instruction, canvas: CanvasSize) -> bool:
+    """Scan lines at or above the coverage threshold, texture below it.
+
+    A periodic tool keeps the scan branch whatever its coverage. Exact
+    repetition is the computer's signature (DESIGN-01-FILL 5-4) and the texture
+    branch has no regular placement to carry it, so sending the machine there
+    would delete the very thing that has to survive this change. This reads the
+    machine property the grammar already declares; it is not a list of tool
+    names, and the coverage rule still decides every hand tool.
+    """
+    if GRAMMARS[ins.weight].periodic:
+        return True
+    return _fill_coverage(ins, canvas) >= FILL_COVERAGE_BRANCH
+
+
+def _fill_hand(ins: Instruction) -> float:
+    return GRAMMARS[ins.weight].fill_hand
+
+
+def _fill_is_scannable(
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    canvas: CanvasSize,
+    render_seed: int | None,
+) -> bool:
+    """Is the shape big enough to be filled at all, or is it one touch?
+
+    Measured at the classic pitch, not at the one the scan branch now packs to.
+    "Too small to be scanned" is a property of the shape and the tool that was
+    settled in engine 16; re-deciding it against a denser pitch would quietly
+    turn dabs back into fills and move cases this change was not aimed at.
+    """
+    seed = _seed_for_instruction(ins, render_seed)
+    segments = _scanline_segments(
+        contour, _fill_scan_angle(seed), _fill_scan_spacing(ins, canvas), seed
+    )
+    return len({index for index, _, _ in segments}) >= FILL_MIN_SCANLINES
+
+
+def _polygon_area(contour: list[tuple[float, float]]) -> float:
+    total = 0.0
+    for index in range(len(contour)):
+        ax, ay = contour[index]
+        bx, by = contour[(index + 1) % len(contour)]
+        total += ax * by - bx * ay
+    return abs(total) / 2.0
+
+
+def _fill_underlay(dwg: svgwrite.Drawing, ins: Instruction, contour, attrs):
+    """The field itself, laid as a real element under whatever marks go on top.
+
+    Both branches get one. It is what lets the marks leave the contour: before
+    engine 22 the stroke WAS the fill, so a stroke that crossed the outline
+    spilled paint outside the shape and every scan line had to be cut at the
+    intersection. That cut is the third regularity the eye reads as a raster
+    (DESIGN-01-FILL 3.2). With the boundary held here, the marks are free.
+
+    Not a filter. `use_filters` is display-only, so an underlay built out of a
+    filter would make the fill VANISH in the `compat` and `editable` profiles
+    (DESIGN-01-FILL 5-1).
+    """
+    opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
+    return dwg.polygon(
+        points=list(contour),
+        class_="fill-underlay-v1",
+        fill=attrs.get("stroke", "#111111"),
+        fill_opacity=opacity * FILL_UNDERLAY_OPACITY_RATIO,
+        stroke="none",
+    )
+
+
 def _fill_stroke_seed(seed: int, index: int) -> int:
     """筆ごとの seed。輪郭帯と共有すると同じ energy 波形が内部にも出る。"""
     digest = hashlib.sha256(f"{seed}:fill-stroke:{index}".encode("utf-8")).digest()
@@ -4688,11 +4805,16 @@ def _scanline_segments(
     angle: float,
     spacing: float,
     seed: int,
+    jitter: float = FILL_SPACING_JITTER,
 ) -> list[tuple[int, tuple[float, float], tuple[float, float]]]:
     """走査線と閉輪郭の交点を対で取り、輪郭内部の区間を返す。
 
     交点で切るので clipPath が要らず、凹形 (cloudform) も交点対のまま扱える。
     辺の判定を半開区間にしてあるので、頂点をかすめる走査線を二重に数えない。
+
+    `jitter` is the full width of the uniform pitch multiplier, so the
+    coefficient of variation of the gaps is `jitter / sqrt(12)`. The default is
+    the engine-21 value; the fill branch passes its own, drawn from the tool.
     """
     ux, uy = math.cos(angle), math.sin(angle)
     nx, ny = -uy, ux
@@ -4722,10 +4844,46 @@ def _scanline_segments(
                     (nx * offset + ux * s1, ny * offset + uy * s1),
                 )
             )
-        jitter = 1.0 + (_hash01(index, seed, "fill-spacing") - 0.5) * FILL_SPACING_JITTER
-        offset += spacing * jitter
+        step = 1.0 + (_hash01(index, seed, "fill-spacing") - 0.5) * jitter
+        offset += spacing * step
         index += 1
     return segments
+
+
+def _line_spans(
+    contour: list[tuple[float, float]],
+    point: tuple[float, float],
+    direction: tuple[float, float],
+) -> list[tuple[float, float]]:
+    """Where an infinite line through `point` runs inside the closed contour.
+
+    Returned as entry/exit parameters along `direction`, in pairs, so a concave
+    form gives several spans and none of them crosses the void. Same half-open
+    edge test as `_scanline_segments`, so a line grazing a vertex is not
+    counted twice.
+
+    `_scanline_segments` cuts every row at one shared angle; this cuts one row
+    at its own. The fill needs both: the rows are laid out parallel so the
+    pitch means something, then each row is turned and re-cut so that "how far
+    past the contour" is measured against the line the stroke actually travels.
+    """
+    ux, uy = direction
+    hits: list[float] = []
+    for edge in range(len(contour)):
+        ax, ay = contour[edge]
+        bx, by = contour[(edge + 1) % len(contour)]
+        ex, ey = bx - ax, by - ay
+        denom = ux * ey - uy * ex
+        if abs(denom) < 1e-12:
+            continue
+        dx, dy = ax - point[0], ay - point[1]
+        # point + t*u = A + s*e, crossed with u: s = (d x u) / (u x e).
+        t_edge = (dx * uy - dy * ux) / denom
+        if not (0.0 <= t_edge < 1.0):
+            continue
+        hits.append((dx + ex * t_edge) * ux + (dy + ey * t_edge) * uy)
+    hits.sort()
+    return [(hits[i], hits[i + 1]) for i in range(0, len(hits) - 1, 2)]
 
 
 def _render_fill_strokes(
@@ -4741,18 +4899,33 @@ def _render_fill_strokes(
 ):
     """閉図形の内部を素材の筆致で埋める。1 パス = 1 筆。
 
-    塗りは領域 fill ではなく、細かいストロークで内側を埋めること。走査線と輪郭の
-    交点で筆を切るため各筆の端点は輪郭上に乗り、縁が揃う。走査線が
+    塗りは領域 fill ではなく、細かいストロークで内側を埋めること。走査線が
     `FILL_MIN_SCANLINES` 本に満たない微小図形では None を返し、呼び出し側が
     `_render_fill_dab` へ回す (engine 16 まではここで領域 fill へ縮退していた)。
+
+    Engine 22 took the three regularities the eye reads as a raster out of this
+    function. The scan angle now moves per stroke, the pitch is drawn far wider,
+    and the ends leave the contour instead of being cut at the intersection --
+    which they can only do because `_fill_underlay` is holding the boundary
+    underneath. All three amplitudes come from the tool (`fill_hand`) and are
+    zero for a machine, so `computer` still lays the same exact raster it did.
     """
     if len(contour) < 3:
         return None
     base_width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     grid_step = _grid_step_px(ins.weight, canvas)
     seed = _seed_for_instruction(ins, render_seed)
+    hand = _fill_hand(ins)
+    # The underlay carries the field, so the scan lines are free to pack to the
+    # coverage the author chose instead of to whatever the classic pitch gave.
+    spacing = base_width / FILL_COVERAGE_TARGET
+    pitch_cv = (FILL_PITCH_CV_MIN + FILL_PITCH_CV_SPAN * hand) if hand else 0.0
     segments = _scanline_segments(
-        contour, _fill_scan_angle(seed), _fill_scan_spacing(ins, canvas), seed
+        contour,
+        _fill_scan_angle(seed),
+        spacing,
+        seed,
+        jitter=pitch_cv * math.sqrt(12.0),
     )
     if len({index for index, _, _ in segments}) < FILL_MIN_SCANLINES:
         return None
@@ -4760,22 +4933,58 @@ def _render_fill_strokes(
     color = attrs.get("stroke", "#111111")
     # 塗りストロークは輪郭ではなく塗りなので、濃度は fill 側の指定に従う。
     opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
-    inset = base_width * 0.5
-    minimum = inset * 2 + base_width * FILL_MIN_STROKE_WIDTHS
+    minimum = base_width * FILL_MIN_STROKE_WIDTHS
+    angle_amp = (
+        math.radians(FILL_ANGLE_MIN_DEG + FILL_ANGLE_SPAN_DEG * hand) * math.sqrt(3.0)
+        if hand
+        else 0.0
+    )
+    reach = (FILL_REACH_MIN + FILL_REACH_SPAN * hand) if hand else 0.0
     paths: list[dict] = []
     for order, (index, start, end) in enumerate(segments):
-        length = math.hypot(end[0] - start[0], end[1] - start[1])
+        chord = math.hypot(end[0] - start[0], end[1] - start[1])
+        if chord <= minimum:
+            continue
+        ux = (end[0] - start[0]) / chord
+        uy = (end[1] - start[1]) / chord
+        mx = (start[0] + end[0]) / 2
+        my = (start[1] + end[1]) / 2
+        # Turn this row on its own midpoint, then cut it against the contour
+        # again. Rotating the chord and keeping its old length would make the
+        # reach below a fraction of a line the stroke no longer travels: near
+        # the edge of a round form a few degrees change the span several-fold.
+        if angle_amp:
+            delta = (_hash01(order, seed, "fill-angle-stroke") - 0.5) * 2 * angle_amp
+            cos_d, sin_d = math.cos(delta), math.sin(delta)
+            ux, uy = ux * cos_d - uy * sin_d, ux * sin_d + uy * cos_d
+            spans = [
+                span for span in _line_spans(contour, (mx, my), (ux, uy))
+                if span[0] <= 0.0 <= span[1]
+            ]
+            if not spans:
+                continue
+            t0, t1 = spans[0]
+        else:
+            t0, t1 = -chord / 2, chord / 2
+        length = t1 - t0
         if length <= minimum:
             continue
-        # 端を線幅の半分だけ内側へ寄せ、帯が輪郭からはみ出さないようにする。
-        ux = (end[0] - start[0]) / length
-        uy = (end[1] - start[1]) / length
-        p0 = (start[0] + ux * inset, start[1] + uy * inset)
-        p1 = (end[0] - ux * inset, end[1] - uy * inset)
+        # One end overshoots the contour, the other may fall short of it. The
+        # sign is drawn per end: an implementation that only insets would leave
+        # the edge as tidy as the cut it replaced.
+        r0 = reach * length
+        r1 = reach * length
+        if _hash01(order, seed, "fill-reach-start") < 0.5:
+            r0 = -r0
+        if _hash01(order, seed, "fill-reach-end") < 0.5:
+            r1 = -r1
+        p0 = (mx + ux * (t0 - r0), my + uy * (t0 - r0))
+        p1 = (mx + ux * (t1 + r1), my + uy * (t1 + r1))
         if index % 2:
-            # 走査線ごとに往復させる。taper の向きが交互になり手の運びとして読める。
+            # 走査線ごとに往復させる。終端の向きが交互になり手の運びとして読める。
             p0, p1 = p1, p0
-        count = max(2, _stroke_sample_count(length - inset * 2, canvas))
+        span = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+        count = max(2, _stroke_sample_count(span, canvas))
         centerline = [
             (
                 p0[0] + (p1[0] - p0[0]) * i / (count - 1),
@@ -4791,6 +5000,7 @@ def _render_fill_strokes(
             closed=False,
             grid_step=grid_step,
             wild=wild,
+            terminal="loaded",
         )
         path_attrs = {
             "d": contour_stroke_path(stroke),
@@ -4810,6 +5020,103 @@ def _render_fill_strokes(
         return None
     group = dwg.g(class_=f"fill-stroke-v1 strokes-{len(paths)}")
     for path_attrs in paths:
+        group.add(dwg.path(**path_attrs))
+    return group
+
+
+def _render_fill_texture(
+    dwg: svgwrite.Drawing,
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    attrs: dict,
+    canvas: CanvasSize,
+    render_seed: int | None,
+    *,
+    use_filters: bool,
+    wild: bool = False,
+):
+    """塗りの上層を、走査線ではなく撒かれた痕で作る (engine 22 段 2)。
+
+    Below the coverage threshold a pass of parallel lines does not become a
+    field. Closing the gaps would take eight times the lines at pencil width and
+    twenty-four at silverpoint (DESIGN-01-FILL 3.3), and that is not how the
+    tool is used: a pencil rubs a tone rather than ruling it. The underlay
+    already holds the field, so these marks only have to give it grain.
+
+    Positions come from `_surface_scatter`, the same scatter the surface layer
+    uses, so a concave shape stays inside its own outline and nothing lands in
+    the bounding box but outside the form. The marks are the tool's own width --
+    not the grain-sized dabs the surface layer draws -- because what is being
+    rubbed here is the tool itself.
+    """
+    if len(contour) < 3:
+        return None
+    seed = _seed_for_instruction(ins, render_seed)
+    pitch = _fill_scan_spacing(ins, canvas)
+    width = _stroke_width_px(ins.weight, canvas, ins.thinness)
+    xs = [point[0] for point in contour]
+    ys = [point[1] for point in contour]
+    short_side = min(max(xs) - min(xs), max(ys) - min(ys))
+    # A mark is never longer than the shape is narrow, or a small form would be
+    # rubbed with strokes several times its own width.
+    mark_length = min(pitch * FILL_TEXTURE_MARK_LENGTH, max(short_side, pitch))
+    # One classic scan pass lays about `area / pitch` of stroke length. Sizing
+    # the count off that keeps the branch anchored to the ink the fill used to
+    # carry, rather than to a number chosen to look right on one shape. The
+    # floor is the scan-line minimum: a shape big enough to have been scanned
+    # has to come out of this branch with marks on it, or the boundary between
+    # "filled" and "one dab" would quietly move off the value engine 16 measured.
+    count = max(
+        FILL_MIN_SCANLINES,
+        int(_polygon_area(contour) / (pitch * mark_length) * FILL_TEXTURE_DENSITY),
+    )
+    points = _surface_scatter(contour, count, seed)
+    if not points:
+        return None
+
+    color = attrs.get("stroke", "#111111")
+    opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
+    grid_step = _grid_step_px(ins.weight, canvas)
+    base_angle = _fill_scan_angle(seed)
+    spread = math.radians(FILL_TEXTURE_ANGLE_SPREAD_DEG) * _fill_hand(ins)
+    group = dwg.g(class_=f"fill-texture-v1 marks-{len(points)}")
+    for index, (px, py) in enumerate(points):
+        # A hand rubbing a tone keeps a general direction; it does not hatch at
+        # random. The spread is the tool's, so a machine sent here would lay the
+        # marks all one way.
+        angle = base_angle + (_hash01(index, seed, "fill-texture-angle") - 0.5) * 2 * spread
+        half = mark_length / 2
+        ux, uy = math.cos(angle) * half, math.sin(angle) * half
+        count_samples = max(2, _stroke_sample_count(mark_length, canvas))
+        centerline = [
+            (
+                px - ux + 2 * ux * i / (count_samples - 1),
+                py - uy + 2 * uy * i / (count_samples - 1),
+            )
+            for i in range(count_samples)
+        ]
+        stroke = synthesize_along(
+            centerline,
+            width,
+            ins.weight,
+            _fill_stroke_seed(seed, index),
+            closed=False,
+            grid_step=grid_step,
+            wild=wild,
+            terminal="loaded",
+        )
+        path_attrs = {
+            "d": contour_stroke_path(stroke),
+            "fill": color,
+            "fill_opacity": opacity,
+            "stroke": "none",
+        }
+        if (
+            use_filters
+            and ins.weight in TEXTURE_FILTER_WEIGHTS
+            and ins.weight != "drypoint"
+        ):
+            path_attrs["filter"] = f"url(#texture-{ins.weight})"
         group.add(dwg.path(**path_attrs))
     return group
 
@@ -4911,20 +5218,55 @@ def _interior_fill(
     rotring (製図ペン) は engine 8 で輪郭を筆致から外してあるのと同じ理由で、
     塗りも機械の塗り = 領域 fill のままにする。手の道具では、走査線に届かない
     微小な図形も領域 fill にはせず、1 筆の打点として置く (engine 16 段 2)。
+
+    Engine 22 puts an underlay under the marks and splits what goes on top:
+    scan lines where the tool is wide enough for them to become a field,
+    scattered marks where it is not. The underlay is common to both branches --
+    the threshold decides only what sits on it -- because the three works the
+    author named as striped were drawn with pen, crayon and pencil, and a design
+    that gave the underlay to the wide branch alone would reach none of them
+    (run 857 §1).
+
+    A dab is not a filled area, so it gets no underlay. It is one touch of the
+    tool, it has no scan strokes to let off the contour, and an underlay would
+    put back exactly the flat region fill engine 16 took out of tiny shapes.
     """
     if not _fills_interior(ins):
         return None, False
     if not _uses_hand_stroke(ins.weight):
         return None, True
-    group = _render_fill_strokes(
-        dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters, wild=wild
-    )
-    if group is None:
+    if len(contour) < 3:
+        return None, True
+
+    if not _fill_is_scannable(ins, contour, canvas, render_seed):
         group = _render_fill_dab(
             dwg, ins, contour, attrs, canvas, render_seed,
             use_filters=use_filters, wild=wild,
         )
-    return (None, True) if group is None else (group, False)
+        return (None, True) if group is None else (group, False)
+
+    render_marks = (
+        _render_fill_strokes
+        if _fill_takes_scan_branch(ins, canvas)
+        else _render_fill_texture
+    )
+    marks = render_marks(
+        dwg, ins, contour, attrs, canvas, render_seed, use_filters=use_filters, wild=wild
+    )
+    if marks is None:
+        # Nothing survived the minimum-length filter. Fall through to the dab
+        # rather than leaving a bare underlay: an area with no mark on it is the
+        # flat fill this engine has been taking apart since 9.
+        group = _render_fill_dab(
+            dwg, ins, contour, attrs, canvas, render_seed,
+            use_filters=use_filters, wild=wild,
+        )
+        return (None, True) if group is None else (group, False)
+
+    group = dwg.g(class_="fill-v2")
+    group.add(_fill_underlay(dwg, ins, contour, attrs))
+    group.add(marks)
+    return group, False
 
 
 def _render_contour_hand_stroke(

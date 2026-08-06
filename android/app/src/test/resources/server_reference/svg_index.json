@@ -106,20 +106,22 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 47053,
+    "bytes": 87844,
     "counts": {
-      "path": 39,
+      "path": 94,
       "polyline": 0,
-      "polygon": 0,
+      "polygon": 1,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 4,
-      "g": 8
+      "g": 9
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
-      "fill-stroke-v1 strokes-38",
+      "fill-texture-v1 marks-93",
+      "fill-underlay-v1",
+      "fill-v2",
       "material-outline"
     ],
     "stroke_colors": [
@@ -665,20 +667,22 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 52720,
+    "bytes": 86853,
     "counts": {
-      "path": 46,
+      "path": 93,
       "polyline": 0,
-      "polygon": 0,
+      "polygon": 1,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 4,
-      "g": 8
+      "g": 9
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
-      "fill-stroke-v1 strokes-45",
+      "fill-texture-v1 marks-92",
+      "fill-underlay-v1",
+      "fill-v2",
       "material-outline"
     ],
     "stroke_colors": [
@@ -1585,20 +1589,22 @@
     "svg_profile": "editable",
     "wild": true,
     "color_catalog_id": "default",
-    "bytes": 50459,
+    "bytes": 91250,
     "counts": {
-      "path": 39,
+      "path": 94,
       "polyline": 0,
-      "polygon": 2,
+      "polygon": 3,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 2,
-      "g": 8
+      "g": 9
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
-      "fill-stroke-v1 strokes-38",
+      "fill-texture-v1 marks-93",
+      "fill-underlay-v1",
+      "fill-v2",
       "material-outline"
     ],
     "stroke_colors": [
@@ -1806,20 +1812,22 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "sea_stone",
-    "bytes": 47052,
+    "bytes": 87843,
     "counts": {
-      "path": 39,
+      "path": 94,
       "polyline": 0,
-      "polygon": 0,
+      "polygon": 1,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 4,
-      "g": 8
+      "g": 9
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
-      "fill-stroke-v1 strokes-38",
+      "fill-texture-v1 marks-93",
+      "fill-underlay-v1",
+      "fill-v2",
       "material-outline"
     ],
     "stroke_colors": [

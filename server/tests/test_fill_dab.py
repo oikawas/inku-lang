@@ -63,9 +63,19 @@ def _render_circle(radius: float, weight: str, *, render_seed: int = 12345) -> s
 def _mechanism(svg: str) -> str:
     if "fill-stroke-v1" in svg:
         return "strokes"
+    if "fill-texture-v1" in svg:
+        return "texture"
     if "fill-dab-v1" in svg:
         return "dab"
     return "region"
+
+
+# Render engine 22 split what goes on top of a fill into two, so "the interior
+# was filled" is no longer one class name. These tests are about the dab
+# boundary -- filled area against single touch -- so they ask the question that
+# survived the split, and the branch itself is gated in
+# `test_fill_underlay_and_branch.py`.
+FILLED_AREA = frozenset({"strokes", "texture"})
 
 
 def _normalized_digest(svg: str) -> str:
@@ -176,16 +186,21 @@ def test_f1_the_dab_follows_the_long_axis_of_the_shape() -> None:
 # --- F-2 陰性: 境界の上側は engine 15 と 1 バイトも変わらない --------------- #
 
 
-def test_f2_a_large_filled_circle_still_scans() -> None:
+def test_f2_a_large_filled_circle_is_still_a_filled_area() -> None:
+    """大きい塗りが打点へ落ちない。pen は engine 22 でテクスチャ枝へ移った。"""
     for radius in (0.05, 0.10, 0.30):
-        assert _mechanism(_render_circle(radius, "pen")) == "strokes", radius
+        assert _mechanism(_render_circle(radius, "pen")) in FILLED_AREA, radius
 
 
-def test_f2_the_filled_cases_above_the_boundary_are_byte_identical_to_engine_15() -> None:
-    """段 2 の帰属の担保。短辺 2% 以上の塗りには触っていない。
+def test_f2_the_filled_cases_above_the_boundary_are_still_filled_areas() -> None:
+    """段 2 の帰属の担保。短辺 2% 以上の塗りが打点や領域 fill へ落ちない。
 
-    正本は engine 15 の凍結コーパスの digest。31 件の内訳は
-    `C-fill-*` 15 / `E-wild-fill-*` 15 / `D-size-large-filled-polygon` 1。
+    engine 16 の時点ではこれが「engine 15 と 1 バイトも変わらない」だった。
+    **engine 22 は 31 件すべてを意図して動かしたので、バイト一致はもう主張ではない**
+    (下地が入り、上層が枝分かれし、終端が変わる)。動いた先が正しいことは凍結コーパスの
+    `changed_from_previous` が見る。ここに残る主張は、**この 31 件が塗られた面のまま
+    である**こと — 打点へ落ちたり領域 fill へ縮退したりしていないこと — で、
+    件数の 31 も併せて見るので case が消えれば落ちる。
     """
     cases = json.loads(ENGINE_15_MANIFEST.read_text())["cases"]
     above = sorted(
@@ -197,9 +212,9 @@ def test_f2_the_filled_cases_above_the_boundary_are_byte_identical_to_engine_15(
     assert len(above) == 31, above
     with _engine_15_seed_material():
         for case_id in above:
-            assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
-                case_id
-            )
+            svg = _replay(cases[case_id])
+            assert _mechanism(svg) in FILLED_AREA, case_id
+            assert "fill-underlay-v1" in svg, case_id
 
 
 def test_f2_the_one_tiny_case_in_the_corpus_did_move() -> None:
@@ -254,7 +269,10 @@ def test_f4_the_mechanism_switches_at_the_measured_boundary() -> None:
     for weight in ("pen", "pencil", "brush_thick"):
         for seed in (1, 12345, 2**63 + 1):
             assert _mechanism(_render_circle(BELOW_BOUNDARY_RADIUS, weight, render_seed=seed)) == "dab"
-            assert _mechanism(_render_circle(ABOVE_BOUNDARY_RADIUS, weight, render_seed=seed)) == "strokes"
+            assert (
+                _mechanism(_render_circle(ABOVE_BOUNDARY_RADIUS, weight, render_seed=seed))
+                in FILLED_AREA
+            )
 
 
 def test_f4_the_boundary_is_crossed_exactly_once() -> None:
@@ -266,6 +284,6 @@ def test_f4_the_boundary_is_crossed_exactly_once() -> None:
         radius += 0.001
     flips = [i for i in range(1, len(seen)) if seen[i] != seen[i - 1]]
     assert len(flips) == 1, [(i, seen[i - 1], seen[i]) for i in flips]
-    assert seen[0] == "dab" and seen[-1] == "strokes"
+    assert seen[0] == "dab" and seen[-1] in FILLED_AREA
     boundary = 0.001 + flips[0] * 0.001
     assert 0.014 <= boundary <= 0.017, boundary

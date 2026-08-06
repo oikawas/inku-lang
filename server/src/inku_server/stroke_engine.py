@@ -34,19 +34,44 @@ class ToolGrammar:
     # because this module does not know the canvas.
     quantize: float = 0.0
     width_steps: int = 0
+    # How loose the hand is when this tool fills an area, from 0 (a machine:
+    # every scan line parallel, every endpoint on the contour) to 1 (the loosest
+    # brush). The renderer reads it for the three quantities that made a fill
+    # read as a raster -- the scan angle, the pitch, and how far each stroke
+    # reaches past the contour -- so the amplitude belongs to the tool and the
+    # description never has to name it. Zero for `rotring` and `computer`:
+    # exact repetition is the machine's signature, not a defect to sand off.
+    fill_hand: float = 0.0
 
 
+# `fill_hand` runs with the tool's stiffness: the stiffer the tool, the tighter
+# the hand that fills with it. The two machines are pinned at zero by hand
+# rather than derived, because zero has to be exact.
 GRAMMARS: dict[str, ToolGrammar] = {
-    "silverpoint": ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012),
-    "pencil": ToolGrammar(0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05),
-    "pen": ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022),
+    "silverpoint": ToolGrammar(
+        0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012, fill_hand=0.05
+    ),
+    "pencil": ToolGrammar(
+        0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05, fill_hand=0.60
+    ),
+    "pen": ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022, fill_hand=0.25),
     "rotring": ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    "crayon": ToolGrammar(0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06),
-    "chalk": ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07),
-    "brush_thin": ToolGrammar(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10),
-    "brush_thick": ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13),
-    "burin": ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018),
-    "drypoint": ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05),
+    "crayon": ToolGrammar(
+        0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06, fill_hand=0.72
+    ),
+    "chalk": ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07, fill_hand=0.80),
+    "brush_thin": ToolGrammar(
+        0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10, fill_hand=0.90
+    ),
+    "brush_thick": ToolGrammar(
+        0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13, fill_hand=1.00
+    ),
+    "burin": ToolGrammar(
+        0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018, fill_hand=0.10
+    ),
+    "drypoint": ToolGrammar(
+        0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05, fill_hand=0.45
+    ),
     "computer": ToolGrammar(
         1.0,
         1.0,
@@ -235,6 +260,25 @@ def _edge_window(t: float) -> float:
     if t > 1.0 - _GESTURE_EDGE:
         return 0.5 * (1 - math.cos(math.pi * (1.0 - t) / _GESTURE_EDGE))
     return 1.0
+
+
+# The terminal is a property of the ROLE, not of the tool. The same brush ends a
+# contour thin (`taper`, what `_edge_window` gives) and ends a fill stroke heavy,
+# because laying down paint is heaviest the moment the brush lands. Constants are
+# the ones the author approved off the run 856 sample: 1.45x where it lands,
+# settling over a tenth of the run, and only the lift narrowing, to 0.55.
+_LOADED_LANDING = 0.45
+_LOADED_SETTLE = 0.10
+_LOADED_LIFT_AT = 0.94
+_LOADED_LIFT_TO = 0.55
+
+
+def _loaded_profile(t: float) -> float:
+    landing = 1.0 + _LOADED_LANDING * math.exp(-t / _LOADED_SETTLE)
+    if t < _LOADED_LIFT_AT:
+        return landing
+    span = 1.0 - _LOADED_LIFT_AT
+    return landing * (_LOADED_LIFT_TO + (1.0 - _LOADED_LIFT_TO) * (1.0 - t) / span)
 
 
 def _swell(t: float, seed: int) -> float:
@@ -685,6 +729,7 @@ def synthesize_along(
     grid_step: float = 0.0,
     wild: bool = False,
     support: Support = DEFAULT_SUPPORT,
+    terminal: str = "taper",
 ) -> ContourStrokeResult:
     """Synthesize one stroke that follows an arbitrary intended centerline.
 
@@ -705,6 +750,12 @@ def synthesize_along(
     `wild` unleashes the same centreline gesture the straight-line synthesizer
     carries, so the toggle reaches contours, arcs, fills and hatches rather than
     lines alone. With it off the amplitude is zero and nothing moves.
+
+    `terminal` selects how the width ends. "taper" is the drawing terminal every
+    open stroke had before render engine 22: thin in, thin out. "loaded" is the
+    painting terminal -- heavy where the tool lands, cut at the lift. It applies
+    to the width alone; the lateral drift keeps reading the same envelope, and a
+    periodic tool is left on its own branch untouched.
     """
     points = list(centerline)
     count = len(points)
@@ -795,10 +846,17 @@ def synthesize_along(
             # Length-based seed kick (see synthesize_stroke).
             lateral += (_unit(seed, "correction-kick", index) * 2 - 1) * base_width * 0.25
         profile = 1.0
-        if grammar.taper:
-            profile *= (1 - grammar.taper) + grammar.taper * envelope
-        if grammar.bulge:
-            profile *= 1 + grammar.bulge * envelope
+        if terminal == "loaded" and not grammar.periodic:
+            # The loaded envelope replaces the taper/bulge shaping outright: it
+            # is a different terminal, not a modifier on top of the old one.
+            # `periodic` is excluded here rather than earlier so the machine
+            # never leaves the branch that keeps it byte-identical.
+            profile = _loaded_profile(t)
+        else:
+            if grammar.taper:
+                profile *= (1 - grammar.taper) + grammar.taper * envelope
+            if grammar.bulge:
+                profile *= 1 + grammar.bulge * envelope
         width = max(
             0.015,
             base_width

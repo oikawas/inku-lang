@@ -288,13 +288,39 @@ def test_s5_display_and_editable_use_the_same_mechanism(texture: str) -> None:
 # --- S-6 恒等: filled 側は段 1 で 1 件も動かない --------------------------- #
 
 
-def test_s6_filled_cases_are_untouched_by_stage_one() -> None:
-    """`_fills_interior` は surface があれば False を返すので両者は排他。"""
+def test_s6_filled_cases_carry_no_surface_layer() -> None:
+    """`_fills_interior` は surface があれば False を返すので両者は排他。
+
+    engine 16 の時点でこれは「30 件が engine 15 とバイト一致」だった。
+    **engine 22 は 30 件すべてを意図して動かした**ので、その形では段 1 の恒等性を
+    もう測れない。排他そのものは frozen digest を経由しなくても測れるので、
+    ここでは製品を直接叩く — 塗りの case に段 1 の要素が 1 つも出ないこと、
+    および `surface` を足した同じ instruction では塗りが消えること。
+    後者が無いと、`_fills_interior` が常に False を返す実装でも通る。
+    """
     cases = _engine_15_cases()
     fill_cases = sorted(case_id for case_id in cases if "-fill-" in case_id)
     assert len(fill_cases) == 30, len(fill_cases)
     with _engine_15_seed_material():
         for case_id in fill_cases:
-            assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
-                case_id
-            )
+            assert "surface-stroke-v1" not in _replay(cases[case_id]), case_id
+
+        # 判別力: 同じ instruction に surface を足すと塗りの側が消える。これが無いと、
+        # `_fills_interior` が常に False を返す実装でも上の走査を通ってしまう。
+        case = json.loads(json.dumps(cases["C-fill-circle-crayon"]))
+        filled = _replay(case)
+        case["input"]["score"]["instructions"][0]["surface"] = {
+            "texture": "hatch",
+            "density": 0.55,
+            "scale": 0.40,
+            "opacity": 0.36,
+            "bleed": 0.25,
+            "direction": "diagonal_rising",
+            "spacing_gradient": "none",
+            "tone_steps": 3,
+            "seed": 24680,
+        }
+        surfaced = _replay(case)
+    assert "fill-underlay-v1" in filled
+    assert "fill-underlay-v1" not in surfaced
+    assert "surface-stroke-v1" in surfaced

@@ -18,6 +18,7 @@ import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.LocalLiteRtLmProvider
 import app.inku.mobile.llm.LocalModelDownloader
 import app.inku.mobile.llm.ModelDownloadSpec
+import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ProviderUrlValidator
 import app.inku.mobile.llm.RoutingModelProvider
@@ -41,10 +42,16 @@ import org.json.JSONObject
 class InkuRepository(
     private val context: Context,
     private val database: InkuDatabase,
+    // Injectable so a test can run the real drawing paths without reaching a
+    // language model, the way the server's acceptance replaces `_ask_model`
+    // and leaves the rest of the paint alone. `null` keeps the router built
+    // from the database, which is what the app always uses.
+    modelProviderOverride: ModelProvider? = null,
     // Injectable so a test can hand out a node id it already knows. Real ids
     // are uuid4, and a test that cannot name one in advance cannot make the
     // edge insert collide, which is the only way to observe whether the node
-    // and the edge are really one transaction.
+    // and the edge are really one transaction. Kept last so that the callers
+    // passing it as a trailing lambda keep working.
     private val newLineageId: () -> String = { java.util.UUID.randomUUID().toString() },
 ) {
     private val providerModelCandidatePrefix = "provider_model_candidates:"
@@ -53,7 +60,10 @@ class InkuRepository(
         database = database,
         localProvider = localLiteRtProvider,
     )
-    private val pipeline = LocalFallbackPipeline(modelProvider = modelRouter)
+    // Every model call in this class goes through this one, so an override
+    // reaches Stage 1, Stage 2 and the demo prompt alike.
+    private val activeModelProvider: ModelProvider = modelProviderOverride ?: modelRouter
+    private val pipeline = LocalFallbackPipeline(modelProvider = activeModelProvider)
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
     private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -333,7 +343,7 @@ class InkuRepository(
 
     suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
         val seed = seedPhrase.trim().ifBlank { "96文字以内の短い描画指示文を1つ作って。" }
-        val response = modelRouter.generate(
+        val response = activeModelProvider.generate(
             ModelRequest(
                 modelId = modelId,
                 prompt = seed,

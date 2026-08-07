@@ -3980,3 +3980,35 @@ the graph on screen and gives the first control that writes to it.
 - **Tests:** **JVM 173 / 0 failures** (39 classes, from 168), **instrumented 46 / 0 failures**
   (Pixel 9 hardware, from 42). **Only `android/VERSION` moves** — `APP_VERSION` and
   `web/BUILD_NUMBER` stay put, and nothing is deployed to pentala.
+
+### Android `2.1.4-android.14` — a work can now be refined one element at a time (android Build 148098, 2026-08-07)
+
+**Third of five.** 2/5 put the lineage on screen; this release gives the app the operation that
+**adds a branch to that lineage on purpose**.
+
+- **The refinement element is one of five — touch, layout, reading, colour catalogue, variation —
+  chosen exactly one at a time** (SPEC `:614`, `:678`). The choice is a radio, and **the amplitude
+  appears directly beneath it only when variation is chosen**. The rule that **each lineage edge
+  attributes to a single cause** is what requires the one-at-a-time discipline.
+- **What is held, what is varied, and which edge is written are decided by a pure function**
+  (`data/refinement/RefinementPlan.kt`). **The colour refinement holds the DDL, the Score, the canvas,
+  the composition seed and the render seed**, and **everything else inherits the effective catalogue
+  and canvas of the parent work on screen, not the settings for the next drawing**.
+- **`PaintRequest` gained the same five seed arguments the server has** (`render_seed`,
+  `composition_seed`, `interpretation_seed`, `variation_amplitude`, `variation_seed`).
+  **The judgement was ported as it stands** — `render_seed` goes through an `or`, so **`0` takes the
+  same path as "not given"**. **A seed is drawn on every render, so images from here on differ from
+  the earlier ones.**
+- **Two spellings the server does not have were dropped** — the `seed` that `renderHash` read
+  alongside `render_seed`, and the `render_seed` the renderer read from inside the Score.
+  **The server's `Score` has no such field.** The comparison-render entry point now takes the same
+  five values the server takes in its request body, as intent extras.
+- **Eleven perturbations were applied, to product code only.** **Two of them passed green at first
+  and were holes in the acceptance side, fixed and re-applied** — **a second copy of the same image
+  replaces the history row**, so a double save cannot be detected by counting rows.
+- **⚠ One perturbation the contract specified pointed the wrong way.** It read "put `null` and `0`
+  on the same path", but **the same path is the correct implementation**. Following the ruling
+  "follow the server", the condition was ported as it stands and **the perturbation was inverted**.
+- **Tests:** **JVM 197 / 0 failures** (41 classes, from 173), **instrumented 62 / 0 failures**
+  (Pixel 9 hardware, from 46). **Only `android/VERSION` moves** — `APP_VERSION` and
+  `web/BUILD_NUMBER` stay put, and nothing is deployed to pentala.

@@ -3889,3 +3889,37 @@ window lasted two days both times. **More drawing revisions have been announced.
 - **Checks:** server **2367 / 31 skipped** (**+1 = F-4**), cli **111**, `npm run check` **241 FILES /
   0 errors / 2 warnings**, ruff clean, `check_frozen_corpora.py` byte-identical, `check_docs.py`
   green, **Android JVM 159 with none red**, **instrumented 31 with none red** (Pixel 9 hardware).
+
+### Android `2.1.4-android.12` — A drawing now names the work it came from (android Build 148093, 2026-08-07)
+
+**[I-138], 1/5 of the Android lineage series.** The port **saved every work as a root**. The server
+has recorded the parent and the kind of derivation from the beginning and web has declared it since
+the lineage panel shipped; **only the port never sent it**, so a phone's history was a flat list of
+unrelated works.
+
+- **One pure function decides** (`SubmitDerivationKind.kt`), with **web's branch order**
+  (`canvasAspectChanged` → no parent means `null` → description / DDL → `replay`), and **every one of
+  the four kinds it returns is one `DerivationKindRegistry` knows**.
+- **The batch, the demo and the headless path write no edge, and a work restored at startup is not a
+  parent** -- neither is something the author picked.
+- **"Start a new lineage" is wired but not on screen.** Web puts it in the lineage panel and the port
+  has no such panel yet (2/5 builds it). **Putting it anywhere else would be the client inventing a
+  design the server side does not have.**
+- **A description counts as untouched even with its prefix stripped.** Web avoids prefixes with a
+  separate `source_text` column and **the port has none**; comparing directly would mark a work
+  derived from the batch as `description_edit` with nothing edited. **Adding a column was rejected**
+  as a client-side invention with no counterpart on the server or in web.
+- **Chasing a flickering instrumented suite found two product defects.** The settings restore and the
+  history restore both read the state, suspended, and **wrote the stale copy back over whatever the
+  author did while they waited**: typing a description, picking a history entry or changing the
+  canvas ratio right after startup was silently undone, and a reverted `lineageDetached` turns a save
+  that should be a child into a root. **Three runs before the fix reddened one or two different tests
+  each time; four runs after it were 11/11 green** (44 executions, none red).
+- **Nine perturbations against production code** (the contract's seven plus two the implementer
+  added). **Dropping the condition that reads `lineageDetached` did not redden T-6**: in the port a
+  parent only ever comes from `selectedHistory`, so dropping the flag removes the parent anyway. That
+  showed **the flag matters in exactly one place -- the startup restore** -- and a perturbation
+  aimed at stage 3 itself was added.
+- **Checks:** Android JVM **168, none failing** (38 classes, 159 at the branch point), **instrumented
+  42, none failing** (Pixel 9 hardware, 31 at the branch point). **Only `android/VERSION` moved** --
+  `APP_VERSION` and `web/BUILD_NUMBER` are unchanged and nothing was deployed to pentala.

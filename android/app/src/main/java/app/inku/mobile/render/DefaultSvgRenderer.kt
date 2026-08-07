@@ -27,10 +27,16 @@ class DefaultSvgRenderer : SvgRenderer {
         val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = ColorCatalogs.get(request.colorCatalogId)
-        // The request decides; the Score is the fallback. The server takes the
-        // seed as an argument (`renderer.render(..., render_seed=...)`) and never
-        // reads one off the Score, but a saved work on this client carries its
-        // seed in the Score it replays from, so that path is kept.
+        // The request decides; the Score is the fallback.
+        //
+        // The server takes the seed as an argument
+        // (`renderer.render(..., render_seed=...)`) and its `Score` has no such
+        // field at all, so reading one off the Score is this client's own. It
+        // stays because it is how the frozen reference corpus hands the seed
+        // over: `gen_android_reference.py` writes `render_seed` into the Score
+        // of every baked case, and that generator belongs to the server. Moving
+        // the fixtures onto the argument is a change to the generator, not to
+        // this file.
         val renderSeed = request.renderSeed
             ?: if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
         val cmap = ServerRendererStyle.DEFAULT_COLOR_MAP + catalog.renderMap

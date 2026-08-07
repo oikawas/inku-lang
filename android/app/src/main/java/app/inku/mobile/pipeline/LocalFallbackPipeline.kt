@@ -1733,7 +1733,10 @@ class LocalFallbackPipeline(
     private fun renderHash(input: String, ddl: String, scoreJson: String, svg: String, renderMetadataJson: String, catalogId: String): String {
         val metadata = JSONObject(renderMetadataJson)
         val scoreObj = runCatching { JSONObject(scoreJson) }.getOrNull() ?: JSONObject()
-        val renderSeed = canonicalSeed(metadata.opt("render_seed") ?: metadata.opt("seed"))
+        // `render_hash_for_item` (`db.py:707-717`) reads one key, `render_seed`.
+        // A second spelling was accepted here and had no counterpart there; the
+        // pipeline writes the canonical key on every drawing, so nothing sent it.
+        val renderSeed = canonicalSeed(metadata.opt("render_seed"))
         val engineId = if (metadata.has("render_engine_id") && !metadata.isNull("render_engine_id")) {
             metadata.optString("render_engine_id").takeIf { it.isNotBlank() }
         } else null

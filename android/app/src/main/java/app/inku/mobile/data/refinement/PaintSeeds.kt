@@ -30,9 +30,9 @@ data class PaintSeeds(
          * What a work was made with, read back off its history row.
          *
          * A refinement that keeps something fixed keeps *this*, not whatever the
-         * describe screen is set to. Rows saved before the columns existed
-         * report `null` for all of them, which is the same answer the server
-         * gives for its own older rows.
+         * describe screen is set to. A work that was simply drawn says only what
+         * it was performed with, so a refinement of it inherits a touch and
+         * nothing else -- which is the right answer, not a missing one.
          */
         fun of(item: HistoryItemEntity): PaintSeeds = PaintSeeds(
             renderSeed = item.renderSeed?.let { parseSeed(it) },

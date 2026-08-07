@@ -42,6 +42,14 @@ class ToolGrammar:
     # description never has to name it. Zero for `rotring` and `computer`:
     # exact repetition is the machine's signature, not a defect to sand off.
     fill_hand: float = 0.0
+    # How far this tool's fill marks stand out from the field they sit on, as a
+    # multiple of whichever branch contrast applies. 1.0 leaves the tool on the
+    # branch's own value; above it the marks read as separate strokes rather
+    # than as grain in a tone. It lives here rather than in the renderer because
+    # "how much this tool separates from its own tone" is a property of the
+    # tool, and a renderer that listed tool names would stop following the
+    # description the moment one asked for a thin chalk.
+    fill_contrast: float = 1.0
 
 
 # `fill_hand` runs with the tool's stiffness: the stiffer the tool, the tighter
@@ -59,7 +67,15 @@ GRAMMARS: dict[str, ToolGrammar] = {
     "crayon": ToolGrammar(
         0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06, fill_hand=0.72
     ),
-    "chalk": ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07, fill_hand=0.80),
+    # chalk carries the one `fill_contrast` above 1.0: "give chalk more contrast
+    # than crayon" (author, 2026-08-07). The two tools sit either side of it in
+    # coverage (0.250 against 0.333) and read almost alike otherwise, so the
+    # separation has to be asked for rather than fall out of the widths.
+    "chalk": ToolGrammar(
+        0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07,
+        fill_hand=0.80,
+        fill_contrast=1.13,
+    ),
     "brush_thin": ToolGrammar(
         0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10, fill_hand=0.90
     ),

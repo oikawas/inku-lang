@@ -42,13 +42,19 @@ REASON = (
     "three amplitudes come from ToolGrammar.fill_hand and are zero for a "
     "machine, so a computer fill keeps the exact repetition that is its "
     "signature. Above the threshold the marks are scan lines packed to coverage "
-    "0.9; below it they are scattered rubbings, because closing the gaps at "
+    "0.9; below it they are rubbings, because closing the gaps at "
     "pencil width would take eight times the lines and that is not how the tool "
-    "is used. The threshold is coverage -- width over pitch -- and not a list "
+    "is used. A rubbing runs the width of the form and takes the region's one "
+    "direction, wobbling by the few degrees the hand gives -- the same band the "
+    "scan branch draws from -- so what separates the two branches is that the "
+    "marks are not on rows, and the count is the stroke length one classic scan "
+    "pass laid. The threshold is coverage -- width over pitch -- and not a list "
     "of tool names: the two cut the engine-21 corpus identically, which is why "
     "C-fill-circle-crayon-extra_fine is added to send one tool across the "
     "branch on thinness alone. A fill stroke also ends the way paint ends, "
-    "heavy where the tool lands, instead of tapering like a drawn line. Tiny "
+    "heavy where the tool lands, instead of tapering like a drawn line. How far "
+    "the marks stand out of their own field is the branch's, times the tool's "
+    "own ToolGrammar.fill_contrast, which is 1.0 everywhere but chalk. Tiny "
     "shapes still degrade to one dab and rotring still degrades to a region "
     "fill; neither gets an underlay."
 )
@@ -214,6 +220,16 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _case(cases, "C-fill-circle-brush_thick-extra_fine",
           _instruction("circle", weight="brush_thick", filled=True,
                        thinness="extra_fine"))
+    # chalk is the one tool carrying ToolGrammar.fill_contrast ("give chalk more
+    # contrast than crayon", author 2026-08-07), and the corpus held no filled
+    # chalk at all -- so the whole of that ruling would have been recorded
+    # nowhere. The pair is deliberate: the contrast belongs to the TOOL, so it
+    # has to survive the tool crossing the branch, which chalk does on thinness
+    # alone (coverage 0.250 to 0.088).
+    _case(cases, "C-fill-circle-chalk",
+          _instruction("circle", weight="chalk", filled=True))
+    _case(cases, "C-fill-circle-chalk-extra_fine",
+          _instruction("circle", weight="chalk", filled=True, thinness="extra_fine"))
 
     for texture in ("stipple", "hatch", "crosshatch", "aquatint", "grain", "wash", "bleed", "paper_grain"):
         for tool in ("pen", "pencil"):
@@ -429,12 +445,13 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _g("G-scatter-fade-edge", "edge", fade="outward")
     _g("G-scatter-rhythm-edge", "edge", rhythm_spacing="loose")
 
-    # C gained 4 in engine 22: a filled computer and a filled silverpoint, which
-    # the corpus had never carried, and the crayon / brush_thick thinness pair
-    # that tells a coverage rule from a list of tool names.
-    expected = {"A": 88, "B": 72, "C": 62, "D": 28, "E": 119, "F": 128, "G": 32}
+    # C gained 6 in engine 22: a filled computer and a filled silverpoint, which
+    # the corpus had never carried, the crayon / brush_thick thinness pair that
+    # tells a coverage rule from a list of tool names, and the chalk pair that
+    # carries the one tool-level fill contrast across the branch.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 32}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 529:
+    if actual != expected or len(cases) != 531:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

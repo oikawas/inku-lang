@@ -46,14 +46,16 @@ def test_render_reference_case_counts() -> None:
     # cases. Group F is now 13 catalogs x 9 abstract colors, six hint cases, and
     # five non-white backgrounds. Engine 20 added group G: the 32 cases that
     # state an `arrangement`, which is the only way to reach placement at all.
-    # Engine 22 added four to C: the corpus carried no filled `computer` and no
+    # Engine 22 added six to C: the corpus carried no filled `computer` and no
     # filled `silverpoint`, and no filled instruction with a thinness modifier
-    # at all -- so a coverage rule and a list of tool names cut it identically.
-    assert len(cases) == 529
+    # at all -- so a coverage rule and a list of tool names cut it identically
+    # -- and no filled `chalk`, which is the one tool carrying a fill contrast
+    # of its own.
+    assert len(cases) == 531
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 62, "D": 28, "E": 119, "F": 128, "G": 32}
+    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 32}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:

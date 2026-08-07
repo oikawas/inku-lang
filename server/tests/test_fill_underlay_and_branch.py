@@ -8,6 +8,12 @@ Thirteen gates over the four stages of the contract
     T-7 .. T-11  stage 3, the variation and the terminal
     T-12 .. T-13 stage 4, the corpus
 
+and six more for the rulings the author made while the contract was running,
+which arrive without gates of their own:
+
+    T-14 .. T-16 the texture branch's direction, its contrast, the machine's raster
+    T-17 .. T-19 its count, how its marks end, and chalk's own contrast
+
 Three of these measure the geometry the renderer INTENDED, not the path string
 it emitted. That is not a shortcut around the product: the intended centreline
 is captured by wrapping the renderer's own `synthesize_along`, so the whole
@@ -458,45 +464,129 @@ def _scan_normal(lines) -> tuple[float, float]:
 # production-side revert has to redden each one.
 
 
-def test_t14_the_texture_branch_scatters_across_directions():
-    """T-14 テクスチャ枝は複数の向きに散る。**直交に近いところまで許す。**
+TEXTURE_TOOLS = ("silverpoint", "pen", "pencil")  # 手の緩さの昇順 (0.05 / 0.25 / 0.60)
 
-    「pen・pencil・silverpoint は複数の向きを散らすように改修。直交に近いレベル
-    まで許容する」（作者裁定 2026-08-07）。単一の狭い散りは**ハッチ**に見え、
-    ハッチは別の機構である（設計 §2 の機構 3）。
 
-    **道具の硬さで散りを縮めない。**`fill_hand` を掛けると silverpoint (0.05) は
-    0.5° しか散らず、作者が名指しした 3 道具のうち 1 つが指示から外れる。
+def test_t14_the_texture_branch_runs_one_direction_with_a_few_degrees_of_wobble(
+    monkeypatch,
+):
+    """T-14 テクスチャ枝の向きは、走査線枝と同じ数度の帯である。
+
+    「テクスチャについては、線の長さ、向きについては engine21 に戻すが、向きの
+    角度に数度レベルの揺らぎを与える」（作者裁定 2026-08-07）。**前巡の ±45° の
+    散りはこの裁定で取り消された。**engine 21 の向きは領域に 1 つだったので、
+    残るのは走査線枝と同じ手の帯である。
+
+    **上下の両方で挟む。**上限だけなら向きを定数にした実装が通り、下限だけなら
+    ±45° の散りが通る。**さらに手の緩さへ順序で結びつける** — 帯を道具に依らない
+    定数へ落とした実装は、3 道具が同じ標準偏差を返して落ちる。
+
+    T-7 と同じ観測点（合成器へ渡った中心線）で測る。SVG のパス文字列から読むと
+    筆致自身の横揺れが乗り、数度の量には効いてしまう。
     """
-    from inku_server.renderer import FILL_TEXTURE_ANGLE_SPREAD_DEG
-
-    assert FILL_TEXTURE_ANGLE_SPREAD_DEG >= 45.0
-    for tool in ("silverpoint", "pencil", "pen"):
+    sds = []
+    for tool in TEXTURE_TOOLS:
         payload = dict(CIRCLE, weight=tool, filled=True)
         assert _has(_svg(payload), "fill-texture-v1"), tool
-        angles = _texture_mark_angles(payload)
+        angles = _stroke_angles_deg(_centerlines(payload, monkeypatch))
         assert len(angles) >= 20, tool
-        # 2 本が直交しうること。最大の開きで見る — 標準偏差では、狭い散りに
-        # 外れ値が 1 本混ざっただけの実装が通る。
-        assert max(angles) - min(angles) >= 80.0, (tool, max(angles) - min(angles))
+        sd = statistics.pstdev(angles)
+        # 契約 §3 の帯。走査線枝の T-7 と同じ数字で、同じ量だからである。
+        assert 2.0 <= sd <= 4.0, (tool, sd)
+        # ±45° の散りは全開き 90° を返していた。数度の帯はその 1/4 にも届かない。
+        assert max(angles) - min(angles) <= 20.0, (tool, max(angles) - min(angles))
+        sds.append(sd)
+    assert sds[0] < sds[1] < sds[2], dict(zip(TEXTURE_TOOLS, sds))
 
 
-def _texture_mark_angles(payload: dict) -> list[float]:
-    svg = _svg(payload)
-    group = re.search(r'<g class="fill-texture-v1[^"]*">(.*?)</g>', svg, flags=re.S)
-    assert group is not None
-    angles = []
-    for path_d in re.findall(r'd="([^"]+)"', group.group(1)):
-        points = [
-            (float(x), float(y))
-            for x, y in re.findall(r"(-?\d+\.\d+) (-?\d+\.\d+)", path_d)
-        ]
-        if len(points) < 4:
-            continue
-        # The band's two ends; the mark's direction is the long axis between them.
-        head, tail = points[0], points[len(points) // 2]
-        angles.append(math.degrees(math.atan2(tail[1] - head[1], tail[0] - head[0])) % 180.0)
-    return angles
+def test_t17_the_texture_branch_lays_the_ink_one_classic_scan_pass_laid(monkeypatch):
+    """T-17 テクスチャ枝の本数は、従来の走査線 1 パスと同量である。
+
+    「倍にする」（作者裁定 2026-08-07）。痕が形の幅を渡るようになった時点で、
+    半分の本数では面が痩せて見えていた。倍にした先がちょうど「engine 21 の
+    走査線 1 パスが置いた墨」で、この枝が何に錨を下ろしているかもそこである。
+
+    **期待値を `FILL_TEXTURE_DENSITY` から作らない。**定数を読む受入は、その定数を
+    戻す摂動で緑のままになる。面積・間隔・平均弦長という製品の量だけから
+    「1 パスぶん」を建てて、出てきた痕の本数と突き合わせる。
+    """
+    for tool in TEXTURE_TOOLS:
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        contour = _contour(payload)
+        ins = Instruction.model_validate(payload)
+        pitch = _fill_scan_spacing(ins, CANVAS)
+        xs = [point[0] for point in contour]
+        ys = [point[1] for point in contour]
+        short_side = min(max(xs) - min(xs), max(ys) - min(ys))
+        area = renderer._polygon_area(contour)
+        one_pass = area / (pitch * max(pitch, area / short_side))
+        drawn = len(_centerlines(payload, monkeypatch))
+        assert 0.8 * one_pass <= drawn <= 1.2 * one_pass, (tool, drawn, one_pass)
+
+
+def test_t18_a_texture_mark_ends_the_way_a_scan_stroke_does(monkeypatch):
+    """T-18 テクスチャ枝の痕も、輪郭で切られ、道具の幅ぶんだけ両符号で外す。
+
+    「線の長さは engine21 に戻す」（作者裁定 2026-08-07）の長さ側。痕は形が
+    与える弦を渡り、端は走査線枝と同じ作法で処理される — **T-8 の断定を、
+    もう一方の枝に対してそのまま置く**。
+
+    片側だけ出す実装は、輪郭の片側を engine 21 の交点切りと同じ整い方で残す。
+    枝が違うだけで同じ欠陥なので、同じ形で挟む。
+    """
+    for tool in TEXTURE_TOOLS:
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        ins = Instruction.model_validate(payload)
+        width = _stroke_width_px(ins.weight, CANVAS, ins.thinness)
+        reaches = _reach_pixels(_centerlines(payload, monkeypatch), _contour(payload))
+        assert reaches, tool
+        assert any(r > 0 for r in reaches), f"{tool}: nothing overshoots"
+        assert any(r < 0 for r in reaches), f"{tool}: nothing falls short"
+        in_widths = [abs(r) / width for r in reaches]
+        assert FILL_REACH_WIDTHS_MIN - 0.05 <= min(in_widths), (tool, min(in_widths))
+        assert max(in_widths) <= FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN + 0.05, (
+            tool,
+            max(in_widths),
+        )
+
+
+def test_t19_chalk_stands_further_out_of_its_field_than_crayon_does():
+    """T-19 chalk の痕は、crayon より下地から離れて見える。
+
+    「chalk については、crayon よりコントラストを付ける」（作者裁定 2026-08-07）。
+    2 つは被覆率 0.250 と 0.333 で枝の同じ側に居り、幅以外はほとんど同じに読める。
+
+    **道具について回ることを枝をまたいで見る。**renderer 側で道具名を並べた実装は
+    細い chalk がテクスチャ枝へ移った瞬間に効かなくなる — 被覆率だけが枝を決める
+    という engine 22 の唯一の閾値（T-6）を、この裁定が黙って壊さないこと。
+    """
+    ratios = {}
+    for tool, thinness in (
+        ("crayon", None),
+        ("chalk", None),
+        ("chalk", "extra_fine"),
+    ):
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        if thinness:
+            payload["thinness"] = thinness
+        svg = _svg(payload)
+        under = float(
+            re.search(r'fill-underlay-v1"[^>]*fill-opacity="([\d.]+)"', svg).group(1)
+        )
+        group = re.search(
+            r'<g class="fill-(?:texture|stroke)-v1[^"]*">(.*?)</g>', svg, flags=re.S
+        )
+        marks = {float(v) for v in re.findall(r'fill-opacity="([\d.]+)"', group.group(1))}
+        assert len(marks) == 1, (tool, thinness, len(marks))
+        ratios[(tool, thinness)] = marks.pop() / under
+
+    # 走査線枝の同士討ち。crayon は枝の値のまま、chalk はその上。
+    assert ratios[("crayon", None)] == pytest.approx(FILL_SCAN_CONTRAST, abs=0.02)
+    assert ratios[("chalk", None)] > ratios[("crayon", None)] + 0.10, ratios
+
+    # 枝をまたいでも道具について回る。細い chalk はテクスチャ枝に居る。
+    assert _has(_svg(dict(CIRCLE, weight="chalk", filled=True, thinness="extra_fine")), "fill-texture-v1")
+    assert ratios[("chalk", "extra_fine")] > FILL_TEXTURE_CONTRAST + 0.10, ratios
 
 
 def test_t15_a_texture_mark_sits_close_to_the_field_it_rises_from():
@@ -614,11 +704,15 @@ NEW_CASES = {
     "C-fill-circle-silverpoint": "fill-texture-v1",
     "C-fill-circle-crayon-extra_fine": "fill-texture-v1",
     "C-fill-circle-brush_thick-extra_fine": "fill-stroke-v1",
+    # 走行中の裁定（chalk のコントラスト）ぶん。コーパスは塗った chalk を
+    # 1 件も持っていなかったので、裁定の全部がどこにも記録されずに済んでいた。
+    "C-fill-circle-chalk": "fill-stroke-v1",
+    "C-fill-circle-chalk-extra_fine": "fill-texture-v1",
 }
 
 
 def test_t12_the_new_cases_exist_and_traverse_the_layer_they_were_added_for():
-    """T-12 足した 4 case が、足した目的の層を実際に通る。
+    """T-12 足した 6 case が、足した目的の層を実際に通る。
 
     **足されたがレンダラに素通りされる case は、検査ではなく記録である。**
     """
@@ -641,7 +735,11 @@ def test_t13_the_frozen_corpus_moved_exactly_the_cases_the_contract_predicted():
 
     予測は既存 32 件（走査線・被覆 0.2 以上 21 ＋ 0.2 未満 11）。**打点 3 件には
     下地を置かない**と決めたので 35 ではない。`changed_from_previous` はこれに
-    新規 4 件を足した 36 になる — 生成器は新規 case も changed に数えるからである。
+    新規 6 件を足した 38 になる — 生成器は新規 case も changed に数えるからである。
+
+    既存 32 件は契約の予測のまま動いていない。**新規は 4 件から 6 件へ増えた** —
+    走行中の裁定「chalk は crayon よりコントラストを付ける」を記録する塗った
+    chalk が、コーパスに 1 件も無かったためである（枝の両側で 2 件）。
 
     決定性そのものは `check_frozen_corpora.py` が見る（CI が走らせるものと同一）。
     """
@@ -651,9 +749,9 @@ def test_t13_the_frozen_corpus_moved_exactly_the_cases_the_contract_predicted():
     moved = sorted(case_id for case_id in changed if case_id in before)
     added = sorted(case_id for case_id in changed if case_id not in before)
     assert len(moved) == 32, moved
-    assert len(added) == 4, added
-    assert len(changed) == 36
-    assert len(manifest["cases"]) == 529
+    assert len(added) == 6, added
+    assert len(changed) == 38
+    assert len(manifest["cases"]) == 531
     assert manifest["engine_version"] == "22"
 
     # 動いたものが「塗りの走査線を通る case」であること。打点と rotring は不動。

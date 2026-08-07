@@ -4684,6 +4684,14 @@ FILL_UNDERLAY_OPACITY_RATIO = 0.75
 # set (DESIGN-01-FILL 7) and the tool picks its place in the band through
 # `ToolGrammar.fill_hand`, so no description ever names them. `fill_hand` is 0
 # for the machines, and all three collapse to nothing there.
+#
+# The angle band is read by BOTH branches. It was a 45-degree scatter on the
+# texture branch for one round -- a rubbed tone laid in several directions --
+# and the author took that back: "put the length and the direction back to
+# engine 21, but give the direction a wobble of a few degrees" (2026-08-07).
+# Engine 21's direction was one angle for the whole region, so what is left is
+# this band, and the two branches now differ in where the marks are put, not in
+# which way they run.
 FILL_ANGLE_MIN_DEG = 2.2
 FILL_ANGLE_SPAN_DEG = 1.6
 FILL_PITCH_CV_MIN = 0.24
@@ -4714,13 +4722,12 @@ FILL_REACH_WIDTHS_SPAN = 0.5
 # as strokes laid across a shape. The length is now whatever the form gives --
 # the mark is cut where the form ends and let past by the tool's own width --
 # and only the COUNT is chosen, off the mean chord.
-FILL_TEXTURE_DENSITY = 0.5  # 1.0 lays the same ink the classic scan laid
-# Half-width of the scatter, so two marks can cross at a right angle. A rubbed
-# tone is not a hatch: it is laid in several directions, and the author allowed
-# "up to nearly orthogonal" (2026-08-07). Not scaled by `fill_hand` -- only hand
-# tools reach this branch at all, and the stiffest of them (silverpoint, 0.05)
-# would otherwise scatter by half a degree.
-FILL_TEXTURE_ANGLE_SPREAD_DEG = 45.0
+#
+# 1.0 lays the same total stroke length one classic scan pass laid. It ran at
+# half that for two rounds; the author asked to "double it" (2026-08-07) once
+# the marks had gone back to running the width of the form, which is what puts
+# it exactly on the classic pass.
+FILL_TEXTURE_DENSITY = 1.0
 # How much darker a mark is than the field it sits on. The marks are meant to
 # rise out of the fill, not to be drawn on top of it: "bring the line and the
 # background closer; only some of the strokes should read as standing out"
@@ -4796,6 +4803,24 @@ def _fill_takes_scan_branch(ins: Instruction, canvas: CanvasSize) -> bool:
 
 def _fill_hand(ins: Instruction) -> float:
     return GRAMMARS[ins.weight].fill_hand
+
+
+def _fill_contrast(ins: Instruction) -> float:
+    """The tool's own multiplier on whichever branch contrast applies."""
+    return GRAMMARS[ins.weight].fill_contrast
+
+
+def _fill_angle_amplitude(hand: float) -> float:
+    """Half-width of the per-mark angle draw, in radians, from the tool's hand.
+
+    Both branches read this one band. The constants state a standard deviation,
+    which is what the contract measures, so the half-width of the uniform draw
+    that produces it is sqrt(3) times as wide. A machine draws nothing: zero has
+    to be exact, and `hand` is pinned at zero for the two machine grammars.
+    """
+    if not hand:
+        return 0.0
+    return math.radians(FILL_ANGLE_MIN_DEG + FILL_ANGLE_SPAN_DEG * hand) * math.sqrt(3.0)
 
 
 def _fill_is_scannable(
@@ -5039,14 +5064,14 @@ def _render_fill_strokes(
     # closed it here too (2026-08-07). A ratio of the underlay's, never an
     # absolute, so a description asking for a pale fill keeps the relation.
     mark_opacity = min(
-        opacity, opacity * FILL_UNDERLAY_OPACITY_RATIO * FILL_SCAN_CONTRAST
+        opacity,
+        opacity
+        * FILL_UNDERLAY_OPACITY_RATIO
+        * FILL_SCAN_CONTRAST
+        * _fill_contrast(ins),
     )
     minimum = base_width * FILL_MIN_STROKE_WIDTHS
-    angle_amp = (
-        math.radians(FILL_ANGLE_MIN_DEG + FILL_ANGLE_SPAN_DEG * hand) * math.sqrt(3.0)
-        if hand
-        else 0.0
-    )
+    angle_amp = _fill_angle_amplitude(hand)
     reach = (
         base_width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN * hand)
         if hand
@@ -5183,6 +5208,11 @@ def _render_fill_texture(
     the bounding box but outside the form. The marks are the tool's own width --
     not the grain-sized dabs the surface layer draws -- because what is being
     rubbed here is the tool itself.
+
+    The scatter is the whole of the difference from the scan branch. Length,
+    direction and end treatment are the scan branch's own (author, 2026-08-07,
+    taking back the 45-degree spread of the round before): what separates a
+    rubbed tone from a ruled one is that the marks are not on rows.
     """
     if len(contour) < 3:
         return None
@@ -5220,25 +5250,31 @@ def _render_fill_texture(
     # every density a description can ask for, and never darker than the ink the
     # description actually specified.
     mark_opacity = min(
-        opacity, opacity * FILL_UNDERLAY_OPACITY_RATIO * FILL_TEXTURE_CONTRAST
+        opacity,
+        opacity
+        * FILL_UNDERLAY_OPACITY_RATIO
+        * FILL_TEXTURE_CONTRAST
+        * _fill_contrast(ins),
     )
     grid_step = _grid_step_px(ins.weight, canvas)
+    hand = _fill_hand(ins)
     base_angle = _fill_scan_angle(seed)
-    spread = math.radians(FILL_TEXTURE_ANGLE_SPREAD_DEG)
-    reach = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN * _fill_hand(ins))
+    spread = _fill_angle_amplitude(hand)
+    reach = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN * hand)
     group = dwg.g(class_=f"fill-texture-v1 marks-{len(points)}")
     for index, (px, py) in enumerate(points):
-        # A rubbed tone is laid in several directions -- two marks may cross at
-        # a right angle -- around a direction the work still keeps. A single
-        # narrow spread reads as a hatch, which is a different mechanism.
+        # The marks run the region's one direction, wobbling by the few degrees
+        # the hand gives -- the same band the scan branch draws from. What makes
+        # this branch a rubbed tone rather than a ruled one is where the marks
+        # are put, which is a scatter, not which way they run.
         angle = base_angle + (_hash01(index, seed, "fill-texture-angle") - 0.5) * 2 * spread
         half = span_limit
         dx, dy = math.cos(angle), math.sin(angle)
-        # A mark is cut where the form ends, and then let past it by the same
-        # tool-width reach the scan branch uses. Without this a mark laid near
-        # the edge hangs half its length outside -- and at twice the length the
-        # author asked for, that is the overshoot that was already rejected once
-        # (F-1), arriving through the other branch.
+        # A mark is cut where the form ends, and then let past it -- or stopped
+        # short of it -- by the same tool-width reach the scan branch uses, with
+        # the sign drawn per end. An implementation that only overshoots leaves
+        # one edge as tidy as the cut it replaced, and one that overshoots at
+        # both ends is the spill that was already rejected once (F-1).
         spans = [
             span for span in _line_spans(contour, (px, py), (dx, dy))
             if span[0] <= 0.0 <= span[1]
@@ -5246,8 +5282,10 @@ def _render_fill_texture(
         if not spans:
             continue
         inside_start, inside_end = spans[0]
-        start = max(-half, inside_start - reach)
-        end = min(half, inside_end + reach)
+        r0 = reach if _hash01(index, seed, "fill-texture-reach-start") >= 0.5 else -reach
+        r1 = reach if _hash01(index, seed, "fill-texture-reach-end") >= 0.5 else -reach
+        start = max(-half, inside_start - r0)
+        end = min(half, inside_end + r1)
         if end - start <= width:
             continue
         length = end - start

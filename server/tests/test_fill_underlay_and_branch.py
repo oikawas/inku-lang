@@ -40,7 +40,6 @@ from inku_server.renderer import (
     FILL_REACH_WIDTHS_SPAN,
     FILL_SCAN_CONTRAST,
     FILL_TEXTURE_CONTRAST,
-    FILL_UNDERLAY_OPACITY_RATIO,
     _fill_coverage,
     _fill_scan_spacing,
     _line_spans,

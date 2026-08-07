@@ -855,6 +855,27 @@ def test_t24_a_pale_patch_comes_down_to_the_field_in_steps(monkeypatch):
                 checked += 1
         assert checked >= 2, (tool, checked)
 
+    # 入れ子は seed 1 つでは確かめられない。**輪が外へ出ないのは、粗さを半径に
+    # 掛けているから** — 加算へ戻すと、くびれた斑で内側の輪が外へ抜ける。この
+    # 絵の seed では抜けないので、SEED の 1 枚だけを見るゲートは加算へ戻した
+    # 実装を緑で通す（実測: 加算では seed 7 で最初の交差が出る）。
+    contour = _contour(TEXTURE_CASE)
+    short_side = 2 * TEXTURE_CASE["radius"] * CANVAS.unit
+    rings = renderer.FILL_FIELD_TONE_RINGS
+    crossings = 0
+    for seed in range(40):
+        layers = renderer._field_tone_patches(contour, seed, short_side)
+        for base in range(0, len(layers), rings):
+            for p in range(len(layers[base])):
+                family = [layers[base + r][p] for r in range(rings)]
+                for outer, inner in zip(family, family[1:]):
+                    centre = _centroid(outer)
+                    for a, b in zip(inner, outer):
+                        ri = math.hypot(a[0] - centre[0], a[1] - centre[1])
+                        ro = math.hypot(b[0] - centre[0], b[1] - centre[1])
+                        crossings += ri > ro + 1e-6
+    assert crossings == 0, crossings
+
     # 4. フィルタの無い profile でも層が残る。
     for profile in ("compat", "editable"):
         plain = _svg(dict(CIRCLE, weight="pencil", filled=True), svg_profile=profile)

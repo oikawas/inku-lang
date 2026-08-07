@@ -50,6 +50,8 @@ private val BatchHistoryInputPrefix = Regex("^#\\d+\\s+")
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
+/** Said by every generating entry point that refuses while candidates are drawn. */
+const val REFINEMENT_IN_PROGRESS = "推敲の候補を生成中です。"
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
 
@@ -797,6 +799,13 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun draw() {
         val current = state.value
+        // 「候補生成中は他の生成・描画操作を禁止し」. Before the model check, because
+        // what stops this drawing has to be the refinement rather than whichever
+        // reason happens to be found first.
+        if (current.refinementBusy) {
+            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS)
+            return
+        }
         validateSelectedModels(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
@@ -912,9 +921,8 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(message = "Prompt is empty.")
             return
         }
-        // 「候補生成中は他の生成・描画操作を禁止し」.
         if (current.refinementBusy) {
-            localState.value = current.copy(message = "推敲の候補を生成中です。")
+            localState.value = current.copy(message = REFINEMENT_IN_PROGRESS)
             return
         }
         // Read before the coroutine starts: the first thing it does is clear
@@ -987,12 +995,12 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun drawFromDdl() {
         val current = state.value
-        validateSelectedModels(current)?.let { message ->
-            localState.value = localState.value.copy(message = message)
+        if (current.refinementBusy) {
+            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS)
             return
         }
-        if (current.refinementBusy) {
-            localState.value = localState.value.copy(message = "推敲の候補を生成中です。")
+        validateSelectedModels(current)?.let { message ->
+            localState.value = localState.value.copy(message = message)
             return
         }
         val ddl = current.ddl.ifBlank { current.prompt }

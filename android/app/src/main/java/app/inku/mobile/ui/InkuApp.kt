@@ -2136,19 +2136,16 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                     onClick = { viewModel.setRefinementCount(count) },
                 )
             }
-            Box(modifier = Modifier.testTag(REFINE_GENERATE_TAG)) {
-                ChipButton(
-                    text = if (state.refinementBusy) "生成中…" else "候補を作る",
-                    onClick = { if (!state.refinementBusy) viewModel.generateRefinementCandidates() },
-                )
-            }
+            ChipButton(
+                text = if (state.refinementBusy) "生成中…" else "候補を作る",
+                modifier = Modifier.testTag(REFINE_GENERATE_TAG),
+                onClick = { if (!state.refinementBusy) viewModel.generateRefinementCandidates() },
+            )
         }
 
         // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
         if (state.refinementCanAbort) {
-            Box(modifier = Modifier.testTag(REFINE_STOP_TAG)) {
-                ChipButton("停止", onClick = viewModel::abortRefinementCandidates)
-            }
+            ChipButton("停止", modifier = Modifier.testTag(REFINE_STOP_TAG), onClick = viewModel::abortRefinementCandidates)
         }
 
         state.refinementStatus?.let {
@@ -2217,9 +2214,8 @@ private fun RefinementCandidateCard(
                 // The three states are three different labels, and only the
                 // first one is a button that does anything.
                 when (candidate.saveState) {
-                    RefinementSaveState.Unsaved -> Box(modifier = Modifier.testTag(REFINE_SAVE_TAG)) {
-                        ChipButton("保存", onClick = onSave)
-                    }
+                    RefinementSaveState.Unsaved ->
+                        ChipButton("保存", modifier = Modifier.testTag(REFINE_SAVE_TAG), onClick = onSave)
                     RefinementSaveState.Saving -> Text("保存中…", style = MaterialTheme.typography.labelSmall)
                     RefinementSaveState.Saved -> Text("保存済み", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -2359,9 +2355,7 @@ private fun LineageNodeCard(
                 // brings exactly the first of them. A tombstone has no work to
                 // refine, which is why this hangs off `history`.
                 if (history != null) {
-                    Box(modifier = Modifier.testTag(REFINE_ENTRY_TAG)) {
-                        ChipButton("描画要素", onClick = { onRefine(history.item) })
-                    }
+                    ChipButton("描画要素", modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item) })
                 }
             }
         }
@@ -4651,16 +4645,21 @@ private fun PresentationControlButton(
 }
 
 @Composable
-private fun ChipButton(text: String, selected: Boolean = false, onClick: () -> Unit) {
+private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    // The modifier goes on the button itself. A `testTag` on a Box around one of
+    // these is not in the merged semantics tree at all -- the button merges its
+    // descendants and the bare wrapper is dropped, so the tag can never be found.
     if (selected) {
         Button(
             onClick = onClick,
+            modifier = modifier,
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = Color(0xFF19150F)),
         ) { Text(text, maxLines = 1) }
     } else {
         OutlinedButton(
             onClick = onClick,
+            modifier = modifier,
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) { Text(text, maxLines = 1) }

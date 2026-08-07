@@ -148,7 +148,10 @@ import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
+import app.inku.mobile.data.lineage.LineageGraphNode
+import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.model.CanvasAspects
+import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.WebDdlSpec
@@ -219,13 +222,13 @@ private object HistoryThumbnailCache {
         }
     }
 
-    suspend fun get(context: Context, item: HistoryListItem): ImageBitmap? {
-        val key = "${item.renderHash}:$THUMBNAIL_PX"
+    suspend fun get(context: Context, renderHash: String, thumbnailPath: String?): ImageBitmap? {
+        val key = "$renderHash:$THUMBNAIL_PX"
         synchronized(cache) {
             cache.get(key)?.let { return it }
         }
         return withContext(Dispatchers.Default) {
-            val rendered = item.thumbnailPath
+            val rendered = thumbnailPath
                 ?.takeIf { isAppThumbnailPath(context, it) }
                 ?.let { path -> runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull() }
             if (rendered != null) {
@@ -342,6 +345,7 @@ fun InkuApp() {
                             val history by viewModel.historyItems.collectAsState()
                             HistoryScreen(state, history, viewModel)
                         }
+                        AppTab.Lineage -> LineageScreen(state, viewModel)
                         AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
                         AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
                     }
@@ -1011,12 +1015,14 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
                 val label = when (tab) {
                     AppTab.Compose -> "記述"
                     AppTab.History -> "履歴"
+                    AppTab.Lineage -> "系譜"
                     AppTab.Demo -> "デモ"
                     AppTab.Settings -> "設定"
                 }
                 val mark = when (tab) {
                     AppTab.Compose -> "✎"
                     AppTab.History -> "◫"
+                    AppTab.Lineage -> "⌥"
                     AppTab.Demo -> "◉"
                     AppTab.Settings -> "⚙"
                 }
@@ -2000,6 +2006,151 @@ private fun HistoryHeader(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             ChipButton("★ 星のみ", selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
             Text("${filteredCount}/${sourceCount}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** So that an instrumented test can count the cards rather than the labels. */
+internal const val LINEAGE_NODE_TAG = "lineage_node"
+
+/**
+ * 作品の系譜 -- the port of web's `LineagePanel.svelte`, cut to what contract
+ * 2/5 asks for: the ancestors and two generations of descendants of the work on
+ * screen, each with its thumbnail, its generation and its state, each edge with
+ * its Japanese label, and the button that starts a new root.
+ *
+ * The tools web puts on its cards -- trash, star, note, the colophon, the
+ * promotion of a `lineage_only` node, the entry to refinement -- are not here.
+ * Some belong to other contracts and some the history screen already has.
+ */
+@Composable
+internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
+    val graph = state.lineageGraph
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("作品の系譜", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            // web puts the same button in the same place, at the right of the
+            // panel header (LineagePanel.svelte:788). The wording is web's.
+            ChipButton("新しい起点にする", onClick = viewModel::detachLineage)
+        }
+        when {
+            state.lineageLoading && graph == null ->
+                Text("系譜を読み込み中…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            graph == null || graph.nodes.isEmpty() ->
+                Text("保存すると、ここに系譜が表示されます。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> LineageColumns(graph, viewModel)
+        }
+    }
+}
+
+@Composable
+private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) {
+    // Grouped by the distance from the topmost node of *this* graph, the way
+    // web's `depthByNode` does. The heading names the generation instead, which
+    // is counted from the root of the whole lineage and so keeps its number
+    // when a graph starts halfway down the tree.
+    val parentOf = remember(graph) { graph.edges.associate { it.childNodeId to it.parentNodeId } }
+    val depthOf = remember(graph) {
+        val shown = graph.nodes.map { it.id }.toSet()
+        graph.nodes.associate { node ->
+            var depth = 0
+            var cursor = node.id
+            val seen = mutableSetOf(cursor)
+            while (true) {
+                val parent = parentOf[cursor] ?: break
+                if (parent !in shown || !seen.add(parent)) break
+                depth += 1
+                cursor = parent
+            }
+            node.id to depth
+        }
+    }
+    val kindOf = remember(graph) { graph.edges.associate { it.childNodeId to it.derivationKind } }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        // One row per generation, oldest first. web labels each of its columns
+        // 第N世代 (LineagePanel.svelte); here the number is on the cards instead,
+        // where a tombstone -- which the server gives no generation -- can say
+        // so for itself rather than sit under a heading that answers for it.
+        graph.nodes.groupBy { depthOf[it.id] ?: 0 }.toSortedMap().forEach { (_, nodes) ->
+            WrapRow(horizontal = 10.dp, vertical = 10.dp) {
+                nodes.forEach { node ->
+                    LineageNodeCard(
+                        node = node,
+                        focused = node.id == graph.focusNodeId,
+                        derivationKind = kindOf[node.id],
+                        onSelect = { viewModel.selectLineageNode(node) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LineageNodeCard(
+    node: LineageGraphNode,
+    focused: Boolean,
+    derivationKind: String?,
+    onSelect: () -> Unit,
+) {
+    val work = node as? LineageGraphNode.Work
+    val history = work?.history
+    Card(
+        modifier = Modifier
+            .width(104.dp)
+            .testTag(LINEAGE_NODE_TAG)
+            .clickable(enabled = history != null, onClick = onSelect)
+            .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
+        shape = RoundedCornerShape(0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (history != null) {
+                ArtworkThumbnail(
+                    id = history.item.id,
+                    renderHash = history.item.renderHash,
+                    thumbnailPath = history.item.thumbnailPath,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(Color(0xFF2A2622)))
+            }
+            Column(modifier = Modifier.padding(horizontal = 6.dp).padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // The label of the edge that produced this work. `labelJa` with
+                // no kind is 起点, which is the answer for a node no edge points
+                // at; the wording is the registry's, never this screen's.
+                Text(
+                    DerivationKindRegistry.labelJa(derivationKind),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    history?.lineageGeneration?.let { "第${it}世代" } ?: "—",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // The server's own value, not a rendering of it.
+                Text(
+                    node.state,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -4672,9 +4823,20 @@ private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HistoryArtworkPreview(item: HistoryListItem, modifier: Modifier = Modifier) {
+    ArtworkThumbnail(item.id, item.renderHash, item.thumbnailPath, modifier)
+}
+
+/** The saved thumbnail of one work, by the three values the cache needs. */
+@Composable
+private fun ArtworkThumbnail(
+    id: String,
+    renderHash: String,
+    thumbnailPath: String?,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
-    val thumbnail by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, item.thumbnailPath) {
-        value = HistoryThumbnailCache.get(context, item)
+    val thumbnail by produceState<ImageBitmap?>(initialValue = null, id, renderHash, thumbnailPath) {
+        value = HistoryThumbnailCache.get(context, renderHash, thumbnailPath)
     }
     Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         val image = thumbnail

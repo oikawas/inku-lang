@@ -1,0 +1,2922 @@
+{
+  "measured_at": "2026-08-07",
+  "source": "server/src/inku_server/db.py get_lineage (real function, throwaway SQLite)",
+  "cases": [
+    {
+      "case_id": "C1-root-alone",
+      "note": "起点 1 つだけ。子も辺も無い",
+      "given": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": []
+      },
+      "expected": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          }
+        ],
+        "edges": []
+      }
+    },
+    {
+      "case_id": "C2-focus-on-the-grandchild",
+      "note": "焦点は孫。祖先を 2 段さかのぼり、子孫は 1 段下る",
+      "given": {
+        "focus_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          }
+        ]
+      },
+      "expected": {
+        "focus_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "state": "active",
+            "at": 2000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-child",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 2000,
+              "input": "円を 2 つ描く",
+              "ddl": "h-child を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-child'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 2 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+              "history_visibility": "normal",
+              "lineage_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "state": "active",
+            "at": 4000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-great",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 4000,
+              "input": "円を 4 つ描く",
+              "ddl": "h-great を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-great'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 4 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+              "history_visibility": "normal",
+              "lineage_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+              "lineage_generation": 4
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata": {},
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata": {},
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata": {},
+            "at": 4000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "C3-focus-on-the-root-depth-2",
+      "note": "焦点は起点。既定の descendant_depth=2 で曾孫は出ない",
+      "given": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          }
+        ]
+      },
+      "expected": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "state": "active",
+            "at": 2000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-child",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 2000,
+              "input": "円を 2 つ描く",
+              "ddl": "h-child を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-child'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 2 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+              "history_visibility": "normal",
+              "lineage_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata": {},
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata": {},
+            "at": 3000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "C4-focus-on-the-root-depth-3",
+      "note": "同じ木を depth=3 で見ると曾孫まで出る",
+      "given": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          }
+        ],
+        "descendant_depth": 3
+      },
+      "expected": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "state": "active",
+            "at": 2000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-child",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 2000,
+              "input": "円を 2 つ描く",
+              "ddl": "h-child を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-child'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 2 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+              "history_visibility": "normal",
+              "lineage_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "state": "active",
+            "at": 4000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-great",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 4000,
+              "input": "円を 4 つ描く",
+              "ddl": "h-great を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-great'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 4 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+              "history_visibility": "normal",
+              "lineage_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+              "lineage_generation": 4
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata": {},
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata": {},
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata": {},
+            "at": 4000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "C5-node-limit-2",
+      "note": "node_limit=2 で打ち切る。焦点は曾孫",
+      "given": {
+        "focus_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          }
+        ],
+        "node_limit": 2
+      },
+      "expected": {
+        "focus_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+        "nodes": [
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "state": "active",
+            "at": 4000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-great",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 4000,
+              "input": "円を 4 つ描く",
+              "ddl": "h-great を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-great'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 4 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+              "history_visibility": "normal",
+              "lineage_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+              "lineage_generation": 4
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata": {},
+            "at": 4000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "C6-clamp-negative-depth",
+      "note": "descendant_depth=-1 は 0 に丸まる",
+      "given": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          }
+        ],
+        "descendant_depth": -1
+      },
+      "expected": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          }
+        ],
+        "edges": []
+      }
+    },
+    {
+      "case_id": "C7-clamp-huge",
+      "note": "descendant_depth=999 は 200・node_limit=999 は 200 に丸まる",
+      "given": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          }
+        ],
+        "descendant_depth": 999,
+        "node_limit": 999
+      },
+      "expected": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "state": "active",
+            "at": 2000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-child",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 2000,
+              "input": "円を 2 つ描く",
+              "ddl": "h-child を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-child'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 2 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+              "history_visibility": "normal",
+              "lineage_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "state": "active",
+            "at": 4000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-great",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 4000,
+              "input": "円を 4 つ描く",
+              "ddl": "h-great を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-great'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 4 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+              "history_visibility": "normal",
+              "lineage_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+              "lineage_generation": 4
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata": {},
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata": {},
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata": {},
+            "at": 4000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "C8-clamp-zero-node-limit",
+      "note": "node_limit=0 は 1 に丸まる",
+      "given": {
+        "focus_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          }
+        ],
+        "node_limit": 0
+      },
+      "expected": {
+        "focus_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+        "nodes": [
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          }
+        ],
+        "edges": []
+      }
+    },
+    {
+      "case_id": "C9-four-siblings-share-one-at",
+      "note": "同じ at の兄弟 4 つ。並びを決めるのは id であり、挿入順とは違う",
+      "given": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": "h-child",
+            "state": "active",
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 2000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "history_id": "h-tie-0",
+            "state": "active",
+            "description_hash": "dh1:43d1e92b99aea36b916dbddd7cacb6c628f413d2776b4bfe02078b57a03268dc",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "history_id": "h-tie-1",
+            "state": "active",
+            "description_hash": "dh1:50232a45c502587700806f76d3e8a6eb1b1f70ffaabb71a8890ed298884a35e6",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "history_id": "h-tie-2",
+            "state": "active",
+            "description_hash": "dh1:7861e9cc44a0a5755404adae6c13ba41b202b42ff839dfccdc6bf9ee69ea454d",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "history_id": "h-tie-3",
+            "state": "active",
+            "description_hash": "dh1:735478a923b0b133d1f62f6a1b73ca302186fcdc7d3f8d75284bd30ed27ce4b1",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          },
+          {
+            "id": "b61e0e31-b350-4878-a6e7-bbfbac9468f0",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "dd09f352-f32e-42e0-925a-850ffbcfc126",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "db1f9812-2b0a-4e71-a9e9-30657ff004f8",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "4133f03c-556e-4d69-9f65-6b2fa99cc8fc",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          }
+        ]
+      },
+      "expected": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 5,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "state": "active",
+            "at": 2000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-child",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 2000,
+              "input": "円を 2 つ描く",
+              "ddl": "h-child を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-child'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 2 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:9ec66563ba5775c83651b462d47208e6b73f916268b9f28c42e362b6276a62f0",
+              "history_visibility": "normal",
+              "lineage_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          },
+          {
+            "id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:50232a45c502587700806f76d3e8a6eb1b1f70ffaabb71a8890ed298884a35e6",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-1",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 5 つ描く",
+              "ddl": "h-tie-1 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-1'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 5 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:50232a45c502587700806f76d3e8a6eb1b1f70ffaabb71a8890ed298884a35e6",
+              "history_visibility": "normal",
+              "lineage_node_id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:7861e9cc44a0a5755404adae6c13ba41b202b42ff839dfccdc6bf9ee69ea454d",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-2",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 6 つ描く",
+              "ddl": "h-tie-2 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-2'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 6 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:7861e9cc44a0a5755404adae6c13ba41b202b42ff839dfccdc6bf9ee69ea454d",
+              "history_visibility": "normal",
+              "lineage_node_id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:43d1e92b99aea36b916dbddd7cacb6c628f413d2776b4bfe02078b57a03268dc",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-0",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 4 つ描く",
+              "ddl": "h-tie-0 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-0'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 4 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:43d1e92b99aea36b916dbddd7cacb6c628f413d2776b4bfe02078b57a03268dc",
+              "history_visibility": "normal",
+              "lineage_node_id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:735478a923b0b133d1f62f6a1b73ca302186fcdc7d3f8d75284bd30ed27ce4b1",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-3",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 7 つ描く",
+              "ddl": "h-tie-3 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-3'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 7 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:735478a923b0b133d1f62f6a1b73ca302186fcdc7d3f8d75284bd30ed27ce4b1",
+              "history_visibility": "normal",
+              "lineage_node_id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+              "lineage_generation": 2
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata": {},
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata": {},
+            "at": 3000
+          },
+          {
+            "id": "4133f03c-556e-4d69-9f65-6b2fa99cc8fc",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          },
+          {
+            "id": "b61e0e31-b350-4878-a6e7-bbfbac9468f0",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          },
+          {
+            "id": "db1f9812-2b0a-4e71-a9e9-30657ff004f8",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          },
+          {
+            "id": "dd09f352-f32e-42e0-925a-850ffbcfc126",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "C10-a-tombstone-in-the-middle",
+      "note": "中間の node が tombstone。ハッシュと履歴が落ちる",
+      "given": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": null,
+            "state": "tombstone",
+            "description_hash": null,
+            "render_hash": null,
+            "at": 2000,
+            "deleted_at": 1786094495811,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "history_id": "h-tie-0",
+            "state": "active",
+            "description_hash": "dh1:43d1e92b99aea36b916dbddd7cacb6c628f413d2776b4bfe02078b57a03268dc",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "history_id": "h-tie-1",
+            "state": "active",
+            "description_hash": "dh1:50232a45c502587700806f76d3e8a6eb1b1f70ffaabb71a8890ed298884a35e6",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "history_id": "h-tie-2",
+            "state": "active",
+            "description_hash": "dh1:7861e9cc44a0a5755404adae6c13ba41b202b42ff839dfccdc6bf9ee69ea454d",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "history_id": "h-tie-3",
+            "state": "active",
+            "description_hash": "dh1:735478a923b0b133d1f62f6a1b73ca302186fcdc7d3f8d75284bd30ed27ce4b1",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          },
+          {
+            "id": "b61e0e31-b350-4878-a6e7-bbfbac9468f0",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "dd09f352-f32e-42e0-925a-850ffbcfc126",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "db1f9812-2b0a-4e71-a9e9-30657ff004f8",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "4133f03c-556e-4d69-9f65-6b2fa99cc8fc",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          }
+        ]
+      },
+      "expected": {
+        "focus_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 5,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "state": "tombstone",
+            "at": 2000,
+            "deleted_at": 1786094495811,
+            "child_count": 1
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          },
+          {
+            "id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:50232a45c502587700806f76d3e8a6eb1b1f70ffaabb71a8890ed298884a35e6",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-1",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 5 つ描く",
+              "ddl": "h-tie-1 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-1'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 5 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:50232a45c502587700806f76d3e8a6eb1b1f70ffaabb71a8890ed298884a35e6",
+              "history_visibility": "normal",
+              "lineage_node_id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:7861e9cc44a0a5755404adae6c13ba41b202b42ff839dfccdc6bf9ee69ea454d",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-2",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 6 つ描く",
+              "ddl": "h-tie-2 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-2'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 6 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:7861e9cc44a0a5755404adae6c13ba41b202b42ff839dfccdc6bf9ee69ea454d",
+              "history_visibility": "normal",
+              "lineage_node_id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:43d1e92b99aea36b916dbddd7cacb6c628f413d2776b4bfe02078b57a03268dc",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-0",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 4 つ描く",
+              "ddl": "h-tie-0 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-0'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 4 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:43d1e92b99aea36b916dbddd7cacb6c628f413d2776b4bfe02078b57a03268dc",
+              "history_visibility": "normal",
+              "lineage_node_id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+              "lineage_generation": 2
+            }
+          },
+          {
+            "id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "state": "active",
+            "at": 5000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:735478a923b0b133d1f62f6a1b73ca302186fcdc7d3f8d75284bd30ed27ce4b1",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-tie-3",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 5000,
+              "input": "三角を 7 つ描く",
+              "ddl": "h-tie-3 を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-tie-3'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "三角を 7 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:735478a923b0b133d1f62f6a1b73ca302186fcdc7d3f8d75284bd30ed27ce4b1",
+              "history_visibility": "normal",
+              "lineage_node_id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+              "lineage_generation": 2
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata": {},
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata": {},
+            "at": 3000
+          },
+          {
+            "id": "4133f03c-556e-4d69-9f65-6b2fa99cc8fc",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          },
+          {
+            "id": "b61e0e31-b350-4878-a6e7-bbfbac9468f0",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          },
+          {
+            "id": "db1f9812-2b0a-4e71-a9e9-30657ff004f8",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          },
+          {
+            "id": "dd09f352-f32e-42e0-925a-850ffbcfc126",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "derivation_kind": "variation",
+            "metadata": {},
+            "at": 5000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "C11-focus-is-below-a-tombstone",
+      "note": "焦点は tombstone の子孫",
+      "given": {
+        "focus_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "history_id": "h-root",
+            "state": "active",
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 1000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "history_id": null,
+            "state": "tombstone",
+            "description_hash": null,
+            "render_hash": null,
+            "at": 2000,
+            "deleted_at": 1786094495811,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "history_id": "h-grand",
+            "state": "active",
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 3000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "history_id": "h-great",
+            "state": "active",
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 4000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "history_id": "h-tie-0",
+            "state": "active",
+            "description_hash": "dh1:43d1e92b99aea36b916dbddd7cacb6c628f413d2776b4bfe02078b57a03268dc",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "history_id": "h-tie-1",
+            "state": "active",
+            "description_hash": "dh1:50232a45c502587700806f76d3e8a6eb1b1f70ffaabb71a8890ed298884a35e6",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "history_id": "h-tie-2",
+            "state": "active",
+            "description_hash": "dh1:7861e9cc44a0a5755404adae6c13ba41b202b42ff839dfccdc6bf9ee69ea454d",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          },
+          {
+            "id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "history_id": "h-tie-3",
+            "state": "active",
+            "description_hash": "dh1:735478a923b0b133d1f62f6a1b73ca302186fcdc7d3f8d75284bd30ed27ce4b1",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "at": 5000,
+            "deleted_at": null,
+            "root_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata_json": "{}",
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata_json": "{}",
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata_json": "{}",
+            "at": 4000
+          },
+          {
+            "id": "b61e0e31-b350-4878-a6e7-bbfbac9468f0",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "cdd85560-4e86-48d7-875c-b2b83b6ab0e0",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "dd09f352-f32e-42e0-925a-850ffbcfc126",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "7fedc4e7-e909-4b3c-9dee-e50b8b31c44d",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "db1f9812-2b0a-4e71-a9e9-30657ff004f8",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "8f68aaa5-214b-4e76-9573-f2aabe68b22a",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          },
+          {
+            "id": "4133f03c-556e-4d69-9f65-6b2fa99cc8fc",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "f98f7939-6c0d-49c8-bbb5-7db4e12c7090",
+            "derivation_kind": "variation",
+            "metadata_json": "{}",
+            "at": 5000
+          }
+        ]
+      },
+      "expected": {
+        "focus_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+        "nodes": [
+          {
+            "id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "state": "active",
+            "at": 1000,
+            "deleted_at": null,
+            "child_count": 5,
+            "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-root",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 1000,
+              "input": "円を描く",
+              "ddl": "h-root を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-root'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:ee8707b541bc3a6315060b6716c97b8fc0b060f324fc114c47407effe8d3f55c",
+              "history_visibility": "normal",
+              "lineage_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+              "lineage_generation": 1
+            }
+          },
+          {
+            "id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "state": "tombstone",
+            "at": 2000,
+            "deleted_at": 1786094495811,
+            "child_count": 1
+          },
+          {
+            "id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "state": "active",
+            "at": 3000,
+            "deleted_at": null,
+            "child_count": 1,
+            "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-grand",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 3000,
+              "input": "円を 3 つ描く",
+              "ddl": "h-grand を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-grand'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 3 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:0eafd850922be8b18684c0f7f10e48583de35c8135c6f1fd6a85e157bdbb496e",
+              "history_visibility": "normal",
+              "lineage_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+              "lineage_generation": 3
+            }
+          },
+          {
+            "id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "state": "active",
+            "at": 4000,
+            "deleted_at": null,
+            "child_count": 0,
+            "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+            "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+            "history": {
+              "id": "h-great",
+              "user_id": "91f3ab98-c528-45c9-a790-fa7915319829",
+              "at": 4000,
+              "input": "円を 4 つ描く",
+              "ddl": "h-great を描く。",
+              "expanded_ddl": null,
+              "score": {
+                "version": "0.1.0",
+                "canvas": "square",
+                "background": "white",
+                "instructions": []
+              },
+              "svg": "<svg id='h-great'/>",
+              "output_path": null,
+              "elapsed_ms": 1,
+              "stage1_model": null,
+              "stage2_model": null,
+              "tokens_in": null,
+              "tokens_out": null,
+              "catalog_id": null,
+              "render_hash": "rh3:37edee0fb66ae402bf6ebd8bfb33b0d921805320271a6fedf7cdddbe9a08150a",
+              "render_hash_short": "150A",
+              "trashed": false,
+              "starred": false,
+              "for_revision": false,
+              "note": null,
+              "source_text": "円を 4 つ描く",
+              "display_label": null,
+              "batch_line_number": null,
+              "batch_run_id": null,
+              "description_hash": "dh1:b105df136657bdbe258e378b064df3afb1c82264036227958f4784490584f2fa",
+              "history_visibility": "normal",
+              "lineage_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+              "lineage_generation": 4
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a4e413ac-c1e2-476f-8c0e-a2f36f34113d",
+            "parent_node_id": "57876dfd-7e46-46a8-b08a-22f6cf6e758e",
+            "child_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "derivation_kind": "description_edit",
+            "metadata": {},
+            "at": 2000
+          },
+          {
+            "id": "949dcb2d-108c-4e53-ad56-0558c9bfa443",
+            "parent_node_id": "9975820b-8167-4d3d-ae50-2572e599dee1",
+            "child_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "derivation_kind": "ddl_edit",
+            "metadata": {},
+            "at": 3000
+          },
+          {
+            "id": "7606fca1-9c9a-4638-9a75-4d7cf3229747",
+            "parent_node_id": "90026151-f7c3-4ead-8e03-a45e257fa4ff",
+            "child_node_id": "86c5a8f7-ef31-44b7-b6c5-f4ebc68ed6c5",
+            "derivation_kind": "replay",
+            "metadata": {},
+            "at": 4000
+          }
+        ]
+      }
+    }
+  ]
+}

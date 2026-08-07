@@ -19,6 +19,12 @@ import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.SubmitDerivationKind
+import app.inku.mobile.data.refinement.RefinementElement
+import app.inku.mobile.data.refinement.RefinementParent
+import app.inku.mobile.data.refinement.RefinementPlan
+import app.inku.mobile.data.refinement.RefinementPlanner
+import app.inku.mobile.data.refinement.VariationAmplitude
+import app.inku.mobile.pipeline.PaintResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
@@ -42,6 +48,10 @@ const val DemoHistoryInputPrefix = "[demo] "
 /** The same, for a batch line: `#<line number> <prose>`. */
 private val BatchHistoryInputPrefix = Regex("^#\\d+\\s+")
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
+/** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
+const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
+/** Said by every generating entry point that refuses while candidates are drawn. */
+const val REFINEMENT_IN_PROGRESS = "推敲の候補を生成中です。"
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
 
@@ -118,12 +128,63 @@ data class InkuUiState(
     val canvasPanY: Float = 0f,
     val canvasPresentationMode: Boolean = false,
     val renderWild: Boolean = false,
+    // 推敲 (SPEC :614). The element is one value, never a set: the radio is
+    // exclusive because a lineage edge has one cause.
+    val refinementOpen: Boolean = false,
+    val refinementParent: HistoryItemEntity? = null,
+    val refinementElement: RefinementElement = RefinementElement.Touch,
+    val refinementAmplitude: VariationAmplitude = VariationAmplitude.Default,
+    val refinementTouchWords: String = "",
+    val refinementCount: Int = 1,
+    val refinementBusy: Boolean = false,
+    // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
+    val refinementCanAbort: Boolean = false,
+    val refinementStatus: String? = null,
+    val refinementCandidates: List<RefinementCandidate> = emptyList(),
+    // The candidate on the canvas that has not been saved. Drawing on from here
+    // has to put it in the lineage first (SPEC :2105).
+    val refinementPreviewId: String? = null,
 )
 
 data class BatchFailure(
     val line: Int,
     val input: String,
     val message: String,
+)
+
+/**
+ * 「保存操作は未保存・保存中・保存済みの3状態を区別し、保存済み候補は再保存できない」
+ * (SPEC `:678`). Three states rather than a boolean, because the middle one is
+ * what stops a second tap while the first save is still in the database.
+ */
+enum class RefinementSaveState {
+    Unsaved,
+    Saving,
+    Saved,
+}
+
+/**
+ * One drawn alternative, held until the author picks it or leaves.
+ *
+ * 「調整候補は生成元の作品に属する一時状態」: nothing here is in the database. The
+ * plan it was drawn from is kept whole, because the save reads its derivation
+ * kind and metadata from the same object the drawing came from -- there is no
+ * second place where the edge is decided.
+ */
+data class RefinementCandidate(
+    val id: String,
+    val label: String,
+    val plan: RefinementPlan,
+    val displaySvg: String,
+    val scoreJson: String,
+    val normalizedDdl: String,
+    val renderHash: String,
+    val renderHashShort: String,
+    val renderMetadataJson: String,
+    val elapsedMs: Long,
+    val saveState: RefinementSaveState = RefinementSaveState.Unsaved,
+    val savedHistoryId: String? = null,
+    val savedNodeId: String? = null,
 )
 
 enum class AppTab {
@@ -195,6 +256,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var modelDownloadJob: Job? = null
     private var drawingJob: Job? = null
     private var lineageJob: Job? = null
+    private var refinementJob: Job? = null
     private var litertWarmupJob: Job? = null
     private var drawingRunSerial: Long = 0L
     private var restoredInitialHistory = false
@@ -278,6 +340,7 @@ class InkuViewModel @JvmOverloads constructor(
         drawingRunSerial += 1
         drawingJob?.cancel()
         lineageJob?.cancel()
+        refinementJob?.cancel()
         modelDownloadJob?.cancel()
         litertWarmupJob?.cancel()
         (getApplication() as InkuApplication).applicationScope.launch {
@@ -736,6 +799,13 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun draw() {
         val current = state.value
+        // 「候補生成中は他の生成・描画操作を禁止し」. Before the model check, because
+        // what stops this drawing has to be the refinement rather than whichever
+        // reason happens to be found first.
+        if (current.refinementBusy) {
+            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS)
+            return
+        }
         validateSelectedModels(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
@@ -851,11 +921,16 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(message = "Prompt is empty.")
             return
         }
+        if (current.refinementBusy) {
+            localState.value = current.copy(message = REFINEMENT_IN_PROGRESS)
+            return
+        }
         // Read before the coroutine starts: the first thing it does is clear
         // `selectedHistory` (below), so a parent read from inside would be gone.
-        val lineage = describeLineage(current)
+        val declared = describeLineage(current)
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
+            val lineage = withPreviewParent(current, declared)
             localState.value = localState.value.copy(
                 isDrawing = true,
                 selectedHistory = null,
@@ -920,14 +995,19 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun drawFromDdl() {
         val current = state.value
+        if (current.refinementBusy) {
+            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS)
+            return
+        }
         validateSelectedModels(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
         }
         val ddl = current.ddl.ifBlank { current.prompt }
-        val lineage = ddlLineage(current)
+        val declared = ddlLineage(current)
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
+            val lineage = withPreviewParent(current, declared)
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -1187,6 +1267,294 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = "停止しました。")
     }
 
+    // ── 推敲 (SPEC :614, :678) ──────────────────────────────
+
+    /**
+     * Opens the refinement on one work.
+     *
+     * The parent is the work itself, read from the database, and every fixed
+     * value a candidate inherits comes from that row -- never from the describe
+     * screen (「次回描画の設定ではなく表示中の親作品の実効カタログとキャンバスを継承
+     * する」).
+     */
+    fun openRefinement(item: HistoryItemEntity) {
+        localState.value = localState.value.copy(
+            refinementOpen = true,
+            refinementParent = item,
+            // A new target owns its own candidates; the previous work's are gone.
+            refinementCandidates = emptyList(),
+            refinementPreviewId = null,
+            refinementStatus = null,
+            tab = AppTab.Lineage,
+        )
+    }
+
+    fun closeRefinement() {
+        refinementJob?.cancel()
+        localState.value = localState.value.copy(
+            refinementOpen = false,
+            refinementParent = null,
+            refinementCandidates = emptyList(),
+            refinementPreviewId = null,
+            refinementBusy = false,
+            refinementCanAbort = false,
+            refinementStatus = null,
+        )
+    }
+
+    /** The radio. One value replaces the previous one; two are not spellable. */
+    fun setRefinementElement(element: RefinementElement) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(refinementElement = element, refinementStatus = null)
+        // 「推敲要素の選択は前回値をブラウザに記憶する」.
+        persistSetting(SETTING_KEY_REFINEMENT_ELEMENT, JSONObject().put("value", element.id).toString())
+    }
+
+    fun setRefinementAmplitude(amplitude: VariationAmplitude) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(refinementAmplitude = amplitude)
+    }
+
+    fun setRefinementTouchWords(value: String) {
+        localState.value = localState.value.copy(refinementTouchWords = value, refinementStatus = null)
+    }
+
+    /**
+     * 1 案 or 4 案. The count is kept independent of the element, as web keeps
+     * its own pair: four touches is refused when the button is pressed, and a
+     * count silently clamped here would make that refusal unreachable.
+     */
+    fun setRefinementCount(count: Int) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(refinementCount = count.coerceIn(1, 4), refinementStatus = null)
+    }
+
+    /**
+     * Draws the candidates.
+     *
+     * 「候補生成中は他の生成・描画操作を禁止し」: the guard is at the top of this and
+     * at the top of every other generating entry point, so neither can start
+     * while the other runs. The candidates are drawn one after another -- web
+     * fans out to the number of render slots the server reports, and there is no
+     * server here to report one.
+     */
+    fun generateRefinementCandidates() {
+        val current = localState.value
+        if (current.refinementBusy || current.isDrawing) return
+        val parentItem = current.refinementParent ?: return
+        val element = current.refinementElement
+        val count = current.refinementCount
+        if (element == RefinementElement.Touch && current.refinementTouchWords.isBlank()) {
+            localState.value = current.copy(refinementStatus = "タッチを変える言葉を入力してください。")
+            return
+        }
+        // The same words give the same seed, so four touch candidates would be
+        // four copies. web refuses in the same place with the same sentence.
+        if (count > RefinementPlanner.maxCandidates(element)) {
+            localState.value = current.copy(refinementStatus = RefinementPlanner.TOUCH_FANOUT_REFUSAL)
+            return
+        }
+        val parent = RefinementParent.of(parentItem, strippedHistoryInput(parentItem.originalInput))
+        refinementJob?.cancel()
+        localState.value = current.copy(
+            refinementBusy = true,
+            refinementCanAbort = false,
+            refinementStatus = null,
+            refinementCandidates = emptyList(),
+            refinementPreviewId = null,
+        )
+        refinementJob = viewModelScope.launch {
+            // The stop appears three seconds in, not at once: a candidate that
+            // is already done needs no stop button.
+            val abortTimer = launch {
+                delay(3000)
+                if (localState.value.refinementBusy) {
+                    localState.value = localState.value.copy(refinementCanAbort = true)
+                }
+            }
+            runCatching {
+                val catalogIds = if (element == RefinementElement.Color) {
+                    RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }, count)
+                } else {
+                    emptyList()
+                }
+                val made = mutableListOf<RefinementCandidate>()
+                for (index in 0 until count) {
+                    val plan = RefinementPlanner.plan(
+                        element = element,
+                        parent = parent,
+                        amplitude = current.refinementAmplitude,
+                        newCatalogId = catalogIds.getOrNull(index),
+                        seedText = current.refinementTouchWords.takeIf { element == RefinementElement.Touch },
+                    )
+                    val started = System.currentTimeMillis()
+                    val result = withContext(Dispatchers.IO) {
+                        repository.renderRefinementCandidate(parent, plan)
+                    }
+                    made.add(
+                        RefinementCandidate(
+                            id = "${element.id}-$index-${result.renderHash.takeLast(8)}",
+                            label = "${element.labelJa} ${index + 1}",
+                            plan = plan,
+                            displaySvg = result.displaySvg,
+                            scoreJson = result.scoreJson,
+                            normalizedDdl = result.normalizedDdl,
+                            renderHash = result.renderHash,
+                            renderHashShort = result.renderHashShort,
+                            renderMetadataJson = result.renderMetadataJson,
+                            elapsedMs = System.currentTimeMillis() - started,
+                        ),
+                    )
+                    // Shown as they arrive, the way web fills its grid.
+                    localState.value = localState.value.copy(refinementCandidates = made.toList())
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                localState.value = localState.value.copy(refinementStatus = error.message ?: "候補の生成に失敗しました。")
+            }
+            abortTimer.cancel()
+            localState.value = localState.value.copy(refinementBusy = false, refinementCanAbort = false)
+        }
+        refinementJob?.invokeOnCompletion { cause ->
+            if (cause is CancellationException) {
+                localState.value = localState.value.copy(
+                    refinementBusy = false,
+                    refinementCanAbort = false,
+                    refinementStatus = "停止しました。",
+                )
+            }
+        }
+    }
+
+    /** The stop button. Cancels the work in flight, which is what web's abort does. */
+    fun abortRefinementCandidates() {
+        refinementJob?.cancel()
+    }
+
+    /**
+     * Saves one candidate into the ordinary history.
+     *
+     * 保存済みは二度保存できない: a candidate that is not [RefinementSaveState.Unsaved]
+     * is refused here rather than in the screen, so a second tap writes no row
+     * whichever way it arrives.
+     */
+    fun saveRefinementCandidate(candidateId: String) {
+        val current = localState.value
+        val candidate = current.refinementCandidates.firstOrNull { it.id == candidateId } ?: return
+        if (candidate.saveState != RefinementSaveState.Unsaved) return
+        val parentItem = current.refinementParent ?: return
+        updateCandidate(candidateId) { it.copy(saveState = RefinementSaveState.Saving) }
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    saveCandidateRow(candidate, parentItem, historyVisibility = null)
+                }
+            }.onSuccess { item ->
+                updateCandidate(candidateId) {
+                    it.copy(
+                        saveState = RefinementSaveState.Saved,
+                        savedHistoryId = item.id,
+                        savedNodeId = item.lineageNodeId,
+                    )
+                }
+                localState.value = localState.value.copy(refinementStatus = "保存しました ${item.renderHashShort}")
+            }.onFailure { error ->
+                updateCandidate(candidateId) { it.copy(saveState = RefinementSaveState.Unsaved) }
+                localState.value = localState.value.copy(refinementStatus = error.message ?: "保存に失敗しました。")
+            }
+        }
+    }
+
+    /** Puts a candidate on the canvas without saving it. */
+    fun previewRefinementCandidate(candidateId: String) {
+        val current = localState.value
+        val candidate = current.refinementCandidates.firstOrNull { it.id == candidateId } ?: return
+        localState.value = current.copy(refinementPreviewId = candidate.id)
+    }
+
+    private fun updateCandidate(id: String, transform: (RefinementCandidate) -> RefinementCandidate) {
+        localState.value = localState.value.copy(
+            refinementCandidates = localState.value.refinementCandidates.map {
+                if (it.id == id) transform(it) else it
+            },
+        )
+    }
+
+    private suspend fun saveCandidateRow(
+        candidate: RefinementCandidate,
+        parentItem: HistoryItemEntity,
+        historyVisibility: String?,
+    ): HistoryItemEntity = repository.saveRefinementCandidate(
+        result = PaintResult(
+            originalInput = strippedHistoryInput(parentItem.originalInput),
+            normalizedDdl = candidate.normalizedDdl,
+            expandedDdl = candidate.normalizedDdl,
+            scoreJson = candidate.scoreJson,
+            displaySvg = candidate.displaySvg,
+            renderMetadataJson = candidate.renderMetadataJson,
+            renderHash = candidate.renderHash,
+            renderHashShort = candidate.renderHashShort,
+            renderSeed = candidate.plan.seeds.renderSeed ?: renderSeedOf(candidate.renderMetadataJson),
+            compositionSeed = candidate.plan.seeds.compositionSeed,
+            interpretationSeed = candidate.plan.seeds.interpretationSeed,
+            variationAmplitude = candidate.plan.seeds.variationAmplitude,
+            variationSeed = candidate.plan.seeds.variationSeed,
+            seedText = candidate.plan.seeds.seedText,
+        ),
+        plan = candidate.plan,
+        parentNodeId = parentItem.lineageNodeId,
+        elapsedMs = candidate.elapsedMs,
+        historyVisibility = historyVisibility,
+        stage1ModelId = parentItem.stage1Model ?: "",
+        stage2ModelId = parentItem.stage2Model ?: "",
+    )
+
+    /** The seed the drawing was performed with, when the plan left it to be drawn. */
+    private fun renderSeedOf(renderMetadataJson: String): Long? = runCatching {
+        val metadata = JSONObject(renderMetadataJson)
+        if (metadata.isNull("render_seed")) null else metadata.getLong("render_seed")
+    }.getOrNull()
+
+    /**
+     * Makes the work on screen into something the next save can hang off.
+     *
+     * A port of web's `ensureLineageParentId` (+page.svelte:4810). SPEC `:2105`:
+     * an unsaved candidate the author drew on from is recorded as a
+     * `lineage_only` node, so the branch keeps the step that was actually taken
+     * instead of showing the new work hanging straight off its grandparent.
+     */
+    private suspend fun materializePreviewNode(current: InkuUiState): String? {
+        val previewId = current.refinementPreviewId ?: return null
+        val candidate = current.refinementCandidates.firstOrNull { it.id == previewId } ?: return null
+        // Already in the database, either as an ordinary save or as an earlier
+        // materialisation. Saving it twice would fork the branch.
+        candidate.savedNodeId?.let { return it }
+        val parentItem = current.refinementParent ?: return null
+        val saved = withContext(Dispatchers.IO) {
+            saveCandidateRow(candidate, parentItem, historyVisibility = "lineage_only")
+        }
+        updateCandidate(candidate.id) {
+            it.copy(savedHistoryId = saved.id, savedNodeId = saved.lineageNodeId)
+        }
+        return saved.lineageNodeId
+    }
+
+    /**
+     * The parent a save should really name.
+     *
+     * When the work on screen is an unsaved candidate, the next drawing comes
+     * from *it*, not from the work it was refined out of; the declaration built
+     * from `selectedHistory` names the grandparent, so the node is materialised
+     * and swapped in here. A detached lineage keeps its empty declaration: the
+     * author asked for a new root.
+     */
+    private suspend fun withPreviewParent(current: InkuUiState, declaration: LineageDeclaration): LineageDeclaration {
+        if (current.refinementPreviewId == null) return declaration
+        if (declaration.parentNodeId.isNullOrEmpty()) return declaration
+        val nodeId = materializePreviewNode(current) ?: return declaration
+        return declaration.copy(parentNodeId = nodeId)
+    }
+
     fun acceptModelLicense() {
         acceptModelLicense(localState.value.selectedModelId)
     }
@@ -1388,6 +1756,9 @@ class InkuViewModel @JvmOverloads constructor(
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
         val batchHistory = settings["batch_prompt_history"]?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
+        val refinementElement = settings[SETTING_KEY_REFINEMENT_ELEMENT]
+            ?.let { RefinementElement.byId(JSONObject(it).optString("value")) }
+            ?: current.refinementElement
         val modelSelection = settings["model_selection"]?.let(::JSONObject)
         val restoredStage1Model = modelSelection?.optString("stage1_model")?.takeIf { it.isNotBlank() }
         val restoredStage2Model = modelSelection?.optString("stage2_model")?.takeIf { it.isNotBlank() }
@@ -1410,6 +1781,7 @@ class InkuViewModel @JvmOverloads constructor(
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),
             batchPromptHistory = batchHistory,
+            refinementElement = refinementElement,
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,
             selectedStage2ModelId = restoredUnifiedModel,

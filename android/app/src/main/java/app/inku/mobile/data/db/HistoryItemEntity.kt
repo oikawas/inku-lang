@@ -64,4 +64,24 @@ data class HistoryItemEntity(
     val renderWild: Boolean? = null,
     @ColumnInfo(name = "lineage_node_id")
     val lineageNodeId: String? = null,
+    // The seeds a work was made with, one column each, with the server's names
+    // and the server's type: `history.render_seed` and its neighbours are all
+    // VARCHAR there (`db.py:132-142`), including the numeric ones, and the
+    // number is parsed on the way out rather than stored as one. NULL is "the
+    // work does not say" -- an ordinary drawing asks for no reading and no
+    // variation, so four of these five stay empty on most rows.
+    // `moved_axes` has no column on either side: it is recomputed from the
+    // amplitude and the seed.
+    @ColumnInfo(name = "render_seed")
+    val renderSeed: String? = null,
+    @ColumnInfo(name = "composition_seed")
+    val compositionSeed: String? = null,
+    @ColumnInfo(name = "interpretation_seed")
+    val interpretationSeed: String? = null,
+    @ColumnInfo(name = "variation_amplitude")
+    val variationAmplitude: String? = null,
+    @ColumnInfo(name = "variation_seed")
+    val variationSeed: String? = null,
+    @ColumnInfo(name = "seed_text")
+    val seedText: String? = null,
 )

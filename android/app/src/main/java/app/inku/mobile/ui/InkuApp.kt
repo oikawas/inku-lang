@@ -150,6 +150,9 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
+import app.inku.mobile.data.refinement.RefinementElement
+import app.inku.mobile.data.refinement.RefinementPlanner
+import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
@@ -2013,6 +2016,13 @@ private fun HistoryHeader(
 /** So that an instrumented test can count the cards rather than the labels. */
 internal const val LINEAGE_NODE_TAG = "lineage_node"
 
+/** Tags for the refinement, so a test counts candidates rather than labels. */
+internal const val REFINE_ENTRY_TAG = "refine_entry"
+internal const val REFINE_CANDIDATE_TAG = "refine_candidate"
+internal const val REFINE_SAVE_TAG = "refine_save"
+internal const val REFINE_STOP_TAG = "refine_stop"
+internal const val REFINE_GENERATE_TAG = "refine_generate"
+
 /**
  * 作品の系譜 -- the port of web's `LineagePanel.svelte`, cut to what contract
  * 2/5 asks for: the ancestors and two generations of descendants of the work on
@@ -2041,11 +2051,200 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
             ChipButton("新しい起点にする", onClick = viewModel::detachLineage)
         }
         when {
+            state.refinementOpen -> RefinementPanel(state, viewModel)
             state.lineageLoading && graph == null ->
                 Text("系譜を読み込み中…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             graph == null || graph.nodes.isEmpty() ->
                 Text("保存すると、ここに系譜が表示されます。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> LineageColumns(graph, viewModel)
+        }
+    }
+}
+
+/**
+ * 推敲 -- the port of web's 推敲 tab, cut to the one entry SPEC `:618` puts on a
+ * lineage card ("描画要素"). The comparison sub-views beside it there belong to
+ * other contracts.
+ *
+ * The radio is the whole of the exclusivity the SPEC asks for: one element at a
+ * time, with the amplitude appearing under the variation choice and nowhere else.
+ */
+@Composable
+private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
+    val parent = state.refinementParent
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("描画要素を編集する", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            ChipButton("閉じる", onClick = viewModel::closeRefinement)
+        }
+        Text(
+            "1 回の推敲で変えられるのは 1 種類だけです。" +
+                (parent?.let { " 親: ${it.renderHashShort} / ${ColorCatalogs.get(it.colorCatalogId).name}" } ?: ""),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+            RefinementElement.entries.forEach { element ->
+                ChipButton(
+                    text = element.labelJa,
+                    selected = state.refinementElement == element,
+                    onClick = { viewModel.setRefinementElement(element) },
+                )
+            }
+        }
+
+        // 「変奏を選択したときだけ強度をラジオ直下に表示」. No section of its own.
+        if (state.refinementElement == RefinementElement.Variation) {
+            WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+                VariationAmplitude.entries.forEach { amplitude ->
+                    ChipButton(
+                        text = amplitude.labelJa,
+                        selected = state.refinementAmplitude == amplitude,
+                        onClick = { viewModel.setRefinementAmplitude(amplitude) },
+                    )
+                }
+            }
+        }
+
+        if (state.refinementElement == RefinementElement.Touch) {
+            OutlinedTextField(
+                value = state.refinementTouchWords,
+                onValueChange = viewModel::setRefinementTouchWords,
+                label = { Text("タッチを変える言葉") },
+                singleLine = true,
+                enabled = !state.refinementBusy,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+            // Both counts stay pressable whichever element is chosen, the way
+            // web leaves its own pair alone: the refusal for four touches is
+            // stated when the button is pressed, not by hiding the choice.
+            listOf(1, 4).forEach { count ->
+                ChipButton(
+                    text = "${count}案",
+                    selected = state.refinementCount == count,
+                    onClick = { viewModel.setRefinementCount(count) },
+                )
+            }
+            ChipButton(
+                text = if (state.refinementBusy) "生成中…" else "候補を作る",
+                modifier = Modifier.testTag(REFINE_GENERATE_TAG),
+                onClick = { if (!state.refinementBusy) viewModel.generateRefinementCandidates() },
+            )
+        }
+
+        // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
+        if (state.refinementCanAbort) {
+            ChipButton("停止", modifier = Modifier.testTag(REFINE_STOP_TAG), onClick = viewModel::abortRefinementCandidates)
+        }
+
+        state.refinementStatus?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+
+        // 「2列（1案のみ全幅1列）でダイアログ内に収めて表示」.
+        val columns = if (state.refinementCandidates.size <= 1) 1 else 2
+        state.refinementCandidates.chunked(columns).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                row.forEach { candidate ->
+                    RefinementCandidateCard(
+                        candidate = candidate,
+                        shownOnCanvas = state.refinementPreviewId == candidate.id,
+                        onSave = { viewModel.saveRefinementCandidate(candidate.id) },
+                        onPreview = { viewModel.previewRefinementCandidate(candidate.id) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefinementCandidateCard(
+    candidate: RefinementCandidate,
+    shownOnCanvas: Boolean,
+    onSave: () -> Unit,
+    onPreview: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // 「読み取りを含む候補は画像hoverで正規化DDLを表示する」. A phone has no hover, so
+    // the DDL opens on a long press instead (contract 段 3 leaves the gesture to
+    // the port); everything else about the candidate is the same.
+    var ddlOpen by remember(candidate.id) { mutableStateOf(false) }
+    val readingCandidate = candidate.plan.element == RefinementElement.Reading
+    Card(
+        modifier = modifier
+            .testTag(REFINE_CANDIDATE_TAG)
+            .border(2.dp, if (shownOnCanvas) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
+        shape = RoundedCornerShape(0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            RefinementCandidateImage(
+                svg = candidate.displaySvg,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .combinedClickable(
+                        onClick = onPreview,
+                        onLongClick = { if (readingCandidate) ddlOpen = !ddlOpen },
+                    ),
+            )
+            Column(modifier = Modifier.padding(horizontal = 6.dp).padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(candidate.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (readingCandidate && ddlOpen) {
+                    Text(candidate.normalizedDdl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                // The three states are three different labels, and only the
+                // first one is a button that does anything.
+                when (candidate.saveState) {
+                    RefinementSaveState.Unsaved ->
+                        ChipButton("保存", modifier = Modifier.testTag(REFINE_SAVE_TAG), onClick = onSave)
+                    RefinementSaveState.Saving -> Text("保存中…", style = MaterialTheme.typography.labelSmall)
+                    RefinementSaveState.Saved -> Text("保存済み", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefinementCandidateImage(svg: String, modifier: Modifier = Modifier) {
+    val image by produceState<ImageBitmap?>(initialValue = null, svg) {
+        value = withContext(Dispatchers.Default) {
+            runCatching {
+                val parsed = SVG.getFromString(svg)
+                val side = 512
+                val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+                val native = AndroidCanvas(bitmap)
+                native.drawColor(android.graphics.Color.WHITE)
+                renderSvgIntoNativeCanvas(parsed, native, side.toFloat(), side.toFloat(), 0)
+                bitmap.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
+        val bitmap = image
+        if (bitmap != null) {
+            Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+        } else {
+            Canvas(modifier = Modifier.fillMaxSize()) { drawRect(Color.White) }
         }
     }
 }
@@ -2090,6 +2289,7 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
                         focused = node.id == graph.focusNodeId,
                         derivationKind = kindOf[node.id],
                         onSelect = { viewModel.selectLineageNode(node) },
+                        onRefine = { item -> viewModel.openRefinement(item) },
                     )
                 }
             }
@@ -2103,6 +2303,7 @@ private fun LineageNodeCard(
     focused: Boolean,
     derivationKind: String?,
     onSelect: () -> Unit,
+    onRefine: (HistoryItemEntity) -> Unit,
 ) {
     val work = node as? LineageGraphNode.Work
     val history = work?.history
@@ -2150,6 +2351,12 @@ private fun LineageNodeCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // 「作品を編集する」 in SPEC :618 lists seven items; this contract
+                // brings exactly the first of them. A tombstone has no work to
+                // refine, which is why this hangs off `history`.
+                if (history != null) {
+                    ChipButton("描画要素", modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item) })
+                }
             }
         }
     }
@@ -4438,16 +4645,21 @@ private fun PresentationControlButton(
 }
 
 @Composable
-private fun ChipButton(text: String, selected: Boolean = false, onClick: () -> Unit) {
+private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    // The modifier goes on the button itself. A `testTag` on a Box around one of
+    // these is not in the merged semantics tree at all -- the button merges its
+    // descendants and the bare wrapper is dropped, so the tag can never be found.
     if (selected) {
         Button(
             onClick = onClick,
+            modifier = modifier,
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = Color(0xFF19150F)),
         ) { Text(text, maxLines = 1) }
     } else {
         OutlinedButton(
             onClick = onClick,
+            modifier = modifier,
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) { Text(text, maxLines = 1) }

@@ -45,7 +45,6 @@ class ServerRendererColorAssignmentTest {
             .put("color", color)
         if (colorHint != null) instruction.put("color_hint", colorHint)
         val score = JSONObject()
-            .put("render_seed", seed)
             .put("instructions", org.json.JSONArray(listOf(instruction)))
         val svg = DefaultSvgRenderer().render(
             RenderRequest(
@@ -53,6 +52,7 @@ class ServerRendererColorAssignmentTest {
                 colorCatalogId = catalogId,
                 canvasAspect = "square",
                 svgProfile = "editable",
+                renderSeed = seed,
             )
         ).svg
         val strokes = Regex("""stroke="(#[0-9a-fA-F]{6})"""").findAll(svg)
@@ -64,7 +64,6 @@ class ServerRendererColorAssignmentTest {
 
     private fun renderBackgroundColor(catalogId: String, background: String): String {
         val score = JSONObject()
-            .put("render_seed", 12345L)
             .put("background", background)
             .put(
                 "instructions",
@@ -84,6 +83,7 @@ class ServerRendererColorAssignmentTest {
                 colorCatalogId = catalogId,
                 canvasAspect = "square",
                 svgProfile = "editable",
+                renderSeed = 12345L,
             )
         ).svg
         val rect = Regex("""<rect[^>]*fill="(#[0-9a-fA-F]{6})"""").find(svg)

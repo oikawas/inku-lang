@@ -240,15 +240,15 @@ class ServerRendererCloudformAndRelationsTest {
         fun renderFromIndexEntry(entryName: String): String {
             val entry = indexJson.getJSONObject(entryName)
             val scoreObj = JSONObject(entry.getJSONObject("score").toString())
-            if (entry.has("render_seed") && !entry.isNull("render_seed")) {
-                scoreObj.put("render_seed", entry.getLong("render_seed"))
-            }
+            // The corpus keeps the seed beside the Score; so does the server.
+            val renderSeed = if (entry.isNull("render_seed")) null else entry.getLong("render_seed")
             return renderer.render(
                 RenderRequest(
                     scoreJson = scoreObj.toString(),
                     colorCatalogId = "default",
                     canvasAspect = "square",
-                    svgProfile = "editable"
+                    svgProfile = "editable",
+                    renderSeed = renderSeed,
                 )
             ).svg
         }

@@ -64,9 +64,8 @@ class DefaultSvgRendererFillDabTest {
         val index = JSONObject(resource("svg_index.json"))
         val entry = index.getJSONObject(key)
         val score = JSONObject(entry.getJSONObject("score").toString())
-        if (entry.has("render_seed") && !entry.isNull("render_seed")) {
-            score.put("render_seed", entry.getLong("render_seed"))
-        }
+        // The corpus keeps the seed beside the Score; so does the server.
+        val renderSeed = if (entry.isNull("render_seed")) null else entry.getLong("render_seed")
         if (entry.has("wild") && !entry.isNull("wild")) {
             score.put("render_wild", entry.getBoolean("wild"))
         }
@@ -81,6 +80,7 @@ class DefaultSvgRendererFillDabTest {
                 colorCatalogId = "default",
                 canvasAspect = entry.optString("canvas_aspect", canvas),
                 svgProfile = "editable",
+                renderSeed = renderSeed,
             )
         ).svg
     }

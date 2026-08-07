@@ -1283,8 +1283,15 @@ class InkuViewModel(
     }
 
     private suspend fun restorePersistedSettings() {
-        val current = localState.value
         val settings = repository.getSettingsMap()
+        // Read after the lookup suspended, not before. Startup runs while the
+        // screen is already live: a description typed, a work picked from
+        // history, a canvas ratio chosen -- all of it lands in the state while
+        // this is waiting on the database, and writing back a copy taken before
+        // the wait undoes it without a trace. `lineageDetached` is the newest
+        // thing that would be undone, and undoing it is not a cosmetic slip:
+        // the pick it erases is what decides whether the next save has a parent.
+        val current = localState.value
         val catalog = settings["color_catalog"]?.let { JSONObject(it).optString("value", current.selectedCatalogId) } ?: current.selectedCatalogId
         val canvas = settings["canvas_aspect"]?.let { JSONObject(it).optString("value", current.selectedCanvasAspect) } ?: current.selectedCanvasAspect
         val canvasPlugin = settings["canvas_aspect_plugin"]?.let { JSONObject(it).optBoolean("enabled", current.canvasAspectPluginEnabled) } ?: current.canvasAspectPluginEnabled

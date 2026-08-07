@@ -127,11 +127,15 @@ class LineageDeclarationWiringTest {
                 }
             }
         } catch (timeout: Exception) {
-            throw AssertionError(
-                "timed out waiting for $what; last message was \"${viewModel?.state?.value?.message}\"",
-                timeout,
-            )
+            throw AssertionError("timed out waiting for $what; ${stateReport()}", timeout)
         }
+    }
+
+    /** Read at failure time, so a timeout says which half of a condition was false. */
+    private fun stateReport(): String {
+        val state = viewModel?.state?.value ?: return "no view model"
+        return "selectedHistory=${state.selectedHistory?.id} lineageDetached=${state.lineageDetached} " +
+            "prompt=\"${state.prompt.take(24)}\" isDrawing=${state.isDrawing} message=\"${state.message}\""
     }
 
     private suspend fun useModel() {

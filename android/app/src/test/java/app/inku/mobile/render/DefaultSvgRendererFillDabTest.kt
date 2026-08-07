@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -17,11 +18,7 @@ class DefaultSvgRendererFillDabTest {
         fill = "#111111",
     )
 
-    private fun resource(name: String): String {
-        val stream = javaClass.getResourceAsStream("/server_reference/$name")
-            ?: error("Resource /server_reference/$name not found")
-        return stream.bufferedReader().use { it.readText() }
-    }
+    private fun resource(name: String): String = ReferenceCorpus.text(name)
 
     private fun fixture(): JSONObject = JSONObject(resource("renderer_fill_and_arc.json"))
 

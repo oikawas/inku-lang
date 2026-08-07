@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.data.model.CanvasSize
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONObject
@@ -10,11 +11,7 @@ import org.junit.Test
 
 class DefaultSvgRendererPhase2fTest {
 
-    private fun readReferenceResource(filename: String): String {
-        val stream = javaClass.getResourceAsStream("/server_reference/$filename")
-            ?: error("Resource /server_reference/$filename not found")
-        return stream.bufferedReader().use { it.readText() }
-    }
+    private fun readReferenceResource(filename: String): String = ReferenceCorpus.text(filename)
 
     private fun readReferenceIndex(): JSONObject {
         return JSONObject(readReferenceResource("svg_index.json"))

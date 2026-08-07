@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -24,10 +25,7 @@ class ServerRendererProportionalTest {
 
     @Test
     fun testProportionalReferenceParity() {
-        val stream = javaClass.getResourceAsStream("/server_reference/renderer_proportional.json")
-            ?: error("Resource /server_reference/renderer_proportional.json not found")
-        val jsonStr = stream.bufferedReader().use { it.readText() }
-        val root = JSONObject(jsonStr)
+        val root = ReferenceCorpus.json("renderer_proportional.json")
 
         val canvases = root.getJSONObject("canvases")
 

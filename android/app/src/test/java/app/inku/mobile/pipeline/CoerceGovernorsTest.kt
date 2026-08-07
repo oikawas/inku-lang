@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -46,9 +47,7 @@ class CoerceGovernorsTest {
 
     @Test
     fun testCoerceGovernorsReference() {
-        val stream = javaClass.getResourceAsStream("/server_reference/coerce_governors.json")
-            ?: error("Resource /server_reference/coerce_governors.json not found")
-        val json = JSONObject(stream.bufferedReader().use { it.readText() })
+        val json = ReferenceCorpus.json("coerce_governors.json")
 
         val bgCases = json.getJSONArray("background_cases")
         for (i in 0 until bgCases.length()) {

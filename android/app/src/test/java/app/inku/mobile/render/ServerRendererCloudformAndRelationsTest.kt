@@ -1,7 +1,7 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.pipeline.RenderRequest
-import java.io.InputStreamReader
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -11,19 +11,13 @@ import org.junit.Test
 
 class ServerRendererCloudformAndRelationsTest {
 
-    private fun readResourceText(path: String): String {
-        val stream = javaClass.getResourceAsStream(path)
-            ?: throw IllegalArgumentException("Resource not found: $path")
-        return InputStreamReader(stream, Charsets.UTF_8).use { it.readText() }
-    }
+    private fun readResourceText(name: String): String = ReferenceCorpus.text(name)
 
-    private fun readResourceJson(path: String): JSONObject {
-        return JSONObject(readResourceText(path))
-    }
+    private fun readResourceJson(name: String): JSONObject = ReferenceCorpus.json(name)
 
     @Test
     fun testToolEnergyLateralParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("tool_energy_lateral")
         for (i in 0 until list.length()) {
             val item = list.getJSONObject(i)
@@ -40,7 +34,7 @@ class ServerRendererCloudformAndRelationsTest {
 
     @Test
     fun testCloudformSeedParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("cloudform_seed")
         for (i in 0 until list.length()) {
             val item = list.getJSONObject(i)
@@ -57,7 +51,7 @@ class ServerRendererCloudformAndRelationsTest {
 
     @Test
     fun testBaseRadiusParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("base_radius")
         val baseRadiusMethod = ServerRendererGeometry::class.java.getDeclaredMethod(
             "baseRadius",
@@ -82,7 +76,7 @@ class ServerRendererCloudformAndRelationsTest {
 
     @Test
     fun testBaseRadiusVariedParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("base_radius_varied")
         val baseRadiusMethod = ServerRendererGeometry::class.java.getDeclaredMethod(
             "baseRadius",
@@ -109,7 +103,7 @@ class ServerRendererCloudformAndRelationsTest {
 
     @Test
     fun testCloudformContourParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("cloudform_contour")
         for (i in 0 until list.length()) {
             val item = list.getJSONObject(i)
@@ -150,7 +144,7 @@ class ServerRendererCloudformAndRelationsTest {
 
     @Test
     fun testMinorArcDeltaParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("minor_arc_delta")
         for (i in 0 until list.length()) {
             val item = list.getJSONObject(i)
@@ -165,7 +159,7 @@ class ServerRendererCloudformAndRelationsTest {
 
     @Test
     fun testArcFromEndpointsAndSagittaParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("arc_from_endpoints_and_sagitta")
         for (i in 0 until list.length()) {
             val item = list.getJSONObject(i)
@@ -198,7 +192,7 @@ class ServerRendererCloudformAndRelationsTest {
 
     @Test
     fun testResolvePerformanceScoreParity() {
-        val json = readResourceJson("/server_reference/renderer_cloudform_and_relations.json")
+        val json = readResourceJson("renderer_cloudform_and_relations.json")
         val list = json.getJSONArray("resolve_performance_score")
         val renderer = DefaultSvgRenderer()
         val resolveMethod = DefaultSvgRenderer::class.java.getDeclaredMethod(
@@ -238,10 +232,10 @@ class ServerRendererCloudformAndRelationsTest {
     fun testReferenceSvgParity11To14() {
         val renderer = DefaultSvgRenderer()
 
-        val svg13Ref = readResourceText("/server_reference/13_touching_arcs.svg")
-        val svg14Ref = readResourceText("/server_reference/14_region_then_relation.svg")
+        val svg13Ref = readResourceText("13_touching_arcs.svg")
+        val svg14Ref = readResourceText("14_region_then_relation.svg")
 
-        val indexJson = readResourceJson("/server_reference/svg_index.json")
+        val indexJson = readResourceJson("svg_index.json")
 
         fun renderFromIndexEntry(entryName: String): String {
             val entry = indexJson.getJSONObject(entryName)
@@ -277,8 +271,8 @@ class ServerRendererCloudformAndRelationsTest {
         assertEquals("14_region_then_relation class match", extractClassAttr(svg14Ref), extractClassAttr(svg14Actual))
         assertEquals("14_region_then_relation path d exact match", extractPathD(svg14Ref), extractPathD(svg14Actual))
 
-        val svg11Ref = readResourceText("/server_reference/11_cloudform_pencil.svg")
-        val svg12Ref = readResourceText("/server_reference/12_cloudform_rotring.svg")
+        val svg11Ref = readResourceText("11_cloudform_pencil.svg")
+        val svg12Ref = readResourceText("12_cloudform_rotring.svg")
         val svg11Actual = renderFromIndexEntry("11_cloudform_pencil")
         val svg12Actual = renderFromIndexEntry("12_cloudform_rotring")
 

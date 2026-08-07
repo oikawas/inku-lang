@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -7,12 +8,7 @@ import org.junit.Test
 
 class WebDdlExpanderPhase3aTest {
 
-    private fun readReferenceCorpus(): JSONObject {
-        val stream = javaClass.getResourceAsStream("/server_reference/ddl_expand.json")
-            ?: error("Resource /server_reference/ddl_expand.json not found")
-        val content = stream.bufferedReader().use { it.readText() }
-        return JSONObject(content)
-    }
+    private fun readReferenceCorpus(): JSONObject = ReferenceCorpus.json("ddl_expand.json")
 
     private fun getCase(corpus: JSONObject, caseName: String): JSONObject {
         val cases = corpus.getJSONArray("cases")

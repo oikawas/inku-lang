@@ -1,5 +1,6 @@
 package app.inku.mobile.data.model
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -9,9 +10,7 @@ import org.junit.Test
 class DerivationKindTest {
 
     private fun serverKinds(): List<String> {
-        val stream = javaClass.getResourceAsStream("/server_reference/lineage_wiring.json")
-            ?: error("lineage_wiring.json is missing")
-        val kinds = JSONObject(stream.bufferedReader().readText()).getJSONArray("derivation_kinds")
+        val kinds = ReferenceCorpus.json("lineage_wiring.json").getJSONArray("derivation_kinds")
         return (0 until kinds.length()).map { kinds.getString(it) }
     }
 

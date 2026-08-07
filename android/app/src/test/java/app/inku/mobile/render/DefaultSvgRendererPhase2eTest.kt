@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -9,17 +10,9 @@ import org.junit.Test
 
 class DefaultSvgRendererPhase2eTest {
 
-    private fun readReferenceSvg(filename: String): String {
-        val stream = javaClass.getResourceAsStream("/server_reference/$filename")
-            ?: error("Resource /server_reference/$filename not found")
-        return stream.bufferedReader().use { it.readText() }
-    }
+    private fun readReferenceSvg(filename: String): String = ReferenceCorpus.text(filename)
 
-    private fun readReferenceIndex(): JSONObject {
-        val stream = javaClass.getResourceAsStream("/server_reference/svg_index.json")
-            ?: error("Resource /server_reference/svg_index.json not found")
-        return JSONObject(stream.bufferedReader().use { it.readText() })
-    }
+    private fun readReferenceIndex(): JSONObject = ReferenceCorpus.json("svg_index.json")
 
     private fun renderSvgForReference(key: String): String {
         val indexJson = readReferenceIndex()

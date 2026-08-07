@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -20,11 +21,7 @@ class CountPreservationTest {
 
     private val pipeline = LocalFallbackPipeline()
 
-    private fun corpus(): JSONObject {
-        val stream = javaClass.getResourceAsStream("/server_reference/count_preservation.json")
-            ?: error("Resource /server_reference/count_preservation.json not found")
-        return JSONObject(stream.bufferedReader().use { it.readText() })
-    }
+    private fun corpus(): JSONObject = ReferenceCorpus.json("count_preservation.json")
 
     private fun instructionsOf(score: JSONObject): List<JSONObject> {
         val array = score.optJSONArray("instructions") ?: JSONArray()

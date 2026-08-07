@@ -234,6 +234,10 @@ fastapi 0.141 onward**), API-surface identity (compared against
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
 `render-engine-22` (531 cases) and `ddl-engine-7` (34 cases) are current, and CI enforces
 byte-identical regeneration.
+- **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
+same way. The port reads the directory for the version it declares, so **raising the server engine
+adds a directory rather than reddening the port**. Older versions cannot be rebaked, so each one is
+held by its own `manifest.json` of names and digests.
 - **`cli/tests`** — pytest.
 - **`npm run check`**, **`lint:i18n`**, **`lint:models`**, **`lint:recommendations`** — web types,
 terminology, and model resolution.

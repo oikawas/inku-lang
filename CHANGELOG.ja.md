@@ -3687,3 +3687,31 @@ web がこの種別を送り始めたのは v2.9.37（2026-08-03）で、**serve
 - **検査:** server **2366 / 31 skipped**（起点 2340・**+26 = 新設 26 本**。既存 5 本はリネームで差引 0）・
   cli **111**・`npm run check` **241 FILES / 0 errors / 2 warnings**・ruff clean・
   `check_frozen_corpora.py` バイト一致・`check_docs.py` 緑。
+
+### 2026-08-07 — Android の参照コーパスが版ごとに分かれた（**採番なし**・検査のみ）
+
+**engine を上げるたびに Android が赤くなる構造を畳んだ。** 参照 fixture は平らな 1 ディレクトリに置かれ、
+生成器がその場で焼き直していたので、**server が engine を上げた瞬間に移植側の期待値が書き換わり、
+移植が名乗ったことのない版と比べられていた**。engine 22 のマージでは **JVM 159 件のうち 7 件**が
+そうして赤くなり、赤の窓は前回・今回とも 2 日続いた。**描画改善は今後も続くと告げられている。**
+
+- **`server/reference/` と同じ作法を当てた** — **版ごとにディレクトリを持ち、生成器は現在版しか書かず、
+  旧版は焼き直さずに manifest で押さえる**。**render engine が支配する 54 ファイル**は
+  `render-engine-<版>/` へ、**`ddl_expand.json`** は `ddl-engine-<版>/` へ移した。
+  **どの engine も支配しない 5 つ**（`prompts` / `lineage_wiring` / `count_preservation` /
+  `coerce_governors` / `score_schema_contract`）は**平らなまま**で、従来どおり焼き直して追随する。
+- **engine 21 の 54 ファイルは履歴から復元した**（`d0a9739f`）。**engine 22 の木では焼けない** —
+  旧版が「焼き直せないもの」であることが、この配置の要である。
+- **移植は素の名前で fixture を頼み、`CompatibilityConstants.renderEngineVersion` が指す版を読む。**
+  資源パスを自前で開いていた **20 のテストファイル**を 1 つの解決器へ寄せた。
+- **Kotlin の実装は 1 行も変えていない。** それでも**赤 7 件は全部閉じた**（159 / 赤 0）。
+  **engine 22 への追随は別の契約**で、`renderEngineVersion` は `"21"` のままである。
+- **旧版を守るのは manifest だけである** — 現在版を焼き直す F-1 は旧版に届かないので、
+  **各版のディレクトリを名前と digest で突き合わせる検査（F-4）**を足した。
+  **旧版の digest を 1 文字変えると F-4 だけが赤くなる**（他の 124 件は緑のまま）。
+- **摂動 6 本を製品コードと製品データへ当てた** — 解決器から版依存を外すと**元の 7 件がそのまま戻り**、
+  `renderEngineVersion` を `"22"` へ向けると**その 7 件＋版を名乗る 2 件**が赤くなる。
+- **検査:** server **2367 / 31 skipped**（**+1 = F-4**）・cli **111**・
+  `npm run check` **241 FILES / 0 errors / 2 warnings**・ruff clean・
+  `check_frozen_corpora.py` バイト一致・`check_docs.py` 緑・
+  **Android JVM 159 / 赤 0**・**計装 31 / 赤 0**（実機 Pixel 9）。

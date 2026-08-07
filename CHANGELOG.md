@@ -3857,3 +3857,35 @@ by **6.1%**, and the endpoints **not at all**.
 - **Checks:** server **2366 / 31 skipped** (2340 at the branch point; **+26 = the 26 new tests**,
   the five existing ones being renames), cli **111**, `npm run check` **241 FILES / 0 errors /
   2 warnings**, ruff clean, `check_frozen_corpora.py` byte-identical, `check_docs.py` green.
+
+### 2026-08-07 — The Android reference corpus is filed by engine version (**no version**, tests only)
+
+**Raising the engine no longer turns the port red.** The reference fixtures sat in one flat
+directory that the generator rebaked in place, so **the moment the server raised its engine the
+port's expectations were rewritten underneath it and it was compared against a version it had
+never claimed**. Merging engine 22 turned **7 of the 159 JVM tests** red that way, and the red
+window lasted two days both times. **More drawing revisions have been announced.**
+
+- **The rule `server/reference/` already follows** — a directory per version, only the current one
+  written, older ones held by a manifest rather than rebaked. The **54 files the render engine
+  governs** moved under `render-engine-<version>/` and **`ddl_expand.json`** under
+  `ddl-engine-<version>/`. The **five no engine governs** (`prompts`, `lineage_wiring`,
+  `count_preservation`, `coerce_governors`, `score_schema_contract`) stay flat and are followed
+  the way they always were.
+- **Engine 21's 54 files were restored from history** (`d0a9739f`). **An engine 22 tree cannot bake
+  them** -- that older versions are unbakeable is the point of the layout.
+- **The port asks for a fixture by bare name** and reads the version
+  `CompatibilityConstants.renderEngineVersion` names. The **20 test files** that each opened their
+  own resource path now go through one resolver.
+- **No implementation file changed**, and all **7 red tests closed** (159, none red). Catching up to
+  engine 22 is a separate contract; `renderEngineVersion` is still `"21"`.
+- **A manifest is the only thing holding an older version** -- F-1 rebakes the current one and
+  cannot reach the rest -- so **F-4** matches every version directory against its own names and
+  digests. Changing one character of engine 21's digest reddens **F-4 alone**, with the other 124
+  related tests still green.
+- **Six perturbations against production code and data**: dropping the version from the resolver
+  **brings back exactly the original 7**, and pointing `renderEngineVersion` at `"22"` reddens
+  **those 7 plus the 2 that assert the declared version**.
+- **Checks:** server **2367 / 31 skipped** (**+1 = F-4**), cli **111**, `npm run check` **241 FILES /
+  0 errors / 2 warnings**, ruff clean, `check_frozen_corpora.py` byte-identical, `check_docs.py`
+  green, **Android JVM 159 with none red**, **instrumented 31 with none red** (Pixel 9 hardware).

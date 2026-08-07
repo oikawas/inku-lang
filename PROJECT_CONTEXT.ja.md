@@ -190,6 +190,9 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
 現役は `render-engine-22`（531 件）と `ddl-engine-7`（34 件）で、再生成のバイト一致を CI が強制する。
+- **Android の参照コーパス** — `android/app/src/test/resources/server_reference/` も同じ作法で版ごとに分かれる。
+移植は自分が名乗る版のディレクトリを読むので、**server が engine を上げてもディレクトリが増えるだけで移植は赤くならない**。
+旧版は焼き直せないので、各版の `manifest.json` が名前と digest で押さえる。
 - **`cli/tests`** — pytest。
 - **`npm run check`** と **`lint:i18n`** / **`lint:models`** / **`lint:recommendations`** — web の型と用語とモデル解決。
 - **`npm run test:unit`** — web の純関数の単体テスト（Node の `node:test`。依存を足していない）。

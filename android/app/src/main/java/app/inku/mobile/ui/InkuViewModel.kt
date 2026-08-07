@@ -163,7 +163,20 @@ enum class HistorySelectionBehavior {
     Current,
 }
 
-class InkuViewModel(
+/**
+ * `@JvmOverloads` is what makes the app start.
+ *
+ * `androidx.lifecycle`'s default factory looks the constructor up by
+ * reflection, as `<init>(Application)`. Kotlin does not emit that signature for
+ * a constructor with a defaulted second parameter -- it emits the two-argument
+ * one plus a synthetic bridge -- so from the day [repositoryOverride] was added
+ * (`4c5e82f6`, 2026-08-06) `viewModel()` in `InkuApp` threw
+ * `NoSuchMethodException` and the app died on launch. Nothing caught it: every
+ * test builds the view model from Kotlin, which calls the bridge.
+ * `AppStartupTest` composes `InkuApp` instead and walks the same reflective
+ * path the running app does.
+ */
+class InkuViewModel @JvmOverloads constructor(
     application: Application,
     // Injectable so an instrumented test can drive the drawing paths against a
     // repository it built itself, with a throwaway database and no language

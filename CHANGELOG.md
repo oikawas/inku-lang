@@ -3923,3 +3923,34 @@ unrelated works.
 - **Checks:** Android JVM **168, none failing** (38 classes, 159 at the branch point), **instrumented
   42, none failing** (Pixel 9 hardware, 31 at the branch point). **Only `android/VERSION` moved** --
   `APP_VERSION` and `web/BUILD_NUMBER` are unchanged and nothing was deployed to pentala.
+
+### 2026-08-07 — The CLI manual is written in the parser's own words (**no version**, tests only)
+
+**The Command Line Help Reference in `cli/README.md` was `--help` copied by hand, and nothing
+compared the copy to the parser.** So a renamed flag left the manual naming the old spelling:
+it said `--original-text` (now `--description`) and `--vary-seed` (now `--composition-seed`),
+and it never listed `--staffage` or `--trace` at all. **Regenerating it on 2026-08-04 fixed the
+content of the day and left the structure, so the next forgotten flag would ship the same way.**
+
+- **The marked region is now generated** — `cli/scripts/gen_readme_help.py` writes the **1,217
+  lines** between `<!-- HELP_START -->` and `<!-- HELP_END -->`. **The 77 lines of prose outside
+  the markers belong to a person, and the generator never touches them.**
+- **`COLUMNS` is pinned to 80** — argparse wraps to the terminal width, so without pinning the
+  generated file would depend on who ran it.
+- **Three things exist (parser, manual, generator) and the suite asserts two of the three edges** —
+  byte equality per command (**48 cases**) and the generator's `--check` (1 case).
+  **That the markers bound the region is asserted separately**, because deleting one would
+  otherwise just shrink what is checked and stay green.
+- **The comparison is the whole block, not the flag names** — a stale description under the right
+  name is the failure this started from.
+- **The existing eight-flag gate stays.** It reads the opening words of each help string, which
+  byte equality does not single out: **changing one word of a description turns only the new gate red.**
+- **Regenerating moved four lines** — how `paint` and `batch` wrap their usage synopsis. Every flag
+  name and description already matched.
+- **Five perturbations were applied to production code and to the generated file** — deleting the
+  generator turns **1** red, adding a flag without regenerating **3**, changing one word of a
+  description **3**, deleting a marker **50**. **The fifth checks the opposite**: running the
+  generator on the third state takes 3 back to 0, so the repair path works.
+- **Tests:** cli **161** (**+50**), server **2367 / 31 skipped** (unchanged),
+  `npm run check` **241 FILES / 0 ERRORS / 2 WARNINGS**, ruff clean
+  (**cli's arguments are now `src tests scripts`**), `check_docs.py` green.

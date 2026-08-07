@@ -265,6 +265,21 @@ ENGINE_22_FILL_CASES = frozenset({
     "E-wild-fill-triangle-pencil",
 })
 
+# The 14 that moved for a DIFFERENT reason, and so are listed apart from the
+# fill cases rather than folded in with them. "For chalk, raise the amount of
+# skipping on the line side" (author, 2026-08-07) is not a fill ruling: it
+# raises how hard the sheet refuses that one tool, which reaches every chalk
+# stroke in the corpus, filled or not. Every one of them is chalk, and no other
+# tool moved -- that is what makes this an authorised exception rather than a
+# leak. The amount is gated in `test_fill_underlay_and_branch.py` (T-22).
+ENGINE_22_CHALK_CASES = frozenset({
+    "A-chalk-arc", "A-chalk-circle", "A-chalk-cloudform", "A-chalk-ellipse",
+    "A-chalk-line", "A-chalk-square", "A-chalk-triangle",
+    "E-wild-chalk-arc", "E-wild-chalk-circle", "E-wild-chalk-cloudform",
+    "E-wild-chalk-ellipse", "E-wild-chalk-line", "E-wild-chalk-square",
+    "E-wild-chalk-triangle",
+})
+
 
 def test_a_score_without_an_arrangement_is_engine_19():
     """The cases of A-F state no arrangement and must be byte-identical.
@@ -274,20 +289,26 @@ def test_a_score_without_an_arrangement_is_engine_19():
     and this test alone would still pass.
 
     Engine 22 rebuilt the fill layer, so the 32 filled cases of A-F are no
-    longer engine 19 and are excluded by name. The other 461 still are: the
-    claim this test carries -- that a score with no arrangement is untouched by
-    everything the layout work added -- is unaffected by a change to how a
-    closed shape is painted inside.
+    longer engine 19 and are excluded by name, and it raised how hard the sheet
+    refuses chalk, which excludes 14 more. The other 447 still are: the claim
+    this test carries -- that a score with no arrangement is untouched by
+    everything the layout work added -- is unaffected by either.
     """
     generator = _generator()
     frozen = json.loads(ENGINE_19_MANIFEST.read_text(encoding="utf-8"))["cases"]
     assert len(frozen) == 493
     assert ENGINE_22_FILL_CASES <= set(frozen)
+    assert ENGINE_22_CHALK_CASES <= set(frozen)
+    assert not (ENGINE_22_FILL_CASES & ENGINE_22_CHALK_CASES)
+    # 除外の理由が名前と一致していること。塗りでない case が塗りの札で
+    # 抜けたり、chalk でない case が chalk の札で抜けたりしない。
+    assert all("fill" in case_id for case_id in ENGINE_22_FILL_CASES)
+    assert all("chalk" in case_id for case_id in ENGINE_22_CHALK_CASES)
     checked = 0
     for case_id, case in frozen.items():
         render_input = case["input"]
         assert render_input["score"]["instructions"][0]["arrangement"] is None
-        if case_id in ENGINE_22_FILL_CASES:
+        if case_id in ENGINE_22_FILL_CASES or case_id in ENGINE_22_CHALK_CASES:
             continue
         svg = render(
             Score.model_validate(render_input["score"]),
@@ -299,7 +320,7 @@ def test_a_score_without_an_arrangement_is_engine_19():
         )
         assert generator._normalized_digest(svg) == case["digest"], case_id
         checked += 1
-    assert checked == 461
+    assert checked == 447
 
 
 # T-6 --------------------------------------------------------------------

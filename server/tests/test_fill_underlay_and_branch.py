@@ -8,11 +8,12 @@ Thirteen gates over the four stages of the contract
     T-7 .. T-11  stage 3, the variation and the terminal
     T-12 .. T-13 stage 4, the corpus
 
-and six more for the rulings the author made while the contract was running,
+and nine more for the rulings the author made while the contract was running,
 which arrive without gates of their own:
 
     T-14 .. T-16 the texture branch's direction, its contrast, the machine's raster
     T-17 .. T-19 its count, how its marks end, and chalk's own contrast
+    T-20 .. T-22 the per-mark tone, the reserve, and chalk's bare paper
 
 Three of these measure the geometry the renderer INTENDED, not the path string
 it emitted. That is not a shortcut around the product: the intended centreline
@@ -244,8 +245,13 @@ def test_t2_the_underlay_survives_the_non_display_profiles():
         for payload in (SCAN_CASE, TEXTURE_CASE):
             svg = _svg(payload, svg_profile=profile)
             assert _has(svg, "fill-underlay-v1"), (profile, payload["weight"])
-            underlay = re.search(r'<polygon class="fill-underlay-v1"[^>]*>', svg)
-            assert underlay is not None
+            # A `polygon` without reserves, a `path` with holes in it when the
+            # tool left the ground bare. Either way a real element, never a
+            # filter.
+            underlay = re.search(
+                r'<(?:polygon|path)[^>]*class="fill-underlay-v1[^"]*"[^>]*>', svg
+            )
+            assert underlay is not None, (profile, payload["weight"])
             assert "filter" not in underlay.group(0), profile
 
 
@@ -520,8 +526,16 @@ def test_t17_the_texture_branch_lays_the_ink_one_classic_scan_pass_laid(monkeypa
         short_side = min(max(xs) - min(xs), max(ys) - min(ys))
         area = renderer._polygon_area(contour)
         one_pass = area / (pitch * max(pitch, area / short_side))
+        marks = int(
+            re.search(r'class="fill-texture-v1 marks-(\d+)"', _svg(payload)).group(1)
+        )
+        assert 0.8 * one_pass <= marks <= 1.2 * one_pass, (tool, marks, one_pass)
+        # **描いたものからも数える。**上の数は renderer が「何本置くと決めたか」で、
+        # これは実際に合成器へ渡った本数である。塗り残しで割れた痕があるので
+        # 断片の方が多いが、痕より少なくなることはない（割れたことそのものは
+        # T-21 が見る。ここは「決めた本数のものが実際に描かれた」だけ）。
         drawn = len(_centerlines(payload, monkeypatch))
-        assert 0.8 * one_pass <= drawn <= 1.2 * one_pass, (tool, drawn, one_pass)
+        assert marks <= drawn <= 2.5 * marks, (tool, drawn, marks)
 
 
 def test_t18_a_texture_mark_ends_the_way_a_scan_stroke_does(monkeypatch):
@@ -533,13 +547,19 @@ def test_t18_a_texture_mark_ends_the_way_a_scan_stroke_does(monkeypatch):
 
     片側だけ出す実装は、輪郭の片側を engine 21 の交点切りと同じ整い方で残す。
     枝が違うだけで同じ欠陥なので、同じ形で挟む。
+
+    **塗り残しで切られた端は対象外である。**これは「痕が形の縁でどう終わるか」の
+    受入で、抜きの縁で終わった端はそもそも縁に居ない。落とした端が半分を超えたら
+    落とし方の側を疑うので、残った割合も見る。
     """
     for tool in TEXTURE_TOOLS:
         payload = dict(CIRCLE, weight=tool, filled=True)
         ins = Instruction.model_validate(payload)
         width = _stroke_width_px(ins.weight, CANVAS, ins.thinness)
-        reaches = _reach_pixels(_centerlines(payload, monkeypatch), _contour(payload))
-        assert reaches, tool
+        every = _reach_pixels(_centerlines(payload, monkeypatch), _contour(payload))
+        reaches = [r for r in every if abs(r) <= 4 * width]
+        assert len(reaches) >= 20, (tool, len(reaches))
+        assert len(reaches) >= 0.5 * len(every), (tool, len(reaches), len(every))
         assert any(r > 0 for r in reaches), f"{tool}: nothing overshoots"
         assert any(r < 0 for r in reaches), f"{tool}: nothing falls short"
         in_widths = [abs(r) / width for r in reaches]
@@ -570,15 +590,10 @@ def test_t19_chalk_stands_further_out_of_its_field_than_crayon_does():
         if thinness:
             payload["thinness"] = thinness
         svg = _svg(payload)
-        under = float(
-            re.search(r'fill-underlay-v1"[^>]*fill-opacity="([\d.]+)"', svg).group(1)
-        )
-        group = re.search(
-            r'<g class="fill-(?:texture|stroke)-v1[^"]*">(.*?)</g>', svg, flags=re.S
-        )
-        marks = {float(v) for v in re.findall(r'fill-opacity="([\d.]+)"', group.group(1))}
-        assert len(marks) == 1, (tool, thinness, len(marks))
-        ratios[(tool, thinness)] = marks.pop() / under
+        under = _underlay_opacity(svg)
+        klass = "fill-texture-v1" if _has(svg, "fill-texture-v1") else "fill-stroke-v1"
+        # テクスチャ枝は 1 本ごとに濃さが違うので平均で見る（走査線枝は 1 値）。
+        ratios[(tool, thinness)] = statistics.fmean(_mark_opacities(svg, klass)) / under
 
     # 走査線枝の同士討ち。crayon は枝の値のまま、chalk はその上。
     assert ratios[("crayon", None)] == pytest.approx(FILL_SCAN_CONTRAST, abs=0.02)
@@ -600,33 +615,186 @@ def test_t15_a_texture_mark_sits_close_to_the_field_it_rises_from():
     筆致まで見えなくなる。**
     """
     texture = _svg(TEXTURE_CASE)
-    under = float(re.search(r'fill-underlay-v1"[^>]*fill-opacity="([\d.]+)"', texture).group(1))
-    marks = {
-        float(value)
-        for value in re.findall(
-            r'fill-opacity="([\d.]+)"',
-            re.search(r'<g class="fill-texture-v1[^"]*">(.*?)</g>', texture, flags=re.S).group(1),
-        )
-    }
-    assert len(marks) == 1
-    mark = marks.pop()
-    assert mark / under == pytest.approx(FILL_TEXTURE_CONTRAST, abs=0.05), (mark, under)
+    under = _underlay_opacity(texture)
+    marks = _mark_opacities(texture, "fill-texture-v1")
+    # 痕は 1 本ごとに濃さが違う（T-20）。**平均で見る** — 個々の値で断定すると、
+    # 濃淡を足した時点でこのゲートが「動かしていない量」まで赤くする。
+    mean = statistics.fmean(marks)
+    assert mean / under == pytest.approx(FILL_TEXTURE_CONTRAST, abs=0.05), (mean, under)
 
     # 対照: 走査線枝も下地に寄せるが、**寄せ方が違う**。両枝が同じ定数を読む
     # 実装は、片方の裁定を動かしたときにもう片方も黙って動く。
     scan = _svg(SCAN_CASE)
-    scan_under = float(re.search(r'fill-underlay-v1"[^>]*fill-opacity="([\d.]+)"', scan).group(1))
-    scan_marks = {
-        float(value)
-        for value in re.findall(
-            r'fill-opacity="([\d.]+)"',
-            re.search(r'<g class="fill-stroke-v1[^"]*">(.*?)</g>', scan, flags=re.S).group(1),
-        )
-    }
+    scan_under = _underlay_opacity(scan)
+    scan_marks = set(_mark_opacities(scan, "fill-stroke-v1"))
     assert len(scan_marks) == 1
     scan_ratio = scan_marks.pop() / scan_under
     assert scan_ratio == pytest.approx(FILL_SCAN_CONTRAST, abs=0.02)
-    assert mark / under < scan_ratio, (mark / under, scan_ratio)
+    assert mean / under < scan_ratio, (mean / under, scan_ratio)
+
+
+def test_t20_every_texture_mark_takes_its_own_tone():
+    """T-20 テクスチャ枝の痕は 1 本ごとに濃さが違う。**平均は動かない。**
+
+    「塗りつぶしの色むらを、テクスチャで使われる細い道具でも表現したい」
+    （作者裁定 2026-08-07）。engine 22 の 5 巡目まで、この枝の痕は全部同じ濃さの
+    1 値だった。
+
+    **平均を据えるのが要点である。**幅だけを足して平均を動かさない、という裁定
+    なので、上下に振っただけの実装と「全部濃くした」実装を分けるにはここを見る。
+    帯の下限が 1.0 なのは、下地より淡い痕も合成では下地を濃くするからで、
+    淡い側へ広げても明るい斑は 1 つも生まれない（明るさは塗り残しが作る）。
+    """
+    for tool in TEXTURE_TOOLS:
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        svg = _svg(payload)
+        under = _underlay_opacity(svg)
+        marks = _mark_opacities(svg, "fill-texture-v1")
+        assert len(marks) >= 20, tool
+        distinct = sorted(set(marks))
+        assert len(distinct) >= 10, (tool, len(distinct))
+        # 幅がある。1 値の実装との差はここで、2 つの値がたまたま違うだけの
+        # 実装は通らない（四分位で見る）。
+        low = statistics.quantiles(marks, n=4)[0]
+        high = statistics.quantiles(marks, n=4)[2]
+        assert (high - low) / statistics.fmean(marks) >= 0.05, (tool, low, high)
+        # どの痕も下地より薄くはならず、記述が求めた墨より濃くもならない。
+        assert min(marks) >= under * 0.98, (tool, min(marks), under)
+        ink = under / renderer.FILL_UNDERLAY_OPACITY_RATIO
+        assert max(marks) <= ink + 1e-9, (tool, max(marks), ink)
+
+
+def test_t21_the_tool_leaves_the_ground_bare_in_places(monkeypatch):
+    """T-21 塗り残し。**地が出る場所には、下地も痕も無い。**
+
+    「逆に塗り残しで地が出る表現を追加する」（作者裁定 2026-08-07）。下地が面を
+    持っている以上、地を出すとは面を取り除くことである。
+
+    **2 つを同時に見る。**下地に穴が開いていても痕がその上を素通りしていれば
+    地は出ないし、痕だけ避けても下地が残っていれば出ない。**片方だけのゲートは、
+    もう片方が抜けた実装を通す。**
+
+    対照: 走査線枝には塗り残しを置かない。
+    """
+    for tool in TEXTURE_TOOLS:
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        svg = _svg(payload)
+        # 下地は穴を持つ path で、穴の数は 2〜4。
+        count = re.search(r'class="fill-underlay-v1 reserves-(\d+)"', svg)
+        assert count is not None, tool
+        assert 2 <= int(count.group(1)) <= 4, (tool, count.group(1))
+        underlay = re.search(
+            r'<path[^>]*class="fill-underlay-v1[^"]*"[^>]*>', svg
+        ).group(0)
+        assert 'fill-rule="evenodd"' in underlay, tool
+        d = re.search(r'\sd="([^"]+)"', underlay).group(1)
+        assert d.count("M ") == int(count.group(1)) + 1, (tool, d.count("M "))
+
+        # そして痕が入っていない。製品の抜きの現物に対して、合成器へ渡った
+        # 中心線の点を数える。
+        contour = _contour(payload)
+        xs = [point[0] for point in contour]
+        ys = [point[1] for point in contour]
+        reserves = renderer._fill_reserves(
+            contour,
+            renderer._seed_for_instruction(Instruction.model_validate(payload), SEED),
+            min(max(xs) - min(xs), max(ys) - min(ys)),
+        )
+        assert reserves, tool
+        width = _stroke_width_px(
+            Instruction.model_validate(payload).weight, CANVAS, None
+        )
+        lines = _centerlines(payload, monkeypatch)
+        # **深さで見る。件数比では分からない。**抜きは形の 4% ほどしか占めないので、
+        # 素通りする実装でも「抜きの中の標本」は 4% にしかならず、ずれ幅ぶんの
+        # 2.6% と見分けがつかない。深さなら、切っていれば道具の幅の数倍まで、
+        # 切っていなければ抜きの半径ぶん（pencil で幅の 20 倍）入る。
+        deepest = 0.0
+        for line in lines:
+            for point in line:
+                for reserve in reserves:
+                    if _point_in_polygon(point, reserve):
+                        deepest = max(deepest, _depth_in_polygon(point, reserve))
+        assert deepest <= 2.0 * width, (tool, deepest, width)
+        # そして実際に切られたこと。抜きが形の外に落ちていれば上は恒真になる。
+        marks = int(re.search(r'class="fill-texture-v1 marks-(\d+)"', svg).group(1))
+        assert len(lines) > marks, (tool, len(lines), marks)
+
+    # 対照。
+    assert "reserves-" not in _svg(SCAN_CASE)
+
+
+def _depth_in_polygon(point: tuple[float, float], polygon) -> float:
+    """How far inside the polygon the point sits: its distance to the nearest edge."""
+    x, y = point
+    best = float("inf")
+    for index in range(len(polygon)):
+        ax, ay = polygon[index]
+        bx, by = polygon[(index + 1) % len(polygon)]
+        ex, ey = bx - ax, by - ay
+        length2 = ex * ex + ey * ey
+        t = 0.0 if length2 == 0 else ((x - ax) * ex + (y - ay) * ey) / length2
+        t = max(0.0, min(1.0, t))
+        best = min(best, math.hypot(x - (ax + ex * t), y - (ay + ey * t)))
+    return best
+
+
+def _point_in_polygon(point: tuple[float, float], polygon) -> bool:
+    x, y = point
+    inside = False
+    for index in range(len(polygon)):
+        ax, ay = polygon[index]
+        bx, by = polygon[(index + 1) % len(polygon)]
+        if (ay > y) != (by > y):
+            crossing = ax + (y - ay) / (by - ay) * (bx - ax)
+            if x < crossing:
+                inside = not inside
+    return inside
+
+
+def test_t22_chalk_shows_more_bare_paper_than_the_other_waxy_tools():
+    """T-22 chalk の掠れは crayon・pencil より多い。
+
+    「chalk については線の側の掠れの量を増加」（作者裁定 2026-08-07）。3 つとも
+    紙が拒む量 1.00 で、同じ 4.8% の紙しか出していなかった。
+
+    **道具の側で測る。**掠れは合成器の機構なので、そこへ直接 widths を渡して
+    切れた標本を数える。片方の道具だけでは「全部増えた」実装が通るので、
+    動かしていない 2 つが動いていないことも見る。
+    """
+    from inku_server.stroke_engine import DEFAULT_SUPPORT, _support_response
+
+    bare = {}
+    for tool in ("chalk", "crayon", "pencil", "pen"):
+        cuts = 0
+        total = 0
+        for seed in range(40):
+            _, marks = _support_response([2.0] * 220, tool, seed, DEFAULT_SUPPORT)
+            cuts += sum(marks)
+            total += len(marks)
+        bare[tool] = cuts / total
+
+    assert bare["chalk"] >= bare["crayon"] * 1.5, bare
+    assert bare["chalk"] >= bare["pencil"] * 1.5, bare
+    # 動かしていない側。crayon と pencil は同じ紙のままで、pen は元から出さない。
+    assert bare["crayon"] == pytest.approx(bare["pencil"], abs=1e-9), bare
+    assert bare["pen"] == 0.0, bare
+
+
+def _underlay_opacity(svg: str) -> float:
+    """下地の濃度。**要素は `polygon` とは限らない** — 塗り残しがあると穴を持つ
+    `path` になる。要素名で引くゲートは、そこで黙って見失う。"""
+    match = re.search(
+        r'class="fill-underlay-v1[^"]*"[^>]*fill-opacity="([\d.]+)"', svg
+    )
+    assert match is not None
+    return float(match.group(1))
+
+
+def _mark_opacities(svg: str, klass: str) -> list[float]:
+    group = re.search(rf'<g class="{klass}[^"]*">(.*?)</g>', svg, flags=re.S)
+    assert group is not None, klass
+    return [float(v) for v in re.findall(r'fill-opacity="([\d.]+)"', group.group(1))]
 
 
 def test_t16_the_machines_fill_is_a_straight_raster_line(monkeypatch):
@@ -733,13 +901,18 @@ def test_t12_the_new_cases_exist_and_traverse_the_layer_they_were_added_for():
 def test_t13_the_frozen_corpus_moved_exactly_the_cases_the_contract_predicted():
     """T-13 コーパスの差分が予測と一致する。
 
-    予測は既存 32 件（走査線・被覆 0.2 以上 21 ＋ 0.2 未満 11）。**打点 3 件には
-    下地を置かない**と決めたので 35 ではない。`changed_from_previous` はこれに
-    新規 6 件を足した 38 になる — 生成器は新規 case も changed に数えるからである。
+    契約の予測は塗りの既存 32 件（走査線・被覆 0.2 以上 21 ＋ 0.2 未満 11）だった。
+    **打点 3 件には下地を置かない**と決めたので 35 ではない。
 
-    既存 32 件は契約の予測のまま動いていない。**新規は 4 件から 6 件へ増えた** —
-    走行中の裁定「chalk は crayon よりコントラストを付ける」を記録する塗った
-    chalk が、コーパスに 1 件も無かったためである（枝の両側で 2 件）。
+    そこへ走行中の裁定が 2 つ乗って 46 件になっている:
+
+    - **新規 6 件**（契約は 4 件）。塗った chalk がコーパスに 1 件も無く、
+      「chalk は crayon よりコントラストを付ける」がどこにも記録されなかった
+    - **既存 +14 件はすべて chalk**。「chalk は線の側の掠れを増やす」は紙が
+      道具を拒む量を動かすので、**塗っていない chalk の輪郭まで動く**。
+      塗りの裁定ではないものが塗りのコーパスを動かした、という記録である
+
+    `changed_from_previous` は 46 + 6 = 52。生成器は新規 case も changed に数える。
 
     決定性そのものは `check_frozen_corpora.py` が見る（CI が走らせるものと同一）。
     """
@@ -748,9 +921,10 @@ def test_t13_the_frozen_corpus_moved_exactly_the_cases_the_contract_predicted():
     changed = manifest["changed_from_previous"]
     moved = sorted(case_id for case_id in changed if case_id in before)
     added = sorted(case_id for case_id in changed if case_id not in before)
-    assert len(moved) == 32, moved
+    assert len(moved) == 46, moved
     assert len(added) == 6, added
-    assert len(changed) == 38
+    assert len(changed) == 52
+    assert len([case_id for case_id in moved if "chalk" in case_id]) == 14, moved
     assert len(manifest["cases"]) == 531
     assert manifest["engine_version"] == "22"
 

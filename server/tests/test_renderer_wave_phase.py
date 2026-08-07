@@ -118,9 +118,13 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # 幅が膨らみ、弾かれる道具は墨が切れる。5 件のうち 4 件が動き、`pencil_circle`
 # だけが不動 — 閉じた輪郭の帯は切らない (SPEC: even-odd の帯を保つ) ので、
 # pencil の吸い (0.10) が 1 度も到着しなかったこの 1 件は 1 バイトも動かない。
+# engine 22 で `chalk_square` の 1 件だけ再採取。「chalk については線の側の掠れの
+# 量を増加」（作者裁定 2026-08-07）で紙が chalk を拒む量が 1.00 → 1.30 になり、
+# 出る紙が 4.8% → 9.5% へ増えた。**残る 4 件が動いていないことが対照である** —
+# 掠れの量は道具ごとの値なので、chalk 以外へこぼれていればここが赤くなる。
 MATERIAL_NONE_SEED_DIGESTS = {
     "brush_thin_line": "896b28849045ca35bbdd94605ba4a5cf",
-    "chalk_square": "d7ef771643bd96c50f47894c69e4381e",
+    "chalk_square": "a166d679bada6f7d8d1ee392542fa669",
     "crayon_arc": "67cdabd624a76ad7059118d46448e730",
     "pencil_circle": "e950ff63e16c5859100c9ffa4f85d978",
     "pencil_ellipse": "21859684c56809933104f8efdcf0197f",

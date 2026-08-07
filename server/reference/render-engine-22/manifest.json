@@ -6,9 +6,16 @@
   "schema_version": "0.1.0",
   "color_map_digest": "d87f7bee737e212d7311cb32f1bbeb84",
   "frozen_at": "2026-08-07",
-  "commit": "aa3953a36d8c72d9715c84f7b1d1395f2c51efd5",
+  "commit": "167e19f18feaa670830b022b88eb71a8eef6f369",
   "reason": "A fill got an underlay, and what goes on top of it got a branch. Until engine 21 a stroke WAS the fill, so every scan line had to be cut at its intersection with the outline or the paint would spill outside the shape. That cut is one of three regularities the eye reads as a raster: measured across the eleven filled shapes of the three works the author named as striped, the scan angle varied by 0.1 degrees inside one shape, the pitch by 6.1%, and the endpoints not at all. A real element now holds the field, so the marks are free to leave the contour: the angle moves per stroke, the pitch is drawn far wider, and each end overshoots or falls short. All three amplitudes come from ToolGrammar.fill_hand and are zero for a machine, so a computer fill keeps the exact repetition that is its signature. Above the threshold the marks are scan lines packed to coverage 0.9; below it they are rubbings, because closing the gaps at pencil width would take eight times the lines and that is not how the tool is used. A rubbing runs the width of the form and takes the region's one direction, wobbling by the few degrees the hand gives -- the same band the scan branch draws from -- so what separates the two branches is that the marks are not on rows, and the count is the stroke length one classic scan pass laid. The threshold is coverage -- width over pitch -- and not a list of tool names: the two cut the engine-21 corpus identically, which is why C-fill-circle-crayon-extra_fine is added to send one tool across the branch on thinness alone. A fill stroke also ends the way paint ends, heavy where the tool lands, instead of tapering like a drawn line. How far the marks stand out of their own field is the branch's, times the tool's own ToolGrammar.fill_contrast, which is 1.0 everywhere but chalk. Tiny shapes still degrade to one dab and rotring still degrades to a region fill; neither gets an underlay.",
   "changed_from_previous": [
+    "A-chalk-arc",
+    "A-chalk-circle",
+    "A-chalk-cloudform",
+    "A-chalk-ellipse",
+    "A-chalk-line",
+    "A-chalk-square",
+    "A-chalk-triangle",
     "C-fill-circle-brush_thick",
     "C-fill-circle-brush_thick-extra_fine",
     "C-fill-circle-chalk",
@@ -32,6 +39,13 @@
     "C-fill-triangle-pencil",
     "C-tinyfill-boundary-pen",
     "D-size-large-filled-polygon",
+    "E-wild-chalk-arc",
+    "E-wild-chalk-circle",
+    "E-wild-chalk-cloudform",
+    "E-wild-chalk-ellipse",
+    "E-wild-chalk-line",
+    "E-wild-chalk-square",
+    "E-wild-chalk-triangle",
     "E-wild-fill-circle-brush_thick",
     "E-wild-fill-circle-crayon",
     "E-wild-fill-circle-pencil",
@@ -1872,7 +1886,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "74323af2b1eadbb6ec83f7c54929f167",
+      "digest": "95bf8b28288cb71439dc5e3a708edf15",
       "bytes": 14082,
       "counts": {
         "path": 4,
@@ -1944,7 +1958,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "7d5a3191316bc532fb3bd41e8a95d199",
+      "digest": "8c7441569f5b7d957d06ea6df67d1912",
       "bytes": 16497,
       "counts": {
         "path": 1,
@@ -2019,7 +2033,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "a5e761e8a016aae5bfda47d5cfdda0b1",
+      "digest": "2f6c2d8b779d1689b7b5c7f63ae29959",
       "bytes": 36102,
       "counts": {
         "path": 2,
@@ -2095,7 +2109,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "b8a113f2e506af433b1c004cc8a89908",
+      "digest": "bbd252fde0ce3f409b4081ac6752ede0",
       "bytes": 13869,
       "counts": {
         "path": 1,
@@ -2170,8 +2184,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "263c2adc41cf3379372edfdfc35b9f8a",
-      "bytes": 9612,
+      "digest": "cce9dd9a41d1f1c553120c5f46f390b4",
+      "bytes": 9566,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -2317,7 +2331,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "d9a07d515fddc353ac5011f2d9a08da5",
+      "digest": "953ae907aa505b4b5303806994146759",
       "bytes": 19186,
       "counts": {
         "path": 1,
@@ -2392,7 +2406,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "8a49ca23a68ca6e890a39c5a6e00e5f2",
+      "digest": "bb1a1bff18dad395ab44db64b8452e11",
       "bytes": 18726,
       "counts": {
         "path": 1,
@@ -12849,8 +12863,8 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "51e857a9f245699f1479e0f36c2efd2b",
-      "bytes": 153999,
+      "digest": "08e4d8ece40435e7bad0e344194989de",
+      "bytes": 148351,
       "counts": {
         "path": 142,
         "polyline": 0,
@@ -12924,12 +12938,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "ec0bb45b0898537e357c333fdbb0a4a6",
-      "bytes": 56849,
+      "digest": "09afd728c852f72b24d691de18c1f298",
+      "bytes": 73761,
       "counts": {
-        "path": 40,
+        "path": 64,
         "polyline": 0,
-        "polygon": 1,
+        "polygon": 0,
         "circle": 115,
         "ellipse": 0,
         "line": 0,
@@ -12939,7 +12953,7 @@
       "classes": [
         "contour-stroke-v1 controls-74 events-1",
         "fill-texture-v1 marks-39",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-4",
         "fill-v2",
         "material-outline"
       ]
@@ -13149,12 +13163,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "2d3374f72d2d59518a4a020f502e2a91",
-      "bytes": 54313,
+      "digest": "e13caa33d569ce035f44a1cd4950dcce",
+      "bytes": 65703,
       "counts": {
-        "path": 39,
+        "path": 53,
         "polyline": 0,
-        "polygon": 1,
+        "polygon": 0,
         "circle": 91,
         "ellipse": 0,
         "line": 0,
@@ -13164,7 +13178,7 @@
       "classes": [
         "contour-stroke-v1 controls-74 events-0",
         "fill-texture-v1 marks-38",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-4",
         "fill-v2",
         "material-outline"
       ]
@@ -13224,12 +13238,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "13be00492f9959b5f2b4ba73dcda4e91",
-      "bytes": 49681,
+      "digest": "6f02876bab48dfe04c42164e4685dd02",
+      "bytes": 65310,
       "counts": {
-        "path": 39,
+        "path": 62,
         "polyline": 0,
-        "polygon": 1,
+        "polygon": 0,
         "circle": 59,
         "ellipse": 0,
         "line": 0,
@@ -13239,7 +13253,7 @@
       "classes": [
         "contour-stroke-v1 controls-74 events-1",
         "fill-texture-v1 marks-38",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-3",
         "fill-v2",
         "material-outline"
       ]
@@ -13299,12 +13313,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "1f690546466c95220eae7262eac150ab",
-      "bytes": 47078,
+      "digest": "e9eb9f7a215717dc5de64a0bd3021345",
+      "bytes": 68009,
       "counts": {
-        "path": 39,
+        "path": 66,
         "polyline": 0,
-        "polygon": 1,
+        "polygon": 0,
         "circle": 1,
         "ellipse": 0,
         "line": 0,
@@ -13314,7 +13328,7 @@
       "classes": [
         "contour-stroke-v1 controls-74 events-0",
         "fill-texture-v1 marks-38",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-4",
         "fill-v2"
       ]
     },
@@ -13532,12 +13546,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "0f973f1fc4fd1f564323d124edfebebb",
-      "bytes": 30814,
+      "digest": "1f0dd7af1c959581eb934adf80c022f4",
+      "bytes": 37865,
       "counts": {
-        "path": 26,
+        "path": 33,
         "polyline": 0,
-        "polygon": 1,
+        "polygon": 0,
         "circle": 46,
         "ellipse": 3,
         "line": 0,
@@ -13547,7 +13561,7 @@
       "classes": [
         "contour-stroke-v1 controls-61 events-1",
         "fill-texture-v1 marks-25",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-3",
         "fill-v2",
         "material-outline"
       ]
@@ -13757,12 +13771,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "3662652b6c32932ba722463dca55fb89",
-      "bytes": 56737,
+      "digest": "4b759fc1686cbe0b98d31c86efcbb9e3",
+      "bytes": 73343,
       "counts": {
-        "path": 40,
+        "path": 64,
         "polyline": 0,
-        "polygon": 4,
+        "polygon": 3,
         "circle": 57,
         "ellipse": 0,
         "line": 0,
@@ -13772,7 +13786,7 @@
       "classes": [
         "contour-stroke-v1 controls-119 events-0",
         "fill-texture-v1 marks-39",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-3",
         "fill-v2",
         "material-outline"
       ]
@@ -13991,12 +14005,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "ba41c1b22ca76648344ac2c63ddcf913",
-      "bytes": 49605,
+      "digest": "e338d386839d443491b40640ebefe1e1",
+      "bytes": 58375,
       "counts": {
-        "path": 37,
+        "path": 51,
         "polyline": 0,
-        "polygon": 1,
+        "polygon": 0,
         "circle": 66,
         "ellipse": 0,
         "line": 0,
@@ -14006,7 +14020,7 @@
       "classes": [
         "contour-stroke-v1 controls-88 events-1",
         "fill-texture-v1 marks-36",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-2",
         "fill-v2",
         "material-outline"
       ]
@@ -14225,12 +14239,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "b006445eb995eb64b1d0166e29f62f64",
-      "bytes": 46168,
+      "digest": "456d8fe0a72050e2ffcfe66c7377962a",
+      "bytes": 56729,
       "counts": {
-        "path": 38,
+        "path": 53,
         "polyline": 0,
-        "polygon": 4,
+        "polygon": 3,
         "circle": 53,
         "ellipse": 0,
         "line": 0,
@@ -14240,7 +14254,7 @@
       "classes": [
         "contour-stroke-v1 controls-70 events-0",
         "fill-texture-v1 marks-37",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-2",
         "fill-v2",
         "material-outline"
       ]
@@ -17191,12 +17205,12 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "5cd4847419a9e16385da846b0ab648c9",
-      "bytes": 5367,
+      "digest": "7627fd344a4e58496827f0cbd26acc4a",
+      "bytes": 9005,
       "counts": {
-        "path": 4,
+        "path": 6,
         "polyline": 0,
-        "polygon": 1,
+        "polygon": 0,
         "circle": 3,
         "ellipse": 0,
         "line": 0,
@@ -17206,7 +17220,7 @@
       "classes": [
         "contour-stroke-v1 controls-17 events-0",
         "fill-texture-v1 marks-3",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-4",
         "fill-v2",
         "material-outline"
       ]
@@ -21279,7 +21293,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "4d1b536fc597e90c4a482dc7cfc379cf",
+      "digest": "e55ed71d84da852e7d611e8c5c0ae2b0",
       "bytes": 16676,
       "counts": {
         "path": 2,
@@ -21351,7 +21365,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "4a0639b96407ba6347f5dc28e6aee1d3",
+      "digest": "cfde90df7d921c5d7f145b14801dac28",
       "bytes": 19679,
       "counts": {
         "path": 1,
@@ -21426,7 +21440,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "551e56b370c3ace1afd25aff1e3683d9",
+      "digest": "f7fe974556beae20c8046b48b024b0bc",
       "bytes": 36205,
       "counts": {
         "path": 2,
@@ -21502,7 +21516,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "a70be149b662f24a41da30a01c77bc4c",
+      "digest": "4213ee7f8ca1609c5d05a2083c96d83d",
       "bytes": 16443,
       "counts": {
         "path": 1,
@@ -21577,8 +21591,8 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "c3210bdda33a2e25cf57bfad7e40c274",
-      "bytes": 9612,
+      "digest": "480de1f506277bb343c319a7816e903e",
+      "bytes": 9566,
       "counts": {
         "path": 1,
         "polyline": 2,
@@ -21724,7 +21738,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "48e52c53292c2caec2c94a31cf4ccaef",
+      "digest": "3e3c4bc630ce20c105051e5e581927f1",
       "bytes": 22944,
       "counts": {
         "path": 1,
@@ -21799,7 +21813,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "525cdbb3fd93ade9ce88f3b644c89eb3",
+      "digest": "0df75c9c246ebf2ccca4d5cee3c06125",
       "bytes": 18932,
       "counts": {
         "path": 1,
@@ -23789,12 +23803,12 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "62a4f0c508980579ae68c989d859da63",
-      "bytes": 52863,
+      "digest": "fec6b103264993d9c817ebb909968274",
+      "bytes": 68492,
       "counts": {
-        "path": 39,
+        "path": 62,
         "polyline": 0,
-        "polygon": 3,
+        "polygon": 2,
         "circle": 57,
         "ellipse": 0,
         "line": 0,
@@ -23804,7 +23818,7 @@
       "classes": [
         "contour-stroke-v1 controls-74 events-1",
         "fill-texture-v1 marks-38",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-3",
         "fill-v2",
         "material-outline"
       ]
@@ -24023,12 +24037,12 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "2af0f3aeb9cf8ca86601d3a0a400ea3b",
-      "bytes": 33388,
+      "digest": "8c9bd8c2de760fdc75829263f5826be4",
+      "bytes": 40439,
       "counts": {
-        "path": 26,
+        "path": 33,
         "polyline": 0,
-        "polygon": 3,
+        "polygon": 2,
         "circle": 46,
         "ellipse": 1,
         "line": 0,
@@ -24038,7 +24052,7 @@
       "classes": [
         "contour-stroke-v1 controls-61 events-1",
         "fill-texture-v1 marks-25",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-3",
         "fill-v2",
         "material-outline"
       ]
@@ -24248,12 +24262,12 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "7ff4a6c46b648d0c629a121a01c96990",
-      "bytes": 56840,
+      "digest": "45172fbb62e1c556a5549f7b922bafa4",
+      "bytes": 73446,
       "counts": {
-        "path": 40,
+        "path": 64,
         "polyline": 0,
-        "polygon": 4,
+        "polygon": 3,
         "circle": 58,
         "ellipse": 0,
         "line": 0,
@@ -24263,7 +24277,7 @@
       "classes": [
         "contour-stroke-v1 controls-119 events-0",
         "fill-texture-v1 marks-39",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-3",
         "fill-v2",
         "material-outline"
       ]
@@ -24482,12 +24496,12 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "415d53ce9ab306dd972f234f9d785c39",
-      "bytes": 53363,
+      "digest": "7b0644f58dc135ffdc203b5821334991",
+      "bytes": 62133,
       "counts": {
-        "path": 37,
+        "path": 51,
         "polyline": 0,
-        "polygon": 3,
+        "polygon": 2,
         "circle": 66,
         "ellipse": 0,
         "line": 0,
@@ -24497,7 +24511,7 @@
       "classes": [
         "contour-stroke-v1 controls-88 events-1",
         "fill-texture-v1 marks-36",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-2",
         "fill-v2",
         "material-outline"
       ]
@@ -24716,12 +24730,12 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "8dce472149823d6216d4f64db2ed4373",
-      "bytes": 46168,
+      "digest": "96da1badeb8d2a9b3070a3d3189a0e85",
+      "bytes": 56729,
       "counts": {
-        "path": 38,
+        "path": 53,
         "polyline": 0,
-        "polygon": 4,
+        "polygon": 3,
         "circle": 53,
         "ellipse": 0,
         "line": 0,
@@ -24731,7 +24745,7 @@
       "classes": [
         "contour-stroke-v1 controls-70 events-0",
         "fill-texture-v1 marks-37",
-        "fill-underlay-v1",
+        "fill-underlay-v1 reserves-2",
         "fill-v2",
         "material-outline"
       ]

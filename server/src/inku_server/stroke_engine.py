@@ -134,7 +134,12 @@ TOOL_SUPPORT_BIAS: dict[str, tuple[float, float]] = {
     "brush_thick": (1.00, 0.15),
     "crayon": (0.10, 1.00),
     "pencil": (0.10, 1.00),
-    "chalk": (0.10, 1.00),
+    # chalk is refused harder than the other two waxy tools: "for chalk, raise
+    # the amount of skipping on the line side" (author, 2026-08-07). At 1.00 it
+    # showed the same 4.8% bare paper as crayon and pencil, which is 1.25 gaps
+    # in a stroke; at 1.30 it shows 9.5% in 1.65 gaps. Above 1.0 the sheet
+    # refuses this tool more than fully, which is what the tool is.
+    "chalk": (0.10, 1.30),
     "pen": (0.15, 0.15),
     "silverpoint": (0.05, 0.25),
     "drypoint": (0.00, 0.35),

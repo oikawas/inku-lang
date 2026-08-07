@@ -106,11 +106,11 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 43819,
+    "bytes": 52923,
     "counts": {
-      "path": 35,
+      "path": 45,
       "polyline": 0,
-      "polygon": 1,
+      "polygon": 0,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
@@ -120,7 +120,7 @@
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
       "fill-texture-v1 marks-34",
-      "fill-underlay-v1",
+      "fill-underlay-v1 reserves-4",
       "fill-v2",
       "material-outline"
     ],
@@ -667,11 +667,11 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 44748,
+    "bytes": 52441,
     "counts": {
-      "path": 34,
+      "path": 45,
       "polyline": 0,
-      "polygon": 1,
+      "polygon": 0,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
@@ -681,7 +681,7 @@
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
       "fill-texture-v1 marks-33",
-      "fill-underlay-v1",
+      "fill-underlay-v1 reserves-2",
       "fill-v2",
       "material-outline"
     ],
@@ -1589,11 +1589,11 @@
     "svg_profile": "editable",
     "wild": true,
     "color_catalog_id": "default",
-    "bytes": 47225,
+    "bytes": 56329,
     "counts": {
-      "path": 35,
+      "path": 45,
       "polyline": 0,
-      "polygon": 3,
+      "polygon": 2,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
@@ -1603,7 +1603,7 @@
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
       "fill-texture-v1 marks-34",
-      "fill-underlay-v1",
+      "fill-underlay-v1 reserves-4",
       "fill-v2",
       "material-outline"
     ],
@@ -1812,11 +1812,11 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "sea_stone",
-    "bytes": 43818,
+    "bytes": 52922,
     "counts": {
-      "path": 35,
+      "path": 45,
       "polyline": 0,
-      "polygon": 1,
+      "polygon": 0,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
@@ -1826,7 +1826,7 @@
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
       "fill-texture-v1 marks-34",
-      "fill-underlay-v1",
+      "fill-underlay-v1 reserves-4",
       "fill-v2",
       "material-outline"
     ],

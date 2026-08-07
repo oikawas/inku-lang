@@ -8,12 +8,13 @@ Thirteen gates over the four stages of the contract
     T-7 .. T-11  stage 3, the variation and the terminal
     T-12 .. T-13 stage 4, the corpus
 
-and nine more for the rulings the author made while the contract was running,
+and ten more for the rulings the author made while the contract was running,
 which arrive without gates of their own:
 
     T-14 .. T-16 the texture branch's direction, its contrast, the machine's raster
     T-17 .. T-19 its count, how its marks end, and chalk's own contrast
-    T-20 .. T-22 the per-mark tone, the reserve, and chalk's bare paper
+    T-20 .. T-22 the per-mark tone, the withdrawn reserve, chalk's bare paper
+    T-23 .. T-24 the field's own mottling, and the graded rim of a pale patch
 
 Three of these measure the geometry the renderer INTENDED, not the path string
 it emitted. That is not a shortcut around the product: the intended centreline
@@ -664,67 +665,52 @@ def test_t20_every_texture_mark_takes_its_own_tone():
         assert max(marks) <= ink + 1e-9, (tool, max(marks), ink)
 
 
-def test_t21_the_tool_leaves_the_ground_bare_along_its_own_strokes(monkeypatch):
-    """T-21 塗り残し。**地が出る場所には下地も痕も無く、その形は筆致に沿う。**
+def test_t21_no_mechanism_leaves_the_ground_bare_inside_a_fill(monkeypatch):
+    """T-21 塗り残しは**廃止された**。痕を割るものは輪郭のほかに無い。
 
-    「逆に塗り残しで地が出る表現を追加する」（作者裁定 2026-08-07）、そして
-    **「塗り残しは筆致の軌跡に応じるべきだ。線の軌跡に被っており、ロジックとして
-    おかしい」**（同 2026-08-07、等方の塊で出したものへの差し戻し）。道具は自分の
-    ストロークを横切って消したりしない。
+    「自然に見えないので、塗り残しの図形での描画は廃止」**および**「塗り残しの
+    線の描画を目視では認識できない」（作者裁定 2026-08-07）。等方の塊・筆致に
+    沿う筋・道具の線の 3 案が順に潰れ、機構ごと引き上げになった。
 
-    **3 つを同時に見る。**下地に穴が開いていても痕が素通りしていれば地は出ず、
-    痕だけ避けても下地が残っていれば出ず、**向きが筆致と無関係なら「破れ」に戻る。**
-    片方だけのゲートは、もう片方が抜けた実装を通す。
+    **削除の受入は「消えたこと」でなく「消し残しが無いこと」を見る。**穴を開ける
+    経路が 1 つでも残っていれば、地はその 1 つから出続ける。
 
-    対照: 走査線枝には塗り残しを置かない。
+    1. 下地に穴を開ける札が出ない（`reserves-`）。
+    2. **痕が 1 本も割れていない。**下地の札だけ消して切断機構を残した実装は
+       1 を通る。散布点 1 つが痕 1 本を出すので、合成器へ渡った中心線の数は
+       `marks-N` を超えない — 超えるのは、何かが痕を切って複数にした時だけ。
+    3. 下地の面に穴が無い（`fill-rule` が食う穴は色むらの層だけで、地の層は
+       `M` を 1 つしか持たない）。
+
+    対照: 走査線枝も同じく割れない。
     """
     for tool in TEXTURE_TOOLS:
         payload = dict(CIRCLE, weight=tool, filled=True)
         svg = _svg(payload)
-        count = re.search(r'class="fill-underlay-v1 reserves-(\d+)"', svg)
-        assert count is not None, tool
-        assert 3 <= int(count.group(1)) <= 7, (tool, count.group(1))
-        underlay = re.search(
-            r'<path[^>]*class="fill-underlay-v1 reserves-[^"]*"[^>]*>', svg
-        ).group(0)
-        assert 'fill-rule="evenodd"' in underlay, tool
-        d = re.search(r'\sd="([^"]+)"', underlay).group(1)
-        assert d.count("M ") == int(count.group(1)) + 1, (tool, d.count("M "))
 
-        contour = _contour(payload)
-        reserves, _ = renderer._texture_field(
-            Instruction.model_validate(payload), contour, CANVAS, SEED
-        )
-        assert len(reserves) == int(count.group(1)), tool
+        # 1. 札が無い。
+        assert "reserves-" not in svg, tool
+
+        # 2. 痕が割れていない。**ここが本体** — 1 だけなら札を消せば通る。
         lines = _centerlines(payload, monkeypatch)
-
-        # 1. 向き。抜きの長軸が痕の走る向きと揃っていること。
-        marks_angle = statistics.fmean(_stroke_angles_deg(lines))
-        for reserve in reserves:
-            axis, elongation = _principal_axis(reserve)
-            # 細長いこと。等方の塊へ戻した実装は、長軸の向き自体が意味を持たない。
-            assert elongation >= 2.0, (tool, elongation)
-            gap = abs(axis - marks_angle) % 180.0
-            assert min(gap, 180.0 - gap) <= 10.0, (tool, axis, marks_angle)
-
-        # 2. 痕が入っていないこと。**深さで見る。件数比では分からない** — 抜きは
-        # 形の数 % しか占めないので、素通りする実装でも「抜きの中の標本」は同じ
-        # 数 % にしかならず、ずれ幅ぶんと見分けがつかない。深さなら、切っていれば
-        # 道具の幅の数倍まで、切っていなければ抜きの半幅ぶん入る。
-        width = _stroke_width_px(
-            Instruction.model_validate(payload).weight, CANVAS, None
-        )
-        deepest = 0.0
-        for line in lines:
-            for point in line:
-                for reserve in reserves:
-                    if _point_in_polygon(point, reserve):
-                        deepest = max(deepest, _depth_in_polygon(point, reserve))
-        assert deepest <= 2.0 * width, (tool, deepest, width)
-
-        # 3. 実際に切られたこと。抜きが形の外に落ちていれば上の 2 つは恒真になる。
         marks = int(re.search(r'class="fill-texture-v1 marks-(\d+)"', svg).group(1))
-        assert len(lines) > marks, (tool, len(lines), marks)
+        assert len(lines) <= marks, (tool, len(lines), marks)
+        # そして痕が消えてもいないこと。0 本なら 2 は恒真になる。
+        assert len(lines) >= 20, (tool, len(lines))
+
+        # 3. 地の層は穴を持たない 1 枚の面である。
+        base = re.search(r'<path[^>]*class="fill-underlay-v1 field-base"[^>]*>', svg)
+        assert base is not None, tool
+        d = re.search(r'\sd="([^"]+)"', base.group(0)).group(1)
+        assert d.count("M ") == 1, (tool, d.count("M "))
+
+    scan_svg = _svg(SCAN_CASE)
+    assert "reserves-" not in scan_svg
+    scan_lines = _centerlines(SCAN_CASE, monkeypatch)
+    scan_marks = int(
+        re.search(r'class="fill-stroke-v1 strokes-(\d+)"', scan_svg).group(1)
+    )
+    assert len(scan_lines) <= scan_marks, (len(scan_lines), scan_marks)
 
 
 def test_t23_the_field_itself_carries_more_than_one_tone(monkeypatch):
@@ -758,8 +744,17 @@ def test_t23_the_field_itself_carries_more_than_one_tone(monkeypatch):
         flat = {tool: _underlay_opacity(_svg(dict(CIRCLE, weight=tool, filled=True)))
                 for tool in TEXTURE_TOOLS}
     for tool in TEXTURE_TOOLS:
-        mottled = _underlay_opacity(_svg(dict(CIRCLE, weight=tool, filled=True)))
-        assert mottled == pytest.approx(flat[tool], abs=1e-6), (tool, mottled, flat[tool])
+        svg = _svg(dict(CIRCLE, weight=tool, filled=True))
+        mottled = _underlay_opacity(svg)
+        # 許容はマスターグリッドの刻みから出す。`_apply_master_grid` が全属性を
+        # 小数 6 桁へ載せるので、層 1 枚あたり最大 5e-7 が印字で失われ、合成は
+        # 層数ぶん積み上がる。**製品の合成式は厳密で、ずれるのは印字だけ** —
+        # 刻みを固定値で緩めると層を増やしたときに黙って甘くなるので、層数から
+        # 引く。式を壊す摂動は 1e-2 の桁で外れるため、これで捕まえ損ねない。
+        tolerance = len(_underlay_layers(svg)) * 5e-7
+        assert mottled == pytest.approx(flat[tool], abs=tolerance), (
+            tool, mottled, flat[tool], tolerance
+        )
 
     # 対照: 走査線枝は 1 枚の平らな polygon のまま。
     scan = _svg(SCAN_CASE)
@@ -767,55 +762,105 @@ def test_t23_the_field_itself_carries_more_than_one_tone(monkeypatch):
     assert "tones-" not in scan
 
 
-def _principal_axis(polygon) -> tuple[float, float]:
-    """多角形の長軸の向き（度・0〜180）と、長短の比。"""
-    cx = statistics.fmean(point[0] for point in polygon)
-    cy = statistics.fmean(point[1] for point in polygon)
-    sxx = syy = sxy = 0.0
-    for x, y in polygon:
-        dx, dy = x - cx, y - cy
-        sxx += dx * dx
-        syy += dy * dy
-        sxy += dx * dy
-    n = len(polygon)
-    sxx, syy, sxy = sxx / n, syy / n, sxy / n
-    angle = 0.5 * math.atan2(2 * sxy, sxx - syy)
-    trace = sxx + syy
-    root = math.sqrt(max(0.0, (sxx - syy) ** 2 + 4 * sxy * sxy))
-    major, minor = (trace + root) / 2, (trace - root) / 2
-    ratio = math.sqrt(major / minor) if minor > 1e-9 else float("inf")
-    return math.degrees(angle) % 180.0, ratio
-
-    # 対照。
-    assert "reserves-" not in _svg(SCAN_CASE)
+def _centroid(polygon) -> tuple[float, float]:
+    return (
+        statistics.fmean(point[0] for point in polygon),
+        statistics.fmean(point[1] for point in polygon),
+    )
 
 
-def _depth_in_polygon(point: tuple[float, float], polygon) -> float:
-    """How far inside the polygon the point sits: its distance to the nearest edge."""
-    x, y = point
-    best = float("inf")
-    for index in range(len(polygon)):
-        ax, ay = polygon[index]
-        bx, by = polygon[(index + 1) % len(polygon)]
-        ex, ey = bx - ax, by - ay
-        length2 = ex * ex + ey * ey
-        t = 0.0 if length2 == 0 else ((x - ax) * ex + (y - ay) * ey) / length2
-        t = max(0.0, min(1.0, t))
-        best = min(best, math.hypot(x - (ax + ex * t), y - (ay + ey * t)))
-    return best
+def _mean_radius(polygon) -> float:
+    cx, cy = _centroid(polygon)
+    return statistics.fmean(math.hypot(x - cx, y - cy) for x, y in polygon)
 
 
-def _point_in_polygon(point: tuple[float, float], polygon) -> bool:
-    x, y = point
-    inside = False
-    for index in range(len(polygon)):
-        ax, ay = polygon[index]
-        bx, by = polygon[(index + 1) % len(polygon)]
-        if (ay > y) != (by > y):
-            crossing = ax + (y - ay) / (by - ay) * (bx - ax)
-            if x < crossing:
-                inside = not inside
-    return inside
+def test_t24_a_pale_patch_comes_down_to_the_field_in_steps(monkeypatch):
+    """T-24 むらの縁は 1 段の段差ではない。**入れ子の輪で階段になっている。**
+
+    「これは変化が付いて良いので採用。**輪郭を荒くぼかす処理は出来るか？**」
+    （作者裁定 2026-08-07）。斑が穴 1 つだったころ、その縁は落差の全部を 1 度に
+    落としており、面の中に描いた輪郭線として読めた。
+
+    **フィルタでは作れない。**`use_filters` は display 専用なので、ぼかしを
+    フィルタで作ると `compat` と `editable` から色むらごと消える（T-2 と同じ
+    理由）。だから実体の輪で作る — その実体を見る。
+
+    **4 つを見る。**
+    1. 段数。**中心から外へ向かうと、覆う層の数が 3 通り以上に変わる。**
+       これが「階段になっている」ことそのもの。
+    2. 入れ子。内側の輪が外側の輪から出ていない。出ていれば階段でなく
+       重なりで、縁は 2 本になる。
+    3. **同心の複製でない。**輪ごとに粗さが違うこと（「荒く」の側）。輪を
+       単に縮小した実装は 1 と 2 を通るが、地図の等高線に見える。
+    4. **display 以外の profile でも輪が残る。**
+    """
+    for tool in TEXTURE_TOOLS:
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        contour = _contour(payload)
+        layers = renderer._field_tone_patches(
+            contour, renderer._seed_for_instruction(
+                Instruction.model_validate(payload), SEED
+            ), 2 * payload["radius"] * CANVAS.unit,
+        )
+        assert layers, tool
+        # SVG に出ている層数と一致すること。製品関数だけを見て SVG を見ない
+        # ゲートは、描画へ結線されていない機構を通す。
+        svg = _svg(payload)
+        assert len(re.findall(r'class="fill-underlay-v1 tones-\d+"', svg)) == len(
+            layers
+        ), tool
+
+        # 輪を束ねる。`_field_tone_patches` は「輪 r は層 s*RINGS+r の同じ
+        # 位置に入る」と約束しているので、その約束のとおりに歩く。**中心の
+        # 近さで寄せる案は使えない** — 別々の斑がたまたま 19px まで寄ることが
+        # あり（silverpoint）、隣の斑と 1 つの族に潰れる。
+        rings = renderer.FILL_FIELD_TONE_RINGS
+        families = [
+            [layers[base + r][p] for r in range(rings)]
+            for base in range(0, len(layers), rings)
+            for p in range(len(layers[base]))
+        ]
+        # 1. どの斑も 3 枚以上の輪を持つ。穴 1 つに戻した実装はここで落ちる
+        # （輪を 1 枚にする摂動は族の大きさごと 1 になるので恒真にならない）。
+        assert families, tool
+        for family in families:
+            assert len(family) >= 3, (tool, [len(f) for f in families])
+            # そして本当に入れ子である。**段の落差を 0 にした実装**（輪はあるが
+            # 全部同じ大きさ）は、下の 2 と 3 を境界の重なりですり抜けうる。
+            radii = [_mean_radius(ring) for ring in family]
+            for outer, inner in zip(radii, radii[1:]):
+                assert inner < outer * 0.95, (tool, radii)
+
+        checked = 0
+        for family in families:
+            for outer, inner in zip(family, family[1:]):
+                centre = _centroid(outer)
+                # 2. 内側の輪が外側から出ていない。**半径で見る。多角形の
+                # 内外判定では見られない** — 斑が輪郭に近いと両方の輪が同じ
+                # 位置まで切り詰められ、頂点が境界の上にちょうど乗る。そこは
+                # 内とも外とも判定されうるので、交差していない実装が落ちる。
+                # 輪は同じ中心から同じ角度で刻んであるので、番号どうしの半径を
+                # 比べれば「出ている」は厳密に測れる。
+                ratios = []
+                for a, b in zip(inner, outer):
+                    ri = math.hypot(a[0] - centre[0], a[1] - centre[1])
+                    ro = math.hypot(b[0] - centre[0], b[1] - centre[1])
+                    assert ri <= ro + 1e-6, (tool, ri, ro)
+                    if ro > 1e-9:
+                        ratios.append(ri / ro)
+                # 3. 縮小の比が頂点ごとに揺れている（＝輪ごとに粗さが違う）。
+                # 単なる相似の縮小コピーは比が一定になり、ここで落ちる。
+                spread = (max(ratios) - min(ratios)) / statistics.fmean(ratios)
+                assert spread >= 0.05, (tool, spread)
+                checked += 1
+        assert checked >= 2, (tool, checked)
+
+    # 4. フィルタの無い profile でも層が残る。
+    for profile in ("compat", "editable"):
+        plain = _svg(dict(CIRCLE, weight="pencil", filled=True), svg_profile=profile)
+        assert len(re.findall(r'class="fill-underlay-v1 tones-\d+"', plain)) >= 3, (
+            profile
+        )
 
 
 def test_t22_chalk_shows_more_bare_paper_than_the_other_waxy_tools():

@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **22** | v2.11.4 | 859 | 2026-08-07 | 531 | **52** | **479** |
 | **21** | v2.9.34 | 838 | 2026-08-03 | 525 | **32** | **493** |
 | **20** | v2.9.20 | 813 | 2026-08-01 | 525 | **32** | **493** |
 | **19** | v2.9.16 | 804 | 2026-08-01 | 493 | **227** | **266** |
@@ -120,11 +121,11 @@ but never asserts "the output will change"**.
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
 | `render_engine_version` | the drawing engine | `22` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `5` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `7` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.3 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.4 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
 | `web/BUILD_NUMBER` | build serial | 859 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
@@ -393,6 +394,62 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 22 — a fill gets an underlay, and what sits on it gets a branch (v2.11.4)
+
+**A stroke WAS the fill, so every scan line had to be cut where it met the outline.**
+
+Until engine 21 the scan lines were the fill itself, so each one had to be cut at its
+intersection with the contour or the ink would spill outside the shape. **That cut is the third
+of the three regularities the eye reads as a raster.** Measured across the eleven filled shapes
+of the three works the author named as striped: inside one shape the scan angle varied by
+**0.1 degrees**, the pitch by **6.1%**, and the endpoints **not at all**.
+
+**A real element now holds the field.** Because the boundary belongs to the underlay, the marks
+are free to leave the contour and free to fall short of it. The angle now moves **3.3–3.6°** per
+stroke, the pitch's coefficient of variation rises to **30–35%**, and each end overshoots or
+undershoots by up to **1.4–1.5 times the tool's width, in both signs**. **All three amplitudes
+come from `ToolGrammar.fill_hand`, and a machine's are zero** — a `computer` fill still has an
+angle standard deviation of 0.00° with its endpoints on the contour, so **the exact repetition
+that is its signature survives**.
+
+**The underlay is common to both branches; the threshold only decides what sits on top.**
+Coverage — width over pitch — at **0.2** divides them: above it the marks are scan lines packed
+to coverage **0.9**; below it they are rubbings. **Closing the gaps at pencil width would take
+eight times the lines, and that is not how the tool is used.** A rubbing runs the width of the
+form and takes the region's one direction, wobbling by the few degrees the hand gives — **the
+same band the scan branch draws from** — so what separates the two branches is that the marks
+are not on rows, and that the count is the stroke length one classic scan pass laid.
+
+**The threshold is coverage, not a list of tool names.** The two cut the engine-21 corpus
+identically, which is why a case that sends **one tool across the branch on thinness alone**
+(`C-fill-circle-crayon-extra_fine`) was added. Without it an implementation that never reads the
+coverage passes every other gate.
+
+**The underlay is not built out of a filter.** `use_filters` is true only for `display`, so a
+filter-built underlay makes **the fill itself vanish** in `compat` and `editable`. It is a real
+element; on the texture branch it is **one pale field plus six layers that draw the mottling as
+three concentric rings**, and **the composite is exactly the original flat value** — stacking
+layers does not move the field's mean tone.
+
+**A fill stroke now ends the way paint ends, not the way a drawn line ends** — heavy where the
+tool lands (`loaded`), narrowing only at the release. **The default terminal for a contour
+stroke is unchanged.** How far a mark stands out of its own field is the branch's value times
+the tool's own `ToolGrammar.fill_contrast`, which is **1.0 everywhere except chalk (1.13)**.
+
+**A tiny shape still degrades to one dab and `rotring` still degrades to a region fill. Neither
+gets an underlay** (both are byte-identical to engine 21).
+
+### Version and corpus
+
+**525 → 531 cases** (six added: `computer`, `silverpoint`, `crayon`+`extra_fine`,
+`brush_thick`+`extra_fine`, `chalk`, `chalk`+`extra_fine`). **52 moved** — 32 fills, **14 chalk
+contours**, and the 6 new ones. **The 14 chalk cases are not fills**: a tool's properties
+(`tooth` 1.00 → 1.30, and its texture filter's blur 1.44 → 0.40) cross the branches, so they
+reached chalk outlines that are not filled at all. **What moved for a different reason is kept
+on a separate roster** (`ENGINE_22_CHALK_CASES` in `test_anchor_authority.py`).
+
+**`ddl_engine_version` did not move** (still 7). Nothing up to Stage 2 changed by a byte.
 
 ## engine 21 — the performance stops reading libm's last bit (v2.9.34)
 

@@ -3806,3 +3806,54 @@ stayed at sixteen kinds.**
   entry), cli **111**, `npm run check` **241 FILES / 0 errors / 2 warnings**, `npm run test:unit`
   **113**, `lint:i18n` **1004/47/0/0**, ruff clean, Android JVM **159 / 0 failures** (37 classes;
   the count is unchanged and two existing assertions moved from 16 to 17).
+
+### v2.11.4 — A fill gets an underlay, and what sits on it gets a branch (Build 859, 2026-08-07)
+
+**A stroke WAS the fill, so every scan line had to be cut where it met the outline** (render
+engine 21 → 22). Without the cut the ink spills outside the shape. **That cut is the third of the
+three regularities the eye reads as a raster** — across the eleven filled shapes of the three
+works the author named as striped, the scan angle varied by **0.1°** inside one shape, the pitch
+by **6.1%**, and the endpoints **not at all**.
+
+- **A real element now holds the field.** Because the boundary belongs to the underlay the marks
+  are free: the angle moves **3.3–3.6°** per stroke, the pitch's coefficient of variation rises to
+  **30–35%**, and each end overshoots or undershoots by up to **1.4–1.5 tool widths, in both
+  signs**. **All three amplitudes belong to the tool and are zero for a machine**, so a
+  `computer` fill keeps an angle standard deviation of 0.00° with its endpoints on the contour.
+- **The underlay is common to both branches; the threshold only decides what sits on top.**
+  Coverage — width over pitch — at **0.2** divides them: above, scan lines packed to coverage
+  **0.9**; below, rubbings. **Closing the gaps at pencil width would take eight times the lines,
+  and that is not how the tool is used.**
+- **The threshold is coverage, not a list of tool names.** The two cut the engine-21 corpus
+  identically, so a case that **sends one tool across the branch on thinness alone** was added.
+  Without it an implementation that never reads the coverage passes every other gate.
+- **The underlay is not built out of a filter.** Filters exist only for `display`, so a
+  filter-built underlay makes **the fill itself vanish** in `compat` and `editable`. On the
+  texture branch it is one pale field plus six layers drawing the mottling as three concentric
+  rings, and **the composite is exactly the original flat value**.
+- **A fill stroke now ends the way paint ends** — heavy where the tool lands, narrowing only at
+  the release. **The default terminal for a contour stroke is unchanged.**
+- **A tiny shape still degrades to a dab and `rotring` to a region fill; neither gets an
+  underlay** (byte-identical to engine 21).
+- **The frozen corpus goes 525 → 531 cases** (`computer`, `silverpoint`, `crayon`+`extra_fine`,
+  `brush_thick`+`extra_fine`, `chalk`, `chalk`+`extra_fine`). **52 moved** — 32 fills, **14 chalk
+  contours**, 6 new. **The 14 chalk cases are not fills** (a tool's properties cross the
+  branches); **what moved for a different reason is kept on a separate roster**.
+- **Mean interior density** (circle r=0.3): pen 15.4 → **69.6%**, pencil 6.9 → **47.8%**,
+  silverpoint 2.8 → **50.9%**, brush_thick 52.1 → **82.7%**, crayon 22.2 → **71.9%**, chalk
+  14.9 → **68.3%**, computer 15.2 → **77.8%**. **Power left at the original band's period**:
+  pen 39.0 → **4.0%**, pencil 28.3 → **4.4%**, silverpoint 19.0 → **0.9%**, and **computer is
+  unchanged at 23.6 → 25.0%**.
+- **This is not "the striping is gone."** Striping also arises from wash and hatch; this version
+  touched only the scan mechanism, and the thirty prompts were not redrawn.
+- **26 new acceptance tests** (`test_fill_underlay_and_branch.py`) and **40 perturbations against
+  production code, 40/40 red**. Five existing tests **had their claims rewritten**: the two that
+  asserted byte-identity with engine 15 now assert the case count, the presence of the underlay,
+  and the exclusivity of the stages, because **engine 22 moves those 31 and 30 cases on purpose**.
+- **`ddl_engine_version` does not move** (still 7); nothing up to Stage 2 changed by a byte.
+- **⚠ Android is still on engine 21.** The reference fixtures were rebaked, so **7 of its 159 JVM
+  unit tests are red** (`DefaultSvgRendererFillDabTest` 2, `DefaultSvgRendererPhase2fTest` 3,
+  `ServerStrokeEngineTest` 2). **The client follows in a later version.**
+- **Checks:** server **2366 / 31 skipped** (2340 at the branch point; **+26 = the 26 new tests**,
+  the five existing ones being renames), cli **111**, `npm run check` **241 FILES / 0 errors /
+  2 warnings**, ruff clean, `check_frozen_corpora.py` byte-identical, `check_docs.py` green.

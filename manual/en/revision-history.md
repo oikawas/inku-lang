@@ -2,6 +2,12 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-07 — v2.11.4 unreleased baseline (Web Build 859)
+
+The thirteen places that name a version now read v2.11.4 (Build 859). No explanatory text changed.
+
+- The only thing this version moved is **how a fill is drawn** (render engine 21 to 22). **Nothing about the controls changed** — no item was added to or removed from the Web UI, the CLI, or the server settings. Filled shapes look different: the strokes now sit on an underlay that holds the field, and a thin tool leaves rubbings rather than scan lines. **Existing works are unaffected** (their saved SVG is returned as it was); redrawing the same description produces the new appearance.
+
 ## 2026-08-06 — v2.11.3 unreleased baseline (Web Build 858)
 
 The thirteen places that name a version now read v2.11.3 (Build 858).

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.11.3 / Build 859**
+**Target version: v2.11.4 / Build 859**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -102,7 +102,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 21 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 22 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 7 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.11` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
@@ -150,9 +150,11 @@ The fill rate of an optional field **depends on its declaration order** in the t
 declared last are filled more often.
 - **coerce** — split into `normalize` and `compose`.
 Invalid values prefer drop-only handling, and no house style is injected.
-- **Render Engine 21** — the SVG performance.
+- **Render Engine 22** — the SVG performance.
 It carries closed-shape outlines and fills, arcs, the material layer, ground resistance, and master
 grid quantization of coordinates.
+**A fill sits on an underlay that holds the field as a real element, and what sits on top splits at
+coverage 0.2 into scan lines and rubbings.**
 
 A RAW trace exists for observation (`include_trace` on `/api/paint` and `/api/compose`, default
 false).
@@ -230,7 +232,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-21` (525 cases) and `ddl-engine-7` (34 cases) are current, and CI enforces
+`render-engine-22` (531 cases) and `ddl-engine-7` (34 cases) are current, and CI enforces
 byte-identical regeneration.
 - **`cli/tests`** — pytest.
 - **`npm run check`**, **`lint:i18n`**, **`lint:models`**, **`lint:recommendations`** — web types,

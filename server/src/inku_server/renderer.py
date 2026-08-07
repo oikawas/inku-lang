@@ -4687,8 +4687,15 @@ FILL_PITCH_CV_SPAN = 0.10
 # How far each end of a scan stroke reaches past the contour, or falls short of
 # it, as a fraction of the stroke's length. The sign is drawn per end, so one
 # stroke can overshoot at the landing and undershoot at the lift.
-FILL_REACH_MIN = 0.10
-FILL_REACH_SPAN = 0.05
+#
+# The design asked for 10-15%, which was drawn and rejected (author, 2026-08-07):
+# "clearly excessive, keep it within a few percent". At 13% the strokes stood off
+# the form like hairs, and the ends that fell short left the underlay bare in a
+# ring, so a second ellipse appeared inside the shape. What the endpoints have to
+# stop being is EQUAL -- the regularity, not the containment -- and a few percent
+# is enough for that.
+FILL_REACH_MIN = 0.02
+FILL_REACH_SPAN = 0.02
 
 # The texture branch. Below the threshold the tool is too thin for parallel
 # lines to become a field -- at pencil width it would take eight times the lines
@@ -4696,7 +4703,30 @@ FILL_REACH_SPAN = 0.05
 # already holds the field, so these marks only have to give it grain.
 FILL_TEXTURE_MARK_LENGTH = 6.0  # in scan pitches
 FILL_TEXTURE_DENSITY = 0.5  # 1.0 lays the same ink the classic scan laid
-FILL_TEXTURE_ANGLE_SPREAD_DEG = 12.0
+# Half-width of the scatter, so two marks can cross at a right angle. A rubbed
+# tone is not a hatch: it is laid in several directions, and the author allowed
+# "up to nearly orthogonal" (2026-08-07). Not scaled by `fill_hand` -- only hand
+# tools reach this branch at all, and the stiffest of them (silverpoint, 0.05)
+# would otherwise scatter by half a degree.
+FILL_TEXTURE_ANGLE_SPREAD_DEG = 45.0
+# How much darker a mark is than the field it sits on. The marks are meant to
+# rise out of the fill, not to be drawn on top of it: "bring the line and the
+# background closer; only some of the strokes should read as standing out"
+# (author, 2026-08-07). 1.0 would make the marks invisible.
+FILL_TEXTURE_CONTRAST = 1.6
+
+# --- the machine's fill: a raster line, not a hatch -------------------------
+# `computer` is the one periodic tool, and its fill is a scan line in the sense
+# a screen means it. The author asked for the cathode-ray reading (2026-08-07):
+# horizontal, a dense core that bleeds at its edges, and a faint shadow visible
+# between the lines. So the machine keeps the classic pitch -- packing it to
+# coverage 0.9 closes the gaps and the lines stop being readable as lines -- and
+# each line is laid as a wide faint halo with a narrow core on top, which is a
+# soft edge built out of real elements rather than a filter (filters are
+# display-only, and this has to survive `compat` and `editable`).
+FILL_RASTER_HALO_WIDTHS = 2.6
+FILL_RASTER_HALO_OPACITY = 0.30
+FILL_RASTER_CORE_WIDTHS = 0.55
 
 
 def _fill_scan_angle(seed: int) -> float:
@@ -4916,13 +4946,22 @@ def _render_fill_strokes(
     grid_step = _grid_step_px(ins.weight, canvas)
     seed = _seed_for_instruction(ins, render_seed)
     hand = _fill_hand(ins)
-    # The underlay carries the field, so the scan lines are free to pack to the
-    # coverage the author chose instead of to whatever the classic pitch gave.
-    spacing = base_width / FILL_COVERAGE_TARGET
+    raster = GRAMMARS[ins.weight].periodic
+    if raster:
+        # A screen's raster: the lines are horizontal, they keep their pitch so
+        # the gaps between them stay readable, and the faint shadow the author
+        # asked to see between them is the underlay showing through.
+        spacing = _fill_scan_spacing(ins, canvas)
+        angle = 0.0
+    else:
+        # The underlay carries the field, so the scan lines are free to pack to
+        # the coverage the author chose instead of to whatever the pitch gave.
+        spacing = base_width / FILL_COVERAGE_TARGET
+        angle = _fill_scan_angle(seed)
     pitch_cv = (FILL_PITCH_CV_MIN + FILL_PITCH_CV_SPAN * hand) if hand else 0.0
     segments = _scanline_segments(
         contour,
-        _fill_scan_angle(seed),
+        angle,
         spacing,
         seed,
         jitter=pitch_cv * math.sqrt(12.0),
@@ -4992,29 +5031,42 @@ def _render_fill_strokes(
             )
             for i in range(count)
         ]
-        stroke = synthesize_along(
-            centerline,
-            base_width,
-            ins.weight,
-            _fill_stroke_seed(seed, order),
-            closed=False,
-            grid_step=grid_step,
-            wild=wild,
-            terminal="loaded",
+        # A raster line is one line with a soft edge, so it is laid twice: a
+        # wide faint halo and a narrow dense core on the same centreline. Two
+        # real elements rather than a blur, because `use_filters` is
+        # display-only and the machine has to look the same in every profile.
+        layers = (
+            (
+                (base_width * FILL_RASTER_HALO_WIDTHS, opacity * FILL_RASTER_HALO_OPACITY),
+                (base_width * FILL_RASTER_CORE_WIDTHS, opacity),
+            )
+            if raster
+            else ((base_width, opacity),)
         )
-        path_attrs = {
-            "d": contour_stroke_path(stroke),
-            "fill": color,
-            "fill_opacity": opacity,
-            "stroke": "none",
-        }
-        if (
-            use_filters
-            and ins.weight in TEXTURE_FILTER_WEIGHTS
-            and ins.weight != "drypoint"
-        ):
-            path_attrs["filter"] = f"url(#texture-{ins.weight})"
-        paths.append(path_attrs)
+        for width, layer_opacity in layers:
+            stroke = synthesize_along(
+                centerline,
+                width,
+                ins.weight,
+                _fill_stroke_seed(seed, order),
+                closed=False,
+                grid_step=grid_step,
+                wild=wild,
+                terminal="loaded",
+            )
+            path_attrs = {
+                "d": contour_stroke_path(stroke),
+                "fill": color,
+                "fill_opacity": layer_opacity,
+                "stroke": "none",
+            }
+            if (
+                use_filters
+                and ins.weight in TEXTURE_FILTER_WEIGHTS
+                and ins.weight != "drypoint"
+            ):
+                path_attrs["filter"] = f"url(#texture-{ins.weight})"
+            paths.append(path_attrs)
 
     if not paths:
         return None
@@ -5076,14 +5128,22 @@ def _render_fill_texture(
 
     color = attrs.get("stroke", "#111111")
     opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
+    # The marks rise out of the field; they are not drawn on top of it. Tying
+    # their opacity to the underlay's keeps the contrast where the author put it
+    # ("only some of the strokes should read as standing out", 2026-08-07) at
+    # every density a description can ask for, and never darker than the ink the
+    # description actually specified.
+    mark_opacity = min(
+        opacity, opacity * FILL_UNDERLAY_OPACITY_RATIO * FILL_TEXTURE_CONTRAST
+    )
     grid_step = _grid_step_px(ins.weight, canvas)
     base_angle = _fill_scan_angle(seed)
-    spread = math.radians(FILL_TEXTURE_ANGLE_SPREAD_DEG) * _fill_hand(ins)
+    spread = math.radians(FILL_TEXTURE_ANGLE_SPREAD_DEG)
     group = dwg.g(class_=f"fill-texture-v1 marks-{len(points)}")
     for index, (px, py) in enumerate(points):
-        # A hand rubbing a tone keeps a general direction; it does not hatch at
-        # random. The spread is the tool's, so a machine sent here would lay the
-        # marks all one way.
+        # A rubbed tone is laid in several directions -- two marks may cross at
+        # a right angle -- around a direction the work still keeps. A single
+        # narrow spread reads as a hatch, which is a different mechanism.
         angle = base_angle + (_hash01(index, seed, "fill-texture-angle") - 0.5) * 2 * spread
         half = mark_length / 2
         ux, uy = math.cos(angle) * half, math.sin(angle) * half
@@ -5108,7 +5168,7 @@ def _render_fill_texture(
         path_attrs = {
             "d": contour_stroke_path(stroke),
             "fill": color,
-            "fill_opacity": opacity,
+            "fill_opacity": mark_opacity,
             "stroke": "none",
         }
         if (

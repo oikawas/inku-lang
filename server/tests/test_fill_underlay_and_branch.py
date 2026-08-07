@@ -34,8 +34,11 @@ from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.renderer import (
     FILL_COVERAGE_BRANCH,
     FILL_COVERAGE_TARGET,
+    FILL_MIN_SCANLINES,
     FILL_REACH_MIN,
     FILL_REACH_SPAN,
+    FILL_TEXTURE_CONTRAST,
+    FILL_UNDERLAY_OPACITY_RATIO,
     _fill_coverage,
     _fill_scan_spacing,
     _line_spans,
@@ -101,7 +104,9 @@ def _centerlines(payload: dict, monkeypatch) -> list[list[tuple[float, float]]]:
 
     monkeypatch.setattr(renderer, "synthesize_along", recording)
     _svg(payload)
-    return captured
+    # A copy: the patch is still in place for the rest of the test, so a caller
+    # that renders again would silently see its own strokes appended to this.
+    return list(captured)
 
 
 def _classes(svg: str) -> set[str]:
@@ -312,6 +317,11 @@ def test_t8_the_endpoints_leave_the_contour_in_both_directions(monkeypatch):
 
     片側だけを見ると、内側へ寄せるだけの実装が通る。engine 21 は交点で切って
     いたので距離は厳密に 0 だった — それが第 3 の規則性である (設計 §3.2)。
+
+    **幅は契約の 10〜15% ではなく 2〜4% である**（作者裁定 2026-08-07・現物を見て
+    「明らかに過大」）。13% では筆が形から毛のように立ち、届かなかった端が下地を
+    輪状に残して図形の中にもう 1 つ楕円が見えた。**端点がやめるべきなのは
+    「揃っていること」であって「収まっていること」ではない**ので、数 % で足りる。
     """
     fractions = _reach_fractions(_centerlines(SCAN_CASE, monkeypatch), _contour(SCAN_CASE))
     assert fractions
@@ -407,6 +417,144 @@ def _scan_normal(lines) -> tuple[float, float]:
     dy = lines[0][-1][1] - lines[0][0][1]
     norm = math.hypot(dx, dy)
     return (-dy / norm, dx / norm)
+
+
+# --- the rulings taken while the contract was running (2026-08-07) ----------
+# The contract did not carry gates for these; they were decided off the drawn
+# picture, so the gates are written here with the same rule as the rest -- a
+# production-side revert has to redden each one.
+
+
+def test_t14_the_texture_branch_scatters_across_directions():
+    """T-14 テクスチャ枝は複数の向きに散る。**直交に近いところまで許す。**
+
+    「pen・pencil・silverpoint は複数の向きを散らすように改修。直交に近いレベル
+    まで許容する」（作者裁定 2026-08-07）。単一の狭い散りは**ハッチ**に見え、
+    ハッチは別の機構である（設計 §2 の機構 3）。
+
+    **道具の硬さで散りを縮めない。**`fill_hand` を掛けると silverpoint (0.05) は
+    0.5° しか散らず、作者が名指しした 3 道具のうち 1 つが指示から外れる。
+    """
+    from inku_server.renderer import FILL_TEXTURE_ANGLE_SPREAD_DEG
+
+    assert FILL_TEXTURE_ANGLE_SPREAD_DEG >= 45.0
+    for tool in ("silverpoint", "pencil", "pen"):
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        assert _has(_svg(payload), "fill-texture-v1"), tool
+        angles = _texture_mark_angles(payload)
+        assert len(angles) >= 20, tool
+        # 2 本が直交しうること。最大の開きで見る — 標準偏差では、狭い散りに
+        # 外れ値が 1 本混ざっただけの実装が通る。
+        assert max(angles) - min(angles) >= 80.0, (tool, max(angles) - min(angles))
+
+
+def _texture_mark_angles(payload: dict) -> list[float]:
+    svg = _svg(payload)
+    group = re.search(r'<g class="fill-texture-v1[^"]*">(.*?)</g>', svg, flags=re.S)
+    assert group is not None
+    angles = []
+    for path_d in re.findall(r'd="([^"]+)"', group.group(1)):
+        points = [
+            (float(x), float(y))
+            for x, y in re.findall(r"(-?\d+\.\d+) (-?\d+\.\d+)", path_d)
+        ]
+        if len(points) < 4:
+            continue
+        # The band's two ends; the mark's direction is the long axis between them.
+        head, tail = points[0], points[len(points) // 2]
+        angles.append(math.degrees(math.atan2(tail[1] - head[1], tail[0] - head[0])) % 180.0)
+    return angles
+
+
+def test_t15_a_texture_mark_sits_close_to_the_field_it_rises_from():
+    """T-15 テクスチャ枝の痕は、下地とのコントラストが近い。
+
+    「線と背景のコントラストを近づける。あくまで塗りつぶしの中から、一部筆致が
+    浮いて見えるという程度」（作者裁定 2026-08-07）。**下地の濃度に対する比で持つ**
+    ので、記述が淡さを求めた作品でも関係は変わらない。
+
+    対照: 走査線枝の筆は下地に寄せない。**枝を問わず寄せる実装では、面を作る
+    筆致まで見えなくなる。**
+    """
+    texture = _svg(TEXTURE_CASE)
+    under = float(re.search(r'fill-underlay-v1"[^>]*fill-opacity="([\d.]+)"', texture).group(1))
+    marks = {
+        float(value)
+        for value in re.findall(
+            r'fill-opacity="([\d.]+)"',
+            re.search(r'<g class="fill-texture-v1[^"]*">(.*?)</g>', texture, flags=re.S).group(1),
+        )
+    }
+    assert len(marks) == 1
+    mark = marks.pop()
+    assert mark / under == pytest.approx(FILL_TEXTURE_CONTRAST, abs=0.05), (mark, under)
+
+    # 対照: 走査線枝の筆は記述の濃度そのままで、下地に寄せていない。下地は
+    # 筆致の半分なので、寄せない枝の比は 1 / 0.5 = 2.0 になる。
+    scan = _svg(SCAN_CASE)
+    scan_under = float(re.search(r'fill-underlay-v1"[^>]*fill-opacity="([\d.]+)"', scan).group(1))
+    scan_marks = {
+        float(value)
+        for value in re.findall(
+            r'fill-opacity="([\d.]+)"',
+            re.search(r'<g class="fill-stroke-v1[^"]*">(.*?)</g>', scan, flags=re.S).group(1),
+        )
+    }
+    assert len(scan_marks) == 1
+    scan_ratio = scan_marks.pop() / scan_under
+    assert scan_ratio == pytest.approx(1.0 / FILL_UNDERLAY_OPACITY_RATIO, abs=0.02)
+    assert mark / under < scan_ratio, (mark / under, scan_ratio)
+
+
+def test_t16_the_machines_fill_is_a_raster_line_not_a_hatch(monkeypatch):
+    """T-16 機械の塗りは走査線である。**水平・間隔を残す・芯と滲みの 2 枚。**
+
+    「ブラウン管の走査線のような表現。線のセンターの輝度が高く周囲が滲む。
+    走査線の間には薄く影が見える」（作者裁定 2026-08-07）。**間隔を被覆 0.9 まで
+    詰めると線の間が閉じ、線として読めなくなる**ので、機械は従来の間隔を保つ。
+    """
+    machine = dict(CIRCLE, weight="computer", filled=True)
+    lines = _centerlines(machine, monkeypatch)
+    assert lines
+
+    # 水平。斜めの seed 由来の角ではない。
+    angles = _stroke_angles_deg(lines)
+    assert set(round(angle, 6) for angle in angles) == {0.0}, sorted(set(angles))[:4]
+
+    # 間隔が残る。被覆率が閾値を下回っていれば、線の間に下地が見える。
+    ins = Instruction.model_validate(machine)
+    width = _stroke_width_px(ins.weight, CANVAS, ins.thinness)
+    pitch = _fill_scan_spacing(ins, CANVAS)
+    assert width / pitch < FILL_COVERAGE_BRANCH, width / pitch
+
+    # 1 本が 2 枚。広くて薄い滲みの上に、狭くて濃い芯。`lines` は
+    # `synthesize_along` の呼び出しを数えているので、2 枚ぶんで 1 本である。
+    svg = _svg(machine)
+    group = re.search(r'<g class="fill-stroke-v1[^"]*">(.*?)</g>', svg, flags=re.S).group(1)
+    opacities = [float(value) for value in re.findall(r'fill-opacity="([\d.]+)"', group)]
+    assert len(opacities) == len(lines), (len(opacities), len(lines))
+    assert len(opacities) % 2 == 0 and len(opacities) >= 2 * FILL_MIN_SCANLINES
+    halo, core = opacities[0], opacities[1]
+    assert halo < core, (halo, core)
+    # 交互であること。まとめて滲みを敷いてからまとめて芯を引く実装は、
+    # 1 本ごとの重なりにならない。
+    assert opacities[0::2] == [halo] * (len(opacities) // 2)
+    assert opacities[1::2] == [core] * (len(opacities) // 2)
+    # 対照: 濃さだけでなく幅も違うこと。同じ幅を 2 度置いても濃くなるだけで、
+    # 縁は柔らかくならない。
+    widths = [_band_width(d) for d in re.findall(r'd="([^"]+)"', group)[:2]]
+    assert widths[0] > widths[1] * 2, widths
+
+
+def _band_width(path_d: str) -> float:
+    """The width of a stroke band, taken across its middle."""
+    points = [
+        (float(x), float(y))
+        for x, y in re.findall(r"(-?\d+\.\d+) (-?\d+\.\d+)", path_d)
+    ]
+    half = len(points) // 2
+    left, right = points[half // 2], points[half + half // 2]
+    return math.hypot(left[0] - right[0], left[1] - right[1])
 
 
 # --- stage 4: the corpus ---------------------------------------------------

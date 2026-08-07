@@ -15,6 +15,8 @@ import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.lineage.SubmitDerivationKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
@@ -33,6 +35,10 @@ import org.json.JSONObject
 
 const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。"
 const val DemoCanvasAspectId = "pixel9_landscape_safe"
+/** Bookkeeping the demo loop puts in front of the prose it saves. */
+const val DemoHistoryInputPrefix = "[demo] "
+/** The same, for a batch line: `#<line number> <prose>`. */
+private val BatchHistoryInputPrefix = Regex("^#\\d+\\s+")
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
@@ -78,6 +84,9 @@ data class InkuUiState(
     val selectedCatalogId: String = "default",
     val selectedCanvasAspect: String = "square",
     val selectedHistory: HistoryItemEntity? = null,
+    // web's `lineageDetached` (+page.svelte:515). While it is up, the work on
+    // screen is shown but not inherited from: the next save becomes a root.
+    val lineageDetached: Boolean = false,
     val historySearchQuery: String = "",
     val historyStarredOnly: Boolean = false,
     val canvasAspectPluginEnabled: Boolean = true,
@@ -208,12 +217,27 @@ class InkuViewModel(
         }
         viewModelScope.launch {
             val latest = history.first { it.isNotEmpty() }.first()
-            val current = localState.value
-            if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null) {
-                repository.getHistoryById(latest.id)?.let { full ->
+            if (restoredInitialHistory || promptEditedByUser || localState.value.selectedHistory != null) return@launch
+            repository.getHistoryById(latest.id)?.let { full ->
+                // Re-read after the lookup suspended. The first history row can
+                // arrive because a drawing just saved it, and that drawing sets
+                // the selection itself a moment later; writing a value captured
+                // before the suspension back over it would restore the flags of
+                // a state that no longer exists -- among them `lineageDetached`,
+                // which decides whether the next save has a parent at all.
+                val current = localState.value
+                if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null) {
                     restoredInitialHistory = true
                     localState.value = current.copy(
                         selectedHistory = full,
+                        // Restored for display only. web has no such restore --
+                        // `displayedHistoryItem` starts null (+page.svelte:2604)
+                        // and `onMount` (:5789) puts nothing back -- so counting
+                        // it as a parent would make this client alone record a
+                        // `replay` for opening the app and drawing. Only an
+                        // explicit pick from history becomes a parent, which is
+                        // what web's `loadIterationItem` does.
+                        lineageDetached = true,
                         prompt = full.originalInput,
                         ddl = full.normalizedDdl,
                         ddlEditedAfterGeneration = false,
@@ -558,6 +582,9 @@ class InkuViewModel(
         promptEditedByUser = false
         localState.value = localState.value.copy(
             selectedHistory = item,
+            // An explicit pick is what makes a work the parent of the next save
+            // (web's `loadIterationItem`, +page.svelte:4600).
+            lineageDetached = false,
             prompt = item.originalInput,
             ddl = item.normalizedDdl,
             ddlEditedAfterGeneration = false,
@@ -573,6 +600,23 @@ class InkuViewModel(
         viewModelScope.launch {
             repository.getHistoryById(item.id)?.let { selectHistory(it) }
         }
+    }
+
+    /**
+     * 「新しい起点にする」-- the next save starts a lineage of its own instead of
+     * hanging off the work on screen.
+     *
+     * A port of web's `detachLineage` (+page.svelte:4539-4548), minus the parts
+     * that clear the lineage graph and switch tabs: this client has no lineage
+     * panel to clear. Contract 2/5 brings that panel, and the button web puts on
+     * it (`LineagePanel.svelte:788`) belongs there rather than somewhere this
+     * client invented.
+     */
+    fun detachLineage() {
+        localState.value = localState.value.copy(
+            selectedHistory = null,
+            lineageDetached = true,
+        )
     }
 
     fun selectPreviousHistory() {
@@ -642,11 +686,92 @@ class InkuViewModel(
         return drawingRunSerial == runId
     }
 
+    /**
+     * Builds the declaration a save carries: which work it came from, and by
+     * which operation.
+     *
+     * `kindOf` is handed the parent -- null when there is none -- so that the
+     * "no parent, no kind" branch of `SubmitDerivationKind` is the one this
+     * client actually walks, rather than a branch only a unit test ever sees.
+     *
+     * The canvas ratio is compared against the parent's stored one, which is
+     * how web reaches the same judgment through `pendingCanvasAspectDerivation`
+     * (+page.svelte:3219-3243).
+     */
+    private fun lineageFor(
+        current: InkuUiState,
+        kindOf: (parent: HistoryItemEntity?, canvasAspectChanged: Boolean) -> String?,
+    ): LineageDeclaration {
+        val parent = (if (current.lineageDetached) null else current.selectedHistory)
+            ?.takeIf { !it.lineageNodeId.isNullOrEmpty() }
+        val canvasAspectChanged = parent != null && current.selectedCanvasAspect != parent.canvasAspect
+        val kind = kindOf(parent, canvasAspectChanged)
+        if (parent == null || kind == null) return LineageDeclaration()
+        return LineageDeclaration(
+            parentNodeId = parent.lineageNodeId,
+            derivationKind = kind,
+            derivationMetadata = if (!canvasAspectChanged) {
+                emptyMap<String, Any?>()
+            } else {
+                mapOf(
+                    "from_canvas_aspect" to parent.canvasAspect,
+                    "to_canvas_aspect" to current.selectedCanvasAspect,
+                )
+            },
+        )
+    }
+
+    private fun describeLineage(current: InkuUiState): LineageDeclaration =
+        lineageFor(current) { parent, canvasAspectChanged ->
+            SubmitDerivationKind.forDescribeSubmit(
+                hasParent = parent != null,
+                canvasAspectChanged = canvasAspectChanged,
+                textChanged = parent != null && descriptionChanged(current.prompt, parent),
+            )
+        }
+
+    private fun ddlLineage(current: InkuUiState): LineageDeclaration =
+        lineageFor(current) { parent, canvasAspectChanged ->
+            SubmitDerivationKind.forDdlSubmit(
+                hasParent = parent != null,
+                canvasAspectChanged = canvasAspectChanged,
+                ddlEdited = current.ddlEditedAfterGeneration,
+            )
+        }
+
+    /**
+     * Whether the description differs from the one its parent was painted from.
+     *
+     * web compares against `source_text` (+page.svelte:3220-3221), a second
+     * column holding the prose without the bookkeeping a batch or demo line
+     * carries. This client has no such column: `originalInput` keeps the prefix
+     * (`#3 …` from a batch line, `[demo] …` from the demo loop) while the
+     * describe box holds sometimes the stored string and sometimes the prose
+     * alone -- `selectHistory` copies the prefix in, the end of a batch strips
+     * it out. Comparing the raw strings would report an edit nobody made and
+     * write `description_edit` for a redraw, so text counts as unchanged when it
+     * matches either form. That is the judgment web reaches through its extra
+     * column, without adding one here.
+     */
+    private fun descriptionChanged(prompt: String, parent: HistoryItemEntity): Boolean {
+        val text = prompt.trim()
+        val stored = parent.originalInput.trim()
+        return text != stored && text != strippedHistoryInput(stored)
+    }
+
+    private fun strippedHistoryInput(stored: String): String = when {
+        stored.startsWith(DemoHistoryInputPrefix) -> stored.removePrefix(DemoHistoryInputPrefix).trim()
+        else -> BatchHistoryInputPrefix.replaceFirst(stored, "").trim()
+    }
+
     private fun runSubmit(current: InkuUiState) {
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = "Prompt is empty.")
             return
         }
+        // Read before the coroutine starts: the first thing it does is clear
+        // `selectedHistory` (below), so a parent read from inside would be gone.
+        val lineage = describeLineage(current)
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             localState.value = localState.value.copy(
@@ -685,6 +810,7 @@ class InkuViewModel(
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
+                        lineage = lineage,
                     )
                 }
             }.onSuccess { item ->
@@ -696,6 +822,9 @@ class InkuViewModel(
                     ddlEditedAfterGeneration = false,
                     confirmDdlOverwrite = false,
                     selectedHistory = item,
+                    // A saved work is what the next one comes from (web lowers
+                    // the same flag on every save, +page.svelte:2883, :3304).
+                    lineageDetached = false,
                     isDrawing = false,
                     message = "Rendered ${item.renderHashShort}",
                 )
@@ -714,12 +843,13 @@ class InkuViewModel(
             return
         }
         val ddl = current.ddl.ifBlank { current.prompt }
+        val lineage = ddlLineage(current)
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId), current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization)
+                    repository.composeFromDdl(current.prompt, ddl, CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId), current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage)
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -730,6 +860,7 @@ class InkuViewModel(
                     ddlEditedAfterGeneration = false,
                     confirmDdlOverwrite = false,
                     selectedHistory = item,
+                    lineageDetached = false,
                     isDrawing = false,
                     message = "Composed ${item.renderHashShort}",
                 )
@@ -808,6 +939,11 @@ class InkuViewModel(
                     last = item
                     localState.value = localState.value.copy(
                         selectedHistory = item,
+                        // The line itself declared no parent -- every batch line
+                        // is a root of its own, as web's does (+page.svelte:3327-3345)
+                        // -- but the work now on screen is one, and web lowers
+                        // this flag on every saved paint (:2883).
+                        lineageDetached = false,
                         ddl = item.normalizedDdl,
                         ddlEditedAfterGeneration = false,
                         batchSuccess = success,
@@ -834,6 +970,7 @@ class InkuViewModel(
             if (!isCurrentDrawingRun(runId)) return@launch
             localState.value = localState.value.copy(
                 selectedHistory = last,
+                lineageDetached = false,
                 ddl = last?.normalizedDdl.orEmpty(),
                 ddlEditedAfterGeneration = false,
                 prompt = last?.originalInput?.removePrefix("#${localState.value.batchActiveLine} ") ?: current.prompt,
@@ -910,7 +1047,7 @@ class InkuViewModel(
                                 stage1ModelId = cycle.selectedModelId,
                                 stage2ModelId = cycle.selectedStage2ModelId,
                                 autoRepair = cycle.ddlAutoRepairEnabled,
-                                historyInput = "[demo] $prompt",
+                                historyInput = "$DemoHistoryInputPrefix$prompt",
                                 litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
                             )
                         }
@@ -920,7 +1057,8 @@ class InkuViewModel(
                         val latest = localState.value
                         localState.value = latest.copy(
                             selectedHistory = item,
-                            prompt = item.originalInput.removePrefix("[demo] "),
+                            lineageDetached = false,
+                            prompt = item.originalInput.removePrefix(DemoHistoryInputPrefix),
                             ddl = item.normalizedDdl,
                             ddlEditedAfterGeneration = false,
                             demoGeneratedDdl = item.normalizedDdl,
@@ -1145,8 +1283,15 @@ class InkuViewModel(
     }
 
     private suspend fun restorePersistedSettings() {
-        val current = localState.value
         val settings = repository.getSettingsMap()
+        // Read after the lookup suspended, not before. Startup runs while the
+        // screen is already live: a description typed, a work picked from
+        // history, a canvas ratio chosen -- all of it lands in the state while
+        // this is waiting on the database, and writing back a copy taken before
+        // the wait undoes it without a trace. `lineageDetached` is the newest
+        // thing that would be undone, and undoing it is not a cosmetic slip:
+        // the pick it erases is what decides whether the next save has a parent.
+        val current = localState.value
         val catalog = settings["color_catalog"]?.let { JSONObject(it).optString("value", current.selectedCatalogId) } ?: current.selectedCatalogId
         val canvas = settings["canvas_aspect"]?.let { JSONObject(it).optString("value", current.selectedCanvasAspect) } ?: current.selectedCanvasAspect
         val canvasPlugin = settings["canvas_aspect_plugin"]?.let { JSONObject(it).optBoolean("enabled", current.canvasAspectPluginEnabled) } ?: current.canvasAspectPluginEnabled

@@ -46,11 +46,16 @@ def test_render_reference_case_counts() -> None:
     # cases. Group F is now 13 catalogs x 9 abstract colors, six hint cases, and
     # five non-white backgrounds. Engine 20 added group G: the 32 cases that
     # state an `arrangement`, which is the only way to reach placement at all.
-    assert len(cases) == 525
+    # Engine 22 added six to C: the corpus carried no filled `computer` and no
+    # filled `silverpoint`, and no filled instruction with a thinness modifier
+    # at all -- so a coverage rule and a list of tool names cut it identically
+    # -- and no filled `chalk`, which is the one tool carrying a fill contrast
+    # of its own.
+    assert len(cases) == 531
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 58, "D": 28, "E": 119, "F": 128, "G": 32}
+    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 32}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -274,7 +279,12 @@ def test_render_reference_discriminator_cases() -> None:
     assert not any("fill-stroke-v1" in name for name in tiny["classes"])
     assert "fill-dab-v1" in tiny["classes"]
     boundary = cases["C-tinyfill-boundary-pen"]
-    assert any(name.startswith("fill-stroke-v1") for name in boundary["classes"])
+    # engine 22: pen は被覆 0.167 でテクスチャ枝へ移った。境界が見ているのは
+    # 「打点ではない = 面として塗られている」ことなので、枝はどちらでもよい。
+    assert any(
+        name.startswith(("fill-stroke-v1", "fill-texture-v1"))
+        for name in boundary["classes"]
+    )
     assert "fill-dab-v1" not in boundary["classes"]
     # 機械の極は大きさに依らず領域 fill のまま (class を 1 つも出さない)。
     assert cases["C-tinyfill-circle-rotring"]["classes"] == []

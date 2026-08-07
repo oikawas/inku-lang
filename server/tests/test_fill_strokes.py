@@ -14,6 +14,8 @@ import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.renderer import (
+    FILL_REACH_WIDTHS_MIN,
+    FILL_REACH_WIDTHS_SPAN,
     _fill_scan_angle,
     _fill_scan_spacing,
     _scanline_segments,
@@ -57,6 +59,17 @@ def _fill_paths(svg: str) -> list[str]:
     return [d for group in _fill_groups(svg) for d in re.findall(r'd="([^"]+)"', group)]
 
 
+def _texture_groups(svg: str) -> list[str]:
+    """テクスチャ枝の痕の群 (fill-texture-v1)。engine 22 の細い側の上層。"""
+    return re.findall(r'<g class="fill-texture-v1[^"]*">.*?</g>', svg, flags=re.S)
+
+
+def _mark_paths(svg: str) -> list[str]:
+    """どちらの枝であれ、下地の上に載った痕の d 属性。"""
+    groups = _fill_groups(svg) + _texture_groups(svg)
+    return [d for group in groups for d in re.findall(r'd="([^"]+)"', group)]
+
+
 def _segment_distance(
     point: tuple[float, float],
     start: tuple[float, float],
@@ -89,10 +102,17 @@ def _points(path_d: str) -> list[tuple[float, float]]:
 @pytest.mark.parametrize("name", sorted(SHAPES))
 @pytest.mark.parametrize("weight", HAND_WEIGHTS)
 def test_filled_shape_is_filled_with_material_strokes(name: str, weight: str):
+    """内部は素材の筆致で埋まる。engine 22 でその筆致が 2 通りになった。
+
+    走査線の枝 (`fill-stroke-v1`) とテクスチャの枝 (`fill-texture-v1`) のどちらを
+    通るかは被覆率が決める。ここが見るのは「素材の筆致で埋まっていること」なので
+    どちらでもよい。**どちらを通るかは `test_fill_underlay_and_branch.py` の
+    T-4〜T-6 が見る。**
+    """
     svg = _render(SHAPES[name], weight=weight, filled=True)
-    groups = _fill_groups(svg)
+    groups = _fill_groups(svg) or _texture_groups(svg)
     assert len(groups) == 1
-    assert len(_fill_paths(svg)) >= 3
+    assert len(_mark_paths(svg)) >= 3
 
 
 @pytest.mark.parametrize("name", sorted(SHAPES))
@@ -124,17 +144,40 @@ def test_fill_strokes_are_one_path_per_stroke(name: str):
         assert path_d.count("M ") >= 1
 
 
-def test_fill_strokes_stay_inside_the_circle():
+def test_fill_strokes_leave_the_circle_by_the_tools_reach_and_no_further():
+    """engine 22: 端点は輪郭を出る。**出る量は道具の幅が決めた分だけ。**
+
+    engine 21 まではここが `<= radius + width` だった — 走査線を交点で切っていたので
+    はみ出しは帯の半幅しか無かった。その一致こそが目に縞を読ませていた第 3 の規則性
+    なので、engine 22 は下地に境界を持たせて筆を解放した。**解放は無制限ではない**:
+    はみ出しは**道具の幅の `FILL_REACH_WIDTHS_MIN..MAX` 倍**で、帯の半幅を足したものが
+    上限になる。図形の大きさには依らない — 依らせると同じ道具が大きい形ほど大きく
+    外し、それは道具の精度ではない。
+    """
     ins = dict(SHAPES["circle"], weight="brush_thick", filled=True)
     svg = _render(ins)
     radius = 0.3 * CANVAS.unit
     width = _stroke_width_px("brush_thick", CANVAS)
-    for x, y in _points("".join(_fill_paths(svg))):
-        assert math.hypot(x - 500.0, y - 500.0) <= radius + width
+    reach = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN)
+    limit = reach + width / 2
+    excursions = [
+        math.hypot(x - 500.0, y - 500.0) - radius
+        for x, y in _points("".join(_fill_paths(svg)))
+    ]
+    assert excursions
+    assert max(excursions) <= limit, (max(excursions), limit)
+    # 判別力: 上限が緩すぎないこと。届いていなければ「解放した」と言えない。
+    assert max(excursions) >= width * FILL_REACH_WIDTHS_MIN * 0.5, max(excursions)
 
 
-def test_fill_strokes_stay_inside_a_concave_cloudform():
-    """凹形でも交点対で切るので、筆が輪郭の外へ出ない。"""
+def test_fill_marks_on_a_concave_cloudform_stay_near_their_own_outline():
+    """凹形でも痕が形から離れない。
+
+    engine 21 まではここが「交点対で切るので外へ出ない」だった。pencil は engine 22
+    でテクスチャ枝（被覆 0.125）へ移り、痕は輪郭の内側に撒いた点を中心に置かれるので、
+    **外へ出るのは痕の半分まで**。凹形の谷へ流れ込まないことを見るのが本題で、
+    それは `_surface_scatter` が交点対で位置を撒くことに依っている。
+    """
     from inku_server.cloudform import generate_cloudform_contour, sample_closed_catmull_rom
 
     payload = dict(SHAPES["cloudform"], weight="pencil", filled=True)
@@ -168,12 +211,14 @@ def test_fill_strokes_stay_inside_a_concave_cloudform():
         )
 
     svg = _render(payload)
-    points = _points("".join(_fill_paths(svg)))
+    points = _points("".join(_mark_paths(svg)))
     assert points
-    # はみ出しうるのは帯の半幅ぶんだけ (交点で切っているので端点は輪郭上)。
-    assert max(excursion(point) for point in points) <= _stroke_width_px(
-        "pencil", CANVAS
-    )
+    # engine 22 の痕は輪郭で切られ、道具の幅ぶんだけ外へ出る。長さは形が決めるので
+    # 「痕の半分」という上限はもう無い — 上限は道具の精度そのものになった。
+    width = _stroke_width_px("pencil", CANVAS)
+    limit = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN) + width
+    worst = max(excursion(point) for point in points)
+    assert worst <= limit, (worst, limit)
 
 
 def test_scan_angle_comes_from_the_instruction_seed():

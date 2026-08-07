@@ -3954,3 +3954,29 @@ content of the day and left the structure, so the next forgotten flag would ship
 - **Tests:** cli **161** (**+50**), server **2367 / 31 skipped** (unchanged),
   `npm run check` **241 FILES / 0 ERRORS / 2 WARNINGS**, ruff clean
   (**cli's arguments are now `src tests scripts`**), `check_docs.py` green.
+
+### Android `2.1.4-android.13` — A drawing now shows on screen where it came from (android Build 148097, 2026-08-07)
+
+**Second of the five lineage releases.** 1/5 wired the parent up and left it invisible; this one puts
+the graph on screen and gives the first control that writes to it.
+
+- **A pure function builds the graph** (`data/lineage/LineageGraph.kt`). **It reproduces all eleven
+  cases baked by actually calling the server's `db.get_lineage`, ordering included** — ordered by
+  `(at, id)`, depth and node count clamped, and **a tombstone left without the hashes and history
+  its neighbours keep**.
+- **Three set queries were added to the DAO**, and the screen names each generation with
+  **`DerivationKindRegistry`'s own labels**. **"Start a new root" reaches the view model from the
+  screen for the first time.**
+- **Nine perturbations were applied to production code only** (no test was touched).
+  **Dropping the rounding turns exactly one test red** — the eleven-case comparison stays green
+  without it, which is precisely why the contract asked for the effective value rather than the output.
+- **⚠ One fix from outside the contract — the app had stopped starting.**
+  **Every launch had thrown since `4c5e82f6` (2026-08-06).** Kotlin emits no `<init>(Application)`
+  signature for a constructor whose second parameter has a default, so `androidx.lifecycle`'s
+  default factory could not find it by reflection and raised `NoSuchMethodException`.
+  **No existing test saw it because they all construct the view model from Kotlin**, going through
+  the synthetic bridge and never walking the reflective path. One word, `@JvmOverloads`, fixes it,
+  and an instrumented gate now composes `InkuApp()` the way `MainActivity` does.
+- **Tests:** **JVM 173 / 0 failures** (39 classes, from 168), **instrumented 46 / 0 failures**
+  (Pixel 9 hardware, from 42). **Only `android/VERSION` moves** — `APP_VERSION` and
+  `web/BUILD_NUMBER` stay put, and nothing is deployed to pentala.

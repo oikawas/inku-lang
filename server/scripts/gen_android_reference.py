@@ -55,9 +55,64 @@ from inku_server.color_catalogs import (
     render_color_map_for_catalog,
 )
 from inku_server import stroke_engine as se
+from inku_server.layer_versions import DDL_ENGINE_VERSION
+from inku_server.render_engines import current_render_engine
 from inku_server.schema import Instruction, Score, Variation
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "android/app/src/test/resources/server_reference"
+
+# Fixtures no engine version governs. They are rebaked in place and the port
+# follows them, the way it always did -- `score_schema_contract.json` moved once,
+# in `4eef595c`, and that frequency is why versioning them would buy nothing.
+FLAT_FIXTURES = frozenset({
+    "coerce_governors.json",
+    "count_preservation.json",
+    "lineage_wiring.json",
+    "prompts.json",
+    "score_schema_contract.json",
+})
+
+# The one fixture the DDL engine governs; everything else answers to the renderer.
+DDL_ENGINE_FIXTURE = "ddl_expand.json"
+
+MANIFEST_NAME = "manifest.json"
+
+
+def render_engine_dir() -> pathlib.Path:
+    return OUT / f"render-engine-{current_render_engine().version}"
+
+
+def ddl_engine_dir() -> pathlib.Path:
+    return OUT / f"ddl-engine-{DDL_ENGINE_VERSION}"
+
+
+def out_path(name: str) -> pathlib.Path:
+    """The file a fixture is written to: the directory of the version governing it.
+
+    Only the current version of each axis is ever written. Older ones are held by
+    their `manifest.json` instead of being rebaked -- the same rule
+    `server/reference/` follows, and the reason raising the engine now adds a
+    directory rather than rewriting expectations the port still holds.
+    """
+    if name in FLAT_FIXTURES:
+        return OUT / name
+    if name == DDL_ENGINE_FIXTURE:
+        return ddl_engine_dir() / name
+    return render_engine_dir() / name
+
+
+def write_manifest(directory: pathlib.Path, layer: str, version: str) -> None:
+    """Freeze a version directory by name and digest so a later tree can hold it."""
+    files = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(directory.iterdir())
+        if path.is_file() and path.name != MANIFEST_NAME
+    }
+    (directory / MANIFEST_NAME).write_text(json.dumps({
+        "layer": layer,
+        "version": version,
+        "files": files,
+    }, ensure_ascii=False, indent=2) + "\n")
 RENDER_SEED = 12345
 SVG_PROFILE = "editable"  # structured output without filters; the port compares against this
 
@@ -135,13 +190,13 @@ def stroke_engine_fixtures() -> None:
         _along("closed_circle_computer_grid_wild", circle, 5.0, "computer", 4242, True,
                grid_step=18.0, wild=True),
     ]
-    (OUT / "stroke_engine_synthesize_along.json").write_text(json.dumps(cases, ensure_ascii=False, indent=2))
+    out_path("stroke_engine_synthesize_along.json").write_text(json.dumps(cases, ensure_ascii=False, indent=2))
 
     energy = [
         {"seed": seed, "samples": [round(se.latent_energy(i / 20.0, seed), 9) for i in range(21)]}
         for seed in (1, 12345, 999)
     ]
-    (OUT / "stroke_engine_latent_energy.json").write_text(json.dumps(energy, ensure_ascii=False, indent=2))
+    out_path("stroke_engine_latent_energy.json").write_text(json.dumps(energy, ensure_ascii=False, indent=2))
 
     # The seeds are chosen so the event branches are actually taken: chalk seed 1
     # fires a `fade`, chalk seed 2 a `catch`, pencil seed 12 both a `correction`
@@ -190,7 +245,7 @@ def stroke_engine_fixtures() -> None:
         _stroke("line_pencil_grid", (100.0, 500.0), (900.0, 500.0), 6.0, "pencil", 12345,
                 grid_step=18.0),
     ]
-    (OUT / "stroke_engine_synthesize_stroke.json").write_text(json.dumps(straight, ensure_ascii=False, indent=2))
+    out_path("stroke_engine_synthesize_stroke.json").write_text(json.dumps(straight, ensure_ascii=False, indent=2))
 
     primitive_fixtures()
 
@@ -349,7 +404,7 @@ def primitive_fixtures() -> None:
         for w in ("computer", "pen", "rotring")
     ]
 
-    (OUT / "stroke_engine_primitives.json").write_text(json.dumps({
+    out_path("stroke_engine_primitives.json").write_text(json.dumps({
         "grammars": {
             weight: {
                 "stiffness": g.stiffness, "damping": g.damping,
@@ -500,7 +555,7 @@ def svg_fixtures() -> None:
             svg_profile=SVG_PROFILE,
             wild=wild,
         )
-        (OUT / f"{name}.svg").write_text(svg)
+        out_path(f"{name}.svg").write_text(svg)
         index[name] = {
             "score": raw,
             "render_seed": RENDER_SEED,
@@ -515,7 +570,7 @@ def svg_fixtures() -> None:
         }
         if source is not None:
             index[name]["wild_off_twin"] = source
-    (OUT / "svg_index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2))
+    out_path("svg_index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2))
 
 
 def variation_fixtures() -> None:
@@ -562,7 +617,7 @@ def variation_fixtures() -> None:
                 })
             offsets.append({"quality": quality, "frequency": frequency, "seed": 12345, "amp": 10.0, "samples": samples})
 
-    (OUT / "renderer_variation_primitives.json").write_text(json.dumps({
+    out_path("renderer_variation_primitives.json").write_text(json.dumps({
         "frequency_cycles": renderer.FREQUENCY_CYCLES,
         "wave_phase": [{"seed": s, "value": renderer._wave_phase(s)} for s in (111, 222, 12345)],
         "hash01": hash01,
@@ -649,7 +704,7 @@ def seed_range_fixtures() -> None:
             ),
         })
 
-    (OUT / "renderer_seed_range.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    out_path("renderer_seed_range.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
 def proportional_fixtures() -> None:
@@ -766,7 +821,7 @@ def proportional_fixtures() -> None:
                     ],
                 })
 
-    (OUT / "renderer_proportional.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    out_path("renderer_proportional.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
 VARIATION_SCORES: dict[str, dict] = {
@@ -1128,7 +1183,7 @@ def fill_and_arc_fixtures() -> None:
             "path_d": se.contour_stroke_path(stroke),
         })
 
-    (OUT / "renderer_fill_and_arc.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    out_path("renderer_fill_and_arc.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
 WEIGHTS_ALL = (
@@ -1284,7 +1339,7 @@ def cloudform_and_relation_fixtures() -> None:
                      "score_in": grid_raw, "score_out": grid_after.model_dump(by_alias=True)})
     out["resolve_performance_score"] = resolved
 
-    (OUT / "renderer_cloudform_and_relations.json").write_text(
+    out_path("renderer_cloudform_and_relations.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2))
 
 
@@ -1398,7 +1453,7 @@ def ddl_expand_fixtures() -> None:
         "focus_ids": sorted(FOCUS_IDS),
         "cases": cases,
     }
-    (OUT / "ddl_expand.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    out_path("ddl_expand.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
 def prompt_fixtures() -> None:
@@ -1435,7 +1490,7 @@ def prompt_fixtures() -> None:
             for name, text in mirrored.items()
         },
     }
-    (OUT / "prompts.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    out_path("prompts.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
 def count_preservation_fixtures() -> None:
@@ -1503,7 +1558,7 @@ def count_preservation_fixtures() -> None:
         "total": len(cases),
         "cases": cases,
     }
-    (OUT / "count_preservation.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    out_path("count_preservation.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
 COLOR_ASSIGNMENT_SEEDS = (RENDER_SEED, 999)
@@ -1648,7 +1703,7 @@ def color_assignment_fixtures() -> None:
         "seed_sensitive": seed_sensitive,
         "hint_resolution": hints,
     }
-    (OUT / "renderer_color_assignment.json").write_text(
+    out_path("renderer_color_assignment.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2)
     )
 
@@ -1691,7 +1746,7 @@ def score_schema_contract_fixture() -> None:
             "color": instruction["color"]["description"],
         },
     }
-    (OUT / "score_schema_contract.json").write_text(
+    out_path("score_schema_contract.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2)
     )
 
@@ -1794,7 +1849,7 @@ def arrangement_fixtures() -> None:
             "count": len(expanded),
             "anchors": [list(renderer._anchor(item)) for item in expanded],
         })
-    (OUT / "renderer_arrangement.json").write_text(
+    out_path("renderer_arrangement.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2)
     )
 
@@ -1895,7 +1950,7 @@ def coerce_governor_fixtures() -> None:
             "expected": both.model_dump(mode="json", exclude_none=True),
             "changed": both.model_dump() != ins.model_dump(),
         })
-    (OUT / "coerce_governors.json").write_text(
+    out_path("coerce_governors.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2)
     )
 
@@ -2034,7 +2089,7 @@ def lineage_wiring_fixtures() -> None:
                 lineage_parent_node_id=root.id, derivation_kind="replay",
                 derivation_metadata=["not", "an", "object"])
 
-        (OUT / "lineage_wiring.json").write_text(json.dumps({
+        out_path("lineage_wiring.json").write_text(json.dumps({
             "note": (
                 "What the server writes to lineage_nodes / lineage_edges when a work "
                 "is saved. Baked by running db.add_item on a throwaway SQLite file."
@@ -2045,7 +2100,8 @@ def lineage_wiring_fixtures() -> None:
 
 
 def main() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+    for directory in (OUT, render_engine_dir(), ddl_engine_dir()):
+        directory.mkdir(parents=True, exist_ok=True)
     SCORES.update(VARIATION_SCORES)
     SCORES.update(CLOUDFORM_SCORES)
     SCORES.update(ARRANGEMENT_SCORES)
@@ -2064,7 +2120,14 @@ def main() -> None:
     coerce_governor_fixtures()
     lineage_wiring_fixtures()
     svg_fixtures()
-    print(f"wrote {len(list(OUT.iterdir()))} files to {OUT}")
+    write_manifest(render_engine_dir(), "render-engine", current_render_engine().version)
+    write_manifest(ddl_engine_dir(), "ddl-engine", DDL_ENGINE_VERSION)
+    written = (
+        sum(1 for path in OUT.iterdir() if path.is_file())
+        + sum(1 for path in render_engine_dir().iterdir() if path.is_file())
+        + sum(1 for path in ddl_engine_dir().iterdir() if path.is_file())
+    )
+    print(f"wrote {written} files to {OUT} (older version directories untouched)")
 
 
 if __name__ == "__main__":

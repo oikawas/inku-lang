@@ -25,9 +25,8 @@ class DefaultSvgRendererPhase2fTest {
         val indexJson = readReferenceIndex()
         val entry = indexJson.getJSONObject(key)
         val scoreObj = entry.getJSONObject("score")
-        if (entry.has("render_seed") && !entry.isNull("render_seed")) {
-            scoreObj.put("render_seed", entry.getLong("render_seed"))
-        }
+        // The corpus keeps the seed beside the Score; so does the server.
+        val renderSeed = if (entry.isNull("render_seed")) null else entry.getLong("render_seed")
         if (entry.has("wild") && !entry.isNull("wild")) {
             scoreObj.put("render_wild", entry.getBoolean("wild"))
         }
@@ -45,7 +44,8 @@ class DefaultSvgRendererPhase2fTest {
                 scoreJson = scoreObj.toString(),
                 colorCatalogId = "default",
                 canvasAspect = aspect,
-                svgProfile = "editable"
+                svgProfile = "editable",
+                renderSeed = renderSeed,
             )
         )
         return result.svg

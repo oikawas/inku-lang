@@ -6,6 +6,7 @@ import android.util.Base64
 import android.util.Log
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.InkuRepository
+import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.security.DisplaySanitizer
 import java.io.File
@@ -97,6 +98,18 @@ class HeadlessRenderActivity : Activity() {
             val saveHistory = intent.getBooleanExtra("save_history", false)
             val inputMode = intent.getStringExtra("input_mode")?.takeIf { it.isNotBlank() } ?: "paint"
             val originalText = intent.getStringExtra("original_text")?.takeIf { it.isNotBlank() } ?: text
+            // The five the server's render and compose bodies take
+            // (`api_core/models.py:14-15`, `:42-45`). A harness that cannot name
+            // a seed cannot draw the same picture twice, and a sender that never
+            // sets a field is a road no test walks.
+            val seeds = PaintSeeds(
+                renderSeed = intent.longExtraOrNull("render_seed"),
+                compositionSeed = intent.longExtraOrNull("composition_seed"),
+                interpretationSeed = intent.getStringExtra("interpretation_seed")?.takeIf { it.isNotBlank() },
+                variationAmplitude = intent.getStringExtra("variation_amplitude")?.takeIf { it.isNotBlank() },
+                variationSeed = intent.longExtraOrNull("variation_seed"),
+                seedText = intent.getStringExtra("seed_text")?.takeIf { it.isNotBlank() },
+            )
 
             val item = when (inputMode) {
                 "ddl" -> repository.composeFromDdl(
@@ -108,6 +121,7 @@ class HeadlessRenderActivity : Activity() {
                     stage2ModelId = stage2Model,
                     autoRepair = autoRepair,
                     litertStage1PromptOptimization = litertStage1PromptOptimization,
+                    seeds = seeds,
                 )
                 "score" -> repository.renderFromScore(
                     description = originalText,
@@ -116,6 +130,7 @@ class HeadlessRenderActivity : Activity() {
                     canvasAspect = canvasAspect,
                     stage1ModelId = stage1Model,
                     stage2ModelId = stage2Model,
+                    seeds = seeds,
                 )
                 else -> repository.paint(
                     description = text,
@@ -126,6 +141,7 @@ class HeadlessRenderActivity : Activity() {
                     autoRepair = autoRepair,
                     historyInput = text,
                     litertStage1PromptOptimization = litertStage1PromptOptimization,
+                    seeds = seeds,
                 )
             }
             if (!saveHistory) {
@@ -273,4 +289,14 @@ class HeadlessRenderActivity : Activity() {
         private const val HEADLESS_OUTPUT_MAX_AGE_MS = 7L * 24L * 60L * 60L * 1000L
         private val RUN_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,80}")
     }
+}
+
+/**
+ * An absent extra is "not given", which is the server's `None`; `getLongExtra`
+ * cannot say that, since its default is a number like any other.
+ */
+private fun android.content.Intent.longExtraOrNull(name: String): Long? {
+    if (!hasExtra(name)) return null
+    getStringExtra(name)?.let { return it.trim().toLongOrNull() }
+    return getLongExtra(name, 0L)
 }

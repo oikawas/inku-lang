@@ -23,7 +23,6 @@ class ServerScoreCompatTest {
     private fun scoreWith(weight: String): String = JSONObject()
         .put("canvas", "square")
         .put("background", "white")
-        .put("render_seed", 12345L)
         .put(
             "instructions",
             JSONArray().put(
@@ -41,7 +40,8 @@ class ServerScoreCompatTest {
             scoreJson = scoreWith(weight),
             colorCatalogId = "default",
             canvasAspect = "square",
-            svgProfile = "editable"
+            svgProfile = "editable",
+            renderSeed = 12345L,
         )
     ).svg
 

@@ -35,7 +35,6 @@ class DefaultSvgRendererPhase2dTest {
         val expectedClass = extractClassAttr(refSvg)
 
         val scoreJson = JSONObject().apply {
-            put("render_seed", 12345)
             put("instructions", JSONArray().apply {
                 put(JSONObject().apply {
                     put("primitive", "line")
@@ -52,7 +51,8 @@ class DefaultSvgRendererPhase2dTest {
                 scoreJson = scoreJson,
                 colorCatalogId = "default",
                 canvasAspect = "square",
-                svgProfile = "editable"
+                svgProfile = "editable",
+                renderSeed = 12345L,
             )
         )
         val actualSvg = actualResult.svg
@@ -67,7 +67,6 @@ class DefaultSvgRendererPhase2dTest {
     @Test
     fun testRotringLineDoesNotCreateStrokeEngineBand() {
         val scoreJson = JSONObject().apply {
-            put("render_seed", 12345)
             put("instructions", JSONArray().apply {
                 put(JSONObject().apply {
                     put("primitive", "line")
@@ -84,7 +83,8 @@ class DefaultSvgRendererPhase2dTest {
                 scoreJson = scoreJson,
                 colorCatalogId = "default",
                 canvasAspect = "square",
-                svgProfile = "editable"
+                svgProfile = "editable",
+                renderSeed = 12345L,
             )
         )
         val actualSvg = actualResult.svg
@@ -100,7 +100,6 @@ class DefaultSvgRendererPhase2dTest {
         val expectedClass = extractClassAttr(refSvg)
 
         val scoreJson = JSONObject().apply {
-            put("render_seed", 12345)
             put("instructions", JSONArray().apply {
                 put(JSONObject().apply {
                     put("primitive", "line")
@@ -123,7 +122,8 @@ class DefaultSvgRendererPhase2dTest {
                 scoreJson = scoreJson,
                 colorCatalogId = "default",
                 canvasAspect = "square",
-                svgProfile = "editable"
+                svgProfile = "editable",
+                renderSeed = 12345L,
             )
         )
         val actualSvg = actualResult.svg

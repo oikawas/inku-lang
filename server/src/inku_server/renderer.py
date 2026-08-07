@@ -5198,6 +5198,7 @@ def _render_fill_texture(
     grid_step = _grid_step_px(ins.weight, canvas)
     base_angle = _fill_scan_angle(seed)
     spread = math.radians(FILL_TEXTURE_ANGLE_SPREAD_DEG)
+    reach = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN * _fill_hand(ins))
     group = dwg.g(class_=f"fill-texture-v1 marks-{len(points)}")
     for index, (px, py) in enumerate(points):
         # A rubbed tone is laid in several directions -- two marks may cross at
@@ -5205,12 +5206,29 @@ def _render_fill_texture(
         # narrow spread reads as a hatch, which is a different mechanism.
         angle = base_angle + (_hash01(index, seed, "fill-texture-angle") - 0.5) * 2 * spread
         half = mark_length / 2
-        ux, uy = math.cos(angle) * half, math.sin(angle) * half
-        count_samples = max(2, _stroke_sample_count(mark_length, canvas))
+        dx, dy = math.cos(angle), math.sin(angle)
+        # A mark is cut where the form ends, and then let past it by the same
+        # tool-width reach the scan branch uses. Without this a mark laid near
+        # the edge hangs half its length outside -- and at twice the length the
+        # author asked for, that is the overshoot that was already rejected once
+        # (F-1), arriving through the other branch.
+        spans = [
+            span for span in _line_spans(contour, (px, py), (dx, dy))
+            if span[0] <= 0.0 <= span[1]
+        ]
+        if not spans:
+            continue
+        inside_start, inside_end = spans[0]
+        start = max(-half, inside_start - reach)
+        end = min(half, inside_end + reach)
+        if end - start <= width:
+            continue
+        length = end - start
+        count_samples = max(2, _stroke_sample_count(length, canvas))
         centerline = [
             (
-                px - ux + 2 * ux * i / (count_samples - 1),
-                py - uy + 2 * uy * i / (count_samples - 1),
+                px + dx * (start + length * i / (count_samples - 1)),
+                py + dy * (start + length * i / (count_samples - 1)),
             )
             for i in range(count_samples)
         ]

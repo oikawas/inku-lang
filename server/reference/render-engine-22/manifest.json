@@ -6,7 +6,7 @@
   "schema_version": "0.1.0",
   "color_map_digest": "72e7600035a80093a46b79d03e147771",
   "frozen_at": "2026-08-07",
-  "commit": "3b899fa66d0a727c45d04569fcbf773f28d14d14",
+  "commit": "5f3e3c9b9d0c0f6b9f91a868d2aac433351fa351",
   "reason": "A fill got an underlay, and what goes on top of it got a branch. Until engine 21 a stroke WAS the fill, so every scan line had to be cut at its intersection with the outline or the paint would spill outside the shape. That cut is one of three regularities the eye reads as a raster: measured across the eleven filled shapes of the three works the author named as striped, the scan angle varied by 0.1 degrees inside one shape, the pitch by 6.1%, and the endpoints not at all. A real element now holds the field, so the marks are free to leave the contour: the angle moves per stroke, the pitch is drawn far wider, and each end overshoots or falls short. All three amplitudes come from ToolGrammar.fill_hand and are zero for a machine, so a computer fill keeps the exact repetition that is its signature. Above the threshold the marks are scan lines packed to coverage 0.9; below it they are scattered rubbings, because closing the gaps at pencil width would take eight times the lines and that is not how the tool is used. The threshold is coverage -- width over pitch -- and not a list of tool names: the two cut the engine-21 corpus identically, which is why C-fill-circle-crayon-extra_fine is added to send one tool across the branch on thinness alone. A fill stroke also ends the way paint ends, heavy where the tool lands, instead of tapering like a drawn line. Tiny shapes still degrade to one dab and rotring still degrades to a region fill; neither gets an underlay.",
   "changed_from_previous": [
     "C-fill-circle-brush_thick",
@@ -12997,7 +12997,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "eaaf2131019d80b7a62bb6261445b3ff",
+      "digest": "88e257e236a2d681a61faa7cd7dca25a",
       "bytes": 58370,
       "counts": {
         "path": 52,
@@ -13072,7 +13072,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "9ea2d4067a41ee3ad25cb9d37eda193b",
+      "digest": "a28c65757fe0f8fcf22ae1f3545be1aa",
       "bytes": 54395,
       "counts": {
         "path": 53,
@@ -13147,7 +13147,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "2d4005b80a998f9bcf32aefb9090c613",
+      "digest": "5144ead7088636bceba301ca966f6c8d",
       "bytes": 52192,
       "counts": {
         "path": 53,
@@ -13380,7 +13380,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "64880076a57c982330b52b8d930d0cfd",
+      "digest": "2fda71af6ce6d620bf33f0ca2fce048b",
       "bytes": 37224,
       "counts": {
         "path": 34,
@@ -13605,7 +13605,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "8c3f34245965201d52e51be8f0e32e1b",
+      "digest": "b2f935552fb6da95b766af34b8726daf",
       "bytes": 58477,
       "counts": {
         "path": 50,
@@ -13839,7 +13839,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "0c2cf0bf02c3602252aacd80bf5a6a8b",
+      "digest": "f5a2c86c069214bab22ff248f0ee6a88",
       "bytes": 58803,
       "counts": {
         "path": 57,
@@ -14073,7 +14073,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "e070dceb1f273f68164720e3c9944d28",
+      "digest": "0b5e9d985f8dae709562ac8ed1deb90c",
       "bytes": 37118,
       "counts": {
         "path": 30,
@@ -17039,7 +17039,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "c5c1d990c50cbfc2ed52eac0bee1c102",
+      "digest": "c32f9cc7e34894b8ede5e95bf242aa4a",
       "bytes": 5367,
       "counts": {
         "path": 4,
@@ -23637,7 +23637,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "dddd360da230845499ed210bee14c024",
+      "digest": "7e63233574047e24d42e9157616aa9c7",
       "bytes": 57577,
       "counts": {
         "path": 53,
@@ -23871,7 +23871,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "68756fb444188413a81e839f2fea857a",
+      "digest": "c45d533c3311aa590462f53970ca7044",
       "bytes": 39798,
       "counts": {
         "path": 34,
@@ -24096,7 +24096,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "5d3519ca1c97ee0b0f7218dce2b73a0b",
+      "digest": "c021f86735363c499151e88c42ec0f55",
       "bytes": 58580,
       "counts": {
         "path": 50,
@@ -24330,7 +24330,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "996bbc63455572155547ac559e6fd6d1",
+      "digest": "61704e15ae401c0aef6ba6c0d7f007ac",
       "bytes": 62561,
       "counts": {
         "path": 57,
@@ -24564,7 +24564,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "8bc3c8c6713494c5c53d608d61cec1b7",
+      "digest": "45a5788801a8050c3e7a0175d94fef4e",
       "bytes": 37118,
       "counts": {
         "path": 30,

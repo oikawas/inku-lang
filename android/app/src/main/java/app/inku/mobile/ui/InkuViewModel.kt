@@ -16,6 +16,8 @@ import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.lineage.LineageGraphNode
+import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.SubmitDerivationKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -87,6 +89,11 @@ data class InkuUiState(
     // web's `lineageDetached` (+page.svelte:515). While it is up, the work on
     // screen is shown but not inherited from: the next save becomes a root.
     val lineageDetached: Boolean = false,
+    // The graph around the work on screen. Held rather than derived, because it
+    // is read from the database and web refetches it on the same occasions
+    // (+page.svelte:4556): opening the lineage, and picking a node in it.
+    val lineageGraph: LineageGraphResult? = null,
+    val lineageLoading: Boolean = false,
     val historySearchQuery: String = "",
     val historyStarredOnly: Boolean = false,
     val canvasAspectPluginEnabled: Boolean = true,
@@ -122,6 +129,10 @@ data class BatchFailure(
 enum class AppTab {
     Compose,
     History,
+    // web keeps the lineage beside the canvas, as one of the output tabs
+    // (CanvasPanel.svelte:517). A phone has no room next to the canvas for a
+    // tree, so it gets a screen of its own; author's ruling, 2026-08-07.
+    Lineage,
     Demo,
     Settings,
 }
@@ -170,6 +181,7 @@ class InkuViewModel(
     private val exportTemplates = repository.exportTemplates()
     private var modelDownloadJob: Job? = null
     private var drawingJob: Job? = null
+    private var lineageJob: Job? = null
     private var litertWarmupJob: Job? = null
     private var drawingRunSerial: Long = 0L
     private var restoredInitialHistory = false
@@ -252,6 +264,7 @@ class InkuViewModel(
     override fun onCleared() {
         drawingRunSerial += 1
         drawingJob?.cancel()
+        lineageJob?.cancel()
         modelDownloadJob?.cancel()
         litertWarmupJob?.cancel()
         (getApplication() as InkuApplication).applicationScope.launch {
@@ -359,6 +372,8 @@ class InkuViewModel(
                 current.settingsPane
             },
         )
+        // web refetches when the lineage tab comes up (+page.svelte:4556).
+        if (tab == AppTab.Lineage) refreshLineage()
     }
 
     fun setSettingsPane(panel: SettingsPane) {
@@ -577,7 +592,16 @@ class InkuViewModel(
         localState.value = localState.value.copy(ddlEditorOpen = false)
     }
 
-    fun selectHistory(item: HistoryItemEntity) {
+    fun selectHistory(item: HistoryItemEntity) = applyHistorySelection(item, AppTab.Compose)
+
+    /**
+     * @param tab where the pick leaves the reader. Picking out of history opens
+     *   the work to be drawn again; picking a node in the lineage re-centres the
+     *   graph and stays on it, which is what web's `openLineageNode` does
+     *   (+page.svelte:4225-4230) -- there it is the double click
+     *   (`openLineageNodeInCanvas`, :4234) that moves to the canvas.
+     */
+    private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab) {
         restoredInitialHistory = true
         promptEditedByUser = false
         localState.value = localState.value.copy(
@@ -591,7 +615,7 @@ class InkuViewModel(
             confirmDdlOverwrite = false,
             selectedCatalogId = item.colorCatalogId,
             selectedCanvasAspect = item.canvasAspect,
-            tab = AppTab.Compose,
+            tab = tab,
             composeMode = ComposeMode.Write,
         )
     }
@@ -616,7 +640,52 @@ class InkuViewModel(
         localState.value = localState.value.copy(
             selectedHistory = null,
             lineageDetached = true,
+            // The two lines contract 1/5 had to leave out, because there was no
+            // lineage on this client to clear or to leave: web's `detachLineage`
+            // ends with `lineageGraph = null; outputTab = 'canvas'`
+            // (+page.svelte:4544-4546). Nothing is left to look at once the work
+            // is dropped, so staying would show an empty screen.
+            lineageGraph = null,
+            tab = AppTab.Compose,
         )
+    }
+
+    /**
+     * Reads the graph around the work on screen.
+     *
+     * The focus is the displayed work's node, the way web's `fetchLineage` is
+     * always called with `currentLineageNodeId`; there is no second notion of
+     * "which node the lineage is looking at" to fall out of step with it.
+     */
+    fun refreshLineage() {
+        val focus = localState.value.selectedHistory?.lineageNodeId
+        lineageJob?.cancel()
+        if (focus.isNullOrEmpty()) {
+            localState.value = localState.value.copy(lineageGraph = null, lineageLoading = false)
+            return
+        }
+        localState.value = localState.value.copy(lineageLoading = true)
+        lineageJob = viewModelScope.launch {
+            val graph = repository.loadLineage(focus)
+            // Re-read after the read suspended: the reader can have picked
+            // another work meanwhile, and writing this graph over theirs would
+            // leave the screen describing a work it is not showing.
+            val current = localState.value
+            if (current.selectedHistory?.lineageNodeId != focus) return@launch
+            localState.value = current.copy(lineageGraph = graph, lineageLoading = false)
+        }
+    }
+
+    /**
+     * 系譜の node を選ぶ -- web's `openLineageNode` (+page.svelte:4225).
+     *
+     * A tombstone has no history row to open, and web guards the same way
+     * (`if (!node.history) return`).
+     */
+    fun selectLineageNode(node: LineageGraphNode) {
+        val item = (node as? LineageGraphNode.Work)?.history?.item ?: return
+        applyHistorySelection(item, AppTab.Lineage)
+        refreshLineage()
     }
 
     fun selectPreviousHistory() {

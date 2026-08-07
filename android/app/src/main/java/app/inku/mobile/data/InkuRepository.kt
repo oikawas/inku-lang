@@ -9,9 +9,12 @@ import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.db.InkuDatabase
+import app.inku.mobile.data.db.LineageEdgeEntity
 import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.lineage.LineageGraph
+import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.llm.DefaultModelDownloads
@@ -90,6 +93,80 @@ class InkuRepository(
     }
 
     suspend fun getHistoryById(id: String): HistoryItemEntity? = database.historyDao().getById(id)
+
+    /**
+     * Gathers the rows around [focusNodeId] and hands them to [LineageGraph].
+     *
+     * Only the fetching lives here; which rows become the graph is decided
+     * there. Two of the walks below are deliberately wider than the graph that
+     * comes out of them, because the server reads wider too:
+     *
+     *  - the climb to the root ignores the node limit, since a generation is
+     *    counted from the root even for a node the limit truncated the graph
+     *    below (`_lineage_generations`, `db.py:1033`);
+     *  - the children of every gathered node are read whether or not they are
+     *    drawn, since `child_count` counts all of them (`db.py:1119`).
+     *
+     * The clamps are not repeated here; they are asked of [LineageGraph], so
+     * that there is one place where 0 becomes 1 and 999 becomes 200.
+     */
+    suspend fun loadLineage(
+        focusNodeId: String,
+        descendantDepth: Int = LineageGraph.DEFAULT_DESCENDANT_DEPTH,
+        nodeLimit: Int = LineageGraph.DEFAULT_NODE_LIMIT,
+    ): LineageGraphResult? {
+        val dao = database.lineageDao()
+        val edges = LinkedHashMap<String, LineageEdgeEntity>()
+
+        // Up to the root. `uq_lineage_primary_parent` gives a child one parent,
+        // so this is a walk; the set of seen edges stops a cycle.
+        var cursor: String? = focusNodeId
+        while (cursor != null) {
+            val edge = dao.getEdgeByChildId(cursor)
+            if (edge == null || edges.put(edge.id, edge) != null) break
+            cursor = edge.parentNodeId
+        }
+
+        // Down as far as the clamped depth reaches, one generation per query.
+        var frontier = listOf(focusNodeId)
+        var level = 0
+        val depth = LineageGraph.effectiveDescendantDepth(descendantDepth)
+        while (level < depth && frontier.isNotEmpty()) {
+            val found = dao.getEdgesByParentIds(frontier)
+            val next = mutableListOf<String>()
+            found.forEach { edge ->
+                if (edges.put(edge.id, edge) == null) next.add(edge.childNodeId)
+            }
+            frontier = next
+            level += 1
+        }
+
+        val nodeIds = LinkedHashSet<String>().apply {
+            add(focusNodeId)
+            edges.values.forEach {
+                add(it.parentNodeId)
+                add(it.childNodeId)
+            }
+        }
+        // One more generation, for the child counts of the deepest nodes.
+        dao.getEdgesByParentIds(nodeIds).forEach { edges.putIfAbsent(it.id, it) }
+
+        val nodes = dao.getNodesByIds(nodeIds)
+        val histories = nodes
+            .mapNotNull { it.historyId }
+            .distinct()
+            .mapNotNull { database.historyDao().getById(it) }
+            .associateBy { it.id }
+
+        return LineageGraph.build(
+            focusNodeId = focusNodeId,
+            nodes = nodes,
+            edges = edges.values.toList(),
+            histories = histories,
+            descendantDepth = descendantDepth,
+            nodeLimit = nodeLimit,
+        )
+    }
 
     suspend fun ensureDefaultModelAssets() {
         ensureDefaultProviderSettings()

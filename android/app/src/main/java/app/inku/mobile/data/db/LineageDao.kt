@@ -21,4 +21,18 @@ interface LineageDao {
 
     @Query("SELECT * FROM lineage_edges WHERE parent_node_id = :parentId")
     suspend fun getEdgesByParentId(parentId: String): List<LineageEdgeEntity>
+
+    // The three below gather the rows `LineageGraph.build` is handed. They only
+    // fetch: which of the rows become the graph, and in which order, is decided
+    // there, so that the same judgment answers for the device and for the baked
+    // expectations.
+
+    @Query("SELECT * FROM lineage_nodes WHERE id IN (:ids)")
+    suspend fun getNodesByIds(ids: Collection<String>): List<LineageNodeEntity>
+
+    @Query("SELECT * FROM lineage_edges WHERE child_node_id IN (:childIds)")
+    suspend fun getEdgesByChildIds(childIds: Collection<String>): List<LineageEdgeEntity>
+
+    @Query("SELECT * FROM lineage_edges WHERE parent_node_id IN (:parentIds)")
+    suspend fun getEdgesByParentIds(parentIds: Collection<String>): List<LineageEdgeEntity>
 }

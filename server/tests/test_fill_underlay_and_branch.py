@@ -35,8 +35,8 @@ from inku_server.renderer import (
     FILL_COVERAGE_BRANCH,
     FILL_COVERAGE_TARGET,
     FILL_MIN_SCANLINES,
-    FILL_REACH_MIN,
-    FILL_REACH_SPAN,
+    FILL_REACH_WIDTHS_MIN,
+    FILL_REACH_WIDTHS_SPAN,
     FILL_TEXTURE_CONTRAST,
     FILL_UNDERLAY_OPACITY_RATIO,
     _fill_coverage,
@@ -109,6 +109,27 @@ def _centerlines(payload: dict, monkeypatch) -> list[list[tuple[float, float]]]:
     return list(captured)
 
 
+def _raster_lines(payload: dict, monkeypatch) -> list[tuple[tuple, tuple, float]]:
+    """The straight bands the machine's raster asked for, before quantisation.
+
+    Same technique as `_centerlines`: wrap the renderer's own helper so the
+    whole product path runs and only the observation point moves. It has to be
+    read here rather than off the path string because the computer rounds its
+    corners onto an 18px lattice, which tilts a band's measured direction by
+    about a degree and makes "exactly one direction" unmeasurable.
+    """
+    captured: list[tuple[tuple, tuple, float]] = []
+    original = renderer._raster_band
+
+    def recording(start, end, width, grid_step):
+        captured.append((tuple(start), tuple(end), width))
+        return original(start, end, width, grid_step)
+
+    monkeypatch.setattr(renderer, "_raster_band", recording)
+    _svg(payload)
+    return list(captured)
+
+
 def _classes(svg: str) -> set[str]:
     """The class names in the document, so an assertion never carries the SVG.
 
@@ -134,14 +155,16 @@ def _stroke_angles_deg(centerlines) -> list[float]:
     return angles
 
 
-def _reach_fractions(centerlines, contour) -> list[float]:
-    """Signed reach of each end, as a fraction of the span across the shape.
+def _reach_pixels(centerlines, contour) -> list[float]:
+    """Signed reach of each end, **in pixels**.
 
     Positive is past the contour, negative is short of it. The stroke's own
     line is cut against the contour the renderer filled -- the polygon, not the
-    ideal circle, or the 92-gon's 0.17px of inset would read as a reach -- and
-    the span between those two crossings is the denominator, which is what
-    "10-15% of the stroke length" means.
+    ideal circle, or the 92-gon's 0.17px of inset would read as a reach.
+
+    Pixels, not a fraction of the stroke: the reach belongs to the tool, so the
+    quantity that has to hold is how far it strays relative to its OWN width,
+    not relative to how big the shape happens to be.
     """
     out: list[float] = []
     for line in centerlines:
@@ -162,8 +185,8 @@ def _reach_fractions(centerlines, contour) -> list[float]:
         # Where the endpoints sit on the same parameter axis.
         s0 = (line[0][0] - mid[0]) * ux + (line[0][1] - mid[1]) * uy
         s1 = (line[-1][0] - mid[0]) * ux + (line[-1][1] - mid[1]) * uy
-        out.append((t0 - s0) / span)
-        out.append((s1 - t1) / span)
+        out.append(t0 - s0)
+        out.append(s1 - t1)
     return out
 
 
@@ -312,25 +335,30 @@ def test_t7_the_scan_angle_varies_within_one_shape(monkeypatch):
     assert 2.0 <= sd <= 4.0, sd
 
 
-def test_t8_the_endpoints_leave_the_contour_in_both_directions(monkeypatch):
-    """T-8 端点が輪郭を離れる。**はみ出しと届かなさの両方**が出る。
+def test_t8_the_endpoints_leave_the_contour_by_a_multiple_of_the_tools_width(monkeypatch):
+    """T-8 端点が輪郭を離れる。**はみ出しと届かなさの両方**が、道具の幅に比例して。
 
     片側だけを見ると、内側へ寄せるだけの実装が通る。engine 21 は交点で切って
     いたので距離は厳密に 0 だった — それが第 3 の規則性である (設計 §3.2)。
 
-    **幅は契約の 10〜15% ではなく 2〜4% である**（作者裁定 2026-08-07・現物を見て
-    「明らかに過大」）。13% では筆が形から毛のように立ち、届かなかった端が下地を
-    輪状に残して図形の中にもう 1 つ楕円が見えた。**端点がやめるべきなのは
-    「揃っていること」であって「収まっていること」ではない**ので、数 % で足りる。
+    **単位は弦長の比ではなく道具の幅である**（作者裁定 2026-08-07）。弦長の比だと
+    誤差が「図形の大きさ」に依ってしまい、同じ pen が大きい形では 17px、小さい形では
+    2px 外す。「この道具はどれだけ狙ったところで止まれるか」は道具の性質なので、
+    幅に比例させる。契約の 10〜15%（弦長）は現物を見て却下されている。
     """
-    fractions = _reach_fractions(_centerlines(SCAN_CASE, monkeypatch), _contour(SCAN_CASE))
-    assert fractions
-    assert any(f > 0 for f in fractions), "no endpoint overshoots the contour"
-    assert any(f < 0 for f in fractions), "no endpoint falls short of the contour"
-    worst = max(abs(f) for f in fractions)
-    least = min(abs(f) for f in fractions)
-    assert FILL_REACH_MIN - 0.01 <= least, least
-    assert worst <= FILL_REACH_MIN + FILL_REACH_SPAN + 0.01, worst
+    for payload in (SCAN_CASE, dict(CIRCLE, weight="brush_thick", filled=True)):
+        ins = Instruction.model_validate(payload)
+        width = _stroke_width_px(ins.weight, CANVAS, ins.thinness)
+        reaches = _reach_pixels(_centerlines(payload, monkeypatch), _contour(payload))
+        assert reaches, payload["weight"]
+        assert any(r > 0 for r in reaches), f"{payload['weight']}: nothing overshoots"
+        assert any(r < 0 for r in reaches), f"{payload['weight']}: nothing falls short"
+        in_widths = [abs(r) / width for r in reaches]
+        assert FILL_REACH_WIDTHS_MIN - 0.05 <= min(in_widths), (payload, min(in_widths))
+        assert max(in_widths) <= FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN + 0.05, (
+            payload,
+            max(in_widths),
+        )
 
 
 def test_t9_a_fill_stroke_ends_loaded_not_tapered():
@@ -379,17 +407,21 @@ def test_t10_a_computer_fill_stays_regular(monkeypatch):
 
     `periodic=True` は「寸分たがわぬ繰り返しは computer のもの」という署名で、
     手を人間らしくする改修がそれを潰してはならない (設計 §5-4)。
+
+    engine 22 では機械の線は演奏されず直線の帯として置かれるので、測る先は
+    `_raster_band` が受け取った 2 点である。
     """
     machine = dict(CIRCLE, weight="computer", filled=True)
     assert GRAMMARS["computer"].periodic
     assert GRAMMARS["computer"].fill_hand == 0.0
-    lines = _centerlines(machine, monkeypatch)
-    assert len(lines) >= 20
+    bands = _raster_lines(machine, monkeypatch)
+    assert len(bands) >= 2 * FILL_MIN_SCANLINES
+    lines = [[start, end] for start, end, _width in bands]
     angles = _stroke_angles_deg(lines)
     assert statistics.pstdev(angles) == pytest.approx(0.0, abs=1e-9)
-    fractions = _reach_fractions(lines, _contour(machine))
-    assert fractions
-    assert max(abs(f) for f in fractions) == pytest.approx(0.0, abs=1e-9)
+    reaches = _reach_pixels(lines, _contour(machine))
+    assert reaches
+    assert max(abs(r) for r in reaches) == pytest.approx(0.0, abs=1e-9)
 
 
 def test_t11_the_scan_branch_reaches_the_coverage_the_author_set(monkeypatch):
@@ -506,20 +538,22 @@ def test_t15_a_texture_mark_sits_close_to_the_field_it_rises_from():
     assert mark / under < scan_ratio, (mark / under, scan_ratio)
 
 
-def test_t16_the_machines_fill_is_a_raster_line_not_a_hatch(monkeypatch):
-    """T-16 機械の塗りは走査線である。**水平・間隔を残す・芯と滲みの 2 枚。**
+def test_t16_the_machines_fill_is_a_straight_raster_line(monkeypatch):
+    """T-16 機械の塗りは走査線である。**直線・1 領域 1 方向・間隔を残す・芯と滲み。**
 
     「ブラウン管の走査線のような表現。線のセンターの輝度が高く周囲が滲む。
-    走査線の間には薄く影が見える」（作者裁定 2026-08-07）。**間隔を被覆 0.9 まで
-    詰めると線の間が閉じ、線として読めなくなる**ので、機械は従来の間隔を保つ。
+    走査線の間には薄く影が見える」（作者裁定 2026-08-07）。続けて
+    「線の途中のゆがみが余分。直線に見えるレベルを維持。主潰し方向は水平・垂直に
+    限らず自由な角度を許容。ただし単体の領域の塗りつぶしの中では向きが揃っている
+    必要がある」。**間隔を被覆 0.9 まで詰めると線の間が閉じ、線として読めなくなる。**
     """
     machine = dict(CIRCLE, weight="computer", filled=True)
-    lines = _centerlines(machine, monkeypatch)
-    assert lines
+    bands = _raster_lines(machine, monkeypatch)
+    assert bands
 
-    # 水平。斜めの seed 由来の角ではない。
-    angles = _stroke_angles_deg(lines)
-    assert set(round(angle, 6) for angle in angles) == {0.0}, sorted(set(angles))[:4]
+    # 1 領域 1 方向。水平とは限らないが、揃っていること。
+    angles = _stroke_angles_deg([[start, end] for start, end, _ in bands])
+    assert len(set(round(a, 9) for a in angles)) == 1, sorted(set(angles))[:4]
 
     # 間隔が残る。被覆率が閾値を下回っていれば、線の間に下地が見える。
     ins = Instruction.model_validate(machine)
@@ -527,34 +561,26 @@ def test_t16_the_machines_fill_is_a_raster_line_not_a_hatch(monkeypatch):
     pitch = _fill_scan_spacing(ins, CANVAS)
     assert width / pitch < FILL_COVERAGE_BRANCH, width / pitch
 
-    # 1 本が 2 枚。広くて薄い滲みの上に、狭くて濃い芯。`lines` は
-    # `synthesize_along` の呼び出しを数えているので、2 枚ぶんで 1 本である。
+    # 直線。演奏された帯は中心線が振れるので輪郭の点が多数になる。
     svg = _svg(machine)
     group = re.search(r'<g class="fill-stroke-v1[^"]*">(.*?)</g>', svg, flags=re.S).group(1)
+    shapes = re.findall(r'd="([^"]+)"', group)
+    assert shapes
+    for path_d in shapes:
+        assert path_d.count(" L ") == 3, path_d[:80]
+
+    # 1 本が 2 枚。広くて薄い滲みの上に、狭くて濃い芯。
     opacities = [float(value) for value in re.findall(r'fill-opacity="([\d.]+)"', group)]
-    assert len(opacities) == len(lines), (len(opacities), len(lines))
+    assert len(opacities) == len(bands), (len(opacities), len(bands))
     assert len(opacities) % 2 == 0 and len(opacities) >= 2 * FILL_MIN_SCANLINES
     halo, core = opacities[0], opacities[1]
     assert halo < core, (halo, core)
-    # 交互であること。まとめて滲みを敷いてからまとめて芯を引く実装は、
-    # 1 本ごとの重なりにならない。
     assert opacities[0::2] == [halo] * (len(opacities) // 2)
     assert opacities[1::2] == [core] * (len(opacities) // 2)
     # 対照: 濃さだけでなく幅も違うこと。同じ幅を 2 度置いても濃くなるだけで、
     # 縁は柔らかくならない。
-    widths = [_band_width(d) for d in re.findall(r'd="([^"]+)"', group)[:2]]
+    widths = [w for _s, _e, w in bands[:2]]
     assert widths[0] > widths[1] * 2, widths
-
-
-def _band_width(path_d: str) -> float:
-    """The width of a stroke band, taken across its middle."""
-    points = [
-        (float(x), float(y))
-        for x, y in re.findall(r"(-?\d+\.\d+) (-?\d+\.\d+)", path_d)
-    ]
-    half = len(points) // 2
-    left, right = points[half // 2], points[half + half // 2]
-    return math.hypot(left[0] - right[0], left[1] - right[1])
 
 
 # --- stage 4: the corpus ---------------------------------------------------

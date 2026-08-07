@@ -14,8 +14,8 @@ import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.renderer import (
-    FILL_REACH_MIN,
-    FILL_REACH_SPAN,
+    FILL_REACH_WIDTHS_MIN,
+    FILL_REACH_WIDTHS_SPAN,
     FILL_TEXTURE_MARK_LENGTH,
     _fill_scan_angle,
     _fill_scan_spacing,
@@ -146,20 +146,21 @@ def test_fill_strokes_are_one_path_per_stroke(name: str):
 
 
 def test_fill_strokes_leave_the_circle_by_the_tools_reach_and_no_further():
-    """engine 22: 端点は輪郭を出る。**出る量は道具が決めた分だけ。**
+    """engine 22: 端点は輪郭を出る。**出る量は道具の幅が決めた分だけ。**
 
     engine 21 まではここが `<= radius + width` だった — 走査線を交点で切っていたので
     はみ出しは帯の半幅しか無かった。その一致こそが目に縞を読ませていた第 3 の規則性
     なので、engine 22 は下地に境界を持たせて筆を解放した。**解放は無制限ではない**:
-    はみ出しは弦長の `FILL_REACH_MIN..MAX` で、円なら弦は直径以下だから上限は
-    `直径 × 0.15 + 半幅` になる。実測は 93.2px（この上限は 98.0px）。
+    はみ出しは**道具の幅の `FILL_REACH_WIDTHS_MIN..MAX` 倍**で、帯の半幅を足したものが
+    上限になる。図形の大きさには依らない — 依らせると同じ道具が大きい形ほど大きく
+    外し、それは道具の精度ではない。
     """
     ins = dict(SHAPES["circle"], weight="brush_thick", filled=True)
     svg = _render(ins)
     radius = 0.3 * CANVAS.unit
     width = _stroke_width_px("brush_thick", CANVAS)
-    reach = FILL_REACH_MIN + FILL_REACH_SPAN
-    limit = reach * 2 * radius + width / 2
+    reach = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN)
+    limit = reach + width / 2
     excursions = [
         math.hypot(x - 500.0, y - 500.0) - radius
         for x, y in _points("".join(_fill_paths(svg)))
@@ -167,7 +168,7 @@ def test_fill_strokes_leave_the_circle_by_the_tools_reach_and_no_further():
     assert excursions
     assert max(excursions) <= limit, (max(excursions), limit)
     # 判別力: 上限が緩すぎないこと。届いていなければ「解放した」と言えない。
-    assert max(excursions) >= reach * radius, max(excursions)
+    assert max(excursions) >= width * FILL_REACH_WIDTHS_MIN * 0.5, max(excursions)
 
 
 def test_fill_marks_on_a_concave_cloudform_stay_near_their_own_outline():

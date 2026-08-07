@@ -4673,8 +4673,12 @@ FILL_COVERAGE_BRANCH = 0.2
 # What the scan branch packs to once it has an underlay under it (author, 2026-08-06).
 FILL_COVERAGE_TARGET = 0.9
 # The underlay's opacity as a ratio of the marks' own, never an absolute: a work
-# whose description asked for a pale fill has to keep a pale underlay.
-FILL_UNDERLAY_OPACITY_RATIO = 0.5
+# whose description asked for a pale fill has to keep a pale underlay. At 0.50
+# the field read as a separate, paler shape with darker strokes lying on it;
+# the author asked for it to blend with the strokes instead ("the contrast is
+# still open", 2026-08-07), so the field sits close under them and what the
+# marks add is texture rather than a second tone.
+FILL_UNDERLAY_OPACITY_RATIO = 0.75
 
 # The three amplitudes that turn a raster into a hand. Each is a band the author
 # set (DESIGN-01-FILL 7) and the tool picks its place in the band through
@@ -4685,23 +4689,26 @@ FILL_ANGLE_SPAN_DEG = 1.6
 FILL_PITCH_CV_MIN = 0.24
 FILL_PITCH_CV_SPAN = 0.10
 # How far each end of a scan stroke reaches past the contour, or falls short of
-# it, as a fraction of the stroke's length. The sign is drawn per end, so one
+# it, **in multiples of the tool's own width**. The sign is drawn per end, so one
 # stroke can overshoot at the landing and undershoot at the lift.
 #
-# The design asked for 10-15%, which was drawn and rejected (author, 2026-08-07):
-# "clearly excessive, keep it within a few percent". At 13% the strokes stood off
-# the form like hairs, and the ends that fell short left the underlay bare in a
-# ring, so a second ellipse appeared inside the shape. What the endpoints have to
-# stop being is EQUAL -- the regularity, not the containment -- and a few percent
-# is enough for that.
-FILL_REACH_MIN = 0.02
-FILL_REACH_SPAN = 0.02
+# It was a fraction of the stroke's LENGTH first, which is the wrong quantity:
+# it made the error depend on how big the shape is rather than on what is
+# drawing it, so the same pen missed by 17px in a large form and 2px in a small
+# one. "How precisely can this tool stop where it means to" belongs to the tool,
+# and the author asked for it to be proportional to the width rather than
+# hard-coded (2026-08-07): a wide brush lands about its own width off, a fine
+# pen a fraction of that. Halving what the length-based rule gave the widest
+# tool lands at 1.5 widths, and the thin tools fall much further than half
+# because their width is what shrank.
+FILL_REACH_WIDTHS_MIN = 1.0
+FILL_REACH_WIDTHS_SPAN = 0.5
 
 # The texture branch. Below the threshold the tool is too thin for parallel
 # lines to become a field -- at pencil width it would take eight times the lines
 # -- and that is not how the tool is used: a pencil rubs a tone. The underlay
 # already holds the field, so these marks only have to give it grain.
-FILL_TEXTURE_MARK_LENGTH = 6.0  # in scan pitches
+FILL_TEXTURE_MARK_LENGTH = 12.0  # in scan pitches
 FILL_TEXTURE_DENSITY = 0.5  # 1.0 lays the same ink the classic scan laid
 # Half-width of the scatter, so two marks can cross at a right angle. A rubbed
 # tone is not a hatch: it is laid in several directions, and the author allowed
@@ -4712,18 +4719,24 @@ FILL_TEXTURE_ANGLE_SPREAD_DEG = 45.0
 # How much darker a mark is than the field it sits on. The marks are meant to
 # rise out of the fill, not to be drawn on top of it: "bring the line and the
 # background closer; only some of the strokes should read as standing out"
-# (author, 2026-08-07). 1.0 would make the marks invisible.
-FILL_TEXTURE_CONTRAST = 1.6
+# (author, 2026-08-07, who then put the number at 1.2-1.3). 1.0 would make the
+# marks invisible.
+FILL_TEXTURE_CONTRAST = 1.25
 
 # --- the machine's fill: a raster line, not a hatch -------------------------
 # `computer` is the one periodic tool, and its fill is a scan line in the sense
 # a screen means it. The author asked for the cathode-ray reading (2026-08-07):
-# horizontal, a dense core that bleeds at its edges, and a faint shadow visible
-# between the lines. So the machine keeps the classic pitch -- packing it to
-# coverage 0.9 closes the gaps and the lines stop being readable as lines -- and
-# each line is laid as a wide faint halo with a narrow core on top, which is a
-# soft edge built out of real elements rather than a filter (filters are
-# display-only, and this has to survive `compat` and `editable`).
+# a dense core that bleeds at its edges, and a faint shadow visible between the
+# lines. So the machine keeps the classic pitch -- packing it to coverage 0.9
+# closes the gaps and the lines stop being readable as lines -- and each line is
+# laid as a wide faint halo with a narrow core on top, which is a soft edge
+# built out of real elements rather than a filter (filters are display-only, and
+# this has to survive `compat` and `editable`).
+#
+# The line is drawn as a straight band rather than performed: the tool grammar's
+# lateral drift bent it visibly along its run, and "keep it at a level that
+# reads as straight" was the correction. The direction is free -- any angle, the
+# seed's -- but one region gets one angle, which the scan layout already gives.
 FILL_RASTER_HALO_WIDTHS = 2.6
 FILL_RASTER_HALO_OPACITY = 0.30
 FILL_RASTER_CORE_WIDTHS = 0.55
@@ -4916,6 +4929,36 @@ def _line_spans(
     return [(hits[i], hits[i + 1]) for i in range(0, len(hits) - 1, 2)]
 
 
+def _raster_band(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    width: float,
+    grid_step: float,
+) -> str:
+    """One straight scan line of the machine's raster, as a band.
+
+    Four corners and nothing else. The tool grammar is deliberately not on this
+    path: a performed line wanders by a third of its width, which over a run
+    this long stops reading as a straight line, and straightness is what the
+    machine's fill is. The endpoints still land on the lattice, so the one thing
+    the computer's material layer gives back (engine 18) is still there to give.
+    """
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    if length <= 0:
+        return ""
+    nx, ny = -dy / length * width / 2, dx / length * width / 2
+    corners = [
+        (start[0] + nx, start[1] + ny),
+        (end[0] + nx, end[1] + ny),
+        (end[0] - nx, end[1] - ny),
+        (start[0] - nx, start[1] - ny),
+    ]
+    if grid_step > 0:
+        corners = [(grid_point(x, grid_step), grid_point(y, grid_step)) for x, y in corners]
+    return "M " + " L ".join(f"{x:.2f} {y:.2f}" for x, y in corners) + " Z"
+
+
 def _render_fill_strokes(
     dwg: svgwrite.Drawing,
     ins: Instruction,
@@ -4948,11 +4991,13 @@ def _render_fill_strokes(
     hand = _fill_hand(ins)
     raster = GRAMMARS[ins.weight].periodic
     if raster:
-        # A screen's raster: the lines are horizontal, they keep their pitch so
-        # the gaps between them stay readable, and the faint shadow the author
-        # asked to see between them is the underlay showing through.
+        # A screen's raster: the lines keep their pitch so the gaps between them
+        # stay readable, and the faint shadow the author asked to see between
+        # them is the underlay showing through. The angle is the work's own --
+        # a raster does not have to be horizontal, it has to be ONE direction
+        # across the region, which the scan layout already guarantees.
         spacing = _fill_scan_spacing(ins, canvas)
-        angle = 0.0
+        angle = _fill_scan_angle(seed)
     else:
         # The underlay carries the field, so the scan lines are free to pack to
         # the coverage the author chose instead of to whatever the pitch gave.
@@ -4978,7 +5023,11 @@ def _render_fill_strokes(
         if hand
         else 0.0
     )
-    reach = (FILL_REACH_MIN + FILL_REACH_SPAN * hand) if hand else 0.0
+    reach = (
+        base_width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN * hand)
+        if hand
+        else 0.0
+    )
     paths: list[dict] = []
     for order, (index, start, end) in enumerate(segments):
         chord = math.hypot(end[0] - start[0], end[1] - start[1])
@@ -5011,8 +5060,8 @@ def _render_fill_strokes(
         # One end overshoots the contour, the other may fall short of it. The
         # sign is drawn per end: an implementation that only insets would leave
         # the edge as tidy as the cut it replaced.
-        r0 = reach * length
-        r1 = reach * length
+        r0 = reach
+        r1 = reach
         if _hash01(order, seed, "fill-reach-start") < 0.5:
             r0 = -r0
         if _hash01(order, seed, "fill-reach-end") < 0.5:
@@ -5044,18 +5093,28 @@ def _render_fill_strokes(
             else ((base_width, opacity),)
         )
         for width, layer_opacity in layers:
-            stroke = synthesize_along(
-                centerline,
-                width,
-                ins.weight,
-                _fill_stroke_seed(seed, order),
-                closed=False,
-                grid_step=grid_step,
-                wild=wild,
-                terminal="loaded",
-            )
+            if raster:
+                # Straight, because a raster line is straight. Performing it
+                # through the tool grammar bent it along its run: the machine's
+                # lateral drift is 0.34 of the width and reads as a wobble at
+                # this length. The lattice is still met -- the endpoints are
+                # rounded onto it -- so engine 18's signature survives.
+                path_d = _raster_band(p0, p1, width, grid_step)
+            else:
+                path_d = contour_stroke_path(
+                    synthesize_along(
+                        centerline,
+                        width,
+                        ins.weight,
+                        _fill_stroke_seed(seed, order),
+                        closed=False,
+                        grid_step=grid_step,
+                        wild=wild,
+                        terminal="loaded",
+                    )
+                )
             path_attrs = {
-                "d": contour_stroke_path(stroke),
+                "d": path_d,
                 "fill": color,
                 "fill_opacity": layer_opacity,
                 "stroke": "none",

@@ -562,11 +562,6 @@ def test_t16_the_machines_fill_is_a_straight_raster_line(monkeypatch):
     pitch = _fill_scan_spacing(ins, CANVAS)
     assert width / pitch < FILL_COVERAGE_BRANCH, width / pitch
 
-    # 幅が一定であること。engine 22 の最初の帯は 4 隅を 18px の格子へ丸めていて、
-    # 1 本ごとに幅が揺れ、端が輪郭に対して階段状になっていた。
-    widths = {round(w, 6) for _s, _e, w in bands}
-    assert len(widths) == 2, widths
-
     # 直線。演奏された帯は中心線が振れるので輪郭の点が多数になる。
     svg = _svg(machine)
     group = re.search(r'<g class="fill-stroke-v1[^"]*">(.*?)</g>', svg, flags=re.S).group(1)
@@ -574,6 +569,18 @@ def test_t16_the_machines_fill_is_a_straight_raster_line(monkeypatch):
     assert shapes
     for path_d in shapes:
         assert path_d.count(" L ") == 3, path_d[:80]
+
+    # 幅が一定であること。**出てきた帯から測る** — `_raster_band` に渡した引数を
+    # 見ても、量子化は関数の中で起きるので何も測れない。engine 22 の最初の帯は
+    # 4 隅を 18px の格子へ丸めていて、1 本ごとに幅が揺れ、端が輪郭に対して
+    # 階段状になっていた。滲みと芯の 2 値だけが出ること。
+    realized = sorted(_band_width(path_d) for path_d in shapes)
+    split = max(range(1, len(realized)), key=lambda i: realized[i] - realized[i - 1])
+    core_widths, halo_widths = realized[:split], realized[split:]
+    # Two groups, each flat to within the 2-decimal rounding the path carries.
+    # Under quantisation the spread inside a group was several pixels.
+    assert max(core_widths) - min(core_widths) <= 0.05, (min(core_widths), max(core_widths))
+    assert max(halo_widths) - min(halo_widths) <= 0.05, (min(halo_widths), max(halo_widths))
 
     # 1 本が 2 枚。広くて薄い滲みの上に、狭くて濃い芯。
     opacities = [float(value) for value in re.findall(r'fill-opacity="([\d.]+)"', group)]
@@ -587,8 +594,17 @@ def test_t16_the_machines_fill_is_a_straight_raster_line(monkeypatch):
     assert opacities[1::2] == [core] * (len(opacities) // 2)
     # 対照: 濃さだけでなく幅も違うこと。同じ幅を 2 度置いても濃くなるだけで、
     # 縁は柔らかくならない。
-    widths = [w for _s, _e, w in bands[:2]]
-    assert widths[0] > widths[1] * 2, widths
+    assert min(halo_widths) > max(core_widths) * 2, (max(core_widths), min(halo_widths))
+
+
+def _band_width(path_d: str) -> float:
+    """The width of a straight raster band, taken across one end."""
+    points = [
+        (float(x), float(y))
+        for x, y in re.findall(r"(-?\d+\.\d+) (-?\d+\.\d+)", path_d)
+    ]
+    assert len(points) == 4, len(points)
+    return math.hypot(points[0][0] - points[3][0], points[0][1] - points[3][1])
 
 
 # --- stage 4: the corpus ---------------------------------------------------

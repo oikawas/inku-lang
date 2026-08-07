@@ -35,8 +35,10 @@ from inku_server.renderer import (
     FILL_COVERAGE_BRANCH,
     FILL_COVERAGE_TARGET,
     FILL_MIN_SCANLINES,
+    FILL_RASTER_HALO_STEP,
     FILL_REACH_WIDTHS_MIN,
     FILL_REACH_WIDTHS_SPAN,
+    FILL_SCAN_CONTRAST,
     FILL_TEXTURE_CONTRAST,
     FILL_UNDERLAY_OPACITY_RATIO,
     _fill_coverage,
@@ -121,9 +123,9 @@ def _raster_lines(payload: dict, monkeypatch) -> list[tuple[tuple, tuple, float]
     captured: list[tuple[tuple, tuple, float]] = []
     original = renderer._raster_band
 
-    def recording(start, end, width, grid_step):
+    def recording(start, end, width):
         captured.append((tuple(start), tuple(end), width))
-        return original(start, end, width, grid_step)
+        return original(start, end, width)
 
     monkeypatch.setattr(renderer, "_raster_band", recording)
     _svg(payload)
@@ -521,8 +523,8 @@ def test_t15_a_texture_mark_sits_close_to_the_field_it_rises_from():
     mark = marks.pop()
     assert mark / under == pytest.approx(FILL_TEXTURE_CONTRAST, abs=0.05), (mark, under)
 
-    # 対照: 走査線枝の筆は記述の濃度そのままで、下地に寄せていない。下地は
-    # 筆致の半分なので、寄せない枝の比は 1 / 0.5 = 2.0 になる。
+    # 対照: 走査線枝も下地に寄せるが、**寄せ方が違う**。両枝が同じ定数を読む
+    # 実装は、片方の裁定を動かしたときにもう片方も黙って動く。
     scan = _svg(SCAN_CASE)
     scan_under = float(re.search(r'fill-underlay-v1"[^>]*fill-opacity="([\d.]+)"', scan).group(1))
     scan_marks = {
@@ -534,7 +536,7 @@ def test_t15_a_texture_mark_sits_close_to_the_field_it_rises_from():
     }
     assert len(scan_marks) == 1
     scan_ratio = scan_marks.pop() / scan_under
-    assert scan_ratio == pytest.approx(1.0 / FILL_UNDERLAY_OPACITY_RATIO, abs=0.02)
+    assert scan_ratio == pytest.approx(FILL_SCAN_CONTRAST, abs=0.02)
     assert mark / under < scan_ratio, (mark / under, scan_ratio)
 
 
@@ -561,6 +563,11 @@ def test_t16_the_machines_fill_is_a_straight_raster_line(monkeypatch):
     pitch = _fill_scan_spacing(ins, CANVAS)
     assert width / pitch < FILL_COVERAGE_BRANCH, width / pitch
 
+    # 幅が一定であること。engine 22 の最初の帯は 4 隅を 18px の格子へ丸めていて、
+    # 1 本ごとに幅が揺れ、端が輪郭に対して階段状になっていた。
+    widths = {round(w, 6) for _s, _e, w in bands}
+    assert len(widths) == 2, widths
+
     # 直線。演奏された帯は中心線が振れるので輪郭の点が多数になる。
     svg = _svg(machine)
     group = re.search(r'<g class="fill-stroke-v1[^"]*">(.*?)</g>', svg, flags=re.S).group(1)
@@ -574,7 +581,9 @@ def test_t16_the_machines_fill_is_a_straight_raster_line(monkeypatch):
     assert len(opacities) == len(bands), (len(opacities), len(bands))
     assert len(opacities) % 2 == 0 and len(opacities) >= 2 * FILL_MIN_SCANLINES
     halo, core = opacities[0], opacities[1]
-    assert halo < core, (halo, core)
+    # 濃さの振れは 0.1 まで。比で持つと 2 枚が 0.56 離れ、線は「淡い帯の中の
+    # 細い濃い罫線」に見えた (作者裁定 2026-08-07)。
+    assert core - halo == pytest.approx(FILL_RASTER_HALO_STEP, abs=0.005), (halo, core)
     assert opacities[0::2] == [halo] * (len(opacities) // 2)
     assert opacities[1::2] == [core] * (len(opacities) // 2)
     # 対照: 濃さだけでなく幅も違うこと。同じ幅を 2 度置いても濃くなるだけで、

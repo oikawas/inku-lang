@@ -4708,7 +4708,12 @@ FILL_REACH_WIDTHS_SPAN = 0.5
 # lines to become a field -- at pencil width it would take eight times the lines
 # -- and that is not how the tool is used: a pencil rubs a tone. The underlay
 # already holds the field, so these marks only have to give it grain.
-FILL_TEXTURE_MARK_LENGTH = 12.0  # in scan pitches
+# A rubbed mark runs the width of the form, like a scan stroke does: "the same
+# length as the non-texture branch" (author, 2026-08-07). It was six scan
+# pitches first, then twelve; both read as a scatter of short dashes rather than
+# as strokes laid across a shape. The length is now whatever the form gives --
+# the mark is cut where the form ends and let past by the tool's own width --
+# and only the COUNT is chosen, off the mean chord.
 FILL_TEXTURE_DENSITY = 0.5  # 1.0 lays the same ink the classic scan laid
 # Half-width of the scatter, so two marks can cross at a right angle. A rubbed
 # tone is not a hatch: it is laid in several directions, and the author allowed
@@ -4719,9 +4724,13 @@ FILL_TEXTURE_ANGLE_SPREAD_DEG = 45.0
 # How much darker a mark is than the field it sits on. The marks are meant to
 # rise out of the fill, not to be drawn on top of it: "bring the line and the
 # background closer; only some of the strokes should read as standing out"
-# (author, 2026-08-07, who then put the number at 1.2-1.3). 1.0 would make the
-# marks invisible.
-FILL_TEXTURE_CONTRAST = 1.25
+# (author, 2026-08-07, who put the number at 1.2-1.3 and then at 1.1). 1.0 would
+# make the marks invisible.
+FILL_TEXTURE_CONTRAST = 1.10
+# The scan branch's own. It used to be 1/0.75 = 1.33 -- the marks at the ink's
+# own density over a field at 0.75 of it -- which the author asked to bring down
+# as well, naming brush_thick, the widest tool and so the highest contrast.
+FILL_SCAN_CONTRAST = 1.15
 
 # --- the machine's fill: a raster line, not a hatch -------------------------
 # `computer` is the one periodic tool, and its fill is a scan line in the sense
@@ -4737,8 +4746,12 @@ FILL_TEXTURE_CONTRAST = 1.25
 # lateral drift bent it visibly along its run, and "keep it at a level that
 # reads as straight" was the correction. The direction is free -- any angle, the
 # seed's -- but one region gets one angle, which the scan layout already gives.
+# The halo is a fixed STEP below the core, not a fraction of it: "keep the
+# scan line's density within a swing of 0.1" (author, 2026-08-07). A ratio put
+# the two 0.56 apart and the line read as a thin dark rule inside a pale band
+# rather than as one line with a soft edge.
 FILL_RASTER_HALO_WIDTHS = 2.6
-FILL_RASTER_HALO_OPACITY = 0.30
+FILL_RASTER_HALO_STEP = 0.10
 FILL_RASTER_CORE_WIDTHS = 0.55
 
 
@@ -4933,15 +4946,21 @@ def _raster_band(
     start: tuple[float, float],
     end: tuple[float, float],
     width: float,
-    grid_step: float,
 ) -> str:
     """One straight scan line of the machine's raster, as a band.
 
     Four corners and nothing else. The tool grammar is deliberately not on this
     path: a performed line wanders by a third of its width, which over a run
     this long stops reading as a straight line, and straightness is what the
-    machine's fill is. The endpoints still land on the lattice, so the one thing
-    the computer's material layer gives back (engine 18) is still there to give.
+    machine's fill is.
+
+    Not quantised. Rounding the four corners onto the 18px lattice moved each of
+    them by up to 9px independently, which made the band's WIDTH vary from line
+    to line and left the ends stepped against the outline -- "keep the scan
+    line's width constant, and leave the start and the end unprocessed"
+    (author, 2026-08-07). The computer's lattice signature stays on its contour,
+    where the material layer can still give the residual back; a raster line
+    does not have one to give.
     """
     dx, dy = end[0] - start[0], end[1] - start[1]
     length = math.hypot(dx, dy)
@@ -4954,8 +4973,6 @@ def _raster_band(
         (end[0] - nx, end[1] - ny),
         (start[0] - nx, start[1] - ny),
     ]
-    if grid_step > 0:
-        corners = [(grid_point(x, grid_step), grid_point(y, grid_step)) for x, y in corners]
     return "M " + " L ".join(f"{x:.2f} {y:.2f}" for x, y in corners) + " Z"
 
 
@@ -5017,6 +5034,13 @@ def _render_fill_strokes(
     color = attrs.get("stroke", "#111111")
     # 塗りストロークは輪郭ではなく塗りなので、濃度は fill 側の指定に従う。
     opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
+    # The marks sit close over the field, on this branch as on the texture one:
+    # the difference between the two is what the fill reads as, and the author
+    # closed it here too (2026-08-07). A ratio of the underlay's, never an
+    # absolute, so a description asking for a pale fill keeps the relation.
+    mark_opacity = min(
+        opacity, opacity * FILL_UNDERLAY_OPACITY_RATIO * FILL_SCAN_CONTRAST
+    )
     minimum = base_width * FILL_MIN_STROKE_WIDTHS
     angle_amp = (
         math.radians(FILL_ANGLE_MIN_DEG + FILL_ANGLE_SPAN_DEG * hand) * math.sqrt(3.0)
@@ -5086,11 +5110,11 @@ def _render_fill_strokes(
         # display-only and the machine has to look the same in every profile.
         layers = (
             (
-                (base_width * FILL_RASTER_HALO_WIDTHS, opacity * FILL_RASTER_HALO_OPACITY),
-                (base_width * FILL_RASTER_CORE_WIDTHS, opacity),
+                (base_width * FILL_RASTER_HALO_WIDTHS, mark_opacity - FILL_RASTER_HALO_STEP),
+                (base_width * FILL_RASTER_CORE_WIDTHS, mark_opacity),
             )
             if raster
-            else ((base_width, opacity),)
+            else ((base_width, mark_opacity),)
         )
         for width, layer_opacity in layers:
             if raster:
@@ -5099,7 +5123,7 @@ def _render_fill_strokes(
                 # lateral drift is 0.34 of the width and reads as a wobble at
                 # this length. The lattice is still met -- the endpoints are
                 # rounded onto it -- so engine 18's signature survives.
-                path_d = _raster_band(p0, p1, width, grid_step)
+                path_d = _raster_band(p0, p1, width)
             else:
                 path_d = contour_stroke_path(
                     synthesize_along(
@@ -5168,9 +5192,12 @@ def _render_fill_texture(
     xs = [point[0] for point in contour]
     ys = [point[1] for point in contour]
     short_side = min(max(xs) - min(xs), max(ys) - min(ys))
-    # A mark is never longer than the shape is narrow, or a small form would be
-    # rubbed with strokes several times its own width.
-    mark_length = min(pitch * FILL_TEXTURE_MARK_LENGTH, max(short_side, pitch))
+    span_limit = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+    area = _polygon_area(contour)
+    # The mean chord of the form, which is what a full-length mark will be. For
+    # a circle `area / short_side` is exactly it, and for anything else it is
+    # the right order. Only the COUNT is decided here; the LENGTH is the form's.
+    mean_chord = max(pitch, area / short_side) if short_side > 0 else pitch
     # One classic scan pass lays about `area / pitch` of stroke length. Sizing
     # the count off that keeps the branch anchored to the ink the fill used to
     # carry, rather than to a number chosen to look right on one shape. The
@@ -5179,7 +5206,7 @@ def _render_fill_texture(
     # "filled" and "one dab" would quietly move off the value engine 16 measured.
     count = max(
         FILL_MIN_SCANLINES,
-        int(_polygon_area(contour) / (pitch * mark_length) * FILL_TEXTURE_DENSITY),
+        int(area / (pitch * mean_chord) * FILL_TEXTURE_DENSITY),
     )
     points = _surface_scatter(contour, count, seed)
     if not points:
@@ -5205,7 +5232,7 @@ def _render_fill_texture(
         # a right angle -- around a direction the work still keeps. A single
         # narrow spread reads as a hatch, which is a different mechanism.
         angle = base_angle + (_hash01(index, seed, "fill-texture-angle") - 0.5) * 2 * spread
-        half = mark_length / 2
+        half = span_limit
         dx, dy = math.cos(angle), math.sin(angle)
         # A mark is cut where the form ends, and then let past it by the same
         # tool-width reach the scan branch uses. Without this a mark laid near

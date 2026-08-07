@@ -16,7 +16,6 @@ from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 from inku_server.renderer import (
     FILL_REACH_WIDTHS_MIN,
     FILL_REACH_WIDTHS_SPAN,
-    FILL_TEXTURE_MARK_LENGTH,
     _fill_scan_angle,
     _fill_scan_spacing,
     _scanline_segments,
@@ -214,14 +213,10 @@ def test_fill_marks_on_a_concave_cloudform_stay_near_their_own_outline():
     svg = _render(payload)
     points = _points("".join(_mark_paths(svg)))
     assert points
-    # はみ出しうるのは痕の半長 + 帯の半幅まで。痕は走査間隔の 6 倍を上限に、
-    # 図形の短辺で頭打ちにしてある。
-    xs = [p[0] for p in polygon]
-    ys = [p[1] for p in polygon]
-    short_side = min(max(xs) - min(xs), max(ys) - min(ys))
-    pitch = _fill_scan_spacing(Instruction.model_validate(payload), CANVAS)
-    mark = min(pitch * FILL_TEXTURE_MARK_LENGTH, max(short_side, pitch))
-    limit = mark / 2 + _stroke_width_px("pencil", CANVAS)
+    # engine 22 の痕は輪郭で切られ、道具の幅ぶんだけ外へ出る。長さは形が決めるので
+    # 「痕の半分」という上限はもう無い — 上限は道具の精度そのものになった。
+    width = _stroke_width_px("pencil", CANVAS)
+    limit = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN) + width
     worst = max(excursion(point) for point in points)
     assert worst <= limit, (worst, limit)
 

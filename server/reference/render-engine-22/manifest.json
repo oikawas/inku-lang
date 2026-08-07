@@ -6,7 +6,7 @@
   "schema_version": "0.1.0",
   "color_map_digest": "72e7600035a80093a46b79d03e147771",
   "frozen_at": "2026-08-07",
-  "commit": "5f3e3c9b9d0c0f6b9f91a868d2aac433351fa351",
+  "commit": "460a93b19702b58ff1f75afb5370d2cac5f7a06a",
   "reason": "A fill got an underlay, and what goes on top of it got a branch. Until engine 21 a stroke WAS the fill, so every scan line had to be cut at its intersection with the outline or the paint would spill outside the shape. That cut is one of three regularities the eye reads as a raster: measured across the eleven filled shapes of the three works the author named as striped, the scan angle varied by 0.1 degrees inside one shape, the pitch by 6.1%, and the endpoints not at all. A real element now holds the field, so the marks are free to leave the contour: the angle moves per stroke, the pitch is drawn far wider, and each end overshoots or falls short. All three amplitudes come from ToolGrammar.fill_hand and are zero for a machine, so a computer fill keeps the exact repetition that is its signature. Above the threshold the marks are scan lines packed to coverage 0.9; below it they are scattered rubbings, because closing the gaps at pencil width would take eight times the lines and that is not how the tool is used. The threshold is coverage -- width over pitch -- and not a list of tool names: the two cut the engine-21 corpus identically, which is why C-fill-circle-crayon-extra_fine is added to send one tool across the branch on thinness alone. A fill stroke also ends the way paint ends, heavy where the tool lands, instead of tapering like a drawn line. Tiny shapes still degrade to one dab and rotring still degrades to a region fill; neither gets an underlay.",
   "changed_from_previous": [
     "C-fill-circle-brush_thick",
@@ -12697,7 +12697,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "d11e8c10f5f04785b4c859dea5dd5dcb",
+      "digest": "d107c73852f4aa7a47e14e36d793c8f2",
       "bytes": 59549,
       "counts": {
         "path": 52,
@@ -12772,7 +12772,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "1508acf56cd41faa55e57ebf57eabe22",
+      "digest": "5d5785422a2bc6fd864cff6221153edb",
       "bytes": 173883,
       "counts": {
         "path": 163,
@@ -12847,7 +12847,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "09e7ce11b66ecfc6f6ff4c6d6dc660ac",
+      "digest": "4dd70c51b6635c558aaed0cc567ff785",
       "bytes": 30340,
       "counts": {
         "path": 81,
@@ -12922,7 +12922,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "8ae2bfeb09397af19904e60ef000c5e6",
+      "digest": "932ad308fd25fdc8e9e34e63791bf366",
       "bytes": 119164,
       "counts": {
         "path": 108,
@@ -12997,10 +12997,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "88e257e236a2d681a61faa7cd7dca25a",
-      "bytes": 58370,
+      "digest": "f75c109259a37e54ef2ddaf41a538f52",
+      "bytes": 34155,
       "counts": {
-        "path": 52,
+        "path": 19,
         "polyline": 0,
         "polygon": 1,
         "circle": 91,
@@ -13011,7 +13011,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-74 events-0",
-        "fill-texture-v1 marks-51",
+        "fill-texture-v1 marks-18",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -13072,10 +13072,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "a28c65757fe0f8fcf22ae1f3545be1aa",
-      "bytes": 54395,
+      "digest": "d5322f25b95762d7266c2032620554a5",
+      "bytes": 31028,
       "counts": {
-        "path": 53,
+        "path": 20,
         "polyline": 0,
         "polygon": 1,
         "circle": 59,
@@ -13086,7 +13086,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-74 events-1",
-        "fill-texture-v1 marks-52",
+        "fill-texture-v1 marks-19",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -13147,10 +13147,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "5144ead7088636bceba301ca966f6c8d",
-      "bytes": 52192,
+      "digest": "41c53365a5fab4b35daa6bf5c48c5d3f",
+      "bytes": 25722,
       "counts": {
-        "path": 53,
+        "path": 19,
         "polyline": 0,
         "polygon": 1,
         "circle": 1,
@@ -13161,7 +13161,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-74 events-0",
-        "fill-texture-v1 marks-52",
+        "fill-texture-v1 marks-18",
         "fill-underlay-v1",
         "fill-v2"
       ]
@@ -13224,7 +13224,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "6424e0d88741af1c798bafa7c18de857",
+      "digest": "df2d86b99a41f0367808c0f77aa3f66b",
       "bytes": 48270,
       "counts": {
         "path": 49,
@@ -13302,7 +13302,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "123ceac14071051e91c53de3d82c7558",
+      "digest": "75dbb39d12cf80079cfab17d6b9dfdb7",
       "bytes": 84785,
       "counts": {
         "path": 87,
@@ -13380,10 +13380,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "2fda71af6ce6d620bf33f0ca2fce048b",
-      "bytes": 37224,
+      "digest": "343a2e4a7c685a0475cdd69f01553137",
+      "bytes": 20837,
       "counts": {
-        "path": 34,
+        "path": 13,
         "polyline": 0,
         "polygon": 1,
         "circle": 46,
@@ -13394,7 +13394,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-61 events-1",
-        "fill-texture-v1 marks-33",
+        "fill-texture-v1 marks-12",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -13455,7 +13455,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "89c2448d7a812b86d17903fcd336fef3",
+      "digest": "a619538cbab8bc9c3b6e0805e69f6b03",
       "bytes": 62455,
       "counts": {
         "path": 50,
@@ -13530,7 +13530,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "e7e522ae0f038489c2bedfeda9b99a84",
+      "digest": "07bbea9d2f68647fedfe4da1c9cf1e09",
       "bytes": 122309,
       "counts": {
         "path": 105,
@@ -13605,10 +13605,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "b2f935552fb6da95b766af34b8726daf",
-      "bytes": 58477,
+      "digest": "7d6239276c7ee5f1d4409ca04df6e6a0",
+      "bytes": 36673,
       "counts": {
-        "path": 50,
+        "path": 20,
         "polyline": 0,
         "polygon": 4,
         "circle": 57,
@@ -13619,7 +13619,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-119 events-0",
-        "fill-texture-v1 marks-49",
+        "fill-texture-v1 marks-19",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -13683,7 +13683,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "0afe9d7184bfa921d407ee426223e96f",
+      "digest": "bb76413d9ae5f10adfa2490ccacfb1db",
       "bytes": 66372,
       "counts": {
         "path": 57,
@@ -13761,7 +13761,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "cfa1268fc83ca8b8fe3f41430b35a2d3",
+      "digest": "df394dbb94dafc00c2bc8775e8ecec6f",
       "bytes": 121139,
       "counts": {
         "path": 106,
@@ -13839,10 +13839,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "f5a2c86c069214bab22ff248f0ee6a88",
-      "bytes": 58803,
+      "digest": "fda1f9c2121c2294bccb6a6b82243aca",
+      "bytes": 31269,
       "counts": {
-        "path": 57,
+        "path": 19,
         "polyline": 0,
         "polygon": 1,
         "circle": 66,
@@ -13853,7 +13853,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-88 events-1",
-        "fill-texture-v1 marks-56",
+        "fill-texture-v1 marks-18",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -13917,7 +13917,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "33defbc17142c6fc1f31f4e513c7b73c",
+      "digest": "fb1bba1c6a35221109fb77f0bfaca4c8",
       "bytes": 51964,
       "counts": {
         "path": 50,
@@ -13995,7 +13995,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "f3afddae7291c2d7937791072977be4d",
+      "digest": "2cd276fc519b40657ab028b0a8b3b89f",
       "bytes": 98876,
       "counts": {
         "path": 96,
@@ -14073,10 +14073,10 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "0b5e9d985f8dae709562ac8ed1deb90c",
-      "bytes": 37118,
+      "digest": "9913dc4b3ef515ab8344c2c156461ebf",
+      "bytes": 28731,
       "counts": {
-        "path": 30,
+        "path": 19,
         "polyline": 0,
         "polygon": 4,
         "circle": 53,
@@ -14087,7 +14087,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-70 events-0",
-        "fill-texture-v1 marks-29",
+        "fill-texture-v1 marks-18",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -17039,7 +17039,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "c32f9cc7e34894b8ede5e95bf242aa4a",
+      "digest": "0201ed363bcc43e9c0d0e26a3a23a9a1",
       "bytes": 5367,
       "counts": {
         "path": 4,
@@ -18781,7 +18781,7 @@
         "svg_profile": "editable",
         "wild": false
       },
-      "digest": "80086b937cbc98221e9860271acafcc2",
+      "digest": "8c4c6854dae04e17bdc2e9a6491091ce",
       "bytes": 193010,
       "counts": {
         "path": 103,
@@ -23487,7 +23487,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "374190735f98ce72dc01e7ec203fbfab",
+      "digest": "4131ba69b9f5a8694e7be3e259d3c25b",
       "bytes": 62731,
       "counts": {
         "path": 52,
@@ -23562,7 +23562,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "243c16e1761595ccf858fa5ba03415a6",
+      "digest": "99c13a117f284101ce9ab90e9eaffa28",
       "bytes": 123937,
       "counts": {
         "path": 108,
@@ -23637,10 +23637,10 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "7e63233574047e24d42e9157616aa9c7",
-      "bytes": 57577,
+      "digest": "d1fbfb53c07fe4c8e77ce6bcbebee7b4",
+      "bytes": 34210,
       "counts": {
-        "path": 53,
+        "path": 20,
         "polyline": 0,
         "polygon": 3,
         "circle": 57,
@@ -23651,7 +23651,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-74 events-1",
-        "fill-texture-v1 marks-52",
+        "fill-texture-v1 marks-19",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -23715,7 +23715,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "7014a287136d3a667b6fc6a4dcaa32fe",
+      "digest": "bbebf910a059644176d785f8540c0c07",
       "bytes": 50844,
       "counts": {
         "path": 49,
@@ -23793,7 +23793,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "42ce6522b27cbc8be9f5a476f8c8cd60",
+      "digest": "257c87935f7fe00c69aed7768dc1a860",
       "bytes": 88646,
       "counts": {
         "path": 87,
@@ -23871,10 +23871,10 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "c45d533c3311aa590462f53970ca7044",
-      "bytes": 39798,
+      "digest": "1c29498fb4ae47df46e2e9d84adeea21",
+      "bytes": 23411,
       "counts": {
-        "path": 34,
+        "path": 13,
         "polyline": 0,
         "polygon": 3,
         "circle": 46,
@@ -23885,7 +23885,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-61 events-1",
-        "fill-texture-v1 marks-33",
+        "fill-texture-v1 marks-12",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -23946,7 +23946,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "a2c4a9efe2b7847d1ff52a9f4f625829",
+      "digest": "6667f7c98cbe0335b4756208a40fb2f1",
       "bytes": 62455,
       "counts": {
         "path": 50,
@@ -24021,7 +24021,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "a8936f9ebb468e4547529c7bcc189383",
+      "digest": "b974c37c4c83976c35e851ea816c159f",
       "bytes": 122309,
       "counts": {
         "path": 105,
@@ -24096,10 +24096,10 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "c021f86735363c499151e88c42ec0f55",
-      "bytes": 58580,
+      "digest": "cad0f230b616a6fae77858bd5a96a574",
+      "bytes": 36776,
       "counts": {
-        "path": 50,
+        "path": 20,
         "polyline": 0,
         "polygon": 4,
         "circle": 58,
@@ -24110,7 +24110,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-119 events-0",
-        "fill-texture-v1 marks-49",
+        "fill-texture-v1 marks-19",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -24174,7 +24174,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "d58f87794e80b6c724ad53b73a1c0440",
+      "digest": "6f586d0994e319d56e61b96e7345233f",
       "bytes": 70130,
       "counts": {
         "path": 57,
@@ -24252,7 +24252,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "5065db826f1e5a590a242ba117e4ad2e",
+      "digest": "e68decc076a14cd3b08e4eb456667cbd",
       "bytes": 126776,
       "counts": {
         "path": 106,
@@ -24330,10 +24330,10 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "61704e15ae401c0aef6ba6c0d7f007ac",
-      "bytes": 62561,
+      "digest": "59ba8fe1e996fa8e9e7c3e2a2c0bd98b",
+      "bytes": 35027,
       "counts": {
-        "path": 57,
+        "path": 19,
         "polyline": 0,
         "polygon": 3,
         "circle": 66,
@@ -24344,7 +24344,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-88 events-1",
-        "fill-texture-v1 marks-56",
+        "fill-texture-v1 marks-18",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"
@@ -24408,7 +24408,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "7472c4ff1626243c77471f6822abb0e7",
+      "digest": "eb703de264349d39777e623239880e12",
       "bytes": 51964,
       "counts": {
         "path": 50,
@@ -24486,7 +24486,7 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "d3bdd0dab9c8761a272119decdab9092",
+      "digest": "54a076e31c816eb977c79fb27b25e73c",
       "bytes": 98979,
       "counts": {
         "path": 96,
@@ -24564,10 +24564,10 @@
         "svg_profile": "editable",
         "wild": true
       },
-      "digest": "45a5788801a8050c3e7a0175d94fef4e",
-      "bytes": 37118,
+      "digest": "f9878c35101f960310d4bbe49a2b03ba",
+      "bytes": 28731,
       "counts": {
-        "path": 30,
+        "path": 19,
         "polyline": 0,
         "polygon": 4,
         "circle": 53,
@@ -24578,7 +24578,7 @@
       },
       "classes": [
         "contour-stroke-v1 controls-70 events-0",
-        "fill-texture-v1 marks-29",
+        "fill-texture-v1 marks-18",
         "fill-underlay-v1",
         "fill-v2",
         "material-outline"

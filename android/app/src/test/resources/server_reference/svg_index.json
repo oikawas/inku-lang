@@ -106,21 +106,24 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 52923,
+    "bytes": 78714,
     "counts": {
-      "path": 45,
+      "path": 53,
       "polyline": 0,
       "polygon": 0,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 4,
-      "g": 9
+      "g": 10
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
+      "fill-field-v2",
       "fill-texture-v1 marks-34",
-      "fill-underlay-v1 reserves-4",
+      "fill-underlay-v1 reserves-7",
+      "fill-underlay-v1 tones-4",
+      "fill-underlay-v1 tones-5",
       "fill-v2",
       "material-outline"
     ],
@@ -667,21 +670,24 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "default",
-    "bytes": 52441,
+    "bytes": 61801,
     "counts": {
-      "path": 45,
+      "path": 42,
       "polyline": 0,
       "polygon": 0,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 4,
-      "g": 9
+      "g": 10
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
+      "fill-field-v2",
       "fill-texture-v1 marks-33",
-      "fill-underlay-v1 reserves-2",
+      "fill-underlay-v1 reserves-3",
+      "fill-underlay-v1 tones-4",
+      "fill-underlay-v1 tones-5",
       "fill-v2",
       "material-outline"
     ],
@@ -1589,21 +1595,24 @@
     "svg_profile": "editable",
     "wild": true,
     "color_catalog_id": "default",
-    "bytes": 56329,
+    "bytes": 82120,
     "counts": {
-      "path": 45,
+      "path": 53,
       "polyline": 0,
       "polygon": 2,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 2,
-      "g": 9
+      "g": 10
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
+      "fill-field-v2",
       "fill-texture-v1 marks-34",
-      "fill-underlay-v1 reserves-4",
+      "fill-underlay-v1 reserves-7",
+      "fill-underlay-v1 tones-4",
+      "fill-underlay-v1 tones-5",
       "fill-v2",
       "material-outline"
     ],
@@ -1812,21 +1821,24 @@
     "svg_profile": "editable",
     "wild": false,
     "color_catalog_id": "sea_stone",
-    "bytes": 52922,
+    "bytes": 78713,
     "counts": {
-      "path": 45,
+      "path": 53,
       "polyline": 0,
       "polygon": 0,
       "circle": 60,
       "ellipse": 0,
       "line": 0,
       "rect": 4,
-      "g": 9
+      "g": 10
     },
     "classes": [
       "contour-stroke-v1 controls-80 events-0",
+      "fill-field-v2",
       "fill-texture-v1 marks-34",
-      "fill-underlay-v1 reserves-4",
+      "fill-underlay-v1 reserves-7",
+      "fill-underlay-v1 tones-4",
+      "fill-underlay-v1 tones-5",
       "fill-v2",
       "material-outline"
     ],

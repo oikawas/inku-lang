@@ -4747,26 +4747,60 @@ FILL_TEXTURE_TONE_SPREAD = 0.10
 # "Would it be good to add bare ground showing through where the fill was left
 # out?" (author, 2026-08-07). The underlay holds the field, so leaving ground
 # means taking the field away in places -- the marks are cut against the same
-# discs, or they would draw straight across the gap.
+# outlines, or they would draw straight across the gap.
 #
-# Placed off the centroid toward the outline and kept inside it. A reserve that
-# reaches the contour is a bite out of the shape rather than a place the tool
-# missed, and one sitting on the centre reads as a hole in the object.
-FILL_RESERVE_COUNT_MIN = 2
-FILL_RESERVE_COUNT_SPAN = 3  # so 2, 3 or 4
-# Of the form's short side. It was 0.10-0.18 for one draft and the picture came
-# back with three white circles punched through it -- at that size the reserve
-# is not a bare patch, it is a hole in the object.
-FILL_RESERVE_RADIUS_MIN = 0.045
-FILL_RESERVE_RADIUS_SPAN = 0.045
+# It was an isotropic blob for one round, and that was wrong twice over: "the
+# reserve does not reflect the track of the stroke either -- it even looks like
+# a tear in the paper. It lies across the track of the line, which makes no
+# sense as logic" (author, 2026-08-07). A tool does not erase across its own
+# strokes. A reserve is now a streak ALONG the run of the marks: the place where
+# a few neighbouring strokes were lifted.
+#
+# The author's own suggestion was to draw the reserve with the tool's line. Taken
+# literally -- one mark's worth of bare ground -- it shows almost nothing: the
+# mark is 1.5px at pencil and the marks are 12px apart, so the ground would come
+# out as a hair. The width is therefore counted in PITCHES, which is the same
+# thing at the scale the eye reads: three to five adjacent strokes lifted at once.
+FILL_RESERVE_COUNT_MIN = 3
+FILL_RESERVE_COUNT_SPAN = 5  # so 3 .. 7
+FILL_RESERVE_HALF_WIDTH_PITCHES_MIN = 0.6  # half-width, across the marks
+FILL_RESERVE_HALF_WIDTH_PITCHES_SPAN = 0.6
+FILL_RESERVE_HALF_LENGTH_CHORD_MIN = 0.05  # half-length, along the marks
+FILL_RESERVE_HALF_LENGTH_CHORD_SPAN = 0.075
 FILL_RESERVE_PLACE_MIN = 0.35  # of the way from the centroid to the outline
 FILL_RESERVE_PLACE_SPAN = 0.40
-FILL_RESERVE_WOBBLE = 0.24  # how far off round each reserve is pulled
-FILL_RESERVE_ROUGHNESS = 0.12  # per-vertex, on top of the wobble
-FILL_RESERVE_SEGMENTS = 28
+FILL_RESERVE_ROUGHNESS = 0.18  # per-vertex, across the streak
+FILL_RESERVE_SEGMENTS = 32
 # How far a mark may stop short of a reserve, or run into it, in tool widths.
 # Without it every mark ends on the same curve and the patch has a drawn edge.
 FILL_RESERVE_SLACK_WIDTHS = 1.2
+
+# --- the field's own mottling -----------------------------------------------
+# A flat field is what made a thin-tool fill read as one even tone, and varying
+# the MARKS did not move it (run 859 round 6: the picture is the same at four
+# times the spread). The tone has to be in the field, so the field is laid in
+# two layers: a lighter one over the whole form, and a second carrying holes.
+# Where the second layer is missing the fill is paler, and everywhere else the
+# two composite to exactly the flat value the field had before -- so the change
+# adds mottling without moving the tone the author already approved.
+#
+# The pale patches are HOLES in a layer rather than dark patches drawn on top,
+# because a patch drawn on top would also paint over the reserves and fill in
+# the bare ground.
+FILL_FIELD_TONE_DROP = 0.10
+# Two layers rather than one, each with its own patches. One layer gives two
+# tones and every patch edge is a step of the whole drop; two give three tones
+# and half the step, and where the patches of the two overlap the edges stop
+# lining up. The cost is one path.
+FILL_FIELD_TONE_LAYERS = 2
+FILL_FIELD_TONE_COUNT_MIN = 3
+FILL_FIELD_TONE_COUNT_SPAN = 3  # so 3, 4 or 5
+FILL_FIELD_TONE_RADIUS_MIN = 0.18  # of the form's short side
+FILL_FIELD_TONE_RADIUS_SPAN = 0.17
+FILL_FIELD_TONE_INSET = 0.04  # kept this far inside the outline, same units
+FILL_FIELD_TONE_WOBBLE = 0.24
+FILL_FIELD_TONE_ROUGHNESS = 0.10
+FILL_FIELD_TONE_SEGMENTS = 32
 # The scan branch's own. It used to be 1/0.75 = 1.33 -- the marks at the ink's
 # own density over a field at 0.75 of it -- which the author asked to bring down
 # as well, naming brush_thick, the widest tool and so the highest contrast.
@@ -4885,44 +4919,48 @@ def _polygon_area(contour: list[tuple[float, float]]) -> float:
     return abs(total) / 2.0
 
 
-def _reserve_blob(
-    cx: float, cy: float, radius: float, seed: int, index: int
+def _reserve_streak(
+    cx: float,
+    cy: float,
+    half_length: float,
+    half_width: float,
+    angle: float,
+    seed: int,
+    index: int,
 ) -> tuple[tuple[float, float], ...]:
-    """A reserve's outline: a disc pulled out of round by two low harmonics.
+    """A reserve's outline: a rounded streak lying ALONG the run of the marks.
 
-    A circle reads as a hole punched in the shape. What has to read is a place
-    the tool went round, so the edge wanders and no two reserves are the same
-    shape. Two harmonics only -- more turns it into a star.
+    Built in the marks' own frame -- `s` along their direction, `n` across it --
+    and then turned into the picture, which is what makes the bare ground read
+    as strokes that were lifted rather than as a tear across them. The edge is
+    roughened across the streak only: a wobble along it would round the streak
+    back toward a blob.
     """
-    amp2 = FILL_RESERVE_WOBBLE * (_hash01(index, seed, "fill-reserve-h2") - 0.5) * 2
-    amp3 = FILL_RESERVE_WOBBLE * (_hash01(index, seed, "fill-reserve-h3") - 0.5) * 2
-    phase2 = _hash01(index, seed, "fill-reserve-p2") * 2 * math.pi
-    phase3 = _hash01(index, seed, "fill-reserve-p3") * 2 * math.pi
+    ux, uy = math.cos(angle), math.sin(angle)
     points = []
     for step in range(FILL_RESERVE_SEGMENTS):
         theta = step * 2 * math.pi / FILL_RESERVE_SEGMENTS
-        # The harmonics give the patch its shape; the per-vertex term gives it a
-        # ragged edge. A smooth edge reads as a shape that was cut out, and what
-        # this has to read as is paper the tool went round.
-        rough = (_hash01(index * FILL_RESERVE_SEGMENTS + step, seed, "fill-reserve-edge") - 0.5) * 2
-        r = radius * (
-            1.0
-            + amp2 * math.sin(2 * theta + phase2)
-            + amp3 * math.sin(3 * theta + phase3)
-            + FILL_RESERVE_ROUGHNESS * rough
-        )
-        points.append((cx + math.cos(theta) * r, cy + math.sin(theta) * r))
+        rough = (
+            _hash01(index * FILL_RESERVE_SEGMENTS + step, seed, "fill-reserve-edge") - 0.5
+        ) * 2
+        s = half_length * math.cos(theta)
+        n = half_width * math.sin(theta) * (1.0 + FILL_RESERVE_ROUGHNESS * rough)
+        points.append((cx + ux * s - uy * n, cy + uy * s + ux * n))
     return tuple(points)
 
 
 def _fill_reserves(
-    contour: list[tuple[float, float]], seed: int, short_side: float
+    contour: list[tuple[float, float]],
+    seed: int,
+    pitch: float,
+    mean_chord: float,
+    angle: float,
 ) -> tuple[tuple[tuple[float, float], ...], ...]:
-    """Where the tool did not touch: discs the field and the marks both avoid.
+    """Where the tool did not touch: streaks the field and the marks both avoid.
 
     One helper, read by the underlay and by the marks, so the two can never
-    disagree about where the ground shows. Deterministic in the seed and the
-    contour, which is why it can be called twice instead of threaded through.
+    disagree about where the ground shows. Deterministic in its arguments, which
+    is why it can be called twice instead of threaded through.
     """
     if len(contour) < 3:
         return ()
@@ -4933,8 +4971,8 @@ def _fill_reserves(
     cy = sum(point[1] for point in contour) / len(contour)
     out: list[tuple[tuple[float, float], ...]] = []
     for index in range(count):
-        angle = _hash01(index, seed, "fill-reserve-angle") * 2 * math.pi
-        dx, dy = math.cos(angle), math.sin(angle)
+        bearing = _hash01(index, seed, "fill-reserve-angle") * 2 * math.pi
+        dx, dy = math.cos(bearing), math.sin(bearing)
         spans = [
             span for span in _line_spans(contour, (cx, cy), (dx, dy))
             if span[0] <= 0.0 <= span[1]
@@ -4942,9 +4980,15 @@ def _fill_reserves(
         if not spans:
             continue
         reach = spans[0][1]
-        radius = short_side * (
-            FILL_RESERVE_RADIUS_MIN
-            + FILL_RESERVE_RADIUS_SPAN * _hash01(index, seed, "fill-reserve-radius")
+        half_width = pitch * (
+            FILL_RESERVE_HALF_WIDTH_PITCHES_MIN
+            + FILL_RESERVE_HALF_WIDTH_PITCHES_SPAN
+            * _hash01(index, seed, "fill-reserve-width")
+        )
+        half_length = mean_chord * (
+            FILL_RESERVE_HALF_LENGTH_CHORD_MIN
+            + FILL_RESERVE_HALF_LENGTH_CHORD_SPAN
+            * _hash01(index, seed, "fill-reserve-length")
         )
         place = reach * (
             FILL_RESERVE_PLACE_MIN
@@ -4952,12 +4996,151 @@ def _fill_reserves(
         )
         # Kept clear of the outline: a reserve that crosses it opens the
         # silhouette, which is a bite out of the shape and not a bare patch.
-        # The clearance is the wobble's own ceiling, not the mean radius.
-        margin = radius * (1.0 + 2 * FILL_RESERVE_WOBBLE)
+        # The clearance is the streak's own corner, not its half-width.
+        margin = math.hypot(half_length, half_width * (1.0 + FILL_RESERVE_ROUGHNESS))
         place = min(place, max(0.0, reach - margin))
-        if radius <= 0 or place <= 0:
+        if half_width <= 0 or half_length <= 0 or place <= 0:
             continue
-        out.append(_reserve_blob(cx + dx * place, cy + dy * place, radius, seed, index))
+        out.append(
+            _reserve_streak(
+                cx + dx * place,
+                cy + dy * place,
+                half_length,
+                half_width,
+                angle,
+                seed,
+                index,
+            )
+        )
+    return tuple(out)
+
+
+def _field_tone_patches(
+    contour: list[tuple[float, float]], seed: int, short_side: float
+) -> tuple[tuple[tuple[tuple[float, float], ...], ...], ...]:
+    """The paler places in the field, one set per layer.
+
+    Isotropic on purpose, unlike a reserve. A reserve is a thing the tool did --
+    it lifted -- so it follows the strokes; this is how much ink the ground took
+    where the tool did pass, which belongs to the sheet and has no direction.
+    """
+    if len(contour) < 3 or short_side <= 0:
+        return ()
+    cx = sum(point[0] for point in contour) / len(contour)
+    cy = sum(point[1] for point in contour) / len(contour)
+    inset = short_side * FILL_FIELD_TONE_INSET
+    layers: list[tuple[tuple[tuple[float, float], ...], ...]] = []
+    for layer in range(FILL_FIELD_TONE_LAYERS):
+        count = FILL_FIELD_TONE_COUNT_MIN + int(
+            _hash01(layer, seed, "fill-field-tone-count") * FILL_FIELD_TONE_COUNT_SPAN
+        )
+        patches: list[tuple[tuple[float, float], ...]] = []
+        for step in range(count):
+            index = layer * 64 + step
+            bearing = _hash01(index, seed, "fill-field-tone-angle") * 2 * math.pi
+            radius = short_side * (
+                FILL_FIELD_TONE_RADIUS_MIN
+                + FILL_FIELD_TONE_RADIUS_SPAN
+                * _hash01(index, seed, "fill-field-tone-radius")
+            )
+            spans = [
+                span for span in _line_spans(
+                    contour, (cx, cy), (math.cos(bearing), math.sin(bearing))
+                )
+                if span[0] <= 0.0 <= span[1]
+            ]
+            if not spans:
+                continue
+            place = spans[0][1] * _hash01(index, seed, "fill-field-tone-place") * 0.6
+            centre = (cx + math.cos(bearing) * place, cy + math.sin(bearing) * place)
+            blob = _wobbly_blob(centre[0], centre[1], radius, seed, index)
+            clamped = _clamp_inside(blob, centre, contour, inset)
+            if clamped is not None:
+                patches.append(clamped)
+        if patches:
+            layers.append(tuple(patches))
+    return tuple(layers)
+
+
+def _texture_field(
+    ins: Instruction,
+    contour: list[tuple[float, float]],
+    canvas: CanvasSize,
+    render_seed: int | None,
+):
+    """The reserves and the pale patches of one texture-branch fill.
+
+    Both the underlay and the marks need the reserves, and they have to be the
+    SAME reserves, so the quantities they come from are derived here once and
+    the two callers ask this rather than each other.
+    """
+    seed = _seed_for_instruction(ins, render_seed)
+    pitch = _fill_scan_spacing(ins, canvas)
+    xs = [point[0] for point in contour]
+    ys = [point[1] for point in contour]
+    short_side = min(max(xs) - min(xs), max(ys) - min(ys))
+    area = _polygon_area(contour)
+    mean_chord = max(pitch, area / short_side) if short_side > 0 else pitch
+    reserves = _fill_reserves(
+        contour, seed, pitch, mean_chord, _fill_scan_angle(seed)
+    )
+    return reserves, _field_tone_patches(contour, seed, short_side)
+
+
+def _wobbly_blob(
+    cx: float, cy: float, radius: float, seed: int, index: int
+) -> tuple[tuple[float, float], ...]:
+    """A disc pulled out of round by two low harmonics and roughened per vertex."""
+    amp2 = FILL_FIELD_TONE_WOBBLE * (_hash01(index, seed, "fill-blob-h2") - 0.5) * 2
+    amp3 = FILL_FIELD_TONE_WOBBLE * (_hash01(index, seed, "fill-blob-h3") - 0.5) * 2
+    phase2 = _hash01(index, seed, "fill-blob-p2") * 2 * math.pi
+    phase3 = _hash01(index, seed, "fill-blob-p3") * 2 * math.pi
+    points = []
+    for step in range(FILL_FIELD_TONE_SEGMENTS):
+        theta = step * 2 * math.pi / FILL_FIELD_TONE_SEGMENTS
+        rough = (
+            _hash01(index * FILL_FIELD_TONE_SEGMENTS + step, seed, "fill-blob-edge") - 0.5
+        ) * 2
+        r = radius * (
+            1.0
+            + amp2 * math.sin(2 * theta + phase2)
+            + amp3 * math.sin(3 * theta + phase3)
+            + FILL_FIELD_TONE_ROUGHNESS * rough
+        )
+        points.append((cx + math.cos(theta) * r, cy + math.sin(theta) * r))
+    return tuple(points)
+
+
+def _clamp_inside(
+    points: tuple[tuple[float, float], ...],
+    centre: tuple[float, float],
+    contour: list[tuple[float, float]],
+    inset: float,
+) -> tuple[tuple[float, float], ...] | None:
+    """Pull every vertex back inside the contour, along its own ray from `centre`.
+
+    A hole that crosses the outline is not a hole: even-odd counts one crossing
+    out there and paints the region OUTSIDE the form. Clamping per vertex keeps
+    the patch's own shape wherever it already fitted.
+    """
+    out: list[tuple[float, float]] = []
+    for x, y in points:
+        dx, dy = x - centre[0], y - centre[1]
+        distance = math.hypot(dx, dy)
+        if distance <= 1e-9:
+            return None
+        ux, uy = dx / distance, dy / distance
+        spans = [
+            span for span in _line_spans(contour, centre, (ux, uy))
+            if span[0] <= 0.0 <= span[1]
+        ]
+        if not spans:
+            return None
+        limit = spans[0][1] - inset
+        if limit <= 0:
+            return None
+        scale = min(1.0, limit / distance)
+        out.append((centre[0] + ux * distance * scale, centre[1] + uy * distance * scale))
     return tuple(out)
 
 
@@ -5006,7 +5189,9 @@ def _reserve_cuts(
     return intervals
 
 
-def _fill_underlay(dwg: svgwrite.Drawing, ins: Instruction, contour, attrs, reserves=()):
+def _fill_underlay(
+    dwg: svgwrite.Drawing, ins: Instruction, contour, attrs, reserves=(), tones=()
+):
     """The field itself, laid as a real element under whatever marks go on top.
 
     Both branches get one. It is what lets the marks leave the contour: before
@@ -5023,26 +5208,60 @@ def _fill_underlay(dwg: svgwrite.Drawing, ins: Instruction, contour, attrs, rese
     element -- even-odd against the outline -- rather than pale patches drawn on
     top, because what has to show through them is the ground, whatever the
     ground happens to be.
+
+    `tones` are the paler places, and they are holes in a SECOND layer for the
+    same reason: a darker patch laid on top would also cover the reserves and
+    put the ground back under paint. Where the second layer is present the two
+    composite to exactly the flat opacity the field used to have, so adding the
+    mottling does not move the tone.
     """
     opacity = float(attrs.get("fill_opacity", attrs.get("stroke_opacity", 1.0)))
-    if not reserves:
+    field = opacity * FILL_UNDERLAY_OPACITY_RATIO
+    color = attrs.get("stroke", "#111111")
+    if not reserves and not tones:
         return dwg.polygon(
             points=list(contour),
             class_="fill-underlay-v1",
-            fill=attrs.get("stroke", "#111111"),
-            fill_opacity=opacity * FILL_UNDERLAY_OPACITY_RATIO,
+            fill=color,
+            fill_opacity=field,
             stroke="none",
         )
-    subpaths = [polygon_path(tuple(contour))]
-    subpaths.extend(polygon_path(reserve) for reserve in reserves)
-    return dwg.path(
-        d=" ".join(subpaths),
-        class_=f"fill-underlay-v1 reserves-{len(reserves)}",
-        fill=attrs.get("stroke", "#111111"),
-        fill_opacity=opacity * FILL_UNDERLAY_OPACITY_RATIO,
-        fill_rule="evenodd",
-        stroke="none",
+    holes = [polygon_path(reserve) for reserve in reserves]
+    base = field * (1.0 - FILL_FIELD_TONE_DROP) if tones else field
+    group = dwg.g(class_="fill-field-v2")
+    group.add(
+        dwg.path(
+            d=" ".join([polygon_path(tuple(contour)), *holes]),
+            class_=f"fill-underlay-v1 reserves-{len(reserves)}",
+            fill=color,
+            fill_opacity=base,
+            fill_rule="evenodd",
+            stroke="none",
+        )
     )
+    if tones:
+        # Solved so that the base under all the layers equals the flat field
+        # exactly: (1 - base)(1 - each)^n = 1 - field.
+        rest = (1.0 - field) / (1.0 - base) if base < 1.0 else 1.0
+        each = 1.0 - rest ** (1.0 / len(tones))
+        for patches in tones:
+            group.add(
+                dwg.path(
+                    d=" ".join(
+                        [
+                            polygon_path(tuple(contour)),
+                            *holes,
+                            *[polygon_path(patch) for patch in patches],
+                        ]
+                    ),
+                    class_=f"fill-underlay-v1 tones-{len(patches)}",
+                    fill=color,
+                    fill_opacity=each,
+                    fill_rule="evenodd",
+                    stroke="none",
+                )
+            )
+    return group
 
 
 def _fill_stroke_seed(seed: int, index: int) -> int:
@@ -5436,9 +5655,9 @@ def _render_fill_texture(
     base_angle = _fill_scan_angle(seed)
     spread = _fill_angle_amplitude(hand)
     reach = width * (FILL_REACH_WIDTHS_MIN + FILL_REACH_WIDTHS_SPAN * hand)
-    # The same discs the underlay left open. Read from the one helper rather
+    # The same streaks the underlay left open. Read from the one helper rather
     # than passed, so a mark can never be drawn across a hole in the field.
-    reserves = _fill_reserves(contour, seed, short_side)
+    reserves, _ = _texture_field(ins, contour, canvas, render_seed)
     group = dwg.g(class_=f"fill-texture-v1 marks-{len(points)}")
     for index, (px, py) in enumerate(points):
         # The marks run the region's one direction, wobbling by the few degrees
@@ -5662,23 +5881,16 @@ def _interior_fill(
         )
         return (None, True) if group is None else (group, False)
 
-    # The reserve is the texture branch's, and only its. The scan branch packs
-    # to the coverage the author set and its own strokes already leave the field
-    # uneven; a hole cut into a scanned fill would be a second mechanism doing
-    # what that one already does.
-    xs = [point[0] for point in contour]
-    ys = [point[1] for point in contour]
-    reserves = (
-        ()
-        if scan_branch
-        else _fill_reserves(
-            contour,
-            _seed_for_instruction(ins, render_seed),
-            min(max(xs) - min(xs), max(ys) - min(ys)),
-        )
+    # The reserve and the field's mottling are the texture branch's, and only
+    # its. The scan branch packs to the coverage the author set and its own
+    # strokes already leave the field uneven -- "I want the mottling of a fill
+    # with the THIN tools too" (author, 2026-08-07) -- so a second mechanism
+    # here would be doing what that one already does.
+    reserves, tones = (
+        ((), ()) if scan_branch else _texture_field(ins, contour, canvas, render_seed)
     )
     group = dwg.g(class_="fill-v2")
-    group.add(_fill_underlay(dwg, ins, contour, attrs, reserves))
+    group.add(_fill_underlay(dwg, ins, contour, attrs, reserves, tones))
     group.add(marks)
     return group, False
 

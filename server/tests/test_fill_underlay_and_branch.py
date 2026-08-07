@@ -664,51 +664,56 @@ def test_t20_every_texture_mark_takes_its_own_tone():
         assert max(marks) <= ink + 1e-9, (tool, max(marks), ink)
 
 
-def test_t21_the_tool_leaves_the_ground_bare_in_places(monkeypatch):
-    """T-21 塗り残し。**地が出る場所には、下地も痕も無い。**
+def test_t21_the_tool_leaves_the_ground_bare_along_its_own_strokes(monkeypatch):
+    """T-21 塗り残し。**地が出る場所には下地も痕も無く、その形は筆致に沿う。**
 
-    「逆に塗り残しで地が出る表現を追加する」（作者裁定 2026-08-07）。下地が面を
-    持っている以上、地を出すとは面を取り除くことである。
+    「逆に塗り残しで地が出る表現を追加する」（作者裁定 2026-08-07）、そして
+    **「塗り残しは筆致の軌跡に応じるべきだ。線の軌跡に被っており、ロジックとして
+    おかしい」**（同 2026-08-07、等方の塊で出したものへの差し戻し）。道具は自分の
+    ストロークを横切って消したりしない。
 
-    **2 つを同時に見る。**下地に穴が開いていても痕がその上を素通りしていれば
-    地は出ないし、痕だけ避けても下地が残っていれば出ない。**片方だけのゲートは、
-    もう片方が抜けた実装を通す。**
+    **3 つを同時に見る。**下地に穴が開いていても痕が素通りしていれば地は出ず、
+    痕だけ避けても下地が残っていれば出ず、**向きが筆致と無関係なら「破れ」に戻る。**
+    片方だけのゲートは、もう片方が抜けた実装を通す。
 
     対照: 走査線枝には塗り残しを置かない。
     """
     for tool in TEXTURE_TOOLS:
         payload = dict(CIRCLE, weight=tool, filled=True)
         svg = _svg(payload)
-        # 下地は穴を持つ path で、穴の数は 2〜4。
         count = re.search(r'class="fill-underlay-v1 reserves-(\d+)"', svg)
         assert count is not None, tool
-        assert 2 <= int(count.group(1)) <= 4, (tool, count.group(1))
+        assert 3 <= int(count.group(1)) <= 7, (tool, count.group(1))
         underlay = re.search(
-            r'<path[^>]*class="fill-underlay-v1[^"]*"[^>]*>', svg
+            r'<path[^>]*class="fill-underlay-v1 reserves-[^"]*"[^>]*>', svg
         ).group(0)
         assert 'fill-rule="evenodd"' in underlay, tool
         d = re.search(r'\sd="([^"]+)"', underlay).group(1)
         assert d.count("M ") == int(count.group(1)) + 1, (tool, d.count("M "))
 
-        # そして痕が入っていない。製品の抜きの現物に対して、合成器へ渡った
-        # 中心線の点を数える。
         contour = _contour(payload)
-        xs = [point[0] for point in contour]
-        ys = [point[1] for point in contour]
-        reserves = renderer._fill_reserves(
-            contour,
-            renderer._seed_for_instruction(Instruction.model_validate(payload), SEED),
-            min(max(xs) - min(xs), max(ys) - min(ys)),
+        reserves, _ = renderer._texture_field(
+            Instruction.model_validate(payload), contour, CANVAS, SEED
         )
-        assert reserves, tool
+        assert len(reserves) == int(count.group(1)), tool
+        lines = _centerlines(payload, monkeypatch)
+
+        # 1. 向き。抜きの長軸が痕の走る向きと揃っていること。
+        marks_angle = statistics.fmean(_stroke_angles_deg(lines))
+        for reserve in reserves:
+            axis, elongation = _principal_axis(reserve)
+            # 細長いこと。等方の塊へ戻した実装は、長軸の向き自体が意味を持たない。
+            assert elongation >= 2.0, (tool, elongation)
+            gap = abs(axis - marks_angle) % 180.0
+            assert min(gap, 180.0 - gap) <= 10.0, (tool, axis, marks_angle)
+
+        # 2. 痕が入っていないこと。**深さで見る。件数比では分からない** — 抜きは
+        # 形の数 % しか占めないので、素通りする実装でも「抜きの中の標本」は同じ
+        # 数 % にしかならず、ずれ幅ぶんと見分けがつかない。深さなら、切っていれば
+        # 道具の幅の数倍まで、切っていなければ抜きの半幅ぶん入る。
         width = _stroke_width_px(
             Instruction.model_validate(payload).weight, CANVAS, None
         )
-        lines = _centerlines(payload, monkeypatch)
-        # **深さで見る。件数比では分からない。**抜きは形の 4% ほどしか占めないので、
-        # 素通りする実装でも「抜きの中の標本」は 4% にしかならず、ずれ幅ぶんの
-        # 2.6% と見分けがつかない。深さなら、切っていれば道具の幅の数倍まで、
-        # 切っていなければ抜きの半径ぶん（pencil で幅の 20 倍）入る。
         deepest = 0.0
         for line in lines:
             for point in line:
@@ -716,9 +721,70 @@ def test_t21_the_tool_leaves_the_ground_bare_in_places(monkeypatch):
                     if _point_in_polygon(point, reserve):
                         deepest = max(deepest, _depth_in_polygon(point, reserve))
         assert deepest <= 2.0 * width, (tool, deepest, width)
-        # そして実際に切られたこと。抜きが形の外に落ちていれば上は恒真になる。
+
+        # 3. 実際に切られたこと。抜きが形の外に落ちていれば上の 2 つは恒真になる。
         marks = int(re.search(r'class="fill-texture-v1 marks-(\d+)"', svg).group(1))
         assert len(lines) > marks, (tool, len(lines), marks)
+
+
+def test_t23_the_field_itself_carries_more_than_one_tone(monkeypatch):
+    """T-23 下地は 1 枚の平らな面ではない。**それでいて面の濃度は動かない。**
+
+    「塗りつぶしの色むらを、テクスチャで使われる細い道具でも表現したい」に対して
+    痕の濃さを振ったが、**4 倍に広げても絵は変わらなかった**（run 859 6 巡目）。
+    面の明るさを決めているのは一様な下地なので、むらは下地の側にしか作れない。
+
+    **合成が元の平らな値と一致することを見る。**むらを足したついでに面が濃く
+    （淡く）なる実装は、作者が承認済みのコントラストを黙って動かしている。
+    """
+    for tool in TEXTURE_TOOLS:
+        payload = dict(CIRCLE, weight=tool, filled=True)
+        svg = _svg(payload)
+        layers = _underlay_layers(svg)
+        assert len(layers) >= 2, (tool, layers)
+        # 一番下の層は、元の平らな面より淡い。ここが「薄いところ」である。
+        composite = _underlay_opacity(svg)
+        assert layers[0] < composite, (tool, layers[0], composite)
+        # 濃淡の層は穴を持っている。穴が無ければ層が何枚あっても一様である。
+        tone_layers = re.findall(r'class="fill-underlay-v1 tones-(\d+)"', svg)
+        assert len(tone_layers) >= 1, tool
+        assert all(int(value) >= 3 for value in tone_layers), (tool, tone_layers)
+
+    # そして重なった先が、むらを持たない面ちょうどであること。**同じ製品を
+    # 層 0 枚で 1 度描いて突き合わせる** — 記述が求めた墨を受入の側で建て直すと、
+    # 建て直しの側が間違っていても気づけない。
+    with monkeypatch.context() as patched:
+        patched.setattr(renderer, "FILL_FIELD_TONE_LAYERS", 0)
+        flat = {tool: _underlay_opacity(_svg(dict(CIRCLE, weight=tool, filled=True)))
+                for tool in TEXTURE_TOOLS}
+    for tool in TEXTURE_TOOLS:
+        mottled = _underlay_opacity(_svg(dict(CIRCLE, weight=tool, filled=True)))
+        assert mottled == pytest.approx(flat[tool], abs=1e-6), (tool, mottled, flat[tool])
+
+    # 対照: 走査線枝は 1 枚の平らな polygon のまま。
+    scan = _svg(SCAN_CASE)
+    assert len(_underlay_layers(scan)) == 1
+    assert "tones-" not in scan
+
+
+def _principal_axis(polygon) -> tuple[float, float]:
+    """多角形の長軸の向き（度・0〜180）と、長短の比。"""
+    cx = statistics.fmean(point[0] for point in polygon)
+    cy = statistics.fmean(point[1] for point in polygon)
+    sxx = syy = sxy = 0.0
+    for x, y in polygon:
+        dx, dy = x - cx, y - cy
+        sxx += dx * dx
+        syy += dy * dy
+        sxy += dx * dy
+    n = len(polygon)
+    sxx, syy, sxy = sxx / n, syy / n, sxy / n
+    angle = 0.5 * math.atan2(2 * sxy, sxx - syy)
+    trace = sxx + syy
+    root = math.sqrt(max(0.0, (sxx - syy) ** 2 + 4 * sxy * sxy))
+    major, minor = (trace + root) / 2, (trace - root) / 2
+    ratio = math.sqrt(major / minor) if minor > 1e-9 else float("inf")
+    return math.degrees(angle) % 180.0, ratio
 
     # 対照。
     assert "reserves-" not in _svg(SCAN_CASE)
@@ -781,14 +847,26 @@ def test_t22_chalk_shows_more_bare_paper_than_the_other_waxy_tools():
     assert bare["pen"] == 0.0, bare
 
 
+def _underlay_layers(svg: str) -> list[float]:
+    """下地の各層の濃度。**要素は `polygon` とは限らず、1 枚とも限らない** —
+    塗り残しがあれば穴を持つ `path` になり、色むらがあれば複数枚になる。
+    要素名や 1 枚を前提に引くゲートは、そこで黙って見失う。"""
+    layers = [
+        float(value)
+        for value in re.findall(
+            r'class="fill-underlay-v1[^"]*"[^>]*fill-opacity="([\d.]+)"', svg
+        )
+    ]
+    assert layers
+    return layers
+
+
 def _underlay_opacity(svg: str) -> float:
-    """下地の濃度。**要素は `polygon` とは限らない** — 塗り残しがあると穴を持つ
-    `path` になる。要素名で引くゲートは、そこで黙って見失う。"""
-    match = re.search(
-        r'class="fill-underlay-v1[^"]*"[^>]*fill-opacity="([\d.]+)"', svg
-    )
-    assert match is not None
-    return float(match.group(1))
+    """痕が乗る面の濃度。層が複数あるところでは、その合成である。"""
+    rest = 1.0
+    for layer in _underlay_layers(svg):
+        rest *= 1.0 - layer
+    return 1.0 - rest
 
 
 def _mark_opacities(svg: str, klass: str) -> list[float]:

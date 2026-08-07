@@ -333,7 +333,8 @@ internal object ServerRendererMaterial {
         instructionSeed: String? = null
     ): String {
         val weight = ins.optString("weight", "pen")
-        val seedStr = instructionSeed ?: ServerRendererGeometry.seedForInstruction(ins, renderSeed).toString()
+        val seedStr = instructionSeed
+            ?: java.lang.Long.toUnsignedString(ServerRendererGeometry.seedForInstruction(ins, renderSeed))
         val out = StringBuilder()
         materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }).forEach { (offset, width, opacity, dash) ->
             val pts = offsetPerformedPath(path, offset, closed, center)

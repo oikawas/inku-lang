@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LineageNodeEntity::class,
         LineageEdgeEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -40,7 +40,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -90,6 +90,28 @@ abstract class InkuDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `uq_lineage_primary_parent` ON `lineage_edges` (`child_node_id`)")
+            }
+        }
+
+        /**
+         * The six columns a refinement needs to record what a work was made
+         * with. The server added the same six to `history` one at a time
+         * (`_HISTORY_COLUMN_MIGRATIONS`, `db.py:341-350`), all VARCHAR, all
+         * nullable; this does it in one step because the client has no rows
+         * between the two states.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "render_seed",
+                    "composition_seed",
+                    "interpretation_seed",
+                    "variation_amplitude",
+                    "variation_seed",
+                    "seed_text",
+                ).forEach { column ->
+                    db.execSQL("ALTER TABLE history_items ADD COLUMN $column TEXT")
+                }
             }
         }
     }

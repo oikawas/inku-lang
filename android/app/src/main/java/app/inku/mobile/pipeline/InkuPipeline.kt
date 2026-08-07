@@ -59,6 +59,19 @@ class InkuPipeline(
     }
 }
 
+/**
+ * The five seeds are the server's, with its names and its types
+ * (`api_core/models.py:14-15`, `:42-45`): `interpretation_seed` is a string,
+ * `variation_amplitude` is a string, the other three are numbers. `null` means
+ * "not given" for every one of them, which is the server's `None`; a caller that
+ * wants a specific value says so.
+ *
+ * `Long` rather than `Int` because the server's own values do not fit one:
+ * `new_render_seed()` is `secrets.randbits(53)`, and a touch seed derived from
+ * words (`_render_seed_from_text`, `rendering.py:324`) is a full unsigned 64-bit
+ * integer. That one is held here as the same 64 bits, and printed unsigned
+ * wherever it becomes part of a hash key, so it agrees with Python's int.
+ */
 data class PaintRequest(
     val description: String,
     val originalText: String = description,
@@ -68,8 +81,20 @@ data class PaintRequest(
     val canvasAspect: String,
     val autoRepair: Boolean,
     val litertStage1PromptOptimization: Boolean = false,
+    val renderSeed: Long? = null,
+    val compositionSeed: Long? = null,
+    val interpretationSeed: String? = null,
+    val variationAmplitude: String? = null,
+    val variationSeed: Long? = null,
+    val seedText: String? = null,
 )
 
+/**
+ * [renderSeed] is what the drawing was actually performed with, not what was
+ * asked for: the request may leave it out, and the layer above the renderer
+ * allocates one, the way `_render_with_metadata` does (`rendering.py:294`). The
+ * other four are carried back unchanged so the save can record them.
+ */
 data class PaintResult(
     val originalInput: String,
     val normalizedDdl: String,
@@ -79,6 +104,12 @@ data class PaintResult(
     val renderMetadataJson: String,
     val renderHash: String,
     val renderHashShort: String,
+    val renderSeed: Long? = null,
+    val compositionSeed: Long? = null,
+    val interpretationSeed: String? = null,
+    val variationAmplitude: String? = null,
+    val variationSeed: Long? = null,
+    val seedText: String? = null,
 )
 
 data class InterpretResult(
@@ -92,9 +123,16 @@ data class InterpretResult(
     val fallbackReasons: List<String> = emptyList(),
 )
 
+/**
+ * [renderSeed] is the seed the performance is drawn with. The server passes it
+ * as an argument to `renderer.render` (`renderer.py:2990`) rather than hiding it
+ * in the Score, and the caller has already decided on a value by then; a `null`
+ * here falls back to a seed the Score carries, which is how a saved work replays.
+ */
 data class RenderRequest(
     val scoreJson: String,
     val colorCatalogId: String,
     val canvasAspect: String,
     val svgProfile: String,
+    val renderSeed: Long? = null,
 )

@@ -27,7 +27,12 @@ class DefaultSvgRenderer : SvgRenderer {
         val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = ColorCatalogs.get(request.colorCatalogId)
-        val renderSeed = if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
+        // The request decides; the Score is the fallback. The server takes the
+        // seed as an argument (`renderer.render(..., render_seed=...)`) and never
+        // reads one off the Score, but a saved work on this client carries its
+        // seed in the Score it replays from, so that path is kept.
+        val renderSeed = request.renderSeed
+            ?: if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
         val cmap = ServerRendererStyle.DEFAULT_COLOR_MAP + catalog.renderMap
         val assignment = ServerRendererStyle.computeColorAssignment(
             catalogMap = catalog.renderMap,
@@ -1428,9 +1433,19 @@ class DefaultSvgRenderer : SvgRenderer {
         return uint32Le(digest, 0).toDouble() / 0xffffffffL.toDouble()
     }
 
+    /**
+     * A render seed is a Python `int` on the other side, and the keys it goes
+     * into are hashed as text. Kotlin's `Long` holds the same 64 bits but prints
+     * the top half of the range as a negative number, so every key that names a
+     * seed asks for it in the unsigned form. Below 2^63 -- which is every seed
+     * `new_render_seed` can produce -- the two spellings are the same string;
+     * above it, only this one agrees with the server.
+     */
+    private fun unsignedSeed(seed: Long): String = java.lang.Long.toUnsignedString(seed)
+
     private fun seedForInstruction(ins: JSONObject, renderSeed: Long? = null): String {
         val base = serverInstructionJson(ins)
-        val key = if (renderSeed != null) "$base:render:$renderSeed" else base
+        val key = if (renderSeed != null) "$base:render:${unsignedSeed(renderSeed)}" else base
         return uint64Le(sha256Bytes(key), 0).toString()
     }
 
@@ -1647,7 +1662,7 @@ class DefaultSvgRenderer : SvgRenderer {
             append(",\"surface\":"); append(dumpSurfaceJson(ins.optJSONObject("surface")))
             append("}")
         }
-        val key = "$dumpJson:surface:$insIdx:$markIdx:${renderSeed ?: "None"}"
+        val key = "$dumpJson:surface:$insIdx:$markIdx:${renderSeed?.let { unsignedSeed(it) } ?: "None"}"
         return uint64Le(sha256Bytes(key), 0).toString()
     }
 

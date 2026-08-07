@@ -40,7 +40,7 @@ class LocalFallbackPipeline(
             interpretText(request.description)
         }
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(normalizedDdl, request.originalText)
+            expandIntermediateDdl(normalizedDdl, request)
         } else {
             normalizedDdl
         }
@@ -54,7 +54,7 @@ class LocalFallbackPipeline(
 
     suspend fun composeFromDdl(ddl: String, request: PaintRequest): PaintResult {
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(ddl, request.originalText)
+            expandIntermediateDdl(ddl, request)
         } else {
             ddl
         }
@@ -65,6 +65,7 @@ class LocalFallbackPipeline(
             scoreFromWebRules(expandedDdl, request.canvasAspect).toString()
         }
         val renderStarted = System.currentTimeMillis()
+        val renderSeed = effectiveRenderSeed(request)
         Log.i(
             PERF_TAG,
             "render_start model_id=${request.stage2Model} score_chars=${scoreJson.length} " +
@@ -76,6 +77,7 @@ class LocalFallbackPipeline(
                 colorCatalogId = request.colorCatalogId,
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
+                renderSeed = renderSeed,
             ),
         )
         Log.i(
@@ -83,12 +85,13 @@ class LocalFallbackPipeline(
             "render_done render_ms=${System.currentTimeMillis() - renderStarted} svg_chars=${render.svg.length} " +
                 "catalog_id=${request.colorCatalogId} canvas_aspect=${request.canvasAspect}",
         )
+        val metadataJson = withRenderSeed(render.metadataJson, renderSeed)
         val hash = renderHash(
             input = request.originalText,
             ddl = expandedDdl,
             scoreJson = scoreJson,
             svg = render.svg,
-            renderMetadataJson = render.metadataJson,
+            renderMetadataJson = metadataJson,
             catalogId = request.colorCatalogId,
         )
         return PaintResult(
@@ -97,28 +100,46 @@ class LocalFallbackPipeline(
             expandedDdl = expandedDdl,
             scoreJson = scoreJson,
             displaySvg = render.svg,
-            renderMetadataJson = render.metadataJson,
+            renderMetadataJson = metadataJson,
             renderHash = hash,
             renderHashShort = hash.takeLast(4).uppercase(),
+            renderSeed = renderSeed,
+            compositionSeed = request.compositionSeed,
+            interpretationSeed = request.interpretationSeed,
+            variationAmplitude = request.variationAmplitude,
+            variationSeed = request.variationSeed,
+            seedText = request.seedText,
         )
     }
 
+    /**
+     * `_render_metadata` puts the seed it resolved into the metadata alongside
+     * what the renderer reported (`rendering.py:296`). The render hash reads it
+     * from there, so a work drawn with a different touch hashes differently even
+     * when its Score is identical.
+     */
+    private fun withRenderSeed(metadataJson: String, renderSeed: Long): String =
+        JSONObject(metadataJson).put("render_seed", renderSeed).toString()
+
     fun renderFromScore(scoreJson: String, request: PaintRequest): PaintResult {
         val normalizedScore = JSONObject(scoreJson).toString()
+        val renderSeed = effectiveRenderSeed(request)
         val render = renderer.render(
             RenderRequest(
                 scoreJson = normalizedScore,
                 colorCatalogId = request.colorCatalogId,
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
+                renderSeed = renderSeed,
             ),
         )
+        val metadataJson = withRenderSeed(render.metadataJson, renderSeed)
         val hash = renderHash(
             input = request.originalText,
             ddl = request.description,
             scoreJson = normalizedScore,
             svg = render.svg,
-            renderMetadataJson = render.metadataJson,
+            renderMetadataJson = metadataJson,
             catalogId = request.colorCatalogId,
         )
         return PaintResult(
@@ -127,9 +148,15 @@ class LocalFallbackPipeline(
             expandedDdl = request.description,
             scoreJson = normalizedScore,
             displaySvg = render.svg,
-            renderMetadataJson = render.metadataJson,
+            renderMetadataJson = metadataJson,
             renderHash = hash,
             renderHashShort = hash.takeLast(4).uppercase(),
+            renderSeed = renderSeed,
+            compositionSeed = request.compositionSeed,
+            interpretationSeed = request.interpretationSeed,
+            variationAmplitude = request.variationAmplitude,
+            variationSeed = request.variationSeed,
+            seedText = request.seedText,
         )
     }
 
@@ -310,9 +337,41 @@ class LocalFallbackPipeline(
         return ensurePlacement(cleaned)
     }
 
-    private fun expandIntermediateDdl(ddl: String, originalText: String): String {
-        return WebDdlExpander.expandIntermediateDdl(ddl, contextText = originalText)
+    /**
+     * Stage 1.5. The three seeds the server hands this layer arrive together
+     * (`_call_compose_detail`, `render.py:889-897`): the composition seed is the
+     * expander's `vary_seed`, and the amplitude and the variation seed only do
+     * anything as a pair -- `buildVariationPlan` returns null unless both are
+     * there, which is `_validated_variation_amplitude` plus the seed on the
+     * server.
+     */
+    private fun expandIntermediateDdl(ddl: String, request: PaintRequest): String {
+        return WebDdlExpander.expandIntermediateDdl(
+            ddl,
+            contextText = request.originalText,
+            varySeed = request.compositionSeed,
+            variationAmplitude = request.variationAmplitude,
+            variationSeed = request.variationSeed,
+        )
     }
+
+    /**
+     * The seed the drawing is actually performed with.
+     *
+     * `_render_with_metadata` (`rendering.py:294`) reads
+     * `render_metadata.get("render_seed") or new_render_seed()`, so a request
+     * that names no seed still gets one, and a request that names `0` gets a new
+     * one too -- Python truthiness, kept here rather than turned into a null
+     * check, because 0 and "not given" really do take the same road on the server.
+     */
+    private fun effectiveRenderSeed(request: PaintRequest): Long {
+        val asked = request.renderSeed
+        if (asked != null && asked != 0L) return asked
+        return newRenderSeed()
+    }
+
+    /** `new_render_seed()` -- `secrets.randbits(53)` (`renderer.py:635`). */
+    private fun newRenderSeed(): Long = java.security.SecureRandom().nextLong() ushr 11
 
     private fun fallbackDdlFromText(text: String): String {
         return ServerFallbackComposer.fallbackDdlFromText(text)

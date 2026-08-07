@@ -313,7 +313,10 @@ internal object ServerRendererStyle {
         fun selectBySeed(candidates: List<String>, abstractColor: String): String {
             val sortedCandidates = candidates.distinct().sorted()
             if (sortedCandidates.size == 1) return sortedCandidates[0]
-            val seedStr = renderSeed?.toString() ?: "None"
+            // Unsigned, because the Python side hashes `f"{render_seed}|..."`
+            // with an int that has no sign bit. Every seed below 2^63 prints the
+            // same either way; a touch seed derived from words does not.
+            val seedStr = renderSeed?.let { java.lang.Long.toUnsignedString(it) } ?: "None"
             val payload = "$seedStr|$catalogId|$abstractColor"
             val md = java.security.MessageDigest.getInstance("SHA-256")
             val digest = md.digest(payload.toByteArray(Charsets.UTF_8))

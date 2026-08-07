@@ -17,6 +17,10 @@ import app.inku.mobile.data.lineage.LineageGraph
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.data.refinement.PaintSeeds
+import app.inku.mobile.data.refinement.RefinementParent
+import app.inku.mobile.data.refinement.RefinementPlan
+import app.inku.mobile.data.refinement.RefinementRoute
 import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.LocalLiteRtLmProvider
 import app.inku.mobile.llm.LocalModelDownloader
@@ -366,7 +370,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -379,6 +383,12 @@ class InkuRepository(
                 canvasAspect = canvasAspect,
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
+                renderSeed = seeds.renderSeed,
+                compositionSeed = seeds.compositionSeed,
+                interpretationSeed = seeds.interpretationSeed,
+                variationAmplitude = seeds.variationAmplitude,
+                variationSeed = seeds.variationSeed,
+                seedText = seeds.seedText,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility)
@@ -400,7 +410,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -413,6 +423,12 @@ class InkuRepository(
                 canvasAspect = canvasAspect,
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
+                renderSeed = seeds.renderSeed,
+                compositionSeed = seeds.compositionSeed,
+                interpretationSeed = seeds.interpretationSeed,
+                variationAmplitude = seeds.variationAmplitude,
+                variationSeed = seeds.variationSeed,
+                seedText = seeds.seedText,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility)
@@ -438,7 +454,7 @@ class InkuRepository(
             ?: error("デモ指示文生成が空でした。")
     }
 
-    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
+    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.renderFromScore(
             scoreJson,
@@ -450,13 +466,89 @@ class InkuRepository(
                 colorCatalogId = catalogId,
                 canvasAspect = canvasAspect,
                 autoRepair = false,
+                renderSeed = seeds.renderSeed,
+                compositionSeed = seeds.compositionSeed,
+                interpretationSeed = seeds.interpretationSeed,
+                variationAmplitude = seeds.variationAmplitude,
+                variationSeed = seeds.variationSeed,
+                seedText = seeds.seedText,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility)
     }
 
+    /**
+     * Draws one refinement candidate and does **not** save it.
+     *
+     * web's candidate grid asks for the same thing with `saveHistory: false`
+     * (`interpretationVariationCandidate`): a candidate is the generating work's
+     * temporary state until the author picks it, so nothing may reach the
+     * history table on the way.
+     */
+    suspend fun renderRefinementCandidate(parent: RefinementParent, plan: RefinementPlan): PaintResult {
+        val request = PaintRequest(
+            description = parent.description,
+            originalText = parent.description,
+            stage1Model = parent.stage1Model,
+            stage2Model = parent.stage2Model,
+            colorCatalogId = plan.catalogId,
+            canvasAspect = plan.canvasAspect,
+            // The colour and touch refinements replay a Score that is already
+            // expanded; the other three go back through Stage 1.5.
+            autoRepair = plan.route != RefinementRoute.RenderFromScore,
+            renderSeed = plan.seeds.renderSeed,
+            compositionSeed = plan.seeds.compositionSeed,
+            interpretationSeed = plan.seeds.interpretationSeed,
+            variationAmplitude = plan.seeds.variationAmplitude,
+            variationSeed = plan.seeds.variationSeed,
+            seedText = plan.seeds.seedText,
+        )
+        return when (plan.route) {
+            RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
+            RefinementRoute.ComposeFromDdl -> pipeline.composeFromDdl(parent.ddl, request)
+            RefinementRoute.Paint -> pipeline.paint(request)
+        }
+    }
+
+    /**
+     * Puts a candidate the author picked into the ordinary history.
+     *
+     * 「選択したものだけを通常履歴へ保存し、保存だけではスターを付けない」(SPEC `:678`):
+     * the star is not touched here, and [HistoryItemEntity.starred] is false for
+     * every row this path writes -- the same value an ordinary drawing gets.
+     */
+    suspend fun saveRefinementCandidate(
+        result: PaintResult,
+        plan: RefinementPlan,
+        parentNodeId: String?,
+        elapsedMs: Long,
+        historyVisibility: String? = null,
+        stage1ModelId: String,
+        stage2ModelId: String,
+    ): HistoryItemEntity = saveResult(
+        result = result,
+        catalogId = plan.catalogId,
+        canvasAspect = plan.canvasAspect,
+        stage1ModelId = stage1ModelId,
+        stage2ModelId = stage2ModelId,
+        elapsedMs = elapsedMs,
+        lineage = if (parentNodeId.isNullOrEmpty()) {
+            LineageDeclaration()
+        } else {
+            LineageDeclaration(
+                parentNodeId = parentNodeId,
+                derivationKind = plan.derivationKind,
+                derivationMetadata = plan.derivationMetadata,
+            )
+        },
+        historyVisibility = historyVisibility,
+    )
+
     private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
+        // The server writes every one of these as a string
+        // (`db.py:2090-2097`), including the numeric ones.
+        val renderSeedText = result.renderSeed?.let { java.lang.Long.toUnsignedString(it) }
         val renderMetadataJson = JSONObject(result.renderMetadataJson)
             .put("render_hash", result.renderHash)
             .put("render_hash_short", result.renderHashShort)
@@ -503,6 +595,12 @@ class InkuRepository(
             thumbnailWidth = null,
             thumbnailHeight = null,
             lineageNodeId = nodeId,
+            renderSeed = renderSeedText,
+            compositionSeed = result.compositionSeed?.toString(),
+            interpretationSeed = result.interpretationSeed,
+            variationAmplitude = result.variationAmplitude,
+            variationSeed = result.variationSeed?.toString(),
+            seedText = result.seedText,
         )
         // One transaction, and the edge after the node: the edge points at a
         // child that has to exist first. A failing edge takes the node and the

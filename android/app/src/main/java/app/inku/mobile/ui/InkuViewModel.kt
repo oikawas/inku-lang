@@ -19,11 +19,15 @@ import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.SubmitDerivationKind
+import app.inku.mobile.data.refinement.ComparisonPlanner
+import app.inku.mobile.data.refinement.LanguageCombo
+import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
+import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.PaintResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,8 +56,18 @@ const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 const val REFINEMENT_IN_PROGRESS = "推敲の候補を生成中です。"
+/** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
+const val MAX_COMPARE_SELECTION = 4
+const val MODEL_SELECT_PROMPT = "比較するモデルを1つ以上選択してください。"
+const val MODEL_FIXED_MISSING = "固定するモデルを選択してください。"
+const val MODEL_CHOICE_BLOCKED = "対象作品と同じ Stage 1/2 の組み合わせは選べません。"
+const val LANGUAGE_SELECT_PROMPT = "比較する組み合わせを1つ以上選択してください。"
+const val LANGUAGE_COMBO_BLOCKED = "対象作品と同じ言語の組み合わせは選べません。"
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
+
+/** 日本語 / English, the two names the language grid shows. */
+fun languageLabel(lang: String): String = if (lang == "en") "English" else "日本語"
 
 data class InkuUiState(
     val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
@@ -144,7 +158,33 @@ data class InkuUiState(
     // The candidate on the canvas that has not been saved. Drawing on from here
     // has to put it in the lineage first (SPEC :2105).
     val refinementPreviewId: String? = null,
+    // 検分 (SPEC :616, :686). The two comparisons are sub-views beside 調整
+    // rather than screens of their own, and they share every field above:
+    // the candidates, the busy flag, the stop and the save are the refinement's.
+    val refinementSubview: RefinementSubview = RefinementSubview.Adjust,
+    val modelCompareMode: ModelCompareMode = ModelCompareMode.Default,
+    val modelCompareFixedModel: String = "",
+    val modelCompareSelectedModels: List<String> = emptyList(),
+    val languageCompareSelectedCombos: List<String> = emptyList(),
 )
+
+/**
+ * The three sub-views of 推敲 (SPEC `:616`, `:686`).
+ *
+ * 調整 varies one of the five elements; the other two vary a model or a
+ * language. They are one screen with three faces rather than three screens,
+ * which is what「比較のロジックを複製しない」(SPEC `:688`) asks for.
+ */
+enum class RefinementSubview(val id: String, val labelJa: String, val titleJa: String) {
+    Adjust("adjust", "調整", "描画要素を編集する"),
+    Model("model", "モデル", "モデルを編集する"),
+    Language("language", "言語", "言語を編集する"),
+    ;
+
+    companion object {
+        fun byId(id: String?): RefinementSubview = entries.firstOrNull { it.id == id } ?: Adjust
+    }
+}
 
 data class BatchFailure(
     val line: Int,
@@ -182,6 +222,13 @@ data class RefinementCandidate(
     val renderHashShort: String,
     val renderMetadataJson: String,
     val elapsedMs: Long,
+    // What the drawing actually used, so the save writes what happened rather
+    // than what was asked for. The models matter for a model comparison, where
+    // the two stages differ from the parent's and from each other.
+    val stage1Model: String,
+    val stage2Model: String,
+    val instructionLangRequested: String? = null,
+    val instructionLangResolved: String? = null,
     val saveState: RefinementSaveState = RefinementSaveState.Unsaved,
     val savedHistoryId: String? = null,
     val savedNodeId: String? = null,
@@ -896,18 +943,21 @@ class InkuViewModel @JvmOverloads constructor(
      *
      * web compares against `source_text` (+page.svelte:3220-3221), a second
      * column holding the prose without the bookkeeping a batch or demo line
-     * carries. This client has no such column: `originalInput` keeps the prefix
-     * (`#3 …` from a batch line, `[demo] …` from the demo loop) while the
-     * describe box holds sometimes the stored string and sometimes the prose
-     * alone -- `selectHistory` copies the prefix in, the end of a batch strips
-     * it out. Comparing the raw strings would report an edit nobody made and
-     * write `description_edit` for a redraw, so text counts as unchanged when it
-     * matches either form. That is the judgment web reaches through its extra
-     * column, without adding one here.
+     * carries. This client now has that column too, and reads it the way the
+     * server does -- `source_text` when there is one, `input` when there is not
+     * (`db.py:1835`).
+     *
+     * The prefix stripping stays as the fallback rather than being deleted with
+     * the column's arrival: `original_input` still keeps the prefix (`#3 …` from
+     * a batch line, `[demo] …` from the demo loop), the describe box holds
+     * sometimes the stored string and sometimes the prose alone, and any row
+     * written before this column existed has NULL there. Comparing the raw
+     * strings on those rows would report an edit nobody made and write
+     * `description_edit` for a redraw.
      */
     private fun descriptionChanged(prompt: String, parent: HistoryItemEntity): Boolean {
         val text = prompt.trim()
-        val stored = parent.originalInput.trim()
+        val stored = (parent.sourceText ?: parent.originalInput).trim()
         return text != stored && text != strippedHistoryInput(stored)
     }
 
@@ -915,6 +965,14 @@ class InkuViewModel @JvmOverloads constructor(
         stored.startsWith(DemoHistoryInputPrefix) -> stored.removePrefix(DemoHistoryInputPrefix).trim()
         else -> BatchHistoryInputPrefix.replaceFirst(stored, "").trim()
     }
+
+    /**
+     * The prose a work was painted from: `source_text` when the row has one and
+     * `original_input` with its bookkeeping cut when it does not, which is the
+     * server's own fallback (`db.py:1835`) with this client's strip behind it.
+     */
+    private fun sourceTextOf(item: HistoryItemEntity): String =
+        item.sourceText?.trim() ?: strippedHistoryInput(item.originalInput)
 
     private fun runSubmit(current: InkuUiState) {
         if (current.prompt.isBlank()) {
@@ -1093,6 +1151,9 @@ class InkuViewModel @JvmOverloads constructor(
                             autoRepair = current.ddlAutoRepairEnabled,
                             historyInput = "#$lineNumber $prompt",
                             litertStage1PromptOptimization = current.litertStage1PromptOptimization,
+                            // The prose without the line number: the same split
+                            // the server keeps between `input` and `source_text`.
+                            sourceText = prompt,
                         )
                     }
                 }.onSuccess { item ->
@@ -1211,6 +1272,9 @@ class InkuViewModel @JvmOverloads constructor(
                                 autoRepair = cycle.ddlAutoRepairEnabled,
                                 historyInput = "$DemoHistoryInputPrefix$prompt",
                                 litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
+                                // The prose without the demo marker, for the
+                                // same reason the batch line strips its number.
+                                sourceText = prompt,
                             )
                         }
                     }.onSuccess { item ->
@@ -1277,17 +1341,126 @@ class InkuViewModel @JvmOverloads constructor(
      * screen (「次回描画の設定ではなく表示中の親作品の実効カタログとキャンバスを継承
      * する」).
      */
-    fun openRefinement(item: HistoryItemEntity) {
+    fun openRefinement(item: HistoryItemEntity, subview: RefinementSubview = RefinementSubview.Adjust) {
+        // 「対象作品変更時は結果を破棄し、進行中の要求を中断する」(SPEC :616, :686,
+        // :2143). The running job is cancelled first: a candidate that lands
+        // after the target changed belongs to a work that is no longer here.
+        refinementJob?.cancel()
+        val previous = localState.value.refinementParent
         localState.value = localState.value.copy(
             refinementOpen = true,
             refinementParent = item,
+            refinementSubview = subview,
             // A new target owns its own candidates; the previous work's are gone.
             refinementCandidates = emptyList(),
             refinementPreviewId = null,
             refinementStatus = null,
+            refinementBusy = false,
+            refinementCanAbort = false,
+            // The selections are read against the target's own pair, so a new
+            // target starts from an empty one rather than from choices that were
+            // legal for the last work.
+            modelCompareSelectedModels = if (previous?.id == item.id) localState.value.modelCompareSelectedModels else emptyList(),
+            languageCompareSelectedCombos = if (previous?.id == item.id) localState.value.languageCompareSelectedCombos else emptyList(),
+            modelCompareFixedModel = if (previous?.id == item.id) localState.value.modelCompareFixedModel else "",
             tab = AppTab.Lineage,
         )
     }
+
+    fun setRefinementSubview(subview: RefinementSubview) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(
+            refinementSubview = subview,
+            refinementStatus = null,
+            refinementCandidates = emptyList(),
+            refinementPreviewId = null,
+        )
+    }
+
+    /**
+     * The comparison mode. Changing it re-seeds the fixed side with the target's
+     * own model for that stage and drops the selection, the way web does
+     * (`setModelCompareMode`, `state.svelte.ts:200-211`): the previous choices
+     * were legal against a different pair.
+     */
+    fun setModelCompareMode(mode: ModelCompareMode) {
+        if (localState.value.refinementBusy) return
+        val parent = localState.value.refinementParent
+        val fixed = when (mode) {
+            ModelCompareMode.Stage1Fixed -> parent?.stage1Model.orEmpty()
+            ModelCompareMode.Stage2Fixed -> parent?.stage2Model.orEmpty()
+            ModelCompareMode.Common -> ""
+        }
+        localState.value = localState.value.copy(
+            modelCompareMode = mode,
+            modelCompareFixedModel = fixed,
+            modelCompareSelectedModels = emptyList(),
+            refinementCandidates = emptyList(),
+            refinementPreviewId = null,
+            refinementStatus = null,
+        )
+    }
+
+    fun setModelCompareFixedModel(modelId: String) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(
+            modelCompareFixedModel = modelId,
+            refinementCandidates = emptyList(),
+            refinementPreviewId = null,
+            refinementStatus = null,
+        )
+    }
+
+    /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
+    fun toggleModelCompareSelection(modelId: String) {
+        val current = localState.value
+        if (current.refinementBusy) return
+        val parent = current.refinementParent
+        if (ComparisonPlanner.isModelChoiceBlocked(
+                mode = current.modelCompareMode,
+                fixedModel = current.modelCompareFixedModel,
+                model = modelId,
+                targetStage1Model = parent?.stage1Model.orEmpty(),
+                targetStage2Model = parent?.stage2Model.orEmpty(),
+            )
+        ) {
+            localState.value = current.copy(refinementStatus = MODEL_CHOICE_BLOCKED)
+            return
+        }
+        val selected = current.modelCompareSelectedModels
+        val next = when {
+            modelId in selected -> selected - modelId
+            selected.size >= MAX_COMPARE_SELECTION -> selected
+            else -> selected + modelId
+        }
+        localState.value = current.copy(modelCompareSelectedModels = next, refinementStatus = null)
+    }
+
+    fun toggleLanguageCombo(comboId: String) {
+        val current = localState.value
+        if (current.refinementBusy) return
+        val combo = LanguageCombo.byId(comboId) ?: return
+        if (ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLang(current.refinementParent))) {
+            localState.value = current.copy(refinementStatus = LANGUAGE_COMBO_BLOCKED)
+            return
+        }
+        val selected = current.languageCompareSelectedCombos
+        val next = if (comboId in selected) selected - comboId else selected + comboId
+        localState.value = current.copy(languageCompareSelectedCombos = next, refinementStatus = null)
+    }
+
+    /**
+     * The language the target work was drawn in.
+     *
+     * web reads the resolved column and falls back to the UI language
+     * (`languageInspectionTargetLang`, `state.svelte.ts:365-368`). This client
+     * has no UI-language setting, so the fallback is the same `"ja"` its
+     * instruction-language resolution uses.
+     */
+    private fun targetInstructionLang(parent: HistoryItemEntity?): String =
+        parent?.instructionLangResolved
+            ?.takeIf { it in InstructionLanguages.SUPPORTED }
+            ?: InstructionLanguages.DEFAULT_LANG
 
     fun closeRefinement() {
         refinementJob?.cancel()
@@ -1329,6 +1502,104 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(refinementCount = count.coerceIn(1, 4), refinementStatus = null)
     }
 
+    /** One candidate's orders plus the two strings the grid shows it under. */
+    private data class CandidateJob(val id: String, val label: String, val plan: RefinementPlan)
+
+    /** A refusal the author has to read, not a failure: it carries the sentence. */
+    private class CandidateRefusal(override val message: String) : IllegalStateException(message)
+
+    /**
+     * What to draw, for whichever sub-view is showing.
+     *
+     * The three lists are built here and nowhere else, so the drawing loop below
+     * has no idea which comparison it is running -- that is what stops the two
+     * inspections from growing a second copy of it (SPEC `:688`).
+     */
+    private fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> =
+        when (current.refinementSubview) {
+            RefinementSubview.Adjust -> adjustJobs(current, parent)
+            RefinementSubview.Model -> modelJobs(current, parent)
+            RefinementSubview.Language -> languageJobs(current, parent)
+        }
+
+    private fun adjustJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
+        val element = current.refinementElement
+        val count = current.refinementCount
+        if (element == RefinementElement.Touch && current.refinementTouchWords.isBlank()) {
+            throw CandidateRefusal("タッチを変える言葉を入力してください。")
+        }
+        // The same words give the same seed, so four touch candidates would be
+        // four copies. web refuses in the same place with the same sentence.
+        if (count > RefinementPlanner.maxCandidates(element)) {
+            throw CandidateRefusal(RefinementPlanner.TOUCH_FANOUT_REFUSAL)
+        }
+        val catalogIds = if (element == RefinementElement.Color) {
+            RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }, count)
+        } else {
+            emptyList()
+        }
+        return (0 until count).map { index ->
+            CandidateJob(
+                id = "${element.id}-$index",
+                label = "${element.labelJa} ${index + 1}",
+                plan = RefinementPlanner.plan(
+                    element = element,
+                    parent = parent,
+                    amplitude = current.refinementAmplitude,
+                    newCatalogId = catalogIds.getOrNull(index),
+                    seedText = current.refinementTouchWords.takeIf { element == RefinementElement.Touch },
+                ),
+            )
+        }
+    }
+
+    /**
+     * 「比較対象はユーザーが明示的に選び、未選択モデルをfallback実行しない」(SPEC `:616`):
+     * an empty selection draws nothing and says so.
+     */
+    private fun modelJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
+        val mode = current.modelCompareMode
+        val fixed = current.modelCompareFixedModel
+        if (mode != ModelCompareMode.Common && fixed.isBlank()) {
+            throw CandidateRefusal(MODEL_FIXED_MISSING)
+        }
+        val chosen = current.modelCompareSelectedModels
+            .take(MAX_COMPARE_SELECTION)
+            .filterNot {
+                ComparisonPlanner.isModelChoiceBlocked(
+                    mode = mode,
+                    fixedModel = fixed,
+                    model = it,
+                    targetStage1Model = current.refinementParent?.stage1Model.orEmpty(),
+                    targetStage2Model = current.refinementParent?.stage2Model.orEmpty(),
+                )
+            }
+        if (chosen.isEmpty()) throw CandidateRefusal(MODEL_SELECT_PROMPT)
+        return chosen.map { model ->
+            val plan = ComparisonPlanner.modelPlan(mode, fixed, model, parent)
+            CandidateJob(
+                id = "${mode.id}:${plan.stage1Model}:${plan.stage2Model}",
+                label = model,
+                plan = plan,
+            )
+        }
+    }
+
+    private fun languageJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
+        val targetLang = targetInstructionLang(current.refinementParent)
+        val chosen = current.languageCompareSelectedCombos
+            .mapNotNull { LanguageCombo.byId(it) }
+            .filterNot { ComparisonPlanner.isLanguageComboBlocked(it, targetLang) }
+        if (chosen.isEmpty()) throw CandidateRefusal(LANGUAGE_SELECT_PROMPT)
+        return chosen.map { combo ->
+            CandidateJob(
+                id = combo.id,
+                label = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}",
+                plan = ComparisonPlanner.languagePlan(combo, parent),
+            )
+        }
+    }
+
     /**
      * Draws the candidates.
      *
@@ -1342,19 +1613,15 @@ class InkuViewModel @JvmOverloads constructor(
         val current = localState.value
         if (current.refinementBusy || current.isDrawing) return
         val parentItem = current.refinementParent ?: return
-        val element = current.refinementElement
-        val count = current.refinementCount
-        if (element == RefinementElement.Touch && current.refinementTouchWords.isBlank()) {
-            localState.value = current.copy(refinementStatus = "タッチを変える言葉を入力してください。")
+        val parent = RefinementParent.of(parentItem, sourceTextOf(parentItem))
+        // One entry point for all three sub-views: what differs between them is
+        // the list of orders, not the drawing, the stopping or the saving.
+        val jobs = try {
+            candidateJobs(current, parent)
+        } catch (refusal: CandidateRefusal) {
+            localState.value = current.copy(refinementStatus = refusal.message)
             return
         }
-        // The same words give the same seed, so four touch candidates would be
-        // four copies. web refuses in the same place with the same sentence.
-        if (count > RefinementPlanner.maxCandidates(element)) {
-            localState.value = current.copy(refinementStatus = RefinementPlanner.TOUCH_FANOUT_REFUSAL)
-            return
-        }
-        val parent = RefinementParent.of(parentItem, strippedHistoryInput(parentItem.originalInput))
         refinementJob?.cancel()
         localState.value = current.copy(
             refinementBusy = true,
@@ -1373,29 +1640,22 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }
             runCatching {
-                val catalogIds = if (element == RefinementElement.Color) {
-                    RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }, count)
-                } else {
-                    emptyList()
-                }
                 val made = mutableListOf<RefinementCandidate>()
-                for (index in 0 until count) {
-                    val plan = RefinementPlanner.plan(
-                        element = element,
-                        parent = parent,
-                        amplitude = current.refinementAmplitude,
-                        newCatalogId = catalogIds.getOrNull(index),
-                        seedText = current.refinementTouchWords.takeIf { element == RefinementElement.Touch },
-                    )
+                jobs.forEach { job ->
                     val started = System.currentTimeMillis()
                     val result = withContext(Dispatchers.IO) {
-                        repository.renderRefinementCandidate(parent, plan)
+                        repository.renderRefinementCandidate(parent, job.plan)
                     }
+                    // 「対象作品変更時は結果を破棄し」: the target may have moved while
+                    // this candidate was being drawn, and a result that arrives
+                    // for a work nobody is looking at is thrown away rather than
+                    // shown against the new one.
+                    if (localState.value.refinementParent?.id != parentItem.id) return@forEach
                     made.add(
                         RefinementCandidate(
-                            id = "${element.id}-$index-${result.renderHash.takeLast(8)}",
-                            label = "${element.labelJa} ${index + 1}",
-                            plan = plan,
+                            id = "${job.id}-${result.renderHash.takeLast(8)}",
+                            label = job.label,
+                            plan = job.plan,
                             displaySvg = result.displaySvg,
                             scoreJson = result.scoreJson,
                             normalizedDdl = result.normalizedDdl,
@@ -1403,6 +1663,10 @@ class InkuViewModel @JvmOverloads constructor(
                             renderHashShort = result.renderHashShort,
                             renderMetadataJson = result.renderMetadataJson,
                             elapsedMs = System.currentTimeMillis() - started,
+                            stage1Model = job.plan.stage1Model ?: parent.stage1Model,
+                            stage2Model = job.plan.stage2Model ?: parent.stage2Model,
+                            instructionLangRequested = result.instructionLangRequested,
+                            instructionLangResolved = result.instructionLangResolved,
                         ),
                     )
                     // Shown as they arrive, the way web fills its grid.
@@ -1486,7 +1750,7 @@ class InkuViewModel @JvmOverloads constructor(
         historyVisibility: String?,
     ): HistoryItemEntity = repository.saveRefinementCandidate(
         result = PaintResult(
-            originalInput = strippedHistoryInput(parentItem.originalInput),
+            originalInput = sourceTextOf(parentItem),
             normalizedDdl = candidate.normalizedDdl,
             expandedDdl = candidate.normalizedDdl,
             scoreJson = candidate.scoreJson,
@@ -1500,13 +1764,18 @@ class InkuViewModel @JvmOverloads constructor(
             variationAmplitude = candidate.plan.seeds.variationAmplitude,
             variationSeed = candidate.plan.seeds.variationSeed,
             seedText = candidate.plan.seeds.seedText,
+            instructionLangRequested = candidate.instructionLangRequested,
+            instructionLangResolved = candidate.instructionLangResolved,
         ),
         plan = candidate.plan,
         parentNodeId = parentItem.lineageNodeId,
         elapsedMs = candidate.elapsedMs,
         historyVisibility = historyVisibility,
-        stage1ModelId = parentItem.stage1Model ?: "",
-        stage2ModelId = parentItem.stage2Model ?: "",
+        // What drew this candidate, which is the parent's pair for a refinement
+        // and the compared pair for a model comparison.
+        stage1ModelId = candidate.stage1Model,
+        stage2ModelId = candidate.stage2Model,
+        sourceText = sourceTextOf(parentItem),
     )
 
     /** The seed the drawing was performed with, when the plan left it to be drawn. */

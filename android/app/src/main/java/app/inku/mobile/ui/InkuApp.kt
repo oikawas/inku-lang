@@ -150,6 +150,9 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
+import app.inku.mobile.data.refinement.ComparisonPlanner
+import app.inku.mobile.data.refinement.LanguageCombo
+import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
@@ -157,6 +160,7 @@ import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.WebDdlSpec
 import java.io.File
 import java.io.FileOutputStream
@@ -2023,6 +2027,16 @@ internal const val REFINE_SAVE_TAG = "refine_save"
 internal const val REFINE_STOP_TAG = "refine_stop"
 internal const val REFINE_GENERATE_TAG = "refine_generate"
 
+/** The two comparison entries on a lineage card, beside 描画要素 (SPEC `:618`). */
+internal const val MODEL_ENTRY_TAG = "model_entry"
+internal const val LANGUAGE_ENTRY_TAG = "language_entry"
+
+/** Tags for the sub-view chips and the two selection grids. */
+internal fun refinementSubviewTag(subview: RefinementSubview): String = "refine_subview_${subview.id}"
+internal fun modelCompareModeTag(mode: ModelCompareMode): String = "model_compare_mode_${mode.id}"
+internal fun modelChoiceTag(modelId: String): String = "model_choice_$modelId"
+internal fun languageComboTag(comboId: String): String = "language_combo_$comboId"
+
 /**
  * 作品の系譜 -- the port of web's `LineagePanel.svelte`, cut to what contract
  * 2/5 asks for: the ancestors and two generations of descendants of the work on
@@ -2081,60 +2095,50 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("描画要素を編集する", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(state.refinementSubview.titleJa, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             ChipButton("閉じる", onClick = viewModel::closeRefinement)
         }
-        Text(
-            "1 回の推敲で変えられるのは 1 種類だけです。" +
-                (parent?.let { " 親: ${it.renderHashShort} / ${ColorCatalogs.get(it.colorCatalogId).name}" } ?: ""),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
+        // 調整・モデル・言語 (SPEC :616, :686). Three faces of one screen.
         WrapRow(horizontal = 8.dp, vertical = 8.dp) {
-            RefinementElement.entries.forEach { element ->
+            RefinementSubview.entries.forEach { subview ->
                 ChipButton(
-                    text = element.labelJa,
-                    selected = state.refinementElement == element,
-                    onClick = { viewModel.setRefinementElement(element) },
+                    text = subview.labelJa,
+                    selected = state.refinementSubview == subview,
+                    modifier = Modifier.testTag(refinementSubviewTag(subview)),
+                    onClick = { viewModel.setRefinementSubview(subview) },
                 )
             }
         }
 
-        // 「変奏を選択したときだけ強度をラジオ直下に表示」. No section of its own.
-        if (state.refinementElement == RefinementElement.Variation) {
-            WrapRow(horizontal = 8.dp, vertical = 8.dp) {
-                VariationAmplitude.entries.forEach { amplitude ->
-                    ChipButton(
-                        text = amplitude.labelJa,
-                        selected = state.refinementAmplitude == amplitude,
-                        onClick = { viewModel.setRefinementAmplitude(amplitude) },
-                    )
-                }
-            }
-        }
+        Text(
+            when (state.refinementSubview) {
+                RefinementSubview.Adjust -> "1 回の推敲で変えられるのは 1 種類だけです。"
+                RefinementSubview.Model -> "対象作品と同じ Stage 1/2 の組み合わせだけが選べません。"
+                RefinementSubview.Language -> "Stage 1 と Stage 2 の言語の組を選びます。"
+            } + (parent?.let { " 親: ${it.renderHashShort} / ${ColorCatalogs.get(it.colorCatalogId).name}" } ?: ""),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-        if (state.refinementElement == RefinementElement.Touch) {
-            OutlinedTextField(
-                value = state.refinementTouchWords,
-                onValueChange = viewModel::setRefinementTouchWords,
-                label = { Text("タッチを変える言葉") },
-                singleLine = true,
-                enabled = !state.refinementBusy,
-                modifier = Modifier.fillMaxWidth(),
-            )
+        when (state.refinementSubview) {
+            RefinementSubview.Adjust -> RefinementAdjustControls(state, viewModel)
+            RefinementSubview.Model -> ModelInspectionControls(state, viewModel)
+            RefinementSubview.Language -> LanguageInspectionControls(state, viewModel)
         }
 
         WrapRow(horizontal = 8.dp, vertical = 8.dp) {
             // Both counts stay pressable whichever element is chosen, the way
             // web leaves its own pair alone: the refusal for four touches is
             // stated when the button is pressed, not by hiding the choice.
-            listOf(1, 4).forEach { count ->
-                ChipButton(
-                    text = "${count}案",
-                    selected = state.refinementCount == count,
-                    onClick = { viewModel.setRefinementCount(count) },
-                )
+            if (state.refinementSubview == RefinementSubview.Adjust) {
+                listOf(1, 4).forEach { count ->
+                    ChipButton(
+                        text = "${count}案",
+                        selected = state.refinementCount == count,
+                        onClick = { viewModel.setRefinementCount(count) },
+                    )
+                }
             }
             ChipButton(
                 text = if (state.refinementBusy) "生成中…" else "候補を作る",
@@ -2173,6 +2177,129 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         }
     }
 }
+
+/** 調整: the five elements, the amplitude under the variation, the touch words. */
+@Composable
+private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewModel) {
+    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        RefinementElement.entries.forEach { element ->
+            ChipButton(
+                text = element.labelJa,
+                selected = state.refinementElement == element,
+                onClick = { viewModel.setRefinementElement(element) },
+            )
+        }
+    }
+
+    // 「変奏を選択したときだけ強度をラジオ直下に表示」. No section of its own.
+    if (state.refinementElement == RefinementElement.Variation) {
+        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+            VariationAmplitude.entries.forEach { amplitude ->
+                ChipButton(
+                    text = amplitude.labelJa,
+                    selected = state.refinementAmplitude == amplitude,
+                    onClick = { viewModel.setRefinementAmplitude(amplitude) },
+                )
+            }
+        }
+    }
+
+    if (state.refinementElement == RefinementElement.Touch) {
+        OutlinedTextField(
+            value = state.refinementTouchWords,
+            onValueChange = viewModel::setRefinementTouchWords,
+            label = { Text("タッチを変える言葉") },
+            singleLine = true,
+            enabled = !state.refinementBusy,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * モデル検分: the three modes, the fixed model when a mode has one, and the
+ * models to compare (SPEC `:616`).
+ *
+ * No judge value is shown -- the SPEC says so twice, and there is nothing on
+ * this screen that would carry one.
+ */
+@Composable
+private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
+    val choices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state) }
+    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        ModelCompareMode.entries.forEach { mode ->
+            ChipButton(
+                text = mode.labelJa,
+                selected = state.modelCompareMode == mode,
+                modifier = Modifier.testTag(modelCompareModeTag(mode)),
+                onClick = { viewModel.setModelCompareMode(mode) },
+            )
+        }
+    }
+
+    if (state.modelCompareMode != ModelCompareMode.Common) {
+        Text(
+            if (state.modelCompareMode == ModelCompareMode.Stage1Fixed) "固定する Stage 1 モデル" else "固定する Stage 2 モデル",
+            style = MaterialTheme.typography.labelMedium,
+        )
+        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+            choices.forEach { choice ->
+                ChipButton(
+                    text = choice.label,
+                    selected = state.modelCompareFixedModel == choice.id,
+                    onClick = { viewModel.setModelCompareFixedModel(choice.id) },
+                )
+            }
+        }
+    }
+
+    Text("比較するモデル (最大 ${MAX_COMPARE_SELECTION})", style = MaterialTheme.typography.labelMedium)
+    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        choices.forEach { choice ->
+            val blocked = ComparisonPlanner.isModelChoiceBlocked(
+                mode = state.modelCompareMode,
+                fixedModel = state.modelCompareFixedModel,
+                model = choice.id,
+                targetStage1Model = state.refinementParent?.stage1Model.orEmpty(),
+                targetStage2Model = state.refinementParent?.stage2Model.orEmpty(),
+            )
+            ChipButton(
+                text = if (blocked) "${choice.label}（対象と同じ）" else choice.label,
+                selected = choice.id in state.modelCompareSelectedModels,
+                modifier = Modifier.testTag(modelChoiceTag(choice.id)),
+                onClick = { viewModel.toggleModelCompareSelection(choice.id) },
+            )
+        }
+    }
+}
+
+/**
+ * 言語検分: the four Stage 1 × Stage 2 pairs, chosen with checkboxes.
+ *
+ * SPEC `:686` describes the same three modes model comparison has; the reference
+ * implementation selects pairs instead (`CanvasPanel.svelte:978-988`), and SPEC
+ * `:614` makes the reference implementation the one to follow.
+ */
+@Composable
+private fun LanguageInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
+    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        LanguageCombo.ALL.forEach { combo ->
+            val blocked = ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLangOf(state.refinementParent))
+            ChipButton(
+                text = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}" + if (blocked) "（対象と同じ）" else "",
+                selected = combo.id in state.languageCompareSelectedCombos,
+                modifier = Modifier.testTag(languageComboTag(combo.id)),
+                onClick = { viewModel.toggleLanguageCombo(combo.id) },
+            )
+        }
+    }
+}
+
+/** The target work's language, read the way `languageInspectionTargetLang` reads it. */
+private fun targetInstructionLangOf(parent: HistoryItemEntity?): String =
+    parent?.instructionLangResolved
+        ?.takeIf { it in InstructionLanguages.SUPPORTED }
+        ?: InstructionLanguages.DEFAULT_LANG
 
 @Composable
 private fun RefinementCandidateCard(
@@ -2289,7 +2416,7 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
                         focused = node.id == graph.focusNodeId,
                         derivationKind = kindOf[node.id],
                         onSelect = { viewModel.selectLineageNode(node) },
-                        onRefine = { item -> viewModel.openRefinement(item) },
+                        onRefine = { item, subview -> viewModel.openRefinement(item, subview) },
                     )
                 }
             }
@@ -2303,7 +2430,7 @@ private fun LineageNodeCard(
     focused: Boolean,
     derivationKind: String?,
     onSelect: () -> Unit,
-    onRefine: (HistoryItemEntity) -> Unit,
+    onRefine: (HistoryItemEntity, RefinementSubview) -> Unit,
 ) {
     val work = node as? LineageGraphNode.Work
     val history = work?.history
@@ -2351,11 +2478,18 @@ private fun LineageNodeCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                // 「作品を編集する」 in SPEC :618 lists seven items; this contract
-                // brings exactly the first of them. A tombstone has no work to
-                // refine, which is why this hangs off `history`.
+                // 「作品を編集する」 in SPEC :618 lists seven items in one order --
+                // 描画要素・記述・DDL・モデル・言語・AI に自律推敲させる・ゴミ箱.
+                // Three of them are here, in that order; 記述 and DDL sit
+                // between them in the SPEC and belong to another contract, so
+                // モデル and 言語 follow 描画要素 directly. Each opens the matching
+                // sub-view of the same 推敲 screen rather than a screen of its own
+                // (SPEC :688). A tombstone has no work to refine, which is why
+                // this hangs off `history`.
                 if (history != null) {
-                    ChipButton("描画要素", modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item) })
+                    ChipButton("描画要素", modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
+                    ChipButton("モデル", modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
+                    ChipButton("言語", modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
                 }
             }
         }

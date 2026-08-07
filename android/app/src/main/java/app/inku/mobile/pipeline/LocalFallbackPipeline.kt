@@ -33,14 +33,18 @@ class LocalFallbackPipeline(
     }
 
     suspend fun interpret(request: PaintRequest): InterpretResult {
-        val generatedDdl = generateStage1(request)
+        // The language is settled on the author's own words, once, before any
+        // stage reads a prompt (`render.py:1735-1741`).
+        val requestedLang = InstructionLanguages.normalize(request.instructionLang)
+        val resolvedLang = InstructionLanguages.resolveWithUiLang(request.description, requestedLang)
+        val generatedDdl = generateStage1(request, resolvedLang)
         val normalizedDdl = generatedDdl ?: if (request.stage1Model.isExplicitProviderModelId()) {
             error("Stage 1 explicit provider returned no usable DDL.")
         } else {
             interpretText(request.description)
         }
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(normalizedDdl, request)
+            expandIntermediateDdl(normalizedDdl, request, resolvedLang)
         } else {
             normalizedDdl
         }
@@ -49,16 +53,26 @@ class LocalFallbackPipeline(
             normalizedDdl = normalizedDdl,
             expandedDdl = expandedDdl,
             ddlForDisplay = expandedDdl,
+            instructionLangRequested = requestedLang,
+            instructionLangResolved = resolvedLang,
         )
     }
 
     suspend fun composeFromDdl(ddl: String, request: PaintRequest): PaintResult {
+        // `description or req.ddl` (`render.py:1317-1322`): an endpoint that
+        // begins at Stage 2 may carry no description, and then the DDL is the
+        // only text there is to read. `ifEmpty` is that same falsy test.
+        val requestedLang = InstructionLanguages.normalize(request.instructionLang)
+        val resolvedLang = InstructionLanguages.resolveWithUiLang(
+            request.description.ifEmpty { ddl },
+            requestedLang,
+        )
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(ddl, request)
+            expandIntermediateDdl(ddl, request, resolvedLang)
         } else {
             ddl
         }
-        val generatedScore = generateStage2(request, expandedDdl)
+        val generatedScore = generateStage2(request, expandedDdl, resolvedLang)
         val scoreJson = generatedScore ?: if (request.stage2Model.isExplicitProviderModelId()) {
             error("Stage 2 explicit provider returned no usable Score.")
         } else {
@@ -109,6 +123,8 @@ class LocalFallbackPipeline(
             variationAmplitude = request.variationAmplitude,
             variationSeed = request.variationSeed,
             seedText = request.seedText,
+            instructionLangRequested = requestedLang,
+            instructionLangResolved = resolvedLang,
         )
     }
 
@@ -160,7 +176,7 @@ class LocalFallbackPipeline(
         )
     }
 
-    private suspend fun generateStage1(request: PaintRequest): String? {
+    private suspend fun generateStage1(request: PaintRequest, lang: String): String? {
         val provider = modelProvider ?: return null
         val started = System.currentTimeMillis()
         return runCatching {
@@ -174,7 +190,7 @@ class LocalFallbackPipeline(
                     prompt = request.description,
                     temperature = 0.2,
                     maxTokens = 1024,
-                    systemInstruction = stage1SystemPromptFor(request.stage1Model, request.description, request.litertStage1PromptOptimization),
+                    systemInstruction = stage1SystemPromptFor(request.stage1Model, request.description, request.litertStage1PromptOptimization, lang),
                 ),
             ).text.cleanModelText().normalizeStage1DdlText()
             if (!generated.isUsableStage1Ddl()) {
@@ -201,12 +217,12 @@ class LocalFallbackPipeline(
         }.getOrNull()
     }
 
-    private suspend fun generateStage2(request: PaintRequest, expandedDdl: String): String? {
+    private suspend fun generateStage2(request: PaintRequest, expandedDdl: String, lang: String): String? {
         val provider = modelProvider ?: return null
         val started = System.currentTimeMillis()
         return runCatching {
             val userPrompt = buildStage2UserMessage(expandedDdl)
-            val systemPrompt = stage2SystemPromptFor(request.stage2Model)
+            val systemPrompt = stage2SystemPromptFor(request.stage2Model, lang)
             Log.i(
                 PERF_TAG,
                 "stage2_start model_id=${request.stage2Model} ddl_chars=${expandedDdl.length} " +
@@ -229,7 +245,7 @@ class LocalFallbackPipeline(
                 ?.takeIf { WebScoreTool.hasRenderableInstructions(it) }
                 ?: run {
                     logStage2InvalidResponse(request.stage2Model, response, extracted.exceptionOrNull(), extracted.getOrNull())
-                    retryStage2OrFallback(provider, request, expandedDdl, userPrompt)
+                    retryStage2OrFallback(provider, request, expandedDdl, userPrompt, lang)
                 }
             normalizeServerScore(score, expandedDdl, request.canvasAspect).toString()
         }.onSuccess { scoreJson ->
@@ -254,11 +270,12 @@ class LocalFallbackPipeline(
         request: PaintRequest,
         expandedDdl: String,
         userPrompt: String,
+        lang: String,
     ): JSONObject {
         if (!request.autoRepair && request.stage2Model.isExplicitProviderModelId()) {
             error("Stage 2 model did not return drawable instructions.")
         }
-        val rescuePrompt = stage2SystemPromptFor(request.stage2Model) + "\n\n# 空描画リトライ / コンパクト描画リトライ\n" +
+        val rescuePrompt = stage2SystemPromptFor(request.stage2Model, lang) + "\n\n# 空描画リトライ / コンパクト描画リトライ\n" +
             "直前の Stage 2 出力は無効または非効率。2〜5個の簡潔な描画命令を返す。" +
             "instructions を空配列にしてはいけない。繰り返し図形は複数 instruction にせず、1 instruction + arrangement で表す。" +
             "DDLを説明し直さず、JSONを短く保つ。"
@@ -305,7 +322,22 @@ class LocalFallbackPipeline(
             .ifBlank { "-" }
     }
 
-    private fun stage2SystemPromptFor(modelId: String): String {
+    /**
+     * The Stage 2 prompt, chosen by language the way `stage_prompts_for_lang`
+     * chooses it (`registry.py:50-52`), and by model only for the shortened
+     * LiteRT variant this client keeps for on-device models.
+     *
+     * The two axes cross at one hole: `STAGE2_SYSTEM_PROMPT_JA_LITERT` has no
+     * English twin. English wins there. The LiteRT text is a *length*
+     * optimisation of the Japanese prompt for a small local model, not a
+     * language of its own, so serving it to a caller who asked for English
+     * would drop the request silently -- the one failure the server's ordering
+     * exists to prevent. The cost is a longer prompt on a small model, which is
+     * a size problem; answering in the wrong language is a wrong judgment.
+     */
+    private fun stage2SystemPromptFor(modelId: String, lang: String): String {
+        val support = InstructionLanguages.support(lang)
+        if (support.isEnglish) return WebDdlSpec.STAGE2_SYSTEM_PROMPT_EN
         return if (modelId.startsWith("local-litert-lm:")) {
             WebDdlSpec.STAGE2_SYSTEM_PROMPT_JA_LITERT
         } else {
@@ -313,12 +345,13 @@ class LocalFallbackPipeline(
         }
     }
 
-    private fun stage1SystemPromptFor(modelId: String, text: String, optimizeLiteRt: Boolean): String {
-        return if (optimizeLiteRt && modelId.startsWith("local-litert-lm:")) {
-            WebDdlSpec.buildStage1LiteRtSystemPrompt(text)
-        } else {
-            WebDdlSpec.buildStage1SystemPrompt(text)
+    /** Stage 1, same two axes and the same crossing as Stage 2 above. */
+    private fun stage1SystemPromptFor(modelId: String, text: String, optimizeLiteRt: Boolean, lang: String): String {
+        val support = InstructionLanguages.support(lang)
+        if (optimizeLiteRt && !support.isEnglish && modelId.startsWith("local-litert-lm:")) {
+            return WebDdlSpec.buildStage1LiteRtSystemPrompt(text)
         }
+        return WebDdlSpec.buildStage1SystemPrompt(text, support.code)
     }
 
     private fun String.isExplicitProviderModelId(): Boolean {
@@ -345,9 +378,14 @@ class LocalFallbackPipeline(
      * there, which is `_validated_variation_amplitude` plus the seed on the
      * server.
      */
-    private fun expandIntermediateDdl(ddl: String, request: PaintRequest): String {
+    private fun expandIntermediateDdl(ddl: String, request: PaintRequest, lang: String): String {
         return WebDdlExpander.expandIntermediateDdl(
             ddl,
+            // Stage 1.5 is chosen by the same resolved language as the two
+            // stages around it: `expand_intermediate_for_lang(..., lang=...)`
+            // (`render.py:889`, `:1542`). The expander here already had both
+            // branches; only the wire was missing.
+            lang = InstructionLanguages.support(lang).code,
             contextText = request.originalText,
             varySeed = request.compositionSeed,
             variationAmplitude = request.variationAmplitude,

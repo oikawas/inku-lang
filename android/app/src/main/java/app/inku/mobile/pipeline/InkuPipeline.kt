@@ -87,6 +87,17 @@ data class PaintRequest(
     val variationAmplitude: String? = null,
     val variationSeed: Long? = null,
     val seedText: String? = null,
+    /**
+     * The instruction language the caller asks for, with the server's key name
+     * (`instruction_lang`) and the server's three requestable words: `ja`, `en`
+     * or `auto`. `null` is "the caller did not say", which is the server's
+     * `None` -- `normalize_instruction_lang` turns both into the default.
+     *
+     * This is the request, not the answer: what the drawing was made in comes
+     * back as [PaintResult.instructionLangResolved], because those are two
+     * quantities and the server stores them in two columns.
+     */
+    val instructionLang: String? = null,
 )
 
 /**
@@ -110,6 +121,20 @@ data class PaintResult(
     val variationAmplitude: String? = null,
     val variationSeed: Long? = null,
     val seedText: String? = null,
+    /**
+     * What was asked for and what it resolved to, carried back so the save can
+     * write both columns (`db.py:2088-2089`). The requested one is the word the
+     * caller used -- `auto` stays `auto` here -- and the resolved one is the
+     * language the prompts were actually chosen with.
+     *
+     * Both are `null` on a path that read no prompt at all. The server resolves
+     * the language at exactly the three endpoints that run a stage plus the demo
+     * one (`render.py:1317`, `:1486`, `:1735`, `public.py:241`); replaying a
+     * Score is not among them, and its columns are NULL rather than a language
+     * nobody chose.
+     */
+    val instructionLangRequested: String? = null,
+    val instructionLangResolved: String? = null,
 )
 
 data class InterpretResult(
@@ -117,6 +142,8 @@ data class InterpretResult(
     val normalizedDdl: String,
     val expandedDdl: String,
     val ddlForDisplay: String,
+    val instructionLangRequested: String? = null,
+    val instructionLangResolved: String? = null,
     val tokensIn: Int? = null,
     val tokensOut: Int? = null,
     val fallbackUsed: Boolean = false,

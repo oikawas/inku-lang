@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LineageNodeEntity::class,
         LineageEdgeEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -40,7 +40,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -109,6 +109,25 @@ abstract class InkuDatabase : RoomDatabase() {
                     "variation_amplitude",
                     "variation_seed",
                     "seed_text",
+                ).forEach { column ->
+                    db.execSQL("ALTER TABLE history_items ADD COLUMN $column TEXT")
+                }
+            }
+        }
+
+        /**
+         * The language a work was asked for and drawn in, and the prose it was
+         * drawn from. All three are nullable Text on the server too
+         * (`db.py:129-130`, `:170`), and NULL is what a row that predates them
+         * holds -- readers fall back to `original_input` for the third and treat
+         * the first two as "this work does not say".
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "instruction_lang_requested",
+                    "instruction_lang_resolved",
+                    "source_text",
                 ).forEach { column ->
                     db.execSQL("ALTER TABLE history_items ADD COLUMN $column TEXT")
                 }

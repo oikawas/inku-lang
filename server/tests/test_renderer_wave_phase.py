@@ -122,9 +122,16 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # 量を増加」（作者裁定 2026-08-07）で紙が chalk を拒む量が 1.00 → 1.30 になり、
 # 出る紙が 4.8% → 9.5% へ増えた。**残る 4 件が動いていないことが対照である** —
 # 掠れの量は道具ごとの値なので、chalk 以外へこぼれていればここが赤くなる。
+# engine 22 の 9 巡目で `chalk_square` をもう 1 度だけ再採取。「chalk の明暗は
+# よりはっきりと」（作者裁定 2026-08-07）で chalk の質感 filter の blur が
+# 0.9 → 0.25 になり、**filter の定義 XML がこの 1 件に埋まっている**ので
+# ダイジェストが動いた。**動いたのは定義であって演奏ではない** — 中心線も帯も
+# 1 バイトも変わっていない。**ここでも残る 4 件が対照**で、blur は道具ごとの値
+# なので他へこぼれていれば赤くなる。凍結コーパスは `editable` で焼いており
+# filter が出ないため、そちらは 1 バイトも動いていない。
 MATERIAL_NONE_SEED_DIGESTS = {
     "brush_thin_line": "896b28849045ca35bbdd94605ba4a5cf",
-    "chalk_square": "a166d679bada6f7d8d1ee392542fa669",
+    "chalk_square": "8d3a46f5c1224ec6f357a7403744b2b8",
     "crayon_arc": "67cdabd624a76ad7059118d46448e730",
     "pencil_circle": "e950ff63e16c5859100c9ffa4f85d978",
     "pencil_ellipse": "21859684c56809933104f8efdcf0197f",

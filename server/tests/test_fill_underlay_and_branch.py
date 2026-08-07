@@ -8,13 +8,13 @@ Thirteen gates over the four stages of the contract
     T-7 .. T-11  stage 3, the variation and the terminal
     T-12 .. T-13 stage 4, the corpus
 
-and ten more for the rulings the author made while the contract was running,
+and eleven more for the rulings the author made while the contract was running,
 which arrive without gates of their own:
 
     T-14 .. T-16 the texture branch's direction, its contrast, the machine's raster
     T-17 .. T-19 its count, how its marks end, and chalk's own contrast
     T-20 .. T-22 the per-mark tone, the withdrawn reserve, chalk's bare paper
-    T-23 .. T-24 the field's own mottling, and the graded rim of a pale patch
+    T-23 .. T-25 the field's mottling, a patch's graded rim, chalk's grain
 
 Three of these measure the geometry the renderer INTENDED, not the path string
 it emitted. That is not a shortcut around the product: the intended centreline
@@ -29,6 +29,7 @@ still exactly regular" unmeasurable.
 
 from __future__ import annotations
 
+import io
 import json
 import math
 import pathlib
@@ -36,6 +37,7 @@ import re
 import statistics
 
 import pytest
+from PIL import Image
 
 import inku_server.renderer as renderer
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
@@ -760,6 +762,67 @@ def test_t23_the_field_itself_carries_more_than_one_tone(monkeypatch):
     scan = _svg(SCAN_CASE)
     assert len(_underlay_layers(scan)) == 1
     assert "tones-" not in scan
+
+
+def _grain(tool: str, raster: int = 300) -> float:
+    """Fine-scale variation inside the fill: mean |difference| between neighbours.
+
+    Rasterised, because the quantity is about what the eye gets and the thing
+    that removes it is an SVG filter -- nothing in the path string moves when a
+    blur changes. The measure is a high-pass by construction: a broad tonal
+    ramp contributes almost nothing to adjacent-pixel differences, so this
+    reads grain and not the field's own mottling, which is what separates
+    "chalk is flat" from "chalk is pale".
+    """
+    from inku_analysis.rasterizer import svg_to_png
+
+    payload = dict(CIRCLE, weight=tool, filled=True)
+    png = svg_to_png(_svg(payload), width=raster, height=raster)
+    image = Image.open(io.BytesIO(png)).convert("L")
+    pixels = image.load()
+    width, height = image.size
+    limit = RADIUS * min(width, height) * 0.80
+    total = 0.0
+    count = 0
+    for y in range(1, height - 1):
+        for x in range(1, width - 1):
+            if math.hypot(y - height / 2, x - width / 2) <= limit:
+                here = pixels[x, y]
+                total += abs(here - pixels[x + 1, y]) + abs(here - pixels[x, y + 1])
+                count += 2
+    assert count, tool
+    return total / count
+
+
+def test_t25_chalk_is_the_grainiest_of_the_scan_branch_tools():
+    """T-25 chalk の塗りは、走査線枝のどの道具より粒が立っている。
+
+    **「chalk の明暗はよりはっきりと」**（作者裁定 2026-08-07）。下地が入って
+    以降、chalk は走査線枝で**いちばん平ら**だった。**平らだった理由は見た目から
+    予想したものと違う** — 面の粗い明暗はむしろ crayon より上（2.30% 対 1.97%）で、
+    足りないのは**粒**（5.26% 対 13.59%）だった。効きそうな弾は全部外れている:
+    `fill_contrast` は chalk の痕が既に墨の 0.975 に居て**記述の濃さで頭打ち**、
+    `tooth` を上げても開くのは下地であって紙ではない、下地を薄くすると平均が
+    動くだけで粒は動かない。**消していたのは chalk 自身の質感フィルタの blur**
+    （全道具で最大・crayon は 0）で、0.9 → 0.25 で crayon と並ぶ。
+
+    **display profile だけの話である。**`compat` と `editable` に filter は出ず、
+    凍結コーパスは `editable` で焼くので、この数字でコーパスは 1 バイトも動かない。
+    だから**ここは display で描いて測る**（他の profile で測ると恒真になる）。
+
+    **定数を読み合わせるゲートにはしない。**「blur が 0.25 であること」は製品の値を
+    製品の値と比べるだけで、絵が変わったことを何も言わない。**crayon と比べる** —
+    作者が言ったのは chalk の見え方であって、chalk の設定値ではない。
+    """
+    pytest.importorskip("inku_analysis.rasterizer")
+    chalk = _grain("chalk")
+    crayon = _grain("crayon")
+    # chalk はいちばん粒が立っている側に居る。blur を 0.9 へ戻すと 20.0 まで落ちて
+    # crayon の 29.1 を下回るので、この不等号が戻し方向の摂動を捕まえる。
+    assert chalk > crayon, (chalk, crayon)
+    # 対照: 動かしていない crayon が動いていないこと。全道具の粒を上げた実装は
+    # 上の不等号を通してしまう。
+    assert 20.0 < crayon < 40.0, crayon
 
 
 def _centroid(polygon) -> tuple[float, float]:

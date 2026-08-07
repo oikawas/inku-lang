@@ -372,7 +372,27 @@ TEXTURE_SPECS: dict[str, dict[str, float | int]] = {
         "octaves": 3,
         "seed": 23,
         "displacement": 2.2,
-        "blur": 0.9,
+        # "chalk's light and dark, more distinct" (author, 2026-08-07). Once the
+        # fill had an underlay under it, chalk was the flattest of the three
+        # tools on the scan branch -- and not for the reason it looked like.
+        # Its COARSE tone was already the highest of them (2.30% against
+        # crayon's 1.97%); what it was short of was grain, 5.26% against
+        # crayon's 13.59%. Every lever that sounded right moved it by under a
+        # point: raising `fill_contrast` does nothing because chalk's marks
+        # already sit at 0.975 of the ink and the product caps them at the
+        # description's own opacity; raising `tooth` only opens more of the
+        # underlay, which is not paper; lowering the field moves the mean and
+        # not the grain.
+        #
+        # What was removing the grain was this blur -- the largest of any tool,
+        # against crayon's none -- applied over chalk's own displacement. At
+        # 0.25 the grain comes back to 13.19%, level with crayon, and chalk
+        # keeps a trace of the softness the blur was there for.
+        #
+        # This is display-only. At `compat` and `editable` chalk always had
+        # 14.92%, and the frozen corpus is baked at `editable`, so no reference
+        # byte moves with this number.
+        "blur": 0.25,
     },
     "brush_thick": {
         "margin": 20,

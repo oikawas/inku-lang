@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -1912,3 +1915,95 @@ def test_the_cli_limit_names_match_the_server_dataclass():
     declared = set(re.findall(r"^    ([a-z_]+): int = ", body, flags=re.MULTILINE))
     assert declared, "no fields read off the server dataclass"
     assert declared == set(cli.RENDER_LIMIT_FIELDS)
+
+
+# --- The Command Line Help Reference is generated, and these hold it there ---
+#
+# The manual once named --original-text three renames after the flag had become
+# --description, because the reference section is `--help` copied by hand and
+# nothing compared the copy to the parser. The section now belongs to
+# scripts/gen_readme_help.py; what follows asserts two of the three edges
+# between parser, manual and generator, plus the markers that bound the region.
+
+HELP_START = "<!-- HELP_START -->"
+HELP_END = "<!-- HELP_END -->"
+GENERATOR = Path(__file__).resolve().parents[1] / "scripts" / "gen_readme_help.py"
+
+# The generator pins this so the file does not depend on the terminal that ran
+# it. The gate has to read at the same width or every wrapped line disagrees.
+os.environ["COLUMNS"] = "80"
+
+
+def _command_paths(parser: argparse.ArgumentParser, prefix: str = "") -> list[str]:
+    """Every command the parser declares. Walked here rather than imported from
+    the generator, so a missing generator cannot make this gate vacuous."""
+    found = [prefix]
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for name, sub in action.choices.items():
+                found.extend(_command_paths(sub, f"{prefix} {name}".strip()))
+    return found
+
+
+MANUAL_COMMAND_PATHS = _command_paths(cli.build_parser())
+
+
+def _marked_region() -> str:
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    assert HELP_START in readme and HELP_END in readme, (
+        "cli/README.md の help マーカーが欠けている。"
+        "マーカーは生成器が書いてよい範囲の境界なので、消えると"
+        "「見る対象が減る」だけで検査が緑になる"
+    )
+    return readme[readme.index(HELP_START) + len(HELP_START):readme.index(HELP_END)]
+
+
+def test_the_manual_keeps_both_help_markers():
+    """Deleting a marker must not be a silent way to shrink what is checked."""
+    region = _marked_region()
+    assert region.count("### `inku-cli") == len(MANUAL_COMMAND_PATHS), (
+        f"マーカー間の節が {region.count('### `inku-cli')} で、"
+        f"パーサの経路 {len(MANUAL_COMMAND_PATHS)} と合わない"
+    )
+
+
+@pytest.mark.parametrize("path", MANUAL_COMMAND_PATHS, ids=[p or "root" for p in MANUAL_COMMAND_PATHS])
+def test_the_manual_is_what_the_parser_prints(path):
+    """A flag added without regenerating leaves the manual describing an older
+    command. Compare the whole block, not the flag names: a stale description
+    under the right name is the failure that started this."""
+    title = f"inku-cli {path}".strip()
+    header = f"### `{title}`\n\n```\n"
+    region = _marked_region()
+    assert header in region, (
+        f"cli/README.md のマーカー間に `{title}` の節が無い。"
+        f"`uv run python scripts/gen_readme_help.py` で再生成する"
+    )
+    start = region.index(header) + len(header)
+    documented = region[start:region.index("\n```\n", start)]
+
+    parser = cli.build_parser()
+    for name in path.split():
+        action = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+        parser = action.choices[name]
+
+    assert documented == parser.format_help(), (
+        f"cli/README.md の `{title}` が --help と食い違っている。"
+        f"`uv run python scripts/gen_readme_help.py` で再生成する"
+    )
+
+
+def test_the_generator_says_the_manual_is_current():
+    """The other edge: manual against generator. The gate above would stay green
+    if the generator were broken, and a gate without a repair path is why the
+    ruling asked for the script rather than the assertion alone."""
+    assert GENERATOR.is_file(), (
+        f"{GENERATOR} が無い。ゲートが赤くなったとき 1,200 行を直す手段が消える"
+    )
+    done = subprocess.run(
+        [sys.executable, str(GENERATOR), "--check"],
+        capture_output=True,
+        text=True,
+        cwd=GENERATOR.parent.parent,
+    )
+    assert done.returncode == 0, done.stderr or done.stdout

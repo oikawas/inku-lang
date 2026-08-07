@@ -104,6 +104,22 @@ def _centerlines(payload: dict, monkeypatch) -> list[list[tuple[float, float]]]:
     return captured
 
 
+def _classes(svg: str) -> set[str]:
+    """The class names in the document, so an assertion never carries the SVG.
+
+    `assert "fill-stroke-v1" not in svg` is correct and unusable: when it fails,
+    pytest's introspection formats a 400KB string and the run stops answering
+    for minutes. A perturbation run makes every one of these fail on purpose,
+    so "the gate is red" and "the gate has not come back" become the same
+    thing to look at. Assertions here compare small sets.
+    """
+    return set(re.findall(r'class="([^"]+)"', svg))
+
+
+def _has(svg: str, prefix: str) -> bool:
+    return any(name.startswith(prefix) for name in _classes(svg))
+
+
 def _stroke_angles_deg(centerlines) -> list[float]:
     angles = []
     for line in centerlines:
@@ -179,8 +195,8 @@ def test_t1_both_branches_lay_an_underlay():
     texture = _svg(TEXTURE_CASE)
     assert _fill_coverage(Instruction.model_validate(SCAN_CASE), CANVAS) >= FILL_COVERAGE_BRANCH
     assert _fill_coverage(Instruction.model_validate(TEXTURE_CASE), CANVAS) < FILL_COVERAGE_BRANCH
-    assert 'class="fill-underlay-v1"' in scan
-    assert 'class="fill-underlay-v1"' in texture
+    assert _has(scan, "fill-underlay-v1")
+    assert _has(texture, "fill-underlay-v1")
 
 
 def test_t2_the_underlay_survives_the_non_display_profiles():
@@ -192,7 +208,7 @@ def test_t2_the_underlay_survives_the_non_display_profiles():
     for profile in ("compat", "editable", "display"):
         for payload in (SCAN_CASE, TEXTURE_CASE):
             svg = _svg(payload, svg_profile=profile)
-            assert 'class="fill-underlay-v1"' in svg, (profile, payload["weight"])
+            assert _has(svg, "fill-underlay-v1"), (profile, payload["weight"])
             underlay = re.search(r'<polygon class="fill-underlay-v1"[^>]*>', svg)
             assert underlay is not None
             assert "filter" not in underlay.group(0), profile
@@ -205,9 +221,8 @@ def test_t3_a_rotring_fill_is_still_a_region_fill_and_byte_identical():
     for case_id in ("C-tinyfill-circle-rotring", "D-canvas-wide-filled-square-rotring"):
         case = frozen[case_id]
         svg = _replay(case)
-        assert "fill-underlay-v1" not in svg, case_id
-        assert "fill-stroke-v1" not in svg, case_id
-        assert "fill-texture-v1" not in svg, case_id
+        classes = _classes(svg)
+        assert not any(name.startswith("fill-") for name in classes), (case_id, classes)
         assert generator_digest(svg) == case["digest"], case_id
 
 
@@ -237,16 +252,16 @@ def _replay(case: dict) -> str:
 
 def test_t4_coverage_at_or_above_the_threshold_gets_scan_lines():
     """T-4 被覆率 0.2 以上は走査線。**クラスは `<g>` にあって `<path>` には無い。**"""
-    svg = _svg(SCAN_CASE)
-    assert re.search(r'<g class="fill-stroke-v1 strokes-\d+">', svg)
-    assert "fill-texture-v1" not in svg
+    classes = _classes(_svg(SCAN_CASE))
+    assert any(re.fullmatch(r"fill-stroke-v1 strokes-\d+", n) for n in classes), classes
+    assert not any(n.startswith("fill-texture-v1") for n in classes), classes
 
 
 def test_t5_coverage_below_the_threshold_gets_the_texture_branch():
     """T-5 被覆率 0.2 未満は走査線をやめてテクスチャへ行く。"""
-    svg = _svg(TEXTURE_CASE)
-    assert "fill-stroke-v1" not in svg
-    assert re.search(r'<g class="fill-texture-v1 marks-\d+">', svg)
+    classes = _classes(_svg(TEXTURE_CASE))
+    assert not any(n.startswith("fill-stroke-v1") for n in classes), classes
+    assert any(re.fullmatch(r"fill-texture-v1 marks-\d+", n) for n in classes), classes
 
 
 def test_t6_the_same_tool_crosses_the_branch_on_thinness_alone():
@@ -265,8 +280,8 @@ def test_t6_the_same_tool_crosses_the_branch_on_thinness_alone():
     assert _fill_coverage(Instruction.model_validate(thin), CANVAS) == pytest.approx(
         0.117, abs=0.001
     )
-    assert "fill-stroke-v1" in _svg(bare)
-    assert "fill-texture-v1" in _svg(thin)
+    assert _has(_svg(bare), "fill-stroke-v1")
+    assert _has(_svg(thin), "fill-texture-v1")
 
     # 対照: 細さ指定そのものが枝を決めているのではない。brush_thick は
     # extra_fine でも被覆 0.233 で走査線側に残る。
@@ -274,7 +289,7 @@ def test_t6_the_same_tool_crosses_the_branch_on_thinness_alone():
     assert _fill_coverage(
         Instruction.model_validate(thick_thin), CANVAS
     ) == pytest.approx(0.233, abs=0.001)
-    assert "fill-stroke-v1" in _svg(thick_thin)
+    assert _has(_svg(thick_thin), "fill-stroke-v1")
 
 
 # --- stage 3: variation and the terminal -----------------------------------
@@ -419,8 +434,8 @@ def test_t12_the_new_cases_exist_and_traverse_the_layer_they_were_added_for():
         # そこだけを読むゲートは製品を壊しても赤くならない。case が「足された」
         # ことは manifest が、「その層を通る」ことは製品が答える。
         svg = _replay(cases[case_id])
-        assert f'class="{expected_class}' in svg, (case_id, expected_class)
-        assert 'class="fill-underlay-v1"' in svg, case_id
+        assert _has(svg, expected_class), (case_id, expected_class, _classes(svg))
+        assert _has(svg, "fill-underlay-v1"), case_id
 
 
 def test_t13_the_frozen_corpus_moved_exactly_the_cases_the_contract_predicted():

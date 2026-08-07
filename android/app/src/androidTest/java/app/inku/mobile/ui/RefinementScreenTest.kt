@@ -299,17 +299,25 @@ class RefinementScreenTest {
         assertEquals(RefinementSaveState.Unsaved, candidate.saveState)
 
         val before = countRows("history_items")
+        val nodesBefore = countRows("lineage_nodes")
         composeTestRule.runOnIdle { vm().saveRefinementCandidate(candidate.id) }
         awaitState("the candidate to be saved") {
             it.refinementCandidates.single().saveState == RefinementSaveState.Saved
         }
         assertEquals("one work was added", before + 1, countRows("history_items"))
-        assertNotNull(vm().state.value.refinementCandidates.single().savedNodeId)
+        assertEquals("and one node", nodesBefore + 1, countRows("lineage_nodes"))
+        val savedNode = vm().state.value.refinementCandidates.single().savedNodeId
+        assertNotNull(savedNode)
 
-        // 「保存済み候補は再保存できない」.
+        // 「保存済み候補は再保存できない」. Counted in `lineage_nodes`, not in
+        // `history_items`: the render hash is unique there, so a second save of
+        // the same drawing replaces the row and the count never moves. Each save
+        // mints a fresh node, so that table is where a second one shows up.
         composeTestRule.runOnIdle { vm().saveRefinementCandidate(candidate.id) }
         composeTestRule.waitForIdle()
         assertEquals("nothing more was written", before + 1, countRows("history_items"))
+        assertEquals("no second node was minted", nodesBefore + 1, countRows("lineage_nodes"))
+        assertEquals("the candidate still points at the first save", savedNode, vm().state.value.refinementCandidates.single().savedNodeId)
         assertEquals(RefinementSaveState.Saved, vm().state.value.refinementCandidates.single().saveState)
     }
 

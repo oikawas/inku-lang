@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -110,10 +111,7 @@ class ServerRendererGeometryTest {
 
     @Test
     fun testReferencePrimitivesExactParity() {
-        val stream = javaClass.getResourceAsStream("/server_reference/renderer_variation_primitives.json")
-            ?: error("Resource /server_reference/renderer_variation_primitives.json not found")
-        val jsonStr = stream.bufferedReader().use { it.readText() }
-        val root = JSONObject(jsonStr)
+        val root = ReferenceCorpus.json("renderer_variation_primitives.json")
 
         // 1. Frequency cycles
         val freqObj = root.getJSONObject("frequency_cycles")
@@ -208,10 +206,7 @@ class ServerRendererGeometryTest {
 
     @Test
     fun testRendererSeedRangeParity() {
-        val stream = javaClass.getResourceAsStream("/server_reference/renderer_seed_range.json")
-            ?: error("Resource /server_reference/renderer_seed_range.json not found")
-        val jsonStr = stream.bufferedReader().use { it.readText() }
-        val root = JSONObject(jsonStr)
+        val root = ReferenceCorpus.json("renderer_seed_range.json")
 
         // 1. stroke_engine_unit
         if (root.has("stroke_engine_unit")) {

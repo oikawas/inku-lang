@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.ReferenceCorpus
 import java.security.MessageDigest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -22,11 +23,8 @@ import org.junit.Test
  */
 class PromptFingerprintTest {
 
-    private fun expectations(): JSONObject {
-        val stream = javaClass.getResourceAsStream("/server_reference/prompts.json")
-            ?: error("Resource /server_reference/prompts.json not found")
-        return JSONObject(stream.bufferedReader().use { it.readText() }).getJSONObject("prompts")
-    }
+    private fun expectations(): JSONObject =
+        ReferenceCorpus.json("prompts.json").getJSONObject("prompts")
 
     private fun sha256(text: String): String =
         MessageDigest.getInstance("SHA-256")

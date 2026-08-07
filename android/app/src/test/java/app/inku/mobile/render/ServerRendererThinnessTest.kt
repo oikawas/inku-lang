@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.pipeline.ServerScoreCoercer
 import app.inku.mobile.pipeline.ServerScoreSchemaJson
 import app.inku.mobile.pipeline.ServerScoreSemantics
@@ -10,11 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ServerRendererThinnessTest {
-    private fun fixture(): JSONObject {
-        val stream = javaClass.getResourceAsStream("/server_reference/renderer_proportional.json")
-            ?: error("renderer_proportional.json not found")
-        return JSONObject(stream.bufferedReader().use { it.readText() })
-    }
+    private fun fixture(): JSONObject = ReferenceCorpus.json("renderer_proportional.json")
 
     private fun nullableString(item: JSONObject, key: String): String? =
         if (!item.has(key) || item.isNull(key)) null else item.getString(key)

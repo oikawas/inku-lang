@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONArray
 import org.json.JSONObject
@@ -8,15 +9,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.InputStreamReader
 
 class DefaultSvgRendererPhase2dTest {
 
-    private fun readResourceText(path: String): String {
-        val stream = javaClass.getResourceAsStream(path)
-            ?: throw IllegalArgumentException("Resource not found: $path")
-        return InputStreamReader(stream, Charsets.UTF_8).use { it.readText() }
-    }
+    private fun readResourceText(name: String): String = ReferenceCorpus.text(name)
 
     private fun extractPathD(svg: String): String {
         val regex = """<path [^>]*d="([^"]+)"[^\/>]*\/>""".toRegex()
@@ -34,7 +30,7 @@ class DefaultSvgRendererPhase2dTest {
 
     @Test
     fun testLineBrushParity() {
-        val refSvg = readResourceText("/server_reference/02_line_brush.svg")
+        val refSvg = readResourceText("02_line_brush.svg")
         val expectedD = extractPathD(refSvg)
         val expectedClass = extractClassAttr(refSvg)
 
@@ -99,7 +95,7 @@ class DefaultSvgRendererPhase2dTest {
 
     @Test
     fun testLineWhiteVariationParity() {
-        val refSvg = readResourceText("/server_reference/09_line_white.svg")
+        val refSvg = readResourceText("09_line_white.svg")
         val expectedD = extractPathD(refSvg)
         val expectedClass = extractClassAttr(refSvg)
 

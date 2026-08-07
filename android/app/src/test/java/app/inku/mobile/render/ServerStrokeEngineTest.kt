@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -8,11 +9,7 @@ import org.junit.Test
 
 class ServerStrokeEngineTest {
 
-    private fun readResource(name: String): String {
-        val stream = javaClass.getResourceAsStream("/server_reference/$name")
-            ?: error("Resource /server_reference/$name not found")
-        return stream.bufferedReader().use { it.readText() }
-    }
+    private fun readResource(name: String): String = ReferenceCorpus.text(name)
 
     @Test
     fun testPrimitivesParity() {

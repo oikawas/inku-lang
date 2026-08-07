@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -16,11 +17,7 @@ import org.junit.Test
  */
 class ServerScoreVocabularyTest {
 
-    private val contract: JSONObject by lazy {
-        val stream = javaClass.getResourceAsStream("/server_reference/score_schema_contract.json")
-            ?: error("score_schema_contract.json not found")
-        JSONObject(stream.bufferedReader().use { it.readText() })
-    }
+    private val contract: JSONObject by lazy { ReferenceCorpus.json("score_schema_contract.json") }
 
     private fun expectedEnum(name: String): List<String> {
         val array = contract.getJSONObject("enums").getJSONArray(name)

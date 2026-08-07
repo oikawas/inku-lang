@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.ReferenceCorpus
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,11 +41,7 @@ class FoldAwayTheStaffageLevelTest {
     private val expanderSource: String
         get() = source("main/java/app/inku/mobile/pipeline/WebDdlExpander.kt")
 
-    private fun readReferenceCorpus(): JSONObject {
-        val stream = javaClass.getResourceAsStream("/server_reference/ddl_expand.json")
-            ?: error("Resource /server_reference/ddl_expand.json not found")
-        return JSONObject(stream.bufferedReader().use { it.readText() })
-    }
+    private fun readReferenceCorpus(): JSONObject = ReferenceCorpus.json("ddl_expand.json")
 
     private fun corpusCases(): List<JSONObject> {
         val cases = readReferenceCorpus().getJSONArray("cases")

@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.pipeline.RenderRequest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -18,11 +19,7 @@ import org.junit.Test
  */
 class ServerRendererColorAssignmentTest {
 
-    private val fixture: JSONObject by lazy {
-        val stream = javaClass.getResourceAsStream("/server_reference/renderer_color_assignment.json")
-            ?: error("renderer_color_assignment.json not found")
-        JSONObject(stream.bufferedReader().use { it.readText() })
-    }
+    private val fixture: JSONObject by lazy { ReferenceCorpus.json("renderer_color_assignment.json") }
 
     private fun colorKeys(): List<String> {
         val constants = fixture.getJSONObject("constants")

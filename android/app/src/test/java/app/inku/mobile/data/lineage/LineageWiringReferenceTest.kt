@@ -1,5 +1,6 @@
 package app.inku.mobile.data.lineage
 
+import app.inku.mobile.ReferenceCorpus
 import app.inku.mobile.data.db.LineageNodeEntity
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -22,11 +23,7 @@ import org.junit.Test
  */
 class LineageWiringReferenceTest {
 
-    private fun fixture(): JSONObject {
-        val stream = javaClass.getResourceAsStream("/server_reference/lineage_wiring.json")
-            ?: error("lineage_wiring.json is missing")
-        return JSONObject(stream.bufferedReader().readText())
-    }
+    private fun fixture(): JSONObject = ReferenceCorpus.json("lineage_wiring.json")
 
     private fun plan(
         nodeId: String,

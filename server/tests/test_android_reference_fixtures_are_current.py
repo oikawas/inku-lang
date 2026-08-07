@@ -1,4 +1,11 @@
-"""The Android reference fixtures must be what today's tree bakes (F-1..F-3).
+"""The Android reference fixtures must be what today's tree bakes (F-1..F-4).
+
+The corpus is filed by the engine version that governs it, so "today's tree"
+means the current version directory plus the five fixtures no engine governs.
+Older versions are not rebaked -- an engine 22 tree cannot produce engine 21's
+expectations -- so F-4 holds them by manifest instead. Rebaking them is exactly
+the failure this layout exists to prevent: it rewrites expectations the port
+still holds, and turned 7 of 159 JVM tests red when engine 22 merged.
 
 `gen_android_reference.py` is run by hand, and nothing watched its output. On
 2026-08-04 five of the 53 files had been stale since `4eef595c` (the commit that
@@ -12,14 +19,17 @@ two days.
 
 `test_thinness_declaration_position.py` P-7 already watched the two order tables
 in `score_schema_contract.json`, which is exactly the file that commit did
-regenerate. Watching one file is not watching the corpus: F-1 rebakes all of it.
+regenerate. Watching one file is not watching the corpus: F-1 rebakes the whole
+current version of it.
 """
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import pathlib
+import re
 
 import pytest
 
@@ -40,6 +50,9 @@ android_only = pytest.mark.skipif(
 )
 
 
+VERSION_DIRECTORY = re.compile(r"^(render-engine|ddl-engine)-(\d+)$")
+
+
 def _load_generator(out_dir: pathlib.Path):
     """Import the generator as a module and point its output at `out_dir`."""
     spec = importlib.util.spec_from_file_location("gen_android_reference", GENERATOR)
@@ -50,20 +63,39 @@ def _load_generator(out_dir: pathlib.Path):
     return module
 
 
+def _fixture_path(name: str) -> pathlib.Path:
+    """Resolve a fixture the way the generator files it, rather than guessing."""
+    return _load_generator(FIXTURES).out_path(name)
+
+
+def _files_under(root: pathlib.Path, subdirectories: set[str]) -> set[str]:
+    """Paths the generator writes: the flat fixtures plus the given directories."""
+    return {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file()
+        and (path.parent == root or path.parent.name in subdirectories)
+    }
+
+
 @android_only
 def test_every_android_fixture_matches_a_fresh_bake(tmp_path) -> None:
-    """F-1 currency: rebaking the whole corpus reproduces every checked-in byte.
+    """F-1 currency: rebaking the current version reproduces every checked-in byte.
 
     This is a record, not a property -- it says the files on disk are what the
     current tree produces. That is the failure it exists for: a change moves the
     drawing, the fixtures are not rebaked, and the port stays green against an
     expectation the server no longer holds.
+
+    It reaches only what the generator writes. Older version directories are held
+    by F-4, because this tree cannot bake them at all.
     """
     module = _load_generator(tmp_path)
     module.main()
 
-    baked = {path.name for path in tmp_path.iterdir()}
-    committed = {path.name for path in FIXTURES.iterdir()}
+    current = {module.render_engine_dir().name, module.ddl_engine_dir().name}
+    baked = _files_under(tmp_path, current)
+    committed = _files_under(FIXTURES, current)
     assert baked == committed
 
     stale = sorted(
@@ -85,7 +117,7 @@ def test_arrangement_anchors_carry_the_quantum_the_renderer_uses() -> None:
     that skips the quantisation is only visible if the expected values really
     carry nine decimals and the comparison is exact.
     """
-    fixture = json.loads((FIXTURES / "renderer_arrangement.json").read_text())
+    fixture = json.loads(_fixture_path("renderer_arrangement.json").read_text())
     assert fixture["arrangement_quantum"] == renderer.ARRANGEMENT_QUANTUM
 
     decimals = max(
@@ -106,7 +138,7 @@ def test_grid_that_states_a_region_is_not_pulled_onto_its_anchor() -> None:
     the region the description gave with the shape's own centre. The sibling
     case without `at` is the contrast: it does move onto the 0.85 anchor.
     """
-    fixture = json.loads((FIXTURES / "renderer_arrangement.json").read_text())
+    fixture = json.loads(_fixture_path("renderer_arrangement.json").read_text())
     cases = {case["case_id"]: case for case in fixture["cases"]}
 
     x0, y0, x1, y1 = cases["G-grid-region-edge"]["instruction"]["at"]["region"]
@@ -115,3 +147,38 @@ def test_grid_that_states_a_region_is_not_pulled_onto_its_anchor() -> None:
 
     free = cases["G-grid-edge"]["anchors"]
     assert max(x for x, _ in free) > x1
+
+
+@android_only
+def test_every_version_directory_matches_its_manifest() -> None:
+    """F-4 holding: an older version is guarded by its manifest, not by a rebake.
+
+    F-1 cannot see these directories -- an engine 22 tree has no way to produce
+    engine 21's SVGs, which is the whole reason they are kept rather than baked.
+    Without this, the corpus the port actually reads would be the one file set in
+    the repository nothing checks at all.
+    """
+    directories = sorted(
+        path
+        for path in FIXTURES.iterdir()
+        if path.is_dir() and VERSION_DIRECTORY.match(path.name)
+    )
+    module = _load_generator(FIXTURES)
+    names = {path.name for path in directories}
+    # The current versions must be among them; the older ones are why this exists.
+    assert module.render_engine_dir().name in names
+    assert module.ddl_engine_dir().name in names
+    assert len(names) > 2, f"only the current versions are filed: {sorted(names)}"
+
+    for directory in directories:
+        layer, version = VERSION_DIRECTORY.match(directory.name).groups()
+        manifest = json.loads((directory / "manifest.json").read_text())
+        assert manifest["layer"] == layer
+        assert manifest["version"] == version
+
+        on_disk = {
+            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(directory.iterdir())
+            if path.is_file() and path.name != "manifest.json"
+        }
+        assert on_disk == manifest["files"], f"{directory.name} drifted from its manifest"

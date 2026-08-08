@@ -480,8 +480,10 @@ options:
   --output OUTPUT, -o OUTPUT
                         summary JSON path (default: INPUT_DIR/diversity-
                         summary.json)
-  --replay REPLAY       render each sampled score N times and compute replay
-                        divergence
+  --replay REPLAY       render each sampled score 2N times: N varying
+                        composition_seed (composition_distance) and N varying
+                        render_seed (performance_distance), each pinning the
+                        other seed
   --replay-limit REPLAY_LIMIT
                         maximum score artifacts to replay
   --canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}

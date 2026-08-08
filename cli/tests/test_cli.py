@@ -1254,6 +1254,140 @@ def test_diversity_summary_replay_requires_client(tmp_path):
         raise AssertionError("expected replay without client to fail")
 
 
+class _ReplayClient:
+    """A stand-in renderer whose ink density answers to the seeds we choose.
+
+    `sensitive_to` names which seed actually moves the drawing, so a test can ask
+    for a server that only the composition seed reaches, or only the performance
+    seed. That is what tells the two sweeps apart: a harness that varies one seed
+    while reporting both columns cannot make the blind column come out at zero.
+    """
+
+    def __init__(self, sensitive_to: str = "both") -> None:
+        self.sensitive_to = sensitive_to
+        self.requests: list[dict] = []
+
+    def request_text(self, method: str, path: str, *, data: dict) -> str:
+        self.requests.append(dict(data))
+        ink = 0
+        if self.sensitive_to in ("composition", "both"):
+            ink += int(data.get("composition_seed") or 0) * 3
+        if self.sensitive_to in ("performance", "both"):
+            ink += int(data.get("render_seed") or 0) * 3
+        width = max(1, min(16, ink))
+        # The white ground has to be painted: a transparent SVG rasterizes to
+        # alpha 0, which the grayscale conversion reads as full ink everywhere,
+        # and then every repetition looks identical no matter what the seeds did.
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">'
+            '<rect x="0" y="0" width="16" height="16" fill="white"/>'
+            f'<rect x="0" y="0" width="{width}" height="16" fill="black"/>'
+            "</svg>"
+        )
+
+
+def _replay_score_dir(tmp_path):
+    (tmp_path / "a.json").write_text(json.dumps({
+        "score": {"instructions": [{"primitive": "line", "from": [0.1, 0.2], "to": [0.9, 0.2]}]}
+    }), encoding="utf-8")
+    return tmp_path
+
+
+def _replay_summary(tmp_path, client, *, replay: int = 3, replay_limit: int = 5):
+    return cli._diversity_summary(
+        _replay_score_dir(tmp_path),
+        replay=replay,
+        replay_limit=replay_limit,
+        client=client,
+    )
+
+
+# T-1
+def test_replay_composition_sweep_varies_composition_seed_and_pins_the_performance_seed(tmp_path):
+    client = _ReplayClient()
+
+    _replay_summary(tmp_path, client, replay=3)
+
+    composition_sweep = client.requests[:3]
+    assert [request["composition_seed"] for request in composition_sweep] == [1, 2, 3]
+    assert {request["render_seed"] for request in composition_sweep} == {cli._REPLAY_PINNED_SEED}
+
+
+# T-2
+def test_replay_performance_sweep_varies_render_seed_and_pins_the_composition_seed(tmp_path):
+    client = _ReplayClient()
+
+    _replay_summary(tmp_path, client, replay=3)
+
+    performance_sweep = client.requests[3:6]
+    assert [request["render_seed"] for request in performance_sweep] == [1, 2, 3]
+    assert {request["composition_seed"] for request in performance_sweep} == {cli._REPLAY_PINNED_SEED}
+
+
+# T-3
+def test_replay_reports_composition_and_performance_separately(tmp_path):
+    summary = _replay_summary(tmp_path, _ReplayClient(), replay=3)
+
+    replay = summary["replay"]
+    assert replay["composition_divergence"] is not None
+    assert replay["performance_divergence"] is not None
+    item = replay["items"][0]
+    assert item["composition_distance"] is not None
+    assert item["performance_distance"] is not None
+
+
+# T-4  (paired with T-5)
+def test_replay_composition_column_alone_moves_for_a_composition_only_renderer(tmp_path):
+    summary = _replay_summary(tmp_path, _ReplayClient("composition"), replay=3)
+
+    item = summary["replay"]["items"][0]
+    assert item["composition_distance"] > 0
+    assert item["performance_distance"] == 0
+
+
+# T-5  (paired with T-4: either one alone passes an implementation that builds
+#       both columns from a single sweep)
+def test_replay_performance_column_alone_moves_for_a_performance_only_renderer(tmp_path):
+    summary = _replay_summary(tmp_path, _ReplayClient("performance"), replay=3)
+
+    item = summary["replay"]["items"][0]
+    assert item["performance_distance"] > 0
+    assert item["composition_distance"] == 0
+
+
+# T-6
+def test_replay_costs_two_renders_per_repetition(tmp_path):
+    client = _ReplayClient()
+
+    _replay_summary(tmp_path, client, replay=4)
+
+    assert len(client.requests) == 8
+
+
+# T-7
+def test_replay_records_which_seed_each_column_varied_and_that_old_runs_do_not_compare(tmp_path):
+    summary = _replay_summary(tmp_path, _ReplayClient(), replay=2)
+
+    note = summary["replay"]["seed_note"]
+    assert "composition_distance varies composition_seed" in note
+    assert "performance_distance varies render_seed" in note
+    assert "not" in note and "comparable" in note
+
+
+# T-8
+def test_replay_limit_still_caps_the_artifacts(tmp_path):
+    for name in ("a", "b", "c"):
+        (tmp_path / f"{name}.json").write_text(json.dumps({
+            "score": {"instructions": [{"primitive": "line", "from": [0.1, 0.2], "to": [0.9, 0.2]}]}
+        }), encoding="utf-8")
+    client = _ReplayClient()
+
+    summary = cli._diversity_summary(tmp_path, replay=2, replay_limit=2, client=client)
+
+    assert summary["replay"]["sample_count"] == 2
+    assert len(client.requests) == 8
+
+
 def test_v180_report_parsers_accept_history_census_and_unread_scopes():
     parser = cli.build_parser()
 

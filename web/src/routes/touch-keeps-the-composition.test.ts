@@ -19,6 +19,10 @@
 // own words, plus the fallback rule itself. Neither half alone is a gate: assert
 // only the rule and the page can stop sending the field; assert only the field
 // and it can be sent as `||`, which drops seed 0 through to the fallback.
+//
+// ⚠ The request body and the result assignment are asserted separately. A first
+// version of this file matched anywhere in the function, so the result line alone
+// satisfied it and dropping the field from the request body stayed green.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,20 +42,45 @@ function body(fnName: string): string {
 	return page.slice(start, next === -1 ? page.length : next);
 }
 
+/** What the function sends: everything from the request literal to the response check. */
+function request(fnName: string): string {
+	const source = body(fnName);
+	const from = source.indexOf('JSON.stringify({');
+	const to = source.indexOf('if (!r.ok)');
+	assert.ok(from !== -1 && to > from, `${fnName} no longer builds a request this way`);
+	return source.slice(from, to);
+}
+
+/** What the function keeps: everything after the response check. */
+function kept(fnName: string): string {
+	const source = body(fnName);
+	const to = source.indexOf('if (!r.ok)');
+	assert.notEqual(to, -1, `${fnName} no longer checks the response`);
+	return source.slice(to);
+}
+
 test('both touch refinements send the placement seed the picture was drawn with', () => {
 	// varyPerformance draws a fresh render_seed; renderWordTouchCandidate derives one
 	// from the words. Both are the same button, and both must hold the composition.
 	for (const fn of ['varyPerformance', 'renderWordTouchCandidate']) {
-		const source = body(fn);
 		assert.match(
-			source,
+			request(fn),
 			/composition_seed:\s*(?:placementSeed|result\.composition_seed \?\? result\.render_seed)/,
 			`${fn} must send the effective placement seed`
 		);
-		assert.doesNotMatch(
+	}
+});
+
+test('the fallback is written with ??, so a seed of zero is not dropped', () => {
+	// `||` would send render_seed for a work whose composition_seed is 0 — the one
+	// user who asked for seed 0 is the one who would not get their composition back.
+	for (const fn of ['varyPerformance', 'renderWordTouchCandidate']) {
+		const source = body(fn);
+		assert.doesNotMatch(source, /composition_seed\s*\|\|/, `${fn} must not fall back with ||`);
+		assert.match(
 			source,
-			/composition_seed:\s*result\.composition_seed\s*\|\|/,
-			`${fn} must not use ||, which sends seed 0 to the fallback`
+			/result\.composition_seed \?\? result\.render_seed/,
+			`${fn} must resolve the placement seed the way the server does`
 		);
 	}
 });
@@ -59,8 +88,7 @@ test('both touch refinements send the placement seed the picture was drawn with'
 test('varyPerformance keeps the placement seed on the result', () => {
 	// Without this, the first touch change holds the composition and the second one
 	// finds no composition_seed and falls back to the performance seed it just drew.
-	const source = body('varyPerformance');
-	assert.match(source, /result = \{[^}]*composition_seed: placementSeed/);
+	assert.match(kept('varyPerformance'), /result = \{[^}]*composition_seed: placementSeed/);
 });
 
 test('a seed of zero is a seed, not an absent one', () => {

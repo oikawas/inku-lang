@@ -435,7 +435,15 @@ def test_the_fill_keeps_its_ratio_to_the_stroke(fade, ratio, layout):
 # T-14 -------------------------------------------------------------------
 def test_a_group_that_declares_no_fade_is_byte_identical():
     """Every G case of engine 23 that states no fade reproduces its frozen
-    digest here, through the bake's own call."""
+    digest here, through the bake's own call.
+
+    The tag is not minted either. The digest above cannot see that on its own:
+    the consumer is gated on the `fade=<mode>` token, which a group that
+    declares no fade never carries, so a level written onto one would ride along
+    unread and change no byte. What must not happen is that it is written.
+    """
+    assert all("fade_level=" not in (hint or "") for hint in _hints(_score(fade="none")))
+
     generator = _load_generator()
     previous = _manifest("23")
     checked = 0

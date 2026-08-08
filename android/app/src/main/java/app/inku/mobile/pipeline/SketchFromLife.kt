@@ -162,10 +162,14 @@ object SketchFromLife {
      * rule Stage 1 already follows for its own failures.
      * `_call_sketch_detail` (`render.py:1141-1198`).
      *
-     * The model is called exactly the way this client's Stage 1 is called --
-     * same provider, same temperature, same token ceiling -- with a different
-     * system prompt. That is the relation on the server too: `sketch_from_life`
-     * reaches Stage 1's own `_interpret_*` functions (`sketch.py:262-304`).
+     * The temperature and the token ceiling are the server's:
+     * `sketch_from_life` reaches Stage 1's own `_interpret_*` functions
+     * (`sketch.py:262-304`), and those send `temperature=0.3` with
+     * `MAX_TOKENS` (`interpreter.py:28`, `:1514`, `:1587`).
+     *
+     * This client's own Stage 1 sends 0.2, which is a divergence from the
+     * server that predates this layer and is not corrected here. The layer
+     * follows the server rather than the neighbour it happens to sit beside.
      */
     suspend fun call(
         text: String,
@@ -182,7 +186,7 @@ object SketchFromLife {
                 ModelRequest(
                     modelId = modelId,
                     prompt = text,
-                    temperature = STAGE1_TEMPERATURE,
+                    temperature = TEMPERATURE,
                     maxTokens = MAX_TOKENS,
                     systemInstruction = prompt,
                 ),
@@ -261,8 +265,10 @@ object SketchFromLife {
     /** `MAX_TOKENS` (`interpreter.py:28`), the ceiling Stage 1 draws under. */
     private const val MAX_TOKENS = 1024
 
-    /** The temperature this client's Stage 1 uses (`LocalFallbackPipeline`). */
-    private const val STAGE1_TEMPERATURE = 0.2
+    /** `temperature=0.3` (`interpreter.py:1514`, `:1587`). No seed is passed
+     *  and none exists to pass: the layer is not reproducible, and a redraw
+     *  replays the stored prose instead of asking for it again. */
+    private const val TEMPERATURE = 0.3
 
     private val FENCE = Regex("^```(?:[\\p{L}\\p{N}_]+)?\\s*\\n?|\\n?```$", RegexOption.MULTILINE)
 

@@ -270,14 +270,18 @@ def test_grid_repeats_exactly(monkeypatch):
 
 
 # T-5 --------------------------------------------------------------------
+# One primitive per layout rather than a circle five times. A circle has no
+# `position` and no endpoints, so a circle-only reading of this cannot see the
+# bbox correction or the midpoint pivot come out -- measured: both perturbations
+# left the five green when they were all circles.
 @pytest.mark.parametrize(
     "changes",
     [
-        {"layout": "scatter"},
-        {"layout": "vertical", "path": "wave"},
-        {"layout": "horizontal"},
-        {"layout": "radial", "count": 12},
-        {"cluster_count": 3},
+        {"layout": "scatter", "primitive": "circle"},
+        {"layout": "vertical", "path": "wave", "primitive": "square"},
+        {"layout": "horizontal", "primitive": "line"},
+        {"layout": "radial", "count": 12, "primitive": "ellipse"},
+        {"cluster_count": 3, "primitive": "triangle"},
     ],
 )
 def test_the_placement_does_not_move(changes, monkeypatch):

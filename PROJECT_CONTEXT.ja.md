@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.11.6 / Build 862**
+**対象バージョン: v2.11.7 / Build 863**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -89,7 +89,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 23 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 25 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 7 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.18` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
@@ -128,7 +128,7 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 任意フィールドの充填率は tool schema の**宣言順に従属する**（末尾に置いた語ほど埋まる）。
 - **coerce** — `normalize` と `compose` の 2 つに割れている。
 不正値は可能な限り drop-only で扱い、新しい様式を自動注入しない。
-- **Render Engine 22** — SVG の演奏。
+- **Render Engine 25** — SVG の演奏。
 閉図形の輪郭と塗り、弧、材質層、地の抵抗、マスターグリッドによる座標の量子化を持つ。
 **塗りは面を実体で持つ下地の上に載り、上に載るものは被覆率 0.2 で走査線と擦りの痕に分かれる。**
 
@@ -189,7 +189,7 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
-現役は `render-engine-23`（535 件）と `ddl-engine-7`（34 件）で、再生成のバイト一致を CI が強制する。
+現役は `render-engine-25`（545 件）と `ddl-engine-7`（34 件）で、再生成のバイト一致を CI が強制する。
 - **Android の参照コーパス** — `android/app/src/test/resources/server_reference/` も同じ作法で版ごとに分かれる。
 移植は自分が名乗る版のディレクトリを読むので、**server が engine を上げてもディレクトリが増えるだけで移植は赤くならない**。
 旧版は焼き直せないので、各版の `manifest.json` が名前と digest で押さえる。

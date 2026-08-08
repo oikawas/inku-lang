@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-08 — v2.11.7 unreleased baseline (Web Build 863)
+
+The 13 places that name a version were updated to v2.11.7 / Build 863. **No manual text changed** — no screen action, CLI flag, setting or response key moved.
+
+- **The drawings do change.** Under render engine 25, **every member of a repeated group gets its own size.** The N copies in a group used to be drawn exactly the same size; **with a hand tool each one now differs, within 25% either side of the stated dimension.**
+- **Rotring and Computer still repeat at exactly one size.** Keeping the machine's repetition exact — in size as well as in stroke — is deliberate: it is those two tools' signature.
+- **Grids and groups of one are unchanged.** A tiling's point is that the cells match.
+- **No new action was added.** "Several of this shape" was always the instruction; **reading it as "all of them the same size" was the drawing side's addition. Nothing about how you write a description changes.**
+- **Redrawing the same description with the same seed changes only the groups that state repetition with a hand tool.** A work that states no repetition does not move by a pixel.
+
 ## 2026-08-08 — v2.11.6 unreleased baseline (Web Build 862)
 
 The 13 places that name a version were updated to v2.11.6 / Build 862. **No manual text changed** — no screen action, CLI flag, setting or response key moved.

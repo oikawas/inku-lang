@@ -4273,3 +4273,55 @@ was in one place.** This stage gives them names and **does not move the drawing 
   it rebuilds the screens** — moving both in one cycle would make it impossible to tell which change
   moved the drawing. By then only `Dimens.kt` has to change.
 - **⚠ The version is `.18` rather than `.17` because the [I-150] fix took `.17` the same day.**
+
+### v2.11.7 — Every member of a group gets its own size (Build 863, render engine 25, 2026-08-08)
+
+**An `Arrangement` says "several of this shape". Nowhere does it say "all of them the same size".**
+
+Through engine 24 the expansion rewrote coordinates and nothing else, so the N members came out
+**exactly congruent — one shape copied N times.** That congruence was never asked for by the
+description: **it was the largest signature the engine was adding on its own.**
+
+- **Hand tools now vary in size inside a group.** The amplitude lives in the tool's grammar as
+  `group_hand`, and **all nine hand tools carry the same ±25%** (`HAND_GROUP_SIZE`). Deriving it
+  from `fill_hand` would give silverpoint ±1.25% and brush_thick ±25%, **which is no longer the
+  picture the author approved**, so it is one constant.
+- **`rotring` and `computer` stay at zero.** Exact repetition is the machine's signature, not a
+  defect to sand off — the same discipline engine 22 gave `fill_hand`. **It was checked by eye:**
+  drawing one Score with only the tool swapped, the 24 `rotring` circles carry a single `r="50.0"`
+  in the SVG while the 24 `pen` circles spread over 0.766x..1.266x.
+- **Size is drawn from the performance seed, not the placement seed.** Engine 23 separated
+  composition from performance; **taking the size from the placement seed would undo that split on
+  the day it was made.**
+- **⚠ The expander's argument had been misnamed since engine 23** — the second parameter was called
+  `performance_seed`, but what reached it was the `placement_seed`. **It was renamed to match what
+  it holds, and the performance seed added as a separate keyword argument.**
+- **Placement does not move by a pixel.** After expansion `_fit_group_to_anchor` reads nothing but
+  the anchors, so **a scaling rule that moved one would hand the placement a different group.** All
+  four rules preserve their own anchor: a line scales **about its midpoint**; square and triangle
+  scale `size` and pull `position` back by half the growth; circle, arc and polygon scale `radius`;
+  ellipse and cloudform scale both components of `size` by the same factor (**the aspect never
+  changes**).
+- **Three groups are left alone**: **`grid`** (a tiling whose point is that the cells match — author
+  ruling), **a group of one** (nobody to differ from), and **the machine tools**.
+- **The corpus goes 541 → 545. Thirty-seven cases moved; 504 did not move by a byte.**
+  **⚠ All 37 that moved are `circle` groups** — the corpus walked nothing else, so **one group each
+  of `line`, `square`, `triangle` and `ellipse` was added.** Line, ellipse and square alone are
+  82.8% of the marks in production, yet **three of the four rules had never been baked.** The bake
+  now asserts that those four cases discriminate before it writes them out.
+- **`ddl_engine_version` did not move** (still 7). Nothing changes up to Stage 2.
+- **All twelve perturbations broke production code and none missed.** **Four of them missed on the
+  first pass**, and the acceptance test — never the product — was fixed and the perturbation
+  re-applied. **All four were of one kind: the gate did not traverse the layer the perturbation
+  broke**, and two of them had the corpus's own blind spot inside the tests, measuring with circles
+  only.
+- **⚠ Eight places went red that the contract had not predicted.** Beyond the five that follow from
+  the version bump, **the moving sizes themselves** moved existing tests. Three of those read the
+  fade and the seed split against engine 23's frozen bytes, and now **neutralise engine 25's layer
+  before comparing** — the same move engine 24 made against engine 23's `_apply_fade_levels`. **The
+  yardstick, the frozen body, was not touched.**
+- **Tests:** server **2,442 passed / 31 skipped** (from 2,411; `def test_` 1,238 → 1,255, **none
+  deleted**), cli 176, `npm run check` 241 FILES / 0 errors, ruff clean, frozen corpora
+  byte-identical. **The Android reference fixtures gained `render-engine-25/` (55 files) and not one
+  line of Kotlin changed** — Android reads only the directory of the version it names. **JVM 238 /
+  0 failed, unchanged.**

@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **25** | v2.11.7 | 863 | 2026-08-08 | 545 | **41** | **504** |
 | **24** | v2.11.6 | 862 | 2026-08-08 | 541 | **7** | **534** |
 | **23** | v2.11.5 | 860 | 2026-08-08 | 535 | **4** | **531** |
 | **22** | v2.11.4 | 859 | 2026-08-07 | 531 | **52** | **479** |
@@ -122,14 +123,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `24` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `25` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `7` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.6 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.7 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 862 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 863 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -396,6 +397,69 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 25 — every member of a group gets its own size (v2.11.7)
+
+**An `Arrangement` says "several of this shape". Nowhere does it say "all of them the same size".**
+
+Through engine 24 the expansion rewrote coordinates and nothing else, so **the N members came out
+exactly congruent — one shape copied N times.** The description never asked for that congruence:
+**it was the largest signature the engine was still adding on its own.**
+
+**The amplitude belongs to the tool's grammar.** `ToolGrammar.group_hand` holds how much the members
+of one repeated group differ in size, as a fraction either side of the stated dimension (0.25 =
+0.75x..1.25x). **All nine hand tools carry the same ±25%** (`HAND_GROUP_SIZE`); **`rotring` and
+`computer` are zero.** Deriving it from `fill_hand` was rejected: **the ruling was given on samples
+that applied one ±25% to four tools whose `fill_hand` spans a factor of 18**, so scaling it per tool
+would leave the picture that was approved.
+
+### The size comes from the performance seed
+
+Engine 23 separated the composition seed from the performance seed, so **which of the two feeds the
+size decides whether that split survives.** Placement is drawn from `placement_seed` (the
+composition seed when one is stated, otherwise the performance seed); **size is drawn from the
+performance seed.**
+
+**⚠ This version uncovered that the expander's second parameter had been misnamed since engine 23** —
+it was called `performance_seed`, but what reached it was the `placement_seed`. **It was renamed to
+match what it holds, and the performance seed added as a separate keyword argument.**
+
+**The size seed is derived from the instruction as stated, before any member is shifted**, so every
+member of one group draws from the same sequence — otherwise it would no longer be a spread *within*
+a group.
+
+### Placement does not move by a pixel
+
+After expansion, `_fit_group_to_anchor` places the group and **reads nothing but each member's
+`_anchor`**, so **a scaling rule that moved an anchor would hand the placement a different group.**
+All four rules preserve their own anchor:
+
+| Shape | What is scaled | What stays put |
+|---|---|---|
+| `line` | both ends, **about the midpoint** | the midpoint |
+| `square` / `triangle` | both components of `size`; **`position` is pulled back by half the growth** | the centre of the bbox |
+| `circle` / `arc` / `polygon` | `radius` | `center` |
+| `ellipse` / `cloudform` | both components of `size` by the **same** factor (**the aspect never changes**) | `center` |
+
+**Exactly three groups are left alone.** **`grid`** is the tiling whose point is that the cells match
+(author ruling); **a group of one** has nobody to differ from; and **the machine tools** carry a
+`group_hand` of zero.
+
+### The version and the corpus
+
+**541 → 545 cases. Forty-one moved** (37 existing plus the 4 added) **and 504 did not move by a
+byte.**
+
+**⚠ All 37 that moved are `circle` groups.** The corpus walked nothing else, so **one group each of
+`line`, `square`, `triangle` and `ellipse` was added.** Line, ellipse and square alone are 82.8% of
+the marks in production, yet **three of the four rules had never been baked.** Before writing them
+out, the bake asserts that those four cases discriminate: taking the size layer out changes all four
+drawings, and the four primitives are four distinct kinds.
+
+**`ddl_engine_version` did not move** (still 7). Nothing changes up to Stage 2.
+
+**The Android reference fixtures gained `render-engine-25/` (55 files) and not one line of Kotlin
+changed** — **Android reads only the directory of the version it names.**
 
 ## engine 24 — the fade reaches every member of a group (v2.11.6)
 

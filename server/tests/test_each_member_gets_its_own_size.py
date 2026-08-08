@@ -124,11 +124,33 @@ def _withhold_sizes(monkeypatch) -> None:
     )
 
 
+def _members_through_render(monkeypatch, instruction: Instruction, **kwargs):
+    """The members as they leave the expander, on the product's own render path.
+
+    `_expand_arrangement` can be called directly, and the tests above do -- but
+    which seed reaches it is decided by `render`, one call further out. A gate
+    that only ever calls the expander itself states both seeds by hand and so
+    cannot see the caller stop passing one.
+    """
+    captured: list[list[Instruction]] = []
+    original = renderer._apply_member_sizes
+
+    def spy(items, arr, size_seed):
+        sized = original(items, arr, size_seed)
+        captured.append(sized)
+        return sized
+
+    monkeypatch.setattr(renderer, "_apply_member_sizes", spy)
+    _draw(instruction, **kwargs)
+    assert len(captured) == 1
+    return captured[0]
+
+
 def _draw(instruction: Instruction, **kwargs) -> str:
     # `editable` keeps one group per mark and is the profile the corpus bakes.
+    kwargs.setdefault("render_seed", RENDER_SEED)
     return render(
         Score.model_validate({"instructions": [instruction.model_dump(by_alias=True)]}),
-        render_seed=RENDER_SEED,
         svg_profile="editable",
         **kwargs,
     )
@@ -282,16 +304,22 @@ def test_the_placement_does_not_move(changes, monkeypatch):
 
 
 # T-6 --------------------------------------------------------------------
-def test_the_composition_seed_does_not_reach_the_size():
+def test_the_composition_seed_does_not_reach_the_size(monkeypatch):
     """Engine 23 declared what a composition seed moves: where the marks land.
 
     The expander's own seed is built from the placement seed, so a size drawn
     from it would follow the composition seed and undo that split. T-7 is the
     other half.
+
+    Through `render`, because that is where the two seeds are told apart.
     """
     instruction = _instruction(count=24)
-    here = _expand(instruction, placement=COMPOSITION_SEED)
-    there = _expand(instruction, placement=COMPOSITION_SEED + 1)
+    here = _members_through_render(
+        monkeypatch, instruction, composition_seed=COMPOSITION_SEED
+    )
+    there = _members_through_render(
+        monkeypatch, instruction, composition_seed=COMPOSITION_SEED + 1
+    )
 
     assert [item.radius for item in here] == [item.radius for item in there]
     # The premise: these two placements really are different placements.
@@ -301,12 +329,31 @@ def test_the_composition_seed_does_not_reach_the_size():
 
 
 # T-7 --------------------------------------------------------------------
-def test_the_performance_seed_does_reach_the_size():
+def test_the_performance_seed_does_reach_the_size(monkeypatch):
     """The reverse of T-6. Without it, an implementation that dropped the size
-    to a constant passes T-6 perfectly."""
+    to a constant passes T-6 perfectly.
+
+    Through `render` and with the composition seed held still, so that what is
+    varied is the performance seed alone. Called directly instead, this passes
+    whether or not `render` ever hands the expander a performance seed -- the
+    test would be stating it itself.
+    """
     instruction = _instruction(count=24)
-    here = [item.radius for item in _expand(instruction, performance=RENDER_SEED)]
-    there = [item.radius for item in _expand(instruction, performance=RENDER_SEED + 1)]
+    here = [
+        item.radius
+        for item in _members_through_render(
+            monkeypatch, instruction, composition_seed=COMPOSITION_SEED
+        )
+    ]
+    there = [
+        item.radius
+        for item in _members_through_render(
+            monkeypatch,
+            instruction,
+            composition_seed=COMPOSITION_SEED,
+            render_seed=RENDER_SEED + 1,
+        )
+    ]
 
     assert here != there
     assert len(set(here)) == 24 and len(set(there)) == 24

@@ -3860,3 +3860,19 @@ engine 22 まで、`render_seed` の 1 つが**配置**（arrangement がどこ�
   **摂動 11 本を製品コードだけに当てた**。**うち 1 本は最初 1 件も赤くしなかった** —
   コーパスを焼く生成器と、それを検算する 2 つのテストが**同じ引数列を別々に書き写していた**ので、
   生成器の配線を切ってもテスト側は渡し続けていた。**replay を名前のある 1 つの呼び出しへ出して塞いだ。**
+
+### 2026-08-08 — API スキーマの `composition_seed` が、engine 23 での役割を述べるようになった（Build 861・**版数は据え置き**）
+
+**engine 23 で配置を担うようになったのに、3 つの request model のうち 2 つは古い説明のままだった。**
+
+- **`ComposeRequest` と `PaintRequest` の `composition_seed` は "Stage 1.5 composition variation seed" と
+  名乗っていた**（`render.py:189` / `:327`）。**`RenderSvgRequest` だけが engine 23 の役割を書いていた。**
+  **この文字列は OpenAPI に出るので、API を直接使う側が読む説明である。**
+- **実測して 2 つの役割を両方書いた** — `paint` / `compose` の経路では、この seed は
+  **`ddl_expander` の中間展開を再ソルトし**（`reference.py:421-426` の `seed_summary` が述べる役割）、
+  **かつ `_render_with_metadata` を通って renderer の配置位相を決める**（`rendering.py:316`）。
+- **変えたのは説明文だけである。** `test_api_surface.py` の台帳は **82 / 82 / 82 で不変**、
+  **`PaintRequest` 36 項目・`ComposeRequest` 19 項目とも増減 0・`required` も不変**で、
+  **動いたのは `composition_seed.description` の 1 項目だけ**（集合差で実測。digest だけが変わる）。
+- **検査:** server **2379 / 31 skipped / 赤 0**（不変）・ruff clean・`check_docs.py` 緑。
+  **`APP_VERSION` は動かしていない**（挙動が変わらないため）。**`manual/` の版マーカー 13 箇所は Build 861 へ。**

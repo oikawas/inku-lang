@@ -4053,3 +4053,21 @@ feature.**
   red at first** — the generator that bakes the corpus and the two tests that check it **each wrote
   out the same argument list separately**, so cutting the generator's wiring left the tests still
   passing the value. **The replay was extracted into one named call to close it.**
+
+### 2026-08-08 — the API schema description of `composition_seed` states its engine 23 role (Build 861, **version unchanged**)
+
+**Engine 23 gave the seed the placement, but two of the three request models still described the old role.**
+
+- **`ComposeRequest` and `PaintRequest` called it "Stage 1.5 composition variation seed"**
+  (`render.py:189`, `:327`). **Only `RenderSvgRequest` stated the engine 23 role.**
+  **This string is served in the OpenAPI document, so it is what a direct API user reads.**
+- **Both roles were measured and written down**: on the `paint` and `compose` routes the seed
+  **re-salts the intermediate expansion in `ddl_expander`** (the role `seed_summary` states at
+  `reference.py:421-426`) **and reaches the renderer's placement phase through
+  `_render_with_metadata`** (`rendering.py:316`).
+- **Only the descriptions changed.** The `test_api_surface.py` ledger stays **82 / 82 / 82**, the
+  **36 fields of `PaintRequest` and the 19 of `ComposeRequest` neither grew nor shrank, `required` is
+  unchanged**, and **the only property that moved is `composition_seed.description`** (measured as a
+  set difference; the digest follows).
+- **Tests:** server **2379 / 31 skipped / 0 failed** (unchanged), ruff clean, `check_docs.py` green.
+  **`APP_VERSION` was not moved** (no behaviour changes). **The 13 manual version markers go to Build 861.**

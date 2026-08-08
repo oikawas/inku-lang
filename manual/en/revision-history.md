@@ -2,6 +2,13 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-08 — v2.11.5 unreleased baseline (Web Build 861)
+
+The 13 places that name a version were updated to Build 861. **The application version is unchanged** (still v2.11.5), and **neither the screen nor the drawings change.**
+
+- **The API reference description of `composition_seed` now states what the seed does under engine 23.** The descriptions on `/api/paint` and `/api/compose` still read "Stage 1.5 composition variation seed" and **did not say that from engine 23 this seed also decides where the marks are placed**. Only `/api/render-svg` carried the correct wording. **This text is what a direct API user reads, so all three now say the same thing.**
+- Only the descriptions changed. **The accepted keys, their defaults and the responses are identical**, and the 36 fields of `/api/paint` and the 19 of `/api/compose` neither grew nor shrank.
+
 ## 2026-08-08 — v2.11.5 unreleased baseline (Web Build 860)
 
 The 13 places that name a version were updated to v2.11.5 (Build 860).

@@ -333,7 +333,14 @@ def test_history_svg_export_draws_with_the_stored_composition_seed(auth_headers)
 
 # T-10 -------------------------------------------------------------------
 def test_the_engine_names_itself_23():
-    assert current_render_engine().version == "23"
+    """The split shipped in 23, and no engine after it took the name back.
+
+    A later engine bumps the number, so what this holds is the floor: 23 is
+    where `composition_seed` reached the renderer, and the corpus directory
+    that carries the twins below is 23's.
+    """
+    assert int(current_render_engine().version) >= 23
+    assert (REFERENCE_ROOT / "render-engine-23" / "manifest.json").is_file()
 
 
 # T-11 -------------------------------------------------------------------
@@ -344,9 +351,11 @@ def test_no_case_frozen_before_this_change_moved():
     A regenerated record, not a property: on its own it is evidence that the
     fallback is right, not that the split happened. T-12 is the other half.
     """
+    # This version, not the current one: the claim is about what engine 23 did
+    # to engine 22's corpus, and a later engine that moves a case moves it for
+    # its own reasons.
     current = json.loads(
-        (REFERENCE_ROOT / f"render-engine-{current_render_engine().version}" / "manifest.json")
-        .read_text(encoding="utf-8")
+        (REFERENCE_ROOT / "render-engine-23" / "manifest.json").read_text(encoding="utf-8")
     )
     previous = json.loads(
         (REFERENCE_ROOT / "render-engine-22" / "manifest.json").read_text(encoding="utf-8")
@@ -377,8 +386,7 @@ def test_the_added_cases_can_tell_the_two_seeds_apart():
     spec.loader.exec_module(generator)
     inputs = generator.build_inputs()
     manifest = json.loads(
-        (REFERENCE_ROOT / f"render-engine-{current_render_engine().version}" / "manifest.json")
-        .read_text(encoding="utf-8")
+        (REFERENCE_ROOT / "render-engine-23" / "manifest.json").read_text(encoding="utf-8")
     )
 
     for case_id, twin_id in COMPOSITION_TWINS.items():

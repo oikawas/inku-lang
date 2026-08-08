@@ -30,24 +30,31 @@ CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-08"
 REASON = (
-    "Placement got its own seed. Until engine 22 one render_seed decided both "
-    "where an arrangement put its marks and how the hand drew each of them, so "
-    "an author who moved the seed to see another touch moved the composition "
-    "too: on a 60-mark scatter, changing render_seed alone moved all 180 "
-    "coordinates. SPEC :614 and :678 both state the opposite -- a touch change "
-    "keeps the composition of the same Score -- so this is a defect in the "
-    "measuring instrument, not a new feature. `composition_seed`, which the "
-    "database, the four render routes and all four clients already carried, "
-    "now reaches the renderer and decides the placement phase; render_seed "
-    "keeps the touch, the color assignment, the ground and the performance "
-    "resolution. A drawing that states no composition seed falls back to "
-    "render_seed -- read with `is None`, so the seed 0 is a seed -- which is "
-    "why all 531 cases of engine 22 are byte-identical here: none of them "
-    "states one. Four cases do now. Each states composition_seed 777 against "
-    "the same score and the same render_seed as its twin above it, and their "
-    "layouts are drawn from the 22 of group G whose expansion moves with the "
-    "seed at all, so the corpus can tell the split happened instead of "
-    "recording that it did not break anything."
+    "The fade reaches every member of a group. `Arrangement.fade` declares how "
+    "a group falls off -- outward from its centre, or along the direction it "
+    "travels -- and the renderer answered it with one constant for the whole "
+    "group: 0.40 for outward, 0.48 for directional, the same number on the "
+    "nearest mark and the farthest. \"It fades from the centre to the edge\" "
+    "was drawn as \"all of it is a bit pale\". In production that is 2,738 of "
+    "6,425 groups (42.6%) and 83,703 of 178,694 marks. Each member now carries "
+    "its own ceiling, ramped 0.62 -> 0.18 outward and 0.70 -> 0.26 "
+    "directional, written onto `color_hint` after the colour cycle rebuilds it "
+    "and read back before normalisation flattens the decimal point. No "
+    "vocabulary is added and no field: the declaration was already there. "
+    "Placement, touch and the performance seed are untouched -- `color_hint` "
+    "sits outside `_SEED_INSTRUCTION_FIELDS`, so the path coordinates of a "
+    "fading group are byte-identical to engine 23 and only the opacity "
+    "attributes differ -- and the surface seed drops the tag before it hashes "
+    "the instruction, so the texture does not move either. A group that cannot "
+    "fade is left exactly as it was: a ring is equidistant from its own centre, "
+    "and so is a pair, and ranking them would draw a gradient nobody stated. "
+    "Of the 535 cases frozen for engine 23 exactly one moves, "
+    "G-scatter-fade-edge, which was the whole of the corpus's fading: outward, "
+    "scatter, a hand tool, no cycle, no surface. Six cases are added for the "
+    "routes that were never walked -- directional along a path, a colour cycle, "
+    "a derived surface seed, a machine tool (which fades too, by ruling: a "
+    "machine has its own ink and its own core), and the two degenerate groups "
+    "that must not move at all."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -397,12 +404,13 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # they would all stay green. Every G case carries one, and inside an anchor
     # triplet the declared centre is the only thing that differs.
     def _g(case_id: str, anchor: str, *, composition_seed: int | None = None,
-           **changes: Any) -> None:
+           weight: str = "pen", radius: float = 0.03,
+           surface: dict[str, Any] | None = None, **changes: Any) -> None:
         arrangement = copy.deepcopy(BASE_ARRANGEMENT)
         arrangement.update(changes)
         _case(cases, case_id,
-              _instruction("circle", weight="pen", center=list(G_ANCHORS[anchor]),
-                           radius=0.03, arrangement=arrangement),
+              _instruction("circle", weight=weight, center=list(G_ANCHORS[anchor]),
+                           radius=radius, arrangement=arrangement, surface=surface),
               composition_seed=composition_seed)
 
     # The largest route (40.9% of the expanded marks in production).
@@ -452,6 +460,30 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # the pathless `vertical` / `horizontal` are excluded because their
     # coordinates are the same for every seed, so a twin there would be
     # identical to its base and prove nothing.
+    # engine 24: the fade reaches every member. Until here the corpus walked one
+    # fading route -- `G-scatter-fade-edge`, the plainest one there is: outward,
+    # scatter, a hand tool, no cycle, no surface. The six below are the routes
+    # the change actually turns on, and none of them existed in any version.
+    #
+    # The surface case states `seed: None` on purpose. Every other surface case
+    # in this corpus states 24680, which returns from `_surface_seed` before the
+    # instruction dump is hashed -- so none of them can see a hint written onto
+    # the members, which is the one thing this case is here to watch.
+    FADE_SURFACE: dict[str, Any] = {
+        "texture": "wash", "density": 0.55, "scale": 0.40, "opacity": 0.36,
+        "bleed": 0.25, "direction": "diagonal_rising", "spacing_gradient": "none",
+        "tone_steps": 3, "seed": None,
+    }
+    _g("G-fade-directional-path-edge", "edge", fade="directional",
+       layout="vertical", path="top_to_bottom", count=20)
+    _g("G-fade-cycle-edge", "edge", fade="outward",
+       color_cycle=["red", "blue", "green"])
+    _g("G-fade-surface-edge", "edge", fade="outward", count=12,
+       radius=0.06, surface=FADE_SURFACE)
+    _g("G-fade-rotring-edge", "edge", fade="outward", weight="rotring")
+    _g("G-fade-radial-edge", "edge", fade="outward", layout="radial", count=12)
+    _g("G-fade-count2-edge", "edge", fade="outward", count=2)
+
     G_COMPOSITION_SEED = 777
     _g("G-composition-scatter-edge", "edge", composition_seed=G_COMPOSITION_SEED)
     _g("G-composition-grid-center", "center", composition_seed=G_COMPOSITION_SEED,
@@ -467,9 +499,10 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # carries the one tool-level fill contrast across the branch.
     # G gained 4 in engine 23: the twins that state a composition seed, which is
     # the only way the corpus reaches the placement seed at all.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 36}
+    # G gained 6 in engine 24: the fading routes the corpus had never walked.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 42}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 535:
+    if actual != expected or len(cases) != 541:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 
@@ -532,9 +565,35 @@ def render_case(render_input: dict[str, Any]) -> str:
                   svg_profile=render_input["svg_profile"], wild=render_input["wild"])
 
 
+FADE_CASES = (
+    "G-fade-directional-path-edge",
+    "G-fade-cycle-edge",
+    "G-fade-surface-edge",
+    "G-fade-rotring-edge",
+    "G-fade-radial-edge",
+    "G-fade-count2-edge",
+)
+
+
+def _assert_fade_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
+    """Every fading case added here has to notice `fade` before it is written.
+
+    A case that draws the same picture with and without the declaration records
+    that nothing broke and nothing else; the corpus would then hold six cases
+    that cannot fail. Checked at bake time, on the bake's own call.
+    """
+    for case_id in FADE_CASES:
+        stated = inputs[case_id]
+        withheld = copy.deepcopy(stated)
+        withheld["score"]["instructions"][0]["arrangement"]["fade"] = "none"
+        if _normalized_digest(render_case(stated)) == _normalized_digest(render_case(withheld)):
+            raise AssertionError(f"{case_id}: the drawing does not read `fade`")
+
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
+    _assert_fade_cases_discriminate(inputs)
 
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}

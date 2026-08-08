@@ -418,7 +418,12 @@ def test_render_clustered_arrangement_uses_fade_and_preserves_elements():
     assert svg.count("<rect") >= 25
     # v2.2 (engine 8): 手描き weight の閉図形は輪郭を帯で描くので、輪郭側の
     # 濃度は stroke-opacity ではなく帯の fill-opacity に載る。
-    assert 'fill-opacity="0.400000"' in svg
+    # engine 24: その濃度は群一律の 0.40 ではなく、各員が中心からの距離で
+    # 受け取る値になった。ここが 1 種類に戻ったら、宣言が定数に潰れている。
+    levels = sorted({float(v) for v in re.findall(r'fill-opacity="([0-9.]+)"', svg)})
+    assert len(levels) > 1
+    assert abs(levels[0] - 0.18) < 5e-5
+    assert abs(levels[-1] - 0.62) < 5e-5
     # v2.3 (engine 9): `filled` の復権により、塗らない図形には fade の塗り濃度
     # (0.22) は載らない。fade は輪郭帯の濃度として読める。
     assert 'fill-opacity="0.22"' not in svg

@@ -53,11 +53,15 @@ def test_render_reference_case_counts() -> None:
     # of its own.
     # Engine 23 added four to G: the twins that state a composition seed, which
     # is the only way the corpus reaches the placement seed at all.
-    assert len(cases) == 535
+    # Engine 24 added six more to G: the corpus stated a fade on one case only,
+    # the plainest one, so none of the routes the per-member fade travels --
+    # a colour cycle, a derived surface seed, a machine tool, and the two
+    # degenerate groups that must not fade -- was walked by it.
+    assert len(cases) == 541
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 36}
+    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 42}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -254,7 +258,7 @@ def test_group_g_matches_the_current_renderer() -> None:
         svg = generator.render_case(render_input)
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
         checked += 1
-    assert checked == 36
+    assert checked == 42
 
 
 def test_render_reference_discriminator_cases() -> None:

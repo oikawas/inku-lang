@@ -98,6 +98,22 @@ ENGINE_23_COMPOSITION_TWINS: dict[str, str] = {
     "G-composition-scatter-edge": "G-scatter-edge",
 }
 
+# engine 24 added six G cases for the fading routes the corpus never walked.
+# None of them can borrow the way the twins above do: each states a score of its
+# own -- another tool, another layout, a surface, a colour cycle -- so no engine
+# 19 measurement covers it and none is identical to a case that has one. They
+# are named rather than matched by pattern, so a case dropping out of T-4 for
+# some other reason is a failure instead of an absence. T-2 and T-3 above do
+# reach them: the exclusion is from the historical comparison only.
+ENGINE_24_FADE_CASES: frozenset[str] = frozenset({
+    "G-fade-count2-edge",
+    "G-fade-cycle-edge",
+    "G-fade-directional-path-edge",
+    "G-fade-radial-edge",
+    "G-fade-rotring-edge",
+    "G-fade-surface-edge",
+})
+
 
 def _g_instructions() -> dict[str, Instruction]:
     """The corpus's own group G, so the gate and the frozen cases cannot drift."""
@@ -209,7 +225,8 @@ def test_no_placed_mark_leaves_the_frame():
     # Not vacuous. Engine 19 never overflowed, because it never went to the
     # anchor in the first place; the overflow is created by the move. So the
     # control is the move without the shrink, which is the implementation this
-    # test exists to reject. It leaves marks outside in 25 of the 36 cases.
+    # test exists to reject. It leaves marks outside in 31 of the 42 cases
+    # (25 of 36 before engine 24 added its six).
     shifted_out = 0
     for instruction in _g_instructions().values():
         points = _laid_out(instruction)
@@ -221,7 +238,7 @@ def test_no_placed_mark_leaves_the_frame():
             for x, y in points
         ):
             shifted_out += 1
-    assert shifted_out == 25
+    assert shifted_out == 31
 
 
 # T-3 --------------------------------------------------------------------
@@ -244,7 +261,11 @@ def test_the_frame_correction_does_not_stack_marks_on_the_edge():
 def test_the_frame_correction_does_not_collapse_a_group():
     ratios: dict[str, float] = {}
     instructions = _g_instructions()
+    unmeasured = ENGINE_24_FADE_CASES & set(instructions)
+    assert len(unmeasured) == 6
     for case_id, instruction in instructions.items():
+        if case_id in unmeasured:
+            continue
         width, height = _spread(_placed(instruction))
         base_id = ENGINE_23_COMPOSITION_TWINS.get(case_id, case_id)
         assert instructions[base_id] == instruction, case_id

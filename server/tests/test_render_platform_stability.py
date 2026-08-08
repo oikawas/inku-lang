@@ -39,6 +39,10 @@ MOVED_WITHOUT_QUANTISER = frozenset(
         "G-cluster-corner",
         "G-cluster-edge",
         "G-cluster-preserve-edge",
+        # engine 23's composition twins: same score, so the same two layouts
+        # reach sin/cos, only from the seed the case states.
+        "G-composition-cluster-center",
+        "G-composition-path-wave-edge",
         "G-path-hwave-edge",
         "G-path-wave-center",
         "G-path-wave-corner",
@@ -92,6 +96,7 @@ def _draw_group_g() -> dict[str, str]:
                 color_map=render_input["color_map"],
                 catalog_id=render_input["catalog_id"],
                 render_seed=render_input["render_seed"],
+                composition_seed=render_input.get("composition_seed"),
                 svg_profile=render_input["svg_profile"],
                 wild=render_input["wild"],
             )
@@ -110,7 +115,7 @@ def _moved_under_one_ulp(monkeypatch) -> set[str]:
 
 def test_group_g_is_the_whole_exposure() -> None:
     """A gate that measured nothing would still pass the two tests below."""
-    assert len(_group_g_inputs()) == 32
+    assert len(_group_g_inputs()) == 36
 
 
 def test_one_ulp_of_libm_does_not_move_the_drawing(monkeypatch) -> None:

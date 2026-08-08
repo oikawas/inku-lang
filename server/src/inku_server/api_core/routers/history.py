@@ -145,6 +145,7 @@ def api_history_svg(
                 item.get("score", {}),
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,
+                composition_seed=item.get("composition_seed"),
                 wild=bool(item.get("render_wild")),
             )
         except HTTPException:

@@ -2336,3 +2336,60 @@ carries the parent's sketch prose.
 **The sketch layer was set to the server's 0.3, but Android's Stage 1 is 0.2 and Stage 2 is 0.1.**
 **That divergence predates the sketch layer** and was not touched here. **It is recorded as pending
 a ruling on [I-159].**
+
+## 2026-08-08 Waiting for the write before the close ([I-150] / android `2.1.4-android.17`)
+
+### What was broken
+
+**A save hands the thumbnail write to `thumbnailScope` and does not wait for it.**
+`InkuRepository.close()` was one line, `thumbnailScope.cancel()`.
+**`cancel()` requests cancellation; it does not wait for it.** A write already inside
+`updateThumbnail` keeps running, so when the caller closes the database next,
+**the database disappears from under the write.**
+
+**The throw lands on the background coroutine rather than on the caller.** It is therefore
+**not recorded as a failing test: the process dies and the remaining tests never run.**
+**This shape arrives as "the rest did not run", not as "one test is red",** so it is invisible
+unless the XML is counted. **Five of twelve runs were truncated.**
+
+### The fix — join, then tear down
+
+```kotlin
+suspend fun close() {
+    thumbnailScope.coroutineContext.job.children.toList().joinAll()
+    thumbnailScope.cancel()
+    localLiteRtProvider.close()
+}
+```
+
+**⚠ Not `cancelAndJoin`.** Cancelling first abandons the write, so the thumbnail never lands and
+**no assertable property is left, which means no gate can be placed.** Joining first means that by
+the time `close()` returns, the write is on disk and nothing holds the database.
+
+### Four classes only closed the repository asynchronously
+
+**Twelve** instrumented classes build an `InkuRepository`. **Four**
+(`CatalogSelectionWiringTest`, `LineageDeclarationWiringTest`, `LineageScreenTest`,
+`SketchLineageWiringTest`) closed it only through
+`store.clear()` → `onCleared` → `applicationScope.launch { repository.close() }`,
+**and leaned on `delay(500)`.** They now close it directly. **The sleep stays**, because it also
+guards the other work the view model starts; for the thumbnail it is now a belt rather than the
+guarantee.
+
+### Two gates, on two different surfaces
+
+| T | Surface | What it watches |
+|---|---|---|
+| T-1 | Instrumented (Pixel 9 hardware) | Save, `close()`, and the row already carries `thumbnail_path`. **A contrast asserts that the save alone does not write it** — without it the assertion would hold vacuously if the save ever finished the thumbnail itself |
+| T-2 | The server's pytest | Every `database.close()` is covered by an earlier `repository.close()`. **Stated as a running count rather than as adjacency**, because one class still keeps a settle between the two and the settle is not what is being asserted |
+
+**T-2 lives on the server side because pytest runs in every acceptance cycle while Gradle runs only
+in the cycles that touch `android/`.** Four tests already read the Kotlin sources from pytest. It
+skips on a missing `android/` (the tree is absent on the deployed server).
+
+### The shipping app never closes the database
+
+**`database.close()` is called only from the instrumented tests.** This is therefore a defect in the
+test scaffolding rather than something a user can see; in production the worst case is one lost
+thumbnail write as the app goes away. **The production code was still changed, because a `close()`
+that does not wait is claiming something untrue.**

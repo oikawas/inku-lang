@@ -4203,3 +4203,39 @@ nearest mark and on the farthest.** **In production that is 2,738 of 6,425 group
 - **⚠ Stage 1 and Stage 2 still run at temperatures that differ from the server** (0.2 and 0.1
   against the sketch layer's 0.3). **That divergence predates the sketch layer**; it was left alone
   and recorded as **[I-159]**, pending a ruling.
+
+### Android `2.1.4-android.17` — waiting for the write before the close (android Build 148098, 2026-08-08)
+
+**Saving a work schedules a thumbnail, which is built in the background and written back to the
+database.** Nobody waited for it: `InkuRepository.close()` was one line, `thumbnailScope.cancel()`.
+**`cancel()` only asks; it does not wait.** So the database could be closed while a write was still
+running, and **the throw happened on the background coroutine rather than on the caller** — which
+took the whole process down and left the remaining tests unrun. **It arrived as "24 of 93 recorded"
+rather than as one red test**, so a run that counted nothing looked green. **Five of twelve runs
+were truncated this way** ([I-150]).
+
+- **`close()` now waits** for the thumbnail scope's children before tearing it down.
+  **⚠ Not `cancelAndJoin`** — cancelling first abandons the write, so the thumbnail never lands and
+  **there is no property left to assert.**
+- **Four of the twelve instrumented classes closed the database without closing the repository.**
+  More precisely they closed it **asynchronously** through `store.clear()` → `onCleared`, and
+  **leaned on a 500 ms sleep.** They now close it directly; the sleep stays as a belt for the other
+  work the view model starts.
+- **Two gates.** On the device: save, `close()`, and the row already carries the thumbnail path. In
+  the server's pytest: every `database.close()` is covered by an earlier `repository.close()`.
+  **The second lives on the server side because pytest runs every cycle while Gradle runs only when
+  `android/` changes**, and four tests already read the Kotlin sources from pytest.
+- **The shipping app never closes the Room database**, so this is a defect in the test scaffolding
+  rather than something a user can see. In production the worst case is one lost thumbnail write as
+  the app goes away.
+- **Both perturbations turned exactly one named test red.** Reverting `close()` to `cancel()` alone
+  turns the instrumented T-1 red; deleting `repository.close()` from one class turns the server's
+  T-2 red. Restoring each returned the count to zero.
+- **Tests:** **instrumented 95 / 0 failed** (Pixel 9 hardware, 19 classes, from 93), **JVM 235 /
+  0 failed** (44 classes, unchanged), **server pytest 2405 passed / 31 skipped** (from 2403).
+  **Only `android/VERSION` moved one step** — `APP_VERSION` and `web/BUILD_NUMBER` stay put, and
+  nothing was deployed to the dev server.
+- **⚠ Two more tests than predicted.** The prediction frozen before any code was written said +1 and
+  +1; **each gate gained a contrast case.** Without the contrast, the instrumented assertion would
+  hold vacuously if the save happened to finish the thumbnail itself, and the structural rule would
+  pass over an empty set. **The number of properties is the predicted one on each side.**

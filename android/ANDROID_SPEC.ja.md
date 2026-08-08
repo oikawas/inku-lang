@@ -1847,3 +1847,62 @@ server 側の裁定「DB の列は残す・開発者モードで過去作にだ�
 
 **写生層は server に合わせて 0.3 にしたが、Android の Stage 1 は 0.2・Stage 2 は 0.1 である。**
 **これは写生層より前から在る乖離**で、本周では直していない。**裁定待ちとして [I-159] に載せた。**
+
+## 2026-08-08 閉じる前に、書き終わるのを待つ（[I-150] / android `2.1.4-android.17`）
+
+### 何が壊れていたか
+
+**保存はサムネイルの書き込みを `thumbnailScope` へ投げっぱなしにする。**
+`InkuRepository.close()` は `thumbnailScope.cancel()` の 1 行だった。
+**`cancel()` は取り消しを要求するだけで、取り消し終わるのを待たない。**
+すでに `updateThumbnail` の中に入っている書き込みはそのまま走り続けるので、
+呼び手が次に `database.close()` を実行すると、**書き込みの足元から DB が消える。**
+
+**例外は呼び手ではなく背景のコルーチンで起きる。** したがって
+**テストの失敗としては記録されず、プロセスごと落ちて残りのテストが 1 件も走らない。**
+**この型は「赤 1 件」ではなく「残りが走らない」形で出るので、XML の件数を数えないと気づけない。**
+**累積 12 回中 5 回打ち切られていた。**
+
+### 直し方 — 待ってから畳む
+
+```kotlin
+suspend fun close() {
+    thumbnailScope.coroutineContext.job.children.toList().joinAll()
+    thumbnailScope.cancel()
+    localLiteRtProvider.close()
+}
+```
+
+**⚠ `cancelAndJoin` にしてはならない。** cancel を先に置くと**書き込みが取り消され、
+サムネイルは永久に書かれない**。そうすると「閉じたときには書き終わっている」という
+**表明できる性質が残らず、ゲートが置けなくなる。**
+待ってから畳めば、`close()` が返った時点で書き込みはディスクに載っており、
+DB を握っているものは何も無い。
+
+### 4 クラスは repository を非同期にしか閉じていなかった
+
+`InkuRepository(` を作る計装クラスは **12**。うち **4 つ**
+（`CatalogSelectionWiringTest` / `LineageDeclarationWiringTest` / `LineageScreenTest` /
+`SketchLineageWiringTest`）は、**`store.clear()` → `onCleared` → `applicationScope.launch { repository.close() }`
+という非同期の経路でしか閉じておらず、`delay(500)` で間に合わせていた。**
+直接閉じる形にした。**待ちは残してある** — あれは view model が始める他の仕事も守っているためで、
+サムネイルについてだけは、待ちが保証ではなく保険になった。
+
+### ゲートは 2 つ、別々の層に置く
+
+| T | 層 | 何を見るか |
+|---|---|---|
+| T-1 | 計装（実機 Pixel 9） | 保存 → `close()` → その場で行を読むと `thumbnail_path` が入っている。**対照として「保存だけでは入っていない」も表明する**（無いと、保存が同期的に書き終わった場合に本命が恒真になる） |
+| T-2 | server の pytest | `database.close()` が必ず先行する `repository.close()` に覆われている。**隣接ではなく通し番号の対で見る**（1 クラスは待ちを挟んだままなので、隣接を要求すると待ちのほうを検査してしまう） |
+
+**T-2 を server 側に置いたのは、pytest が毎周の受け入れで必ず走るのに対し、
+Gradle は `android/` に差分がある周にしか走らないからである。**
+**Kotlin のソースを pytest から読む前例は 4 本ある。** `android/` の不在で skip する
+（pentala に `android/` は無い）。
+
+### 本番アプリは DB を閉じない
+
+**`database.close()` の呼び出しは計装にしか無い。** したがってこれは**テスト足場の欠陥であって、
+利用者に見える不具合ではない。** 本番で起きるのは、アプリを閉じる瞬間にサムネイル 1 枚の
+書き込みが落ちることだけである。**それでも製品側を直したのは、待たない `close()` が
+「閉じた」と名乗っていること自体が偽だからである。**

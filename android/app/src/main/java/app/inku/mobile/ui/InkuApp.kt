@@ -25,6 +25,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -75,6 +77,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -120,6 +124,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
@@ -131,6 +137,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.onFocusChanged
@@ -147,6 +154,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.testTag
 import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
+import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
@@ -178,6 +186,15 @@ import org.json.JSONObject
 
 private const val HISTORY_SWIPE_MIN_DISTANCE_PX = 96f
 private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
+
+/** How often the running row redraws its elapsed time. */
+private const val RUN_STATUS_TICK_MS = 100L
+
+/**
+ * What the double tap goes to when the artwork is already at or above its own
+ * size, so that 1:1 would be a zoom *out* and the gesture would look broken.
+ */
+private const val PRESENTATION_FALLBACK_ZOOM = 2.0f
 private const val PRESENTATION_PREFS_NAME = "presentation_preferences"
 private const val PRESENTATION_CAPTION_VISIBLE_KEY = "caption_visible"
 private val SvgViewBoxRegex = Regex("""\bviewBox\s*=\s*["']\s*[-+]?[0-9.]+\s+[-+]?[0-9.]+\s+([-+]?[0-9.]+)\s+([-+]?[0-9.]+)\s*["']""")
@@ -311,10 +328,32 @@ fun InkuApp() {
     val state by viewModel.state.collectAsState()
     val deviceRotation = rememberDeviceRotation(enabled = state.canvasPresentationMode)
 
+    // One back key, one destination per screen state. Android's back always means
+    // "up one level"; before this it meant "leave the app" from everywhere except
+    // a dialog, so the full screen and the four tabs were one-way doors.
+    val backTarget: (() -> Unit)? = when {
+        state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
+        state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
+        state.ddlEditorOpen -> viewModel::closeDdlEditor
+        state.modelSelectionOpen -> viewModel::cancelModelSelection
+        state.catalogSelectionOpen -> viewModel::cancelCatalogSelection
+        state.canvasSelectionOpen -> viewModel::closeTransientPanel
+        state.tab == AppTab.Settings && state.settingsPane != SettingsPane.Home ->
+            ({ viewModel.setSettingsPane(SettingsPane.Home) })
+        state.tab != AppTab.Compose -> ({ viewModel.setTab(AppTab.Compose) })
+        // The compose screen is the root. Back leaves the app from here.
+        else -> null
+    }
+    BackHandler(enabled = backTarget != null) { backTarget?.invoke() }
+
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
             bottomBar = {
-                if (!state.canvasPresentationMode) {
+                // While the description is being written the four destinations
+                // step aside: keeping them would hold a bar's worth of height
+                // between the keyboard and 「描画する」, and going somewhere else
+                // is not what one is about to do mid-sentence.
+                if (!state.canvasPresentationMode && !state.descriptionFocused) {
                     BottomNavigationBar(state.tab, viewModel)
                 }
             },
@@ -325,6 +364,11 @@ fun InkuApp() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
+                    // `contentPadding` already holds the navigation bar, so
+                    // without this `imePadding` adds the keyboard on top of an
+                    // inset the keyboard covers -- a bar's worth of dead space
+                    // between the content and the keys.
+                    .consumeWindowInsets(contentPadding)
                     .imePadding()
                     .background(MaterialTheme.colorScheme.background),
             ) {
@@ -338,7 +382,6 @@ fun InkuApp() {
                             HistoryScreen(state, history, viewModel)
                         }
                         AppTab.Lineage -> LineageScreen(state, viewModel)
-                        AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl))
                         AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl))
                     }
                 }
@@ -1008,14 +1051,12 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
                     AppTab.Compose -> "記述"
                     AppTab.History -> "履歴"
                     AppTab.Lineage -> "系譜"
-                    AppTab.Demo -> "デモ"
                     AppTab.Settings -> "設定"
                 }
                 val mark = when (tab) {
                     AppTab.Compose -> "✎"
                     AppTab.History -> "◫"
                     AppTab.Lineage -> "⌥"
-                    AppTab.Demo -> "◉"
                     AppTab.Settings -> "⚙"
                 }
                 NavButton(
@@ -1084,6 +1125,15 @@ private fun shortCanvasLabel(state: InkuUiState): String {
     }
 }
 
+/**
+ * The compose screen, ordered by what it is about.
+ *
+ * The work comes first. Under it sits everything that decides the *next*
+ * drawing, and nothing else: before this, the canvas was the fourth block down,
+ * behind a mascot that ran whether or not anything was running, and the row
+ * above the canvas mixed the work's own star and hash with a zoom and a canvas
+ * aspect -- three families and two tenses on one line.
+ */
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     if (state.canvasPresentationMode) {
@@ -1093,6 +1143,12 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    // Where the top of the scrolling area is on screen, and where the
+    // description is. Both are measured in window coordinates: the field's
+    // position inside its own parent says nothing about how far down the scroll
+    // it sits, so the two have to be compared in the one frame they share.
+    var viewportTop by remember { mutableStateOf(0f) }
+    var descriptionTop by remember { mutableStateOf(0f) }
     LaunchedEffect(state.isDrawing, state.selectedHistory?.id) {
         if (!state.isDrawing && state.selectedHistory != null) {
             focusManager.clearFocus(force = true)
@@ -1100,40 +1156,187 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             scrollState.animateScrollTo(0)
         }
     }
-    Column(
+    // Focus pulls the description to the top of what is left of the screen.
+    // Otherwise the keyboard takes the lower half and the field keeps a sliver.
+    LaunchedEffect(state.descriptionFocused) {
+        if (state.descriptionFocused) {
+            val delta = (descriptionTop - viewportTop).toInt()
+            scrollState.animateScrollTo((scrollState.value + delta).coerceAtLeast(0))
+        }
+    }
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = Dimens.space20, vertical = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+            .onGloballyPositioned { viewportTop = it.positionInWindow().y },
     ) {
-        ComposeModeTabs(state.composeMode, viewModel)
-        if (state.composeMode == ComposeMode.Batch) {
-            ConditionChips(state, viewModel)
-            BatchPanel(state, viewModel)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = Dimens.space20, vertical = Dimens.spaceXs),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        ) {
+            RunStatusRow(state, viewModel)
             CanvasHeroCard(state, viewModel)
-        } else {
-            // The display mode decides how much surrounds the canvas; the mascot
-            // and the condition strip only appear in the full mode.
-            UiModeContainer(
-                uiMode = state.uiMode,
-                simpleContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-                        CanvasHeroCard(state, viewModel)
-                        DrawPanel(state, viewModel)
-                    }
-                },
-                fullContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-                        MascotWidget(mascotKind = state.mascotKind)
-                        ConditionChips(state, viewModel)
-                        CanvasHeroCard(state, viewModel)
-                        DrawPanel(state, viewModel)
-                    }
-                },
+            DrawSettingsPanel(state, viewModel)
+            if (state.composeMode == ComposeMode.Batch) {
+                BatchPanel(state, viewModel)
+            } else {
+                DrawPanel(
+                    state,
+                    viewModel,
+                    onDescriptionFocusChanged = viewModel::setDescriptionFocused,
+                    onDescriptionPositioned = { descriptionTop = it },
+                )
+            }
+            Spacer(Modifier.height(Dimens.scrollTailSpace))
+        }
+        if (state.descriptionFocused && state.composeMode == ComposeMode.Write) {
+            ImeActionBar(state, viewModel, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+    }
+}
+
+/**
+ * The main action, pinned above the keyboard.
+ *
+ * The screen is one vertical scroll and the root carries `imePadding()`, so
+ * opening the keyboard lifts the bottom of the scroll without bringing anything
+ * with it: measured on the device, the description had ~300px of empty space
+ * under it and neither 「描画する」 nor the bottom bar was on screen. This bar is
+ * outside the scroll, so it stays where the thumb already is.
+ *
+ * The IME action key is deliberately left alone. In Japanese input the return
+ * key commits the conversion, and a draw bound to it would start drawing when
+ * the author meant to accept 「ゆらぎ」.
+ */
+@Composable
+private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = Dimens.space2,
+        shadowElevation = Dimens.spaceM,
+    ) {
+        Box(modifier = Modifier.padding(horizontal = Dimens.space20, vertical = Dimens.spaceM)) {
+            DrawingActionButton(
+                idleText = "▶  描画する",
+                runningText = "■  描画中",
+                state = state,
+                onClick = viewModel::draw,
+                onStop = viewModel::stopDrawing,
             )
         }
-        Spacer(Modifier.height(Dimens.scrollTailSpace))
+    }
+}
+
+/**
+ * The one "something is running" line, which web keeps in `RunStatus.svelte`.
+ *
+ * web renders that component from every running operation -- single draw, batch,
+ * demo, DDL editor, lineage -- and the mascot lives inside it, so the animation
+ * always means the same thing. The port had lifted the mascot out and placed it
+ * unconditionally at the top of the compose screen, where it span with nothing
+ * around it to say why. Here it is a state display again: mascot, model,
+ * elapsed, stop; and when nothing runs, the row is not composed at all.
+ */
+@Composable
+private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
+    if (!state.isRunning) return
+    val startedAt = remember(state.isDrawing, state.refinementBusy) { System.currentTimeMillis() }
+    var elapsedMs by remember(startedAt) { mutableStateOf(0L) }
+    LaunchedEffect(startedAt) {
+        while (true) {
+            elapsedMs = System.currentTimeMillis() - startedAt
+            delay(RUN_STATUS_TICK_MS)
+        }
+    }
+    val progress = if (state.batchTotal > 1) "${state.batchCurrent} / ${state.batchTotal}   " else ""
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MascotWidget(mascotKind = state.mascotKind)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+                Text(
+                    state.message?.takeIf { it.isNotBlank() } ?: "描画中",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    selectedModelLabel(state),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "$progress${formatDuration(elapsedMs)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            MiniPill(
+                text = "停止",
+                onClick = if (state.refinementBusy) viewModel::abortRefinementCandidates else viewModel::stopDrawing,
+            )
+        }
+    }
+}
+
+/**
+ * Everything that decides the drawing that has not happened yet.
+ *
+ * One entry per setting, and one place for all of them. The model used to be
+ * openable from three separate rows; the colour catalog from two; the canvas
+ * aspect sat beside the star and the hash, which belong to the work already on
+ * screen rather than to the next one.
+ */
+@Composable
+private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        ComposeModeTabs(state.composeMode, viewModel)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        ) {
+            CompactLabel("描画設定")
+            Spacer(Modifier.weight(1f))
+            MiniPill(
+                "新規作成",
+                onClick = if (state.composeMode == ComposeMode.Batch) viewModel::clearBatchText else viewModel::clearPrompt,
+            )
+        }
+        WrapRow {
+            MiniPill(
+                text = "◇ ${shortModelLabel(state)}",
+                onClick = viewModel::openModelSelection,
+                modifier = Modifier.widthIn(max = Dimens.panelWideMaxWidth),
+            )
+            MiniPill(
+                text = "◐ ${shortCatalogLabel(state)}",
+                onClick = viewModel::openCatalogSelection,
+                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
+            )
+            MiniPill(
+                text = "⬚ ${shortCanvasLabel(state)}",
+                onClick = viewModel::openCanvasSelection,
+                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
+            )
+        }
+        if (state.composeMode == ComposeMode.Write) {
+            SketchModeRow(state, viewModel)
+        }
     }
 }
 
@@ -1157,9 +1360,7 @@ private fun CanvasHeroCard(
         context.applicationContext.getSharedPreferences(PRESENTATION_PREFS_NAME, Context.MODE_PRIVATE)
     }
     var canvasMessage by remember { mutableStateOf<String?>(null) }
-    var svgMenuOpen by remember { mutableStateOf(false) }
-    var svgHelpOpen by remember { mutableStateOf(false) }
-    var pngMenuOpen by remember { mutableStateOf(false) }
+    var exportSheetOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
     var instructionCaptionVisible by remember {
         mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
@@ -1188,6 +1389,17 @@ private fun CanvasHeroCard(
         val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
         }
+        // Where the double tap goes: the work at its own size. The fitted canvas
+        // is `presentationCanvasWidth` across, and the work's own width is in its
+        // SVG, so the ratio of the two is the 1:1 factor. A work already at or
+        // above its size would be *shrunk* by 1:1, so that case magnifies instead
+        // -- a double tap that appears to do nothing reads as a broken gesture.
+        val fittedWidthPx = with(LocalDensity.current) { presentationCanvasWidth.toPx() }
+        val intrinsicWidthPx = remember(item?.id, item?.displaySvg) { item?.displaySvg?.let(::svgIntrinsicWidth) }
+        val oneToOneZoom = remember(intrinsicWidthPx, fittedWidthPx) {
+            val natural = if (intrinsicWidthPx != null && fittedWidthPx > 0f) intrinsicWidthPx / fittedWidthPx else 0f
+            if (natural > CANVAS_FIT_ZOOM + CANVAS_ZOOM_EPSILON) natural else PRESENTATION_FALLBACK_ZOOM
+        }
         val instructionCaptionText = item?.originalInput?.trim().orEmpty()
         val canShowInstructionCaption = instructionCaptionText.isNotBlank()
         val historyIndex = item?.let { selected -> historyItems.indexOfFirst { it.id == selected.id } } ?: -1
@@ -1197,6 +1409,10 @@ private fun CanvasHeroCard(
         val canGoOlder = historyIndex >= 0 && historyIndex < historyItems.lastIndex
         val historyCounter = if (historyIndex >= 0 && historyTotal > 0) "${historyIndex + 1} / $historyTotal" else ""
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+            // The strip above the canvas says what the work on screen *is*: its
+            // star, its hash, where it sits in the lineage, and the way into the
+            // full screen. The zoom and the canvas aspect used to be here too --
+            // one is a property of the view, the other of the next drawing.
             if (!presentation && showControls) {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -1214,21 +1430,15 @@ private fun CanvasHeroCard(
                                     canvasMessage = "Hash copied."
                                 },
                             )
+                            MiniPill(text = "系譜", onClick = { viewModel.setTab(AppTab.Lineage) })
                         }
                     }
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        MiniPill("-", onClick = { viewModel.setCanvasZoom(state.canvasZoom - 0.25f) })
-                        MiniPill("${(state.canvasZoom * 100).toInt()}%", onClick = viewModel::resetCanvasZoom)
-                        MiniPill("+", onClick = { viewModel.setCanvasZoom(state.canvasZoom + 0.25f) })
-                    }
+                    // A double tap enters the full screen too, but a gesture that
+                    // nothing on screen mentions is a gesture nobody finds.
                     MiniPill(
-                        shortCanvasLabel(state),
-                        onClick = viewModel::openCanvasSelection,
-                        modifier = Modifier.align(Alignment.CenterEnd).widthIn(max = Dimens.heroCaptionMaxWidth),
+                        text = "⛶ 全画面",
+                        onClick = viewModel::enterCanvasPresentationMode,
+                        modifier = Modifier.align(Alignment.CenterEnd),
                     )
                 }
             }
@@ -1242,18 +1452,23 @@ private fun CanvasHeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        // Right goes back through the works in both modes, which
+                        // is the direction of Android's own back gesture. The
+                        // full screen used to be bound the other way round, so
+                        // the same finger movement meant opposite things
+                        // depending on which of the two canvases was on screen.
                         .historySwipeNavigation(
-                            enabled = presentation,
+                            enabled = presentation && state.canvasZoom <= CANVAS_FIT_ZOOM + CANVAS_ZOOM_EPSILON,
                             gestureKey = item?.id,
                             deviceRotation = deviceRotation,
-                            onSwipeRight = viewModel::selectNextHistory,
-                            onSwipeLeft = viewModel::selectPreviousHistory,
+                            onSwipeRight = viewModel::selectPreviousHistory,
+                            onSwipeLeft = viewModel::selectNextHistory,
                         )
-                        .pointerInput(item?.id, state.canvasPresentationMode) {
+                        .pointerInput(item?.id, state.canvasPresentationMode, oneToOneZoom) {
                             detectTapGestures(
                                 onDoubleTap = {
                                     if (state.canvasPresentationMode) {
-                                        viewModel.resetCanvasZoom()
+                                        viewModel.toggleCanvasZoom(oneToOneZoom)
                                     } else {
                                         viewModel.enterCanvasPresentationMode()
                                     }
@@ -1281,29 +1496,43 @@ private fun CanvasHeroCard(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .historySwipeNavigation(
-                                        enabled = !presentation && state.canvasZoom <= 1.05f,
+                                        enabled = !presentation,
                                         gestureKey = item.id,
                                         deviceRotation = DeviceRotation.Portrait,
                                         onSwipeRight = viewModel::selectPreviousHistory,
                                         onSwipeLeft = viewModel::selectNextHistory,
                                     )
+                                    // Magnification belongs to the full screen and
+                                    // to nothing else (ruling 2026-08-08): the
+                                    // small canvas in the middle of a scrolling
+                                    // form is not where one looks closely, and a
+                                    // pinch there fought the scroll for the
+                                    // gesture. Reversed, the pinch is wired where
+                                    // the work fills the screen, and the ordinary
+                                    // canvas carries no transform at all.
                                     .then(
                                         if (presentation) {
-                                            Modifier
-                                        } else {
-                                            Modifier.pointerInput(Unit) {
+                                            Modifier.pointerInput(item.id) {
                                                 detectTransformGestures { _, pan, zoom, _ ->
                                                     if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
                                                     if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
                                                 }
                                             }
+                                        } else {
+                                            Modifier
                                         },
                                     )
-                                    .graphicsLayer(
-                                        scaleX = if (presentation) 1f else state.canvasZoom,
-                                        scaleY = if (presentation) 1f else state.canvasZoom,
-                                        translationX = if (presentation) 0f else state.canvasPanX,
-                                        translationY = if (presentation) 0f else state.canvasPanY,
+                                    .then(
+                                        if (presentation) {
+                                            Modifier.graphicsLayer(
+                                                scaleX = state.canvasZoom,
+                                                scaleY = state.canvasZoom,
+                                                translationX = state.canvasPanX,
+                                                translationY = state.canvasPanY,
+                                            )
+                                        } else {
+                                            Modifier
+                                        },
                                     )
                             )
                         }
@@ -1338,6 +1567,8 @@ private fun CanvasHeroCard(
                                 .align(Alignment.BottomCenter)
                                 .padding(start = Dimens.spaceXl, end = Dimens.spaceXl, bottom = Dimens.spaceXxl),
                             counter = historyCounter,
+                            zoomPercent = (state.canvasZoom * 100).toInt(),
+                            onResetZoom = viewModel::resetCanvasZoom,
                             starred = item?.starred == true,
                             canGoOlder = canGoOlder,
                             canGoLatest = canGoLatest,
@@ -1358,13 +1589,20 @@ private fun CanvasHeroCard(
                                         .apply()
                                 }
                             },
-                            onClose = viewModel::resetCanvasZoom,
+                            onClose = viewModel::exitCanvasPresentationMode,
                         )
                     }
                 }
             }
+            // Under the canvas: on the left the ways of looking at the same work,
+            // on the right the one way out of the app. Getting a file used to be
+            // two dropdown menus in this row and a third place in the settings.
             if (!presentation && showControls) item?.let {
-                WrapRow {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
+                ) {
                     RenderTab.entries.forEach { tab ->
                         MiniPill(
                             text = when (tab) {
@@ -1376,117 +1614,45 @@ private fun CanvasHeroCard(
                             onClick = { viewModel.setRenderTab(tab) },
                         )
                     }
-                    Box {
-                        MiniPill(text = "SVG ▾", onClick = { svgMenuOpen = true })
-                        DropdownMenu(
-                            expanded = svgMenuOpen,
-                            onDismissRequest = {
-                                svgMenuOpen = false
-                                svgHelpOpen = false
-                            },
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceM),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
-                            ) {
-                                Text(
-                                    "SVG export",
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                TextButton(onClick = { svgHelpOpen = !svgHelpOpen }) {
-                                    Text("?")
-                                }
-                            }
-                            if (svgHelpOpen) {
-                                SvgExportHelp()
-                            }
-                            SvgExportOption(
-                                title = "表示用SVG",
-                                sub = "Web表示向けの標準SVG",
-                                onClick = {
-                                    svgMenuOpen = false
-                                    svgHelpOpen = false
-                                    canvasMessage = "SVG export preparing..."
-                                    scope.launch {
-                                        canvasMessage = runCatching {
-                                            shareHistorySvg(context, it, "display")
-                                            "SVG exported F${it.renderHashShort}"
-                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
-                                    }
-                                },
-                            )
-                            SvgExportOption(
-                                title = "編集用SVG",
-                                sub = "編集用メタデータとIDを含む",
-                                onClick = {
-                                    svgMenuOpen = false
-                                    svgHelpOpen = false
-                                    canvasMessage = "SVG export preparing..."
-                                    scope.launch {
-                                        canvasMessage = runCatching {
-                                            shareHistorySvg(context, it, "editable")
-                                            "SVG exported F${it.renderHashShort}"
-                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
-                                    }
-                                },
-                            )
-                            SvgExportOption(
-                                title = "汎用SVG",
-                                sub = "互換性重視のポータブルSVG",
-                                onClick = {
-                                    svgMenuOpen = false
-                                    svgHelpOpen = false
-                                    canvasMessage = "SVG export preparing..."
-                                    scope.launch {
-                                        canvasMessage = runCatching {
-                                            shareHistorySvg(context, it, "compat")
-                                            "SVG exported F${it.renderHashShort}"
-                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
-                                    }
-                                },
-                            )
-                        }
-                    }
-                    Box {
-                        MiniPill(text = "PNG ▾", onClick = { pngMenuOpen = true })
-                        DropdownMenu(
-                            expanded = pngMenuOpen,
-                            onDismissRequest = { pngMenuOpen = false },
-                        ) {
-                            state.exportTemplates.forEach { template ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Column {
-                                            Text(template.name, style = MaterialTheme.typography.labelMedium)
-                                            Text(
-                                                exportTemplateDescription(template.description, template.heightPx),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        pngMenuOpen = false
-                                        pngExporting = true
-                                        canvasMessage = "PNG export preparing..."
-                                        scope.launch {
-                                            canvasMessage = runCatching {
-                                                shareHistoryPng(context, it, template.heightPx)
-                                                "PNG exported F${it.renderHashShort}"
-                                            }.getOrElse { error -> error.message ?: "PNG export failed." }
-                                            pngExporting = false
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
+                    Spacer(Modifier.weight(1f))
+                    MiniPill(text = "⬆ 書き出し", onClick = { exportSheetOpen = true })
                 }
             }
         }
+    }
+    if (!presentation && showControls && exportSheetOpen) item?.let {
+        ExportSheet(
+            item = it,
+            templates = state.exportTemplates,
+            onDismiss = { exportSheetOpen = false },
+            onEditTemplates = {
+                exportSheetOpen = false
+                viewModel.setTab(AppTab.Settings)
+                viewModel.setSettingsPane(SettingsPane.Export)
+            },
+            onExportSvg = { profile ->
+                exportSheetOpen = false
+                canvasMessage = "SVG export preparing..."
+                scope.launch {
+                    canvasMessage = runCatching {
+                        shareHistorySvg(context, it, profile)
+                        "SVG exported F${it.renderHashShort}"
+                    }.getOrElse { error -> error.message ?: "SVG export failed." }
+                }
+            },
+            onExportPng = { heightPx ->
+                exportSheetOpen = false
+                pngExporting = true
+                canvasMessage = "PNG export preparing..."
+                scope.launch {
+                    canvasMessage = runCatching {
+                        shareHistoryPng(context, it, heightPx)
+                        "PNG exported F${it.renderHashShort}"
+                    }.getOrElse { error -> error.message ?: "PNG export failed." }
+                    pngExporting = false
+                }
+            },
+        )
     }
     if (!presentation && showControls && pngExporting) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
@@ -1508,53 +1674,76 @@ private fun CanvasHeroCard(
     }
 }
 
+/**
+ * The one way a work leaves the app.
+ *
+ * Three destinations used to be spread over two dropdown menus hanging off the
+ * canvas card and a third pane in the settings, so "get a file out of this"
+ * had no single place to look. A bottom sheet is where Android puts a list of
+ * destinations, and it has room to say what each one is for -- the SVG profiles
+ * needed a help popover to explain themselves inside a dropdown.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExportSheet(
+    item: HistoryItemEntity,
+    templates: List<ExportTemplateEntity>,
+    onDismiss: () -> Unit,
+    onEditTemplates: () -> Unit,
+    onExportSvg: (String) -> Unit,
+    onExportPng: (Int) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Dimens.spaceXl)
+                .padding(bottom = Dimens.spaceXl),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        ) {
+            Text("書き出し  F${item.renderHashShort}", style = MaterialTheme.typography.titleMedium)
+            CompactLabel("SVG")
+            SvgExportOption(title = "表示用SVG", sub = "Web表示向けの標準SVG", onClick = { onExportSvg("display") })
+            SvgExportOption(title = "編集用SVG", sub = "編集用メタデータとIDを含む", onClick = { onExportSvg("editable") })
+            SvgExportOption(title = "汎用SVG", sub = "互換性重視のポータブルSVG", onClick = { onExportSvg("compat") })
+            CompactLabel("PNG")
+            templates.forEach { template ->
+                SvgExportOption(
+                    title = template.name,
+                    sub = exportTemplateDescription(template.description, template.heightPx),
+                    onClick = { onExportPng(template.heightPx) },
+                )
+            }
+            SecondarySmallButton(text = "テンプレートを編集", onClick = onEditTemplates)
+        }
+    }
+}
+
 @Composable
 private fun SvgExportOption(title: String, sub: String, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = {
-            Column {
-                Text(title, style = MaterialTheme.typography.labelMedium)
-                Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun SvgExportHelp() {
-    Column(
-        modifier = Modifier
-            .widthIn(min = Dimens.helpPopoverMinWidth, max = Dimens.renderTextViewHeight)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(Dimens.spaceXl),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
-        SvgExportHelpRow("表示用SVG", "Web表示", "標準表示向け")
-        SvgExportHelpRow("編集用SVG", "ベクター編集", "メタデータとIDを含む")
-        SvgExportHelpRow("汎用SVG", "外部共有", "互換性重視")
+        Column(
+            modifier = Modifier.padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceL),
+            verticalArrangement = Arrangement.spacedBy(Dimens.space2),
+        ) {
+            Text(title, style = MaterialTheme.typography.labelMedium)
+            Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
-@Composable
-private fun SvgExportHelpRow(format: String, use: String, feature: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), verticalAlignment = Alignment.Top) {
-        Text(format, modifier = Modifier.width(Dimens.helpLabelWidth), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-        Text(use, modifier = Modifier.width(Dimens.helpLabelWideWidth), style = MaterialTheme.typography.labelSmall)
-        Text(feature, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
+// `SvgExportHelp` and its row lived here: a popover inside the SVG dropdown
+// that explained what the three profiles were for. The bottom sheet says the
+// same thing on the destination itself, so the explanation no longer needs a
+// place to be opened from.
 
 private fun exportTemplateDescription(description: String, heightPx: Int): String {
     return description.ifBlank { "PNG / Y軸 ${heightPx}px" }
-}
-
-@Composable
-private fun ConditionChips(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow {
-        ChipButton("◐ ${ColorCatalogs.get(state.selectedCatalogId).name}", onClick = viewModel::openCatalogSelection)
-        ChipButton("◇ モデル", onClick = viewModel::openModelSelection)
-    }
 }
 
 /**
@@ -1590,88 +1779,85 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
     )
 }
 
+/**
+ * The description and the action that draws it.
+ *
+ * The settings that used to head this panel -- the model, the colour catalog,
+ * 写生 -- moved to [DrawSettingsPanel] above, which is now the only place any
+ * of them is opened from. What is left is the writing itself: the field, the
+ * draw, and 解釈 (the DDL) under it.
+ */
 @Composable
-private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+private fun DrawPanel(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    modifier: Modifier = Modifier,
+    onDescriptionFocusChanged: (Boolean) -> Unit = {},
+    onDescriptionPositioned: (Float) -> Unit = {},
+) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            CompactLabel("指示")
-            Spacer(Modifier.weight(1f))
-            MiniPill(
-                text = "◐ ${shortCatalogLabel(state)}",
-                onClick = viewModel::openCatalogSelection,
-                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
-            )
-            MiniPill(
-                text = "◇ ${shortModelLabel(state)}",
-                onClick = viewModel::openModelSelection,
-                modifier = Modifier.widthIn(max = Dimens.panelWideMaxWidth),
-            )
-            MiniPill("新規作成", onClick = viewModel::clearPrompt)
-        }
-        SketchModeRow(state, viewModel)
+        CompactLabel("記述")
         DenseMultilineInput(
             value = state.prompt,
             onValueChange = viewModel::setPrompt,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
             minLines = 5,
             maxLines = 8,
+            onFocusChanged = onDescriptionFocusChanged,
         )
-        DrawingActionButton(
-            idleText = "▶  描画する",
-            runningText = "■  描画中",
-            state = state,
-            onClick = viewModel::draw,
-            onStop = viewModel::stopDrawing,
-        )
+        // While the keyboard is up the same button is pinned above it, and two
+        // 「描画する」 on one screen is a question about which one draws.
+        if (!state.descriptionFocused) {
+            DrawingActionButton(
+                idleText = "▶  描画する",
+                runningText = "■  描画中",
+                state = state,
+                onClick = viewModel::draw,
+                onStop = viewModel::stopDrawing,
+            )
+        }
         state.message?.takeIf { it.isNotBlank() }?.let { message ->
             Text(message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            CompactLabel("解釈")
-            Spacer(Modifier.weight(1f))
-            DdlActionRow(state, viewModel)
-        }
-        if (state.saijikiOpen) {
-            SaijikiPanel(viewModel)
-        }
-        DdlPreviewBox(
-            value = state.ddl,
-            onClick = viewModel::openDdlEditor,
-            modifier = Modifier.fillMaxWidth(),
+        // 解釈 is the half of this screen one reaches for after the drawing, so
+        // it is what the simple display mode leaves out. Before this stage the
+        // mode's only effect was hiding the mascot and a duplicated chip row,
+        // and both of those are gone.
+        UiModeContainer(
+            uiMode = state.uiMode,
+            simpleContent = {},
+            fullContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                    ) {
+                        CompactLabel("解釈")
+                        Spacer(Modifier.weight(1f))
+                        DdlActionRow(state, viewModel)
+                    }
+                    if (state.saijikiOpen) {
+                        SaijikiPanel(viewModel)
+                    }
+                    DdlPreviewBox(
+                        value = state.ddl,
+                        onClick = viewModel::openDdlEditor,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    DrawingActionButton(
+                        idleText = "▶  DDLから描画",
+                        runningText = "■  描画中",
+                        state = state,
+                        onClick = viewModel::drawFromDdl,
+                        onStop = viewModel::stopDrawing,
+                        tonal = true,
+                    )
+                }
+            },
         )
-        DrawingActionButton(
-            idleText = "▶  DDLから描画",
-            runningText = "■  描画中",
-            state = state,
-            onClick = viewModel::drawFromDdl,
-            onStop = viewModel::stopDrawing,
-            tonal = true,
-        )
-    }
-}
-
-@Composable
-private fun InputSectionHeader(state: InkuUiState, viewModel: InkuViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        CompactLabel("指示")
-        WrapRow {
-            SecondarySmallButton(
-                text = ColorCatalogs.get(state.selectedCatalogId).name,
-                onClick = viewModel::openCatalogSelection,
-            )
-            PrimarySmallButton(
-                text = "モデル",
-                onClick = viewModel::openModelSelection,
-            )
-        }
     }
 }
 
@@ -1683,15 +1869,7 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            CompactLabel("バッチ")
-            Spacer(Modifier.weight(1f))
-            MiniPill("新規作成", onClick = viewModel::clearBatchText)
-        }
+        CompactLabel("バッチ")
         NumberedBatchTextField(
             value = state.batchText,
             onValueChange = viewModel::setBatchText,
@@ -2544,7 +2722,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
         }
         SettingsListItem(mark = "◇", title = "モデル設定", sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
-        SettingsListItem(mark = "◉", title = "デモ設定", sub = "シードフレーズ", onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
+        SettingsListItem(mark = "◉", title = "デモ", sub = "実行とシードフレーズ", onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
         SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
         SettingsListItem(mark = "◐", title = "その他", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(
@@ -2614,6 +2792,10 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
+        // The demo was the fifth bottom tab until 2026-08-08. M3 keeps that bar
+        // for the places one returns to, and the demo is started now and then,
+        // so the running of it sits here with the settings it runs under.
+        DemoPanel(state, viewModel)
         SettingsCard("シードフレーズ", "デモ指示文生成", "保存済み") {
             ImeAwareOutlinedTextField(
                 value = state.demoSeed,
@@ -3390,7 +3572,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "設定"
     SettingsPane.ModelSelection -> "モデル選択"
     SettingsPane.Models -> "モデル設定"
-    SettingsPane.Demo -> "デモ設定"
+    SettingsPane.Demo -> "デモ"
     SettingsPane.Export -> "エクスポート"
     SettingsPane.Misc -> "その他"
     SettingsPane.Version -> "バージョン情報"
@@ -3400,7 +3582,7 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
     SettingsPane.ModelSelection -> "Stage 1 / Stage 2 共通"
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
-    SettingsPane.Demo -> "seed phrase / interval"
+    SettingsPane.Demo -> "実行 / seed phrase / interval"
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> "言語・テーマ・密度"
     SettingsPane.Version -> "version / build"
@@ -4391,6 +4573,9 @@ private fun DenseMultilineInput(
     minLines: Int,
     maxLines: Int,
     enabled: Boolean = true,
+    // The screen, not the field, decides what follows the keyboard, so the
+    // focus has to leave the field.
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
@@ -4401,6 +4586,7 @@ private fun DenseMultilineInput(
         modifier = modifier
             .bringIntoViewRequester(bringIntoViewRequester)
             .onFocusChanged { focusState ->
+                onFocusChanged(focusState.isFocused)
                 if (focusState.isFocused) {
                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
@@ -4668,10 +4854,17 @@ private fun MetaPanel(
 
 @Composable
 private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
-    val base = modifier.background(
-        if (selected) MaterialTheme.colorScheme.primary else MiniPillSurface,
-        RoundedCornerShape(100),
-    )
+    // The pill is the app's densest control and it draws at about 26dp tall.
+    // `minimumInteractiveComponentSize` keeps that drawing and gives the touch
+    // the 48dp Android asks for; a pill with no `onClick` is a label and gets
+    // neither, since reserving a touch slot for something untouchable only
+    // spreads the row out.
+    val base = modifier
+        .then(if (onClick != null) Modifier.minimumInteractiveComponentSize() else Modifier)
+        .background(
+            if (selected) MaterialTheme.colorScheme.primary else MiniPillSurface,
+            RoundedCornerShape(100),
+        )
     Text(
         text,
         modifier = (onClick?.let { base.clickable(onClick = it) } ?: base).padding(horizontal = Dimens.spaceL, vertical = Dimens.space5),
@@ -4710,6 +4903,11 @@ private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier
 @Composable
 private fun PresentationControls(
     counter: String,
+    // The magnification reads here, where the magnifying is done. It used to be
+    // three pills over the small canvas on the compose screen, which was the one
+    // place zoom was not wanted.
+    zoomPercent: Int,
+    onResetZoom: () -> Unit,
     starred: Boolean,
     canGoOlder: Boolean,
     canGoLatest: Boolean,
@@ -4749,6 +4947,12 @@ private fun PresentationControls(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
+            PresentationControlButton(
+                "${zoomPercent}%",
+                wide = true,
+                enabled = zoomPercent != (CANVAS_FIT_ZOOM * 100).toInt(),
+                onClick = onResetZoom,
+            )
             PresentationControlButton("★", selected = starred, enabled = canToggleStar, onClick = onToggleStar)
             PresentationControlButton("▭", selected = captionVisible, enabled = captionEnabled, onClick = onToggleCaption)
             PresentationControlButton("×", onClick = onClose)
@@ -4775,6 +4979,7 @@ private fun PresentationControlButton(
     }
     Box(
         modifier = Modifier
+            .minimumInteractiveComponentSize()
             .then(if (wide) Modifier.widthIn(min = Dimens.buttonHeightMedium) else Modifier.size(Dimens.controlSizeMedium))
             .height(Dimens.controlSizeMedium)
             .background(background, shape)
@@ -5360,6 +5565,20 @@ private fun svgAspectRatio(svgText: String): Float? {
     val width = SvgWidthRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()
     val height = SvgHeightRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()
     return if (width != null && height != null && width > 0f && height > 0f) width / height else null
+}
+
+/**
+ * The width the work asks to be drawn at, in its own units.
+ *
+ * The same two regexes [svgAspectRatio] reads, in the same order: the viewBox
+ * is authoritative, and a bare `width=` is the fallback for anything that has
+ * no viewBox.
+ */
+private fun svgIntrinsicWidth(svgText: String): Float? {
+    SvgViewBoxRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()?.let { width ->
+        if (width > 0f) return width
+    }
+    return SvgWidthRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()?.takeIf { it > 0f }
 }
 
 private fun hash01(index: Int, seed: String): Double {

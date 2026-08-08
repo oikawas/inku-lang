@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -70,6 +71,18 @@ const val LANGUAGE_SELECT_PROMPT = "比較する組み合わせを1つ以上選�
 const val LANGUAGE_COMBO_BLOCKED = "対象作品と同じ言語の組み合わせは選べません。"
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
+
+// The magnification range web offers in `CanvasPanel.svelte:45-51`. The port
+// takes the same numbers rather than a phone-sized guess: the same work has to
+// be readable to the same depth on both.
+const val CANVAS_ZOOM_MIN = 0.25f
+const val CANVAS_ZOOM_MAX = 10.0f
+
+/** The whole work on screen. Only the full screen leaves it. */
+const val CANVAS_FIT_ZOOM = 1.0f
+
+/** Float slack for "is it back at fit", which a pinch never lands on exactly. */
+const val CANVAS_ZOOM_EPSILON = 0.01f
 
 /** 日本語 / English, the two names the language grid shows. */
 fun languageLabel(lang: String): String = if (lang == "en") "English" else "日本語"
@@ -133,6 +146,10 @@ data class InkuUiState(
     val ddlAutoRepairEnabled: Boolean = false,
     val litertStage1PromptOptimization: Boolean = false,
     val saijikiOpen: Boolean = false,
+    // Whether the description is being written. The bottom bar reads it: while
+    // the keyboard is up, the four destinations give their place to the one
+    // action the writing is heading for.
+    val descriptionFocused: Boolean = false,
     val ddlEditorOpen: Boolean = false,
     val isDrawing: Boolean = false,
     val message: String? = null,
@@ -174,7 +191,19 @@ data class InkuUiState(
     val modelCompareFixedModel: String = "",
     val modelCompareSelectedModels: List<String> = emptyList(),
     val languageCompareSelectedCombos: List<String> = emptyList(),
-)
+) {
+    /**
+     * Whether any operation is running.
+     *
+     * web has no such flag: every running operation renders `RunStatus.svelte`
+     * itself, so the condition is spread over the components. The port needs the
+     * union in one place, because Android shows one status row for the whole
+     * screen. `isDrawing` covers the single draw, the batch, the demo and the
+     * DDL editor's draw; `refinementBusy` covers the lineage's refinement and
+     * the model and language comparisons.
+     */
+    val isRunning: Boolean get() = isDrawing || refinementBusy
+}
 
 /**
  * The three sub-views of 推敲 (SPEC `:616`, `:686`).
@@ -249,7 +278,9 @@ enum class AppTab {
     // (CanvasPanel.svelte:517). A phone has no room next to the canvas for a
     // tree, so it gets a screen of its own; author's ruling, 2026-08-07.
     Lineage,
-    Demo,
+    // The demo used to be the fifth destination here. M3 reserves the bottom bar
+    // for the places one goes back to; the demo is run once in a while, so it
+    // lives under `SettingsPane.Demo` beside its own settings (ruling 2026-08-08).
     Settings,
 }
 
@@ -579,35 +610,77 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(composeMode = mode)
     }
 
+    fun setDescriptionFocused(focused: Boolean) {
+        if (localState.value.descriptionFocused == focused) return
+        localState.value = localState.value.copy(descriptionFocused = focused)
+    }
+
     fun setRenderTab(tab: RenderTab) {
         localState.value = localState.value.copy(renderTab = tab)
     }
 
     fun setCanvasZoom(value: Float) {
-        localState.value = localState.value.copy(canvasZoom = value.coerceIn(0.5f, 8.0f), canvasPresentationMode = false)
+        localState.value = localState.value.copy(canvasZoom = value.coerceIn(CANVAS_ZOOM_MIN, CANVAS_ZOOM_MAX))
     }
 
     fun scaleCanvasZoom(multiplier: Float) {
         val current = localState.value
-        localState.value = current.copy(canvasZoom = (current.canvasZoom * multiplier).coerceIn(0.5f, 8.0f))
+        localState.value = current.copy(canvasZoom = (current.canvasZoom * multiplier).coerceIn(CANVAS_ZOOM_MIN, CANVAS_ZOOM_MAX))
     }
 
+    /** Back to fit. The pan goes with it: an unzoomed canvas cannot be off-centre. */
     fun resetCanvasZoom() {
-        localState.value = localState.value.copy(canvasZoom = 1.0f, canvasPanX = 0f, canvasPanY = 0f, canvasPresentationMode = false)
+        localState.value = localState.value.copy(canvasZoom = CANVAS_FIT_ZOOM, canvasPanX = 0f, canvasPanY = 0f)
+    }
+
+    /**
+     * The double tap in presentation: fit <-> 1:1, as web's `CanvasPanel` does.
+     *
+     * The caller measures `oneToOneZoom`, because only the layout knows how many
+     * pixels the fitted artwork got. Off fit, the tap always returns to fit --
+     * that is the state one wants back after looking closely.
+     */
+    fun toggleCanvasZoom(oneToOneZoom: Float) {
+        val current = localState.value
+        val atFit = abs(current.canvasZoom - CANVAS_FIT_ZOOM) < CANVAS_ZOOM_EPSILON
+        if (!atFit) {
+            resetCanvasZoom()
+            return
+        }
+        localState.value = current.copy(
+            canvasZoom = oneToOneZoom.coerceIn(CANVAS_ZOOM_MIN, CANVAS_ZOOM_MAX),
+            canvasPanX = 0f,
+            canvasPanY = 0f,
+        )
     }
 
     fun enterCanvasPresentationMode() {
         localState.value = localState.value.copy(
-            canvasZoom = 1.0f,
+            canvasZoom = CANVAS_FIT_ZOOM,
             canvasPanX = 0f,
             canvasPanY = 0f,
             canvasPresentationMode = true,
         )
     }
 
+    /**
+     * Leave the full screen.
+     *
+     * This used to be `resetCanvasZoom`, which meant the close button and the
+     * zoom reset were the same call and neither could be done without the other.
+     */
+    fun exitCanvasPresentationMode() {
+        localState.value = localState.value.copy(
+            canvasZoom = CANVAS_FIT_ZOOM,
+            canvasPanX = 0f,
+            canvasPanY = 0f,
+            canvasPresentationMode = false,
+        )
+    }
+
     fun panCanvas(dx: Float, dy: Float) {
         val current = localState.value
-        if (current.canvasZoom <= 1.0f) return
+        if (current.canvasZoom <= CANVAS_FIT_ZOOM) return
         localState.value = current.copy(
             canvasPanX = (current.canvasPanX + dx).coerceIn(-500f, 500f),
             canvasPanY = (current.canvasPanY + dy).coerceIn(-500f, 500f),

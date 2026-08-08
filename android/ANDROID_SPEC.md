@@ -2336,3 +2336,75 @@ carries the parent's sketch prose.
 **The sketch layer was set to the server's 0.3, but Android's Stage 1 is 0.2 and Stage 2 is 0.1.**
 **That divergence predates the sketch layer** and was not touched here. **It is recorded as pending
 a ruling on [I-159].**
+
+---
+
+## 2026-08-08 Naming what the app draws with (UI redesign, stage A / android `2.1.4-android.17`)
+
+**The app can now name its drawing materials by what they are for, not by their value.** Not one
+pixel moved.
+
+### Every literal lived in one file
+
+Before the move, the materials **sat as literals inside `ui/InkuApp.kt`** — colours in **89 places
+(57 values)**, `.dp` in **429 places (54 values)**, `.sp` in **8 places (5 values)**. Across 5,773
+lines, none of those 526 numbers carried the name of a role. `Color(0xFF34302B)` appears four times
+as the hairline around a card, and **nowhere said so.**
+
+**The other 68 files held zero literals of all three kinds.** Not because the discipline held, but
+because **only one file drew screens.**
+
+### Three files under `ui/theme/`
+
+| file | what it holds |
+|---|---|
+| `Color.kt` | `InkuColors` (9 roles) plus **65 tokens naming the 57 values by their use** |
+| `Dimens.kt` | **new**. The **53 dp values** except `0.dp` (plus 3 aliases) |
+| `Type.kt` | The **5 hand-set sp values**, and a record of which M3 steps the screens use |
+
+**Colours are named for their role** — `CardHairline`, not `Ink34302B` — the rule the web side
+follows with `--action-bg` / `--accent`. **Two roles that share an ARGB were given two names**
+(`background` and `PresentationDarkBackground` are both `0xFF11100F`, but they are **two decisions
+that only currently agree**). That is why there are 65 tokens rather than 57: **gaining is normal,
+losing is the regression.**
+
+### No value moved
+
+The 53 dp values are not on a 4dp grid — **22 of them sit off it**. **The pull to tidy them is
+real, and was not acted on.** If stage A and stage B (the navigation work) both move pixels in the
+same round, **there is no way to tell which one moved them** — the same reason the engine versions
+are kept on a single line. Pulling the values onto a grid belongs to stage B, where the screens get
+rebuilt anyway.
+
+### Zero gets no token
+
+**"No padding" is not a measurement.** The **20** occurrences of `PaddingValues(0.dp)` stay literal,
+and **that is the only exception.** (Counting them has a trap: `grep -c '0\.dp'` also matches the
+tail of `10.dp` and `20.dp`, which in this file returns 68 false hits against 20 real ones. **Match
+the whole literal.**)
+
+### The gates live in the server's pytest
+
+**The extraction happens once; literals come back every round.** Each new screen makes writing
+`12.dp` on the spot faster than looking up `Dimens.spaceXl`. **With nothing guarding it, a token
+layer is at its most consistent on the day it is built.**
+
+The six checks (T-4..T-9) are in `server/tests/test_android_names_what_it_draws_with.py`. **The
+server's pytest runs in every acceptance round; Gradle only runs in rounds that touch `android/`.**
+Following the four existing precedents, they skip on the absence of the `android/` **directory**.
+
+**T-7 freezes the zero across every Kotlin file outside `theme/`.** If T-4..T-6 watched only
+`InkuApp.kt`, **a round that built a new screen in a new file would sail straight through** — a hole
+shaped like guarding one file instead of guarding the rule.
+
+### What goes to Claude Design
+
+`android/design/gen_design_preview.py` reads the three Kotlin token files and bakes
+`design/preview/*.html`. **It parses source and needs neither Gradle nor the Android SDK** — **a
+generator CI cannot run defeats the point of baking the files at all**, since a check nobody runs
+reports a stale preview as green. Each page carries an `@dsCard` marker on its first line, and a
+third job in `reference-corpus.yml` **requires byte identity**.
+
+**T-8 is a regenerated record, not a check of a property.** It says nothing about whether the tokens
+are right. **That is why it sits paired with T-4..T-7** — one side holds "literals do not come
+back", the other holds "the Claude Design copy does not go stale". **Neither one alone is enough.**

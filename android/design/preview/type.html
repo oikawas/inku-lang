@@ -1,0 +1,44 @@
+<!-- @dsCard group="Type" -->
+<!doctype html>
+<meta charset="utf-8">
+<title>inku Android — Type</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 32px;
+    background: #11100f; color: #ede7de;
+    font: 14px/1.6 -apple-system, "Helvetica Neue", "Hiragino Sans", sans-serif;
+  }
+  h1 { font-size: 21px; font-weight: 600; margin: 0 0 4px; }
+  .lede { color: #cfc6ba; max-width: 62ch; margin: 0 0 28px; }
+  h2 {
+    font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: #cfc6ba; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #34302b;
+  }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+  .tile { background: #181715; border: 1px solid #34302b; border-radius: 14px; padding: 12px; }
+  .swatch {
+    height: 56px; border-radius: 8px; border: 1px solid #66000000;
+    background-image: linear-gradient(45deg, #2a2622 25%, transparent 25%),
+                      linear-gradient(-45deg, #2a2622 25%, transparent 25%),
+                      linear-gradient(45deg, transparent 75%, #2a2622 75%),
+                      linear-gradient(-45deg, transparent 75%, #2a2622 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+    margin-bottom: 10px; position: relative; overflow: hidden;
+  }
+  .swatch span { position: absolute; inset: 0; }
+  .name { font-weight: 600; word-break: break-word; }
+  .value { color: #cfc6ba; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .doc { color: #cfc6ba; margin-top: 6px; }
+  .bar { background: #7fa6d8; height: 10px; border-radius: 5px; margin: 10px 0; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #24211e; vertical-align: baseline; }
+  th { color: #cfc6ba; font-weight: 600; font-size: 12px; }
+  td.n { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  .role { display: flex; align-items: center; gap: 10px; }
+  .chip { width: 22px; height: 22px; border-radius: 4px; border: 1px solid #514a43; flex: none; }
+</style>
+<h1>inku Android — Type</h1>
+<p class="lede">Type sizes the app sets by hand, and a record of which Material scale steps it actually leans on.</p>
+<h2>Hand-set sizes</h2><p class="lede">The eight places that override a size or a line height on top of a Material scale step. The preview column is rendered in CSS px, which is a sketch of the relationship, not the device rendering.</p><table><tr><th>token</th><th>value</th><th>preview</th><th>where</th></tr><tr><td><code>labelTiny</code></td><td class="n">11sp</td><td style="font-size:11px">Aa 墨 いろは</td><td>11sp. The model picker&#x27;s action buttons, which must fit on one line.</td></tr><tr><td><code>editorBody</code></td><td class="n">16sp</td><td style="font-size:16px">Aa 墨 いろは</td><td>16sp. The multi-line DDL input, sized up from the scale step for editing.</td></tr><tr><td><code>denseLineHeight</code></td><td class="n">17sp</td><td style="font-size:17px">Aa 墨 いろは</td><td>17sp. Line height for dense monospace-ish text: the DDL preview and inputs.</td></tr><tr><td><code>editorLineHeight</code></td><td class="n">21sp</td><td style="font-size:21px">Aa 墨 いろは</td><td>21sp. Line height paired with [editorBody].</td></tr><tr><td><code>proseLineHeight</code></td><td class="n">22sp</td><td style="font-size:22px">Aa 墨 いろは</td><td>22sp. Line height for the demo panel&#x27;s prose.</td></tr></table><h2>Which scale steps the screens use</h2><p class="lede">The app defines no <code>Typography</code> of its own; all 140 text styles come from M3's default scale. The distribution is the useful part: <code>labelSmall</code> carries more than half of all text.</p><table><tr><th>step</th><th>uses</th><th>what it carries</th></tr><tr><td><code>labelSmall</code></td><td class="n">73</td><td>the app&#x27;s workhorse -- chips, units, hints</td></tr><tr><td><code>bodySmall</code></td><td class="n">28</td><td>prose in cards and dialogs</td></tr><tr><td><code>labelMedium</code></td><td class="n">11</td><td>buttons and tabs</td></tr><tr><td><code>titleSmall</code></td><td class="n">7</td><td>card headings</td></tr><tr><td><code>bodyMedium</code></td><td class="n">6</td><td>longer prose</td></tr><tr><td><code>titleMedium</code></td><td class="n">5</td><td>dialog headings</td></tr><tr><td><code>labelLarge</code></td><td class="n">4</td><td>primary action labels</td></tr><tr><td><code>headlineSmall</code></td><td class="n">4</td><td>screen headings</td></tr><tr><td><code>titleLarge</code></td><td class="n">2</td><td>the presentation caption</td></tr></table>

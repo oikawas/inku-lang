@@ -41,3 +41,19 @@ jobs:
         run: |
           git diff --exit-code -- server/reference/
           test -z "$(git status --porcelain --untracked-files=all -- server/reference/)"
+
+  android-design-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Regenerate Android design preview
+        run: uv run python android/design/gen_design_preview.py
+      - name: Require byte-identical frozen output
+        run: |
+          git diff --exit-code -- android/design/preview/
+          test -z "$(git status --porcelain --untracked-files=all -- android/design/preview/)"

@@ -1,6 +1,7 @@
 package app.inku.mobile.ui
 
 import app.inku.mobile.ui.mascot.MascotArt
+import app.inku.mobile.ui.theme.*
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -175,23 +176,6 @@ import com.caverock.androidsvg.SVG
 import org.json.JSONArray
 import org.json.JSONObject
 
-private val InkuColors = darkColorScheme(
-    background = Color(0xFF11100F),
-    surface = Color(0xFF181715),
-    surfaceVariant = Color(0xFF24211E),
-    primary = Color(0xFF7FA6D8),
-    secondary = Color(0xFFEAD7A3),
-    outline = Color(0xFF514A43),
-    onBackground = Color(0xFFEDE7DE),
-    onSurface = Color(0xFFEDE7DE),
-    onSurfaceVariant = Color(0xFFCFC6BA),
-)
-
-private val ServerCanvasAreaColor = Color(0xFF20201F)
-private val ServerCanvasBoxColor = Color(0xFF242321)
-private val ServerCanvasPaperColor = Color(0xFFF5F1E9)
-private val PresentationDarkBackground = Color(0xFF11100F)
-private val PresentationLightBackground = Color(0xFFF8F8F6)
 private const val HISTORY_SWIPE_MIN_DISTANCE_PX = 96f
 private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
 private const val PRESENTATION_PREFS_NAME = "presentation_preferences"
@@ -310,15 +294,15 @@ internal val saijikiGroups = listOf(
 )
 
 private val saijikiGroupColors = listOf(
-    Color(0xFFEAD7A3),
-    Color(0xFF9CC6E8),
-    Color(0xFFB8D58A),
-    Color(0xFFE08A7A),
-    Color(0xFFD2B7F0),
-    Color(0xFF8FD8C1),
-    Color(0xFFF2B66D),
-    Color(0xFFAEB7D8),
-    Color(0xFFE7A9C1),
+    SaijikiGroupSand,
+    SaijikiGroupSky,
+    SaijikiGroupLeaf,
+    SaijikiGroupClay,
+    SaijikiGroupIris,
+    SaijikiGroupMint,
+    SaijikiGroupAmber,
+    SaijikiGroupSlate,
+    SaijikiGroupBlossom,
 )
 
 @Composable
@@ -354,8 +338,8 @@ fun InkuApp() {
                             HistoryScreen(state, history, viewModel)
                         }
                         AppTab.Lineage -> LineageScreen(state, viewModel)
-                        AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
-                        AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(12.dp))
+                        AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl))
+                        AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl))
                     }
                 }
                 if (state.confirmDdlOverwrite) {
@@ -390,7 +374,7 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 TextButton(onClick = viewModel::cancelDdlOverwrite) {
                     Text("キャンセル")
                 }
@@ -450,19 +434,19 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .imePadding()
-                .padding(12.dp),
-            shape = RoundedCornerShape(6.dp),
+                .padding(Dimens.spaceXl),
+            shape = RoundedCornerShape(Dimens.spaceS),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
+            tonalElevation = Dimens.spaceS,
         ) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize().padding(Dimens.spaceL),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
                     Text("DDL編集", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
@@ -523,7 +507,7 @@ private fun DdlSelectedVocabularyHeader(selectedWord: DdlVocabularyToken?) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
     ) {
         Text(
             "選択中",
@@ -634,11 +618,11 @@ private fun DdlVocabularyBar(
             )
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
         ) {
             MiniPill(if (open) "素材を閉じる" else "素材", selected = open, onClick = onToggle)
             if (selectedWord != null) {
@@ -656,7 +640,7 @@ private fun DdlVocabularyBar(
             }
         }
         if (prioritizedDetectedWords.isNotEmpty()) {
-            WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+            WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
                 prioritizedDetectedWords.take(12).forEach { token ->
                     DdlVocabularyPill(token = token, selected = token.word == selectedWord?.word, onClick = { onSelectDetected(token.word) })
                 }
@@ -665,12 +649,12 @@ private fun DdlVocabularyBar(
         if (open) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(max = 248.dp),
+                shape = RoundedCornerShape(Dimens.spaceS),
+                modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.vocabularyBarMaxHeight),
             ) {
                 Column(
-                    modifier = Modifier.padding(8.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(Dimens.spaceM).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
                     DenseSingleLineInput(
                         value = query,
@@ -679,13 +663,13 @@ private fun DdlVocabularyBar(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     prioritizedGroups.forEach { group ->
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                             Text(
                                 if (selectedWord?.group?.label == group.label) "${group.label} / 代替候補" else group.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                            WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
                                 group.words.forEach { word ->
                                     val token = tokenForWord(word)
                                     if (token != null) {
@@ -706,13 +690,13 @@ private fun DdlVocabularyBar(
 @Composable
 private fun DdlVocabularyPill(token: DdlVocabularyToken, selected: Boolean = false, onClick: () -> Unit) {
     val background = if (selected) token.color else token.color.copy(alpha = 0.84f)
-    val foreground = if (isLightColor(background)) Color(0xFF12110F) else Color(0xFFF8F8F6)
+    val foreground = if (isLightColor(background)) PillInkOnLight else PillInkOnDark
     Text(
         token.word,
         modifier = Modifier
-            .background(background, RoundedCornerShape(3.dp))
+            .background(background, RoundedCornerShape(Dimens.radiusXs))
             .clickable(onClick = onClick)
-            .padding(horizontal = 5.dp, vertical = 2.dp),
+            .padding(horizontal = Dimens.space5, vertical = Dimens.space2),
         style = MaterialTheme.typography.labelSmall,
         color = foreground,
         maxLines = 1,
@@ -731,8 +715,8 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
         title = { Text("モデル選択") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.modelDialogMaxHeight).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
             ) {
                 WebStyleModelStageEditor(
                     title = "描画モデル",
@@ -771,20 +755,20 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
         title = { Text("色カタログ") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().height(560.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth().height(Dimens.colorCatalogDialogHeight).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
             ) {
                 ColorCatalogs.all.forEach { catalog ->
                     val active = catalog.id == state.selectedCatalogId
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable { viewModel.setCatalog(catalog.id) },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (active) Color(0x1AEAD7A3) else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(Dimens.spaceM),
+                        color = if (active) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
-                            modifier = Modifier.padding(10.dp),
+                            modifier = Modifier.padding(Dimens.spaceL),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
                         ) {
                             SwatchStrip(catalog.swatches.take(8))
                             Column(modifier = Modifier.weight(1f)) {
@@ -797,12 +781,12 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                 }
                 SettingsSectionHeader(current.name.uppercase(), "カタログ詳細")
                 current.map.forEach { (name, code) ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
-                                .background(parseColor(code), RoundedCornerShape(3.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(3.dp)),
+                                .size(Dimens.space28)
+                                .background(parseColor(code), RoundedCornerShape(Dimens.radiusXs))
+                                .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusXs)),
                         )
                         Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                         Text(code, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -826,8 +810,8 @@ private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewM
         title = { Text("キャンバス") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().height(460.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().height(Dimens.aspectDialogHeight).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 CanvasAspects.all.forEach { aspect ->
                     val active = aspect.id == state.selectedCanvasAspect
@@ -836,18 +820,18 @@ private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                             viewModel.setCanvasAspect(aspect.id)
                             viewModel.closeTransientPanel()
                         },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (active) Color(0x1AEAD7A3) else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(Dimens.spaceM),
+                        color = if (active) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
-                            modifier = Modifier.padding(10.dp),
+                            modifier = Modifier.padding(Dimens.spaceL),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(34.dp)
-                                    .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(3.dp))
+                                    .size(Dimens.controlSizeMedium)
+                                    .border(Dimens.hairline, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(Dimens.radiusXs))
                                     .aspectRatio(aspect.ratioW.toFloat() / aspect.ratioH.toFloat()),
                             )
                             Column(modifier = Modifier.weight(1f)) {
@@ -879,19 +863,19 @@ private fun WebStyleModelStageEditor(
     val selectedProvider = providers.firstOrNull { it.providerId == selectedProviderId } ?: providers.firstOrNull()
     val models = modelOptionsForProvider(state, selectedProviderId)
     var providerMenuOpen by remember(title, selectedProviderId) { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         SettingsSectionHeader(title.uppercase(), sub)
         CompactLabel("Provider")
         Box(modifier = Modifier.fillMaxWidth()) {
             Surface(
                 modifier = Modifier.fillMaxWidth().clickable { providerMenuOpen = true },
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(Dimens.spaceM),
                 color = MaterialTheme.colorScheme.surface,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth().border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceM)).padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceL),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
                     Text(selectedProvider?.displayName ?: selectedProviderId, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("▼", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -924,20 +908,20 @@ private fun WebStyleModelStageEditor(
         if (models.isEmpty()) {
             Text("公開モデルは未選択です。接続先設定でモデルを選択してください。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
                 models.forEach { option ->
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable { onSelectModel(option.qualifiedId) },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (option.qualifiedId == selectedModelId) Color(0x1AEAD7A3) else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(Dimens.spaceM),
+                        color = if (option.qualifiedId == selectedModelId) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.space9),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
-                            Text(if (option.qualifiedId == selectedModelId) "✓" else "", modifier = Modifier.width(18.dp), color = MaterialTheme.colorScheme.secondary)
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(if (option.qualifiedId == selectedModelId) "✓" else "", modifier = Modifier.width(Dimens.space18), color = MaterialTheme.colorScheme.secondary)
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
                                 Text(option.label, style = MaterialTheme.typography.bodySmall)
                                 if (option.notes != null) {
                                     Text(option.notes, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -955,16 +939,16 @@ private fun WebStyleModelStageEditor(
 private fun SaijikiPanel(viewModel: InkuViewModel) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
             Text("歳時記", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
             Text("語を押すと DDL 編集欄へ挿入します。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             saijikiGroups.forEach { group ->
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
                     Text("${group.label} / ${group.en}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
                         group.words.forEach { word ->
                             MiniPill(word, onClick = { viewModel.insertDdlWord(word) })
                         }
@@ -1008,16 +992,16 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
     Surface(
         modifier = Modifier
             .navigationBarsPadding()
-            .border(1.dp, Color(0xFF26221E)),
+            .border(Dimens.hairline, BottomNavDivider),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
+        tonalElevation = Dimens.space2,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp)
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .height(Dimens.bottomNavHeight)
+                .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
         ) {
             AppTab.entries.forEach { tab ->
                 val label = when (tab) {
@@ -1052,8 +1036,8 @@ private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(100))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(Dimens.spaceXs),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
     ) {
         ComposeMode.entries.forEach { tab ->
             val active = selected == tab
@@ -1064,11 +1048,11 @@ private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
             Surface(
                 modifier = Modifier
                     .weight(1f)
-                    .height(40.dp)
+                    .height(Dimens.buttonHeightSmall)
                     .clickable { viewModel.setComposeMode(tab) },
                 shape = RoundedCornerShape(100),
                 color = if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                tonalElevation = if (active) 2.dp else 0.dp,
+                tonalElevation = if (active) Dimens.space2 else 0.dp,
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Text(
@@ -1120,8 +1104,8 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = Dimens.space20, vertical = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         ComposeModeTabs(state.composeMode, viewModel)
         if (state.composeMode == ComposeMode.Batch) {
@@ -1134,13 +1118,13 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             UiModeContainer(
                 uiMode = state.uiMode,
                 simpleContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
                         CanvasHeroCard(state, viewModel)
                         DrawPanel(state, viewModel)
                     }
                 },
                 fullContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
                         MascotWidget(mascotKind = state.mascotKind)
                         ConditionChips(state, viewModel)
                         CanvasHeroCard(state, viewModel)
@@ -1149,7 +1133,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                 },
             )
         }
-        Spacer(Modifier.height(96.dp))
+        Spacer(Modifier.height(Dimens.scrollTailSpace))
     }
 }
 
@@ -1159,7 +1143,7 @@ private fun CanvasHeroCard(
     viewModel: InkuViewModel,
     modifier: Modifier = Modifier.fillMaxWidth(),
     showControls: Boolean = true,
-    maxPreviewHeight: Dp = 330.dp,
+    maxPreviewHeight: Dp = Dimens.heroPreviewMaxHeight,
     canvasAspectOverride: String? = null,
     deviceRotation: DeviceRotation = DeviceRotation.Portrait,
 ) {
@@ -1212,12 +1196,12 @@ private fun CanvasHeroCard(
         val canGoNewer = historyIndex > 0
         val canGoOlder = historyIndex >= 0 && historyIndex < historyItems.lastIndex
         val historyCounter = if (historyIndex >= 0 && historyTotal > 0) "${historyIndex + 1} / $historyTotal" else ""
-        Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             if (!presentation && showControls) {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.align(Alignment.CenterStart),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         item?.let {
@@ -1234,7 +1218,7 @@ private fun CanvasHeroCard(
                     }
                     Row(
                         modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         MiniPill("-", onClick = { viewModel.setCanvasZoom(state.canvasZoom - 0.25f) })
@@ -1244,16 +1228,16 @@ private fun CanvasHeroCard(
                     MiniPill(
                         shortCanvasLabel(state),
                         onClick = viewModel::openCanvasSelection,
-                        modifier = Modifier.align(Alignment.CenterEnd).widthIn(max = 72.dp),
+                        modifier = Modifier.align(Alignment.CenterEnd).widthIn(max = Dimens.heroCaptionMaxWidth),
                     )
                 }
             }
             Surface(
                 modifier = (if (presentation) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(previewHeight))
-                    .border(1.dp, Color(0x1A000000)),
+                    .border(Dimens.hairline, HeroCardHairline),
                 color = if (presentation) presentationBackground else ServerCanvasAreaColor,
                 shape = RoundedCornerShape(0.dp),
-                tonalElevation = 1.dp,
+                tonalElevation = Dimens.hairline,
             ) {
                 Box(
                     modifier = Modifier
@@ -1328,16 +1312,16 @@ private fun CanvasHeroCard(
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(end = 16.dp, bottom = 78.dp),
+                                .padding(end = Dimens.radiusLarge, bottom = Dimens.heroOverlayBottomInset),
                             shape = RoundedCornerShape(100),
-                            color = Color(0xCC11100F),
-                            border = BorderStroke(1.dp, Color(0x55EDE7DE)),
+                            color = HeroOverlayScrim,
+                            border = BorderStroke(Dimens.hairline, HeroOverlayHairline),
                         ) {
                             Text(
                                 "残り ${state.demoWaitingSeconds}秒",
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceM),
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Color(0xFFEDE7DE),
+                                color = HeroOverlayInk,
                             )
                         }
                     }
@@ -1352,7 +1336,7 @@ private fun CanvasHeroCard(
                         PresentationControls(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
+                                .padding(start = Dimens.spaceXl, end = Dimens.spaceXl, bottom = Dimens.spaceXxl),
                             counter = historyCounter,
                             starred = item?.starred == true,
                             canGoOlder = canGoOlder,
@@ -1402,9 +1386,9 @@ private fun CanvasHeroCard(
                             },
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceM),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
                             ) {
                                 Text(
                                     "SVG export",
@@ -1505,8 +1489,8 @@ private fun CanvasHeroCard(
         }
     }
     if (!presentation && showControls && pngExporting) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(modifier = Modifier.size(Dimens.spaceXxl), strokeWidth = Dimens.space2)
             Text(canvasMessage ?: "PNG export preparing...", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
     } else if (!presentation && showControls) {
@@ -1517,9 +1501,9 @@ private fun CanvasHeroCard(
             RenderTab.Artwork -> Unit
             RenderTab.Prompt -> RenderTextView(
                 renderPromptText(it, state.litertStage1PromptOptimization),
-                Modifier.fillMaxWidth().height(360.dp),
+                Modifier.fillMaxWidth().height(Dimens.renderTextViewHeight),
             )
-            RenderTab.Json -> RenderTextView(renderJsonText(it), Modifier.fillMaxWidth().height(360.dp))
+            RenderTab.Json -> RenderTextView(renderJsonText(it), Modifier.fillMaxWidth().height(Dimens.renderTextViewHeight))
         }
     }
 }
@@ -1541,10 +1525,10 @@ private fun SvgExportOption(title: String, sub: String, onClick: () -> Unit) {
 private fun SvgExportHelp() {
     Column(
         modifier = Modifier
-            .widthIn(min = 260.dp, max = 360.dp)
+            .widthIn(min = Dimens.helpPopoverMinWidth, max = Dimens.renderTextViewHeight)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         SvgExportHelpRow("表示用SVG", "Web表示", "標準表示向け")
         SvgExportHelpRow("編集用SVG", "ベクター編集", "メタデータとIDを含む")
@@ -1554,9 +1538,9 @@ private fun SvgExportHelp() {
 
 @Composable
 private fun SvgExportHelpRow(format: String, use: String, feature: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-        Text(format, modifier = Modifier.width(76.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-        Text(use, modifier = Modifier.width(82.dp), style = MaterialTheme.typography.labelSmall)
+    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), verticalAlignment = Alignment.Top) {
+        Text(format, modifier = Modifier.width(Dimens.helpLabelWidth), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+        Text(use, modifier = Modifier.width(Dimens.helpLabelWideWidth), style = MaterialTheme.typography.labelSmall)
         Text(feature, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -1586,7 +1570,7 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         CompactLabel("写生")
         Spacer(Modifier.weight(1f))
@@ -1608,23 +1592,23 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
 
 @Composable
 private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             CompactLabel("指示")
             Spacer(Modifier.weight(1f))
             MiniPill(
                 text = "◐ ${shortCatalogLabel(state)}",
                 onClick = viewModel::openCatalogSelection,
-                modifier = Modifier.widthIn(max = 112.dp),
+                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
             )
             MiniPill(
                 text = "◇ ${shortModelLabel(state)}",
                 onClick = viewModel::openModelSelection,
-                modifier = Modifier.widthIn(max = 124.dp),
+                modifier = Modifier.widthIn(max = Dimens.panelWideMaxWidth),
             )
             MiniPill("新規作成", onClick = viewModel::clearPrompt)
         }
@@ -1649,7 +1633,7 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             CompactLabel("解釈")
             Spacer(Modifier.weight(1f))
@@ -1676,7 +1660,7 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
 
 @Composable
 private fun InputSectionHeader(state: InkuUiState, viewModel: InkuViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         CompactLabel("指示")
         WrapRow {
             SecondarySmallButton(
@@ -1697,12 +1681,12 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
     val nonEmpty = lines.count { it.trim().isNotBlank() }
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             CompactLabel("バッチ")
             Spacer(Modifier.weight(1f))
@@ -1717,7 +1701,7 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Text(
                 "${nonEmpty}件/100件",
@@ -1728,7 +1712,7 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
         if (!state.isDrawing) {
             if (state.batchPromptHistory.isNotEmpty()) {
                 CompactLabel("バッチ指示履歴")
-                WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
                     state.batchPromptHistory.forEach { prompt ->
                         MiniPill(
                             text = prompt.lineSequence().firstOrNull()?.take(22) ?: "履歴",
@@ -1772,29 +1756,29 @@ private fun NumberedBatchTextField(
     val scope = rememberCoroutineScope()
     val textStyle = MaterialTheme.typography.bodySmall.copy(
         color = MaterialTheme.colorScheme.onSurface,
-        lineHeight = 17.sp,
+        lineHeight = TypeScale.denseLineHeight,
     )
 
     Surface(
         modifier = modifier
-            .height(320.dp)
+            .height(Dimens.batchEditorHeight)
             .bringIntoViewRequester(bringIntoViewRequester),
-        shape = RoundedCornerShape(4.dp),
-        color = Color(0xFF191816),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(Dimens.spaceXs),
+        color = InputWellSurface,
+        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .clipToBounds()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+                .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS),
+            verticalArrangement = Arrangement.spacedBy(Dimens.space2),
         ) {
             lines.forEachIndexed { index, line ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                     verticalAlignment = Alignment.Top,
                 ) {
                     Text(
@@ -1802,7 +1786,7 @@ private fun NumberedBatchTextField(
                         style = textStyle,
                         textAlign = TextAlign.End,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(28.dp),
+                        modifier = Modifier.width(Dimens.space28),
                     )
                     BasicTextField(
                         value = line,
@@ -1814,7 +1798,7 @@ private fun NumberedBatchTextField(
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1f)
-                            .heightIn(min = 20.dp)
+                            .heightIn(min = Dimens.space20)
                             .onFocusChanged { focusState ->
                                 if (focusState.isFocused) {
                                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
@@ -1824,7 +1808,7 @@ private fun NumberedBatchTextField(
                 }
             }
             if (lineCount < 6) {
-                Spacer(Modifier.height(20.dp * (6 - lineCount)))
+                Spacer(Modifier.height(Dimens.space20 * (6 - lineCount)))
             }
         }
     }
@@ -1845,10 +1829,10 @@ private fun replaceBatchEditorLine(lines: List<String>, index: Int, edited: Stri
 
 @Composable
 private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                     Text("進捗 ${state.batchCurrent} / ${state.batchTotal}", style = MaterialTheme.typography.titleSmall)
                     Text(
                         "累計 ${formatDuration(state.batchElapsedMs)} / 成功 ${state.batchSuccess} / 失敗 ${state.batchFailures.size}",
@@ -1866,7 +1850,7 @@ private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
             }
             RenderTextView(
                 state.batchActiveDdl ?: "解釈を待機中...",
-                modifier = Modifier.fillMaxWidth().height(116.dp),
+                modifier = Modifier.fillMaxWidth().height(Dimens.batchProgressHeight),
             )
         }
     }
@@ -1874,8 +1858,8 @@ private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
 
 @Composable
 private fun BatchFailureSummary(state: InkuUiState) {
-    Surface(color = Color(0x22E08A7A), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Surface(color = FailureSummaryWash, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
             Text("成功 ${state.batchSuccess} / 失敗 ${state.batchFailures.size} / 全 ${state.batchTotal}", style = MaterialTheme.typography.titleSmall)
             Text("失敗した行", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.batchFailures.forEach { failure ->
@@ -1895,28 +1879,28 @@ private fun BatchFailureSummary(state: InkuUiState) {
 private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         CanvasHeroCard(
             state,
             viewModel,
             showControls = false,
-            maxPreviewHeight = 250.dp,
+            maxPreviewHeight = Dimens.demoPreviewMaxHeight,
             canvasAspectOverride = DemoCanvasAspectId,
         )
 
         CompactLabel("生成された指示文")
         Surface(
             color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shape = RoundedCornerShape(Dimens.radiusCard),
+            border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
                 state.demoGeneratedPrompt.ifBlank { "—" },
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceXl),
                 style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 22.sp,
+                lineHeight = TypeScale.proseLineHeight,
                 color = if (state.demoGeneratedPrompt.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -1933,7 +1917,7 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             CompactLabel("生成された解釈")
             RenderTextView(
                 state.demoGeneratedDdl,
-                modifier = Modifier.fillMaxWidth().height(140.dp),
+                modifier = Modifier.fillMaxWidth().height(Dimens.demoPanelHeight),
             )
         }
         MetaPanel(
@@ -1965,11 +1949,11 @@ private fun DemoSettingRow(
                     Modifier
                 },
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceXl),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
             Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             sub?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1987,8 +1971,8 @@ private fun DemoSettingRow(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 14.dp)
-                .height(1.dp)
+                .padding(start = Dimens.spaceXxl)
+                .height(Dimens.hairline)
                 .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
         )
     }
@@ -2014,9 +1998,9 @@ private fun HistoryScreen(
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(horizontal = Dimens.spaceXl, vertical = Dimens.spaceL),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
         gridItems(filteredHistory, key = { it.id }) { item ->
@@ -2037,7 +2021,7 @@ private fun HistoryHeader(
     filteredCount: Int,
     viewModel: InkuViewModel,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
         ImeAwareOutlinedTextField(
             value = state.historySearchQuery,
             onValueChange = viewModel::setHistorySearchQuery,
@@ -2045,7 +2029,7 @@ private fun HistoryHeader(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl), modifier = Modifier.fillMaxWidth()) {
             ChipButton("★ 星のみ", selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
             Text("${filteredCount}/${sourceCount}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -2086,13 +2070,13 @@ internal fun languageComboTag(comboId: String): String = "language_combo_$comboI
 internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val graph = state.lineageGraph
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceL),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Text("作品の系譜", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             // web puts the same button in the same place, at the right of the
@@ -2123,19 +2107,19 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val parent = state.refinementParent
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Text(state.refinementSubview.titleJa, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             ChipButton("閉じる", onClick = viewModel::closeRefinement)
         }
 
         // 調整・モデル・言語 (SPEC :616, :686). Three faces of one screen.
-        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             RefinementSubview.entries.forEach { subview ->
                 ChipButton(
                     text = subview.labelJa,
@@ -2162,7 +2146,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             RefinementSubview.Language -> LanguageInspectionControls(state, viewModel)
         }
 
-        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             // Both counts stay pressable whichever element is chosen, the way
             // web leaves its own pair alone: the refusal for four touches is
             // stated when the button is pressed, not by hiding the choice.
@@ -2196,7 +2180,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         state.refinementCandidates.chunked(columns).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
             ) {
                 row.forEach { candidate ->
                     RefinementCandidateCard(
@@ -2216,7 +2200,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
 /** 調整: the five elements, the amplitude under the variation, the touch words. */
 @Composable
 private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         RefinementElement.entries.forEach { element ->
             ChipButton(
                 text = element.labelJa,
@@ -2228,7 +2212,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
 
     // 「変奏を選択したときだけ強度をラジオ直下に表示」. No section of its own.
     if (state.refinementElement == RefinementElement.Variation) {
-        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             VariationAmplitude.entries.forEach { amplitude ->
                 ChipButton(
                     text = amplitude.labelJa,
@@ -2261,7 +2245,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
 @Composable
 private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
     val choices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state) }
-    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         ModelCompareMode.entries.forEach { mode ->
             ChipButton(
                 text = mode.labelJa,
@@ -2277,7 +2261,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
             if (state.modelCompareMode == ModelCompareMode.Stage1Fixed) "固定する Stage 1 モデル" else "固定する Stage 2 モデル",
             style = MaterialTheme.typography.labelMedium,
         )
-        WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             choices.forEach { choice ->
                 ChipButton(
                     text = choice.label,
@@ -2289,7 +2273,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
     }
 
     Text("比較するモデル (最大 ${MAX_COMPARE_SELECTION})", style = MaterialTheme.typography.labelMedium)
-    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         choices.forEach { choice ->
             val blocked = ComparisonPlanner.isModelChoiceBlocked(
                 mode = state.modelCompareMode,
@@ -2317,7 +2301,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
  */
 @Composable
 private fun LanguageInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow(horizontal = 8.dp, vertical = 8.dp) {
+    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         LanguageCombo.ALL.forEach { combo ->
             val blocked = ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLangOf(state.refinementParent))
             ChipButton(
@@ -2352,11 +2336,11 @@ private fun RefinementCandidateCard(
     Card(
         modifier = modifier
             .testTag(REFINE_CANDIDATE_TAG)
-            .border(2.dp, if (shownOnCanvas) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
+            .border(Dimens.space2, if (shownOnCanvas) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             RefinementCandidateImage(
                 svg = candidate.displaySvg,
                 modifier = Modifier
@@ -2367,7 +2351,7 @@ private fun RefinementCandidateCard(
                         onLongClick = { if (readingCandidate) ddlOpen = !ddlOpen },
                     ),
             )
-            Column(modifier = Modifier.padding(horizontal = 6.dp).padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(modifier = Modifier.padding(horizontal = Dimens.spaceS).padding(bottom = Dimens.spaceS), verticalArrangement = Arrangement.spacedBy(Dimens.radiusXs)) {
                 Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(candidate.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (readingCandidate && ddlOpen) {
@@ -2437,14 +2421,14 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxl),
     ) {
         // One row per generation, oldest first. web labels each of its columns
         // 第N世代 (LineagePanel.svelte); here the number is on the cards instead,
         // where a tombstone -- which the server gives no generation -- can say
         // so for itself rather than sit under a heading that answers for it.
         graph.nodes.groupBy { depthOf[it.id] ?: 0 }.toSortedMap().forEach { (_, nodes) ->
-            WrapRow(horizontal = 10.dp, vertical = 10.dp) {
+            WrapRow(horizontal = Dimens.spaceL, vertical = Dimens.spaceL) {
                 nodes.forEach { node ->
                     LineageNodeCard(
                         node = node,
@@ -2471,14 +2455,14 @@ private fun LineageNodeCard(
     val history = work?.history
     Card(
         modifier = Modifier
-            .width(104.dp)
+            .width(Dimens.chipWidth)
             .testTag(LINEAGE_NODE_TAG)
             .clickable(enabled = history != null, onClick = onSelect)
-            .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
+            .border(Dimens.space2, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             if (history != null) {
                 ArtworkThumbnail(
                     id = history.item.id,
@@ -2487,9 +2471,9 @@ private fun LineageNodeCard(
                     modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 )
             } else {
-                Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(Color(0xFF2A2622)))
+                Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(LineagePlaceholderSurface))
             }
-            Column(modifier = Modifier.padding(horizontal = 6.dp).padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.padding(horizontal = Dimens.spaceS).padding(bottom = Dimens.spaceS), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
                 // The label of the edge that produced this work. `labelJa` with
                 // no kind is 起点, which is the answer for a node no edge points
                 // at; the wording is the registry's, never this screen's.
@@ -2549,13 +2533,13 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
         }
@@ -2577,12 +2561,12 @@ private fun SettingsHeader(selectedPane: SettingsPane, viewModel: InkuViewModel)
     val title = settingsPaneTitle(selectedPane)
     val subtitle = settingsPaneSubtitle(selectedPane)
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         MiniPill("‹", onClick = { viewModel.setSettingsPane(SettingsPane.Home) })
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -2595,13 +2579,13 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Text("モデル選択", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             SecondarySmallButton(text = "取消", onClick = viewModel::cancelModelSelection)
@@ -2626,8 +2610,8 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
 @Composable
 private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
         SettingsCard("シードフレーズ", "デモ指示文生成", "保存済み") {
@@ -2641,7 +2625,7 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
             SecondarySmallButton(text = "デフォルト値に戻す", onClick = viewModel::resetDemoSeed)
         }
         SettingsCard("表示間隔", "デモ表示", "${state.demoIntervalSeconds}秒") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                 SecondarySmallButton(
                     text = "−",
                     onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
@@ -2668,8 +2652,8 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
 @Composable
 private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
         SettingsCard("PNG / SVG", "Web版の出力設定", "保存済み") {
@@ -2678,7 +2662,7 @@ private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mo
                 text = "PNG透過時の白背景",
                 onCheckedChange = viewModel::setPngAlphaWhite,
             )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 state.exportTemplates.forEach { template ->
                     ExportTemplateRow(template, viewModel)
                 }
@@ -2691,18 +2675,18 @@ private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mo
 @Composable
 private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
         SettingsCard("表示モード", "UIの表示密度・構成", state.uiMode) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 ChipButton("フルモード", selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })
                 ChipButton("シンプルモード", selected = state.uiMode == "simple", onClick = { viewModel.setUiMode("simple") })
             }
         }
         SettingsCard("マスコット選択", "Incu (立方体) または Yuragi (蟹)", state.mascotKind) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 ChipButton("Incu (立方体)", selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
                 ChipButton("Yuragi (蟹)", selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
             }
@@ -2728,8 +2712,8 @@ internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Mod
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         SettingsHeader(SettingsPane.Version, viewModel)
         SettingsCard("inku Android", "アプリケーション", BuildConfig.VERSION_NAME) {
@@ -2754,7 +2738,7 @@ private fun VersionInfoRow(label: String, value: String) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             value,
-            modifier = Modifier.padding(start = 12.dp).weight(1f),
+            modifier = Modifier.padding(start = Dimens.spaceXl).weight(1f),
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.End,
         )
@@ -2766,12 +2750,12 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
@@ -2837,7 +2821,7 @@ private fun ProviderConnectionCard(
             SecondarySmallButton(text = "変更", onClick = { editNameOpen = true })
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             ModelSettingValueRow(
                 label = "Base URL",
                 value = baseUrl.ifBlank { provider.baseUrl ?: "-" },
@@ -2856,7 +2840,7 @@ private fun ProviderConnectionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2864,7 +2848,7 @@ private fun ProviderConnectionCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("APIキー", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS), verticalAlignment = Alignment.CenterVertically) {
                             Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
                             if (!keySet) Text("ローカルLLMの場合、APIキー無しで利用可能な場合があります。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -2877,7 +2861,7 @@ private fun ProviderConnectionCard(
                     )
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2889,7 +2873,7 @@ private fun ProviderConnectionCard(
                 if (publishedModelIds.isEmpty()) {
                     Text("公開モデルは未選択です。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
                         publishedModelIds.forEach { modelId ->
                             PublishedModelChip(modelDisplayName(modelId))
                         }
@@ -2900,9 +2884,9 @@ private fun ProviderConnectionCard(
                 OutlinedButton(
                     onClick = { confirmDeleteService = true },
                     enabled = !provider.isDefaultLocal,
-                    modifier = Modifier.height(32.dp),
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    modifier = Modifier.height(Dimens.controlSizeSmall),
+                    shape = RoundedCornerShape(Dimens.spaceXs),
+                    contentPadding = PaddingValues(horizontal = Dimens.spaceL, vertical = 0.dp),
                 ) {
                     Text("サービス削除", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
@@ -3030,14 +3014,14 @@ private fun ModelSettingValueRow(label: String, value: String, action: String, o
 @Composable
 private fun PublishedModelChip(label: String) {
     Surface(
-        color = Color(0xFF20201E),
+        color = ChipSurface,
         shape = RoundedCornerShape(100),
-        border = BorderStroke(1.dp, Color(0xFF34302B)),
-        modifier = Modifier.widthIn(max = 220.dp),
+        border = BorderStroke(Dimens.hairline, CardHairline),
+        modifier = Modifier.widthIn(max = Dimens.publishedChipMaxWidth),
     ) {
         Text(
             label,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceS),
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -3100,10 +3084,10 @@ private fun ProviderModelPickerDialog(
         title = { Text(provider.displayName) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().height(520.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().height(Dimens.providerModelDialogHeight),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS), modifier = Modifier.fillMaxWidth()) {
                     ModelPickerActionButton(text = "モデルリスト取得", onClick = onFetchModels, modifier = Modifier.weight(1.5f))
                     ModelPickerActionButton(text = "全選択", onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f))
                     ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.weight(1f))
@@ -3118,16 +3102,16 @@ private fun ProviderModelPickerDialog(
                 )
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
                 ) {
                     filtered.forEach { model ->
                         val checked = selected.contains(model.id)
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable {
                                 selected = if (checked) selected - model.id else selected + model.id
-                            }.padding(vertical = 4.dp),
+                            }.padding(vertical = Dimens.spaceXs),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
                             Checkbox(checked = checked, onCheckedChange = { enabled ->
                                 selected = if (enabled) selected + model.id else selected - model.id
@@ -3174,14 +3158,14 @@ private fun LocalModelManagementDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
-                .heightIn(max = 680.dp),
-            shape = RoundedCornerShape(22.dp),
+                .heightIn(max = Dimens.localModelDialogMaxHeight),
+            shape = RoundedCornerShape(Dimens.radiusDialogLarge),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
+            tonalElevation = Dimens.spaceS,
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(Dimens.space18),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -3192,15 +3176,15 @@ private fun LocalModelManagementDialog(
                         Text("LiteRT-LM", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
                         Text("ローカルモデル", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ModelPickerActionButton(text = "全選択", onClick = { selected = assetIds }, modifier = Modifier.width(76.dp))
-                        ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.width(76.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+                        ModelPickerActionButton(text = "全選択", onClick = { selected = assetIds }, modifier = Modifier.width(Dimens.helpLabelWidth))
+                        ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.width(Dimens.helpLabelWidth))
                     }
                 }
 
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
                 ) {
                     modelAssets.forEach { asset ->
                         LocalModelAssetRow(
@@ -3257,21 +3241,21 @@ private fun LocalModelAssetRow(
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = Color(0xFF181715),
-        border = BorderStroke(1.dp, Color(0xFF34302B)),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = InkSurface,
+        border = BorderStroke(Dimens.hairline, CardHairline),
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(Dimens.spaceL),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
                     Text(asset.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(asset.qualityTier, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
@@ -3280,9 +3264,9 @@ private fun LocalModelAssetRow(
             progressValue?.let {
                 LinearProgressIndicator(
                     progress = { it },
-                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    modifier = Modifier.fillMaxWidth().height(Dimens.spaceXs),
                     color = if (isReady) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
-                    trackColor = Color(0x3324211E),
+                    trackColor = ProgressTrack,
                 )
             }
             Text(
@@ -3306,7 +3290,7 @@ private fun LocalModelAssetRow(
                     }
                     else -> {
                         SecondarySmallButton(text = "再取得", onClick = onRedownloadModel, enabled = !isBusy)
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(Dimens.spaceS))
                         PrimarySmallButton(text = if (isBusy) "取得中" else "ダウンロード", onClick = onDownloadModel, enabled = !isBusy)
                     }
                 }
@@ -3319,11 +3303,11 @@ private fun LocalModelAssetRow(
 private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.height(40.dp),
-        shape = RoundedCornerShape(4.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+        modifier = modifier.height(Dimens.buttonHeightSmall),
+        shape = RoundedCornerShape(Dimens.spaceXs),
+        contentPadding = PaddingValues(horizontal = Dimens.spaceXs, vertical = 0.dp),
     ) {
-        Text(text, maxLines = 1, overflow = TextOverflow.Clip, fontSize = 11.sp)
+        Text(text, maxLines = 1, overflow = TextOverflow.Clip, fontSize = TypeScale.labelTiny)
     }
 }
 
@@ -3344,13 +3328,13 @@ private fun AddProviderCard(
             title = { Text("AIサービスを追加") },
             text = {
                 Column(
-                    modifier = Modifier.fillMaxWidth().height(420.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(Dimens.addProviderCardHeight).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
                     ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = "サービスID", modifier = Modifier.fillMaxWidth(), singleLine = true)
                     ImeAwareOutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = "サービス名", modifier = Modifier.fillMaxWidth(), singleLine = true)
                     CompactLabel("接続形式")
-                    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+                    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
                         listOf("openai-compatible" to "OpenAI compatible", "anthropic" to "Claude API", "gemini" to "Gemini API").forEach { (value, label) ->
                             MiniPill(label, selected = kind == value, onClick = { kind = value })
                         }
@@ -3379,21 +3363,21 @@ private fun AddProviderCard(
 private fun SettingsListItem(mark: String, title: String, sub: String, onClick: () -> Unit, active: Boolean = false) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        color = if (active) Color(0x1A7FA6D8) else Color.Transparent,
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = if (active) ActiveSettingsRowTint else Color.Transparent,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceXl),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXxl),
         ) {
             Box(
-                modifier = Modifier.size(38.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)),
+                modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceL)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(mark, style = MaterialTheme.typography.titleMedium)
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
                 Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -3427,7 +3411,7 @@ private fun SettingCheckRow(checked: Boolean, text: String, onCheckedChange: (Bo
     Row(
         modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
         Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
@@ -3440,9 +3424,9 @@ private fun SettingChoiceRow(
     selected: HistorySelectionBehavior,
     onSelect: (HistorySelectionBehavior) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
         CompactLabel(title)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
             if (selected == HistorySelectionBehavior.History) {
                 PrimarySmallButton("履歴の値", onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
                 SecondarySmallButton("現在値を維持", onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
@@ -3461,14 +3445,14 @@ private fun ExportTemplateRow(template: app.inku.mobile.data.db.ExportTemplateEn
     var height by remember(template.id, template.heightPx) { mutableStateOf(template.heightPx.toString()) }
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Dimens.spaceL),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             ImeAwareOutlinedTextField(name, { name = it }, label = "名前", modifier = Modifier.fillMaxWidth(), singleLine = true)
             ImeAwareOutlinedTextField(description, { description = it }, label = "説明", modifier = Modifier.fillMaxWidth(), singleLine = true)
             ImeAwareOutlinedTextField(height, { height = it.filter(Char::isDigit) }, label = "Y軸px", modifier = Modifier.fillMaxWidth(), singleLine = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                 SecondarySmallButton(
                     text = "削除",
                     onClick = { viewModel.removeExportTemplate(template.id) },
@@ -3490,7 +3474,7 @@ private fun ModelChoiceRow(
     selectedValue: String,
     onSelect: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         WrapRow {
             choices.forEach { choice ->
                 val rec = app.inku.mobile.data.model.ModelRecommendations.items.find { it.modelId == choice.id }
@@ -3674,15 +3658,15 @@ private fun formatDuration(ms: Long): String {
 @Composable
 private fun SettingsCard(title: String, sub: String, status: String, titleAction: (@Composable () -> Unit)? = null, actions: @Composable () -> Unit) {
     Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1A18)),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        colors = CardDefaults.cardColors(containerColor = SettingsCardSurface),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
-                .border(1.dp, Color(0xFF34302B), RoundedCornerShape(14.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .border(Dimens.hairline, CardHairline, RoundedCornerShape(Dimens.radiusCard))
+                .padding(Dimens.spaceXl),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -3722,24 +3706,24 @@ private fun ModelAssetControls(
     val path = asset.localPath?.substringAfterLast("/") ?: "not stored"
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier
-                .border(1.dp, Color(0xFF34302B), RoundedCornerShape(14.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+                .border(Dimens.hairline, CardHairline, RoundedCornerShape(Dimens.radiusCard))
+                .padding(Dimens.spaceXl),
+            verticalArrangement = Arrangement.spacedBy(Dimens.space9),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl)) {
                 Box(
-                    modifier = Modifier.size(38.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)),
+                    modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceL)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(if (asset.qualityTier.contains("high", ignoreCase = true)) "E4" else "E2", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
                     Text(asset.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(asset.qualityTier, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
@@ -3749,9 +3733,9 @@ private fun ModelAssetControls(
             progressValue?.let {
                 LinearProgressIndicator(
                     progress = { it },
-                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    modifier = Modifier.fillMaxWidth().height(Dimens.spaceXs),
                     color = if (isReady) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
-                    trackColor = Color(0x3324211E),
+                    trackColor = ProgressTrack,
                 )
             }
             Text(
@@ -3795,7 +3779,7 @@ private fun ModelAssetLicenseDownloadDialog(
         onDismissRequest = onDismiss,
         title = { Text("${asset.displayName} の取得") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 Text("LiteRT-LM でローカル実行する Gemma モデルです。")
                 Text("品質: ${asset.qualityTier}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("状態: ${modelStatusLabel(asset.downloadState)}$progress", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -3813,7 +3797,7 @@ private fun ModelAssetLicenseDownloadDialog(
             }
         },
         confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 TextButton(
                     onClick = onRedownload,
                     enabled = asset.licenseAcceptedAt != null && !isBusy,
@@ -3835,7 +3819,7 @@ private fun ModelAssetLicenseDownloadDialog(
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 TextButton(onClick = onDismiss) { Text("閉じる") }
                 TextButton(onClick = onAccept, enabled = asset.licenseAcceptedAt == null) {
                     Text(if (asset.licenseAcceptedAt != null) "同意済み" else "ライセンス同意")
@@ -3848,9 +3832,9 @@ private fun ModelAssetLicenseDownloadDialog(
 @Composable
 private fun SettingsSectionHeader(label: String, title: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
         verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
@@ -3863,8 +3847,8 @@ private fun StatusPill(text: String, color: Color) {
         text,
         modifier = Modifier
             .background(color.copy(alpha = 0.18f), RoundedCornerShape(100))
-            .border(1.dp, color.copy(alpha = 0.42f), RoundedCornerShape(100))
-            .padding(horizontal = 9.dp, vertical = 4.dp),
+            .border(Dimens.hairline, color.copy(alpha = 0.42f), RoundedCornerShape(100))
+            .padding(horizontal = Dimens.space9, vertical = Dimens.spaceXs),
         style = MaterialTheme.typography.labelSmall,
         color = color,
         maxLines = 1,
@@ -3887,8 +3871,8 @@ private fun modelStatusLabel(state: String?): String = when (state) {
 private fun modelStatusColor(state: String?): Color = when (state) {
     "ready" -> MaterialTheme.colorScheme.secondary
     "queued", "connecting", "downloading", "verifying" -> MaterialTheme.colorScheme.primary
-    "failed", "cancelled" -> Color(0xFFE08A7A)
-    "ready_to_download" -> Color(0xFFB8D58A)
+    "failed", "cancelled" -> StatusFailed
+    "ready_to_download" -> StatusReady
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
@@ -3916,18 +3900,18 @@ private fun ColorCatalogButtonRow(selectedValue: String, onSelect: (String) -> U
             val selected = catalog.id == selectedValue
             OutlinedButton(
                 onClick = { onSelect(catalog.id) },
-                modifier = Modifier.height(54.dp).fillMaxWidth(),
-                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.height(Dimens.buttonHeightMedium).fillMaxWidth(),
+                shape = RoundedCornerShape(Dimens.spaceXs),
                 colors = if (selected) {
                     ButtonDefaults.outlinedButtonColors(
                         containerColor = MaterialTheme.colorScheme.secondary,
-                        contentColor = Color(0xFF19150F),
+                        contentColor = InkOnSecondary,
                     )
                 } else {
                     ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     SwatchStrip(catalog.swatches.take(4))
                     Text(catalog.name, maxLines = 1)
                 }
@@ -3938,13 +3922,13 @@ private fun ColorCatalogButtonRow(selectedValue: String, onSelect: (String) -> U
 
 @Composable
 private fun SwatchStrip(colors: List<String>) {
-    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.space2)) {
         colors.forEach { hex ->
             Box(
                 modifier = Modifier
-                    .size(14.dp)
-                    .background(parseColor(hex), RoundedCornerShape(2.dp))
-                    .border(1.dp, Color(0x66000000), RoundedCornerShape(2.dp)),
+                    .size(Dimens.spaceXxl)
+                    .background(parseColor(hex), RoundedCornerShape(Dimens.space2))
+                    .border(Dimens.hairline, SwatchHairline, RoundedCornerShape(Dimens.space2)),
             )
         }
     }
@@ -3980,12 +3964,12 @@ private fun selectedStage2ModelLabel(state: InkuUiState): String {
 private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val item = state.selectedHistory
     Surface(
-        modifier = modifier.border(1.dp, Color(0xFF2C2925), RoundedCornerShape(6.dp)),
-        color = Color(0xFF1B1B1A),
-        shape = RoundedCornerShape(6.dp),
+        modifier = modifier.border(Dimens.hairline, CanvasPanelHairline, RoundedCornerShape(Dimens.spaceS)),
+        color = CanvasPanelSurface,
+        shape = RoundedCornerShape(Dimens.spaceS),
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXxl)) {
                 RenderTab.entries.forEach { tab ->
                     Text(
                         when (tab) {
@@ -4005,8 +3989,8 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(Color(0xFF20201E), RoundedCornerShape(4.dp))
-                    .padding(10.dp),
+                    .background(ChipSurface, RoundedCornerShape(Dimens.spaceXs))
+                    .padding(Dimens.spaceL),
                 contentAlignment = Alignment.Center,
             ) {
                 if (item == null) {
@@ -4034,11 +4018,11 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
 private fun RenderTextView(text: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(Color(0xFFF8F8F6), RoundedCornerShape(2.dp))
-            .padding(10.dp)
+            .background(RenderTextPaper, RoundedCornerShape(Dimens.space2))
+            .padding(Dimens.spaceL)
             .verticalScroll(rememberScrollState()),
     ) {
-        Text(text, color = Color(0xFF22201D), style = MaterialTheme.typography.bodySmall)
+        Text(text, color = RenderTextInk, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -4263,27 +4247,27 @@ private fun HistoryGridTile(
                 onClick = onSelect,
                 onLongClick = onToggleStar,
             )
-            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp))
-            .border(4.dp, if (selected) Color(0x337FA6D8) else Color.Transparent, RoundedCornerShape(0.dp)),
+            .border(Dimens.space2, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp))
+            .border(Dimens.selectionRingWidth, if (selected) SelectionRing else Color.Transparent, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
             Box {
                 HistoryArtworkPreview(item, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
                 if (selected) {
                     Box(
                         modifier = Modifier
-                            .width(22.dp)
-                            .height(22.dp)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(bottomEnd = 16.dp)),
+                            .width(Dimens.radiusDialogLarge)
+                            .height(Dimens.radiusDialogLarge)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(bottomEnd = Dimens.radiusLarge)),
                     )
                 }
                 if (item.starred) {
-                    HistoryBadge(text = "★", selected = true, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
+                    HistoryBadge(text = "★", selected = true, modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceS))
                 }
             }
-            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS), verticalAlignment = Alignment.CenterVertically) {
                 Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
             }
         }
@@ -4293,10 +4277,10 @@ private fun HistoryGridTile(
 @Composable
 private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     val base = modifier
-        .size(26.dp)
+        .size(Dimens.badgeSize)
         .background(
-            if (selected) MaterialTheme.colorScheme.secondary else Color(0xCC24211E),
-            RoundedCornerShape(13.dp),
+            if (selected) MaterialTheme.colorScheme.secondary else HistoryBadgeSurface,
+            RoundedCornerShape(Dimens.radiusBadge),
         )
     Box(
         modifier = onClick?.let { base.clickable(onClick = it) } ?: base,
@@ -4305,7 +4289,7 @@ private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -
         Text(
             text,
             style = MaterialTheme.typography.labelSmall,
-            color = if (selected) Color(0xFF101010) else MaterialTheme.colorScheme.onSurface,
+            color = if (selected) InkOnPrimary else MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
         )
     }
@@ -4340,7 +4324,7 @@ private fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(reques
 
 @Composable
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow(horizontal = 6.dp, vertical = 6.dp) {
+    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
         MiniPill("歳時記", selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
         MiniPill("補正", selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
     }
@@ -4355,9 +4339,9 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     Box(
         modifier = modifier
-            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS)
             .clickable(onClick = onClick),
     ) {
         BasicTextField(
@@ -4366,7 +4350,7 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
             readOnly = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 112.dp)
+                .heightIn(min = Dimens.panelMinHeight)
                 .pointerInput(value) {
                     detectTapGestures(onTap = { onClick() })
                 }
@@ -4376,7 +4360,7 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
                 },
             textStyle = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 17.sp,
+                lineHeight = TypeScale.denseLineHeight,
             ),
             cursorBrush = SolidColor(Color.Transparent),
             visualTransformation = visualTransformation,
@@ -4387,7 +4371,7 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
                 if (value.isBlank()) {
                     Text(
                         "解釈を待機中...",
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 17.sp),
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = TypeScale.denseLineHeight),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
@@ -4421,12 +4405,12 @@ private fun DenseMultilineInput(
                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             }
-            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS),
         textStyle = MaterialTheme.typography.bodySmall.copy(
             color = MaterialTheme.colorScheme.onSurface,
-            lineHeight = 17.sp,
+            lineHeight = TypeScale.denseLineHeight,
         ),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         minLines = minLines,
@@ -4467,9 +4451,9 @@ private fun DenseTextFieldValueInput(
     Box(
         modifier = modifier
             .bringIntoViewRequester(bringIntoViewRequester)
-            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .padding(horizontal = Dimens.spaceS, vertical = Dimens.spaceXs),
     ) {
         BasicTextField(
             value = value,
@@ -4488,8 +4472,8 @@ private fun DenseTextFieldValueInput(
                 },
             textStyle = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 16.sp,
-                lineHeight = 21.sp,
+                fontSize = TypeScale.editorBody,
+                lineHeight = TypeScale.editorLineHeight,
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             visualTransformation = visualTransformation,
@@ -4507,9 +4491,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHighl
 ) {
     if (text.isBlank() || tokens.isEmpty()) return
     val occupied = BooleanArray(text.length)
-    val horizontalPad = 1.5.dp.toPx()
-    val verticalPad = 1.dp.toPx()
-    val radius = 2.5.dp.toPx()
+    val horizontalPad = Dimens.highlightPadHorizontal.toPx()
+    val verticalPad = Dimens.hairline.toPx()
+    val radius = Dimens.radiusHighlight.toPx()
     tokens.forEach { token ->
         val word = token.word
         if (word.isBlank()) return@forEach
@@ -4560,7 +4544,7 @@ private class DdlKeywordHighlightTransformation(
                 if (!overlaps) {
                     builder.addStyle(
                         SpanStyle(
-                            color = if (isLightColor(token.color)) Color(0xFF12110F) else Color(0xFFF8F8F6),
+                            color = if (isLightColor(token.color)) PillInkOnLight else PillInkOnDark,
                         ),
                         start,
                         end,
@@ -4594,9 +4578,9 @@ private fun DenseSingleLineInput(
                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             }
-            .background(Color(0xFF191816), RoundedCornerShape(4.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS),
         textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         singleLine = true,
@@ -4615,8 +4599,8 @@ private fun DenseSingleLineInput(
 @Composable
 private fun WrapRow(
     modifier: Modifier = Modifier,
-    horizontal: androidx.compose.ui.unit.Dp = 8.dp,
-    vertical: androidx.compose.ui.unit.Dp = 8.dp,
+    horizontal: androidx.compose.ui.unit.Dp = Dimens.spaceM,
+    vertical: androidx.compose.ui.unit.Dp = Dimens.spaceM,
     content: @Composable () -> Unit,
 ) {
     FlowRow(
@@ -4659,7 +4643,7 @@ private fun ImeAwareOutlinedTextField(
         singleLine = singleLine,
         enabled = enabled,
         keyboardOptions = keyboardOptions,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Dimens.radiusLarge),
     )
 }
 
@@ -4671,8 +4655,8 @@ private fun MetaPanel(
 ) {
     val catalogName = ColorCatalogs.get(catalogIdOverride ?: state.selectedCatalogId).name
     val canvasAspect = canvasLabelFor(canvasAspectOverride ?: state.selectedCanvasAspect)
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
             Text("LLM · ${selectedModelLabel(state)} · 指示文生成/Stage1/2共通", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Color · $catalogName   Canvas · $canvasAspect", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.message?.let {
@@ -4685,14 +4669,14 @@ private fun MetaPanel(
 @Composable
 private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     val base = modifier.background(
-        if (selected) MaterialTheme.colorScheme.primary else Color(0xDD24211E),
+        if (selected) MaterialTheme.colorScheme.primary else MiniPillSurface,
         RoundedCornerShape(100),
     )
     Text(
         text,
-        modifier = (onClick?.let { base.clickable(onClick = it) } ?: base).padding(horizontal = 10.dp, vertical = 5.dp),
+        modifier = (onClick?.let { base.clickable(onClick = it) } ?: base).padding(horizontal = Dimens.spaceL, vertical = Dimens.space5),
         style = MaterialTheme.typography.labelSmall,
-        color = if (selected) Color(0xFF101010) else MaterialTheme.colorScheme.onSurface,
+        color = if (selected) InkOnPrimary else MaterialTheme.colorScheme.onSurface,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -4701,20 +4685,20 @@ private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Un
 private fun BoxScope.presentationCaptionPlacement(screenWidth: Dp): Modifier =
     Modifier.align(Alignment.BottomCenter)
         .width(screenWidth * 0.92f)
-        .padding(bottom = 92.dp)
+        .padding(bottom = Dimens.presentationCaptionBottomInset)
 
 @Composable
 private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xB8000000),
+        shape = RoundedCornerShape(Dimens.spaceM),
+        color = PresentationCaptionScrim,
         tonalElevation = 0.dp,
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-            color = Color(0xFFFFFDF8),
+            modifier = Modifier.padding(horizontal = Dimens.space18, vertical = Dimens.spaceXl),
+            color = PresentationCaptionInk,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             maxLines = 3,
@@ -4744,14 +4728,14 @@ private fun PresentationControls(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(100),
-        color = Color(0xE01C1C1C),
-        border = BorderStroke(1.dp, Color(0x2EFFFFFF)),
+        color = PresentationControlsSurface,
+        border = BorderStroke(Dimens.hairline, PresentationControlOutline),
         tonalElevation = 0.dp,
-        shadowElevation = 8.dp,
+        shadowElevation = Dimens.spaceM,
     ) {
         Row(
-            modifier = Modifier.padding(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(Dimens.spaceS),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
@@ -4759,8 +4743,8 @@ private fun PresentationControls(
             PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
             Text(
                 counter,
-                modifier = Modifier.widthIn(min = 44.dp).padding(horizontal = 4.dp),
-                color = Color(0xB8FFFDF8),
+                modifier = Modifier.widthIn(min = Dimens.presentationControlMinWidth).padding(horizontal = Dimens.spaceXs),
+                color = PresentationControlLabelMuted,
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -4782,29 +4766,29 @@ private fun PresentationControlButton(
 ) {
     val shape = if (wide) RoundedCornerShape(100) else RoundedCornerShape(50)
     val background = when {
-        selected -> Color(0x29FFFFFF)
-        else -> Color(0x10FFFFFF)
+        selected -> PresentationControlFillSelected
+        else -> PresentationControlFillIdle
     }
     val border = when {
-        selected && text == "★" -> Color(0x9EFFD45C)
-        else -> Color(0x2EFFFFFF)
+        selected && text == "★" -> PresentationStarOutline
+        else -> PresentationControlOutline
     }
     Box(
         modifier = Modifier
-            .then(if (wide) Modifier.widthIn(min = 54.dp) else Modifier.size(34.dp))
-            .height(34.dp)
+            .then(if (wide) Modifier.widthIn(min = Dimens.buttonHeightMedium) else Modifier.size(Dimens.controlSizeMedium))
+            .height(Dimens.controlSizeMedium)
             .background(background, shape)
-            .border(1.dp, border, shape)
+            .border(Dimens.hairline, border, shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = if (wide) 12.dp else 0.dp),
+            .padding(horizontal = if (wide) Dimens.spaceXl else 0.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text,
             color = when {
-                !enabled -> Color(0x59FFFDF8)
-                selected && text == "★" -> Color(0xFFFFD45C)
-                else -> Color(0xFFFFFDF8)
+                !enabled -> PresentationControlLabelDisabled
+                selected && text == "★" -> PresentationStarInk
+                else -> PresentationControlLabel
             },
             style = if (wide) MaterialTheme.typography.labelSmall else MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
@@ -4823,7 +4807,7 @@ private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifi
             onClick = onClick,
             modifier = modifier,
             shape = RoundedCornerShape(100),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = Color(0xFF19150F)),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = InkOnSecondary),
         ) { Text(text, maxLines = 1) }
     } else {
         OutlinedButton(
@@ -4850,11 +4834,11 @@ private fun NavButton(mark: String, label: String, selected: Boolean, onClick: (
         ) {
             Box(
                 modifier = Modifier
-                    .width(64.dp)
-                    .height(32.dp)
+                    .width(Dimens.navButtonWidth)
+                    .height(Dimens.controlSizeSmall)
                     .background(
-                        if (selected) Color(0x337FA6D8) else Color.Transparent,
-                        RoundedCornerShape(16.dp),
+                        if (selected) SelectionRing else Color.Transparent,
+                        RoundedCornerShape(Dimens.radiusLarge),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -4887,26 +4871,26 @@ private fun DrawingActionButton(
     modifier: Modifier = Modifier,
 ) {
     if (state.isDrawing) {
-        Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Surface(
-                modifier = Modifier.weight(1f).height(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = if (tonal) MaterialTheme.colorScheme.surfaceVariant else Color(0xFF233144),
-                tonalElevation = 1.dp,
+                modifier = Modifier.weight(1f).height(Dimens.buttonHeightLarge),
+                shape = RoundedCornerShape(Dimens.spaceM),
+                color = if (tonal) MaterialTheme.colorScheme.surfaceVariant else DrawingActionSurface,
+                tonalElevation = Dimens.hairline,
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     LinearProgressIndicator(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .fillMaxWidth()
-                            .height(4.dp),
+                            .height(Dimens.spaceXs),
                         color = MaterialTheme.colorScheme.secondary,
-                        trackColor = Color(0x3324211E),
+                        trackColor = ProgressTrack,
                     )
                     Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceXxl),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
                     ) {
                         Text(runningText, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.weight(1f))
@@ -4920,7 +4904,7 @@ private fun DrawingActionButton(
                     }
                 }
             }
-            SecondaryActionButton(text = "停止", onClick = onStop, modifier = Modifier.width(104.dp))
+            SecondaryActionButton(text = "停止", onClick = onStop, modifier = Modifier.width(Dimens.chipWidth))
         }
     } else if (tonal) {
         SecondaryActionButton(text = idleText, onClick = onClick, modifier = modifier)
@@ -4934,9 +4918,9 @@ private fun PrimaryActionButton(text: String, onClick: () -> Unit, enabled: Bool
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().height(56.dp),
-        shape = RoundedCornerShape(28.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color(0xFF101010)),
+        modifier = modifier.fillMaxWidth().height(Dimens.buttonHeightLarge),
+        shape = RoundedCornerShape(Dimens.radiusPill),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = InkOnPrimary),
     ) { Text(text, maxLines = 1) }
 }
 
@@ -4945,8 +4929,8 @@ private fun SecondaryActionButton(text: String, onClick: () -> Unit, enabled: Bo
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().height(56.dp),
-        shape = RoundedCornerShape(28.dp),
+        modifier = modifier.fillMaxWidth().height(Dimens.buttonHeightLarge),
+        shape = RoundedCornerShape(Dimens.radiusPill),
     ) { Text(text, maxLines = 1) }
 }
 
@@ -4955,9 +4939,9 @@ private fun PrimarySmallButton(text: String, onClick: () -> Unit, enabled: Boole
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(40.dp),
-        shape = RoundedCornerShape(4.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color(0xFF101010)),
+        modifier = modifier.height(Dimens.buttonHeightSmall),
+        shape = RoundedCornerShape(Dimens.spaceXs),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = InkOnPrimary),
     ) { Text(text, maxLines = 1) }
 }
 
@@ -4966,8 +4950,8 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(40.dp),
-        shape = RoundedCornerShape(4.dp),
+        modifier = modifier.height(Dimens.buttonHeightSmall),
+        shape = RoundedCornerShape(Dimens.spaceXs),
     ) { Text(text, maxLines = 1) }
 }
 
@@ -5157,7 +5141,7 @@ private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
         }
         drawPath(
             path = lineA,
-            color = Color(0xFFCFC6B6).copy(alpha = 0.72f),
+            color = CanvasSketchInkLight.copy(alpha = 0.72f),
             style = Stroke(width = unit * 0.007f, cap = StrokeCap.Round),
         )
         val lineB = Path().apply {
@@ -5168,7 +5152,7 @@ private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
         }
         drawPath(
             path = lineB,
-            color = Color(0xFFDED6C9).copy(alpha = 0.72f),
+            color = CanvasSketchInkMid.copy(alpha = 0.72f),
             style = Stroke(
                 width = unit * 0.004f,
                 cap = StrokeCap.Round,
@@ -5177,13 +5161,13 @@ private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
         )
         val shapeStroke = Stroke(width = unit * 0.006f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         drawCircle(
-            color = Color(0xFFD8CFC0).copy(alpha = 0.72f),
+            color = CanvasSketchInkStrong.copy(alpha = 0.72f),
             radius = unit * 0.055f,
             center = Offset(w * 0.33f, h * 0.53f),
             style = shapeStroke,
         )
         drawRect(
-            color = Color(0xFFD8CFC0).copy(alpha = 0.72f),
+            color = CanvasSketchInkStrong.copy(alpha = 0.72f),
             topLeft = Offset(w * 0.63f, h * 0.48f),
             size = Size(w * 0.09f, h * 0.11f),
             style = shapeStroke,
@@ -5196,7 +5180,7 @@ private fun CanvasPlaceholderPreview(modifier: Modifier = Modifier) {
         }
         drawPath(
             path = triangle,
-            color = Color(0xFFD8CFC0).copy(alpha = 0.72f),
+            color = CanvasSketchInkStrong.copy(alpha = 0.72f),
             style = shapeStroke,
         )
     }
@@ -5426,7 +5410,7 @@ internal fun MascotWidget(
     mascotKind: String,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.padding(4.dp)) {
+    Box(modifier = modifier.padding(Dimens.spaceXs)) {
         if (mascotKind == "yuragi") {
             YuragiMascotView()
         } else {
@@ -5467,11 +5451,11 @@ internal fun IncuMascotView(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .testTag("mascot_incu")
-            .size(32.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+            .size(Dimens.controlSizeSmall)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(32.dp)) {
+        Canvas(modifier = Modifier.size(Dimens.controlSizeSmall)) {
             val scaleFactor = size.width / 92f
             val timeSec = timeMs / 1000.0
 
@@ -5590,11 +5574,11 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .testTag("mascot_yuragi")
-            .size(32.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+            .size(Dimens.controlSizeSmall)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(32.dp)) {
+        Canvas(modifier = Modifier.size(Dimens.controlSizeSmall)) {
             val scaleFactor = size.width / 92f
             val timeSec = timeMs / 1000.0
 

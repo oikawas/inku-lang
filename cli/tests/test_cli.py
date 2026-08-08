@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from inku_analysis.rasterize_batch import Failure, Report
 from inku_cli import cli
 
 
@@ -2143,6 +2144,17 @@ def test_the_generator_says_the_manual_is_current():
     assert done.returncode == 0, done.stderr or done.stdout
 
 
+# T-9
+def test_the_manual_lists_the_rasterize_command():
+    """A subcommand added without regenerating leaves a manual that does not know
+    the command exists. The gates above compare the blocks that are there; this
+    one says which command has to be among them."""
+    assert "### `inku-cli rasterize`" in _marked_region(), (
+        "cli/README.md の help 節に rasterize が無い。"
+        "`uv run python scripts/gen_readme_help.py` で再生成する"
+    )
+
+
 SERVER_INFO = {
     "name": "inku-server",
     "version": "v2.11.4",
@@ -2294,3 +2306,96 @@ def test_render_score_hashes_with_the_server_engine_version(monkeypatch, capsys)
     )
 
     assert first["render_hash"] != other["render_hash"]
+
+
+# `rasterize` -- the CLI is the thin door onto inku_analysis.rasterize_batch, which
+# is where the rule for burning a picture lives. These two say the door is thin.
+
+def _rasterize_corpus(tmp_path):
+    """A directory a naive implementation would actually try to rasterize."""
+    src = tmp_path / "svg"
+    src.mkdir()
+    for name in ("one", "two"):
+        (src / f"{name}.svg").write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
+            '<circle cx="10" cy="10" r="5" fill="black"/></svg>',
+            encoding="utf-8",
+        )
+    return src
+
+
+# T-7
+def test_rasterize_calls_the_shared_batch_and_burns_nothing_of_its_own(monkeypatch, capsys, tmp_path):
+    src = _rasterize_corpus(tmp_path)
+    calls = []
+
+    def fake_rasterize_dir(source, target, **kwargs):
+        calls.append((Path(source), Path(target)))
+        return Report(written=(Path("one.png"),), failed=())
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("the CLI rasterized on its own instead of calling rasterize_dir")
+
+    monkeypatch.setattr(cli, "rasterize_dir", fake_rasterize_dir)
+    # A second implementation written here would reach the rasterizer through this
+    # name, the way `paint --png` does.
+    monkeypatch.setattr(cli, "svg_to_png", forbidden)
+
+    args = cli.build_parser().parse_args(
+        ["rasterize", "--in", str(src), "--out", str(tmp_path / "png")]
+    )
+    assert cli.command_rasterize(args) == 0
+
+    assert calls == [(src, tmp_path / "png")]
+    assert json.loads(capsys.readouterr().out)["written"] == 1
+
+
+# T-8
+@pytest.mark.parametrize(
+    "extra, expected",
+    [
+        ([], {"width": None, "workers": 1}),
+        (["--width", "1618", "--workers", "6"], {"width": 1618, "workers": 6}),
+    ],
+    ids=["without-flags", "with-flags"],
+)
+def test_rasterize_hands_width_and_workers_straight_through(monkeypatch, capsys, tmp_path, extra, expected):
+    """Including when the flags are absent: a default that stops at the parser and
+    never reaches the batch is a flag nobody is carrying."""
+    seen = {}
+
+    def fake_rasterize_dir(source, target, *, width, workers):
+        seen.update(width=width, workers=workers)
+        return Report(written=(), failed=())
+
+    monkeypatch.setattr(cli, "rasterize_dir", fake_rasterize_dir)
+    args = cli.build_parser().parse_args(
+        ["rasterize", "--in", str(_rasterize_corpus(tmp_path)), "--out", str(tmp_path / "png"), *extra]
+    )
+    assert cli.command_rasterize(args) == 0
+    capsys.readouterr()
+
+    assert seen == expected
+
+
+def test_rasterize_reports_the_files_it_could_not_burn(monkeypatch, capsys, tmp_path):
+    """A dropped population has to be readable from the artifact, not only from
+    the terminal, and the exit status has to say the run was not whole."""
+    monkeypatch.setattr(
+        cli,
+        "rasterize_dir",
+        lambda source, target, **kwargs: Report(
+            written=(Path("one.png"),),
+            failed=(Failure(Path("two.svg"), "child killed by signal 11"),),
+        ),
+    )
+    args = cli.build_parser().parse_args(
+        ["rasterize", "--in", str(_rasterize_corpus(tmp_path)), "--out", str(tmp_path / "png")]
+    )
+    assert cli.command_rasterize(args) == 1
+
+    captured = capsys.readouterr()
+    summary = json.loads(captured.out)
+    assert (summary["attempted"], summary["written"], summary["failed"]) == (2, 1, 1)
+    assert summary["unresolved"] == [{"source": "two.svg", "reason": "child killed by signal 11"}]
+    assert "UNRESOLVED two.svg" in captured.err

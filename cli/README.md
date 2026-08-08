@@ -83,13 +83,13 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
@@ -97,6 +97,7 @@ positional arguments:
     paint               generate one drawing
     batch               generate drawings from a prompt list
     contact-sheet       create a contact sheet from PNG files in a directory
+    rasterize           rasterize a directory of SVG files to PNG
     analyze             analyze generated PNG/JSON outputs
     ddl-compare         compare normalized DDL artifacts side by side
     vision-review       use the configured NIM vision model as a read-only
@@ -448,6 +449,23 @@ options:
   --columns COLUMNS
   --thumb-size THUMB_SIZE
   --order {name,similarity}
+
+```
+
+### `inku-cli rasterize`
+
+```
+usage: inku-cli rasterize [-h] --in INPUT_DIR --out OUTPUT_DIR [--width WIDTH]
+                          [--workers WORKERS]
+
+options:
+  -h, --help         show this help message and exit
+  --in INPUT_DIR     directory to read .svg files from
+  --out OUTPUT_DIR   directory to write .png files to, created if absent
+  --width WIDTH      render at this pixel width instead of the width each SVG
+                     declares
+  --workers WORKERS  rasterize this many files at once; each file still gets
+                     its own process
 
 ```
 

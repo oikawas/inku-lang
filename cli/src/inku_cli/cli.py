@@ -30,6 +30,7 @@ from inku_analysis import (
     composition_family as _composition_family_from_score,
     motif_signatures as _motif_signatures,
 )
+from inku_analysis.rasterize_batch import rasterize_dir
 from inku_analysis.rasterizer import (
     RasterizerUnavailable,
     rasterizer_backend,
@@ -2779,6 +2780,42 @@ def command_contact_sheet(args: argparse.Namespace) -> int:
     print(str(output_path))
     return 0
 
+def command_rasterize(args: argparse.Namespace) -> int:
+    """Burn a directory of SVGs. The rule for how one is burned is not here.
+
+    It is `inku_analysis.rasterize_batch`, because the development server -- eight
+    times faster at this than the Mac -- carries only what its two services need
+    and `cli/` is not there. A second copy of the rule written here would be the
+    fifth one, after the four that grew in `cli/out2/`.
+    """
+    try:
+        report = rasterize_dir(
+            Path(args.input_dir),
+            Path(args.output_dir),
+            width=args.width,
+            workers=args.workers,
+        )
+    except NotADirectoryError as exc:
+        raise CliError(str(exc)) from exc
+    for failure in report.failed:
+        print(f"UNRESOLVED {failure.source}: {failure.reason}", file=sys.stderr)
+    _print_json(
+        {
+            "output_dir": str(args.output_dir),
+            "attempted": report.attempted,
+            "written": report.succeeded,
+            "failed": report.failures,
+            # Absent measurements, not zeros: named so a dropped population is
+            # readable from the artifact and not only from the terminal.
+            "unresolved": [
+                {"source": str(failure.source), "reason": failure.reason}
+                for failure in report.failed
+            ],
+            "rasterizer": rasterizer_info(),
+        }
+    )
+    return 1 if report.failed else 0
+
 def command_analyze(args: argparse.Namespace) -> int:
     if args.census and args.history:
         if args.input_dir:
@@ -3710,6 +3747,13 @@ def build_parser() -> argparse.ArgumentParser:
     contact_sheet.add_argument("--thumb-size", type=int, default=220)
     contact_sheet.add_argument("--order", choices=["name", "similarity"], default="name")
     contact_sheet.set_defaults(func=command_contact_sheet)
+
+    rasterize = subparsers.add_parser("rasterize", help="rasterize a directory of SVG files to PNG")
+    rasterize.add_argument("--in", dest="input_dir", required=True, help="directory to read .svg files from")
+    rasterize.add_argument("--out", dest="output_dir", required=True, help="directory to write .png files to, created if absent")
+    rasterize.add_argument("--width", type=int, help="render at this pixel width instead of the width each SVG declares")
+    rasterize.add_argument("--workers", type=int, default=1, help="rasterize this many files at once; each file still gets its own process")
+    rasterize.set_defaults(func=command_rasterize)
 
     analyze = subparsers.add_parser("analyze", help="analyze generated PNG/JSON outputs")
     _add_common_server_args(analyze)

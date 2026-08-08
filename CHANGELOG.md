@@ -4166,3 +4166,40 @@ nearest mark and on the farthest.** **In production that is 2,738 of 6,425 group
 - **Tests:** server **2,403 passed / 31 skipped** (`def test_` 1,215 → 1,230, **nothing deleted or
   renamed**), ruff clean, frozen corpora byte-identical. **The Android reference fixtures gained a
   `render-engine-24/` directory of 55 files, and no Kotlin changed.**
+
+### Android `2.1.4-android.16` — the app sketches before it paints (android Build 148098, 2026-08-08)
+
+**The layer that rewrites a description into "the language of things" before Stage 1 reads it
+(sketching, Stage 0.5) is now on Android.** The last of the five-part Android series; **`server/`,
+`web/` and `shared/` were not changed by one line.**
+
+- **The control has three states** (`Off` / `Fine` / `Coarse`), **defaulting to `Fine`** so the
+  layer runs. **`Fine` and `Coarse` do not change how much is said — only the size of the pieces.**
+- **Three columns were added to history** (Room 7 → 8): the sketch prose, the grain and the state.
+  **`MIGRATION_7_8` backfills nothing.** Backfilling would turn **a work drawn before the layer
+  into a work drawn with the layer switched off** — **the absence of a value carries a sixth
+  meaning.**
+- **⚠ The server and the web client each hold a normalisation function of the same name whose
+  answers differ on unknown or missing input** (the server rounds to the default, the web client
+  returns `null`). **The port gives them different names, and comparison against a parent uses the
+  web one.** **Confusing them inverts the verdict in both directions for a work with no grain
+  recorded.**
+- **A fallback row records no sketch prose** (**author's ruling 2026-08-08, matching the server**).
+  **What a fallback carries is the description itself**, and writing that into the sketch column
+  would make **a work that never passed through the layer indistinguishable from one that did.**
+- **Sketching is non-deterministic, so reproduction means sending the stored sketch prose again,
+  not sketching again.** A redraw whose description and grain both stand still carries the parent's
+  prose.
+- **Refinement candidates inherit the parent's sketch prose too.** Without it **the parent is drawn
+  from the sketch and the candidate from the raw description**, which makes it a refinement of
+  something else.
+- **Twelve perturbations were applied to production code only, and none missed.** **One was split
+  in two because the contract expected a single edit to turn two tests red** — **one of them reads
+  the SQLite column directly, and the normalisation function is not on that path.**
+- **Tests:** **JVM 235 / 0 failed** (44 classes, from 223), **instrumented 93 / 0 failed** (Pixel 9
+  hardware, 18 classes, from 81). **Test functions +24, nothing deleted or renamed.**
+  **Only `android/VERSION` moved one step** — `APP_VERSION` and `web/BUILD_NUMBER` stay put, and
+  nothing was deployed to the dev server.
+- **⚠ Stage 1 and Stage 2 still run at temperatures that differ from the server** (0.2 and 0.1
+  against the sketch layer's 0.3). **That divergence predates the sketch layer**; it was left alone
+  and recorded as **[I-159]**, pending a ruling.

@@ -2280,3 +2280,59 @@ in the acceptance**, and T-2 was extended to cover it.
 
 - **Instrumented 31 / 0 failures** (physical Pixel 9, from 25).
 - **JVM unit 159 / 0 failures** (37 classes, unchanged). **No production code changed.**
+
+## 2026-08-08 The sketch layer (Stage 0.5) reaches the client ([I-138] series 5/5 / android `2.1.4-android.16`)
+
+**The layer that rewrites a description into "the language of things" before Stage 1 reads it is now
+on the client too.** The last of the five-part series, ported under the rule that **the server is
+canonical and the client is where it is carried to** (development conventions §2-4).
+
+### There are two normalisation functions with the same name
+
+**This is the easiest thing to get wrong in this port.** The server and the web client each hold a
+function of **the same name with different behaviour**.
+
+| Function | Origin | On unknown or missing | Role |
+|---|---|---|---|
+| `normalize_sketch_grain` | server `sketch.py:43` | **`fine`** (rounds to the default) | resolves the grain that was **requested** |
+| `normalizeSketchGrain` | web `sketch.ts:82` | **`null`** | reads the grain a stored work **recorded** |
+
+**The port gives them different names** — `Sketches.normalizeGrain` (the server one) and
+`Sketches.recordedGrainOf` (the web one). **Comparison against a parent uses the latter. Using the
+former inverts both answers.**
+
+| Parent's `sketch_grain` | Control | `recordedGrainOf` (chosen) | `normalizeGrain` (wrong) |
+|---|---|---|---|
+| `null` (a work older than the column) | `Off` | `null` vs `null` → **replay** | `fine` vs `null` → **grain change** |
+| `null` (a work older than the column) | `Fine` | `null` vs `fine` → **grain change** | `fine` vs `fine` → **replay** |
+
+**A work older than the column is not "a work drawn at the default" — it is a work drawn before
+there was a grain to record.** `off` carries no grain either, so **absence equals absence, and
+redrawing with the layer switched off stays a replay.**
+
+### The sixth state is the absence of a value, not `off`
+
+There are five recorded states (the server's `sketch_state`), but **an empty column carries a sixth
+meaning**. `MIGRATION_7_8` **backfills nothing** — backfilling would turn **a work drawn before the
+layer into a work drawn with the layer switched off**.
+
+### A fallback row records no sketch prose (**author's ruling 2026-08-08, matching the server**)
+
+The contract asked that a fallback run leave `sketch_text` non-empty, but **the server writes
+neither `sketch_text` nor `sketch_grain` on a fallback row** (`render.py:1917-1922`). **What a
+fallback carries is the description itself**, and writing that into the sketch column would make
+**a work that never passed through the layer indistinguishable from one that did.** **An empty
+column with only the state set to `fallback` is the whole reason the state column exists.**
+
+### Sketching is non-deterministic, and reproduction means sending it again
+
+`SketchFromLife.call` **passes no seed**. There is therefore **no test asserting that the same
+description and grain sketch the same way twice.** Reproduction works **not by sketching again but
+by sending the stored `sketch_text` again** — a redraw whose description and grain both stand still
+carries the parent's sketch prose.
+
+### The temperature still diverges from the server ([I-159])
+
+**The sketch layer was set to the server's 0.3, but Android's Stage 1 is 0.2 and Stage 2 is 0.1.**
+**That divergence predates the sketch layer** and was not touched here. **It is recorded as pending
+a ruling on [I-159].**

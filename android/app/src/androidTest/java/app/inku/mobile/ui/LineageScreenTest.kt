@@ -98,6 +98,10 @@ class LineageScreenTest {
         // reading a database the next test has already closed.
         store?.let { withContext(Dispatchers.Main) { it.clear() } }
         delay(SETTLE_AFTER_CLEAR_MS)
+        // Closing it here as well is what makes the wait above a belt rather
+        // than the guarantee: this one blocks until the scheduled thumbnail
+        // write is on disk, so the close below cannot land on top of it.
+        repository.close()
         database.close()
     }
 

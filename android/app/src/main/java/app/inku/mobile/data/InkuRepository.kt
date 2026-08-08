@@ -43,6 +43,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -92,7 +94,24 @@ class InkuRepository(
 
     fun exportTemplates(): Flow<List<ExportTemplateEntity>> = database.exportTemplateDao().observeAll()
 
+    /**
+     * Waits for the scheduled thumbnail writes, then tears the scope down.
+     *
+     * `cancel()` alone only asks; it does not wait. A write already inside
+     * `updateThumbnail` keeps running, and a caller that closes the database
+     * next takes it out from under the write. That throws on a background
+     * coroutine rather than on the caller, so it kills the whole process --
+     * which is why the instrumentation runs ended with most of their tests
+     * unrecorded rather than with one red test (I-150).
+     *
+     * Joining before cancelling, rather than `cancelAndJoin`, is deliberate:
+     * cancelling first abandons the write, so the thumbnail would never land
+     * and there would be no property left to assert. Waiting means that once
+     * this returns, the scheduled write is on disk and nothing is holding the
+     * database.
+     */
     suspend fun close() {
+        thumbnailScope.coroutineContext.job.children.toList().joinAll()
         thumbnailScope.cancel()
         localLiteRtProvider.close()
     }

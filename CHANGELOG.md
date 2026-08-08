@@ -4239,3 +4239,37 @@ were truncated this way** ([I-150]).
   +1; **each gate gained a contrast case.** Without the contrast, the instrumented assertion would
   hold vacuously if the save happened to finish the thumbnail itself, and the structural rule would
   pass over an empty set. **The number of properties is the predicted one on each side.**
+
+### Android `2.1.4-android.18` — naming what the app draws with (UI redesign, stage A; android Build 148098, 2026-08-08)
+
+**One file, `InkuApp.kt`, held 89 hardcoded colours (57 values), 429 `.dp` literals (54 values) and
+8 `.sp` literals (5 values).** The other 68 Kotlin files held none of the three, so **every literal
+was in one place.** This stage gives them names and **does not move the drawing by a pixel.**
+
+- **A token layer.** `ui/theme/Color.kt` (65 tokens plus the 9 `InkuColors` roles), `Dimens.kt`
+  (**new**, 53 values — `0.dp` gets no token), `Type.kt` (5 sp values). What is left inline in
+  `InkuApp.kt` is **no colours, no `.sp`, and the 20 occurrences of `0.dp`.**
+- **Two independent checks that no value moved.** Normalising the tokens to symbols and diffing
+  gives **5,756 lines against 5,756 with zero structural difference** — nothing but substitution
+  went in. And **the 57 colours, 53 dp and 5 sp values from before are all present** in the token
+  sets.
+- **65 colour tokens carry 57 distinct values.** Seven groups share an ARGB and were given more than
+  one name, which is the direction the gate allows: **growing is fine, shrinking is the regression.**
+  **The names were not folded together**, because they agree today by coincidence and stage B may
+  need to move one without the other.
+- **A preview for Claude Design, with its generator.** `android/design/gen_design_preview.py` reads
+  the Kotlin sources and needs neither Gradle nor the Android SDK, so it runs in CI; a job in
+  `reference-corpus.yml` demands byte equality. **A generator CI cannot run defeats the purpose of
+  watching for staleness.**
+- **All eight perturbations turned their named test red** (the five extra reds are overlaps the
+  design predicts). **⚠ The contract's P-3 — delete an unused colour — could not be run:** all 65
+  tokens are referenced, and the seven duplicated values can each be deleted with the gate staying
+  green, so deletion has no discriminating power twice over. It was replaced by a perturbation that
+  causes the property directly in production code.
+- **Tests:** **JVM 238 / 0 failed** (45 classes, from 235), **server pytest 2411 passed / 31
+  skipped** (from 2405), **instrumented 95 / 0 failed** (Pixel 9 hardware, 19 classes), ruff clean,
+  `check_docs.py` green. **Only `android/VERSION` moved one step.**
+- **⚠ 22 of the 53 dp values sit off the 4dp grid and not one was moved.** **Stage B does that when
+  it rebuilds the screens** — moving both in one cycle would make it impossible to tell which change
+  moved the drawing. By then only `Dimens.kt` has to change.
+- **⚠ The version is `.18` rather than `.17` because the [I-150] fix took `.17` the same day.**

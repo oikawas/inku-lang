@@ -592,6 +592,28 @@ def test_a_score_with_no_arrangement_is_byte_identical(monkeypatch):
     for case_id in plain:
         assert current[case_id]["digest"] == previous[case_id]["digest"], case_id
 
+    # Read live, not manifest against manifest. Both files are frozen, so the
+    # comparison above cannot see the renderer start scaling single
+    # instructions; it would only notice on the next bake. Sampled rather than
+    # replayed whole -- 453 renders is the bake itself -- and the sample is
+    # required to carry hand tools, because a machine's `group_hand` is zero
+    # and a sample of machines would not move whatever was done to it.
+    generator = _load_generator()
+    sample = sorted(plain)[::32]
+    assert len(sample) >= 12
+    weights = {
+        previous[case_id]["input"]["score"]["instructions"][0]["weight"]
+        for case_id in sample
+    }
+    assert len({w for w in weights if GRAMMARS[w].group_hand > 0}) >= 4, weights
+    for case_id in sample:
+        assert (
+            generator._normalized_digest(
+                generator.render_case(previous[case_id]["input"])
+            )
+            == previous[case_id]["digest"]
+        ), case_id
+
     single = Score.model_validate(
         {
             "instructions": [

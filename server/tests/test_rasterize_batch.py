@@ -183,3 +183,49 @@ def test_more_workers_do_not_change_the_bytes(tmp_path):
     assert alone.failures == together.failures == 0
     for path in alone.written:
         assert path.read_bytes() == (tmp_path / "many" / path.name).read_bytes(), path.name
+
+
+# T-3b (added by the accepting session, 2026-08-09). The contract's stage 1 asked
+# for two things about failure: that `rasterize_dir` return the count and the
+# reason, and that `__main__` PRINT them under UNRESOLVED. Only the first had a
+# gate. `python -m inku_analysis.rasterize_batch` is the entry point the server
+# image and the development server actually use -- `cli/` is in neither -- so the
+# printing is production behaviour on the only path that reaches pentala, and it
+# was the one part of stage 1 nothing measured.
+def test_the_module_entry_point_prints_what_it_could_not_burn(tmp_path):
+    src = _corpus(tmp_path)
+    (src / "broken.svg").write_text("this is not an svg at all", encoding="utf-8")
+    dst = tmp_path / "png"
+
+    run = subprocess.run(
+        [sys.executable, "-m", "inku_analysis.rasterize_batch", str(src), str(dst)],
+        capture_output=True,
+        text=True,
+    )
+
+    # A dropped population that exits 0 is read as a complete one.
+    assert run.returncode == 1, run.stderr
+    assert "done 3 / 4, failed 1" in run.stdout
+    assert "UNRESOLVED" in run.stdout
+    # The name AND a reason: "one failed" cannot be acted on.
+    assert "broken.svg" in run.stdout
+    reason = run.stdout.split("broken.svg", 1)[1].strip()
+    assert reason
+
+
+def test_the_module_entry_point_stays_quiet_about_unresolved_when_none_failed(tmp_path):
+    """The counterpart: a clean run must not print the word at all.
+
+    Without this the gate above is satisfied by a module that prints UNRESOLVED
+    unconditionally, which would make every complete run look like a dropped one.
+    """
+    run = subprocess.run(
+        [sys.executable, "-m", "inku_analysis.rasterize_batch",
+         str(_corpus(tmp_path)), str(tmp_path / "png")],
+        capture_output=True,
+        text=True,
+    )
+
+    assert run.returncode == 0, run.stderr
+    assert "done 3 / 3, failed 0" in run.stdout
+    assert "UNRESOLVED" not in run.stdout

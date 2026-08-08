@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-08 — v2.11.8 unreleased baseline (Web Build 864)
+
+The 13 places that name a version were updated to v2.11.8 / Build 864. **No manual text changed** — no screen action, CLI flag, setting or response key moved.
+
+- **The drawings do change.** Under render engine 26, **every member of a repeated group finds its own angle.** The previous version gave each member its own size, but they all still faced the same way; **with a hand tool each one now differs, within 12 degrees either side.**
+- **Rotring and Computer still repeat at exactly one angle.** Keeping the machine's repetition exact — in angle as well as in size and stroke — is deliberate: it is those two tools' signature.
+- **A description that states an angle is drawn exactly as stated.** A group whose rotation you name never wavers. **That includes stating zero degrees.**
+- **Lines and circles, grids, and groups of one are unchanged.** Turning a line makes a different line, turning a circle changes nothing you can see, and a tiling's point is that the cells match.
+- **No new action was added.** "Several of this shape" was always the instruction; **reading it as "all of them facing the same way" was the drawing side's addition. Nothing about how you write a description changes.**
+- **Redrawing the same description with the same seed changes only the groups that state repetition with a hand tool.** A work that states no repetition does not move by a pixel.
+
 ## 2026-08-08 — v2.11.7 unreleased baseline (Web Build 863)
 
 The 13 places that name a version were updated to v2.11.7 / Build 863. **No manual text changed** — no screen action, CLI flag, setting or response key moved.

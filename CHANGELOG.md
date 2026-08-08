@@ -4325,3 +4325,60 @@ description: **it was the largest signature the engine was adding on its own.**
   byte-identical. **The Android reference fixtures gained `render-engine-25/` (55 files) and not one
   line of Kotlin changed** — Android reads only the directory of the version it names. **JVM 238 /
   0 failed, unchanged.**
+
+### v2.11.8 — Every member of a group finds its own angle (Build 864, render engine 26, 2026-08-08)
+
+**Engine 25 gave up "the same size". What was left was "the same angle".**
+
+An `Arrangement` says only "several of the same shape". **Nowhere does it say they all face the same
+way.** After engine 25 the N members of a group still shared a single angle. **This is the last stage
+of improvement plan #5.**
+
+- **A hand tool now gives each member of a group its own angle.** The spread lives in the tool
+  grammar as `group_rot`, and **all nine hand tools carry the same ±12°** (`HAND_GROUP_ROT`).
+  It is a single constant for the same reason the previous stage made `group_hand` one.
+- **`rotring` and `computer` stay at 0.** Exact repetition by a machine is a signature, not a defect;
+  this is the third rule of that shape, after `fill_hand` in engine 22 and `group_hand` in engine 25.
+- **Not one pixel of placement moves.** `_turn_member` rewrites `rotation` and nothing else.
+  **`_apply_rotation` turns a mark about its anchor**, so **the three coordinate corrections the
+  previous stage needed have no counterpart here.** Size can move a centre; angle cannot.
+- **Five exclusions**: **`line`** (turning a line makes a different line), **`circle`** (turning it
+  changes nothing visible while consuming performance seed), **a group that states its `rotation`**
+  (if the description names the angle, the description wins), **`grid`** (a lattice is meant to line
+  up), and **a group of one**.
+- **⚠ The test is `stated.rotation is not None`, not truthiness.** **Production holds 141 groups that
+  state `rotation: 0`.** Written as a truthy test, exactly those 141 fall through to "unstated" and
+  get turned. **A case that states `0` was added to the corpus, with a gate that watches only that
+  point.**
+- **The angle comes from the performance seed, not the placement seed** — the boundary engine 23 drew
+  between composition and performance, kept for the same reason as the previous stage.
+- **⚠ The expander argument `size_seed` was renamed to `member_seed`.** The previous stage named it
+  for size, but angle reads the same seed, so **the name had grown narrower than the thing.** No
+  `size_seed` remains in the tree.
+- **The corpus goes from 545 to 549 cases. Only 3 moved; 542 are byte-for-byte unchanged.** The three
+  are `G-size-ellipse-edge`, `-square-` and `-triangle-`, which the previous stage added itself —
+  **the groups that are neither circles nor lines carried straight over into this stage.**
+  **⚠ The corpus held no `arc` group, no `cloudform` group and no group stating a `rotation`**, so
+  **four cases were added** (`G-angle-arc-edge`, `-cloudform-edge`, `-stated-zero-edge`,
+  `-stated-30-edge`). The generator asserts that those four discriminate before it writes them out.
+- **`ddl_engine_version` does not move** (still 7). Nothing through Stage 2 changes by a byte.
+- **All twelve perturbations broke production code, and none of them missed.** **One hole was found
+  before the perturbation was applied**: bleeding the angle into the size and comparing against
+  "the same build with the angle layer disabled" leaves **the same broken coefficient on both sides,
+  so the gate stays green**. It was closed by adding **a check that redraws engine 25's 43 frozen
+  cases through the product now in the tree and compares against the digest engine 25 recorded** —
+  a live drawing against a frozen record, not one frozen file against another. **What was added is a
+  gate, not production code.**
+- **⚠ Unlike the previous stage, not one golden digest moved.** Six unforeseen failures appeared, but
+  **all six follow from adding four corpus cases, and none from the angle moving.**
+  `test_legacy_arrangement_layouts_keep_golden_output` stays green because **all four of its goldens
+  are circle groups** (engine 26 does not turn circles). The same check went red under engine 25 and
+  was re-taken for the seventh time.
+- **Confirmed by eye.** Drawing one production Score under each version, engine 25 emits **no
+  `rotate(` at all** — the Score names no angle, so all 109 marks line up the same way. Engine 26
+  gives **all 109 a distinct angle**, every one inside **-11.95° to +11.83°**.
+- **Checks:** server **2,466 passed / 31 skipped** (from 2,442; `def test_` 1,255 → 1,270, **none
+  deleted**), cli 176, `npm run check` 241 FILES / 0 errors, ruff clean, frozen corpora
+  byte-identical. **The Android reference fixtures gained `render-engine-26/` (55 files) and not one
+  line of Kotlin changed** — Android reads only the directory of the version it names. **JVM 238 /
+  0 failed, unchanged.**

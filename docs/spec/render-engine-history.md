@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **26** | v2.11.8 | 864 | 2026-08-08 | 549 | **7** | **542** |
 | **25** | v2.11.7 | 863 | 2026-08-08 | 545 | **41** | **504** |
 | **24** | v2.11.6 | 862 | 2026-08-08 | 541 | **7** | **534** |
 | **23** | v2.11.5 | 860 | 2026-08-08 | 535 | **4** | **531** |
@@ -123,14 +124,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `25` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `26` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `7` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.7 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.8 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 863 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 864 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -397,6 +398,70 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 26 — every member of a group finds its own angle (v2.11.8)
+
+**Engine 25 gave up "the same size". What was left was "the same angle".**
+
+An `Arrangement` says only "several of the same shape". **Nowhere does it say they all face the same
+way.** After engine 25 the N members of a group still shared a single angle. **This is the last stage
+of improvement plan #5.**
+
+**The spread lives in the tool grammar.** `ToolGrammar.group_rot` holds how many degrees the members
+of a group drawn with that tool may scatter (12.0 = ±12°). **All nine hand tools carry the same ±12°**
+(`HAND_GROUP_ROT`) and **`rotring` and `computer` are 0**. This is the third rule of that shape, after
+`fill_hand` in engine 22 and `group_hand` in engine 25: **exact repetition by a machine is a
+signature, not a defect.**
+
+### Not one pixel of placement moves
+
+`_turn_member` rewrites `rotation` and nothing else. **`_apply_rotation` turns a mark about its own
+anchor**, so **the three coordinate corrections engine 25 needed have no counterpart here.** Size can
+move a centre; angle cannot. **A group is placed after expansion by `_fit_group_to_anchor`, which
+reads only the anchor**, so placement is unchanged as long as the anchor is preserved.
+
+### Five exclusions
+
+| Excluded | Why |
+|---|---|
+| `line` | Turning a line makes a different line |
+| `circle` | Turning it changes nothing visible while consuming performance seed |
+| A group that states its `rotation` | If the description names the angle, the description wins |
+| `grid` | A lattice is meant to line up (the same author's ruling as engine 25) |
+| A group of one | There is nobody to differ from |
+
+**⚠ The test is `stated.rotation is not None`, not truthiness.** Production holds **141 groups that
+state `rotation: 0`.** Written as a truthy test, **exactly those 141 fall through to the "unstated"
+side and get turned.** A case stating `0` was added to the corpus, with a gate that watches only that
+point.
+
+### The angle comes from the performance seed
+
+Engine 23 separated composition from performance, so **deriving the angle from the placement seed
+would break that separation.** It reads the same seed as engine 25's size (`member_seed`).
+**⚠ Engine 25 named that expander argument `size_seed`, but angle reads the same seed, so the name
+had grown narrower than the thing. It was renamed to `member_seed`.**
+
+### The corpus
+
+**545 → 549 cases. Only 3 existing cases moved; 542 are byte-for-byte unchanged.** The three are
+`G-size-ellipse-edge`, `-square-` and `-triangle-`, which engine 25 added itself — **the groups that
+are neither circles nor lines carried straight over into this stage.**
+
+**⚠ The corpus held no `arc` group, no `cloudform` group and no group stating a `rotation`.** Four
+cases were added — `G-angle-arc-edge`, `G-angle-cloudform-edge`, `G-angle-stated-zero-edge` and
+`G-angle-stated-30-edge`. **The generator asserts that those four discriminate before it writes them
+out** (the same practice as engine 25).
+
+### ⚠ Not one golden digest moved
+
+Engine 25 moved 37 corpus cases and the goldens with them, but **the three existing cases engine 26
+moved were none of them checked against frozen bytes.**
+`test_legacy_arrangement_layouts_keep_golden_output` stays green because **all four of its goldens are
+circle groups.** **When estimating the next stage, ask whether that stage passes through a layer
+checked against frozen bytes.**
+
+**`ddl_engine_version` does not move** (still 7). Nothing through Stage 2 changes by a byte.
 
 ## engine 25 — every member of a group gets its own size (v2.11.7)
 

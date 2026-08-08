@@ -132,7 +132,7 @@ def _without_member_sizes(monkeypatch) -> None:
     claim.
     """
     monkeypatch.setattr(
-        renderer, "_apply_member_sizes", lambda items, arr, size_seed: items
+        renderer, "_apply_member_sizes", lambda items, arr, member_seed: items
     )
 
 

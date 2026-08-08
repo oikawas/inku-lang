@@ -33,31 +33,35 @@ CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-08"
 REASON = (
-    "Every member of a group gets its own size. `Arrangement` is the "
-    "declaration \"several of this shape\", and the renderer answered it by "
-    "moving coordinates and nothing else, so the N members came out congruent "
-    "-- the one signature the engine was adding that no description had asked "
-    "for. In production 2,559 of 2,757 works carry an expanded group, the "
-    "expander lays down 178,694 marks, and the coefficient of variation of the "
-    "sizes inside a group is 0.0000. Each member is now scaled about its own "
-    "anchor by 0.75x..1.25x, drawn from the performance seed rather than the "
-    "placement seed so that a composition seed still moves only where the "
-    "marks land (engine 23). Nothing is added to the vocabulary and no field "
-    "to the schema: this takes a property out rather than putting one in. The "
-    "rule preserves every anchor -- a circle keeps its centre, a bbox pulls "
-    "its corner back by half the growth, a line grows about its own midpoint "
-    "-- so the group is placed on exactly the coordinates engine 24 placed it "
-    "on, and stage A's fade ceilings, which are measured from those anchors, "
-    "arrive unchanged. Three groups keep their exact repetition: `grid`, whose "
-    "point is that the cells match (author ruling, 2026-08-08), a group of "
-    "one, which has nobody to differ from, and the machine tools `rotring` "
-    "and `computer`, whose `group_hand` is pinned at zero the way `fill_hand` "
-    "is. Of the 541 cases frozen for engine 24, 37 move -- every G case that "
-    "expands with a hand tool and is not a grid -- and 504 do not. Four cases "
-    "are added because all 42 of the corpus's groups were circles, so `radius "
-    "x k` was the only rule it could see: a line (43.8% of the expanded marks "
-    "in production), a square and a triangle (14.2%, the `position` "
-    "correction), and an ellipse (24.8%, the same factor on both axes)."
+    "Every member of a group finds its own angle, the other half of the pair "
+    "engine 25 began. `Arrangement` says \"several of this shape\" and no more "
+    "says \"all of them at the same angle\" than it says \"all of them the same "
+    "size\"; +/-25% and +/-12 degrees were ruled on together (author, "
+    "2026-08-08) and the second amplitude arrives here. Each member is turned "
+    "about its own anchor by a draw off the same performance seed the size "
+    "reads, with a different salt, so the angles follow the performance and "
+    "not the composition seed (engine 23's split). Every consumer of "
+    "`rotation` already turns the shape about `_anchor(ins)`, so unlike the "
+    "size rule this needs no coordinate correction and the group is placed on "
+    "exactly the coordinates engine 25 placed it on. Nothing is added to the "
+    "vocabulary and no field to the schema. The reach is narrower than either "
+    "stage before it, by ruling rather than by accident: 17.5% of production's "
+    "groups and 18.2% of its expanded marks. A `line` is left alone because "
+    "there the angle is what the mark says -- tilting the blades tips the "
+    "grass over -- and a group that states `rotation` is left alone because "
+    "the description has already answered the question; that test is `is not "
+    "None`, since `rotation: 0` is an answer and 2,135 groups in production "
+    "state an angle, 141 of them zero. A `circle` is left alone because an "
+    "angle cannot be seen on one, and `grid`, a group of one, and the machine "
+    "tools carry over from engine 25, the machines pinned by a `group_rot` of "
+    "zero. Of the 545 cases frozen for engine 25, 3 move -- the ellipse, "
+    "square and triangle groups engine 25 itself added, which are the only "
+    "hand-tool groups in the corpus that are neither circles nor lines -- and "
+    "542 do not. Four cases are added: an `arc` group, the largest target in "
+    "production at 377 groups and absent from the corpus entirely, a "
+    "`cloudform` group (64), and two groups that state their own angle, `0` "
+    "and `30`, which are the corpus's only sight of the difference between "
+    "`is not None` and a truthy test."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -512,6 +516,32 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _g_shape("G-size-ellipse-edge", "ellipse",
              {"center": [0.85, 0.85], "size": [0.10, 0.06]}, count=12)
 
+    # engine 26: every member of a group gets its own angle. Four more, because
+    # otherwise the corpus barely sees the rule. Of the 46 groups above, 42 are
+    # circles -- which the rule leaves alone, an angle being invisible on one --
+    # one is a line and one is a grid, both excluded by the ruling, so only the
+    # three shapes engine 25 added turn. `arc` is the largest target there is in
+    # production (377 groups against `ellipse`'s 373) and the corpus holds not
+    # one; `cloudform` (64) likewise.
+    #
+    # The other two state `rotation` themselves and are here to be identical.
+    # The ruling excludes a group that names its own angle, and `rotation: 0` is
+    # such a group: it says "do not tilt these", which is an answer and not a
+    # missing one. 141 groups in production give it, and they are the only ones
+    # a truthy test would silently turn -- so this pair is the corpus's only
+    # sight of the difference between `is not None` and `if ins.rotation:`.
+    _g_shape("G-angle-arc-edge", "arc",
+             {"center": [0.85, 0.85], "radius": 0.06,
+              "angle_start": 15.0, "angle_end": 285.0}, count=12)
+    _g_shape("G-angle-cloudform-edge", "cloudform",
+             {"center": [0.85, 0.85], "size": [0.10, 0.06]}, count=12)
+    _g_shape("G-angle-stated-zero-edge", "ellipse",
+             {"center": [0.85, 0.85], "size": [0.10, 0.06], "rotation": 0.0},
+             count=12)
+    _g_shape("G-angle-stated-30-edge", "ellipse",
+             {"center": [0.85, 0.85], "size": [0.10, 0.06], "rotation": 30.0},
+             count=12)
+
     G_COMPOSITION_SEED = 777
     _g("G-composition-scatter-edge", "edge", composition_seed=G_COMPOSITION_SEED)
     _g("G-composition-grid-center", "center", composition_seed=G_COMPOSITION_SEED,
@@ -529,9 +559,11 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # the only way the corpus reaches the placement seed at all.
     # G gained 6 in engine 24: the fading routes the corpus had never walked.
     # G gained 4 in engine 25: the three size rules a circle cannot reach.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 46}
+    # G gained 4 in engine 26: the two shapes the angle rule turns that the
+    # corpus had never carried, and the two groups that state their own angle.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 50}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 545:
+    if actual != expected or len(cases) != 549:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 
@@ -631,7 +663,7 @@ SIZE_CASES = (
 def _member_sizes_withheld() -> Iterator[None]:
     """Draw as engine 24 did: the group expands, and every member is congruent."""
     original = renderer._apply_member_sizes
-    renderer._apply_member_sizes = lambda items, arr, size_seed: items
+    renderer._apply_member_sizes = lambda items, arr, member_seed: items
     try:
         yield
     finally:
@@ -662,11 +694,69 @@ def _assert_size_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
             raise AssertionError(f"{case_id}: the drawing does not read the member size")
 
 
+# The two the angle rule turns, and the two it has to leave alone.
+ANGLE_CASES = ("G-angle-arc-edge", "G-angle-cloudform-edge")
+STATED_ANGLE_CASES = ("G-angle-stated-zero-edge", "G-angle-stated-30-edge")
+
+
+@contextlib.contextmanager
+def _member_rotations_withheld() -> Iterator[None]:
+    """Draw as engine 25 did: the group expands, and every member shares an angle."""
+    original = renderer._apply_member_rotations
+    renderer._apply_member_rotations = lambda items, arr, member_seed: items
+    try:
+        yield
+    finally:
+        renderer._apply_member_rotations = original
+
+
+def _assert_angle_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
+    """The four added here have to notice the angle, in the two opposite ways.
+
+    The turning pair has to change when the amplitude is withheld, and it has
+    to be `arc` and `cloudform`: the corpus can already reach the rule through
+    the three shapes engine 25 added, so a fourth ellipse would discriminate
+    perfectly and cover nothing new.
+
+    The stating pair has to do the reverse -- withholding the amplitude must
+    not move them, because a group that names its own angle is excluded -- and
+    still has to read `rotation` itself, or the pair records that nothing broke
+    and nothing else. Dropping the stated angle turns the exclusion off, which
+    is the only thing that separates `rotation: 0` from an unstated angle:
+    neither draws a rotate() of its own. Checked at bake time, on the bake's
+    own call.
+    """
+    primitives = {
+        inputs[case_id]["score"]["instructions"][0]["primitive"]
+        for case_id in ANGLE_CASES
+    }
+    if primitives != {"arc", "cloudform"}:
+        raise AssertionError(f"the added cases do not reach the missing shapes: {sorted(primitives)}")
+    for case_id in ANGLE_CASES:
+        stated = inputs[case_id]
+        drawn = _normalized_digest(render_case(stated))
+        with _member_rotations_withheld():
+            withheld = _normalized_digest(render_case(stated))
+        if drawn == withheld:
+            raise AssertionError(f"{case_id}: the drawing does not read the member angle")
+    for case_id in STATED_ANGLE_CASES:
+        stated = inputs[case_id]
+        drawn = _normalized_digest(render_case(stated))
+        with _member_rotations_withheld():
+            if _normalized_digest(render_case(stated)) != drawn:
+                raise AssertionError(f"{case_id}: a group that states its angle was turned")
+        dropped = copy.deepcopy(stated)
+        dropped["score"]["instructions"][0]["rotation"] = None
+        if _normalized_digest(render_case(dropped)) == drawn:
+            raise AssertionError(f"{case_id}: the drawing does not read `rotation`")
+
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
     _assert_fade_cases_discriminate(inputs)
     _assert_size_cases_discriminate(inputs)
+    _assert_angle_cases_discriminate(inputs)
 
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}

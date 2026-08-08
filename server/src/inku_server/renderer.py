@@ -1866,8 +1866,22 @@ def _scale_member(ins: Instruction, k: float) -> Instruction:
     return ins
 
 
+def _turn_member(ins: Instruction, dr: float) -> Instruction:
+    """Turn one member by `dr` degrees, leaving every coordinate where it is.
+
+    `rotation` is already an engine quantity and every consumer of it turns the
+    shape about `_anchor(ins)` -- relation resolution, the tangents an arc hands
+    the mark after it, and `_apply_rotation` in the SVG writer. The anchor a
+    member was laid out on is therefore the point it spins around, which is why
+    this needs none of the three coordinate corrections `_scale_member` needs.
+    """
+    data = ins.model_dump(by_alias=True)
+    data["rotation"] = (ins.rotation or 0.0) + dr
+    return Instruction.model_validate(data)
+
+
 def _apply_member_sizes(
-    items: list[Instruction], arr: Arrangement, size_seed: int | None
+    items: list[Instruction], arr: Arrangement, member_seed: int | None
 ) -> list[Instruction]:
     """Give each member of a group its own size (engine 25).
 
@@ -1882,15 +1896,61 @@ def _apply_member_sizes(
     nobody to differ from; and the machine tools carry a `group_hand` of zero,
     the same rule `fill_hand` follows.
     """
-    if size_seed is None or arr.layout == "grid" or len(items) < 2:
+    if member_seed is None or arr.layout == "grid" or len(items) < 2:
         return items
     hand = GRAMMARS[items[0].weight].group_hand
     if hand <= 0.0:
         return items
     result: list[Instruction] = []
     for i, item in enumerate(items):
-        k = 1 + (_hash01(i, size_seed, "member-size") - 0.5) * 2 * hand
+        k = 1 + (_hash01(i, member_seed, "member-size") - 0.5) * 2 * hand
         result.append(_scale_member(item, k))
+    return result
+
+
+def _apply_member_rotations(
+    items: list[Instruction], arr: Arrangement, member_seed: int | None
+) -> list[Instruction]:
+    """Give each member of a group its own angle (engine 26).
+
+    The other half of what engine 25 started: an `Arrangement` says "several of
+    this shape" and no more says "all of them at the same angle" than it says
+    "all of them the same size". The two amplitudes were ruled on as a pair,
+    +/-25% and +/-12 degrees (author, 2026-08-08), and the second one arrives
+    here. It reads the same `member_seed` as the size with a different salt, so
+    the angles come off the performance rather than the composition seed
+    (engine 23's split), and it turns each member about its own anchor, so the
+    group is placed on exactly the coordinates engine 25 placed it on.
+
+    This exclusion list is longer than the size rule's, and deliberately so.
+
+    A `line` is left alone because there the angle *is* what the mark says:
+    tilting the blades of grass tips the grass over (author ruling, 2026-08-08).
+    A group that states `rotation` is left alone for the mirror reason -- the
+    description has already answered the question. That test is `is not None`
+    and not a truthy one: `rotation: 0` is an answer ("do not tilt these"), and
+    141 groups in production give exactly that answer.
+
+    A `circle` is left alone because an angle cannot be seen on one. Turning it
+    would change no pixel and move the performance seed, which is the worse
+    half of both outcomes.
+
+    `grid` (whose point is that the cells match), a group of one, and the
+    machine tools carry over unchanged from the size rule; the machines are
+    pinned by a `group_rot` of zero, the way `group_hand` and `fill_hand` are.
+    """
+    if member_seed is None or arr.layout == "grid" or len(items) < 2:
+        return items
+    stated = items[0]
+    if stated.primitive in ("line", "circle") or stated.rotation is not None:
+        return items
+    spread = GRAMMARS[stated.weight].group_rot
+    if spread <= 0.0:
+        return items
+    result: list[Instruction] = []
+    for i, item in enumerate(items):
+        dr = (_hash01(i, member_seed, "member-rot") - 0.5) * 2 * spread
+        result.append(_turn_member(item, dr))
     return result
 
 
@@ -1899,27 +1959,35 @@ def _finish_expanded_group(
     arr: Arrangement,
     *,
     center: tuple[float, float] | None = None,
-    size_seed: int | None = None,
+    member_seed: int | None = None,
 ) -> list[Instruction]:
-    """The one exit every layout branch takes: colour cycle, fade, then size.
+    """The one exit every layout branch takes: colour cycle, fade, size, angle.
 
     Order matters. `_apply_color_cycle` rebuilds `color_hint` from the effect
     allowlist, so a level written before it is dropped -- and 43.5% of the
     groups in production state a cycle.
 
-    Size comes last and is read by neither of the two before it: the fade ramp
-    is measured from the anchors and the member count, and `_scale_member`
-    moves no anchor, so engine 24's ceilings arrive unchanged.
+    Size and angle come last and are read by none of the three before them: the
+    fade ramp is measured from the anchors and the member count, and neither
+    `_scale_member` nor `_turn_member` moves an anchor, so engine 24's ceilings
+    arrive unchanged. The two are ordered size-then-angle for the same reason,
+    which is to say for no reason that shows: the size rule reads `radius` /
+    `size` / the endpoints and the angle rule reads `rotation`, so neither can
+    see what the other wrote and swapping them draws the same picture.
 
     `center` is the centre the layout laid the group around, for the branches
     that have one; see `_fade_levels`.
     """
-    return _apply_member_sizes(
-        _apply_fade_levels(
-            _apply_color_cycle(items, arr.color_cycle), arr, center=center
+    return _apply_member_rotations(
+        _apply_member_sizes(
+            _apply_fade_levels(
+                _apply_color_cycle(items, arr.color_cycle), arr, center=center
+            ),
+            arr,
+            member_seed,
         ),
         arr,
-        size_seed,
+        member_seed,
     )
 
 
@@ -1971,12 +2039,12 @@ def _expand_arrangement_layout(
     ins = _ensure_line_coords(ins)
     # Derived from the instruction as stated, before any member is shifted, so
     # every member of one group is drawn from the same sequence.
-    size_seed = _seed_for_instruction(ins, performance_seed)
+    member_seed = _seed_for_instruction(ins, performance_seed)
     if arr.count == 1 and arr.layout != "grid":
         data = ins.model_dump(by_alias=True)
         data.pop("arrangement", None)
         return _finish_expanded_group(
-            [Instruction.model_validate(data)], arr, size_seed=size_seed
+            [Instruction.model_validate(data)], arr, member_seed=member_seed
         )
     n = arr.count
     margin = max(arr.margin, 0.20) if arr.preserve_space else arr.margin
@@ -2039,7 +2107,7 @@ def _expand_arrangement_layout(
             data.pop("at", None)
             data.pop("relation", None)
             result.append(Instruction.model_validate(data))
-        return _finish_expanded_group(result, arr, size_seed=size_seed)
+        return _finish_expanded_group(result, arr, member_seed=member_seed)
 
     if cluster_count > 0 and arr.layout in ("scatter", "horizontal", "vertical"):
         path = arr.path
@@ -2062,7 +2130,7 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _finish_expanded_group(result, arr, size_seed=size_seed)
+        return _finish_expanded_group(result, arr, member_seed=member_seed)
 
     if arr.layout == "horizontal":
         if arr.path != "none":
@@ -2071,14 +2139,14 @@ def _expand_arrangement_layout(
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-            return _finish_expanded_group(result, arr, size_seed=size_seed)
+            return _finish_expanded_group(result, arr, member_seed=member_seed)
         span = 1.0 - 2 * margin
         targets = [
             (margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span, ay)
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
-        return _finish_expanded_group(result, arr, size_seed=size_seed)
+        return _finish_expanded_group(result, arr, member_seed=member_seed)
 
     if arr.layout == "vertical":
         if arr.path != "none":
@@ -2087,14 +2155,14 @@ def _expand_arrangement_layout(
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-            return _finish_expanded_group(result, arr, size_seed=size_seed)
+            return _finish_expanded_group(result, arr, member_seed=member_seed)
         span = 1.0 - 2 * margin
         targets = [
             (ax, margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span)
             for i in range(n)
         ]
         result = [_shift(ins, 0.0, ty - ay) for _, ty in targets]
-        return _finish_expanded_group(result, arr, size_seed=size_seed)
+        return _finish_expanded_group(result, arr, member_seed=member_seed)
 
     if arr.layout == "radial":
         # engine 20: `center` is radial's own rotation centre. When the
@@ -2119,7 +2187,7 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _finish_expanded_group(result, arr, center=(cx, cy), size_seed=size_seed)
+        return _finish_expanded_group(result, arr, center=(cx, cy), member_seed=member_seed)
 
     if arr.layout == "scatter":
         targets = [
@@ -2127,9 +2195,9 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _finish_expanded_group(result, arr, size_seed=size_seed)
+        return _finish_expanded_group(result, arr, member_seed=member_seed)
 
-    return _finish_expanded_group([ins], arr, size_seed=size_seed)
+    return _finish_expanded_group([ins], arr, member_seed=member_seed)
 
 
 def _fit_axis_scales(anchor: float, offsets: list[float]) -> tuple[float, float]:

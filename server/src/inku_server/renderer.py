@@ -1830,23 +1830,96 @@ def _apply_fade_levels(
     return result
 
 
+def _scale_member(ins: Instruction, k: float) -> Instruction:
+    """Scale one member about its own `_anchor` by `k`, keeping the aspect.
+
+    Every branch here has to leave `_anchor(ins)` where it was: the group is
+    placed afterwards by `_fit_group_to_anchor`, which reads nothing but the
+    anchors, so a rule that moved one would hand the placement a different
+    group. circle/ellipse/arc/polygon/cloudform are anchored on `center` and
+    never touch it; `square`/`triangle` are anchored on the middle of a bbox
+    whose corner is `position`, so growing `size` has to pull the corner back
+    by half the growth; a line is anchored on its midpoint, so both ends move
+    away from the midpoint rather than one end away from the other.
+    """
+    data = ins.model_dump(by_alias=True)
+    if ins.primitive == "line" and ins.from_ and ins.to:
+        mx = (ins.from_[0] + ins.to[0]) / 2
+        my = (ins.from_[1] + ins.to[1]) / 2
+        data["from"] = [mx + (ins.from_[0] - mx) * k, my + (ins.from_[1] - my) * k]
+        data["to"] = [mx + (ins.to[0] - mx) * k, my + (ins.to[1] - my) * k]
+        return Instruction.model_validate(data)
+    if ins.primitive in ("square", "triangle") and ins.position and ins.size:
+        w, h = ins.size
+        data["size"] = [w * k, h * k]
+        data["position"] = [
+            ins.position[0] - (w * k - w) / 2,
+            ins.position[1] - (h * k - h) / 2,
+        ]
+        return Instruction.model_validate(data)
+    if ins.radius is not None:
+        data["radius"] = ins.radius * k
+        return Instruction.model_validate(data)
+    if ins.size is not None:
+        data["size"] = [ins.size[0] * k, ins.size[1] * k]
+        return Instruction.model_validate(data)
+    return ins
+
+
+def _apply_member_sizes(
+    items: list[Instruction], arr: Arrangement, size_seed: int | None
+) -> list[Instruction]:
+    """Give each member of a group its own size (engine 25).
+
+    `Arrangement` is "several of this shape"; it never says "all of them the
+    same size". Until here `_shift` rewrote coordinates and nothing else, so
+    the N members came out congruent -- the largest signature the engine was
+    adding on its own. This takes it back out; nothing is added to the
+    vocabulary and no field is added to the schema.
+
+    Three groups keep their exact repetition. `grid` is the tiling whose point
+    is that the cells match (author ruling, 2026-08-08); a group of one has
+    nobody to differ from; and the machine tools carry a `group_hand` of zero,
+    the same rule `fill_hand` follows.
+    """
+    if size_seed is None or arr.layout == "grid" or len(items) < 2:
+        return items
+    hand = GRAMMARS[items[0].weight].group_hand
+    if hand <= 0.0:
+        return items
+    result: list[Instruction] = []
+    for i, item in enumerate(items):
+        k = 1 + (_hash01(i, size_seed, "member-size") - 0.5) * 2 * hand
+        result.append(_scale_member(item, k))
+    return result
+
+
 def _finish_expanded_group(
     items: list[Instruction],
     arr: Arrangement,
     *,
     center: tuple[float, float] | None = None,
+    size_seed: int | None = None,
 ) -> list[Instruction]:
-    """The one exit every layout branch takes: colour cycle, then fade levels.
+    """The one exit every layout branch takes: colour cycle, fade, then size.
 
     Order matters. `_apply_color_cycle` rebuilds `color_hint` from the effect
     allowlist, so a level written before it is dropped -- and 43.5% of the
     groups in production state a cycle.
 
+    Size comes last and is read by neither of the two before it: the fade ramp
+    is measured from the anchors and the member count, and `_scale_member`
+    moves no anchor, so engine 24's ceilings arrive unchanged.
+
     `center` is the centre the layout laid the group around, for the branches
     that have one; see `_fade_levels`.
     """
-    return _apply_fade_levels(
-        _apply_color_cycle(items, arr.color_cycle), arr, center=center
+    return _apply_member_sizes(
+        _apply_fade_levels(
+            _apply_color_cycle(items, arr.color_cycle), arr, center=center
+        ),
+        arr,
+        size_seed,
     )
 
 
@@ -1879,21 +1952,36 @@ def _strip_fade_level(ins: Instruction) -> Instruction:
 
 def _expand_arrangement_layout(
     ins: Instruction,
-    performance_seed: int | None = None,
+    placement_seed: int | None = None,
     canvas: CanvasSize | None = None,
+    *,
+    performance_seed: int | None = None,
 ) -> list[Instruction]:
-    """arrangement を展開して N 個の Instruction を返す。"""
+    """arrangement を展開して N 個の Instruction を返す。
+
+    The two seeds are separate on purpose (engine 25). `placement_seed` decides
+    where the members land, which is the composition seed's business since
+    engine 23; `performance_seed` decides how big each one is, which belongs to
+    the performance. Feeding the size from the placement seed would make the
+    drawing's shapes follow the composition seed and undo that split on the day
+    it was made.
+    """
     arr = ins.arrangement
     assert arr is not None
     ins = _ensure_line_coords(ins)
+    # Derived from the instruction as stated, before any member is shifted, so
+    # every member of one group is drawn from the same sequence.
+    size_seed = _seed_for_instruction(ins, performance_seed)
     if arr.count == 1 and arr.layout != "grid":
         data = ins.model_dump(by_alias=True)
         data.pop("arrangement", None)
-        return _finish_expanded_group([Instruction.model_validate(data)], arr)
+        return _finish_expanded_group(
+            [Instruction.model_validate(data)], arr, size_seed=size_seed
+        )
     n = arr.count
     margin = max(arr.margin, 0.20) if arr.preserve_space else arr.margin
     ax, ay = _anchor(ins)
-    seed = _seed_for_instruction(ins, performance_seed)
+    seed = _seed_for_instruction(ins, placement_seed)
     cluster_count = arr.cluster_count or 0
 
     if arr.layout == "grid":
@@ -1951,7 +2039,7 @@ def _expand_arrangement_layout(
             data.pop("at", None)
             data.pop("relation", None)
             result.append(Instruction.model_validate(data))
-        return _finish_expanded_group(result, arr)
+        return _finish_expanded_group(result, arr, size_seed=size_seed)
 
     if cluster_count > 0 and arr.layout in ("scatter", "horizontal", "vertical"):
         path = arr.path
@@ -1974,7 +2062,7 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _finish_expanded_group(result, arr)
+        return _finish_expanded_group(result, arr, size_seed=size_seed)
 
     if arr.layout == "horizontal":
         if arr.path != "none":
@@ -1983,14 +2071,14 @@ def _expand_arrangement_layout(
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-            return _finish_expanded_group(result, arr)
+            return _finish_expanded_group(result, arr, size_seed=size_seed)
         span = 1.0 - 2 * margin
         targets = [
             (margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span, ay)
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
-        return _finish_expanded_group(result, arr)
+        return _finish_expanded_group(result, arr, size_seed=size_seed)
 
     if arr.layout == "vertical":
         if arr.path != "none":
@@ -1999,14 +2087,14 @@ def _expand_arrangement_layout(
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-            return _finish_expanded_group(result, arr)
+            return _finish_expanded_group(result, arr, size_seed=size_seed)
         span = 1.0 - 2 * margin
         targets = [
             (ax, margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span)
             for i in range(n)
         ]
         result = [_shift(ins, 0.0, ty - ay) for _, ty in targets]
-        return _finish_expanded_group(result, arr)
+        return _finish_expanded_group(result, arr, size_seed=size_seed)
 
     if arr.layout == "radial":
         # engine 20: `center` is radial's own rotation centre. When the
@@ -2031,7 +2119,7 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _finish_expanded_group(result, arr, center=(cx, cy))
+        return _finish_expanded_group(result, arr, center=(cx, cy), size_seed=size_seed)
 
     if arr.layout == "scatter":
         targets = [
@@ -2039,9 +2127,9 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _finish_expanded_group(result, arr)
+        return _finish_expanded_group(result, arr, size_seed=size_seed)
 
-    return _finish_expanded_group([ins], arr)
+    return _finish_expanded_group([ins], arr, size_seed=size_seed)
 
 
 def _fit_axis_scales(anchor: float, offsets: list[float]) -> tuple[float, float]:
@@ -2121,11 +2209,15 @@ def _quantise_instructions(items: list[Instruction]) -> list[Instruction]:
 
 def _expand_arrangement(
     ins: Instruction,
-    performance_seed: int | None = None,
+    placement_seed: int | None = None,
     canvas: CanvasSize | None = None,
+    *,
+    performance_seed: int | None = None,
 ) -> list[Instruction]:
     """Expand an arrangement and place the resulting group on its anchor."""
-    expanded = _expand_arrangement_layout(ins, performance_seed, canvas)
+    expanded = _expand_arrangement_layout(
+        ins, placement_seed, canvas, performance_seed=performance_seed
+    )
     if not expanded:
         return expanded
     arr = ins.arrangement
@@ -3194,7 +3286,11 @@ def render(
     placement_seed = composition_seed if composition_seed is not None else render_seed
     for ins_idx, ins in ordered_instructions:
         expanded = (
-            _expand_arrangement(ins, placement_seed, canvas) if ins.arrangement else [ins]
+            _expand_arrangement(
+                ins, placement_seed, canvas, performance_seed=render_seed
+            )
+            if ins.arrangement
+            else [ins]
         )
         instruction_group = (
             dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content

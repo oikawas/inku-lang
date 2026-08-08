@@ -1842,7 +1842,9 @@ def arrangement_fixtures() -> None:
     }
     for case_id, raw in arrangement_cases().items():
         ins = Instruction.model_validate(raw)
-        expanded = renderer._expand_arrangement(ins, RENDER_SEED, None)
+        expanded = renderer._expand_arrangement(
+            ins, RENDER_SEED, None, performance_seed=RENDER_SEED
+        )
         out["cases"].append({
             "case_id": case_id,
             "instruction": ins.model_dump(mode="json"),

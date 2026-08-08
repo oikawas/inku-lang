@@ -30,7 +30,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from inku_server import db
+from inku_server import db, renderer
 from inku_server.api import app
 from inku_server.api_core.rendering import (
     _render_metadata,
@@ -374,12 +374,22 @@ def test_no_case_frozen_before_this_change_moved():
 
 
 # T-12 -------------------------------------------------------------------
-def test_the_added_cases_can_tell_the_two_seeds_apart():
+def test_the_added_cases_can_tell_the_two_seeds_apart(monkeypatch):
     """Each added case states a composition seed, and the value is load-bearing.
 
     Without this the corpus would record that engine 23 changed no picture,
     which is true and says nothing about whether the split happened.
+
+    Engine 25's per-member size is taken back out first. It moves these four
+    drawings for a reason that has nothing to do with which seed placed them,
+    and it is engine 23's frozen bytes that this reads against; without the
+    step below the test would stop measuring the split and start measuring the
+    size. The yardstick stays the frozen body -- what is neutralised is the
+    later layer.
     """
+    monkeypatch.setattr(
+        renderer, "_apply_member_sizes", lambda items, arr, size_seed: items
+    )
     spec = importlib.util.spec_from_file_location("gen_render_reference", GENERATOR_PATH)
     assert spec is not None and spec.loader is not None
     generator = importlib.util.module_from_spec(spec)

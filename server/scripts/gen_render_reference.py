@@ -7,6 +7,8 @@ catalog, or coerce path supplies fixture values.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+import contextlib
 import copy
 import hashlib
 import json
@@ -15,6 +17,7 @@ import re
 import subprocess
 from typing import Any
 
+from inku_server import renderer
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import render
@@ -30,31 +33,31 @@ CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-08"
 REASON = (
-    "The fade reaches every member of a group. `Arrangement.fade` declares how "
-    "a group falls off -- outward from its centre, or along the direction it "
-    "travels -- and the renderer answered it with one constant for the whole "
-    "group: 0.40 for outward, 0.48 for directional, the same number on the "
-    "nearest mark and the farthest. \"It fades from the centre to the edge\" "
-    "was drawn as \"all of it is a bit pale\". In production that is 2,738 of "
-    "6,425 groups (42.6%) and 83,703 of 178,694 marks. Each member now carries "
-    "its own ceiling, ramped 0.62 -> 0.18 outward and 0.70 -> 0.26 "
-    "directional, written onto `color_hint` after the colour cycle rebuilds it "
-    "and read back before normalisation flattens the decimal point. No "
-    "vocabulary is added and no field: the declaration was already there. "
-    "Placement, touch and the performance seed are untouched -- `color_hint` "
-    "sits outside `_SEED_INSTRUCTION_FIELDS`, so the path coordinates of a "
-    "fading group are byte-identical to engine 23 and only the opacity "
-    "attributes differ -- and the surface seed drops the tag before it hashes "
-    "the instruction, so the texture does not move either. A group that cannot "
-    "fade is left exactly as it was: a ring is equidistant from its own centre, "
-    "and so is a pair, and ranking them would draw a gradient nobody stated. "
-    "Of the 535 cases frozen for engine 23 exactly one moves, "
-    "G-scatter-fade-edge, which was the whole of the corpus's fading: outward, "
-    "scatter, a hand tool, no cycle, no surface. Six cases are added for the "
-    "routes that were never walked -- directional along a path, a colour cycle, "
-    "a derived surface seed, a machine tool (which fades too, by ruling: a "
-    "machine has its own ink and its own core), and the two degenerate groups "
-    "that must not move at all."
+    "Every member of a group gets its own size. `Arrangement` is the "
+    "declaration \"several of this shape\", and the renderer answered it by "
+    "moving coordinates and nothing else, so the N members came out congruent "
+    "-- the one signature the engine was adding that no description had asked "
+    "for. In production 2,559 of 2,757 works carry an expanded group, the "
+    "expander lays down 178,694 marks, and the coefficient of variation of the "
+    "sizes inside a group is 0.0000. Each member is now scaled about its own "
+    "anchor by 0.75x..1.25x, drawn from the performance seed rather than the "
+    "placement seed so that a composition seed still moves only where the "
+    "marks land (engine 23). Nothing is added to the vocabulary and no field "
+    "to the schema: this takes a property out rather than putting one in. The "
+    "rule preserves every anchor -- a circle keeps its centre, a bbox pulls "
+    "its corner back by half the growth, a line grows about its own midpoint "
+    "-- so the group is placed on exactly the coordinates engine 24 placed it "
+    "on, and stage A's fade ceilings, which are measured from those anchors, "
+    "arrive unchanged. Three groups keep their exact repetition: `grid`, whose "
+    "point is that the cells match (author ruling, 2026-08-08), a group of "
+    "one, which has nobody to differ from, and the machine tools `rotring` "
+    "and `computer`, whose `group_hand` is pinned at zero the way `fill_hand` "
+    "is. Of the 541 cases frozen for engine 24, 37 move -- every G case that "
+    "expands with a hand tool and is not a grid -- and 504 do not. Four cases "
+    "are added because all 42 of the corpus's groups were circles, so `radius "
+    "x k` was the only rule it could see: a line (43.8% of the expanded marks "
+    "in production), a square and a triangle (14.2%, the `position` "
+    "correction), and an ellipse (24.8%, the same factor on both axes)."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -484,6 +487,31 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _g("G-fade-radial-edge", "edge", fade="outward", layout="radial", count=12)
     _g("G-fade-count2-edge", "edge", fade="outward", count=2)
 
+    # engine 25: every member of a group gets its own size. All 42 G cases
+    # above are circles, so `radius x k` was the only one of the four size
+    # rules the corpus could reach -- and in production a circle is 14.3% of
+    # the expanded marks against a line's 43.8%. These four walk the other
+    # three: the same factor on both components of `size`, the `position`
+    # correction that keeps a bbox centred on its anchor while it grows, and
+    # the scaling of a line about its own midpoint rather than about one end.
+    # All four sit on the `edge` anchor, where the frame correction fires.
+    def _g_shape(case_id: str, primitive: str, geometry: dict[str, Any],
+                 **changes: Any) -> None:
+        arrangement = copy.deepcopy(BASE_ARRANGEMENT)
+        arrangement.update(changes)
+        _case(cases, case_id,
+              _instruction(primitive, weight="pen", arrangement=arrangement,
+                           **geometry))
+
+    _g_shape("G-size-line-edge", "line",
+             {"from": [0.81, 0.83], "to": [0.89, 0.87]}, count=12)
+    _g_shape("G-size-square-edge", "square",
+             {"position": [0.81, 0.81], "size": [0.08, 0.08]}, count=12)
+    _g_shape("G-size-triangle-edge", "triangle",
+             {"position": [0.81, 0.81], "size": [0.08, 0.08]}, count=12)
+    _g_shape("G-size-ellipse-edge", "ellipse",
+             {"center": [0.85, 0.85], "size": [0.10, 0.06]}, count=12)
+
     G_COMPOSITION_SEED = 777
     _g("G-composition-scatter-edge", "edge", composition_seed=G_COMPOSITION_SEED)
     _g("G-composition-grid-center", "center", composition_seed=G_COMPOSITION_SEED,
@@ -500,9 +528,10 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # G gained 4 in engine 23: the twins that state a composition seed, which is
     # the only way the corpus reaches the placement seed at all.
     # G gained 6 in engine 24: the fading routes the corpus had never walked.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 42}
+    # G gained 4 in engine 25: the three size rules a circle cannot reach.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 46}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 541:
+    if actual != expected or len(cases) != 545:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 
@@ -590,10 +619,54 @@ def _assert_fade_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
             raise AssertionError(f"{case_id}: the drawing does not read `fade`")
 
 
+SIZE_CASES = (
+    "G-size-line-edge",
+    "G-size-square-edge",
+    "G-size-triangle-edge",
+    "G-size-ellipse-edge",
+)
+
+
+@contextlib.contextmanager
+def _member_sizes_withheld() -> Iterator[None]:
+    """Draw as engine 24 did: the group expands, and every member is congruent."""
+    original = renderer._apply_member_sizes
+    renderer._apply_member_sizes = lambda items, arr, size_seed: items
+    try:
+        yield
+    finally:
+        renderer._apply_member_sizes = original
+
+
+def _assert_size_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
+    """Every case added here has to notice the per-member size, two ways.
+
+    Withholding the amplitude has to change the drawing, or the case records
+    that nothing broke and nothing else. And the four have to walk four
+    different rules: the corpus already held 42 groups that were circles to
+    the last one, so a fifth circle would discriminate perfectly and cover
+    nothing. Checked at bake time, on the bake's own call.
+    """
+    primitives = {
+        inputs[case_id]["score"]["instructions"][0]["primitive"]
+        for case_id in SIZE_CASES
+    }
+    if primitives != {"line", "square", "triangle", "ellipse"}:
+        raise AssertionError(f"the added cases do not cover the four rules: {sorted(primitives)}")
+    for case_id in SIZE_CASES:
+        stated = inputs[case_id]
+        drawn = _normalized_digest(render_case(stated))
+        with _member_sizes_withheld():
+            withheld = _normalized_digest(render_case(stated))
+        if drawn == withheld:
+            raise AssertionError(f"{case_id}: the drawing does not read the member size")
+
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
     _assert_fade_cases_discriminate(inputs)
+    _assert_size_cases_discriminate(inputs)
 
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}

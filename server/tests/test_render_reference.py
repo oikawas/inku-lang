@@ -57,11 +57,15 @@ def test_render_reference_case_counts() -> None:
     # the plainest one, so none of the routes the per-member fade travels --
     # a colour cycle, a derived surface seed, a machine tool, and the two
     # degenerate groups that must not fade -- was walked by it.
-    assert len(cases) == 541
+    # Engine 25 added four more to G: all 42 groups above are circles, so
+    # `radius x k` was the only one of the four member-size rules the corpus
+    # could reach -- and a circle is 14.3% of the expanded marks in production
+    # against a line's 43.8%.
+    assert len(cases) == 545
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 42}
+    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 46}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -258,7 +262,7 @@ def test_group_g_matches_the_current_renderer() -> None:
         svg = generator.render_case(render_input)
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
         checked += 1
-    assert checked == 42
+    assert checked == 46
 
 
 def test_render_reference_discriminator_cases() -> None:

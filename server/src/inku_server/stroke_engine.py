@@ -42,6 +42,17 @@ class ToolGrammar:
     # description never has to name it. Zero for `rotring` and `computer`:
     # exact repetition is the machine's signature, not a defect to sand off.
     fill_hand: float = 0.0
+    # How much this tool's members of one repeated group differ in size, as a
+    # fraction either side of the stated dimension (0.25 = 0.75x..1.25x). An
+    # `Arrangement` declares "several of this shape", never "all of them the
+    # same size", so the congruence was the engine's addition and this takes it
+    # back out. One value for every hand tool rather than one derived from
+    # `fill_hand`: the ruling (author, 2026-08-08) was given on samples that
+    # applied the same +/-25% to tools spanning 0.05..0.90 of `fill_hand`, so
+    # scaling it per tool would leave the picture that was approved. Zero for
+    # `rotring` and `computer`, pinned by hand for the same reason `fill_hand`
+    # is: exact repetition is the machine's signature.
+    group_hand: float = 0.0
     # How far this tool's fill marks stand out from the field they sit on, as a
     # multiple of whichever branch contrast applies. 1.0 leaves the tool on the
     # branch's own value; above it the marks read as separate strokes rather
@@ -52,20 +63,33 @@ class ToolGrammar:
     fill_contrast: float = 1.0
 
 
+# Every hand tool gets the same amount of size variation inside a group. The
+# ruling that set +/-25% was given on samples that used one amplitude for four
+# tools whose `fill_hand` spans 18x, so this is a single constant rather than a
+# per-tool value; a tool-by-tool adjustment is a later change, made once the
+# effect is measured.
+HAND_GROUP_SIZE = 0.25
+
 # `fill_hand` runs with the tool's stiffness: the stiffer the tool, the tighter
 # the hand that fills with it. The two machines are pinned at zero by hand
 # rather than derived, because zero has to be exact.
 GRAMMARS: dict[str, ToolGrammar] = {
     "silverpoint": ToolGrammar(
-        0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012, fill_hand=0.05
+        0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012,
+        fill_hand=0.05, group_hand=HAND_GROUP_SIZE,
     ),
     "pencil": ToolGrammar(
-        0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05, fill_hand=0.60
+        0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05,
+        fill_hand=0.60, group_hand=HAND_GROUP_SIZE,
     ),
-    "pen": ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022, fill_hand=0.25),
-    "rotring": ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    "pen": ToolGrammar(
+        0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022,
+        fill_hand=0.25, group_hand=HAND_GROUP_SIZE,
+    ),
+    "rotring": ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, group_hand=0.0),
     "crayon": ToolGrammar(
-        0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06, fill_hand=0.72
+        0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06,
+        fill_hand=0.72, group_hand=HAND_GROUP_SIZE,
     ),
     # chalk carries the one `fill_contrast` above 1.0: "give chalk more contrast
     # than crayon" (author, 2026-08-07). The two tools sit either side of it in
@@ -74,19 +98,24 @@ GRAMMARS: dict[str, ToolGrammar] = {
     "chalk": ToolGrammar(
         0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07,
         fill_hand=0.80,
+        group_hand=HAND_GROUP_SIZE,
         fill_contrast=1.13,
     ),
     "brush_thin": ToolGrammar(
-        0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10, fill_hand=0.90
+        0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10,
+        fill_hand=0.90, group_hand=HAND_GROUP_SIZE,
     ),
     "brush_thick": ToolGrammar(
-        0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13, fill_hand=1.00
+        0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13,
+        fill_hand=1.00, group_hand=HAND_GROUP_SIZE,
     ),
     "burin": ToolGrammar(
-        0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018, fill_hand=0.10
+        0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018,
+        fill_hand=0.10, group_hand=HAND_GROUP_SIZE,
     ),
     "drypoint": ToolGrammar(
-        0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05, fill_hand=0.45
+        0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05,
+        fill_hand=0.45, group_hand=HAND_GROUP_SIZE,
     ),
     "computer": ToolGrammar(
         1.0,
@@ -100,6 +129,7 @@ GRAMMARS: dict[str, ToolGrammar] = {
         periodic=True,
         quantize=0.018,
         width_steps=4,
+        group_hand=0.0,
     ),
 }
 

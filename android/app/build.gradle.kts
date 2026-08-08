@@ -67,6 +67,14 @@ android {
     sourceSets.getByName("androidTest") {
         assets.srcDir("$projectDir/schemas")
     }
+
+    testOptions {
+        // The stages log what they hand a model, so a JVM test that walks the
+        // real `interpret` / `composeFromDdl` hits `android.util.Log`. Without
+        // this it throws and the only reachable path is `renderFromScore`,
+        // which is the one path that chooses no prompt at all.
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 room {

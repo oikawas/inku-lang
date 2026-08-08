@@ -370,7 +370,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds()): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -389,12 +389,13 @@ class InkuRepository(
                 variationAmplitude = seeds.variationAmplitude,
                 variationSeed = seeds.variationSeed,
                 seedText = seeds.seedText,
+                instructionLang = instructionLang,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText)
     }
 
-    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false): InterpretResult {
+    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null): InterpretResult {
         val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
@@ -406,11 +407,12 @@ class InkuRepository(
                 canvasAspect = canvasAspect,
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
+                instructionLang = instructionLang,
             ),
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds()): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -429,9 +431,10 @@ class InkuRepository(
                 variationAmplitude = seeds.variationAmplitude,
                 variationSeed = seeds.variationSeed,
                 seedText = seeds.seedText,
+                instructionLang = instructionLang,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText)
     }
 
     suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
@@ -454,7 +457,7 @@ class InkuRepository(
             ?: error("デモ指示文生成が空でした。")
     }
 
-    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds()): HistoryItemEntity {
+    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.renderFromScore(
             scoreJson,
@@ -474,7 +477,7 @@ class InkuRepository(
                 seedText = seeds.seedText,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText)
     }
 
     /**
@@ -489,8 +492,11 @@ class InkuRepository(
         val request = PaintRequest(
             description = parent.description,
             originalText = parent.description,
-            stage1Model = parent.stage1Model,
-            stage2Model = parent.stage2Model,
+            // A comparison candidate is the only thing that overrides these; a
+            // refinement leaves them null and inherits the parent's, which is
+            // what「対象作品の設定を継承する」means for every other element.
+            stage1Model = plan.stage1Model ?: parent.stage1Model,
+            stage2Model = plan.stage2Model ?: parent.stage2Model,
             colorCatalogId = plan.catalogId,
             canvasAspect = plan.canvasAspect,
             // The colour and touch refinements replay a Score that is already
@@ -506,7 +512,17 @@ class InkuRepository(
         return when (plan.route) {
             RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
             RefinementRoute.ComposeFromDdl -> pipeline.composeFromDdl(parent.ddl, request)
-            RefinementRoute.Paint -> pipeline.paint(request)
+            // A pair of languages is passed the way web passes it: the two
+            // stages are asked separately, each with its own language
+            // (`state.svelte.ts:432-435`). A single call could carry only one,
+            // and inventing a per-stage key here would be a shape the server
+            // does not have.
+            RefinementRoute.Paint -> if (plan.stage1Lang != null || plan.stage2Lang != null) {
+                val interpreted = pipeline.interpret(request.copy(instructionLang = plan.stage1Lang))
+                pipeline.composeFromDdl(interpreted.ddlForDisplay, request.copy(instructionLang = plan.stage2Lang))
+            } else {
+                pipeline.paint(request)
+            }
         }
     }
 
@@ -525,8 +541,10 @@ class InkuRepository(
         historyVisibility: String? = null,
         stage1ModelId: String,
         stage2ModelId: String,
+        sourceText: String? = null,
     ): HistoryItemEntity = saveResult(
         result = result,
+        sourceText = sourceText,
         catalogId = plan.catalogId,
         canvasAspect = plan.canvasAspect,
         stage1ModelId = stage1ModelId,
@@ -544,7 +562,7 @@ class InkuRepository(
         historyVisibility = historyVisibility,
     )
 
-    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null): HistoryItemEntity {
+    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, sourceText: String? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
         // The server writes every one of these as a string
         // (`db.py:2090-2097`), including the numeric ones.
@@ -555,6 +573,11 @@ class InkuRepository(
             .toString()
         val historyId = pipeline.newHistoryId()
         val originalInput = historyInput ?: result.originalInput
+        // `source_text` if there is one, `input` if there is not, and the
+        // description hash is taken from whichever it was (`db.py:2049-2051`).
+        // Hashing `original_input` instead would give a batch line a different
+        // identity from the same prose typed by hand.
+        val descriptionSource = sourceText ?: originalInput
         val nodeId = newLineageId()
         // The server decides all of this before it creates any row, so a
         // rejected declaration leaves the history table untouched too.
@@ -563,7 +586,7 @@ class InkuRepository(
             edgeId = newLineageId(),
             historyId = historyId,
             at = now,
-            descriptionHash = pipeline.descriptionHash(originalInput),
+            descriptionHash = pipeline.descriptionHash(descriptionSource),
             renderHash = result.renderHash,
             historyVisibility = historyVisibility,
             declaration = lineage,
@@ -601,6 +624,9 @@ class InkuRepository(
             variationAmplitude = result.variationAmplitude,
             variationSeed = result.variationSeed?.toString(),
             seedText = result.seedText,
+            instructionLangRequested = result.instructionLangRequested,
+            instructionLangResolved = result.instructionLangResolved,
+            sourceText = sourceText,
         )
         // One transaction, and the edge after the node: the edge points at a
         // child that has to exist first. A failing edge takes the node and the

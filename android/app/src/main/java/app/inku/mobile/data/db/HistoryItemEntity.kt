@@ -84,4 +84,20 @@ data class HistoryItemEntity(
     val variationSeed: String? = null,
     @ColumnInfo(name = "seed_text")
     val seedText: String? = null,
+    // What the author asked the instruction language to be and what it resolved
+    // to, with the server's names and its nullable type (`db.py:129-130`). They
+    // are two quantities: a work asked for with `auto` keeps `auto` on the left
+    // and the language it was actually drawn in on the right, and a work drawn
+    // on a path that ran no prompt has neither.
+    @ColumnInfo(name = "instruction_lang_requested")
+    val instructionLangRequested: String? = null,
+    @ColumnInfo(name = "instruction_lang_resolved")
+    val instructionLangResolved: String? = null,
+    // The prose alone, without the bookkeeping `original_input` carries in front
+    // of it on a batch or demo line (`db.py:170`). NULL means the row never had
+    // a separate one, and every reader falls back to `original_input` for those
+    // -- `row.source_text if row.source_text is not None else row.input`
+    // (`db.py:1835`).
+    @ColumnInfo(name = "source_text")
+    val sourceText: String? = null,
 )

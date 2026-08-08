@@ -118,7 +118,9 @@ def _moved_under_one_ulp(monkeypatch) -> set[str]:
 
 def test_group_g_is_the_whole_exposure() -> None:
     """A gate that measured nothing would still pass the two tests below."""
-    assert len(_group_g_inputs()) == 42
+    # 46 since engine 25 added the four non-circle groups. None of them joins
+    # the set below: all four are `scatter`, which never reaches sin/cos.
+    assert len(_group_g_inputs()) == 46
 
 
 def test_one_ulp_of_libm_does_not_move_the_drawing(monkeypatch) -> None:

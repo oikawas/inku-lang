@@ -121,6 +121,21 @@ def _draw_as_engine_23(score: dict, monkeypatch) -> str:
     return _draw(score)
 
 
+def _without_member_sizes(monkeypatch) -> None:
+    """Take engine 25's per-member size back out.
+
+    The three tests below read this layer against engine 23's frozen bytes.
+    Engine 25 gives every member of a group its own size, which moves those
+    bytes for a reason that has nothing to do with the fade -- so without this
+    they would stop measuring the fade and start measuring the size. The frozen
+    body stays the yardstick; what is neutralised is the later layer, not the
+    claim.
+    """
+    monkeypatch.setattr(
+        renderer, "_apply_member_sizes", lambda items, arr, size_seed: items
+    )
+
+
 def _mark_ceilings(svg: str) -> list[float]:
     """The ink ceiling each member was drawn with, in expansion order.
 
@@ -318,8 +333,10 @@ def test_a_group_that_cannot_fade_is_left_where_engine_23_left_it(
 
 
 # T-8 --------------------------------------------------------------------
-def test_the_engine_names_itself_24():
-    assert current_render_engine().version == "24"
+def test_the_engine_names_itself_24_or_later():
+    """`>=`, not `==`: what engine 24 added holds for every version after it,
+    and an equality here is a statement that is true for one round only."""
+    assert int(current_render_engine().version) >= 24
 
 
 # T-9 --------------------------------------------------------------------
@@ -345,7 +362,10 @@ def test_one_case_of_the_frozen_corpus_moved():
     """A regenerated record, not a property: on its own it is not evidence that
     the change is right. It says what the corpus could see -- one route out of
     535, the plainest fading group there is."""
-    current = _manifest(current_render_engine().version)
+    # Named, not "current": this records what engine 24's bake did to engine
+    # 23's, and that pair is fixed forever. Read as "current" it would restate
+    # itself against every later bake and go red on the next one.
+    current = _manifest("24")
     previous = _manifest("23")
     assert len(previous["cases"]) == 535
     assert len(current["cases"]) == 541
@@ -361,7 +381,7 @@ def test_one_case_of_the_frozen_corpus_moved():
 
 
 # T-11 -------------------------------------------------------------------
-def test_the_hand_does_not_feel_the_level():
+def test_the_hand_does_not_feel_the_level(monkeypatch):
     """Stage A is orthogonal to placement and to touch.
 
     `color_hint` is the carriage exactly because it is outside
@@ -379,6 +399,7 @@ def test_the_hand_does_not_feel_the_level():
     # keeps one body per case, in the version where it last moved.
     assert generator._normalized_digest(engine_23) == case["digest"]
 
+    _without_member_sizes(monkeypatch)
     engine_24 = generator.render_case(case["input"])
     assert engine_24 != engine_23
     assert D_ATTR.findall(engine_24) == D_ATTR.findall(engine_23)
@@ -433,7 +454,7 @@ def test_the_fill_keeps_its_ratio_to_the_stroke(fade, ratio, layout):
 
 
 # T-14 -------------------------------------------------------------------
-def test_a_group_that_declares_no_fade_is_byte_identical():
+def test_a_group_that_declares_no_fade_is_byte_identical(monkeypatch):
     """Every G case of engine 23 that states no fade reproduces its frozen
     digest here, through the bake's own call.
 
@@ -444,6 +465,7 @@ def test_a_group_that_declares_no_fade_is_byte_identical():
     """
     assert all("fade_level=" not in (hint or "") for hint in _hints(_score(fade="none")))
 
+    _without_member_sizes(monkeypatch)
     generator = _load_generator()
     previous = _manifest("23")
     checked = 0

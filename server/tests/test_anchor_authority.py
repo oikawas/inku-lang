@@ -114,6 +114,17 @@ ENGINE_24_FADE_CASES: frozenset[str] = frozenset({
     "G-fade-surface-edge",
 })
 
+# engine 25 added four G cases for the three size rules a circle cannot reach.
+# Excluded from T-4 for the same reason as the six above and one more: these are
+# the only G cases that are not circles at all, so engine 19 measured neither
+# the case nor its shape. Named rather than matched, for the same reason.
+ENGINE_25_SIZE_CASES: frozenset[str] = frozenset({
+    "G-size-ellipse-edge",
+    "G-size-line-edge",
+    "G-size-square-edge",
+    "G-size-triangle-edge",
+})
+
 
 def _g_instructions() -> dict[str, Instruction]:
     """The corpus's own group G, so the gate and the frozen cases cannot drift."""
@@ -225,8 +236,9 @@ def test_no_placed_mark_leaves_the_frame():
     # Not vacuous. Engine 19 never overflowed, because it never went to the
     # anchor in the first place; the overflow is created by the move. So the
     # control is the move without the shrink, which is the implementation this
-    # test exists to reject. It leaves marks outside in 31 of the 42 cases
-    # (25 of 36 before engine 24 added its six).
+    # test exists to reject. It leaves marks outside in 35 of the 46 cases
+    # (31 of 42 before engine 25 added its four, 25 of 36 before engine 24
+    # added its six).
     shifted_out = 0
     for instruction in _g_instructions().values():
         points = _laid_out(instruction)
@@ -238,7 +250,7 @@ def test_no_placed_mark_leaves_the_frame():
             for x, y in points
         ):
             shifted_out += 1
-    assert shifted_out == 31
+    assert shifted_out == 35
 
 
 # T-3 --------------------------------------------------------------------
@@ -261,8 +273,8 @@ def test_the_frame_correction_does_not_stack_marks_on_the_edge():
 def test_the_frame_correction_does_not_collapse_a_group():
     ratios: dict[str, float] = {}
     instructions = _g_instructions()
-    unmeasured = ENGINE_24_FADE_CASES & set(instructions)
-    assert len(unmeasured) == 6
+    unmeasured = (ENGINE_24_FADE_CASES | ENGINE_25_SIZE_CASES) & set(instructions)
+    assert len(unmeasured) == 10
     for case_id, instruction in instructions.items():
         if case_id in unmeasured:
             continue

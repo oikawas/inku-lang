@@ -1505,7 +1505,7 @@ def _grid_circle(**arrangement: object) -> Instruction:
 
 
 def test_grid_explicit_rows_and_cols_override_count():
-    expanded = _expand_arrangement(_grid_circle(rows=2, cols=3), performance_seed=123)
+    expanded = _expand_arrangement(_grid_circle(rows=2, cols=3), placement_seed=123)
 
     assert len(expanded) == 6
     _assert_centers(
@@ -1523,7 +1523,7 @@ def test_grid_explicit_rows_and_cols_override_count():
 
 def test_grid_count_estimates_rows_and_cols_and_honors_margin():
     instruction = _grid_circle(count=5, margin=0.2)
-    expanded = _expand_arrangement(instruction, performance_seed=123)
+    expanded = _expand_arrangement(instruction, placement_seed=123)
 
     assert len(expanded) == 6
     assert all(0.2 <= item.center[0] <= 0.8 for item in expanded if item.center)
@@ -1545,7 +1545,7 @@ def test_grid_uses_at_region_instead_of_margin():
     )
 
     resolved = _resolve_performance_score(score, 123)
-    expanded = _expand_arrangement(resolved.instructions[0], performance_seed=123)
+    expanded = _expand_arrangement(resolved.instructions[0], placement_seed=123)
 
     _assert_centers(
         expanded,
@@ -1562,19 +1562,19 @@ def test_grid_uses_at_region_instead_of_margin():
 def test_grid_jitter_is_deterministic_and_seed_sensitive():
     instruction = _grid_circle(count=16, jitter=0.8)
 
-    first = _expand_arrangement(instruction, performance_seed=123)
-    replay = _expand_arrangement(instruction, performance_seed=123)
-    alternate = _expand_arrangement(instruction, performance_seed=456)
+    first = _expand_arrangement(instruction, placement_seed=123)
+    replay = _expand_arrangement(instruction, placement_seed=123)
+    alternate = _expand_arrangement(instruction, placement_seed=456)
 
     assert [item.center for item in first] == [item.center for item in replay]
     assert [item.center for item in first] != [item.center for item in alternate]
 
 
 def test_grid_rhythm_changes_both_axis_spacing():
-    regular = _expand_arrangement(_grid_circle(rows=3, cols=3), performance_seed=123)
+    regular = _expand_arrangement(_grid_circle(rows=3, cols=3), placement_seed=123)
     loose = _expand_arrangement(
         _grid_circle(rows=3, cols=3, rhythm_spacing="loose"),
-        performance_seed=123,
+        placement_seed=123,
     )
 
     assert [item.center for item in regular] != [item.center for item in loose]
@@ -1663,7 +1663,13 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # 動く。数値の個数は engine 19 と同じ 1724 個で、動いたのは値だけである。
     # engine 21 (展開後の座標を 9 桁へ量子化) で再採取。4 つとも arrangement を
     # 持つので座標が丸まり、演奏 seed が変わるぶん値が動く。
-    assert digest == "c445ca5901a918e559c2c05d8562be6ab9967015216a4fae911a6f9ebd4bcf17"
+    # engine 25 (群の一人ひとりが自分の大きさを持つ) で再採取。4 つとも
+    # arrangement を持ち、既定 weight の pen は group_hand=0.25 なので、5 個の
+    # 半径が 0.75〜1.25 倍に散る。半径は演奏 seed の allowlist に入っているので
+    # 筆の震えも 1 個ずつ変わる。数値は 1724 個から 1756 個へ増えたが、これは
+    # 大きくなった痕で墨の切れ目が増えたぶんである。群の位置は動いていない
+    # (寸法の規則はどれも anchor を保存する)。
+    assert digest == "a30a69b8290c67a98b32596e1185c1d5d6967f5fadc398671a3ba72c10f7fd2c"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

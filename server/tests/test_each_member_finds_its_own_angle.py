@@ -61,6 +61,7 @@ AMPLITUDE = 12.0
 # the ellipse, square and triangle groups engine 25 itself added: they are the
 # only hand-tool groups in the corpus that are neither circles nor lines.
 ENGINE_25_CASES = 545
+ENGINE_25_G_CASES = 46
 ENGINE_26_CASES = 549
 MOVED_CASES = 3
 UNCHANGED_CASES = 542
@@ -419,6 +420,48 @@ def test_the_earlier_stages_do_not_move(primitive, monkeypatch):
     assert all(level for level in _fade_levels(engine_26))
     # Not vacuous: the angles moved in the very call the sizes did not.
     assert [item.rotation for item in engine_26] != [item.rotation for item in engine_25]
+
+
+def test_engine_25s_own_drawings_replay_unchanged():
+    """The other half of T-11, and the half the comparison above cannot reach.
+
+    Withholding the angle step shows that the angle step wrote no size -- but
+    both sides of that comparison run the same size rule, so a change to the
+    size rule itself is invisible to it, and mixing the angle draw into the
+    size coefficient would pass it perfectly.
+
+    So this replays engine 25's own frozen cases through the installed product
+    and holds them to the digest engine 25 recorded. Live rendering against a
+    frozen record, not manifest against manifest: two frozen files agree with
+    each other whatever the renderer is doing today.
+    """
+    generator = _load_generator()
+    previous = _manifest("25")["cases"]
+    current = _manifest("26")["cases"]
+
+    replayed = [
+        case_id
+        for case_id in previous
+        if case_id.startswith("G-")
+        and previous[case_id]["digest"] == current[case_id]["digest"]
+    ]
+    assert len(replayed) == ENGINE_25_G_CASES - MOVED_CASES
+
+    # The premise: these are groups whose members really do carry engine 25's
+    # per-member sizes, so a change to that rule has somewhere to show.
+    sized = [
+        case_id
+        for case_id in replayed
+        if (instruction := previous[case_id]["input"]["score"]["instructions"][0])
+        and instruction["arrangement"]["layout"] != "grid"
+        and instruction["arrangement"]["count"] > 1
+        and GRAMMARS[instruction["weight"]].group_hand > 0.0
+    ]
+    assert len(sized) == 38
+
+    for case_id in replayed:
+        svg = generator.render_case(previous[case_id]["input"])
+        assert generator._normalized_digest(svg) == previous[case_id]["digest"], case_id
 
 
 # T-12 --------------------------------------------------------------------

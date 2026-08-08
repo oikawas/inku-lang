@@ -51,6 +51,9 @@ MOVED_WITHOUT_QUANTISER = frozenset(
         "G-radial-nocenter-center",
         "G-radial-nocenter-corner",
         "G-radial-nocenter-edge",
+        # engine 24's fading cases: only the ring reaches sin/cos at all. The
+        # other five are scatter, cluster and path layouts, which do not.
+        "G-fade-radial-edge",
     }
 )
 
@@ -115,7 +118,7 @@ def _moved_under_one_ulp(monkeypatch) -> set[str]:
 
 def test_group_g_is_the_whole_exposure() -> None:
     """A gate that measured nothing would still pass the two tests below."""
-    assert len(_group_g_inputs()) == 36
+    assert len(_group_g_inputs()) == 42
 
 
 def test_one_ulp_of_libm_does_not_move_the_drawing(monkeypatch) -> None:

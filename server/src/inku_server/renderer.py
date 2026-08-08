@@ -23,6 +23,7 @@ from .color_catalogs import DEFAULT_COLOR_CATALOG_ID
 from .master_grid import fmt
 from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import (
+    Arrangement,
     CanvasGroundSpec,
     CanvasSpec,
     Instruction,
@@ -1741,6 +1742,141 @@ def _render_effect_hint(color_hint: str | None) -> str | None:
     return "; ".join(kept) if kept else None
 
 
+# engine 24: `fade` declares how a group falls off, so each member carries its
+# own ceiling instead of one constant for the whole group. The pairs are the
+# near and the far end of the ramp (author ruling A-1 = F1); the fill keeps the
+# ratio the engine-23 constants had (0.22/0.40 outward, 0.30/0.48 directional).
+_FADE_NEAR_FAR: dict[str, tuple[float, float]] = {
+    "outward": (0.62, 0.18),
+    "directional": (0.70, 0.26),
+}
+_FADE_FILL_RATIO: dict[str, float] = {"outward": 0.55, "directional": 0.625}
+# A group whose members are all the same distance from the centre is not an
+# "outward" fade at all: a ring is equidistant by construction, and so is a pair.
+_FADE_SPAN_EPS = 1e-9
+_FADE_LEVEL_RE = re.compile(r"fade_level=(\d+(?:\.\d+)?)")
+_FADE_LEVEL_TAG_RE = re.compile(r"(?:;\s*)?fade_level=\d+(?:\.\d+)?")
+
+
+def _fade_levels(
+    items: list[Instruction],
+    arr: Arrangement,
+    *,
+    center: tuple[float, float] | None = None,
+) -> list[float] | None:
+    """One opacity ceiling per member, or None when the group cannot fade.
+
+    `outward` reads the distance from the group's centre: the stated
+    `arrangement.center` when there is one, the centre the layout laid the group
+    around when the layout has one of its own, and the centroid of the expanded
+    anchors otherwise. `directional` reads the expansion order, which is the
+    order the path lays the members down in.
+
+    A ring passes its own centre because the centroid is not it: `_rhythm_t`
+    spans 0 to 1 inclusive, so the first mark is drawn twice and pulls the mean
+    off the axis by radius/count. Measured from there the ring is not
+    equidistant, and it would fade -- once around itself, which is the pattern
+    the degenerate rule exists to prevent.
+    """
+    near_far = _FADE_NEAR_FAR.get(arr.fade)
+    if near_far is None or len(items) < 2:
+        return None
+    near, far = near_far
+    count = len(items)
+    if arr.fade == "directional":
+        ratios = [index / (count - 1) for index in range(count)]
+    else:
+        anchors = [_anchor(item) for item in items]
+        if arr.center is not None:
+            cx, cy = arr.center
+        elif center is not None:
+            cx, cy = center
+        else:
+            cx = sum(anchor[0] for anchor in anchors) / count
+            cy = sum(anchor[1] for anchor in anchors) / count
+        distances = [math.hypot(x - cx, y - cy) for x, y in anchors]
+        span = max(distances) - min(distances)
+        # Ranking an equidistant group by index would draw a gradient running
+        # once around the ring -- a pattern the description never states.
+        if span < _FADE_SPAN_EPS:
+            return None
+        nearest = min(distances)
+        ratios = [(distance - nearest) / span for distance in distances]
+    return [near + (far - near) * ratio for ratio in ratios]
+
+
+def _apply_fade_levels(
+    items: list[Instruction],
+    arr: Arrangement,
+    *,
+    center: tuple[float, float] | None = None,
+) -> list[Instruction]:
+    """Write each member's ceiling onto its `color_hint`.
+
+    `color_hint` is the carriage because `Instruction` has no opacity field and
+    `fade=<mode>` already travels there. It is outside `_SEED_INSTRUCTION_FIELDS`,
+    so the tag moves no performance seed and the hand stays byte-identical.
+    """
+    levels = _fade_levels(items, arr, center=center)
+    if levels is None:
+        return items
+    result: list[Instruction] = []
+    for item, level in zip(items, levels):
+        data = item.model_dump(by_alias=True)
+        hint = data.get("color_hint")
+        tag = f"fade_level={level:.4f}"
+        data["color_hint"] = f"{hint}; {tag}" if hint else tag
+        result.append(Instruction.model_validate(data))
+    return result
+
+
+def _finish_expanded_group(
+    items: list[Instruction],
+    arr: Arrangement,
+    *,
+    center: tuple[float, float] | None = None,
+) -> list[Instruction]:
+    """The one exit every layout branch takes: colour cycle, then fade levels.
+
+    Order matters. `_apply_color_cycle` rebuilds `color_hint` from the effect
+    allowlist, so a level written before it is dropped -- and 43.5% of the
+    groups in production state a cycle.
+
+    `center` is the centre the layout laid the group around, for the branches
+    that have one; see `_fade_levels`.
+    """
+    return _apply_fade_levels(
+        _apply_color_cycle(items, arr.color_cycle), arr, center=center
+    )
+
+
+def _fade_level_from_hint(color_hint: str | None) -> float | None:
+    """Read a member's ceiling out of the raw hint.
+
+    Read before `_norm_label`: normalisation replaces the dot, so "0.3000"
+    reaches the consumer as "0 3000" and the value is gone.
+    """
+    if not color_hint:
+        return None
+    match = _FADE_LEVEL_RE.search(color_hint)
+    return float(match.group(1)) if match else None
+
+
+def _strip_fade_level(ins: Instruction) -> Instruction:
+    """Drop the engine-24 level tag, keeping `fade=<mode>` itself.
+
+    The surface seed hashes the whole instruction dump, so a per-member tag
+    would move the texture of every mark in a fading group.
+    """
+    hint = ins.color_hint
+    if not hint or "fade_level=" not in hint:
+        return ins
+    stripped = _FADE_LEVEL_TAG_RE.sub("", hint).strip().strip(";").strip()
+    data = ins.model_dump(by_alias=True)
+    data["color_hint"] = stripped or None
+    return Instruction.model_validate(data)
+
+
 def _expand_arrangement_layout(
     ins: Instruction,
     performance_seed: int | None = None,
@@ -1753,7 +1889,7 @@ def _expand_arrangement_layout(
     if arr.count == 1 and arr.layout != "grid":
         data = ins.model_dump(by_alias=True)
         data.pop("arrangement", None)
-        return _apply_color_cycle([Instruction.model_validate(data)], arr.color_cycle)
+        return _finish_expanded_group([Instruction.model_validate(data)], arr)
     n = arr.count
     margin = max(arr.margin, 0.20) if arr.preserve_space else arr.margin
     ax, ay = _anchor(ins)
@@ -1815,7 +1951,7 @@ def _expand_arrangement_layout(
             data.pop("at", None)
             data.pop("relation", None)
             result.append(Instruction.model_validate(data))
-        return _apply_color_cycle(result, arr.color_cycle)
+        return _finish_expanded_group(result, arr)
 
     if cluster_count > 0 and arr.layout in ("scatter", "horizontal", "vertical"):
         path = arr.path
@@ -1838,7 +1974,7 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _apply_color_cycle(result, arr.color_cycle)
+        return _finish_expanded_group(result, arr)
 
     if arr.layout == "horizontal":
         if arr.path != "none":
@@ -1847,14 +1983,14 @@ def _expand_arrangement_layout(
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-            return _apply_color_cycle(result, arr.color_cycle)
+            return _finish_expanded_group(result, arr)
         span = 1.0 - 2 * margin
         targets = [
             (margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span, ay)
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, 0.0) for tx, _ in targets]
-        return _apply_color_cycle(result, arr.color_cycle)
+        return _finish_expanded_group(result, arr)
 
     if arr.layout == "vertical":
         if arr.path != "none":
@@ -1863,14 +1999,14 @@ def _expand_arrangement_layout(
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-            return _apply_color_cycle(result, arr.color_cycle)
+            return _finish_expanded_group(result, arr)
         span = 1.0 - 2 * margin
         targets = [
             (ax, margin + _rhythm_t(i, n, seed, arr.rhythm_spacing) * span)
             for i in range(n)
         ]
         result = [_shift(ins, 0.0, ty - ay) for _, ty in targets]
-        return _apply_color_cycle(result, arr.color_cycle)
+        return _finish_expanded_group(result, arr)
 
     if arr.layout == "radial":
         # engine 20: `center` is radial's own rotation centre. When the
@@ -1895,7 +2031,7 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _apply_color_cycle(result, arr.color_cycle)
+        return _finish_expanded_group(result, arr, center=(cx, cy))
 
     if arr.layout == "scatter":
         targets = [
@@ -1903,9 +2039,9 @@ def _expand_arrangement_layout(
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
-        return _apply_color_cycle(result, arr.color_cycle)
+        return _finish_expanded_group(result, arr)
 
-    return _apply_color_cycle([ins], arr.color_cycle)
+    return _finish_expanded_group([ins], arr)
 
 
 def _fit_axis_scales(anchor: float, offsets: list[float]) -> tuple[float, float]:
@@ -2286,7 +2422,7 @@ def _surface_seed(
     if ins.surface is not None and ins.surface.seed is not None:
         return int(ins.surface.seed)
     key = (
-        ins.model_dump_json(by_alias=True)
+        _strip_fade_level(ins).model_dump_json(by_alias=True)
         + f":surface:{ins_idx}:{mark_idx}:{render_seed}"
     )
     return struct.unpack("<Q", hashlib.sha256(key.encode("utf-8")).digest()[:8])[0]
@@ -3708,13 +3844,26 @@ def _stroke_attrs(
         if do_fill:
             attrs["fill_opacity"] = 0.18
     elif "fade directional" in hint or "fade=directional" in hint:
-        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.48)
+        # engine 24: the member's own ceiling when the expansion wrote one, the
+        # group-wide constant when it did not (a degenerate group, or a fading
+        # instruction that never went through an arrangement).
+        level = _fade_level_from_hint(ins.color_hint)
+        ceiling = 0.48 if level is None else level
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), ceiling)
         if do_fill:
-            attrs["fill_opacity"] = 0.30
+            attrs["fill_opacity"] = (
+                0.30 if level is None
+                else round(ceiling * _FADE_FILL_RATIO["directional"], 4)
+            )
     elif "fade outward" in hint or "fade=outward" in hint:
-        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.40)
+        level = _fade_level_from_hint(ins.color_hint)
+        ceiling = 0.40 if level is None else level
+        attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), ceiling)
         if do_fill:
-            attrs["fill_opacity"] = 0.22
+            attrs["fill_opacity"] = (
+                0.22 if level is None
+                else round(ceiling * _FADE_FILL_RATIO["outward"], 4)
+            )
     if any(token in hint for token in ("reflection", "反射", "映り")):
         attrs["stroke_opacity"] = min(float(attrs.get("stroke_opacity", 1.0)), 0.52)
     scale = _unit_scale(canvas)

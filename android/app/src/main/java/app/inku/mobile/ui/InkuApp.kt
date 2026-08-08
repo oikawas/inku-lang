@@ -25,6 +25,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -75,6 +77,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -120,6 +124,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
@@ -131,6 +137,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.onFocusChanged
@@ -147,6 +154,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.testTag
 import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
+import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
@@ -178,6 +186,21 @@ import org.json.JSONObject
 
 private const val HISTORY_SWIPE_MIN_DISTANCE_PX = 96f
 private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
+
+/** How often the running row redraws its elapsed time. */
+private const val RUN_STATUS_TICK_MS = 100L
+
+/** The description field. The instrumented IME test needs to reach it by name. */
+internal const val DESCRIPTION_INPUT_TAG = "description_input"
+
+/** What the main action says, in both the in-flow button and the IME bar. */
+internal const val DRAW_ACTION_LABEL = "描画する"
+
+/**
+ * What the double tap goes to when the artwork is already at or above its own
+ * size, so that 1:1 would be a zoom *out* and the gesture would look broken.
+ */
+private const val PRESENTATION_FALLBACK_ZOOM = 2.0f
 private const val PRESENTATION_PREFS_NAME = "presentation_preferences"
 private const val PRESENTATION_CAPTION_VISIBLE_KEY = "caption_visible"
 private val SvgViewBoxRegex = Regex("""\bviewBox\s*=\s*["']\s*[-+]?[0-9.]+\s+[-+]?[0-9.]+\s+([-+]?[0-9.]+)\s+([-+]?[0-9.]+)\s*["']""")
@@ -311,10 +334,32 @@ fun InkuApp() {
     val state by viewModel.state.collectAsState()
     val deviceRotation = rememberDeviceRotation(enabled = state.canvasPresentationMode)
 
+    // One back key, one destination per screen state. Android's back always means
+    // "up one level"; before this it meant "leave the app" from everywhere except
+    // a dialog, so the full screen and the four tabs were one-way doors.
+    val backTarget: (() -> Unit)? = when {
+        state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
+        state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
+        state.ddlEditorOpen -> viewModel::closeDdlEditor
+        state.modelSelectionOpen -> viewModel::cancelModelSelection
+        state.catalogSelectionOpen -> viewModel::cancelCatalogSelection
+        state.canvasSelectionOpen -> viewModel::closeTransientPanel
+        state.tab == AppTab.Settings && state.settingsPane != SettingsPane.Home ->
+            ({ viewModel.setSettingsPane(SettingsPane.Home) })
+        state.tab != AppTab.Compose -> ({ viewModel.setTab(AppTab.Compose) })
+        // The compose screen is the root. Back leaves the app from here.
+        else -> null
+    }
+    BackHandler(enabled = backTarget != null) { backTarget?.invoke() }
+
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
             bottomBar = {
-                if (!state.canvasPresentationMode) {
+                // While the description is being written the four destinations
+                // step aside: keeping them would hold a bar's worth of height
+                // between the keyboard and 「描画する」, and going somewhere else
+                // is not what one is about to do mid-sentence.
+                if (!state.canvasPresentationMode && !state.descriptionFocused) {
                     BottomNavigationBar(state.tab, viewModel)
                 }
             },
@@ -325,6 +370,11 @@ fun InkuApp() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
+                    // `contentPadding` already holds the navigation bar, so
+                    // without this `imePadding` adds the keyboard on top of an
+                    // inset the keyboard covers -- a bar's worth of dead space
+                    // between the content and the keys.
+                    .consumeWindowInsets(contentPadding)
                     .imePadding()
                     .background(MaterialTheme.colorScheme.background),
             ) {
@@ -338,8 +388,7 @@ fun InkuApp() {
                             HistoryScreen(state, history, viewModel)
                         }
                         AppTab.Lineage -> LineageScreen(state, viewModel)
-                        AppTab.Demo -> DemoPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl))
-                        AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceXl))
+                        AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceL))
                     }
                 }
                 if (state.confirmDdlOverwrite) {
@@ -434,13 +483,13 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .imePadding()
-                .padding(Dimens.spaceXl),
-            shape = RoundedCornerShape(Dimens.spaceS),
+                .padding(Dimens.spaceL),
+            shape = RoundedCornerShape(Dimens.radiusCard),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = Dimens.spaceS,
+            tonalElevation = Dimens.spaceM,
         ) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(Dimens.spaceL),
+                modifier = Modifier.fillMaxSize().padding(Dimens.spaceM),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Row(
@@ -507,7 +556,7 @@ private fun DdlSelectedVocabularyHeader(selectedWord: DdlVocabularyToken?) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         Text(
             "選択中",
@@ -618,11 +667,11 @@ private fun DdlVocabularyBar(
             )
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             MiniPill(if (open) "素材を閉じる" else "素材", selected = open, onClick = onToggle)
             if (selectedWord != null) {
@@ -640,7 +689,7 @@ private fun DdlVocabularyBar(
             }
         }
         if (prioritizedDetectedWords.isNotEmpty()) {
-            WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
+            WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                 prioritizedDetectedWords.take(12).forEach { token ->
                     DdlVocabularyPill(token = token, selected = token.word == selectedWord?.word, onClick = { onSelectDetected(token.word) })
                 }
@@ -649,7 +698,7 @@ private fun DdlVocabularyBar(
         if (open) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(Dimens.spaceS),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.vocabularyBarMaxHeight),
             ) {
                 Column(
@@ -669,7 +718,7 @@ private fun DdlVocabularyBar(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
+                            WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                                 group.words.forEach { word ->
                                     val token = tokenForWord(word)
                                     if (token != null) {
@@ -694,9 +743,9 @@ private fun DdlVocabularyPill(token: DdlVocabularyToken, selected: Boolean = fal
     Text(
         token.word,
         modifier = Modifier
-            .background(background, RoundedCornerShape(Dimens.radiusXs))
+            .background(background, RoundedCornerShape(100))
             .clickable(onClick = onClick)
-            .padding(horizontal = Dimens.space5, vertical = Dimens.space2),
+            .padding(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs),
         style = MaterialTheme.typography.labelSmall,
         color = foreground,
         maxLines = 1,
@@ -716,7 +765,7 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.modelDialogMaxHeight).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
             ) {
                 WebStyleModelStageEditor(
                     title = "描画モデル",
@@ -756,19 +805,19 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().height(Dimens.colorCatalogDialogHeight).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 ColorCatalogs.all.forEach { catalog ->
                     val active = catalog.id == state.selectedCatalogId
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable { viewModel.setCatalog(catalog.id) },
-                        shape = RoundedCornerShape(Dimens.spaceM),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
                         color = if (active) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
-                            modifier = Modifier.padding(Dimens.spaceL),
+                            modifier = Modifier.padding(Dimens.spaceM),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
                             SwatchStrip(catalog.swatches.take(8))
                             Column(modifier = Modifier.weight(1f)) {
@@ -781,12 +830,12 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                 }
                 SettingsSectionHeader(current.name.uppercase(), "カタログ詳細")
                 current.map.forEach { (name, code) ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                         Box(
                             modifier = Modifier
-                                .size(Dimens.space28)
-                                .background(parseColor(code), RoundedCornerShape(Dimens.radiusXs))
-                                .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusXs)),
+                                .size(Dimens.swatchSize)
+                                .background(parseColor(code), RoundedCornerShape(100))
+                                .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(100)),
                         )
                         Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                         Text(code, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -820,18 +869,18 @@ private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                             viewModel.setCanvasAspect(aspect.id)
                             viewModel.closeTransientPanel()
                         },
-                        shape = RoundedCornerShape(Dimens.spaceM),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
                         color = if (active) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
-                            modifier = Modifier.padding(Dimens.spaceL),
+                            modifier = Modifier.padding(Dimens.spaceM),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(Dimens.controlSizeMedium)
-                                    .border(Dimens.hairline, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(Dimens.radiusXs))
+                                    .size(Dimens.controlSizeSmall)
+                                    .border(Dimens.hairline, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(100))
                                     .aspectRatio(aspect.ratioW.toFloat() / aspect.ratioH.toFloat()),
                             )
                             Column(modifier = Modifier.weight(1f)) {
@@ -869,11 +918,11 @@ private fun WebStyleModelStageEditor(
         Box(modifier = Modifier.fillMaxWidth()) {
             Surface(
                 modifier = Modifier.fillMaxWidth().clickable { providerMenuOpen = true },
-                shape = RoundedCornerShape(Dimens.spaceM),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 color = MaterialTheme.colorScheme.surface,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceM)).padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceL),
+                    modifier = Modifier.fillMaxWidth().border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard)).padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
@@ -908,20 +957,20 @@ private fun WebStyleModelStageEditor(
         if (models.isEmpty()) {
             Text("公開モデルは未選択です。接続先設定でモデルを選択してください。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 models.forEach { option ->
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable { onSelectModel(option.qualifiedId) },
-                        shape = RoundedCornerShape(Dimens.spaceM),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
                         color = if (option.qualifiedId == selectedModelId) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.space9),
+                            modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
-                            Text(if (option.qualifiedId == selectedModelId) "✓" else "", modifier = Modifier.width(Dimens.space18), color = MaterialTheme.colorScheme.secondary)
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+                            Text(if (option.qualifiedId == selectedModelId) "✓" else "", modifier = Modifier.width(Dimens.spaceL), color = MaterialTheme.colorScheme.secondary)
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                                 Text(option.label, style = MaterialTheme.typography.bodySmall)
                                 if (option.notes != null) {
                                     Text(option.notes, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -942,13 +991,13 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
         shape = RoundedCornerShape(Dimens.radiusCard),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
+        Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Text("歳時記", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
             Text("語を押すと DDL 編集欄へ挿入します。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             saijikiGroups.forEach { group ->
-                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     Text("${group.label} / ${group.en}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
+                    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         group.words.forEach { word ->
                             MiniPill(word, onClick = { viewModel.insertDdlWord(word) })
                         }
@@ -994,7 +1043,7 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
             .navigationBarsPadding()
             .border(Dimens.hairline, BottomNavDivider),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = Dimens.space2,
+        tonalElevation = Dimens.spaceXs,
     ) {
         Row(
             modifier = Modifier
@@ -1008,14 +1057,12 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
                     AppTab.Compose -> "記述"
                     AppTab.History -> "履歴"
                     AppTab.Lineage -> "系譜"
-                    AppTab.Demo -> "デモ"
                     AppTab.Settings -> "設定"
                 }
                 val mark = when (tab) {
                     AppTab.Compose -> "✎"
                     AppTab.History -> "◫"
                     AppTab.Lineage -> "⌥"
-                    AppTab.Demo -> "◉"
                     AppTab.Settings -> "⚙"
                 }
                 NavButton(
@@ -1052,7 +1099,7 @@ private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
                     .clickable { viewModel.setComposeMode(tab) },
                 shape = RoundedCornerShape(100),
                 color = if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                tonalElevation = if (active) Dimens.space2 else 0.dp,
+                tonalElevation = if (active) Dimens.spaceXs else 0.dp,
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Text(
@@ -1084,6 +1131,15 @@ private fun shortCanvasLabel(state: InkuUiState): String {
     }
 }
 
+/**
+ * The compose screen, ordered by what it is about.
+ *
+ * The work comes first. Under it sits everything that decides the *next*
+ * drawing, and nothing else: before this, the canvas was the fourth block down,
+ * behind a mascot that ran whether or not anything was running, and the row
+ * above the canvas mixed the work's own star and hash with a zoom and a canvas
+ * aspect -- three families and two tenses on one line.
+ */
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     if (state.canvasPresentationMode) {
@@ -1093,6 +1149,12 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    // Where the top of the scrolling area is on screen, and where the
+    // description is. Both are measured in window coordinates: the field's
+    // position inside its own parent says nothing about how far down the scroll
+    // it sits, so the two have to be compared in the one frame they share.
+    var viewportTop by remember { mutableStateOf(0f) }
+    var descriptionTop by remember { mutableStateOf(0f) }
     LaunchedEffect(state.isDrawing, state.selectedHistory?.id) {
         if (!state.isDrawing && state.selectedHistory != null) {
             focusManager.clearFocus(force = true)
@@ -1100,40 +1162,187 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             scrollState.animateScrollTo(0)
         }
     }
-    Column(
+    // Focus pulls the description to the top of what is left of the screen.
+    // Otherwise the keyboard takes the lower half and the field keeps a sliver.
+    LaunchedEffect(state.descriptionFocused) {
+        if (state.descriptionFocused) {
+            val delta = (descriptionTop - viewportTop).toInt()
+            scrollState.animateScrollTo((scrollState.value + delta).coerceAtLeast(0))
+        }
+    }
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = Dimens.space20, vertical = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+            .onGloballyPositioned { viewportTop = it.positionInWindow().y },
     ) {
-        ComposeModeTabs(state.composeMode, viewModel)
-        if (state.composeMode == ComposeMode.Batch) {
-            ConditionChips(state, viewModel)
-            BatchPanel(state, viewModel)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceXs),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        ) {
+            RunStatusRow(state, viewModel)
             CanvasHeroCard(state, viewModel)
-        } else {
-            // The display mode decides how much surrounds the canvas; the mascot
-            // and the condition strip only appear in the full mode.
-            UiModeContainer(
-                uiMode = state.uiMode,
-                simpleContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-                        CanvasHeroCard(state, viewModel)
-                        DrawPanel(state, viewModel)
-                    }
-                },
-                fullContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-                        MascotWidget(mascotKind = state.mascotKind)
-                        ConditionChips(state, viewModel)
-                        CanvasHeroCard(state, viewModel)
-                        DrawPanel(state, viewModel)
-                    }
-                },
+            DrawSettingsPanel(state, viewModel)
+            if (state.composeMode == ComposeMode.Batch) {
+                BatchPanel(state, viewModel)
+            } else {
+                DrawPanel(
+                    state,
+                    viewModel,
+                    onDescriptionFocusChanged = viewModel::setDescriptionFocused,
+                    onDescriptionPositioned = { descriptionTop = it },
+                )
+            }
+            Spacer(Modifier.height(Dimens.scrollTailSpace))
+        }
+        if (state.descriptionFocused && state.composeMode == ComposeMode.Write) {
+            ImeActionBar(state, viewModel, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+    }
+}
+
+/**
+ * The main action, pinned above the keyboard.
+ *
+ * The screen is one vertical scroll and the root carries `imePadding()`, so
+ * opening the keyboard lifts the bottom of the scroll without bringing anything
+ * with it: measured on the device, the description had ~300px of empty space
+ * under it and neither 「描画する」 nor the bottom bar was on screen. This bar is
+ * outside the scroll, so it stays where the thumb already is.
+ *
+ * The IME action key is deliberately left alone. In Japanese input the return
+ * key commits the conversion, and a draw bound to it would start drawing when
+ * the author meant to accept 「ゆらぎ」.
+ */
+@Composable
+private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = Dimens.spaceXs,
+        shadowElevation = Dimens.spaceM,
+    ) {
+        Box(modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM)) {
+            DrawingActionButton(
+                idleText = "▶  $DRAW_ACTION_LABEL",
+                runningText = "■  描画中",
+                state = state,
+                onClick = viewModel::draw,
+                onStop = viewModel::stopDrawing,
             )
         }
-        Spacer(Modifier.height(Dimens.scrollTailSpace))
+    }
+}
+
+/**
+ * The one "something is running" line, which web keeps in `RunStatus.svelte`.
+ *
+ * web renders that component from every running operation -- single draw, batch,
+ * demo, DDL editor, lineage -- and the mascot lives inside it, so the animation
+ * always means the same thing. The port had lifted the mascot out and placed it
+ * unconditionally at the top of the compose screen, where it span with nothing
+ * around it to say why. Here it is a state display again: mascot, model,
+ * elapsed, stop; and when nothing runs, the row is not composed at all.
+ */
+@Composable
+private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
+    if (!state.isRunning) return
+    val startedAt = remember(state.isDrawing, state.refinementBusy) { System.currentTimeMillis() }
+    var elapsedMs by remember(startedAt) { mutableStateOf(0L) }
+    LaunchedEffect(startedAt) {
+        while (true) {
+            elapsedMs = System.currentTimeMillis() - startedAt
+            delay(RUN_STATUS_TICK_MS)
+        }
+    }
+    val progress = if (state.batchTotal > 1) "${state.batchCurrent} / ${state.batchTotal}   " else ""
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MascotWidget(mascotKind = state.mascotKind)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                Text(
+                    state.message?.takeIf { it.isNotBlank() } ?: "描画中",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    selectedModelLabel(state),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "$progress${formatDuration(elapsedMs)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            MiniPill(
+                text = "停止",
+                onClick = if (state.refinementBusy) viewModel::abortRefinementCandidates else viewModel::stopDrawing,
+            )
+        }
+    }
+}
+
+/**
+ * Everything that decides the drawing that has not happened yet.
+ *
+ * One entry per setting, and one place for all of them. The model used to be
+ * openable from three separate rows; the colour catalog from two; the canvas
+ * aspect sat beside the star and the hash, which belong to the work already on
+ * screen rather than to the next one.
+ */
+@Composable
+private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        ComposeModeTabs(state.composeMode, viewModel)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        ) {
+            CompactLabel("描画設定")
+            Spacer(Modifier.weight(1f))
+            MiniPill(
+                "新規作成",
+                onClick = if (state.composeMode == ComposeMode.Batch) viewModel::clearBatchText else viewModel::clearPrompt,
+            )
+        }
+        WrapRow {
+            MiniPill(
+                text = "◇ ${shortModelLabel(state)}",
+                onClick = viewModel::openModelSelection,
+                modifier = Modifier.widthIn(max = Dimens.panelWideMaxWidth),
+            )
+            MiniPill(
+                text = "◐ ${shortCatalogLabel(state)}",
+                onClick = viewModel::openCatalogSelection,
+                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
+            )
+            MiniPill(
+                text = "⬚ ${shortCanvasLabel(state)}",
+                onClick = viewModel::openCanvasSelection,
+                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
+            )
+        }
+        if (state.composeMode == ComposeMode.Write) {
+            SketchModeRow(state, viewModel)
+        }
     }
 }
 
@@ -1157,9 +1366,7 @@ private fun CanvasHeroCard(
         context.applicationContext.getSharedPreferences(PRESENTATION_PREFS_NAME, Context.MODE_PRIVATE)
     }
     var canvasMessage by remember { mutableStateOf<String?>(null) }
-    var svgMenuOpen by remember { mutableStateOf(false) }
-    var svgHelpOpen by remember { mutableStateOf(false) }
-    var pngMenuOpen by remember { mutableStateOf(false) }
+    var exportSheetOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
     var instructionCaptionVisible by remember {
         mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
@@ -1188,6 +1395,17 @@ private fun CanvasHeroCard(
         val presentationBackground = remember(item?.id, item?.displaySvg, presentation) {
             if (presentation && item != null) presentationBackgroundForSvg(item.displaySvg) else ServerCanvasAreaColor
         }
+        // Where the double tap goes: the work at its own size. The fitted canvas
+        // is `presentationCanvasWidth` across, and the work's own width is in its
+        // SVG, so the ratio of the two is the 1:1 factor. A work already at or
+        // above its size would be *shrunk* by 1:1, so that case magnifies instead
+        // -- a double tap that appears to do nothing reads as a broken gesture.
+        val fittedWidthPx = with(LocalDensity.current) { presentationCanvasWidth.toPx() }
+        val intrinsicWidthPx = remember(item?.id, item?.displaySvg) { item?.displaySvg?.let(::svgIntrinsicWidth) }
+        val oneToOneZoom = remember(intrinsicWidthPx, fittedWidthPx) {
+            val natural = if (intrinsicWidthPx != null && fittedWidthPx > 0f) intrinsicWidthPx / fittedWidthPx else 0f
+            if (natural > CANVAS_FIT_ZOOM + CANVAS_ZOOM_EPSILON) natural else PRESENTATION_FALLBACK_ZOOM
+        }
         val instructionCaptionText = item?.originalInput?.trim().orEmpty()
         val canShowInstructionCaption = instructionCaptionText.isNotBlank()
         val historyIndex = item?.let { selected -> historyItems.indexOfFirst { it.id == selected.id } } ?: -1
@@ -1197,11 +1415,15 @@ private fun CanvasHeroCard(
         val canGoOlder = historyIndex >= 0 && historyIndex < historyItems.lastIndex
         val historyCounter = if (historyIndex >= 0 && historyTotal > 0) "${historyIndex + 1} / $historyTotal" else ""
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+            // The strip above the canvas says what the work on screen *is*: its
+            // star, its hash, where it sits in the lineage, and the way into the
+            // full screen. The zoom and the canvas aspect used to be here too --
+            // one is a property of the view, the other of the next drawing.
             if (!presentation && showControls) {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.align(Alignment.CenterStart),
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         item?.let {
@@ -1214,21 +1436,15 @@ private fun CanvasHeroCard(
                                     canvasMessage = "Hash copied."
                                 },
                             )
+                            MiniPill(text = "系譜", onClick = { viewModel.setTab(AppTab.Lineage) })
                         }
                     }
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        MiniPill("-", onClick = { viewModel.setCanvasZoom(state.canvasZoom - 0.25f) })
-                        MiniPill("${(state.canvasZoom * 100).toInt()}%", onClick = viewModel::resetCanvasZoom)
-                        MiniPill("+", onClick = { viewModel.setCanvasZoom(state.canvasZoom + 0.25f) })
-                    }
+                    // A double tap enters the full screen too, but a gesture that
+                    // nothing on screen mentions is a gesture nobody finds.
                     MiniPill(
-                        shortCanvasLabel(state),
-                        onClick = viewModel::openCanvasSelection,
-                        modifier = Modifier.align(Alignment.CenterEnd).widthIn(max = Dimens.heroCaptionMaxWidth),
+                        text = "⛶ 全画面",
+                        onClick = viewModel::enterCanvasPresentationMode,
+                        modifier = Modifier.align(Alignment.CenterEnd),
                     )
                 }
             }
@@ -1242,18 +1458,23 @@ private fun CanvasHeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        // Right goes back through the works in both modes, which
+                        // is the direction of Android's own back gesture. The
+                        // full screen used to be bound the other way round, so
+                        // the same finger movement meant opposite things
+                        // depending on which of the two canvases was on screen.
                         .historySwipeNavigation(
-                            enabled = presentation,
+                            enabled = presentation && state.canvasZoom <= CANVAS_FIT_ZOOM + CANVAS_ZOOM_EPSILON,
                             gestureKey = item?.id,
                             deviceRotation = deviceRotation,
-                            onSwipeRight = viewModel::selectNextHistory,
-                            onSwipeLeft = viewModel::selectPreviousHistory,
+                            onSwipeRight = viewModel::selectPreviousHistory,
+                            onSwipeLeft = viewModel::selectNextHistory,
                         )
-                        .pointerInput(item?.id, state.canvasPresentationMode) {
+                        .pointerInput(item?.id, state.canvasPresentationMode, oneToOneZoom) {
                             detectTapGestures(
                                 onDoubleTap = {
                                     if (state.canvasPresentationMode) {
-                                        viewModel.resetCanvasZoom()
+                                        viewModel.toggleCanvasZoom(oneToOneZoom)
                                     } else {
                                         viewModel.enterCanvasPresentationMode()
                                     }
@@ -1281,29 +1502,43 @@ private fun CanvasHeroCard(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .historySwipeNavigation(
-                                        enabled = !presentation && state.canvasZoom <= 1.05f,
+                                        enabled = !presentation,
                                         gestureKey = item.id,
                                         deviceRotation = DeviceRotation.Portrait,
                                         onSwipeRight = viewModel::selectPreviousHistory,
                                         onSwipeLeft = viewModel::selectNextHistory,
                                     )
+                                    // Magnification belongs to the full screen and
+                                    // to nothing else (ruling 2026-08-08): the
+                                    // small canvas in the middle of a scrolling
+                                    // form is not where one looks closely, and a
+                                    // pinch there fought the scroll for the
+                                    // gesture. Reversed, the pinch is wired where
+                                    // the work fills the screen, and the ordinary
+                                    // canvas carries no transform at all.
                                     .then(
                                         if (presentation) {
-                                            Modifier
-                                        } else {
-                                            Modifier.pointerInput(Unit) {
+                                            Modifier.pointerInput(item.id) {
                                                 detectTransformGestures { _, pan, zoom, _ ->
                                                     if (zoom != 1f) viewModel.scaleCanvasZoom(zoom)
                                                     if (pan != Offset.Zero) viewModel.panCanvas(pan.x, pan.y)
                                                 }
                                             }
+                                        } else {
+                                            Modifier
                                         },
                                     )
-                                    .graphicsLayer(
-                                        scaleX = if (presentation) 1f else state.canvasZoom,
-                                        scaleY = if (presentation) 1f else state.canvasZoom,
-                                        translationX = if (presentation) 0f else state.canvasPanX,
-                                        translationY = if (presentation) 0f else state.canvasPanY,
+                                    .then(
+                                        if (presentation) {
+                                            Modifier.graphicsLayer(
+                                                scaleX = state.canvasZoom,
+                                                scaleY = state.canvasZoom,
+                                                translationX = state.canvasPanX,
+                                                translationY = state.canvasPanY,
+                                            )
+                                        } else {
+                                            Modifier
+                                        },
                                     )
                             )
                         }
@@ -1312,14 +1547,14 @@ private fun CanvasHeroCard(
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(end = Dimens.radiusLarge, bottom = Dimens.heroOverlayBottomInset),
+                                .padding(end = Dimens.radiusCard, bottom = Dimens.heroOverlayBottomInset),
                             shape = RoundedCornerShape(100),
                             color = HeroOverlayScrim,
                             border = BorderStroke(Dimens.hairline, HeroOverlayHairline),
                         ) {
                             Text(
                                 "残り ${state.demoWaitingSeconds}秒",
-                                modifier = Modifier.padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceM),
+                                modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = HeroOverlayInk,
                             )
@@ -1336,8 +1571,10 @@ private fun CanvasHeroCard(
                         PresentationControls(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(start = Dimens.spaceXl, end = Dimens.spaceXl, bottom = Dimens.spaceXxl),
+                                .padding(start = Dimens.spaceL, end = Dimens.spaceL, bottom = Dimens.spaceL),
                             counter = historyCounter,
+                            zoomPercent = (state.canvasZoom * 100).toInt(),
+                            onResetZoom = viewModel::resetCanvasZoom,
                             starred = item?.starred == true,
                             canGoOlder = canGoOlder,
                             canGoLatest = canGoLatest,
@@ -1358,13 +1595,20 @@ private fun CanvasHeroCard(
                                         .apply()
                                 }
                             },
-                            onClose = viewModel::resetCanvasZoom,
+                            onClose = viewModel::exitCanvasPresentationMode,
                         )
                     }
                 }
             }
+            // Under the canvas: on the left the ways of looking at the same work,
+            // on the right the one way out of the app. Getting a file used to be
+            // two dropdown menus in this row and a third place in the settings.
             if (!presentation && showControls) item?.let {
-                WrapRow {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                ) {
                     RenderTab.entries.forEach { tab ->
                         MiniPill(
                             text = when (tab) {
@@ -1376,121 +1620,49 @@ private fun CanvasHeroCard(
                             onClick = { viewModel.setRenderTab(tab) },
                         )
                     }
-                    Box {
-                        MiniPill(text = "SVG ▾", onClick = { svgMenuOpen = true })
-                        DropdownMenu(
-                            expanded = svgMenuOpen,
-                            onDismissRequest = {
-                                svgMenuOpen = false
-                                svgHelpOpen = false
-                            },
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceM),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
-                            ) {
-                                Text(
-                                    "SVG export",
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                TextButton(onClick = { svgHelpOpen = !svgHelpOpen }) {
-                                    Text("?")
-                                }
-                            }
-                            if (svgHelpOpen) {
-                                SvgExportHelp()
-                            }
-                            SvgExportOption(
-                                title = "表示用SVG",
-                                sub = "Web表示向けの標準SVG",
-                                onClick = {
-                                    svgMenuOpen = false
-                                    svgHelpOpen = false
-                                    canvasMessage = "SVG export preparing..."
-                                    scope.launch {
-                                        canvasMessage = runCatching {
-                                            shareHistorySvg(context, it, "display")
-                                            "SVG exported F${it.renderHashShort}"
-                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
-                                    }
-                                },
-                            )
-                            SvgExportOption(
-                                title = "編集用SVG",
-                                sub = "編集用メタデータとIDを含む",
-                                onClick = {
-                                    svgMenuOpen = false
-                                    svgHelpOpen = false
-                                    canvasMessage = "SVG export preparing..."
-                                    scope.launch {
-                                        canvasMessage = runCatching {
-                                            shareHistorySvg(context, it, "editable")
-                                            "SVG exported F${it.renderHashShort}"
-                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
-                                    }
-                                },
-                            )
-                            SvgExportOption(
-                                title = "汎用SVG",
-                                sub = "互換性重視のポータブルSVG",
-                                onClick = {
-                                    svgMenuOpen = false
-                                    svgHelpOpen = false
-                                    canvasMessage = "SVG export preparing..."
-                                    scope.launch {
-                                        canvasMessage = runCatching {
-                                            shareHistorySvg(context, it, "compat")
-                                            "SVG exported F${it.renderHashShort}"
-                                        }.getOrElse { error -> error.message ?: "SVG export failed." }
-                                    }
-                                },
-                            )
-                        }
-                    }
-                    Box {
-                        MiniPill(text = "PNG ▾", onClick = { pngMenuOpen = true })
-                        DropdownMenu(
-                            expanded = pngMenuOpen,
-                            onDismissRequest = { pngMenuOpen = false },
-                        ) {
-                            state.exportTemplates.forEach { template ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Column {
-                                            Text(template.name, style = MaterialTheme.typography.labelMedium)
-                                            Text(
-                                                exportTemplateDescription(template.description, template.heightPx),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        pngMenuOpen = false
-                                        pngExporting = true
-                                        canvasMessage = "PNG export preparing..."
-                                        scope.launch {
-                                            canvasMessage = runCatching {
-                                                shareHistoryPng(context, it, template.heightPx)
-                                                "PNG exported F${it.renderHashShort}"
-                                            }.getOrElse { error -> error.message ?: "PNG export failed." }
-                                            pngExporting = false
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
+                    Spacer(Modifier.weight(1f))
+                    MiniPill(text = "⬆ 書き出し", onClick = { exportSheetOpen = true })
                 }
             }
         }
     }
+    if (!presentation && showControls && exportSheetOpen) item?.let {
+        ExportSheet(
+            item = it,
+            templates = state.exportTemplates,
+            onDismiss = { exportSheetOpen = false },
+            onEditTemplates = {
+                exportSheetOpen = false
+                viewModel.setTab(AppTab.Settings)
+                viewModel.setSettingsPane(SettingsPane.Export)
+            },
+            onExportSvg = { profile ->
+                exportSheetOpen = false
+                canvasMessage = "SVG export preparing..."
+                scope.launch {
+                    canvasMessage = runCatching {
+                        shareHistorySvg(context, it, profile)
+                        "SVG exported F${it.renderHashShort}"
+                    }.getOrElse { error -> error.message ?: "SVG export failed." }
+                }
+            },
+            onExportPng = { heightPx ->
+                exportSheetOpen = false
+                pngExporting = true
+                canvasMessage = "PNG export preparing..."
+                scope.launch {
+                    canvasMessage = runCatching {
+                        shareHistoryPng(context, it, heightPx)
+                        "PNG exported F${it.renderHashShort}"
+                    }.getOrElse { error -> error.message ?: "PNG export failed." }
+                    pngExporting = false
+                }
+            },
+        )
+    }
     if (!presentation && showControls && pngExporting) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(modifier = Modifier.size(Dimens.spaceXxl), strokeWidth = Dimens.space2)
+            CircularProgressIndicator(modifier = Modifier.size(Dimens.spaceL), strokeWidth = Dimens.spaceXs)
             Text(canvasMessage ?: "PNG export preparing...", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
     } else if (!presentation && showControls) {
@@ -1508,53 +1680,76 @@ private fun CanvasHeroCard(
     }
 }
 
+/**
+ * The one way a work leaves the app.
+ *
+ * Three destinations used to be spread over two dropdown menus hanging off the
+ * canvas card and a third pane in the settings, so "get a file out of this"
+ * had no single place to look. A bottom sheet is where Android puts a list of
+ * destinations, and it has room to say what each one is for -- the SVG profiles
+ * needed a help popover to explain themselves inside a dropdown.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExportSheet(
+    item: HistoryItemEntity,
+    templates: List<ExportTemplateEntity>,
+    onDismiss: () -> Unit,
+    onEditTemplates: () -> Unit,
+    onExportSvg: (String) -> Unit,
+    onExportPng: (Int) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Dimens.spaceL)
+                .padding(bottom = Dimens.spaceL),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        ) {
+            Text("書き出し  F${item.renderHashShort}", style = MaterialTheme.typography.titleMedium)
+            CompactLabel("SVG")
+            SvgExportOption(title = "表示用SVG", sub = "Web表示向けの標準SVG", onClick = { onExportSvg("display") })
+            SvgExportOption(title = "編集用SVG", sub = "編集用メタデータとIDを含む", onClick = { onExportSvg("editable") })
+            SvgExportOption(title = "汎用SVG", sub = "互換性重視のポータブルSVG", onClick = { onExportSvg("compat") })
+            CompactLabel("PNG")
+            templates.forEach { template ->
+                SvgExportOption(
+                    title = template.name,
+                    sub = exportTemplateDescription(template.description, template.heightPx),
+                    onClick = { onExportPng(template.heightPx) },
+                )
+            }
+            SecondarySmallButton(text = "テンプレートを編集", onClick = onEditTemplates)
+        }
+    }
+}
+
 @Composable
 private fun SvgExportOption(title: String, sub: String, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = {
-            Column {
-                Text(title, style = MaterialTheme.typography.labelMedium)
-                Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun SvgExportHelp() {
-    Column(
-        modifier = Modifier
-            .widthIn(min = Dimens.helpPopoverMinWidth, max = Dimens.renderTextViewHeight)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(Dimens.spaceXl),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
-        SvgExportHelpRow("表示用SVG", "Web表示", "標準表示向け")
-        SvgExportHelpRow("編集用SVG", "ベクター編集", "メタデータとIDを含む")
-        SvgExportHelpRow("汎用SVG", "外部共有", "互換性重視")
+        Column(
+            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+        ) {
+            Text(title, style = MaterialTheme.typography.labelMedium)
+            Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
-@Composable
-private fun SvgExportHelpRow(format: String, use: String, feature: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), verticalAlignment = Alignment.Top) {
-        Text(format, modifier = Modifier.width(Dimens.helpLabelWidth), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-        Text(use, modifier = Modifier.width(Dimens.helpLabelWideWidth), style = MaterialTheme.typography.labelSmall)
-        Text(feature, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
+// `SvgExportHelp` and its row lived here: a popover inside the SVG dropdown
+// that explained what the three profiles were for. The bottom sheet says the
+// same thing on the destination itself, so the explanation no longer needs a
+// place to be opened from.
 
 private fun exportTemplateDescription(description: String, heightPx: Int): String {
     return description.ifBlank { "PNG / Y軸 ${heightPx}px" }
-}
-
-@Composable
-private fun ConditionChips(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow {
-        ChipButton("◐ ${ColorCatalogs.get(state.selectedCatalogId).name}", onClick = viewModel::openCatalogSelection)
-        ChipButton("◇ モデル", onClick = viewModel::openModelSelection)
-    }
 }
 
 /**
@@ -1590,88 +1785,86 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
     )
 }
 
+/**
+ * The description and the action that draws it.
+ *
+ * The settings that used to head this panel -- the model, the colour catalog,
+ * 写生 -- moved to [DrawSettingsPanel] above, which is now the only place any
+ * of them is opened from. What is left is the writing itself: the field, the
+ * draw, and 解釈 (the DDL) under it.
+ */
 @Composable
-private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+private fun DrawPanel(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    modifier: Modifier = Modifier,
+    onDescriptionFocusChanged: (Boolean) -> Unit = {},
+    onDescriptionPositioned: (Float) -> Unit = {},
+) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            CompactLabel("指示")
-            Spacer(Modifier.weight(1f))
-            MiniPill(
-                text = "◐ ${shortCatalogLabel(state)}",
-                onClick = viewModel::openCatalogSelection,
-                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
-            )
-            MiniPill(
-                text = "◇ ${shortModelLabel(state)}",
-                onClick = viewModel::openModelSelection,
-                modifier = Modifier.widthIn(max = Dimens.panelWideMaxWidth),
-            )
-            MiniPill("新規作成", onClick = viewModel::clearPrompt)
-        }
-        SketchModeRow(state, viewModel)
+        CompactLabel("記述")
         DenseMultilineInput(
             value = state.prompt,
             onValueChange = viewModel::setPrompt,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(DESCRIPTION_INPUT_TAG)
+                .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
             minLines = 5,
             maxLines = 8,
+            onFocusChanged = onDescriptionFocusChanged,
         )
-        DrawingActionButton(
-            idleText = "▶  描画する",
-            runningText = "■  描画中",
-            state = state,
-            onClick = viewModel::draw,
-            onStop = viewModel::stopDrawing,
-        )
+        // While the keyboard is up the same button is pinned above it, and two
+        // 「描画する」 on one screen is a question about which one draws.
+        if (!state.descriptionFocused) {
+            DrawingActionButton(
+                idleText = "▶  $DRAW_ACTION_LABEL",
+                runningText = "■  描画中",
+                state = state,
+                onClick = viewModel::draw,
+                onStop = viewModel::stopDrawing,
+            )
+        }
         state.message?.takeIf { it.isNotBlank() }?.let { message ->
             Text(message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            CompactLabel("解釈")
-            Spacer(Modifier.weight(1f))
-            DdlActionRow(state, viewModel)
-        }
-        if (state.saijikiOpen) {
-            SaijikiPanel(viewModel)
-        }
-        DdlPreviewBox(
-            value = state.ddl,
-            onClick = viewModel::openDdlEditor,
-            modifier = Modifier.fillMaxWidth(),
+        // 解釈 is the half of this screen one reaches for after the drawing, so
+        // it is what the simple display mode leaves out. Before this stage the
+        // mode's only effect was hiding the mascot and a duplicated chip row,
+        // and both of those are gone.
+        UiModeContainer(
+            uiMode = state.uiMode,
+            simpleContent = {},
+            fullContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                    ) {
+                        CompactLabel("解釈")
+                        Spacer(Modifier.weight(1f))
+                        DdlActionRow(state, viewModel)
+                    }
+                    if (state.saijikiOpen) {
+                        SaijikiPanel(viewModel)
+                    }
+                    DdlPreviewBox(
+                        value = state.ddl,
+                        onClick = viewModel::openDdlEditor,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    DrawingActionButton(
+                        idleText = "▶  DDLから描画",
+                        runningText = "■  描画中",
+                        state = state,
+                        onClick = viewModel::drawFromDdl,
+                        onStop = viewModel::stopDrawing,
+                        tonal = true,
+                    )
+                }
+            },
         )
-        DrawingActionButton(
-            idleText = "▶  DDLから描画",
-            runningText = "■  描画中",
-            state = state,
-            onClick = viewModel::drawFromDdl,
-            onStop = viewModel::stopDrawing,
-            tonal = true,
-        )
-    }
-}
-
-@Composable
-private fun InputSectionHeader(state: InkuUiState, viewModel: InkuViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        CompactLabel("指示")
-        WrapRow {
-            SecondarySmallButton(
-                text = ColorCatalogs.get(state.selectedCatalogId).name,
-                onClick = viewModel::openCatalogSelection,
-            )
-            PrimarySmallButton(
-                text = "モデル",
-                onClick = viewModel::openModelSelection,
-            )
-        }
     }
 }
 
@@ -1681,17 +1874,9 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
     val nonEmpty = lines.count { it.trim().isNotBlank() }
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            CompactLabel("バッチ")
-            Spacer(Modifier.weight(1f))
-            MiniPill("新規作成", onClick = viewModel::clearBatchText)
-        }
+        CompactLabel("バッチ")
         NumberedBatchTextField(
             value = state.batchText,
             onValueChange = viewModel::setBatchText,
@@ -1712,7 +1897,7 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
         if (!state.isDrawing) {
             if (state.batchPromptHistory.isNotEmpty()) {
                 CompactLabel("バッチ指示履歴")
-                WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
+                WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                     state.batchPromptHistory.forEach { prompt ->
                         MiniPill(
                             text = prompt.lineSequence().firstOrNull()?.take(22) ?: "履歴",
@@ -1763,7 +1948,7 @@ private fun NumberedBatchTextField(
         modifier = modifier
             .height(Dimens.batchEditorHeight)
             .bringIntoViewRequester(bringIntoViewRequester),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         color = InputWellSurface,
         border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
     ) {
@@ -1772,8 +1957,8 @@ private fun NumberedBatchTextField(
                 .fillMaxSize()
                 .clipToBounds()
                 .verticalScroll(scrollState)
-                .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS),
-            verticalArrangement = Arrangement.spacedBy(Dimens.space2),
+                .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
         ) {
             lines.forEachIndexed { index, line ->
                 Row(
@@ -1786,7 +1971,7 @@ private fun NumberedBatchTextField(
                         style = textStyle,
                         textAlign = TextAlign.End,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(Dimens.space28),
+                        modifier = Modifier.width(Dimens.batchLineNumberWidth),
                     )
                     BasicTextField(
                         value = line,
@@ -1798,7 +1983,7 @@ private fun NumberedBatchTextField(
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1f)
-                            .heightIn(min = Dimens.space20)
+                            .heightIn(min = Dimens.batchLineHeight)
                             .onFocusChanged { focusState ->
                                 if (focusState.isFocused) {
                                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
@@ -1808,7 +1993,7 @@ private fun NumberedBatchTextField(
                 }
             }
             if (lineCount < 6) {
-                Spacer(Modifier.height(Dimens.space20 * (6 - lineCount)))
+                Spacer(Modifier.height(Dimens.batchLineHeight * (6 - lineCount)))
             }
         }
     }
@@ -1830,8 +2015,8 @@ private fun replaceBatchEditorLine(lines: List<String>, index: Int, edited: Stri
 @Composable
 private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                     Text("進捗 ${state.batchCurrent} / ${state.batchTotal}", style = MaterialTheme.typography.titleSmall)
                     Text(
@@ -1859,7 +2044,7 @@ private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
 @Composable
 private fun BatchFailureSummary(state: InkuUiState) {
     Surface(color = FailureSummaryWash, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+        Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Text("成功 ${state.batchSuccess} / 失敗 ${state.batchFailures.size} / 全 ${state.batchTotal}", style = MaterialTheme.typography.titleSmall)
             Text("失敗した行", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.batchFailures.forEach { failure ->
@@ -1879,7 +2064,7 @@ private fun BatchFailureSummary(state: InkuUiState) {
 private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         CanvasHeroCard(
             state,
@@ -1898,7 +2083,7 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
         ) {
             Text(
                 state.demoGeneratedPrompt.ifBlank { "—" },
-                modifier = Modifier.padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceXl),
+                modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
                 style = MaterialTheme.typography.bodyMedium,
                 lineHeight = TypeScale.proseLineHeight,
                 color = if (state.demoGeneratedPrompt.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
@@ -1949,11 +2134,11 @@ private fun DemoSettingRow(
                     Modifier
                 },
             )
-            .padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceXl),
+            .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             sub?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1971,7 +2156,7 @@ private fun DemoSettingRow(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = Dimens.spaceXxl)
+                .padding(start = Dimens.spaceL)
                 .height(Dimens.hairline)
                 .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
         )
@@ -1998,9 +2183,9 @@ private fun HistoryScreen(
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = Dimens.spaceXl, vertical = Dimens.spaceL),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        contentPadding = PaddingValues(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
         gridItems(filteredHistory, key = { it.id }) { item ->
@@ -2021,7 +2206,7 @@ private fun HistoryHeader(
     filteredCount: Int,
     viewModel: InkuViewModel,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
         ImeAwareOutlinedTextField(
             value = state.historySearchQuery,
             onValueChange = viewModel::setHistorySearchQuery,
@@ -2029,7 +2214,7 @@ private fun HistoryHeader(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl), modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
             ChipButton("★ 星のみ", selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
             Text("${filteredCount}/${sourceCount}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -2070,13 +2255,13 @@ internal fun languageComboTag(comboId: String): String = "language_combo_$comboI
 internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val graph = state.lineageGraph
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceL),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Text("作品の系譜", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             // web puts the same button in the same place, at the right of the
@@ -2107,7 +2292,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val parent = state.refinementParent
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -2180,7 +2365,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         state.refinementCandidates.chunked(columns).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 row.forEach { candidate ->
                     RefinementCandidateCard(
@@ -2336,7 +2521,7 @@ private fun RefinementCandidateCard(
     Card(
         modifier = modifier
             .testTag(REFINE_CANDIDATE_TAG)
-            .border(Dimens.space2, if (shownOnCanvas) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
+            .border(Dimens.spaceXs, if (shownOnCanvas) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
@@ -2351,7 +2536,7 @@ private fun RefinementCandidateCard(
                         onLongClick = { if (readingCandidate) ddlOpen = !ddlOpen },
                     ),
             )
-            Column(modifier = Modifier.padding(horizontal = Dimens.spaceS).padding(bottom = Dimens.spaceS), verticalArrangement = Arrangement.spacedBy(Dimens.radiusXs)) {
+            Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(candidate.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (readingCandidate && ddlOpen) {
@@ -2421,14 +2606,14 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         // One row per generation, oldest first. web labels each of its columns
         // 第N世代 (LineagePanel.svelte); here the number is on the cards instead,
         // where a tombstone -- which the server gives no generation -- can say
         // so for itself rather than sit under a heading that answers for it.
         graph.nodes.groupBy { depthOf[it.id] ?: 0 }.toSortedMap().forEach { (_, nodes) ->
-            WrapRow(horizontal = Dimens.spaceL, vertical = Dimens.spaceL) {
+            WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                 nodes.forEach { node ->
                     LineageNodeCard(
                         node = node,
@@ -2458,7 +2643,7 @@ private fun LineageNodeCard(
             .width(Dimens.chipWidth)
             .testTag(LINEAGE_NODE_TAG)
             .clickable(enabled = history != null, onClick = onSelect)
-            .border(Dimens.space2, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
+            .border(Dimens.spaceXs, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
@@ -2473,7 +2658,7 @@ private fun LineageNodeCard(
             } else {
                 Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(LineagePlaceholderSurface))
             }
-            Column(modifier = Modifier.padding(horizontal = Dimens.spaceS).padding(bottom = Dimens.spaceS), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+            Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 // The label of the edge that produced this work. `labelJa` with
                 // no kind is 起点, which is the answer for a node no edge points
                 // at; the wording is the registry's, never this screen's.
@@ -2534,17 +2719,17 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
         }
         SettingsListItem(mark = "◇", title = "モデル設定", sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
-        SettingsListItem(mark = "◉", title = "デモ設定", sub = "シードフレーズ", onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
+        SettingsListItem(mark = "◉", title = "デモ", sub = "実行とシードフレーズ", onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
         SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
         SettingsListItem(mark = "◐", title = "その他", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(
@@ -2563,10 +2748,10 @@ private fun SettingsHeader(selectedPane: SettingsPane, viewModel: InkuViewModel)
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         MiniPill("‹", onClick = { viewModel.setSettingsPane(SettingsPane.Home) })
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -2580,12 +2765,12 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Text("モデル選択", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             SecondarySmallButton(text = "取消", onClick = viewModel::cancelModelSelection)
@@ -2611,9 +2796,13 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
 private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
+        // The demo was the fifth bottom tab until 2026-08-08. M3 keeps that bar
+        // for the places one returns to, and the demo is started now and then,
+        // so the running of it sits here with the settings it runs under.
+        DemoPanel(state, viewModel)
         SettingsCard("シードフレーズ", "デモ指示文生成", "保存済み") {
             ImeAwareOutlinedTextField(
                 value = state.demoSeed,
@@ -2653,7 +2842,7 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
 private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
         SettingsCard("PNG / SVG", "Web版の出力設定", "保存済み") {
@@ -2676,7 +2865,7 @@ private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mo
 private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
         SettingsCard("表示モード", "UIの表示密度・構成", state.uiMode) {
@@ -2713,7 +2902,7 @@ internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Mod
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(SettingsPane.Version, viewModel)
         SettingsCard("inku Android", "アプリケーション", BuildConfig.VERSION_NAME) {
@@ -2738,7 +2927,7 @@ private fun VersionInfoRow(label: String, value: String) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             value,
-            modifier = Modifier.padding(start = Dimens.spaceXl).weight(1f),
+            modifier = Modifier.padding(start = Dimens.spaceL).weight(1f),
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.End,
         )
@@ -2751,11 +2940,11 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
 
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
@@ -2840,7 +3029,7 @@ private fun ProviderConnectionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2848,7 +3037,7 @@ private fun ProviderConnectionCard(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("APIキー", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS), verticalAlignment = Alignment.CenterVertically) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                             Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
                             if (!keySet) Text("ローカルLLMの場合、APIキー無しで利用可能な場合があります。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -2861,7 +3050,7 @@ private fun ProviderConnectionCard(
                     )
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2873,7 +3062,7 @@ private fun ProviderConnectionCard(
                 if (publishedModelIds.isEmpty()) {
                     Text("公開モデルは未選択です。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
+                    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         publishedModelIds.forEach { modelId ->
                             PublishedModelChip(modelDisplayName(modelId))
                         }
@@ -2885,8 +3074,8 @@ private fun ProviderConnectionCard(
                     onClick = { confirmDeleteService = true },
                     enabled = !provider.isDefaultLocal,
                     modifier = Modifier.height(Dimens.controlSizeSmall),
-                    shape = RoundedCornerShape(Dimens.spaceXs),
-                    contentPadding = PaddingValues(horizontal = Dimens.spaceL, vertical = 0.dp),
+                    shape = RoundedCornerShape(Dimens.radiusCard),
+                    contentPadding = PaddingValues(horizontal = Dimens.spaceM, vertical = 0.dp),
                 ) {
                     Text("サービス削除", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
@@ -3021,7 +3210,7 @@ private fun PublishedModelChip(label: String) {
     ) {
         Text(
             label,
-            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceS),
+            modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -3087,7 +3276,7 @@ private fun ProviderModelPickerDialog(
                 modifier = Modifier.fillMaxWidth().height(Dimens.providerModelDialogHeight),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                     ModelPickerActionButton(text = "モデルリスト取得", onClick = onFetchModels, modifier = Modifier.weight(1.5f))
                     ModelPickerActionButton(text = "全選択", onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f))
                     ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.weight(1f))
@@ -3159,13 +3348,13 @@ private fun LocalModelManagementDialog(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
                 .heightIn(max = Dimens.localModelDialogMaxHeight),
-            shape = RoundedCornerShape(Dimens.radiusDialogLarge),
+            shape = RoundedCornerShape(Dimens.radiusCard),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = Dimens.spaceS,
+            tonalElevation = Dimens.spaceM,
         ) {
             Column(
-                modifier = Modifier.padding(Dimens.space18),
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+                modifier = Modifier.padding(Dimens.spaceL),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -3176,15 +3365,15 @@ private fun LocalModelManagementDialog(
                         Text("LiteRT-LM", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
                         Text("ローカルモデル", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
-                        ModelPickerActionButton(text = "全選択", onClick = { selected = assetIds }, modifier = Modifier.width(Dimens.helpLabelWidth))
-                        ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.width(Dimens.helpLabelWidth))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                        ModelPickerActionButton(text = "全選択", onClick = { selected = assetIds }, modifier = Modifier.width(Dimens.modelActionWidth))
+                        ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.width(Dimens.modelActionWidth))
                     }
                 }
 
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
                     modelAssets.forEach { asset ->
                         LocalModelAssetRow(
@@ -3246,7 +3435,7 @@ private fun LocalModelAssetRow(
         border = BorderStroke(Dimens.hairline, CardHairline),
     ) {
         Column(
-            modifier = Modifier.padding(Dimens.spaceL),
+            modifier = Modifier.padding(Dimens.spaceM),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Row(
@@ -3255,7 +3444,7 @@ private fun LocalModelAssetRow(
                 horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                     Text(asset.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(asset.qualityTier, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
@@ -3290,7 +3479,7 @@ private fun LocalModelAssetRow(
                     }
                     else -> {
                         SecondarySmallButton(text = "再取得", onClick = onRedownloadModel, enabled = !isBusy)
-                        Spacer(modifier = Modifier.width(Dimens.spaceS))
+                        Spacer(modifier = Modifier.width(Dimens.spaceM))
                         PrimarySmallButton(text = if (isBusy) "取得中" else "ダウンロード", onClick = onDownloadModel, enabled = !isBusy)
                     }
                 }
@@ -3304,7 +3493,7 @@ private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier:
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.height(Dimens.buttonHeightSmall),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         contentPadding = PaddingValues(horizontal = Dimens.spaceXs, vertical = 0.dp),
     ) {
         Text(text, maxLines = 1, overflow = TextOverflow.Clip, fontSize = TypeScale.labelTiny)
@@ -3334,7 +3523,7 @@ private fun AddProviderCard(
                     ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = "サービスID", modifier = Modifier.fillMaxWidth(), singleLine = true)
                     ImeAwareOutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = "サービス名", modifier = Modifier.fillMaxWidth(), singleLine = true)
                     CompactLabel("接続形式")
-                    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
+                    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         listOf("openai-compatible" to "OpenAI compatible", "anthropic" to "Claude API", "gemini" to "Gemini API").forEach { (value, label) ->
                             MiniPill(label, selected = kind == value, onClick = { kind = value })
                         }
@@ -3367,17 +3556,17 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
         color = if (active) ActiveSettingsRowTint else Color.Transparent,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceXxl, vertical = Dimens.spaceXl),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXxl),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Box(
-                modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceL)),
+                modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(mark, style = MaterialTheme.typography.titleMedium)
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
                 Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -3390,7 +3579,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "設定"
     SettingsPane.ModelSelection -> "モデル選択"
     SettingsPane.Models -> "モデル設定"
-    SettingsPane.Demo -> "デモ設定"
+    SettingsPane.Demo -> "デモ"
     SettingsPane.Export -> "エクスポート"
     SettingsPane.Misc -> "その他"
     SettingsPane.Version -> "バージョン情報"
@@ -3400,7 +3589,7 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
     SettingsPane.ModelSelection -> "Stage 1 / Stage 2 共通"
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
-    SettingsPane.Demo -> "seed phrase / interval"
+    SettingsPane.Demo -> "実行 / seed phrase / interval"
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> "言語・テーマ・密度"
     SettingsPane.Version -> "version / build"
@@ -3424,7 +3613,7 @@ private fun SettingChoiceRow(
     selected: HistorySelectionBehavior,
     onSelect: (HistorySelectionBehavior) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         CompactLabel(title)
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
             if (selected == HistorySelectionBehavior.History) {
@@ -3445,10 +3634,10 @@ private fun ExportTemplateRow(template: app.inku.mobile.data.db.ExportTemplateEn
     var height by remember(template.id, template.heightPx) { mutableStateOf(template.heightPx.toString()) }
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Dimens.spaceL),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        Column(modifier = Modifier.padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             ImeAwareOutlinedTextField(name, { name = it }, label = "名前", modifier = Modifier.fillMaxWidth(), singleLine = true)
             ImeAwareOutlinedTextField(description, { description = it }, label = "説明", modifier = Modifier.fillMaxWidth(), singleLine = true)
             ImeAwareOutlinedTextField(height, { height = it.filter(Char::isDigit) }, label = "Y軸px", modifier = Modifier.fillMaxWidth(), singleLine = true)
@@ -3665,7 +3854,7 @@ private fun SettingsCard(title: String, sub: String, status: String, titleAction
         Column(
             modifier = Modifier
                 .border(Dimens.hairline, CardHairline, RoundedCornerShape(Dimens.radiusCard))
-                .padding(Dimens.spaceXl),
+                .padding(Dimens.spaceL),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Row(
@@ -3713,17 +3902,17 @@ private fun ModelAssetControls(
         Column(
             modifier = Modifier
                 .border(Dimens.hairline, CardHairline, RoundedCornerShape(Dimens.radiusCard))
-                .padding(Dimens.spaceXl),
-            verticalArrangement = Arrangement.spacedBy(Dimens.space9),
+                .padding(Dimens.spaceL),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXl)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
                 Box(
-                    modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceL)),
+                    modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(if (asset.qualityTier.contains("high", ignoreCase = true)) "E4" else "E2", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                     Text(asset.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(asset.qualityTier, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
@@ -3848,7 +4037,7 @@ private fun StatusPill(text: String, color: Color) {
         modifier = Modifier
             .background(color.copy(alpha = 0.18f), RoundedCornerShape(100))
             .border(Dimens.hairline, color.copy(alpha = 0.42f), RoundedCornerShape(100))
-            .padding(horizontal = Dimens.space9, vertical = Dimens.spaceXs),
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
         style = MaterialTheme.typography.labelSmall,
         color = color,
         maxLines = 1,
@@ -3900,8 +4089,8 @@ private fun ColorCatalogButtonRow(selectedValue: String, onSelect: (String) -> U
             val selected = catalog.id == selectedValue
             OutlinedButton(
                 onClick = { onSelect(catalog.id) },
-                modifier = Modifier.height(Dimens.buttonHeightMedium).fillMaxWidth(),
-                shape = RoundedCornerShape(Dimens.spaceXs),
+                modifier = Modifier.height(Dimens.buttonHeightLarge).fillMaxWidth(),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 colors = if (selected) {
                     ButtonDefaults.outlinedButtonColors(
                         containerColor = MaterialTheme.colorScheme.secondary,
@@ -3922,13 +4111,13 @@ private fun ColorCatalogButtonRow(selectedValue: String, onSelect: (String) -> U
 
 @Composable
 private fun SwatchStrip(colors: List<String>) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         colors.forEach { hex ->
             Box(
                 modifier = Modifier
-                    .size(Dimens.spaceXxl)
-                    .background(parseColor(hex), RoundedCornerShape(Dimens.space2))
-                    .border(Dimens.hairline, SwatchHairline, RoundedCornerShape(Dimens.space2)),
+                    .size(Dimens.spaceL)
+                    .background(parseColor(hex), RoundedCornerShape(Dimens.radiusCard))
+                    .border(Dimens.hairline, SwatchHairline, RoundedCornerShape(Dimens.radiusCard)),
             )
         }
     }
@@ -3964,12 +4153,12 @@ private fun selectedStage2ModelLabel(state: InkuUiState): String {
 private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val item = state.selectedHistory
     Surface(
-        modifier = modifier.border(Dimens.hairline, CanvasPanelHairline, RoundedCornerShape(Dimens.spaceS)),
+        modifier = modifier.border(Dimens.hairline, CanvasPanelHairline, RoundedCornerShape(Dimens.radiusCard)),
         color = CanvasPanelSurface,
-        shape = RoundedCornerShape(Dimens.spaceS),
+        shape = RoundedCornerShape(Dimens.radiusCard),
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXxl)) {
+        Column(modifier = Modifier.fillMaxSize().padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
                 RenderTab.entries.forEach { tab ->
                     Text(
                         when (tab) {
@@ -3989,8 +4178,8 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(ChipSurface, RoundedCornerShape(Dimens.spaceXs))
-                    .padding(Dimens.spaceL),
+                    .background(ChipSurface, RoundedCornerShape(Dimens.radiusCard))
+                    .padding(Dimens.spaceM),
                 contentAlignment = Alignment.Center,
             ) {
                 if (item == null) {
@@ -4018,8 +4207,8 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
 private fun RenderTextView(text: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(RenderTextPaper, RoundedCornerShape(Dimens.space2))
-            .padding(Dimens.spaceL)
+            .background(RenderTextPaper, RoundedCornerShape(Dimens.radiusCard))
+            .padding(Dimens.spaceM)
             .verticalScroll(rememberScrollState()),
     ) {
         Text(text, color = RenderTextInk, style = MaterialTheme.typography.bodySmall)
@@ -4247,27 +4436,27 @@ private fun HistoryGridTile(
                 onClick = onSelect,
                 onLongClick = onToggleStar,
             )
-            .border(Dimens.space2, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp))
+            .border(Dimens.spaceXs, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp))
             .border(Dimens.selectionRingWidth, if (selected) SelectionRing else Color.Transparent, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceS)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Box {
                 HistoryArtworkPreview(item, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
                 if (selected) {
                     Box(
                         modifier = Modifier
-                            .width(Dimens.radiusDialogLarge)
-                            .height(Dimens.radiusDialogLarge)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(bottomEnd = Dimens.radiusLarge)),
+                            .width(Dimens.radiusCard)
+                            .height(Dimens.radiusCard)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(bottomEnd = Dimens.radiusCard)),
                     )
                 }
                 if (item.starred) {
-                    HistoryBadge(text = "★", selected = true, modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceS))
+                    HistoryBadge(text = "★", selected = true, modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceM))
                 }
             }
-            Row(modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                 Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
             }
         }
@@ -4280,7 +4469,7 @@ private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -
         .size(Dimens.badgeSize)
         .background(
             if (selected) MaterialTheme.colorScheme.secondary else HistoryBadgeSurface,
-            RoundedCornerShape(Dimens.radiusBadge),
+            RoundedCornerShape(100),
         )
     Box(
         modifier = onClick?.let { base.clickable(onClick = it) } ?: base,
@@ -4324,7 +4513,7 @@ private fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(reques
 
 @Composable
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow(horizontal = Dimens.spaceS, vertical = Dimens.spaceS) {
+    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         MiniPill("歳時記", selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
         MiniPill("補正", selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
     }
@@ -4339,9 +4528,9 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     Box(
         modifier = modifier
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
-            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS)
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM)
             .clickable(onClick = onClick),
     ) {
         BasicTextField(
@@ -4391,6 +4580,9 @@ private fun DenseMultilineInput(
     minLines: Int,
     maxLines: Int,
     enabled: Boolean = true,
+    // The screen, not the field, decides what follows the keyboard, so the
+    // focus has to leave the field.
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
@@ -4401,13 +4593,14 @@ private fun DenseMultilineInput(
         modifier = modifier
             .bringIntoViewRequester(bringIntoViewRequester)
             .onFocusChanged { focusState ->
+                onFocusChanged(focusState.isFocused)
                 if (focusState.isFocused) {
                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             }
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
-            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS),
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
         textStyle = MaterialTheme.typography.bodySmall.copy(
             color = MaterialTheme.colorScheme.onSurface,
             lineHeight = TypeScale.denseLineHeight,
@@ -4451,9 +4644,9 @@ private fun DenseTextFieldValueInput(
     Box(
         modifier = modifier
             .bringIntoViewRequester(bringIntoViewRequester)
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
-            .padding(horizontal = Dimens.spaceS, vertical = Dimens.spaceXs),
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
     ) {
         BasicTextField(
             value = value,
@@ -4491,9 +4684,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHighl
 ) {
     if (text.isBlank() || tokens.isEmpty()) return
     val occupied = BooleanArray(text.length)
-    val horizontalPad = Dimens.highlightPadHorizontal.toPx()
+    val horizontalPad = Dimens.hairline.toPx()
     val verticalPad = Dimens.hairline.toPx()
-    val radius = Dimens.radiusHighlight.toPx()
+    val radius = Dimens.highlightCorner.toPx()
     tokens.forEach { token ->
         val word = token.word
         if (word.isBlank()) return@forEach
@@ -4578,9 +4771,9 @@ private fun DenseSingleLineInput(
                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             }
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
-            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceS),
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
         textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         singleLine = true,
@@ -4643,7 +4836,7 @@ private fun ImeAwareOutlinedTextField(
         singleLine = singleLine,
         enabled = enabled,
         keyboardOptions = keyboardOptions,
-        shape = RoundedCornerShape(Dimens.radiusLarge),
+        shape = RoundedCornerShape(Dimens.radiusCard),
     )
 }
 
@@ -4656,7 +4849,7 @@ private fun MetaPanel(
     val catalogName = ColorCatalogs.get(catalogIdOverride ?: state.selectedCatalogId).name
     val canvasAspect = canvasLabelFor(canvasAspectOverride ?: state.selectedCanvasAspect)
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(Dimens.spaceXl), verticalArrangement = Arrangement.spacedBy(Dimens.space2)) {
+        Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             Text("LLM · ${selectedModelLabel(state)} · 指示文生成/Stage1/2共通", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Color · $catalogName   Canvas · $canvasAspect", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.message?.let {
@@ -4668,13 +4861,20 @@ private fun MetaPanel(
 
 @Composable
 private fun MiniPill(text: String, selected: Boolean = false, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
-    val base = modifier.background(
-        if (selected) MaterialTheme.colorScheme.primary else MiniPillSurface,
-        RoundedCornerShape(100),
-    )
+    // The pill is the app's densest control and it draws at about 26dp tall.
+    // `minimumInteractiveComponentSize` keeps that drawing and gives the touch
+    // the 48dp Android asks for; a pill with no `onClick` is a label and gets
+    // neither, since reserving a touch slot for something untouchable only
+    // spreads the row out.
+    val base = modifier
+        .then(if (onClick != null) Modifier.minimumInteractiveComponentSize() else Modifier)
+        .background(
+            if (selected) MaterialTheme.colorScheme.primary else MiniPillSurface,
+            RoundedCornerShape(100),
+        )
     Text(
         text,
-        modifier = (onClick?.let { base.clickable(onClick = it) } ?: base).padding(horizontal = Dimens.spaceL, vertical = Dimens.space5),
+        modifier = (onClick?.let { base.clickable(onClick = it) } ?: base).padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
         style = MaterialTheme.typography.labelSmall,
         color = if (selected) InkOnPrimary else MaterialTheme.colorScheme.onSurface,
         maxLines = 1,
@@ -4691,13 +4891,13 @@ private fun BoxScope.presentationCaptionPlacement(screenWidth: Dp): Modifier =
 private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(Dimens.spaceM),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         color = PresentationCaptionScrim,
         tonalElevation = 0.dp,
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = Dimens.space18, vertical = Dimens.spaceXl),
+            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
             color = PresentationCaptionInk,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
@@ -4710,6 +4910,11 @@ private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier
 @Composable
 private fun PresentationControls(
     counter: String,
+    // The magnification reads here, where the magnifying is done. It used to be
+    // three pills over the small canvas on the compose screen, which was the one
+    // place zoom was not wanted.
+    zoomPercent: Int,
+    onResetZoom: () -> Unit,
     starred: Boolean,
     canGoOlder: Boolean,
     canGoLatest: Boolean,
@@ -4734,8 +4939,8 @@ private fun PresentationControls(
         shadowElevation = Dimens.spaceM,
     ) {
         Row(
-            modifier = Modifier.padding(Dimens.spaceS),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceS),
+            modifier = Modifier.padding(Dimens.spaceM),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
@@ -4748,6 +4953,12 @@ private fun PresentationControls(
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
+            )
+            PresentationControlButton(
+                "${zoomPercent}%",
+                wide = true,
+                enabled = zoomPercent != (CANVAS_FIT_ZOOM * 100).toInt(),
+                onClick = onResetZoom,
             )
             PresentationControlButton("★", selected = starred, enabled = canToggleStar, onClick = onToggleStar)
             PresentationControlButton("▭", selected = captionVisible, enabled = captionEnabled, onClick = onToggleCaption)
@@ -4764,7 +4975,7 @@ private fun PresentationControlButton(
     wide: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val shape = if (wide) RoundedCornerShape(100) else RoundedCornerShape(50)
+    val shape = if (wide) RoundedCornerShape(100) else RoundedCornerShape(100)
     val background = when {
         selected -> PresentationControlFillSelected
         else -> PresentationControlFillIdle
@@ -4775,12 +4986,13 @@ private fun PresentationControlButton(
     }
     Box(
         modifier = Modifier
-            .then(if (wide) Modifier.widthIn(min = Dimens.buttonHeightMedium) else Modifier.size(Dimens.controlSizeMedium))
-            .height(Dimens.controlSizeMedium)
+            .minimumInteractiveComponentSize()
+            .then(if (wide) Modifier.widthIn(min = Dimens.buttonHeightLarge) else Modifier.size(Dimens.controlSizeSmall))
+            .height(Dimens.controlSizeSmall)
             .background(background, shape)
             .border(Dimens.hairline, border, shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = if (wide) Dimens.spaceXl else 0.dp),
+            .padding(horizontal = if (wide) Dimens.spaceL else 0.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -4838,7 +5050,7 @@ private fun NavButton(mark: String, label: String, selected: Boolean, onClick: (
                     .height(Dimens.controlSizeSmall)
                     .background(
                         if (selected) SelectionRing else Color.Transparent,
-                        RoundedCornerShape(Dimens.radiusLarge),
+                        RoundedCornerShape(Dimens.radiusCard),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -4874,7 +5086,7 @@ private fun DrawingActionButton(
         Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Surface(
                 modifier = Modifier.weight(1f).height(Dimens.buttonHeightLarge),
-                shape = RoundedCornerShape(Dimens.spaceM),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 color = if (tonal) MaterialTheme.colorScheme.surfaceVariant else DrawingActionSurface,
                 tonalElevation = Dimens.hairline,
             ) {
@@ -4888,9 +5100,9 @@ private fun DrawingActionButton(
                         trackColor = ProgressTrack,
                     )
                     Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceXxl),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceL),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                     ) {
                         Text(runningText, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.weight(1f))
@@ -4940,7 +5152,7 @@ private fun PrimarySmallButton(text: String, onClick: () -> Unit, enabled: Boole
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(Dimens.buttonHeightSmall),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = InkOnPrimary),
     ) { Text(text, maxLines = 1) }
 }
@@ -4951,7 +5163,7 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(Dimens.buttonHeightSmall),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
     ) { Text(text, maxLines = 1) }
 }
 
@@ -5362,6 +5574,20 @@ private fun svgAspectRatio(svgText: String): Float? {
     return if (width != null && height != null && width > 0f && height > 0f) width / height else null
 }
 
+/**
+ * The width the work asks to be drawn at, in its own units.
+ *
+ * The same two regexes [svgAspectRatio] reads, in the same order: the viewBox
+ * is authoritative, and a bare `width=` is the fallback for anything that has
+ * no viewBox.
+ */
+private fun svgIntrinsicWidth(svgText: String): Float? {
+    SvgViewBoxRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()?.let { width ->
+        if (width > 0f) return width
+    }
+    return SvgWidthRegex.find(svgText)?.groupValues?.getOrNull(1)?.toFloatOrNull()?.takeIf { it > 0f }
+}
+
 private fun hash01(index: Int, seed: String): Double {
     val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$index".toByteArray())
     val raw = ((digest[0].toInt() and 0xff) shl 24) or ((digest[1].toInt() and 0xff) shl 16) or ((digest[2].toInt() and 0xff) shl 8) or (digest[3].toInt() and 0xff)
@@ -5452,7 +5678,7 @@ internal fun IncuMascotView(modifier: Modifier = Modifier) {
         modifier = modifier
             .testTag("mascot_incu")
             .size(Dimens.controlSizeSmall)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(Dimens.controlSizeSmall)) {
@@ -5575,7 +5801,7 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
         modifier = modifier
             .testTag("mascot_yuragi")
             .size(Dimens.controlSizeSmall)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(Dimens.controlSizeSmall)) {

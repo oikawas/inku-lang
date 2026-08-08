@@ -63,15 +63,22 @@ class ThemeTokensPreserveTheDrawingTest {
     )
 
     /**
-     * The 53 distinct dp values, `0.dp` excluded. Zero is not a measurement and
-     * deliberately has no token: `PaddingValues` still asks for it literally.
+     * The grid every dimension sits on, and the one value allowed off it.
+     *
+     * This replaces the frozen list of 53 pre-extraction dp values that stood
+     * here through stage A. That list said "naming a distance must not move it",
+     * which was the whole of stage A's claim. Stage B rebuilt the screens and
+     * pulled the 22 off-grid values on by ruling (2026-08-08), so asserting the
+     * old values now would assert against the contract rather than for it.
+     *
+     * What survives is the property the old list was protecting -- that a
+     * distance is a decision someone made, not whatever the screen was written
+     * with -- expressed as the grid instead of as a census.
      */
-    private val dpBefore = listOf(
-        1f, 1.5f, 2f, 2.5f, 3f, 4f, 5f, 6f, 8f, 9f, 10f, 12f, 13f, 14f, 16f,
-        18f, 20f, 22f, 26f, 28f, 32f, 34f, 38f, 40f, 44f, 54f, 56f, 64f, 72f,
-        76f, 78f, 80f, 82f, 92f, 96f, 104f, 112f, 116f, 124f, 140f, 220f, 248f,
-        250f, 260f, 320f, 330f, 360f, 420f, 430f, 460f, 520f, 560f, 680f,
-    )
+    private val gridStepDp = 4f
+
+    /** A 1dp border is a line, not a distance. It is the only exemption. */
+    private val offGridExemptions = setOf("Hairline")
 
     // --- T-1 ---------------------------------------------------------------
 
@@ -123,28 +130,25 @@ class ThemeTokensPreserveTheDrawingTest {
     // --- T-3 ---------------------------------------------------------------
 
     @Test
-    fun t3_everyDimensionAndTypeSizeThatExistedBeforeStillHasAToken() {
+    fun t3_everyDimensionSitsOnTheGridAndNoTypeSizeIsBelowTwelve() {
         val dp = dimenTokens()
         assertTrue(
             "expected the dimension tokens to be readable; found ${dp.size}",
-            dp.size >= dpBefore.size,
+            dp.size >= 20,
         )
-        val missingDp = dpBefore.distinct().filter { want -> dp.values.none { it == want } }
+        val offGrid = dp
+            .filterKeys { it !in offGridExemptions }
+            .filterValues { it % gridStepDp != 0f }
         assertEquals(
-            "dp values lost in the extraction: $missingDp",
-            emptyList<Float>(),
-            missingDp,
+            "dimensions off the ${gridStepDp}dp grid: $offGrid",
+            emptyMap<String, Float>(),
+            offGrid,
         )
 
-        val sp = setOf(
-            TypeScale.labelTiny,
-            TypeScale.editorBody,
-            TypeScale.denseLineHeight,
-            TypeScale.editorLineHeight,
-            TypeScale.proseLineHeight,
-        )
-        listOf(11.sp, 16.sp, 17.sp, 21.sp, 22.sp).forEach {
-            assertTrue("sp value $it lost in the extraction", it in sp)
+        // Line heights are paired with a size and are free to sit between the
+        // steps; the sizes themselves are what Material 3 floors at 12sp.
+        listOf(TypeScale.labelTiny, TypeScale.editorBody).forEach {
+            assertTrue("type size $it is below Material 3's 12sp floor", it.value >= 12f)
         }
     }
 
@@ -166,14 +170,21 @@ class ThemeTokensPreserveTheDrawingTest {
             }
     }
 
-    /** `Dimens` is an object; `Dp` is a value class over `Float`. */
+    /**
+     * `Dimens` is an object; `Dp` is a value class over `Float`.
+     *
+     * A getter that returns a value class is name-mangled -- `getHairline`
+     * arrives as `getHairline-D9Ej5fM` -- so the hash is cut off. Reading the
+     * names mattered from stage B on, where the report is a list of the tokens
+     * that are off the grid rather than a count.
+     */
     private fun dimenTokens(): Map<String, Float> {
         return Dimens::class.java.declaredMethods
             .filter { it.name.startsWith("get") && it.parameterCount == 0 }
             .filter { it.returnType == java.lang.Float.TYPE }
             .associate { m ->
                 m.isAccessible = true
-                m.name.removePrefix("get") to (m.invoke(Dimens) as Float)
+                m.name.removePrefix("get").substringBefore('-') to (m.invoke(Dimens) as Float)
             }
     }
 }

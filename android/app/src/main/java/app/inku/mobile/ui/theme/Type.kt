@@ -38,8 +38,14 @@ import androidx.compose.ui.unit.sp
  */
 object TypeScale {
 
-    /** 11sp. The model picker's action buttons, which must fit on one line. */
-    val labelTiny: TextUnit = 11.sp
+    /**
+     * 12sp. The model picker's action buttons, which must fit on one line.
+     *
+     * It was 11sp, which is under Material 3's floor: 12sp is the smallest size
+     * the scale defines, and the app had gone below it to win a line break back.
+     * The button is wider now instead.
+     */
+    val labelTiny: TextUnit = 12.sp
 
     /** 16sp. The multi-line DDL input, sized up from the scale step for editing. */
     val editorBody: TextUnit = 16.sp

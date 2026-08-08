@@ -516,6 +516,22 @@ def _source_commit() -> str:
                           check=True, capture_output=True, text=True).stdout.strip()
 
 
+def render_case(render_input: dict[str, Any]) -> str:
+    """Draw one case from its stated input, and only from that.
+
+    Named so the tests that replay a case go through the same call the bake
+    does. A test that copies the argument list instead stays green when this
+    one stops forwarding a key, which is how a corpus can hold an input field
+    that never reaches the renderer.
+    """
+    return render(Score.model_validate(render_input["score"]),
+                  color_map=render_input["color_map"],
+                  catalog_id=render_input["catalog_id"],
+                  render_seed=render_input["render_seed"],
+                  composition_seed=render_input.get("composition_seed"),
+                  svg_profile=render_input["svg_profile"], wild=render_input["wild"])
+
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
@@ -523,12 +539,7 @@ def generate() -> None:
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}
     for case_id, render_input in sorted(inputs.items()):
-        svg = render(Score.model_validate(render_input["score"]),
-                     color_map=render_input["color_map"],
-                     catalog_id=render_input["catalog_id"],
-                     render_seed=render_input["render_seed"],
-                     composition_seed=render_input.get("composition_seed"),
-                     svg_profile=render_input["svg_profile"], wild=render_input["wild"])
+        svg = render_case(render_input)
         rendered[case_id] = svg
         cases[case_id] = {
             "input": render_input,

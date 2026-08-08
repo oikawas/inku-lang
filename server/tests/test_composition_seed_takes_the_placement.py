@@ -384,6 +384,12 @@ def test_the_added_cases_can_tell_the_two_seeds_apart():
     for case_id, twin_id in COMPOSITION_TWINS.items():
         case = inputs[case_id]
         twin = inputs[twin_id]
+        # Through the bake's own call: the stated seed has to survive the trip
+        # the generator itself makes, not one this test writes out by hand.
+        assert (
+            generator._normalized_digest(generator.render_case(case))
+            == manifest["cases"][case_id]["digest"]
+        ), case_id
         assert case["composition_seed"] is not None, case_id
         assert case["composition_seed"] != case["render_seed"], case_id
         # The pair differs by the seed and nothing else.

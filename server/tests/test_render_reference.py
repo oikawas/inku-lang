@@ -249,15 +249,9 @@ def test_group_g_matches_the_current_renderer() -> None:
     for case_id, render_input in inputs.items():
         if not case_id.startswith("G-"):
             continue
-        svg = generator.render(
-            Score.model_validate(render_input["score"]),
-            color_map=render_input["color_map"],
-            catalog_id=render_input["catalog_id"],
-            render_seed=render_input["render_seed"],
-            composition_seed=render_input.get("composition_seed"),
-            svg_profile=render_input["svg_profile"],
-            wild=render_input["wild"],
-        )
+        # Through the bake's own call, so that a key the generator stops
+        # forwarding is seen here instead of being copied into this test too.
+        svg = generator.render_case(render_input)
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
         checked += 1
     assert checked == 36

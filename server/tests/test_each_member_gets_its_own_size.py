@@ -120,7 +120,7 @@ def _withhold_sizes(monkeypatch) -> None:
     device engine 24's own gates used to read engine 23's.
     """
     monkeypatch.setattr(
-        renderer, "_apply_member_sizes", lambda items, arr, size_seed: items
+        renderer, "_apply_member_sizes", lambda items, arr, member_seed: items
     )
 
 
@@ -135,8 +135,8 @@ def _members_through_render(monkeypatch, instruction: Instruction, **kwargs):
     captured: list[list[Instruction]] = []
     original = renderer._apply_member_sizes
 
-    def spy(items, arr, size_seed):
-        sized = original(items, arr, size_seed)
+    def spy(items, arr, member_seed):
+        sized = original(items, arr, member_seed)
         captured.append(sized)
         return sized
 
@@ -429,6 +429,11 @@ def test_the_corpus_walks_every_size_rule(monkeypatch):
     the corpus could reach and the other three would go unwatched by every
     frozen record. This is what the four cases added in engine 25 are for, and
     it is what stops them being quietly replaced by four more circles.
+
+    engine 26 added four more G cases, two of them shapes engine 25 had not
+    reached (`arc`, `cloudform`). They are named here rather than let in by a
+    subset test, so that replacing any of the six non-circle shapes with a
+    circle still fails.
     """
     generator = _load_generator()
     instructions = {
@@ -438,14 +443,14 @@ def test_the_corpus_walks_every_size_rule(monkeypatch):
         for case_id, render_input in generator.build_inputs().items()
         if case_id.startswith("G-")
     }
-    assert len(instructions) == 46
+    assert len(instructions) == 50
     shaped = {
         case_id: instruction
         for case_id, instruction in instructions.items()
         if instruction.primitive != "circle"
     }
     assert {item.primitive for item in shaped.values()} == {
-        "line", "square", "triangle", "ellipse"
+        "line", "square", "triangle", "ellipse", "arc", "cloudform"
     }
 
     seed = generator.DEFAULT_RENDER_SEED

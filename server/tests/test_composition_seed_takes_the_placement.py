@@ -388,7 +388,7 @@ def test_the_added_cases_can_tell_the_two_seeds_apart(monkeypatch):
     later layer.
     """
     monkeypatch.setattr(
-        renderer, "_apply_member_sizes", lambda items, arr, size_seed: items
+        renderer, "_apply_member_sizes", lambda items, arr, member_seed: items
     )
     spec = importlib.util.spec_from_file_location("gen_render_reference", GENERATOR_PATH)
     assert spec is not None and spec.loader is not None

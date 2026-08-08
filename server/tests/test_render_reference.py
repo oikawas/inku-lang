@@ -61,11 +61,16 @@ def test_render_reference_case_counts() -> None:
     # `radius x k` was the only one of the four member-size rules the corpus
     # could reach -- and a circle is 14.3% of the expanded marks in production
     # against a line's 43.8%.
-    assert len(cases) == 545
+    # Engine 26 added four more to G: two shapes the angle rule turns that the
+    # corpus had never carried (`arc`, the largest target in production at 377
+    # groups, and `cloudform`), and two groups that state their own angle, `0`
+    # and `30` -- the only sight the corpus has of `is not None` against a
+    # truthy test.
+    assert len(cases) == 549
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 46}
+    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 50}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -262,7 +267,7 @@ def test_group_g_matches_the_current_renderer() -> None:
         svg = generator.render_case(render_input)
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
         checked += 1
-    assert checked == 46
+    assert checked == 50
 
 
 def test_render_reference_discriminator_cases() -> None:

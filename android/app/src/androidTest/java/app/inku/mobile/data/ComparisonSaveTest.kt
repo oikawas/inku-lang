@@ -13,6 +13,7 @@ import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
 import app.inku.mobile.pipeline.WebDdlSpec
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -72,6 +73,10 @@ class ComparisonSaveTest {
     @After
     fun tearDown() = runBlocking {
         repository.close()
+        // The thumbnail scope may already be inside a transaction when it is
+        // cancelled; closing the database out from under it takes the whole
+        // instrumentation process down, and every test after it with it.
+        delay(300)
         database.close()
     }
 

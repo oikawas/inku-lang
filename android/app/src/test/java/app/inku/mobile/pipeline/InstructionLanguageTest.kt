@@ -37,6 +37,16 @@ class InstructionLanguageTest {
         assertEquals("unsupported instruction language:   ", error.message)
     }
 
+    /**
+     * The other spelling the space case guards against: a read that trims first
+     * and then treats blank as absent would answer `ja` here instead of raising.
+     */
+    @Test
+    fun `a tab and a newline are refused for the same reason`() {
+        assertThrows(IllegalArgumentException::class.java) { InstructionLanguages.normalize("\t") }
+        assertThrows(IllegalArgumentException::class.java) { InstructionLanguages.normalize("\n") }
+    }
+
     @Test
     fun `the three requestable words pass through`() {
         assertEquals("ja", InstructionLanguages.normalize("ja"))
@@ -107,6 +117,13 @@ class InstructionLanguageTest {
         assertEquals("ja", InstructionLanguages.resolve("12345", "auto", fallback = "ja"))
         assertEquals("en", InstructionLanguages.resolve("12345", "auto", fallback = "en"))
         assertEquals("ja", InstructionLanguages.resolve("12345", "auto", fallback = "auto"))
+        // Normalisation, not just the `auto` case: a fallback with case or
+        // spaces is cleaned, and an unsupported one is refused rather than
+        // returned. Dropping the normalise call is invisible without these.
+        assertEquals("en", InstructionLanguages.resolve("12345", "auto", fallback = " EN "))
+        assertThrows(IllegalArgumentException::class.java) {
+            InstructionLanguages.resolve("12345", "auto", fallback = "fr")
+        }
     }
 
     @Test

@@ -55,12 +55,26 @@ class ComparisonScreenTest {
     private var viewModel: InkuViewModel? = null
     private var store: ViewModelStore? = null
 
-    /** Slow enough that a run can be caught while it is still going. */
+    private companion object {
+        /** One stage call takes this long, so a run of four is still going. */
+        const val STAGE_DELAY_MS = 3_000L
+        /** Long enough that an uninterrupted run would have called again. */
+        const val WATCH_AFTER_CHANGE_MS = 9_000L
+    }
+
+    /**
+     * Slow enough that a run can be caught while it is still going, and it
+     * counts: whether a run really stopped is a question about work, and a busy
+     * flag can be lowered while the coroutine behind it keeps drawing.
+     */
     private class SlowModel(private val delayMs: Long) : ModelProvider {
         override val providerId: String = "test-slow"
+        @Volatile
+        var calls: Int = 0
 
         override suspend fun generate(request: ModelRequest): ModelResponse {
             delay(delayMs)
+            calls += 1
             return ModelResponse(text = "細い線を五本、中央付近に置く。", modelId = request.modelId)
         }
     }
@@ -91,10 +105,12 @@ class ComparisonScreenTest {
 
     private fun vm(): InkuViewModel = requireNotNull(viewModel) { "showLineage() was not called" }
 
-    private fun useSlowModel(delayMs: Long) {
+    private fun useSlowModel(delayMs: Long): SlowModel {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         runBlocking { repository.close() }
-        repository = InkuRepository(context, database, modelProviderOverride = SlowModel(delayMs))
+        val model = SlowModel(delayMs)
+        repository = InkuRepository(context, database, modelProviderOverride = model)
+        return model
     }
 
     private fun paintWork(description: String): HistoryItemEntity = runBlocking {
@@ -238,20 +254,34 @@ class ComparisonScreenTest {
     @Test
     fun t11_changingTheTargetStopsTheRunAndDropsTheResults() {
         val first = paintWork("赤い線を引く")
-        useSlowModel(4_000)
+        val model = useSlowModel(STAGE_DELAY_MS)
         val second = paintWork("青い円を置く")
         showLineage()
         composeTestRule.runOnIdle {
             vm().openRefinement(first, RefinementSubview.Model)
-            vm().toggleModelCompareSelection("cmp-model")
+            vm().toggleModelCompareSelection("cmp-one")
+            vm().toggleModelCompareSelection("cmp-two")
             vm().generateRefinementCandidates()
         }
         awaitState("the comparison to be running") { it.refinementBusy }
+        // Two candidates, two stages each: the run is four calls long, and it is
+        // caught after the first one.
+        composeTestRule.waitUntil(30_000) { model.calls >= 1 }
 
         composeTestRule.runOnIdle { vm().openRefinement(second, RefinementSubview.Model) }
+        val callsAtChange = model.calls
 
-        awaitState("the run to have stopped") { !it.refinementBusy }
+        // What is read is the work, not the flag: a run left to finish would
+        // keep asking the model long after `refinementBusy` went down.
+        Thread.sleep(WATCH_AFTER_CHANGE_MS)
+        assertEquals(
+            "the run kept drawing after the target changed; it was not interrupted",
+            callsAtChange,
+            model.calls,
+        )
+
         val state = vm().state.value
+        assertFalse("nothing is running", state.refinementBusy)
         assertEquals("the new target is the one on screen", second.id, state.refinementParent?.id)
         assertTrue("the old work's candidates are gone", state.refinementCandidates.isEmpty())
         assertTrue("and the old selection with them", state.modelCompareSelectedModels.isEmpty())

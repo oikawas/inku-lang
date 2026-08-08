@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — `rasterize` was added to the CLI (still v2.11.8 / Web Build 864)
+
+**The 13 places that name a version were not touched.** Nothing in the web interface or the server's responses changed, and no version was numbered. **One line of manual text changed.**
+
+- **`inku-cli rasterize` is available.** Point it at a folder of SVGs and it burns them all to PNG. `--width` sets the pixel width; leave it out and each SVG is burned at the width it declares. `--workers` sets how many run at once.
+- **A file that cannot be burned leaves no output at all.** A truncated or 0-byte PNG would be counted and looked at like any other picture. **What could not be burned is printed, with a count and a reason.**
+- **One process per file.** If a single picture fails, the rest are still burned to the end.
+- **No drawing changes.** The rule for burning a picture is the same one as before, now kept in a single place. **The same SVG gives the same PNG** — across the development server and the Mac, all 24 test pictures matched to the byte.
+
 ## 2026-08-08 — v2.11.8 unreleased baseline (Web Build 864)
 
 The 13 places that name a version were updated to v2.11.8 / Build 864. **No manual text changed** — no screen action, CLI flag, setting or response key moved.

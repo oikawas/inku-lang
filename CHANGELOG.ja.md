@@ -4187,3 +4187,44 @@ engine 25 のあとも、群の N 個は 1 つの角度を共有していた。*
 - **検査:** **server pytest 2,476 passed / 31 skipped**（マージ後の main で実測。起点 2,466 ＋ T-1〜T-10 の 10 本）・
   **JVM 238 / 赤 0（45 クラス）**・**計装 96 / 赤 0**（実機 Pixel 9・20 クラス・実装セッションの実測）・ruff clean。
   **`android/VERSION` だけを 1 歩** — `APP_VERSION`・`web/BUILD_NUMBER` は不動、pentala 反映も無し。
+
+### 2026-08-09 — フォルダを焼くのは 1 つのコマンドである（**採番なし**・`shared/` と `cli/` のみ）
+
+**目視材料の PNG は、ランごとに書き捨てのスクリプトで焼かれていた。** `851-…/harness/rasterize_one.py`・
+`859-…/harness/rasterize_all.py`・`rasterize_full.py`・`864-…/harness/rasterize_on_pentala.py` は
+**どれも同じ 1 行（`svg_to_png(svg, width=width)`）を呼ぶだけ**で、違うのは並列数と置き場だけだった。
+**同じものが 4 つあり、次のランで 5 つ目が生えるところだった。**
+
+**実装は `shared/src/inku_analysis/rasterize_batch.py`（213 行）に 1 本だけ置き、CLI はその薄い入口にした。**
+
+- **`rasterize_dir(src, dst, *, width=None, workers=1) -> Report`**。**1 ファイル 1 子プロセス**（[I-075]。
+  resvg の panic は in-process だと親を道連れにする）。子は `python -m inku_analysis.rasterize_batch --one`
+  として**自分自身に再入する** — 焼く規則を 2 つ書かないためである
+- **失敗したファイルは出力を残さない。** 子は隠し名の一時ファイルへ書き、**親だけが `os.replace` で最終名へ移す**。
+  子が 0 で終わり、かつ一時ファイルが 0 バイトでないときに限る。**中断された実行が 0 バイトの PNG を
+  1 枚残した事故**が契機で、「**失敗は 0 ではなく測っていない**」という規律が**ファイルの存在**で破られていた
+- **`__main__` は落とした母集団を `UNRESOLVED (absent measurements, not zeros):` として理由つきで印字し、1 を返す**
+- **この module は `inku_cli` も `inku_server` も import しない。** **`server/Dockerfile` は `shared/` と `server/` を
+  COPY するが `cli/` は入れない**ので、コンテナの中で `python -m` として動くことが要件である
+- **CLI は `inku-cli rasterize --in DIR --out DIR [--width N] [--workers N]`。** 段 1 の関数を呼ぶだけで、
+  焼く規則を 2 つ目書いていない。**`cli/README.md` の help 節は生成器で再生成した**（48 → **49 経路**）
+
+**pentala への配備に旗が無かったので足した** — **`deploy.sh --shared`**（`shared/` だけ・`--delete` なし・
+`inku-api` を再起動）。**それまで `shared/` を含む旗は `--all` だけで、それは `cli/` `docs/` `manual/` まで
+送るので [I-059] に触れる。つまり `shared/` を pentala へ送る合法な道が 1 本も無かった。**
+
+**実測（2026-08-09・実物の SVG 24 枚・width 1618）:** **pentala 6 並列 17.7 秒 = 0.74 秒/枚**、
+**Mac 4 並列 70.1 秒（CPU 136 秒 = 5.66 秒/枚）**。**PNG は 24/24 が両機でバイト一致**（resvg 0.3.3）。
+**`sys.path` 操作なしで `inku_analysis` が import できることを現物で確認した。**
+
+- **⚠ 契約の摂動 P-6 は、T-9 が守っている場合と食い違っていた** — 旗を 1 本足しても
+  「`rasterize` という節が載っている」は消えない。**サブコマンドを足して生成器を回さない場合（P-6b）で
+  はじめて赤くなる。****ゲートの形は正しく、契約の P 欄の書き方が誤っていた**（台帳へ起票）
+- **⚠ 受け入れで穴を 1 つ塞いだ** — 契約の段 1 は「`__main__` が `UNRESOLVED` を印字する」ことも求めていたが、
+  **`rasterize_dir` の戻り値にしかゲートが無かった**。**`python -m` はコンテナと pentala が通る唯一の入口**なので、
+  **印字は製品の振る舞いである**。受入 2 本を足し、摂動 2 本（失敗があっても 0 を返す・UNRESOLVED を
+  無条件に印字する）がそれぞれ 1 本だけを赤くすることを確かめた
+- **検査:** **server pytest 2,485 passed / 31 skipped**（起点 2,476 ＋ 実装の 7 件 ＋ 受け入れの 2 件）・
+  **cli pytest 182**（起点 176）・ruff clean（server・cli・`shared/src`）・`check_docs.py` 緑・
+  **凍結コーパスはバイト一致**。**採番なし** — web の振る舞いも API も変わらず、
+  **server のどの経路も `rasterize_batch` を import していない**

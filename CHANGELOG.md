@@ -4438,3 +4438,52 @@ the work moves to the top, and the settings gather directly above the descriptio
   ten T-1–T-10), **JVM 238 / 0 failed (45 classes)**, **instrumentation 96 / 0 failed** (Pixel 9,
   20 classes, measured by the implementing session), ruff clean. **Only `android/VERSION` moves one
   step** — `APP_VERSION` and `web/BUILD_NUMBER` stay put, and nothing is deployed to pentala.
+
+### 2026-08-09 — Rasterizing a folder is one command (**no version bump**; `shared/` and `cli/` only)
+
+**The PNGs used for looking at work were burned by throwaway scripts, one per run.**
+`851-…/harness/rasterize_one.py`, `859-…/harness/rasterize_all.py`, `rasterize_full.py` and
+`864-…/harness/rasterize_on_pentala.py` all **call the same single line** (`svg_to_png(svg, width=width)`);
+only the worker count and the output directory differ. **There were four copies of one rule, and the next
+run would have grown a fifth.**
+
+**The rule now lives once, in `shared/src/inku_analysis/rasterize_batch.py` (213 lines), and the CLI is a
+thin door onto it.**
+
+- **`rasterize_dir(src, dst, *, width=None, workers=1) -> Report`**, with **one child process per file**
+  (ledger I-075: a resvg panic in-process takes the interpreter with it). The child re-enters the module
+  as `python -m inku_analysis.rasterize_batch --one` — **so that no second rule for burning a picture
+  gets written anywhere.**
+- **A file that cannot be burned leaves nothing behind.** The child writes a hidden temporary file and
+  **only the parent renames it into place**, and only when the child exited 0 and the temporary is not
+  empty. The trigger was an interrupted run that **left one 0-byte PNG**: "a failure is absent, not zero"
+  is a rule about reading numbers, and a file on disk breaks it before the reading starts.
+- **`__main__` prints the population it dropped** as `UNRESOLVED (absent measurements, not zeros):`
+  with a reason per file, and exits 1.
+- **The module imports neither `inku_cli` nor `inku_server`.** `server/Dockerfile` copies `shared/` and
+  `server/` but not `cli/`, so running as `python -m` inside the container is a requirement, not a style.
+- **`inku-cli rasterize --in DIR --out DIR [--width N] [--workers N]`** calls the shared function and
+  nothing else. **`cli/README.md`'s help section was regenerated** (48 → **49 paths**).
+
+**Deploying it needed a flag that did not exist**, so one was added: **`deploy.sh --shared`** (`shared/`
+only, no `--delete`, restarts `inku-api`). **Until then the only flag carrying `shared/` was `--all`,
+which also sends `cli/`, `docs/` and `manual/` — the tree ledger I-059 exists to keep off the
+development server. There had been no legal route for a `shared/` change to reach pentala at all.**
+
+**Measured 2026-08-09** on 24 real SVGs at width 1618: **pentala at 6 workers, 17.7 s = 0.74 s/picture**;
+**the Mac at 4 workers, 70.1 s (136 s CPU = 5.66 s/picture)**. **All 24 PNGs are byte-identical between
+the two machines** (resvg 0.3.3), and `inku_analysis` imports on pentala with no `sys.path` handling.
+
+- **⚠ The contract's perturbation P-6 did not match what T-9 guards.** Adding a flag does not remove the
+  `rasterize` section from the manual; **only adding a subcommand without regenerating (P-6b) turns it
+  red.** The gate is the right shape — **the contract's perturbation column was written wrong** (filed
+  in the ledger).
+- **⚠ Acceptance closed one hole.** Stage 1 of the contract asked that `__main__` print UNRESOLVED, but
+  **only the return value of `rasterize_dir` had a gate**. `python -m` is the one entry point the
+  container and the development server use, so **the printing is production behaviour**. Two gates were
+  added, and two perturbations (returning 0 despite failures; printing UNRESOLVED unconditionally) each
+  turn exactly one of them red.
+- **Checks:** **server pytest 2,485 passed / 31 skipped** (from 2,476: seven from the implementation,
+  two from acceptance), **cli pytest 182** (from 176), ruff clean across `server`, `cli` and
+  `shared/src`, `check_docs.py` green, frozen corpora byte-identical. **No version bump** — web
+  behaviour and the API are unchanged, and **no server path imports `rasterize_batch`.**

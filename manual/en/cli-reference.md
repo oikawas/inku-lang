@@ -29,6 +29,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | history / history-export | List or export history by hash |
 | unread-words | Show the user's ledger; administrators may use --all |
 | contact-sheet / analyze / ddl-compare | Compare and analyze local artifacts |
+| rasterize | Burn a folder of SVGs to PNG, one child process per file; `--workers` sets how many run at once |
 | vision-review | Run the configured vision model as a read-only mirror |
 | plugin | List, validate, and reload declarative DDL plugins |
 | reference | Dump the implementation vocabulary and constant tables, read-only |

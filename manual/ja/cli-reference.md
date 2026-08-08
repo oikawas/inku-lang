@@ -29,6 +29,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | history / history-export | 履歴一覧とhash指定の書き出し |
 | unread-words | 本人の未読語台帳。管理者は --all で全体集計 |
 | contact-sheet / analyze / ddl-compare | ローカル成果物の比較・解析 |
+| rasterize | SVGのフォルダをPNGへ焼く。1ファイル1子プロセスで、`--workers` で同時に走らせる本数を決める |
 | vision-review | 設定済みvision modelによる読み取り専用評価 |
 | plugin | 宣言的DDLプラグインの一覧、検証、再読込 |
 | reference | 実装内の語彙・定数テーブルの読み取り専用ダンプ |

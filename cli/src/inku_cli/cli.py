@@ -788,6 +788,50 @@ def _svg_occupancy_grid(svg: str, *, cells: int = 16) -> list[float]:
         pixels = list(image.getdata())
     return [1.0 - (float(pixel) / 255.0) for pixel in pixels]
 
+# Render engine 23 split the placement off the performance: the renderer takes
+# composition_seed for where the marks go and render_seed for how the hand moves.
+# Omitting composition_seed makes the placement follow the performance seed, so a
+# sweep over render_seed alone moves both at once and reports one composite
+# number. Measured on a 12-circle scattered group: the composite came to 0.472
+# while the performance on its own is 0.014 -- a signal 32x smaller, invisible
+# inside the sum. So a sweep has to name which seed it varies and pin the other.
+_REPLAY_VARY_COMPOSITION = "composition"
+_REPLAY_VARY_PERFORMANCE = "performance"
+_REPLAY_PINNED_SEED = 1
+_REPLAY_SEED_NOTE = (
+    "composition_distance varies composition_seed with render_seed pinned to "
+    f"{_REPLAY_PINNED_SEED}; performance_distance varies render_seed with "
+    f"composition_seed pinned to {_REPLAY_PINNED_SEED}. Earlier runs swept one seed "
+    "that moved both, so their number is a composite and is not comparable with "
+    "either column."
+)
+
+def _replay_vectors(
+    client: ApiClient,
+    score: dict[str, Any],
+    *,
+    replay: int,
+    vary: str,
+    color_catalog: str,
+    canvas_aspect: str | None,
+) -> list[list[float]]:
+    vectors: list[list[float]] = []
+    for seed in range(1, replay + 1):
+        varies_composition = vary == _REPLAY_VARY_COMPOSITION
+        svg = client.request_text(
+            "POST",
+            "/api/render-svg",
+            data={
+                "score": score,
+                "catalog_id": color_catalog,
+                "canvas_aspect": canvas_aspect,
+                "composition_seed": seed if varies_composition else _REPLAY_PINNED_SEED,
+                "render_seed": _REPLAY_PINNED_SEED if varies_composition else seed,
+            },
+        )
+        vectors.append(_svg_occupancy_grid(svg))
+    return vectors
+
 def _cosine_distance(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
@@ -1101,25 +1145,30 @@ def _diversity_summary(
         if client is None:
             raise CliError("analyze --replay requires API access; log in or provide --base-url")
         for artifact in artifacts[: max(1, replay_limit)]:
-            vectors: list[list[float]] = []
-            for seed in range(1, replay + 1):
-                svg = client.request_text(
-                    "POST",
-                    "/api/render-svg",
-                    data={
-                        "score": artifact["score"],
-                        "catalog_id": color_catalog,
-                        "canvas_aspect": canvas_aspect,
-                        "render_seed": seed,
-                    },
-                )
-                vectors.append(_svg_occupancy_grid(svg))
+            composition_vectors = _replay_vectors(
+                client,
+                artifact["score"],
+                replay=replay,
+                vary=_REPLAY_VARY_COMPOSITION,
+                color_catalog=color_catalog,
+                canvas_aspect=canvas_aspect,
+            )
+            performance_vectors = _replay_vectors(
+                client,
+                artifact["score"],
+                replay=replay,
+                vary=_REPLAY_VARY_PERFORMANCE,
+                color_catalog=color_catalog,
+                canvas_aspect=canvas_aspect,
+            )
             replay_items.append({
                 "path": artifact["path"],
                 "replay_count": replay,
-                "composition_distance": _mean_pair_distance(vectors),
+                "composition_distance": _mean_pair_distance(composition_vectors),
+                "performance_distance": _mean_pair_distance(performance_vectors),
             })
-    replay_values = [item["composition_distance"] for item in replay_items if item.get("composition_distance") is not None]
+    composition_values = [item["composition_distance"] for item in replay_items if item.get("composition_distance") is not None]
+    performance_values = [item["performance_distance"] for item in replay_items if item.get("performance_distance") is not None]
     family_total = sum(family_counts.values())
     return {
         "input_dir": str(input_dir),
@@ -1149,7 +1198,9 @@ def _diversity_summary(
         "replay": {
             "requested_count": replay,
             "sample_count": len(replay_items),
-            "replay_divergence": round(sum(replay_values) / len(replay_values), 6) if replay_values else None,
+            "seed_note": _REPLAY_SEED_NOTE,
+            "composition_divergence": round(sum(composition_values) / len(composition_values), 6) if composition_values else None,
+            "performance_divergence": round(sum(performance_values) / len(performance_values), 6) if performance_values else None,
             "items": replay_items,
         },
         "score_primitive_counts": dict(sorted(primitive_counts.items())),
@@ -3667,7 +3718,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--census", action="store_true", help="report frequent mechanical motif signatures with thumbnail examples")
     analyze.add_argument("--history", action="store_true", help="run --census over the current user history instead of a directory")
     analyze.add_argument("--output", "-o", help="summary JSON path (default: INPUT_DIR/diversity-summary.json)")
-    analyze.add_argument("--replay", type=int, default=0, help="render each sampled score N times and compute replay divergence")
+    analyze.add_argument("--replay", type=int, default=0, help="render each sampled score 2N times: N varying composition_seed (composition_distance) and N varying render_seed (performance_distance), each pinning the other seed")
     analyze.add_argument("--replay-limit", type=int, default=5, help="maximum score artifacts to replay")
     analyze.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, default="square")
     analyze.add_argument("--catalog-id", help="color catalog id (legacy alias)")

@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **24** | v2.11.6 | 862 | 2026-08-08 | 541 | **7** | **534** |
 | **23** | v2.11.5 | 860 | 2026-08-08 | 535 | **4** | **531** |
 | **22** | v2.11.4 | 859 | 2026-08-07 | 531 | **52** | **479** |
 | **21** | v2.9.34 | 838 | 2026-08-03 | 525 | **32** | **493** |
@@ -121,14 +122,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `23` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `24` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `7` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.5 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.6 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 861 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 862 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -395,6 +396,64 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 24 — the fade reaches every member of a group (v2.11.6)
+
+**"It fades from the centre to the edge" was drawn as "all of it is a bit pale".**
+
+`Arrangement.fade` declares how a group falls off — outward from its centre (`outward`), or along
+the direction it travels (`directional`). Up to engine 23 the renderer answered that with **one
+constant for the whole group**: 0.40 for outward, 0.48 for directional. **The same number on the
+nearest mark and on the farthest.** The declaration states a falling-off; what was drawn was a
+uniform paleness. **In production that is 2,738 of 6,425 groups (42.6%) and 83,703 of 178,694
+marks.**
+
+**Each member now carries its own ceiling**, ramped 0.62 → 0.18 outward and 0.70 → 0.26
+directional, by its position within the group. **No vocabulary is added and no field** — the
+declaration was already there.
+
+**The carriage is `color_hint`.** The tag is written after the colour cycle rebuilds the hint, and
+**read back before normalisation flattens the decimal point**. A consumer reading the normalised
+value sees the ramp already levelled out.
+
+**Placement, touch and the performance seed are untouched.** `color_hint` sits outside
+`_SEED_INSTRUCTION_FIELDS`, so **the path coordinates of a fading group are byte-identical to
+engine 23 and only the opacity attributes differ.** The surface seed does not move either: it drops
+the tag before it hashes the instruction.
+
+**A group that cannot fade was left exactly as it was.** A ring is equidistant from its own centre,
+and so is a pair. **Ranking them would draw a gradient nobody stated.**
+
+### A ring is not equidistant when measured from the centroid
+
+**This version found it.** `_rhythm_t` returns 0 to 1 **inclusive at both ends**, so **a ring of 12
+puts its first and last member on the same point.** That doubling pulls the centroid off the axis
+by **radius / count** (0.025 measured). **Measured from the centroid a ring is no longer
+equidistant, and a gradient appeared running once around the ring.** So the `radial` branch alone
+measures from **its own centre of rotation** (`arr.center`, or the declared anchor). Every other
+layout still measures from the centroid. **"A ring degenerates naturally because it is
+equidistant" depended on where the centre was taken from.**
+
+**A single-member group cannot be tagged by any implementation** — one mark has no position within
+a group. The `count == 1` branch does not pass through `_shift`, so **even under engine 23 the
+`fade` never reached the hint and such a group never faded** (measured: opacity 1.0).
+
+### Version and corpus
+
+**535 → 541 cases, and seven moved** (measured from `changed_from_previous`). **Six of those are
+the added cases; the seventh is `G-scatter-fade-edge`, the only existing case that moved.** The
+remaining 534 did not move by a byte.
+
+`G-scatter-fade-edge` was **the whole of the corpus's fading** under engine 23 — outward, scatter, a
+hand tool, no cycle, no surface. **Six cases were added for the routes that were never walked**:
+directional along a path, a colour cycle, a derived surface seed, a machine tool (**a machine fades
+too**, by the author's ruling: it has its own ink and its own core), and **the two degenerate groups
+that must not move at all**.
+
+**`ddl_engine_version` did not move** (still 7). Nothing through Stage 2 changes by a byte.
+
+**The Android reference fixtures gained a `render-engine-24/` directory of 55 files, and no Kotlin
+changed** — as with engine 23, **Android only reads the directory of the version it names.**
 
 ## engine 23 — the placement got a seed of its own (v2.11.5)
 

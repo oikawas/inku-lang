@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-08 — v2.11.6 unreleased baseline (Web Build 862)
+
+The 13 places that name a version were updated to v2.11.6 / Build 862. **No manual text changed** — no screen action, CLI flag, setting or response key moved.
+
+- **The drawings do change.** Under render engine 24 a group's fade reaches every member. Saying "it fades from the centre to the edge" previously drew the whole group at one density; **now the nearer marks are darker and the farther ones paler.**
+- **No new action was added.** The fade declaration already existed; only the side that draws it could not receive it. **Nothing about how you write a description changes.**
+- **Redrawing the same description with the same seed changes only the groups that declared a fade.** A work that never declared one does not move by a pixel.
+
 ## 2026-08-08 — v2.11.5 unreleased baseline (Web Build 861)
 
 The 13 places that name a version were updated to Build 861. **The application version is unchanged** (still v2.11.5), and **neither the screen nor the drawings change.**

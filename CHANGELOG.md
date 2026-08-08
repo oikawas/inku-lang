@@ -4120,3 +4120,49 @@ operation that **draws the same description again under different conditions and
 - **Tests:** **JVM 223 / 0 failed** (43 classes, from 197), **instrumented 81 / 0 failed** (Pixel 9
   hardware, from 62). **Only `android/VERSION` moved one step** — `APP_VERSION` and `web/BUILD_NUMBER`
   stay put, and nothing was deployed to the dev server.
+
+### v2.11.6 — the fade reaches every member of a group (Build 862, render engine 24, 2026-08-08)
+
+**"It fades from the centre to the edge" was drawn as "all of it is a bit pale".**
+
+`Arrangement.fade` declares how a group falls off — outward from its centre (`outward`), or along
+the direction it travels (`directional`). Up to engine 23 the renderer answered that with **one
+constant for the whole group**: 0.40 for outward, 0.48 for directional. **The same number on the
+nearest mark and on the farthest.** **In production that is 2,738 of 6,425 groups (42.6%) and
+83,703 of 178,694 marks.**
+
+- **Every member of a group now carries its own ceiling**, ramped 0.62 → 0.18 outward and
+  0.70 → 0.26 directional, by its position within the group. **No vocabulary is added and no
+  field** — the declaration was already there.
+- **The carriage is `color_hint`.** The tag is written after the colour cycle rebuilds the hint and
+  **read back before normalisation flattens the decimal point.** Read after normalisation, the ramp
+  is already levelled out.
+- **Placement, touch and the performance seed are untouched.** `color_hint` sits outside
+  `_SEED_INSTRUCTION_FIELDS`, so **the path coordinates of a fading group are byte-identical to
+  engine 23 and only the opacity attributes differ.** The surface seed drops the tag before it
+  hashes the instruction, so the texture does not move either.
+- **A group that cannot fade was left exactly as it was.** A ring is equidistant from its own
+  centre, and so is a pair. **Ranking them would draw a gradient nobody stated.**
+- **⚠ A ring is not equidistant when measured from the centroid.** `_rhythm_t` returns 0 to 1
+  **inclusive at both ends**, so **a ring of 12 puts its first and last member on the same point**
+  and the centroid is pulled off the axis by **radius / count** (0.025 measured). Measured from
+  there a gradient ran once around the ring, so **the `radial` branch alone measures from its own
+  centre of rotation.** Every other layout still measures from the centroid.
+- **A single-member group cannot be tagged by any implementation.** The `count == 1` branch does
+  not pass through `_shift`, so **even under engine 23 the `fade` never reached the hint and such a
+  group never faded** (measured: opacity 1.0).
+- **The corpus went 535 → 541 cases, and seven moved** — the six added, plus the one existing case
+  that moved, `G-scatter-fade-edge`. **The remaining 534 did not move by a byte.** That one case
+  was **the whole of the corpus's fading** under engine 23. **Six cases were added for the routes
+  that were never walked**: directional along a path, a colour cycle, a derived surface seed, a
+  machine tool (**a machine fades too**, by the author's ruling), and **the two degenerate groups
+  that must not move at all**.
+- **`ddl_engine_version` did not move** (still 7). Nothing through Stage 2 changes by a byte.
+- **Thirteen perturbations were applied to production code only, and none missed.** Two of them at
+  first were applied to only one of the two branches, and the test they named stayed green.
+  **Counting the points of enforcement and applying each perturbation to both branches turned them
+  red** — reporting the one-sided attempt as a miss would have produced the false conclusion that
+  the acceptance had a hole.
+- **Tests:** server **2,403 passed / 31 skipped** (`def test_` 1,215 → 1,230, **nothing deleted or
+  renamed**), ruff clean, frozen corpora byte-identical. **The Android reference fixtures gained a
+  `render-engine-24/` directory of 55 files, and no Kotlin changed.**

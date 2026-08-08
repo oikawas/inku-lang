@@ -190,6 +190,12 @@ private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
 /** How often the running row redraws its elapsed time. */
 private const val RUN_STATUS_TICK_MS = 100L
 
+/** The description field. The instrumented IME test needs to reach it by name. */
+internal const val DESCRIPTION_INPUT_TAG = "description_input"
+
+/** What the main action says, in both the in-flow button and the IME bar. */
+internal const val DRAW_ACTION_LABEL = "描画する"
+
 /**
  * What the double tap goes to when the artwork is already at or above its own
  * size, so that 1:1 would be a zoom *out* and the gesture would look broken.
@@ -1220,7 +1226,7 @@ private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier:
     ) {
         Box(modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM)) {
             DrawingActionButton(
-                idleText = "▶  描画する",
+                idleText = "▶  $DRAW_ACTION_LABEL",
                 runningText = "■  描画中",
                 state = state,
                 onClick = viewModel::draw,
@@ -1802,6 +1808,7 @@ private fun DrawPanel(
             onValueChange = viewModel::setPrompt,
             modifier = Modifier
                 .fillMaxWidth()
+                .testTag(DESCRIPTION_INPUT_TAG)
                 .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
             minLines = 5,
             maxLines = 8,
@@ -1811,7 +1818,7 @@ private fun DrawPanel(
         // 「描画する」 on one screen is a question about which one draws.
         if (!state.descriptionFocused) {
             DrawingActionButton(
-                idleText = "▶  描画する",
+                idleText = "▶  $DRAW_ACTION_LABEL",
                 runningText = "■  描画中",
                 state = state,
                 onClick = viewModel::draw,

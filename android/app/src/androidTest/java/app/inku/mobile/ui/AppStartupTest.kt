@@ -38,7 +38,9 @@ class AppStartupTest {
 
         // 記述 is on the bottom bar and again on the compose screen's own tabs,
         // so this counts rather than assumes there is one of each.
-        listOf("記述", "履歴", "系譜", "デモ", "設定").forEach { label ->
+        // デモ left this list on 2026-08-08: the bottom bar is for the places one
+        // returns to, and the demo runs from its settings pane instead.
+        listOf("記述", "履歴", "系譜", "設定").forEach { label ->
             val found = composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes()
             assertTrue("the app came up without a $label tab", found.isNotEmpty())
         }

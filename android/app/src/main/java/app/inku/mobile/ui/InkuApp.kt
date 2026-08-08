@@ -484,7 +484,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 .fillMaxSize()
                 .imePadding()
                 .padding(Dimens.spaceL),
-            shape = RoundedCornerShape(Dimens.spaceM),
+            shape = RoundedCornerShape(Dimens.radiusCard),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = Dimens.spaceM,
         ) {
@@ -698,7 +698,7 @@ private fun DdlVocabularyBar(
         if (open) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(Dimens.spaceM),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.vocabularyBarMaxHeight),
             ) {
                 Column(
@@ -811,7 +811,7 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                     val active = catalog.id == state.selectedCatalogId
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable { viewModel.setCatalog(catalog.id) },
-                        shape = RoundedCornerShape(Dimens.spaceM),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
                         color = if (active) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
@@ -869,7 +869,7 @@ private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                             viewModel.setCanvasAspect(aspect.id)
                             viewModel.closeTransientPanel()
                         },
-                        shape = RoundedCornerShape(Dimens.spaceM),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
                         color = if (active) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
@@ -918,11 +918,11 @@ private fun WebStyleModelStageEditor(
         Box(modifier = Modifier.fillMaxWidth()) {
             Surface(
                 modifier = Modifier.fillMaxWidth().clickable { providerMenuOpen = true },
-                shape = RoundedCornerShape(Dimens.spaceM),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 color = MaterialTheme.colorScheme.surface,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceM)).padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+                    modifier = Modifier.fillMaxWidth().border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard)).padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
@@ -961,7 +961,7 @@ private fun WebStyleModelStageEditor(
                 models.forEach { option ->
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable { onSelectModel(option.qualifiedId) },
-                        shape = RoundedCornerShape(Dimens.spaceM),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
                         color = if (option.qualifiedId == selectedModelId) ActiveRowTint else MaterialTheme.colorScheme.surface,
                     ) {
                         Row(
@@ -1948,7 +1948,7 @@ private fun NumberedBatchTextField(
         modifier = modifier
             .height(Dimens.batchEditorHeight)
             .bringIntoViewRequester(bringIntoViewRequester),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         color = InputWellSurface,
         border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
     ) {
@@ -3074,7 +3074,7 @@ private fun ProviderConnectionCard(
                     onClick = { confirmDeleteService = true },
                     enabled = !provider.isDefaultLocal,
                     modifier = Modifier.height(Dimens.controlSizeSmall),
-                    shape = RoundedCornerShape(Dimens.spaceXs),
+                    shape = RoundedCornerShape(Dimens.radiusCard),
                     contentPadding = PaddingValues(horizontal = Dimens.spaceM, vertical = 0.dp),
                 ) {
                     Text("サービス削除", style = MaterialTheme.typography.labelSmall, maxLines = 1)
@@ -3493,7 +3493,7 @@ private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier:
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.height(Dimens.buttonHeightSmall),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         contentPadding = PaddingValues(horizontal = Dimens.spaceXs, vertical = 0.dp),
     ) {
         Text(text, maxLines = 1, overflow = TextOverflow.Clip, fontSize = TypeScale.labelTiny)
@@ -3561,7 +3561,7 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
             Box(
-                modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
+                modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(mark, style = MaterialTheme.typography.titleMedium)
@@ -3634,7 +3634,7 @@ private fun ExportTemplateRow(template: app.inku.mobile.data.db.ExportTemplateEn
     var height by remember(template.id, template.heightPx) { mutableStateOf(template.heightPx.toString()) }
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Dimens.spaceM),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
@@ -3907,7 +3907,7 @@ private fun ModelAssetControls(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
                 Box(
-                    modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
+                    modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(if (asset.qualityTier.contains("high", ignoreCase = true)) "E4" else "E2", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
@@ -4090,7 +4090,7 @@ private fun ColorCatalogButtonRow(selectedValue: String, onSelect: (String) -> U
             OutlinedButton(
                 onClick = { onSelect(catalog.id) },
                 modifier = Modifier.height(Dimens.buttonHeightLarge).fillMaxWidth(),
-                shape = RoundedCornerShape(Dimens.spaceXs),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 colors = if (selected) {
                     ButtonDefaults.outlinedButtonColors(
                         containerColor = MaterialTheme.colorScheme.secondary,
@@ -4116,8 +4116,8 @@ private fun SwatchStrip(colors: List<String>) {
             Box(
                 modifier = Modifier
                     .size(Dimens.spaceL)
-                    .background(parseColor(hex), RoundedCornerShape(Dimens.spaceXs))
-                    .border(Dimens.hairline, SwatchHairline, RoundedCornerShape(Dimens.spaceXs)),
+                    .background(parseColor(hex), RoundedCornerShape(Dimens.radiusCard))
+                    .border(Dimens.hairline, SwatchHairline, RoundedCornerShape(Dimens.radiusCard)),
             )
         }
     }
@@ -4153,9 +4153,9 @@ private fun selectedStage2ModelLabel(state: InkuUiState): String {
 private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val item = state.selectedHistory
     Surface(
-        modifier = modifier.border(Dimens.hairline, CanvasPanelHairline, RoundedCornerShape(Dimens.spaceM)),
+        modifier = modifier.border(Dimens.hairline, CanvasPanelHairline, RoundedCornerShape(Dimens.radiusCard)),
         color = CanvasPanelSurface,
-        shape = RoundedCornerShape(Dimens.spaceM),
+        shape = RoundedCornerShape(Dimens.radiusCard),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
@@ -4178,7 +4178,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(ChipSurface, RoundedCornerShape(Dimens.spaceXs))
+                    .background(ChipSurface, RoundedCornerShape(Dimens.radiusCard))
                     .padding(Dimens.spaceM),
                 contentAlignment = Alignment.Center,
             ) {
@@ -4207,7 +4207,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
 private fun RenderTextView(text: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(RenderTextPaper, RoundedCornerShape(Dimens.spaceXs))
+            .background(RenderTextPaper, RoundedCornerShape(Dimens.radiusCard))
             .padding(Dimens.spaceM)
             .verticalScroll(rememberScrollState()),
     ) {
@@ -4528,8 +4528,8 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     Box(
         modifier = modifier
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
             .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM)
             .clickable(onClick = onClick),
     ) {
@@ -4598,8 +4598,8 @@ private fun DenseMultilineInput(
                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             }
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
             .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
         textStyle = MaterialTheme.typography.bodySmall.copy(
             color = MaterialTheme.colorScheme.onSurface,
@@ -4644,8 +4644,8 @@ private fun DenseTextFieldValueInput(
     Box(
         modifier = modifier
             .bringIntoViewRequester(bringIntoViewRequester)
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
             .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
     ) {
         BasicTextField(
@@ -4771,8 +4771,8 @@ private fun DenseSingleLineInput(
                     scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
                 }
             }
-            .background(InputWellSurface, RoundedCornerShape(Dimens.spaceXs))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.spaceXs))
+            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
+            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
             .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
         textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -4891,7 +4891,7 @@ private fun BoxScope.presentationCaptionPlacement(screenWidth: Dp): Modifier =
 private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(Dimens.spaceM),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         color = PresentationCaptionScrim,
         tonalElevation = 0.dp,
     ) {
@@ -4975,7 +4975,7 @@ private fun PresentationControlButton(
     wide: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val shape = if (wide) RoundedCornerShape(100) else RoundedCornerShape(50)
+    val shape = if (wide) RoundedCornerShape(100) else RoundedCornerShape(100)
     val background = when {
         selected -> PresentationControlFillSelected
         else -> PresentationControlFillIdle
@@ -5086,7 +5086,7 @@ private fun DrawingActionButton(
         Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Surface(
                 modifier = Modifier.weight(1f).height(Dimens.buttonHeightLarge),
-                shape = RoundedCornerShape(Dimens.spaceM),
+                shape = RoundedCornerShape(Dimens.radiusCard),
                 color = if (tonal) MaterialTheme.colorScheme.surfaceVariant else DrawingActionSurface,
                 tonalElevation = Dimens.hairline,
             ) {
@@ -5152,7 +5152,7 @@ private fun PrimarySmallButton(text: String, onClick: () -> Unit, enabled: Boole
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(Dimens.buttonHeightSmall),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = InkOnPrimary),
     ) { Text(text, maxLines = 1) }
 }
@@ -5163,7 +5163,7 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(Dimens.buttonHeightSmall),
-        shape = RoundedCornerShape(Dimens.spaceXs),
+        shape = RoundedCornerShape(Dimens.radiusCard),
     ) { Text(text, maxLines = 1) }
 }
 
@@ -5678,7 +5678,7 @@ internal fun IncuMascotView(modifier: Modifier = Modifier) {
         modifier = modifier
             .testTag("mascot_incu")
             .size(Dimens.controlSizeSmall)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(Dimens.controlSizeSmall)) {
@@ -5801,7 +5801,7 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
         modifier = modifier
             .testTag("mascot_yuragi")
             .size(Dimens.controlSizeSmall)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.spaceM)),
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(Dimens.controlSizeSmall)) {

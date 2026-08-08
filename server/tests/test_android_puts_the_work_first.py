@@ -329,8 +329,18 @@ def test_t8_no_token_borrows_from_another_family() -> None:
     # took its width from a token named for the presentation caption's inset.
     # ⚠ 発行日 (`9a85d783`) には `heroCaptionMaxWidth` を使っており、段 B-1 が
     # その呼び出しごと消したので、ここは B-1 の完了時点で既に満たされていた。
-    mini_pill = _function_body(_read(INKU_APP), "private fun MiniPill(")
+    app = _read(INKU_APP)
+    mini_pill = _function_body(app, "private fun MiniPill(")
     stolen = re.findall(r"Dimens\.((?:presentationCaption|hero)\w*)", mini_pill)
     assert stolen == [], (
         f"`MiniPill` が別用途のトークンを寸法に使っている: {sorted(set(stolen))}"
+    )
+
+    # **宣言だけを見ると素通りする。** トークンから `radiusXs` (3dp) を消しても、
+    # 呼び出し側が `RoundedCornerShape(Dimens.spaceXs)` と書けば角丸は 4 種類に戻る。
+    # 完了時の実測でこの形が 34 件残っていて、宣言側の T-8 は 1 件も見ていなかった。
+    corners = re.findall(r"RoundedCornerShape\(\s*Dimens\.(space\w*)", app)
+    assert corners == [], (
+        f"角丸に余白のトークンを渡している: {sorted(set(corners))} ({len(corners)} 件)。"
+        "角丸は radiusCard と pill の 2 種類"
     )

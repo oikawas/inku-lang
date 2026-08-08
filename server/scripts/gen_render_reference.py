@@ -28,35 +28,26 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-07"
+FROZEN_AT = "2026-08-08"
 REASON = (
-    "A fill got an underlay, and what goes on top of it got a branch. Until "
-    "engine 21 a stroke WAS the fill, so every scan line had to be cut at its "
-    "intersection with the outline or the paint would spill outside the shape. "
-    "That cut is one of three regularities the eye reads as a raster: measured "
-    "across the eleven filled shapes of the three works the author named as "
-    "striped, the scan angle varied by 0.1 degrees inside one shape, the pitch "
-    "by 6.1%, and the endpoints not at all. A real element now holds the field, "
-    "so the marks are free to leave the contour: the angle moves per stroke, "
-    "the pitch is drawn far wider, and each end overshoots or falls short. All "
-    "three amplitudes come from ToolGrammar.fill_hand and are zero for a "
-    "machine, so a computer fill keeps the exact repetition that is its "
-    "signature. Above the threshold the marks are scan lines packed to coverage "
-    "0.9; below it they are rubbings, because closing the gaps at "
-    "pencil width would take eight times the lines and that is not how the tool "
-    "is used. A rubbing runs the width of the form and takes the region's one "
-    "direction, wobbling by the few degrees the hand gives -- the same band the "
-    "scan branch draws from -- so what separates the two branches is that the "
-    "marks are not on rows, and the count is the stroke length one classic scan "
-    "pass laid. The threshold is coverage -- width over pitch -- and not a list "
-    "of tool names: the two cut the engine-21 corpus identically, which is why "
-    "C-fill-circle-crayon-extra_fine is added to send one tool across the "
-    "branch on thinness alone. A fill stroke also ends the way paint ends, "
-    "heavy where the tool lands, instead of tapering like a drawn line. How far "
-    "the marks stand out of their own field is the branch's, times the tool's "
-    "own ToolGrammar.fill_contrast, which is 1.0 everywhere but chalk. Tiny "
-    "shapes still degrade to one dab and rotring still degrades to a region "
-    "fill; neither gets an underlay."
+    "Placement got its own seed. Until engine 22 one render_seed decided both "
+    "where an arrangement put its marks and how the hand drew each of them, so "
+    "an author who moved the seed to see another touch moved the composition "
+    "too: on a 60-mark scatter, changing render_seed alone moved all 180 "
+    "coordinates. SPEC :614 and :678 both state the opposite -- a touch change "
+    "keeps the composition of the same Score -- so this is a defect in the "
+    "measuring instrument, not a new feature. `composition_seed`, which the "
+    "database, the four render routes and all four clients already carried, "
+    "now reaches the renderer and decides the placement phase; render_seed "
+    "keeps the touch, the color assignment, the ground and the performance "
+    "resolution. A drawing that states no composition seed falls back to "
+    "render_seed -- read with `is None`, so the seed 0 is a seed -- which is "
+    "why all 531 cases of engine 22 are byte-identical here: none of them "
+    "states one. Four cases do now. Each states composition_seed 777 against "
+    "the same score and the same render_seed as its twin above it, and their "
+    "layouts are drawn from the 22 of group G whose expansion moves with the "
+    "seed at all, so the corpus can tell the split happened instead of "
+    "recording that it did not break anything."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -160,6 +151,7 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
           aspect: str = "square", ground: dict[str, Any] | None = None,
           background: str = "white",
           render_seed: int = DEFAULT_RENDER_SEED,
+          composition_seed: int | None = None,
           color_map: dict[str, str] = DEFAULT_COLOR_MAP,
           catalog_id: str | None = None,
           svg_profile: str = SVG_PROFILE,
@@ -176,6 +168,11 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
         "svg_profile": svg_profile,
         "wild": wild,
     }
+    # Stated only where it is stated. Writing the key unconditionally would
+    # move all 531 inputs the day the key was added, and the manifest would
+    # report a corpus-wide change for a case nobody drew differently.
+    if composition_seed is not None:
+        cases[case_id]["composition_seed"] = composition_seed
 
 
 def build_inputs() -> dict[str, dict[str, Any]]:
@@ -399,12 +396,14 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # 493 reaches `_expand_arrangement` -- engine 20 could be deleted whole and
     # they would all stay green. Every G case carries one, and inside an anchor
     # triplet the declared centre is the only thing that differs.
-    def _g(case_id: str, anchor: str, **changes: Any) -> None:
+    def _g(case_id: str, anchor: str, *, composition_seed: int | None = None,
+           **changes: Any) -> None:
         arrangement = copy.deepcopy(BASE_ARRANGEMENT)
         arrangement.update(changes)
         _case(cases, case_id,
               _instruction("circle", weight="pen", center=list(G_ANCHORS[anchor]),
-                           radius=0.03, arrangement=arrangement))
+                           radius=0.03, arrangement=arrangement),
+              composition_seed=composition_seed)
 
     # The largest route (40.9% of the expanded marks in production).
     for anchor in G_ANCHORS:
@@ -445,13 +444,32 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _g("G-scatter-fade-edge", "edge", fade="outward")
     _g("G-scatter-rhythm-edge", "edge", rhythm_spacing="loose")
 
+    # engine 23: the four cases that state a composition seed. Each is the twin
+    # of a case above with the same score and the same performance seed, so the
+    # pair is the whole claim -- placement follows the composition seed, and
+    # nothing else in the drawing does. The layouts are taken from the 22 of
+    # group G whose expansion actually moves when the seed moves; `radial` and
+    # the pathless `vertical` / `horizontal` are excluded because their
+    # coordinates are the same for every seed, so a twin there would be
+    # identical to its base and prove nothing.
+    G_COMPOSITION_SEED = 777
+    _g("G-composition-scatter-edge", "edge", composition_seed=G_COMPOSITION_SEED)
+    _g("G-composition-grid-center", "center", composition_seed=G_COMPOSITION_SEED,
+       layout="grid", count=16, rows=4, cols=4)
+    _g("G-composition-cluster-center", "center", composition_seed=G_COMPOSITION_SEED,
+       cluster_count=3)
+    _g("G-composition-path-wave-edge", "edge", composition_seed=G_COMPOSITION_SEED,
+       layout="vertical", path="wave")
+
     # C gained 6 in engine 22: a filled computer and a filled silverpoint, which
     # the corpus had never carried, the crayon / brush_thick thinness pair that
     # tells a coverage rule from a list of tool names, and the chalk pair that
     # carries the one tool-level fill contrast across the branch.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 32}
+    # G gained 4 in engine 23: the twins that state a composition seed, which is
+    # the only way the corpus reaches the placement seed at all.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 36}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 531:
+    if actual != expected or len(cases) != 535:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 
@@ -498,6 +516,22 @@ def _source_commit() -> str:
                           check=True, capture_output=True, text=True).stdout.strip()
 
 
+def render_case(render_input: dict[str, Any]) -> str:
+    """Draw one case from its stated input, and only from that.
+
+    Named so the tests that replay a case go through the same call the bake
+    does. A test that copies the argument list instead stays green when this
+    one stops forwarding a key, which is how a corpus can hold an input field
+    that never reaches the renderer.
+    """
+    return render(Score.model_validate(render_input["score"]),
+                  color_map=render_input["color_map"],
+                  catalog_id=render_input["catalog_id"],
+                  render_seed=render_input["render_seed"],
+                  composition_seed=render_input.get("composition_seed"),
+                  svg_profile=render_input["svg_profile"], wild=render_input["wild"])
+
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
@@ -505,11 +539,7 @@ def generate() -> None:
     rendered: dict[str, str] = {}
     cases: dict[str, dict[str, Any]] = {}
     for case_id, render_input in sorted(inputs.items()):
-        svg = render(Score.model_validate(render_input["score"]),
-                     color_map=render_input["color_map"],
-                     catalog_id=render_input["catalog_id"],
-                     render_seed=render_input["render_seed"],
-                     svg_profile=render_input["svg_profile"], wild=render_input["wild"])
+        svg = render_case(render_input)
         rendered[case_id] = svg
         cases[case_id] = {
             "input": render_input,

@@ -10,7 +10,7 @@ from .base import RenderEngineResult
 @dataclass(frozen=True)
 class DefaultRenderEngine:
     id: str = "default"
-    version: str = "22"
+    version: str = "23"
 
     def render(
         self,
@@ -20,6 +20,7 @@ class DefaultRenderEngine:
         catalog_id: str | None = None,
         svg_profile: str | None = None,
         render_seed: int | None = None,
+        composition_seed: int | None = None,
         wild: bool = False,
     ) -> RenderEngineResult:
         svg = render_svg(
@@ -28,6 +29,7 @@ class DefaultRenderEngine:
             catalog_id=catalog_id,
             svg_profile=svg_profile,
             render_seed=render_seed,
+            composition_seed=composition_seed,
             wild=wild,
         )
         return RenderEngineResult(

@@ -24,6 +24,7 @@ class RenderEngine(Protocol):
         catalog_id: str | None = None,
         svg_profile: str | None = None,
         render_seed: int | None = None,
+        composition_seed: int | None = None,
         wild: bool = False,
     ) -> RenderEngineResult:
         ...

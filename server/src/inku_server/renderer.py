@@ -2988,6 +2988,7 @@ def render(
     canvas_aspect: str | None = None,
     svg_profile: str | None = None,
     render_seed: int | None = None,
+    composition_seed: int | None = None,
     wild: bool = False,
 ) -> str:
     profile = _normalize_svg_profile(svg_profile)
@@ -3049,9 +3050,15 @@ def render(
     ordered_instructions = sorted(
         enumerate(score.instructions), key=lambda pair: pair[1].mode == "carve"
     )
+    # Placement is the composition seed's, the touch stays the performance
+    # seed's. Read with `is None` and never with `or`: 0 is a seed a caller can
+    # legitimately state, and it is how the rest of the server reads this field
+    # (db.py:1911). Without a composition seed the placement falls back to the
+    # performance seed, so every drawing made before this split replays.
+    placement_seed = composition_seed if composition_seed is not None else render_seed
     for ins_idx, ins in ordered_instructions:
         expanded = (
-            _expand_arrangement(ins, render_seed, canvas) if ins.arrangement else [ins]
+            _expand_arrangement(ins, placement_seed, canvas) if ins.arrangement else [ins]
         )
         instruction_group = (
             dwg.g(id=_instruction_svg_id(ins, ins_idx)) if structured else content

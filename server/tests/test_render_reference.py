@@ -51,11 +51,13 @@ def test_render_reference_case_counts() -> None:
     # at all -- so a coverage rule and a list of tool names cut it identically
     # -- and no filled `chalk`, which is the one tool carrying a fill contrast
     # of its own.
-    assert len(cases) == 531
+    # Engine 23 added four to G: the twins that state a composition seed, which
+    # is the only way the corpus reaches the placement seed at all.
+    assert len(cases) == 535
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 32}
+    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 36}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -247,17 +249,12 @@ def test_group_g_matches_the_current_renderer() -> None:
     for case_id, render_input in inputs.items():
         if not case_id.startswith("G-"):
             continue
-        svg = generator.render(
-            Score.model_validate(render_input["score"]),
-            color_map=render_input["color_map"],
-            catalog_id=render_input["catalog_id"],
-            render_seed=render_input["render_seed"],
-            svg_profile=render_input["svg_profile"],
-            wild=render_input["wild"],
-        )
+        # Through the bake's own call, so that a key the generator stops
+        # forwarding is seen here instead of being copied into this test too.
+        svg = generator.render_case(render_input)
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"], case_id
         checked += 1
-    assert checked == 32
+    assert checked == 36
 
 
 def test_render_reference_discriminator_cases() -> None:

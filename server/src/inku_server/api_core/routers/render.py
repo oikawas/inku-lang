@@ -427,6 +427,7 @@ class RenderSvgRequest(BaseModel):
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
+    composition_seed: int | None = Field(default=None, description="Placement seed for arrangements; omitted means the placement follows the performance seed")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
@@ -1699,6 +1700,7 @@ def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user))
             canvas_aspect=req.canvas_aspect,
             svg_profile=req.svg_profile,
             render_seed=render_seed,
+            composition_seed=req.composition_seed,
             wild=req.wild,
         )
     except HTTPException:

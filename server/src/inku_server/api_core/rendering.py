@@ -133,6 +133,22 @@ def _validated_svg_profile(svg_profile: str | None) -> str:
     return profile
 
 
+def _composition_seed(value: object) -> int | None:
+    """Read a composition seed the way the rest of the server reads one.
+
+    `is None`, never `or`: 0 is a seed the placement stage must honour, and
+    db.py:1911 tests the same field the same way. A row written before the
+    column held numbers can still carry a non-numeric string; that is not a
+    seed, so it falls back to the performance seed instead of raising.
+    """
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _render_score_svg(
     score_payload: dict,
     *,
@@ -140,6 +156,7 @@ def _render_score_svg(
     canvas_aspect: str | None = None,
     svg_profile: str | None = None,
     render_seed: int | None = None,
+    composition_seed: int | None = None,
     wild: bool = False,
 ) -> str:
     # Site 1 of 5. `using_limits` covers Score.model_validate, whose count clamp
@@ -158,6 +175,7 @@ def _render_score_svg(
             catalog_id=render_metadata.get("render_color_catalog_id"),
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=render_seed,
+            composition_seed=_composition_seed(composition_seed),
             wild=wild,
         ).svg
 
@@ -292,6 +310,10 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
 
 def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: str | None = None) -> tuple[str, dict]:
     effective_seed = int(render_metadata.get("render_seed") or new_render_seed())
+    # The two seeds are read differently on purpose: an absent performance seed
+    # is drawn fresh, while an absent composition seed means "the placement
+    # follows the performance seed" and 0 means the seed 0.
+    composition_seed = _composition_seed(render_metadata.get("composition_seed"))
     wild = bool(render_metadata.get("render_wild"))
     render_metadata = {**render_metadata, "render_seed": effective_seed, "render_wild": wild}
     with _render_capacity():
@@ -301,6 +323,7 @@ def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: s
             catalog_id=render_metadata.get("render_color_catalog_id"),
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=effective_seed,
+            composition_seed=composition_seed,
             wild=wild,
         )
     return result.svg, {**render_metadata, **result.metadata}

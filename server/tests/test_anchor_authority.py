@@ -86,6 +86,19 @@ def _generator():
     return module
 
 
+# engine 23 added four G cases that differ from an existing one only by the
+# composition seed they state, which no test in this file reads: the score, and
+# so the instruction, is the same object. Engine 19's spread was measured before
+# these ids existed, so the twin borrows its base case's measurement rather than
+# claiming a number nobody took.
+ENGINE_23_COMPOSITION_TWINS: dict[str, str] = {
+    "G-composition-cluster-center": "G-cluster-center",
+    "G-composition-grid-center": "G-grid-center",
+    "G-composition-path-wave-edge": "G-path-wave-edge",
+    "G-composition-scatter-edge": "G-scatter-edge",
+}
+
+
 def _g_instructions() -> dict[str, Instruction]:
     """The corpus's own group G, so the gate and the frozen cases cannot drift."""
     inputs = _generator().build_inputs()
@@ -176,9 +189,11 @@ def test_the_frame_is_the_one_the_contract_states():
 
 
 # T-2 --------------------------------------------------------------------
-# Moving the group without shrinking it puts marks outside the frame in 23 of
-# the 32 G cases (measured). Every case is checked, not only the edge scatter,
-# because that is where the count of 23 comes from.
+# Moving the group without shrinking it puts marks outside the frame in 25 of
+# the 36 G cases (measured). Every case is checked, not only the edge scatter,
+# because that is where the count of 25 comes from. It was 23 of 32 until
+# engine 23 added the four composition twins: two of the cases they copy
+# overflow, so they carry that over.
 def test_no_placed_mark_leaves_the_frame():
     outside = {
         case_id: [
@@ -194,7 +209,7 @@ def test_no_placed_mark_leaves_the_frame():
     # Not vacuous. Engine 19 never overflowed, because it never went to the
     # anchor in the first place; the overflow is created by the move. So the
     # control is the move without the shrink, which is the implementation this
-    # test exists to reject. It leaves marks outside in 23 of the 32 cases.
+    # test exists to reject. It leaves marks outside in 25 of the 36 cases.
     shifted_out = 0
     for instruction in _g_instructions().values():
         points = _laid_out(instruction)
@@ -206,7 +221,7 @@ def test_no_placed_mark_leaves_the_frame():
             for x, y in points
         ):
             shifted_out += 1
-    assert shifted_out == 23
+    assert shifted_out == 25
 
 
 # T-3 --------------------------------------------------------------------
@@ -228,9 +243,12 @@ def test_the_frame_correction_does_not_stack_marks_on_the_edge():
 # of 0.315, which passes at 0.3 and proves nothing. R5's worst is 0.660.
 def test_the_frame_correction_does_not_collapse_a_group():
     ratios: dict[str, float] = {}
-    for case_id, instruction in _g_instructions().items():
+    instructions = _g_instructions()
+    for case_id, instruction in instructions.items():
         width, height = _spread(_placed(instruction))
-        was_width, was_height = ENGINE_19_SPREAD[case_id]
+        base_id = ENGINE_23_COMPOSITION_TWINS.get(case_id, case_id)
+        assert instructions[base_id] == instruction, case_id
+        was_width, was_height = ENGINE_19_SPREAD[base_id]
         ratios[case_id] = min(
             width / was_width if was_width else 1.0,
             height / was_height if was_height else 1.0,

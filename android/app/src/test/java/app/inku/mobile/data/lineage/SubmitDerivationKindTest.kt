@@ -27,6 +27,7 @@ class SubmitDerivationKindTest {
                 hasParent = false,
                 canvasAspectChanged = false,
                 textChanged = false,
+                grainChanged = false,
             ),
         )
         assertNull(
@@ -35,6 +36,16 @@ class SubmitDerivationKindTest {
                 hasParent = false,
                 canvasAspectChanged = false,
                 textChanged = true,
+                grainChanged = false,
+            ),
+        )
+        assertNull(
+            "a moved 写生 grain with nothing to descend from is still a root",
+            SubmitDerivationKind.forDescribeSubmit(
+                hasParent = false,
+                canvasAspectChanged = false,
+                textChanged = false,
+                grainChanged = true,
             ),
         )
     }
@@ -46,14 +57,18 @@ class SubmitDerivationKindTest {
         // parent whose kind is absent).
         for (canvasAspectChanged in listOf(false, true)) {
             for (textChanged in listOf(false, true)) {
-                assertNotNull(
-                    "hasParent=true canvasAspectChanged=$canvasAspectChanged textChanged=$textChanged",
-                    SubmitDerivationKind.forDescribeSubmit(
-                        hasParent = true,
-                        canvasAspectChanged = canvasAspectChanged,
-                        textChanged = textChanged,
-                    ),
-                )
+                for (grainChanged in listOf(false, true)) {
+                    assertNotNull(
+                        "hasParent=true canvasAspectChanged=$canvasAspectChanged " +
+                            "textChanged=$textChanged grainChanged=$grainChanged",
+                        SubmitDerivationKind.forDescribeSubmit(
+                            hasParent = true,
+                            canvasAspectChanged = canvasAspectChanged,
+                            textChanged = textChanged,
+                            grainChanged = grainChanged,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -67,6 +82,47 @@ class SubmitDerivationKindTest {
                 hasParent = true,
                 canvasAspectChanged = true,
                 textChanged = true,
+                grainChanged = false,
+            ),
+        )
+        assertEquals(
+            "and it wins over the 写生 grain as well",
+            "canvas_aspect_change",
+            SubmitDerivationKind.forDescribeSubmit(
+                hasParent = true,
+                canvasAspectChanged = true,
+                textChanged = false,
+                grainChanged = true,
+            ),
+        )
+    }
+
+    /**
+     * 写生 (Stage 0.5), and the branch order that keeps it honest: a run that
+     * rewrote the description *and* moved the grain writes one edge, and it is
+     * the description's. Reordering these two lines would silently reclassify
+     * every such redraw, which is why the pair is asserted rather than the
+     * grain case alone.
+     */
+    @Test
+    fun describeSubmitReadsTheDescriptionBeforeTheGrain() {
+        assertEquals(
+            "description_edit",
+            SubmitDerivationKind.forDescribeSubmit(
+                hasParent = true,
+                canvasAspectChanged = false,
+                textChanged = true,
+                grainChanged = true,
+            ),
+        )
+        assertEquals(
+            "the grain alone is its own edge",
+            "sketch_grain_change",
+            SubmitDerivationKind.forDescribeSubmit(
+                hasParent = true,
+                canvasAspectChanged = false,
+                textChanged = false,
+                grainChanged = true,
             ),
         )
     }
@@ -75,15 +131,19 @@ class SubmitDerivationKindTest {
     fun describeSubmitNamesTheOperationThatDiffers() {
         assertEquals(
             "canvas_aspect_change",
-            SubmitDerivationKind.forDescribeSubmit(hasParent = true, canvasAspectChanged = true, textChanged = false),
+            SubmitDerivationKind.forDescribeSubmit(hasParent = true, canvasAspectChanged = true, textChanged = false, grainChanged = false),
         )
         assertEquals(
             "description_edit",
-            SubmitDerivationKind.forDescribeSubmit(hasParent = true, canvasAspectChanged = false, textChanged = true),
+            SubmitDerivationKind.forDescribeSubmit(hasParent = true, canvasAspectChanged = false, textChanged = true, grainChanged = false),
+        )
+        assertEquals(
+            "sketch_grain_change",
+            SubmitDerivationKind.forDescribeSubmit(hasParent = true, canvasAspectChanged = false, textChanged = false, grainChanged = true),
         )
         assertEquals(
             "replay",
-            SubmitDerivationKind.forDescribeSubmit(hasParent = true, canvasAspectChanged = false, textChanged = false),
+            SubmitDerivationKind.forDescribeSubmit(hasParent = true, canvasAspectChanged = false, textChanged = false, grainChanged = false),
         )
     }
 
@@ -146,14 +206,17 @@ class SubmitDerivationKindTest {
             for (hasParent in listOf(false, true)) {
                 for (canvasAspectChanged in listOf(false, true)) {
                     for (flag in listOf(false, true)) {
-                        SubmitDerivationKind.forDescribeSubmit(hasParent, canvasAspectChanged, flag)?.let { add(it) }
+                        for (grainChanged in listOf(false, true)) {
+                            SubmitDerivationKind.forDescribeSubmit(hasParent, canvasAspectChanged, flag, grainChanged)
+                                ?.let { add(it) }
+                        }
                         SubmitDerivationKind.forDdlSubmit(hasParent, canvasAspectChanged, flag)?.let { add(it) }
                     }
                 }
             }
         }
         assertEquals(
-            setOf("canvas_aspect_change", "description_edit", "ddl_edit", "replay"),
+            setOf("canvas_aspect_change", "description_edit", "sketch_grain_change", "ddl_edit", "replay"),
             returned,
         )
         assertTrue(

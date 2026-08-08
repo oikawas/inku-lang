@@ -161,6 +161,7 @@ import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.InstructionLanguages
+import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.WebDdlSpec
 import java.io.File
 import java.io.FileOutputStream
@@ -1572,6 +1573,39 @@ private fun ConditionChips(state: InkuUiState, viewModel: InkuViewModel) {
     }
 }
 
+/**
+ * 写生 (Stage 0.5): one control carrying three states.
+ *
+ * It sits above the description because that is where the layer sits -- it
+ * reads the description before Stage 1 does. `切` is kept, since the layer can
+ * still be skipped, but it is marked as the one not to reach for: this row is
+ * the only place that says so (`sketchModeNote`, `sketch.ts:51-58`).
+ */
+@Composable
+private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        CompactLabel("写生")
+        Spacer(Modifier.weight(1f))
+        Sketches.MODES.forEach { mode ->
+            val note = Sketches.modeNote(mode, isJapanese = true)
+            MiniPill(
+                text = Sketches.modeLabel(mode, isJapanese = true) + note,
+                selected = state.sketchMode == mode,
+                onClick = { viewModel.setSketchMode(mode) },
+            )
+        }
+    }
+    Text(
+        Sketches.modeHint(state.sketchMode, isJapanese = true),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1594,6 +1628,7 @@ private fun DrawPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             )
             MiniPill("新規作成", onClick = viewModel::clearPrompt)
         }
+        SketchModeRow(state, viewModel)
         DenseMultilineInput(
             value = state.prompt,
             onValueChange = viewModel::setPrompt,

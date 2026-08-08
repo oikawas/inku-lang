@@ -29,6 +29,9 @@ import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.PaintResult
+import app.inku.mobile.pipeline.SketchInput
+import app.inku.mobile.pipeline.SketchMode
+import app.inku.mobile.pipeline.Sketches
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
@@ -54,6 +57,8 @@ private val BatchHistoryInputPrefix = Regex("^#\\d+\\s+")
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
+/** 写生 (Stage 0.5): which of the three states the control was left in. */
+const val SETTING_KEY_SKETCH_MODE = "sketch_mode"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 const val REFINEMENT_IN_PROGRESS = "推敲の候補を生成中です。"
 /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
@@ -142,6 +147,9 @@ data class InkuUiState(
     val canvasPanY: Float = 0f,
     val canvasPresentationMode: Boolean = false,
     val renderWild: Boolean = false,
+    // 写生 (Stage 0.5). One control, three states, and the author's default is
+    // that the layer runs cutting fine (`sketch.ts:26`, `sketch.py:36`).
+    val sketchMode: SketchMode = Sketches.DEFAULT_MODE,
     // 推敲 (SPEC :614). The element is one value, never a set: the radio is
     // exclusive because a lineage edge has one cause.
     val refinementOpen: Boolean = false,
@@ -620,6 +628,11 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(renderWild = wild)
     }
 
+    fun setSketchMode(mode: SketchMode) {
+        localState.value = localState.value.copy(sketchMode = mode)
+        persistSetting(SETTING_KEY_SKETCH_MODE, JSONObject().put("value", mode.wire).toString())
+    }
+
     fun setSaveReplayAsNewVersion(enabled: Boolean) {
         localState.value = localState.value.copy(saveReplayAsNewVersion = enabled)
         persistSetting("save_replay_as_new_version", JSONObject().put("enabled", enabled).toString())
@@ -897,12 +910,16 @@ class InkuViewModel @JvmOverloads constructor(
      * how web reaches the same judgment through `pendingCanvasAspectDerivation`
      * (+page.svelte:3219-3243).
      */
+    /** The work the next save descends from, or null when it becomes a root. */
+    private fun lineageParent(current: InkuUiState): HistoryItemEntity? =
+        (if (current.lineageDetached) null else current.selectedHistory)
+            ?.takeIf { !it.lineageNodeId.isNullOrEmpty() }
+
     private fun lineageFor(
         current: InkuUiState,
         kindOf: (parent: HistoryItemEntity?, canvasAspectChanged: Boolean) -> String?,
     ): LineageDeclaration {
-        val parent = (if (current.lineageDetached) null else current.selectedHistory)
-            ?.takeIf { !it.lineageNodeId.isNullOrEmpty() }
+        val parent = lineageParent(current)
         val canvasAspectChanged = parent != null && current.selectedCanvasAspect != parent.canvasAspect
         val kind = kindOf(parent, canvasAspectChanged)
         if (parent == null || kind == null) return LineageDeclaration()
@@ -926,8 +943,52 @@ class InkuViewModel @JvmOverloads constructor(
                 hasParent = parent != null,
                 canvasAspectChanged = canvasAspectChanged,
                 textChanged = parent != null && descriptionChanged(current.prompt, parent),
+                grainChanged = parent != null && grainChanged(current.sketchMode, parent),
             )
         }
+
+    /**
+     * Whether the 写生 (Stage 0.5) grain differs from the one its parent was
+     * painted at. web reaches the same judgment with
+     * `normalizeSketchGrain(displayedHistoryItem?.sketch_grain) !==
+     * sketchGrainOf(sketchMode)` (+page.svelte:3225-3227), and this is that
+     * comparison, both halves included.
+     *
+     * **What a parent with no grain is compared against: nothing.** The
+     * normalizer used here is web's -- [Sketches.recordedGrainOf], which answers
+     * `null` for an absent value, for `off`, and for a row written before the
+     * column. It is NOT [Sketches.normalizeGrain], which rounds an unknown value
+     * up to the default `fine` because it is resolving a *requested* grain.
+     * Using that one here would invert both readings: redrawing a work that
+     * predates the column with the layer off would look like a grain change,
+     * and redrawing it at `fine` would look like a replay. `off` carries no
+     * grain either ([Sketches.grainOf]), so absence compares equal to absence
+     * and a redraw with the layer off stays a replay -- which is what it is.
+     */
+    private fun grainChanged(mode: SketchMode, parent: HistoryItemEntity): Boolean =
+        Sketches.grainOf(mode) != Sketches.recordedGrainOf(parent.sketchGrain)
+
+    /**
+     * What the describe screen asks 写生 (Stage 0.5) for.
+     *
+     * A redraw that moved neither the description nor the grain replays the
+     * prose its parent was painted from rather than asking the layer again
+     * (+page.svelte:3238-3241): the layer is not deterministic, so calling it a
+     * second time would produce a different sketch, and that is not a replay.
+     * Anything else -- an edited description, a moved grain, no parent at all --
+     * carries no prose, and the layer runs if the control asks it to.
+     */
+    private fun describeSketchInput(current: InkuUiState): SketchInput {
+        val parent = lineageParent(current)
+        val replaying = parent != null &&
+            !descriptionChanged(current.prompt, parent) &&
+            !grainChanged(current.sketchMode, parent)
+        return SketchInput(
+            requested = current.sketchMode != SketchMode.Off,
+            text = if (replaying) parent?.sketchText else null,
+            grain = Sketches.grainOf(current.sketchMode)?.wire,
+        )
+    }
 
     private fun ddlLineage(current: InkuUiState): LineageDeclaration =
         lineageFor(current) { parent, canvasAspectChanged ->
@@ -986,6 +1047,9 @@ class InkuViewModel @JvmOverloads constructor(
         // Read before the coroutine starts: the first thing it does is clear
         // `selectedHistory` (below), so a parent read from inside would be gone.
         val declared = describeLineage(current)
+        // Read here for the same reason: it is decided against the parent, and
+        // the coroutine clears the parent before it draws.
+        val sketchRequest = describeSketchInput(current)
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             val lineage = withPreviewParent(current, declared)
@@ -1007,6 +1071,7 @@ class InkuViewModel @JvmOverloads constructor(
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
+                        sketch = sketchRequest,
                     )
                 }
                 if (!isCurrentDrawingRun(runId)) return@launch
@@ -1026,6 +1091,14 @@ class InkuViewModel @JvmOverloads constructor(
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
                         lineage = lineage,
+                        // 0.5 ran in the step above and is not run again: what it
+                        // produced -- and what it did, including a fallback the
+                        // prose cannot show -- travels to the save from there.
+                        sketch = sketchRequest.copy(
+                            text = interpreted.sketchText,
+                            grain = interpreted.sketchGrain,
+                            claimedState = interpreted.sketchState,
+                        ),
                     )
                 }
             }.onSuccess { item ->
@@ -2025,6 +2098,11 @@ class InkuViewModel @JvmOverloads constructor(
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
         val batchHistory = settings["batch_prompt_history"]?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
+        // A stored word that is not one of the three is not the author's choice,
+        // so the author's default stands rather than a silent `off`.
+        val sketchMode = settings[SETTING_KEY_SKETCH_MODE]
+            ?.let { stored -> Sketches.MODES.firstOrNull { it.wire == JSONObject(stored).optString("value") } }
+            ?: current.sketchMode
         val refinementElement = settings[SETTING_KEY_REFINEMENT_ELEMENT]
             ?.let { RefinementElement.byId(JSONObject(it).optString("value")) }
             ?: current.refinementElement
@@ -2050,6 +2128,7 @@ class InkuViewModel @JvmOverloads constructor(
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),
             batchPromptHistory = batchHistory,
+            sketchMode = sketchMode,
             refinementElement = refinementElement,
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,

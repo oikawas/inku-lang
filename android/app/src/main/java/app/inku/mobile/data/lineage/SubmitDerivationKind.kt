@@ -24,18 +24,27 @@ object SubmitDerivationKind {
      * The kind a redraw from the describe screen writes. Ported from
      * `submitDerivationKind` (web/src/lib/derivation.ts:64-75).
      *
-     * The 写生 (Stage 0.5) grain branch web has between `textChanged` and
-     * `replay` is absent because this client has no such layer to change the
-     * grain of; contract 5/5 brings the branch together with the layer.
+     * [grainChanged] is the 写生 (Stage 0.5) grain, and it is read *after* the
+     * description for the same reason the canvas ratio is read before it: one
+     * edge, one cause (SPEC.ja.md:614). A run that rewrote the description and
+     * moved the grain together writes `description_edit` alone. A redraw at the
+     * same grain is a replay -- the layer is not deterministic, so asking it
+     * again would not reproduce the prose, and the prose the work was painted
+     * from is replayed instead (SPEC.ja.md:1198).
      */
     fun forDescribeSubmit(
         hasParent: Boolean,
         canvasAspectChanged: Boolean,
         textChanged: Boolean,
+        // No default: web's input type makes every one of the four required, and
+        // a caller that stayed silent here would quietly get "the grain did not
+        // move" and write `replay` over a real grain edge.
+        grainChanged: Boolean,
     ): String? {
         if (canvasAspectChanged) return CANVAS_ASPECT_CHANGE
         if (!hasParent) return null
         if (textChanged) return DESCRIPTION_EDIT
+        if (grainChanged) return SKETCH_GRAIN_CHANGE
         return REPLAY
     }
 
@@ -57,5 +66,6 @@ object SubmitDerivationKind {
     const val CANVAS_ASPECT_CHANGE = "canvas_aspect_change"
     const val DESCRIPTION_EDIT = "description_edit"
     const val DDL_EDIT = "ddl_edit"
+    const val SKETCH_GRAIN_CHANGE = "sketch_grain_change"
     const val REPLAY = "replay"
 }

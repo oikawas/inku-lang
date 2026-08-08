@@ -23,7 +23,24 @@ class LocalFallbackPipeline(
                 "prompt_chars=${request.description.length} catalog_id=${request.colorCatalogId} canvas_aspect=${request.canvasAspect}",
         )
         val interpreted = interpret(request)
-        return composeFromDdl(interpreted.ddlForDisplay, request).also {
+        // 0.5 ran once, inside `interpret`, exactly as it does on the server's
+        // own two-step route (`/api/interpret` returns `sketch_text` and
+        // `sketch_grain`, `render.py:1558-1560`, and the caller hands them to
+        // `/api/compose`). Carrying the state as well is the same move web makes
+        // when it saves: a client knows its own path and may name the state, and
+        // the derivation only fills in for one that did not (`history.py:255`).
+        // Without that, a run whose layer fell back would be saved as `off` --
+        // a wiring regression written down as a choice the author made.
+        return composeFromDdl(
+            interpreted.ddlForDisplay,
+            request.copy(
+                sketch = request.sketch.copy(
+                    text = interpreted.sketchText,
+                    grain = interpreted.sketchGrain,
+                    claimedState = interpreted.sketchState,
+                ),
+            ),
+        ).also {
             Log.i(
                 PERF_TAG,
                 "paint_done elapsed_ms=${System.currentTimeMillis() - started} stage1_model=${request.stage1Model} " +
@@ -34,20 +51,40 @@ class LocalFallbackPipeline(
 
     suspend fun interpret(request: PaintRequest): InterpretResult {
         // The language is settled on the author's own words, once, before any
-        // stage reads a prompt (`render.py:1735-1741`).
+        // stage reads a prompt -- and before 0.5, which is handed the answer
+        // rather than deciding for itself (`render.py:1486-1500`). Reading the
+        // sketch here instead would let the layer choose the language it is
+        // written in.
         val requestedLang = InstructionLanguages.normalize(request.instructionLang)
         val resolvedLang = InstructionLanguages.resolveWithUiLang(request.description, requestedLang)
-        val generatedDdl = generateStage1(request, resolvedLang)
+        val sketch = SketchFromLife.resolve(
+            input = request.sketch,
+            description = request.description,
+            provider = modelProvider,
+            modelId = request.stage1Model,
+            lang = resolvedLang,
+        )
+        // 写生 (Stage 0.5) stands in for the description everywhere the
+        // description went: Stage 1, the plugin expansion, Stage 1.5, Stage 2
+        // and coerce (`render.py:1503-1510`, `:1754-1764`). Wiring it into the
+        // Stage 1 prompt alone would leave the rest reading the raw description,
+        // and the range the layer exists to open would not appear.
+        // `originalText` is left untouched -- it is what the work is saved and
+        // hashed as (`artifact_input`, `render.py:1903`).
+        val sourceText = sketch?.text
+        val stage1Text = sourceText ?: request.description
+        val generatedDdl = generateStage1(request, resolvedLang, stage1Text)
         val normalizedDdl = generatedDdl ?: if (request.stage1Model.isExplicitProviderModelId()) {
             error("Stage 1 explicit provider returned no usable DDL.")
         } else {
-            interpretText(request.description)
+            interpretText(stage1Text)
         }
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(normalizedDdl, request, resolvedLang)
+            expandIntermediateDdl(normalizedDdl, request, resolvedLang, sourceText)
         } else {
             normalizedDdl
         }
+        val recorded = sketch != null && !sketch.fallbackUsed
         return InterpretResult(
             originalInput = request.originalText,
             normalizedDdl = normalizedDdl,
@@ -55,6 +92,16 @@ class LocalFallbackPipeline(
             ddlForDisplay = expandedDdl,
             instructionLangRequested = requestedLang,
             instructionLangResolved = resolvedLang,
+            sketchText = if (recorded) sketch?.text else null,
+            sketchGrain = if (recorded) sketch?.grain?.wire else null,
+            // Derived once, through the one function that names what 0.5 did,
+            // so the record and what the author is shown cannot disagree
+            // (`render.py:1919-1926`).
+            sketchState = SketchFromLife.stateOf(
+                sketch,
+                requested = request.sketch.requested,
+                hasDescription = request.description.isNotBlank(),
+            ).wire,
         )
     }
 
@@ -67,8 +114,13 @@ class LocalFallbackPipeline(
             request.description.ifEmpty { ddl },
             requestedLang,
         )
+        // This path begins at Stage 2, so 0.5 never runs here. When the caller
+        // carries a prose (a candidate, a redraw of a saved work) it stands in
+        // for the description in the plugin expansion and Stage 1.5, the same
+        // way it does during a paint (`render.py:1327-1338`).
+        val carriedSketch = (request.sketch.text ?: "").trim().ifEmpty { null }
         val expandedDdl = if (request.autoRepair) {
-            expandIntermediateDdl(ddl, request, resolvedLang)
+            expandIntermediateDdl(ddl, request, resolvedLang, carriedSketch)
         } else {
             ddl
         }
@@ -125,6 +177,23 @@ class LocalFallbackPipeline(
             seedText = request.seedText,
             instructionLangRequested = requestedLang,
             instructionLangResolved = resolvedLang,
+            sketchText = carriedSketch,
+            sketchGrain = if (!request.sketch.text.isNullOrEmpty()) {
+                Sketches.normalizeGrain(request.sketch.grain).wire
+            } else {
+                null
+            },
+            // The state is named through the one derivation function rather than
+            // by rules of this path's own, so this writer cannot mean something
+            // different by "off" than the paint path does (`render.py:1340-1344`).
+            // A `null` here would say the row predates the column, which is a
+            // sixth state only the migration may write.
+            sketchState = SketchFromLife.claimedOrDerivedState(
+                claimed = request.sketch.claimedState,
+                prose = carriedSketch,
+                grain = request.sketch.grain,
+                hasDescription = request.description.isNotBlank(),
+            ).wire,
         )
     }
 
@@ -138,6 +207,12 @@ class LocalFallbackPipeline(
         JSONObject(metadataJson).put("render_seed", renderSeed).toString()
 
     fun renderFromScore(scoreJson: String, request: PaintRequest): PaintResult {
+        // Replaying a Score reads no description and runs no stage, so 0.5 has
+        // nothing to do here either. The state is still named -- through the
+        // same function the server's own client-save path uses
+        // (`_derived_sketch_state`, `history.py:158-175`) -- because leaving the
+        // column empty would claim the row is older than the column.
+        val carriedSketch = (request.sketch.text ?: "").trim().ifEmpty { null }
         val normalizedScore = JSONObject(scoreJson).toString()
         val renderSeed = effectiveRenderSeed(request)
         val render = renderer.render(
@@ -173,24 +248,41 @@ class LocalFallbackPipeline(
             variationAmplitude = request.variationAmplitude,
             variationSeed = request.variationSeed,
             seedText = request.seedText,
+            sketchText = carriedSketch,
+            sketchGrain = if (!request.sketch.text.isNullOrEmpty()) {
+                Sketches.normalizeGrain(request.sketch.grain).wire
+            } else {
+                null
+            },
+            sketchState = SketchFromLife.claimedOrDerivedState(
+                claimed = request.sketch.claimedState,
+                prose = carriedSketch,
+                grain = request.sketch.grain,
+                hasDescription = request.description.isNotBlank(),
+            ).wire,
         )
     }
 
-    private suspend fun generateStage1(request: PaintRequest, lang: String): String? {
+    /**
+     * [stage1Text] is what Stage 1 actually reads: the prose 写生 (Stage 0.5)
+     * produced when the layer ran, the description itself when it did not
+     * (`stage1_text`, `render.py:1761-1764`).
+     */
+    private suspend fun generateStage1(request: PaintRequest, lang: String, stage1Text: String): String? {
         val provider = modelProvider ?: return null
         val started = System.currentTimeMillis()
         return runCatching {
             Log.i(
                 PERF_TAG,
-                "stage1_start model_id=${request.stage1Model} prompt_chars=${request.description.length}",
+                "stage1_start model_id=${request.stage1Model} prompt_chars=${stage1Text.length}",
             )
             val generated = provider.generate(
                 ModelRequest(
                     modelId = request.stage1Model,
-                    prompt = request.description,
+                    prompt = stage1Text,
                     temperature = 0.2,
                     maxTokens = 1024,
-                    systemInstruction = stage1SystemPromptFor(request.stage1Model, request.description, request.litertStage1PromptOptimization, lang),
+                    systemInstruction = stage1SystemPromptFor(request.stage1Model, stage1Text, request.litertStage1PromptOptimization, lang),
                 ),
             ).text.cleanModelText().normalizeStage1DdlText()
             if (!generated.isUsableStage1Ddl()) {
@@ -378,7 +470,12 @@ class LocalFallbackPipeline(
      * there, which is `_validated_variation_amplitude` plus the seed on the
      * server.
      */
-    private fun expandIntermediateDdl(ddl: String, request: PaintRequest, lang: String): String {
+    private fun expandIntermediateDdl(
+        ddl: String,
+        request: PaintRequest,
+        lang: String,
+        sourceText: String? = null,
+    ): String {
         return WebDdlExpander.expandIntermediateDdl(
             ddl,
             // Stage 1.5 is chosen by the same resolved language as the two
@@ -386,7 +483,10 @@ class LocalFallbackPipeline(
             // (`render.py:889`, `:1542`). The expander here already had both
             // branches; only the wire was missing.
             lang = InstructionLanguages.support(lang).code,
-            contextText = request.originalText,
+            // `context_text=original_description` (`render.py:893`), and
+            // `original_description` is `source_text` -- the sketch when 0.5
+            // ran, the description when it did not (`render.py:1358`, `:1760`).
+            contextText = sourceText ?: request.originalText,
             varySeed = request.compositionSeed,
             variationAmplitude = request.variationAmplitude,
             variationSeed = request.variationSeed,

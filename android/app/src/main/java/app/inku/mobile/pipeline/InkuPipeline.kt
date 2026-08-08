@@ -98,6 +98,14 @@ data class PaintRequest(
      * quantities and the server stores them in two columns.
      */
     val instructionLang: String? = null,
+    /**
+     * 写生 (Stage 0.5). The server's three request fields in one value
+     * (`render.py:333-336`). The default is the layer switched off, which is
+     * `sketch: bool = Field(default=False)` there: a caller that says nothing
+     * gets the plain path, and it is the screen that carries the author's
+     * default of `fine`.
+     */
+    val sketch: SketchInput = SketchInput(),
 )
 
 /**
@@ -135,6 +143,20 @@ data class PaintResult(
      */
     val instructionLangRequested: String? = null,
     val instructionLangResolved: String? = null,
+    /**
+     * 写生 (Stage 0.5), as the row records it (`render.py:1917-1922`,
+     * `:1975-1977`).
+     *
+     * [sketchText] and [sketchGrain] are what the *layer produced*, and they are
+     * absent when the layer fell back: a fallback carries the description
+     * itself, and writing that into the prose column would make a work that
+     * never went through the layer indistinguishable from one that did.
+     * [sketchState] is present on every path, and it is the only trace a
+     * fallback leaves -- which is the point of having a state column at all.
+     */
+    val sketchText: String? = null,
+    val sketchGrain: String? = null,
+    val sketchState: String? = null,
 )
 
 data class InterpretResult(
@@ -148,6 +170,19 @@ data class InterpretResult(
     val tokensOut: Int? = null,
     val fallbackUsed: Boolean = false,
     val fallbackReasons: List<String> = emptyList(),
+    /**
+     * 写生 (Stage 0.5), which runs here and nowhere else on a describe-screen
+     * submit: this is the step that reads the description. The server's
+     * `/api/interpret` answers the same way (`render.py:1558-1560`), and the
+     * caller hands these straight to the composing step so the layer is not
+     * asked twice for a prose it cannot reproduce.
+     *
+     * [sketchText] and [sketchGrain] are absent when the layer fell back;
+     * [sketchState] is always present and is the only trace that leaves.
+     */
+    val sketchText: String? = null,
+    val sketchGrain: String? = null,
+    val sketchState: String? = null,
 )
 
 /**

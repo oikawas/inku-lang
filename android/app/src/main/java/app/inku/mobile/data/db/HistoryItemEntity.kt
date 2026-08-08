@@ -100,4 +100,17 @@ data class HistoryItemEntity(
     // (`db.py:1835`).
     @ColumnInfo(name = "source_text")
     val sourceText: String? = null,
+    // 写生 (Stage 0.5). Three nullable Text columns, the server's names and its
+    // types (`db.py`), and the state is the one that is always written: a work
+    // whose layer fell back records `fallback` here with no prose beside it.
+    //
+    // NULL in these three is a sixth state and it is NOT `off`: `off` is a
+    // choice the author made, and a row written before the columns existed made
+    // no such choice. Only the migration may produce it.
+    @ColumnInfo(name = "sketch_text")
+    val sketchText: String? = null,
+    @ColumnInfo(name = "sketch_grain")
+    val sketchGrain: String? = null,
+    @ColumnInfo(name = "sketch_state")
+    val sketchState: String? = null,
 )

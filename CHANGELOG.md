@@ -4012,3 +4012,44 @@ the graph on screen and gives the first control that writes to it.
 - **Tests:** **JVM 197 / 0 failures** (41 classes, from 173), **instrumented 62 / 0 failures**
   (Pixel 9 hardware, from 46). **Only `android/VERSION` moves** — `APP_VERSION` and
   `web/BUILD_NUMBER` stay put, and nothing is deployed to pentala.
+
+### v2.11.5 — the placement got a seed of its own (Build 860, render engine 23, 2026-08-08)
+
+**Moving the seed to compare touches moved the composition as well.**
+
+Up to engine 22 a single `render_seed` decided both the **placement** — where an arrangement puts
+its marks — and the **hand**: each stroke's touch, the colour assignment, the ground, and the
+resolution of the performance. So the operation "show me another touch of the same composition"
+did not exist — **on a work that scatters 60 marks, moving `render_seed` alone moves all 180
+coordinates**. `SPEC.md` `:614` and `:678` state the opposite: **refining the touch keeps the
+composition of the same Score**. **This was a defect in the measuring instrument, not a missing
+feature.**
+
+- **`composition_seed` now carries the placement phase, and only that.** The key was already in the
+  database, in the four render routes and in all four clients, but **it had never reached the
+  renderer**. Five points of carriage were built to deliver it (the `renderer.render()` argument,
+  the engine protocol, the default engine, `_render_with_metadata`, and `_render_score_svg` with
+  `RenderSvgRequest`). **The four callers of `_render_with_metadata` were not changed by one line.**
+- **`render_seed` keeps the hand.** Touch, colour assignment, ground and performance resolution do
+  not move. **Placement and hand can be varied separately for the first time.**
+- **With no `composition_seed` the placement falls back to `render_seed`**, so **not one existing
+  picture moves**. **The test is `is not None`**, so **`0` is the seed zero and not "not given".**
+- **The reference corpus goes 531 → 535 cases, and not one of the 531 moved** (the change list
+  holds only the four added). The four are **twins of existing cases**, with the same Score and the
+  same `render_seed`, differing only in `composition_seed` — **60/60, 16/16, 60/60 and 60/60** of
+  the expanded marks move, so an implementation that confuses the two seeds fails them.
+  **Layouts whose placement does not follow the seed (`G-radial-*`, `G-*-nopath-*`) were not used**,
+  since they would make the expectation vacuous.
+- **`ddl_engine_version` did not move** (still 7). Nothing through Stage 2 changes by a byte.
+- **The Android reference fixtures gained a `render-engine-23/` directory of 55 files**, and **no
+  Kotlin changed** — Android reads only the `render-engine-21/` it declares, so **raising the engine
+  adds a directory and nothing else** (the design from cycle 43; demonstrated by JVM 197 / 0
+  failures on the merged tree).
+- **One gap remains**: the history SVG export (profiles other than `display`) does not pass
+  `render_seed`, so **it now reproduces the placement of the stored picture but not its hand**.
+  Before this change it reproduced neither, so **half is fixed and half remains**. Filed as [I-158].
+- **Tests:** server **2379 / 31 skipped / 0 failed** (from 2367, **+12** for the new acceptance
+  T-1..T-12); **eleven perturbations applied to product code only**. **One of them turned nothing
+  red at first** — the generator that bakes the corpus and the two tests that check it **each wrote
+  out the same argument list separately**, so cutting the generator's wiring left the tests still
+  passing the value. **The replay was extracted into one named call to close it.**

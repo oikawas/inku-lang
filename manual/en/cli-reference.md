@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions of regular users, group leads, and administrators.
 
-It covers inku v2.11.4 (Web Build 859).
+It covers inku v2.11.5 (Web Build 860).
 
 ## Basics
 
@@ -88,7 +88,7 @@ paint and batch take the same flags. **A flag you omit falls back to the server 
 | Flag | Contents |
 |---|---|
 | `--render-seed SEED` | Performance seed. The same seed and the same score give the same picture |
-| `--composition-seed SEED` | Stage 1.5 composition variation seed |
+| `--composition-seed SEED` | Seed for where the marks are placed. Without it the placement follows `--render-seed` (render engine 23 onwards) |
 | `--seed-text TEXT` | Text used only to derive the performance seed; the counterpart of `Another performance` in the Web UI |
 | `--interpretation-seed ID` | Ask Stage 1 for an explicit re-interpretation under this identifier instead of reusing the previous reading |
 

@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-08 — v2.11.5 unreleased baseline (Web Build 860)
+
+The 13 places that name a version were updated to v2.11.5 (Build 860).
+
+- **`Another performance` now keeps the composition.** Until this version, changing only the touch also **moved where the marks were placed**, because one seed decided both. From this version the placement is decided by `composition_seed`, so a new touch seed leaves the composition where it was. **The action now behaves the way its own description said it did.**
+- **`inku-cli --composition-seed` now actually draws at the placement you asked for.** It used to record the value in the output metadata and in the identity hash while **never drawing with it**. The flag's description in the `inku-cli Reference` was corrected as well.
+- **Existing works look exactly as they did** (a stored SVG is returned unchanged). Redrawing the same description also gives the same picture as before unless you set a composition seed.
+- The render engine goes 22 to 23. Section 6 of `Server Configuration` now states how the placement seed is resolved: it follows the performance seed when omitted, and `0` is a seed rather than "not given".
+
 ## 2026-08-07 — v2.11.4 unreleased baseline (Web Build 859)
 
 The thirteen places that name a version now read v2.11.4 (Build 859). No explanatory text changed.

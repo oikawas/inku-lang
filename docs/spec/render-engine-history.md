@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **23** | v2.11.5 | 860 | 2026-08-08 | 535 | **4** | **531** |
 | **22** | v2.11.4 | 859 | 2026-08-07 | 531 | **52** | **479** |
 | **21** | v2.9.34 | 838 | 2026-08-03 | 525 | **32** | **493** |
 | **20** | v2.9.20 | 813 | 2026-08-01 | 525 | **32** | **493** |
@@ -120,14 +121,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `22` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `23` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `7` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.4 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.5 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 859 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 860 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -394,6 +395,51 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 23 — the placement got a seed of its own (v2.11.5)
+
+**Moving the seed to compare touches moved the composition as well.**
+
+Up to engine 22 a single `render_seed` decided both the **placement** — where an arrangement puts
+its marks — and the **hand**: each stroke's touch, the colour assignment, the ground, and the
+resolution of the performance. **On a work that scatters 60 marks, moving `render_seed` alone moves
+all 180 coordinates.** `SPEC.md` `:614` and `:678` state the opposite — **refining the touch keeps
+the composition of the same Score**. **This version repairs a defect in the measuring instrument;
+it does not add a feature.**
+
+**`composition_seed` was already in the database, in the four render routes and in all four
+clients. The only stretch it never crossed was the one into the renderer.** Five points of carriage
+were built: the `renderer.render()` argument, the engine protocol, the default engine, the line
+where `_render_with_metadata` takes it out of `render_metadata`, and `_render_score_svg` with
+`RenderSvgRequest`. **The four callers of `_render_with_metadata` were not changed by one line.**
+
+**Only the placement phase was separated.** `render_seed` keeps the touch,
+`_work_color_assignment`, `_render_canvas_ground` and `_resolve_performance_score`, so **placement
+and hand can be varied separately for the first time.**
+
+**The fallback is `render_seed`, and the test is `is not None`.** A request that does not give a
+`composition_seed` renders exactly as it did under engine 22. **`0` is the seed zero, not "not
+given"** — written with `or`, zero would fall through to the fallback, and **the one user who asked
+for seed 0 would be the one who does not get their composition back.**
+
+### Version and corpus
+
+**531 → 535 cases, and not one of the 531 moved** (`changed_from_previous` holds only the four
+added). **The version rises although no picture changed, because the performable vocabulary grew** —
+the second of the two conditions for raising it.
+
+The four added are **twins of existing cases**, with the same Score and the same `render_seed`
+(12345), differing only in `composition_seed` (777). Of the expanded marks, the ones that move are
+`G-composition-scatter-edge` **60/60**, `G-composition-grid-center` **16/16**,
+`G-composition-cluster-center` **60/60** and `G-composition-path-wave-edge` **60/60**.
+**Layouts whose placement does not follow the seed (`G-radial-*` and `G-*-nopath-*`) were not
+used** — their output is identical under either seed, so an expectation built on them is vacuous.
+
+**`ddl_engine_version` did not move** (still 7). Nothing through Stage 2 changes by a byte.
+
+**The Android reference fixtures gained a `render-engine-23/` directory of 55 files, and no Kotlin
+changed** — Android reads only the directory of the version it declares, so **raising the engine
+adds a directory and nothing else.**
 
 ## engine 22 — a fill gets an underlay, and what sits on it gets a branch (v2.11.4)
 

@@ -4862,6 +4862,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const usedSeeds = new Set<number>();
 			if (Number.isFinite(result.render_seed ?? NaN)) usedSeeds.add(Number(result.render_seed));
 			const nextSeed = createSafeIntegerSeed(usedSeeds);
+			// The placement on screen was drawn with composition_seed when the work has one and
+			// with render_seed otherwise (renderer.py:3058). Send that same value so changing the
+			// touch keeps the composition, which is what this operation says it does. It is also
+			// carried onto the result below: without that, a second touch change would find no
+			// composition_seed and fall back to the new performance seed, moving the composition.
+			const placementSeed = result.composition_seed ?? result.render_seed ?? null;
 			const r = await apiFetch('/api/render-svg', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -4869,12 +4875,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					score: result.score,
 					canvas_aspect: refinementCanvasAspectId(),
 					render_seed: nextSeed,
+					composition_seed: placementSeed,
 					...renderSettingsPayload('render-svg', colorCatalogOverride(refinementCatalogId())),
 				})
 			});
 			if (!r.ok) throw await apiError(r);
 			const svg = await r.text();
-			result = { ...result, svg, render_seed: nextSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_change' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
+			result = { ...result, svg, render_seed: nextSeed, composition_seed: placementSeed, render_hash: null, render_hash_short: null, history_id: null, history_at: null, lineage_node_id: null, lineage_parent_node_id: parentNodeId, derivation_kind: parentNodeId ? 'touch_change' : null, derivation_metadata: { render_seed_from: result.render_seed ?? null, render_seed_to: nextSeed } };
 			displayedHistoryItem = null;
 			historyCursor = -1;
 			outputTab = 'canvas';
@@ -5040,7 +5047,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				input: input.trim(),
 				ddl: ddl ?? '',
 				canvas_aspect: refinementCanvasAspectId(),
-				composition_seed: result.composition_seed,
+				// Same reasoning as varyPerformance: the placement on screen followed render_seed
+				// when the work carries no composition_seed, so sending the raw field would send
+				// null and let the placement follow the new performance seed instead.
+				composition_seed: result.composition_seed ?? result.render_seed ?? null,
 				interpretation_seed: result.interpretation_seed,
 				seed_text: normalizedSeedText,
 				...renderSettingsPayload('render-score', colorCatalogOverride(refinementCatalogId())),

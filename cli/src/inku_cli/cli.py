@@ -2812,6 +2812,10 @@ def command_render_score(args: argparse.Namespace) -> int:
             "canvas_aspect": args.canvas_aspect,
             "svg_profile": args.svg_profile,
             "render_seed": args.render_seed,
+            # Since render engine 23 this seed decides the placement, so it has to be sent
+            # and not only recorded: the metadata and the render hash below both name it,
+            # and without this line they would name a seed the picture was not drawn with.
+            "composition_seed": args.composition_seed,
         },
     )
     # The server drew this SVG, so the server names the versions it drew with.
@@ -3550,7 +3554,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
-    parser.add_argument("--composition-seed", type=int, help="Stage 1.5 composition variation seed")
+    parser.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")
     parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
     # Spelled straight from the server request keys (`sketch_grain` -> `--sketch-grain`).
     # These layers have always been accepted by /api/paint; the CLI simply never named
@@ -3692,7 +3696,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display")
     render_score.add_argument("--canvas-aspect", default="square")
     render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
-    render_score.add_argument("--composition-seed", type=int, help="record Stage 1.5 composition variation seed in output metadata")
+    render_score.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")
     render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     render_score.add_argument("--color-catalog", help="server color catalog id")
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")

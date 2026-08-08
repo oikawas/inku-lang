@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v2.11.4（Web Build 859）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v2.11.5（Web Build 860）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -210,7 +210,7 @@ Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費
 
 ## 6. Rendererと再現性
 
-`render_seed`はタッチ、`composition_seed`は配置、`variation_seed`は変奏、`interpretation_seed`は読み取りの再現補助です。`seed_text`は明示語を決定的にhashし、Rendererのperformance seedだけへ作用します。解釈、DDL、JSON Score、配置へ作用させません。
+`render_seed`はタッチ、`composition_seed`は配置、`variation_seed`は変奏、`interpretation_seed`は読み取りの再現補助です。render engine 23以降、配置は`composition_seed`が決め、省略したときだけ`render_seed`に従います。判定は`is not None`なので、`0`は「指定なし」ではなく0というseedです。`seed_text`は明示語を決定的にhashし、Rendererのperformance seedだけへ作用します。解釈、DDL、JSON Score、配置へ作用させません。
 
 `variation_seed`は`variation_amplitude`と揃って初めて効きます。片方だけでは展開層の軸は動きません。
 

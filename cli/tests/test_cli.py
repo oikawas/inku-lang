@@ -2044,12 +2044,14 @@ def _render_score_client(info=None, *, info_fails=False):
 
         def request_text(self, method, path, **kwargs):
             assert path == "/api/render-svg", path
+            FakeClient.sent.append(kwargs.get("data") or {})
             return "<svg></svg>"
 
+    FakeClient.sent = []
     return FakeClient
 
 
-def _run_render_score(monkeypatch, capsys, client):
+def _run_render_score(monkeypatch, capsys, client, *extra_argv):
     monkeypatch.setattr(cli, "ApiClient", client)
     parser = cli.build_parser()
     args = parser.parse_args([
@@ -2057,6 +2059,7 @@ def _run_render_score(monkeypatch, capsys, client):
         json.dumps({"version": "0.1.0", "background": "white", "instructions": []}),
         "--color-catalog", "default",
         "--render-seed", "4242",
+        *extra_argv,
     ])
     assert cli.command_render_score(args) == 0
     return json.loads(capsys.readouterr().out)
@@ -2072,6 +2075,34 @@ def test_render_score_names_the_engine_version_the_server_drew_with(monkeypatch,
     result = _run_render_score(monkeypatch, capsys, _render_score_client())
 
     assert result["render_engine_version"] == "22"
+
+
+def test_render_score_sends_the_composition_seed_it_records(monkeypatch, capsys):
+    """Recording a seed the picture was not drawn with is worse than not naming one.
+
+    Since render engine 23 `composition_seed` decides the placement, so the request
+    has to carry it. The command wrote it into the output metadata and into the
+    render hash while never sending it, so both named a seed the server never saw
+    and the drawing kept the placement of `--render-seed`.
+    """
+    client = _render_score_client()
+    result = _run_render_score(monkeypatch, capsys, client, "--composition-seed", "777")
+
+    assert client.sent[-1]["composition_seed"] == 777
+    assert result["composition_seed"] == 777
+
+
+def test_render_score_leaves_the_composition_seed_out_when_it_is_not_asked_for(monkeypatch, capsys):
+    """The counterpart: absent must stay absent, not become a number.
+
+    The server reads this field with `is not None`, so sending anything other
+    than None would take the placement off the performance seed for every caller
+    that never asked for a composition seed.
+    """
+    client = _render_score_client()
+    _run_render_score(monkeypatch, capsys, client)
+
+    assert client.sent[-1]["composition_seed"] is None
 
 
 def test_render_score_takes_the_build_number_from_the_server(monkeypatch, capsys):

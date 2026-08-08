@@ -274,7 +274,8 @@ options:
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
   --composition-seed COMPOSITION_SEED
-                        Stage 1.5 composition variation seed
+                        seed for where the marks are placed; without it the
+                        placement follows --render-seed
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
@@ -380,7 +381,8 @@ options:
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
   --composition-seed COMPOSITION_SEED
-                        Stage 1.5 composition variation seed
+                        seed for where the marks are placed; without it the
+                        placement follows --render-seed
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
@@ -555,8 +557,8 @@ options:
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay
   --composition-seed COMPOSITION_SEED
-                        record Stage 1.5 composition variation seed in output
-                        metadata
+                        seed for where the marks are placed; without it the
+                        placement follows --render-seed
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
   --color-catalog COLOR_CATALOG

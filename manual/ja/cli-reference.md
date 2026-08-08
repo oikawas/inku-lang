@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、一般ユーザー、グループリード、管理者それぞれの権限判定はサーバーが行います。
 
-対象はinku v2.11.4（Web Build 859）です。
+対象はinku v2.11.5（Web Build 860）です。
 
 ## 基本操作
 
@@ -88,7 +88,7 @@ paintとbatchは同じ旗を受け取ります。**旗を書かなければサ�
 | 旗 | 内容 |
 |---|---|
 | `--render-seed SEED` | 演奏のseed。同じseedと同じScoreなら同じ絵になる |
-| `--composition-seed SEED` | Stage 1.5の配置変奏のseed |
+| `--composition-seed SEED` | 墨を置く位置のseed。省略すると配置は`--render-seed`に従う（render engine 23〜） |
 | `--seed-text TEXT` | 演奏のseedだけを導く文字列（Web UIの「言葉でタッチを変える」に相当） |
 | `--interpretation-seed ID` | 前の読み取りを使い回さず、この識別子でStage 1へ明示的な読み直しを求める |
 

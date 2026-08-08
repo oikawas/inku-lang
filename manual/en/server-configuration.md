@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.11.4 (Web Build 859). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.11.5 (Web Build 860). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -210,7 +210,7 @@ Mutually inconsistent values are rounded rather than rejected — if the represe
 
 ## 6. Renderer and Replay
 
-`render_seed` controls touch, `composition_seed` supports composition variation, `variation_seed` supports the variation layer, and `interpretation_seed` supports reading variation. `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or composition.
+`render_seed` controls touch, `composition_seed` controls placement, `variation_seed` supports the variation layer, and `interpretation_seed` supports reading variation. From render engine 23 the placement is decided by `composition_seed`, and follows `render_seed` only when it is omitted. The test is `is not None`, so `0` is the seed zero and not "not given". `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or composition.
 
 `variation_seed` takes effect only together with `variation_amplitude`. Either one alone moves no axis of the expansion layer.
 

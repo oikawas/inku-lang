@@ -2007,3 +2007,125 @@ def test_the_generator_says_the_manual_is_current():
         cwd=GENERATOR.parent.parent,
     )
     assert done.returncode == 0, done.stderr or done.stdout
+
+
+SERVER_INFO = {
+    "name": "inku-server",
+    "version": "v2.11.4",
+    "release_version": "2.7.2",
+    "build_number": "859",
+    "render_engine_id": "default",
+    "render_engine_version": "22",
+    "ddl_version": "3",
+    "ddl_engine_version": "7",
+}
+
+
+def _render_score_client(info=None, *, info_fails=False):
+    """A client for `render-score`: catalogs, the drawing, and /api/info."""
+    payload = SERVER_INFO if info is None else info
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            if path == "/api/color-catalogs":
+                # The wire format is a list; CATALOG_DATA is the normalized one.
+                return {
+                    "default_catalog_id": CATALOG_DATA["default_catalog_id"],
+                    "catalogs": list(CATALOG_DATA["catalogs"].values()),
+                }, None
+            if path == "/api/info":
+                if info_fails:
+                    raise cli.CliError("connection refused")
+                return payload, None
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        def request_text(self, method, path, **kwargs):
+            assert path == "/api/render-svg", path
+            return "<svg></svg>"
+
+    return FakeClient
+
+
+def _run_render_score(monkeypatch, capsys, client):
+    monkeypatch.setattr(cli, "ApiClient", client)
+    parser = cli.build_parser()
+    args = parser.parse_args([
+        "render-score",
+        json.dumps({"version": "0.1.0", "background": "white", "instructions": []}),
+        "--color-catalog", "default",
+        "--render-seed", "4242",
+    ])
+    assert cli.command_render_score(args) == 0
+    return json.loads(capsys.readouterr().out)
+
+
+def test_render_score_names_the_engine_version_the_server_drew_with(monkeypatch, capsys):
+    """The server drew it, so the server names the engine it drew with.
+
+    This used to be the literal "2" while the engine had reached 22, so every
+    artifact the command wrote claimed an engine twenty versions old. Nothing in
+    the SVG says otherwise, which is why it went unnoticed.
+    """
+    result = _run_render_score(monkeypatch, capsys, _render_score_client())
+
+    assert result["render_engine_version"] == "22"
+
+
+def test_render_score_takes_the_build_number_from_the_server(monkeypatch, capsys):
+    """Not from whichever checkout the CLI happens to be run from.
+
+    A CLI pointed at pentala used to record the Mac's `web/BUILD_NUMBER` for a
+    drawing the Mac did not make.
+    """
+    info = {**SERVER_INFO, "build_number": "1234"}
+    result = _run_render_score(monkeypatch, capsys, _render_score_client(info))
+
+    assert result["render_build_number"] == "1234"
+    assert result["render_build_number"] != cli._cli_build_number()
+
+
+def test_render_score_takes_the_engine_id_from_the_server(monkeypatch, capsys):
+    info = {**SERVER_INFO, "render_engine_id": "experimental"}
+    result = _run_render_score(monkeypatch, capsys, _render_score_client(info))
+
+    assert result["render_engine_id"] == "experimental"
+
+
+def test_render_score_refuses_to_guess_when_the_server_will_not_say(monkeypatch):
+    """No fallback, for the reason `_rasterize_png` has none.
+
+    An artifact that names a version nobody checked still gets used to decide
+    things, and unlike a dropped filter a wrong version is invisible in the
+    drawing itself. Missing keys count as not saying.
+    """
+    monkeypatch.setattr(cli, "ApiClient", _render_score_client(info_fails=True))
+    parser = cli.build_parser()
+    args = parser.parse_args([
+        "render-score",
+        json.dumps({"version": "0.1.0", "background": "white", "instructions": []}),
+        "--color-catalog", "default",
+    ])
+    with pytest.raises(cli.CliError, match="/api/info"):
+        cli.command_render_score(args)
+
+    incomplete = {key: value for key, value in SERVER_INFO.items() if key != "render_engine_version"}
+    monkeypatch.setattr(cli, "ApiClient", _render_score_client(incomplete))
+    with pytest.raises(cli.CliError, match="render_engine_version"):
+        cli.command_render_score(args)
+
+
+def test_render_score_hashes_with_the_server_engine_version(monkeypatch, capsys):
+    """The version is material to the hash, not decoration beside it.
+
+    Two runs that differ only in the engine the server reports must not collide:
+    the same score drawn by two engines is two works.
+    """
+    first = _run_render_score(monkeypatch, capsys, _render_score_client())
+    other = _run_render_score(
+        monkeypatch, capsys, _render_score_client({**SERVER_INFO, "render_engine_version": "23"})
+    )
+
+    assert first["render_hash"] != other["render_hash"]

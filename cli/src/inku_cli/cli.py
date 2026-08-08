@@ -348,6 +348,31 @@ def _cli_build_number() -> str | None:
             continue
     return None
 
+
+_SERVER_RENDER_VERSION_KEYS = ("build_number", "render_engine_id", "render_engine_version")
+
+
+def _server_render_versions(client: ApiClient) -> dict[str, str]:
+    """The versions the server drew with, asked of the server.
+
+    There is no fallback to a local default here, for the same reason there is
+    none in `_rasterize_png`: an artifact that names a version nobody checked
+    still gets used to decide things, and unlike a dropped filter a wrong
+    version number is invisible in the drawing itself.
+    """
+    try:
+        info, _ = client.request("GET", "/api/info", auth=False)
+    except CliError as exc:
+        raise CliError(
+            "the server must answer GET /api/info to name the versions it drew with"
+        ) from exc
+    if not isinstance(info, dict):
+        raise CliError("/api/info did not return an object")
+    missing = [key for key in _SERVER_RENDER_VERSION_KEYS if not info.get(key)]
+    if missing:
+        raise CliError(f"/api/info did not report {', '.join(missing)}")
+    return {key: str(info[key]) for key in _SERVER_RENDER_VERSION_KEYS}
+
 def _app_version() -> str | None:
     # web/APP_VERSION is the single source the UI and the server also read. An
     # installed CLI with no repository tree above it simply reports nothing,
@@ -2789,14 +2814,23 @@ def command_render_score(args: argparse.Namespace) -> int:
             "render_seed": args.render_seed,
         },
     )
-    render_build_number = _cli_build_number()
+    # The server drew this SVG, so the server names the versions it drew with.
+    # These three used to be a literal "2", a literal "default", and the build
+    # number of whatever checkout the CLI happened to be run from. The engine
+    # has since gone from 2 to 22 and the literal never followed, so every
+    # artifact this command wrote claimed an engine twenty versions old; and a
+    # CLI pointed at pentala recorded the Mac's build number for a drawing the
+    # Mac did not make. Every other command already reads these off the
+    # response it got back.
+    server_versions = _server_render_versions(client)
+    render_build_number = server_versions["build_number"]
     render_hash = _render_hash_for_score(
         score,
         render_seed=args.render_seed,
         composition_seed=args.composition_seed,
         render_build_number=render_build_number,
-        render_engine_id="default",
-        render_engine_version="2",
+        render_engine_id=server_versions["render_engine_id"],
+        render_engine_version=server_versions["render_engine_version"],
         render_color_catalog_id=color_catalog,
     )
     result = {
@@ -2806,8 +2840,8 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_hash": render_hash,
         "render_hash_short": render_hash[-4:].upper(),
         "render_build_number": render_build_number,
-        "render_engine_id": "default",
-        "render_engine_version": "2",
+        "render_engine_id": server_versions["render_engine_id"],
+        "render_engine_version": server_versions["render_engine_version"],
         "render_color_catalog_id": color_catalog,
         "render_canvas_aspect": args.canvas_aspect,
         "render_canvas_aspect_id": args.canvas_aspect,

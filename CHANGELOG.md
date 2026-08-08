@@ -4071,3 +4071,52 @@ feature.**
   set difference; the digest follows).
 - **Tests:** server **2379 / 31 skipped / 0 failed** (unchanged), ruff clean, `check_docs.py` green.
   **`APP_VERSION` was not moved** (no behaviour changes). **The 13 manual version markers go to Build 861.**
+
+### Android `2.1.4-android.15` — a work can now be compared across models and languages (android Build 148098, 2026-08-08)
+
+**Fourth of five.** 3/5 went as far as refining one element at a time; this release gives the app the
+operation that **draws the same description again under different conditions and sets the results side by side**.
+
+- **The instruction-language resolution was ported from the server condition for condition**
+  (`language_support/registry.py`). Two supported languages, Japanese and English, and a third
+  requestable word, `auto`. `auto` reads the text, and **the Japanese probe is asked first**, so a
+  text holding both scripts resolves to Japanese. **The `(value or default)` falsy test was carried
+  across as it stands** — replacing it with a default-valued read would send **a value of only spaces
+  down another road**, so the spelling here falls back for `null` and the empty string and for
+  nothing else.
+- **All three stages — Stage 1, Stage 1.5 and Stage 2 — choose their prompt in the resolved language.**
+  **The English Stage 2 prompt had never once been read from product code before this release**
+  (the constant existed with zero references; measured). Stage 1.5 already held both language
+  branches and **only its wiring was pinned to Japanese**, so that was joined up too.
+- **Three columns were added to the history** — the requested language, the resolved language, and the
+  description itself (the Room version goes 6 → 7). **Requested and resolved are written separately**,
+  so a work drawn with `auto` can be read afterwards for what was asked and what it settled on.
+  **The identity of a description is taken from `source_text` when there is one and from
+  `original_input` when there is not** (the server's own two-step), so **a work drawn from a numbered
+  batch line and the same sentence typed by hand count as the same description.**
+  **[I-153] (no `source_text` column) is closed by this column.**
+- **Model inspection and language inspection sit on the existing refinement skeleton.** The four entry
+  points — open, generate options, abort, save — are shared by all three subviews, and **the only
+  difference is the single function that returns the list of jobs** (SPEC `:688`: the comparison logic
+  is not duplicated).
+- **The lineage edge is written as `model_comparison` or `language_comparison` from one branch in one
+  place.** The metadata keys recorded match the reference implementation one for one.
+- **The work menu on the lineage card gained Model and Language** in the SPEC `:618` order. Choosing
+  one opens the matching subview against that work, and closing it returns to the lineage view.
+- **⚠ SPEC `:686` describes language comparison as having "the same three modes as model comparison",
+  and the reference implementation has no such modes** (the web app offers the four Japanese/English
+  pairs as checkboxes). **The contract's instruction was to follow the reference implementation, and
+  the discrepancy is left with SPEC as [I-156].**
+- **Fifteen perturbations were applied, to product code only** (the contract's fourteen plus one for a
+  stage added along the way). **Three of them missed at first and exposed defects on the checking
+  side** — a line that let an unknown fallback pass through, **a discriminating point that was the
+  empty string rather than whitespace**, and an abort check where **the work went on running while
+  only the flag came down, which read as "stopped".**
+- **Measured during acceptance:** **the two places that read `source_text` change no judgement at all
+  under the present shape of the data** — the write side stores the prefixed `original_input` and the
+  bare prose as a pair, so **the existing prefix-stripping stand-in always yields the same answer**.
+  **A perturbation dropping both reads left every JVM and instrumented test green.** They begin to
+  matter only once a row holds two values that disagree; **that question is recorded on [I-153].**
+- **Tests:** **JVM 223 / 0 failed** (43 classes, from 197), **instrumented 81 / 0 failed** (Pixel 9
+  hardware, from 62). **Only `android/VERSION` moved one step** — `APP_VERSION` and `web/BUILD_NUMBER`
+  stay put, and nothing was deployed to the dev server.

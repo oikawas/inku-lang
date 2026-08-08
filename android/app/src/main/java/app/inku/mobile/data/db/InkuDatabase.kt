@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LineageNodeEntity::class,
         LineageEdgeEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class InkuDatabase : RoomDatabase() {
@@ -40,7 +40,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 DB_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build()
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -128,6 +128,30 @@ abstract class InkuDatabase : RoomDatabase() {
                     "instruction_lang_requested",
                     "instruction_lang_resolved",
                     "source_text",
+                ).forEach { column ->
+                    db.execSQL("ALTER TABLE history_items ADD COLUMN $column TEXT")
+                }
+            }
+        }
+
+        /**
+         * 写生 (Stage 0.5): the prose the work was painted from, the grain it
+         * was cut at, and what the layer did. All three are nullable Text on the
+         * server too, and every row that exists before this runs keeps NULL in
+         * all three.
+         *
+         * That NULL is the point. It is the sixth state -- "this work was drawn
+         * before the layer was recorded" -- and it reads differently from every
+         * recorded state, `off` included. Backfilling `off` here would say the
+         * author switched the layer off on works drawn before there was a
+         * layer to switch off.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "sketch_text",
+                    "sketch_grain",
+                    "sketch_state",
                 ).forEach { column ->
                     db.execSQL("ALTER TABLE history_items ADD COLUMN $column TEXT")
                 }

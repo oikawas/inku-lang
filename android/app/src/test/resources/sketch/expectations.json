@@ -1,0 +1,106 @@
+{
+  "normalize_sketch_grain": {
+    "None": "fine",
+    "''": "fine",
+    "'fine'": "fine",
+    "'coarse'": "coarse",
+    "'COARSE'": "coarse",
+    "'  fine  '": "fine",
+    "'medium'": "fine",
+    "'off'": "fine",
+    "'0'": "fine"
+  },
+  "normalize_sketch_state": {
+    "None": null,
+    "''": null,
+    "'fine'": "fine",
+    "'coarse'": "coarse",
+    "'fallback'": "fallback",
+    "'off'": "off",
+    "'not_applicable'": "not_applicable",
+    "'FINE'": "fine",
+    "'unknown'": null
+  },
+  "build_system_prompt": {
+    "ja/fine": {
+      "chars": 824,
+      "bytes": 2306,
+      "digest": "3ffcfaf98a200924"
+    },
+    "ja/coarse": {
+      "chars": 845,
+      "bytes": 2373,
+      "digest": "793e6b6cb7278614"
+    },
+    "en/fine": {
+      "chars": 1791,
+      "bytes": 1791,
+      "digest": "90fae948476f883e"
+    },
+    "en/coarse": {
+      "chars": 1815,
+      "bytes": 1815,
+      "digest": "3e49524168badc6d"
+    }
+  },
+  "sketch_state_of": [
+    {
+      "case": "detail(grain=fine, fallback=False)",
+      "detail": {
+        "grain": "fine",
+        "fallback_used": false
+      },
+      "requested": true,
+      "has_description": true,
+      "state": "fine"
+    },
+    {
+      "case": "detail(grain=coarse, fallback=False)",
+      "detail": {
+        "grain": "coarse",
+        "fallback_used": false
+      },
+      "requested": true,
+      "has_description": true,
+      "state": "coarse"
+    },
+    {
+      "case": "detail(grain=fine, fallback=True)",
+      "detail": {
+        "grain": "fine",
+        "fallback_used": true
+      },
+      "requested": true,
+      "has_description": true,
+      "state": "fallback"
+    },
+    {
+      "case": "detail=None, requested=False, has_description=True",
+      "detail": null,
+      "requested": false,
+      "has_description": true,
+      "state": "off"
+    },
+    {
+      "case": "detail=None, requested=True,  has_description=True",
+      "detail": null,
+      "requested": true,
+      "has_description": true,
+      "state": "not_applicable"
+    },
+    {
+      "case": "detail=None, requested=False, has_description=False",
+      "detail": null,
+      "requested": false,
+      "has_description": false,
+      "state": "not_applicable"
+    },
+    {
+      "case": "detail=None, requested=True,  has_description=False",
+      "detail": null,
+      "requested": true,
+      "has_description": false,
+      "state": "not_applicable"
+    }
+  ]
+}

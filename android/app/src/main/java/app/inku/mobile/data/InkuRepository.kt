@@ -33,6 +33,7 @@ import app.inku.mobile.pipeline.LocalFallbackPipeline
 import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
+import app.inku.mobile.pipeline.SketchInput
 import com.caverock.androidsvg.SVG
 import java.io.File
 import java.io.FileOutputStream
@@ -370,7 +371,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -390,12 +391,13 @@ class InkuRepository(
                 variationSeed = seeds.variationSeed,
                 seedText = seeds.seedText,
                 instructionLang = instructionLang,
+                sketch = sketch,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText)
     }
 
-    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null): InterpretResult {
+    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, sketch: SketchInput = SketchInput()): InterpretResult {
         val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
@@ -408,11 +410,12 @@ class InkuRepository(
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
                 instructionLang = instructionLang,
+                sketch = sketch,
             ),
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -432,6 +435,7 @@ class InkuRepository(
                 variationSeed = seeds.variationSeed,
                 seedText = seeds.seedText,
                 instructionLang = instructionLang,
+                sketch = sketch,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText)
@@ -508,6 +512,13 @@ class InkuRepository(
             variationAmplitude = plan.seeds.variationAmplitude,
             variationSeed = plan.seeds.variationSeed,
             seedText = plan.seeds.seedText,
+            // 写生 (Stage 0.5) is not re-run for a candidate: a refinement varies
+            // a stage after it, and the layer is not deterministic, so asking it
+            // again would move the one thing the refinement is not varying. The
+            // parent's prose is carried instead, which is what web hands every
+            // candidate (+page.svelte:5116). `requested` stays false: nothing is
+            // being asked of the layer, and the state derives from the prose.
+            sketch = SketchInput(text = parent.sketchText, grain = parent.sketchGrain),
         )
         return when (plan.route) {
             RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
@@ -627,6 +638,13 @@ class InkuRepository(
             instructionLangRequested = result.instructionLangRequested,
             instructionLangResolved = result.instructionLangResolved,
             sourceText = sourceText,
+            // 写生 (Stage 0.5), as the drawing reported it. The prose and the
+            // grain are absent on a run whose layer fell back; the state is
+            // written on every path, and it is the only trace that fallback
+            // leaves (`render.py:1917-1922`).
+            sketchText = result.sketchText,
+            sketchGrain = result.sketchGrain,
+            sketchState = result.sketchState,
         )
         // One transaction, and the edge after the node: the edge points at a
         // child that has to exist first. A failing edge takes the node and the

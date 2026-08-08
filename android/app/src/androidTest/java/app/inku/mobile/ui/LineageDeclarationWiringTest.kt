@@ -179,9 +179,18 @@ class LineageDeclarationWiringTest {
      * refused, and `replay` -- the case where nothing changed -- could never be
      * reached at all.
      */
+    /**
+     * [sketchGrain] defaults to the grain the app draws at, because that is what
+     * a work this app made looks like. Leaving it null would make every redraw
+     * here a 写生 grain change -- correctly so: a work with no grain recorded was
+     * not drawn at the default, it was drawn before there was a grain to record.
+     * That case is covered in `SketchLineageWiringTest`, where it is the subject
+     * rather than the scenery.
+     */
     private suspend fun seedParent(
         description: String = PARENT_DESCRIPTION,
         canvasAspect: String = PARENT_CANVAS,
+        sketchGrain: String? = "fine",
     ): HistoryItemEntity {
         val now = System.currentTimeMillis()
         val nodeId = "seed-node-$now"
@@ -206,6 +215,9 @@ class LineageDeclarationWiringTest {
             elapsedMs = 0L,
             tokenMetadataJson = null,
             lineageNodeId = nodeId,
+            sketchText = sketchGrain?.let { "$description を物の言葉で写した散文。" },
+            sketchGrain = sketchGrain,
+            sketchState = sketchGrain ?: "off",
         )
         database.historyDao().upsert(item)
         database.lineageDao().insertNode(

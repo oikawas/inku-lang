@@ -7,10 +7,11 @@ data class DerivationKindInfo(
 
 object DerivationKindRegistry {
     // The server's `LINEAGE_DERIVATION_KINDS` (db.py:50), sorted, exactly as
-    // the baked `lineage_wiring.json` carries it. The six kinds no screen
+    // the baked `lineage_wiring.json` carries it. The five kinds no screen
     // here reaches yet are still listed: which operations exist is the
-    // server's judgment, not the client's. (`sketch_grain_change` is the
-    // sixth -- there is no 写生 layer on this client.)
+    // server's judgment, not the client's. (`sketch_grain_change` used to be a
+    // sixth; the 写生 layer arrived with contract 5/5 and the describe screen
+    // writes that edge now -- `SubmitDerivationKind.forDescribeSubmit`.)
     val KINDS: List<String> = listOf(
         "age_change",
         "canvas_aspect_change",

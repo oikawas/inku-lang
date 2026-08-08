@@ -70,6 +70,16 @@ data class RefinementParent(
     val stage1Model: String,
     val stage2Model: String,
     val seeds: PaintSeeds,
+    /**
+     * The 写生 (Stage 0.5) prose the parent was painted from, and the grain it
+     * was cut at. A refinement varies a stage *after* 0.5, so it inherits the
+     * prose rather than asking the layer for a new one -- web hands the same
+     * string to every candidate (`sketchText: sketchTextFor(source)`,
+     * +page.svelte:5116). Drawing a refinement from the raw description instead
+     * would make it a refinement of a work nobody made.
+     */
+    val sketchText: String? = null,
+    val sketchGrain: String? = null,
 ) {
     companion object {
         /**
@@ -89,6 +99,8 @@ data class RefinementParent(
             stage1Model = item.stage1Model ?: "",
             stage2Model = item.stage2Model ?: "",
             seeds = PaintSeeds.of(item),
+            sketchText = item.sketchText,
+            sketchGrain = item.sketchGrain,
         )
     }
 }

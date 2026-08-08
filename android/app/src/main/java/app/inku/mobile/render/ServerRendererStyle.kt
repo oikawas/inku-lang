@@ -182,13 +182,31 @@ internal object ServerRendererStyle {
         return if (weight in setOf("pencil", "crayon", "chalk", "brush_thick")) " filter=\"url(#texture-$weight)\"" else ""
     }
 
+    // The material intensity the server runs at (`MATERIAL_INTENSITY["s1"]`).
+    // `_texture_filter_xml` multiplies the spec by these before it writes the
+    // attribute, so a port that writes the bare spec draws a fainter grain than
+    // the server does at every tool.
+    private const val TEXTURE_DISPLACEMENT_GAIN = 2.8
+    private const val TEXTURE_BLUR_GAIN = 1.6
+
     fun textureFilterDefs(weights: Set<String>, unit: Double): String = buildString {
         val scale = unit / 1000.0
         val fmt = { v: Double -> ServerRendererGeometry.fmt(v) }
-        if ("pencil" in weights) append("""<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.9 / scale)}" numOctaves="2" seed="11" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(0.7 * scale)}"/></filter>""")
-        if ("crayon" in weights) append("""<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.55 / scale)}" numOctaves="3" seed="17" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(1.8 * scale)}"/></filter>""")
-        if ("chalk" in weights) append("""<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.75 / scale)}" numOctaves="3" seed="23" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(2.2 * scale)}"/><feGaussianBlur stdDeviation="${fmt(0.9 * scale)}"/></filter>""")
-        if ("brush_thick" in weights) append("""<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.2 / scale)}" numOctaves="2" seed="31" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${fmt(1.4 * scale)}"/><feGaussianBlur stdDeviation="${fmt(0.6 * scale)}"/></filter>""")
+        val disp = { spec: Double -> fmt(spec * scale * TEXTURE_DISPLACEMENT_GAIN) }
+        val blur = { spec: Double -> fmt(spec * scale * TEXTURE_BLUR_GAIN) }
+        if ("pencil" in weights) append("""<filter id="texture-pencil" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.9 / scale)}" numOctaves="2" seed="11" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${disp(0.7)}"/></filter>""")
+        if ("crayon" in weights) append("""<filter id="texture-crayon" x="-18%" y="-18%" width="136%" height="136%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.55 / scale)}" numOctaves="3" seed="17" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${disp(1.8)}"/></filter>""")
+        // engine 22 dropped chalk's blur from 0.25 to... rather, the spec from
+        // 0.9 to 0.25: the blur was the largest of any tool and it was rubbing
+        // out chalk's own grain (5.26% against crayon's 13.59%). At 0.25 the
+        // grain comes back level with crayon and chalk keeps a trace of the
+        // softness the blur was there for.
+        if ("chalk" in weights) append("""<filter id="texture-chalk" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.75 / scale)}" numOctaves="3" seed="23" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${disp(2.2)}"/><feGaussianBlur stdDeviation="${blur(0.25)}"/></filter>""")
+        if ("brush_thick" in weights) append("""<filter id="texture-brush_thick" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="${fmt(0.2 / scale)}" numOctaves="2" seed="31" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="${disp(1.4)}"/><feGaussianBlur stdDeviation="${blur(0.6)}"/></filter>""")
+        // The server's table has a fifth entry, `drypoint` (a blur and no
+        // turbulence), but nothing here ever reaches it: `textureWeights` and
+        // `filterAttr` both list four tools, so a definition for it would be
+        // written by no call and read by none. Left out rather than added dead.
     }
 
     fun blurFilterDefs(neededBlurs: Map<String, Double>): String = buildString {

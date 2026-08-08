@@ -496,7 +496,14 @@ class DefaultSvgRenderer : SvgRenderer {
         return res
     }
 
-    private fun anchor(ins: JSONObject): Pair<Double, Double> {
+    /**
+     * The logical centre of a shape, which is the quantity the arrangement
+     * moves. Not one field: `center` for the round primitives, the middle of
+     * the bbox for `square` / `triangle` and the midpoint for a `line`. A
+     * reader that knows only about `circle` is right for every group this
+     * corpus held before engine 26 and wrong for the ones it holds now.
+     */
+    internal fun anchor(ins: JSONObject): Pair<Double, Double> {
         val p = ins.optString("primitive", "line")
         val from = ins.optJSONArray("from_") ?: ins.optJSONArray("from")
         val to = ins.optJSONArray("to")
@@ -1760,6 +1767,17 @@ class DefaultSvgRenderer : SvgRenderer {
         return ""
     }
 
+    /**
+     * The inside of a closed shape, filled with the material's own strokes.
+     *
+     * Engine 22 took the three regularities the eye reads as a raster out of
+     * this function. The scan angle now moves per stroke, the pitch is drawn
+     * far wider, and the ends leave the contour instead of being cut at the
+     * intersection -- which they can only do because the underlay is holding
+     * the boundary underneath. All three amplitudes come from the tool
+     * (`fillHand`) and are zero for a machine, so `computer` still lays the
+     * same exact raster it did.
+     */
     internal fun renderFillStrokes(
         ins: JSONObject,
         attrs: SvgAttrs,
@@ -1774,61 +1792,240 @@ class DefaultSvgRenderer : SvgRenderer {
         val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
         val gridStep = gridStepPx(weight, unit)
         val seedStr = instructionSeed ?: seedForInstruction(ins, renderSeed)
+        val hand = ServerRendererFill.fillHand(ins)
+        val raster = (GRAMMARS[weight] ?: GRAMMARS.getValue("pen")).periodic
         val angle = ServerRendererGeometry.fillScanAngle(seedStr)
-        val spacing = ServerRendererGeometry.fillScanSpacing(ins, unit)
-        val segments = ServerRendererGeometry.scanlineSegments(contour, angle, spacing, seedStr)
-        val distinctScanlines = segments.map { it.first }.toSet()
-        if (distinctScanlines.size < 3) return null
+        // A screen's raster keeps the classic pitch so the gaps between the
+        // lines stay readable; a hand tool is free to pack to the coverage the
+        // underlay made possible.
+        val spacing = if (raster) {
+            ServerRendererGeometry.fillScanSpacing(ins, unit)
+        } else {
+            baseWidth / ServerRendererFill.COVERAGE_TARGET
+        }
+        val pitchCv = if (hand != 0.0) {
+            ServerRendererFill.PITCH_CV_MIN + ServerRendererFill.PITCH_CV_SPAN * hand
+        } else {
+            0.0
+        }
+        val segments = ServerRendererGeometry.scanlineSegments(
+            contour, angle, spacing, seedStr, pitchCv * kotlin.math.sqrt(12.0)
+        )
+        if (segments.map { it.first }.toSet().size < ServerRendererFill.MIN_SCANLINES) return null
 
         val color = attrs.stroke
         val opacity = attrs.fillOpacity ?: attrs.strokeOpacity
-        val inset = baseWidth * 0.5
-        val minimum = inset * 2 + baseWidth * 1.2
+        // The marks sit close over the field. A ratio of the underlay's, never
+        // an absolute, so a description asking for a pale fill keeps the
+        // relation -- and never darker than the ink the description specified.
+        val markOpacity = min(
+            opacity,
+            opacity * ServerRendererFill.UNDERLAY_OPACITY_RATIO *
+                ServerRendererFill.SCAN_CONTRAST * ServerRendererFill.fillContrast(ins)
+        )
+        val minimum = baseWidth * ServerRendererFill.MIN_STROKE_WIDTHS
+        val angleAmp = ServerRendererFill.angleAmplitude(hand)
+        val reach = if (hand != 0.0) {
+            baseWidth * (ServerRendererFill.REACH_WIDTHS_MIN + ServerRendererFill.REACH_WIDTHS_SPAN * hand)
+        } else {
+            0.0
+        }
         val paths = mutableListOf<String>()
 
         for ((order, seg) in segments.withIndex()) {
             val index = seg.first
-            var p0 = seg.second
-            var p1 = seg.third
-            val dx = p1.first - p0.first
-            val dy = p1.second - p0.second
-            val length = kotlin.math.hypot(dx, dy)
-            if (length <= minimum) continue
-
-            val ux = dx / length
-            val uy = dy / length
-            var start = (p0.first + ux * inset) to (p0.second + uy * inset)
-            var end = (p1.first - ux * inset) to (p1.second - uy * inset)
-            if (index % 2 != 0) {
-                val tmp = start
-                start = end
-                end = tmp
+            val segStart = seg.second
+            val segEnd = seg.third
+            val chord = kotlin.math.hypot(segEnd.first - segStart.first, segEnd.second - segStart.second)
+            if (chord <= minimum) continue
+            var ux = (segEnd.first - segStart.first) / chord
+            var uy = (segEnd.second - segStart.second) / chord
+            val mx = (segStart.first + segEnd.first) / 2
+            val my = (segStart.second + segEnd.second) / 2
+            // Turn this row on its own midpoint, then cut it against the
+            // contour again. Rotating the chord and keeping its old length
+            // would make the reach a fraction of a line the stroke no longer
+            // travels: near the edge of a round form a few degrees change the
+            // span several-fold.
+            val t0: Double
+            val t1: Double
+            if (angleAmp != 0.0) {
+                val delta = (ServerRendererGeometry.hash01(order, seedStr, "fill-angle-stroke") - 0.5) * 2 * angleAmp
+                val cosD = kotlin.math.cos(delta)
+                val sinD = kotlin.math.sin(delta)
+                val rx = ux * cosD - uy * sinD
+                val ry = ux * sinD + uy * cosD
+                ux = rx
+                uy = ry
+                val span = ServerRendererFill.lineSpans(contour, mx to my, ux to uy)
+                    .firstOrNull { it.first <= 0.0 && 0.0 <= it.second } ?: continue
+                t0 = span.first
+                t1 = span.second
+            } else {
+                t0 = -chord / 2
+                t1 = chord / 2
             }
-            val count = max(2, ServerRendererGeometry.strokeSampleCount(length - inset * 2, unit))
+            val length = t1 - t0
+            if (length <= minimum) continue
+            // One end overshoots the contour, the other may fall short of it.
+            // The sign is drawn per end: an implementation that only insets
+            // would leave the edge as tidy as the cut it replaced.
+            var r0 = reach
+            var r1 = reach
+            if (ServerRendererGeometry.hash01(order, seedStr, "fill-reach-start") < 0.5) r0 = -r0
+            if (ServerRendererGeometry.hash01(order, seedStr, "fill-reach-end") < 0.5) r1 = -r1
+            var p0 = (mx + ux * (t0 - r0)) to (my + uy * (t0 - r0))
+            var p1 = (mx + ux * (t1 + r1)) to (my + uy * (t1 + r1))
+            if (index % 2 != 0) {
+                val tmp = p0
+                p0 = p1
+                p1 = tmp
+            }
+            val span = kotlin.math.hypot(p1.first - p0.first, p1.second - p0.second)
+            val count = max(2, ServerRendererGeometry.strokeSampleCount(span, unit))
             val centerline = (0 until count).map { i ->
                 val t = i.toDouble() / (count - 1).toDouble()
-                (start.first + (end.first - start.first) * t) to (start.second + (end.second - start.second) * t)
+                (p0.first + (p1.first - p0.first) * t) to (p0.second + (p1.second - p0.second) * t)
             }
-            val strokeSeed = ServerRendererGeometry.fillStrokeSeed(seedStr, order)
-            val stroke = ServerStrokeEngine.synthesizeAlong(
-                centerline = centerline,
-                baseWidth = baseWidth,
-                weight = weight,
-                seed = strokeSeed,
-                closed = false,
-                gridStep = gridStep,
-                wild = wild
-            )
-            val d = ServerStrokeEngine.contourStrokePath(stroke)
-            val textureFilterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "drypoint")
-            val filterAttr = if (weight in textureFilterWeights && weight != "drypoint") """ filter="url(#texture-$weight)"""" else ""
-            val fillOpacityStr = fmt(opacity)
-
-            paths.add("""<path d="$d" fill="$color" fill-opacity="$fillOpacityStr" stroke="none"$filterAttr/>""")
+            // A raster line is one line with a soft edge, so it is laid twice:
+            // a wide faint halo and a narrow dense core on the same centreline.
+            // Two real elements rather than a blur, because filters are
+            // display-only and the machine has to look the same in every profile.
+            val layers = if (raster) {
+                listOf(
+                    (baseWidth * ServerRendererFill.RASTER_HALO_WIDTHS) to (markOpacity - ServerRendererFill.RASTER_HALO_STEP),
+                    (baseWidth * ServerRendererFill.RASTER_CORE_WIDTHS) to markOpacity
+                )
+            } else {
+                listOf(baseWidth to markOpacity)
+            }
+            for ((width, layerOpacity) in layers) {
+                val d = if (raster) {
+                    // Straight, because a raster line is straight. Performing
+                    // it through the tool grammar bent it along its run.
+                    ServerRendererFill.rasterBand(p0, p1, width)
+                } else {
+                    ServerStrokeEngine.contourStrokePath(
+                        ServerStrokeEngine.synthesizeAlong(
+                            centerline = centerline,
+                            baseWidth = width,
+                            weight = weight,
+                            seed = ServerRendererGeometry.fillStrokeSeed(seedStr, order),
+                            closed = false,
+                            gridStep = gridStep,
+                            wild = wild,
+                            terminal = "loaded"
+                        )
+                    )
+                }
+                val textureFilterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "drypoint")
+                val filterAttr = if (weight in textureFilterWeights && weight != "drypoint") """ filter="url(#texture-$weight)"""" else ""
+                paths.add("""<path d="$d" fill="$color" fill-opacity="${fmt(layerOpacity)}" stroke="none"$filterAttr/>""")
+            }
         }
 
         if (paths.isEmpty()) return null
         return """<g class="fill-stroke-v1 strokes-${paths.size}">${paths.joinToString("")}</g>"""
+    }
+
+    /**
+     * The upper layer of a fill, made of scattered marks rather than scan lines.
+     *
+     * Below the coverage threshold a pass of parallel lines does not become a
+     * field -- closing the gaps would take eight times the lines at pencil
+     * width -- and that is not how the tool is used: a pencil rubs a tone
+     * rather than ruling it. The underlay already holds the field, so these
+     * marks only have to give it grain.
+     *
+     * The scatter is the whole of the difference from the scan branch. Length,
+     * direction and end treatment are the scan branch's own: what separates a
+     * rubbed tone from a ruled one is that the marks are not on rows.
+     */
+    internal fun renderFillTexture(
+        ins: JSONObject,
+        attrs: SvgAttrs,
+        contour: List<Pair<Double, Double>>,
+        unit: Double,
+        renderSeed: Long? = null,
+        wild: Boolean = false,
+        instructionSeed: Any? = null
+    ): String? {
+        if (contour.size < 3) return null
+        val weight = ins.optString("weight", "pen")
+        val seedStr = instructionSeed ?: seedForInstruction(ins, renderSeed)
+        val pitch = ServerRendererGeometry.fillScanSpacing(ins, unit)
+        val width = ServerRendererStyle.strokeWidth(
+            weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+        )
+        val xs = contour.map { it.first }
+        val ys = contour.map { it.second }
+        val spanLimit = kotlin.math.hypot(xs.max() - xs.min(), ys.max() - ys.min())
+        val count = ServerRendererFill.textureMarkCount(contour, pitch)
+        val points = ServerRendererFill.surfaceScatter(contour, count, seedStr)
+        if (points.isEmpty()) return null
+
+        val color = attrs.stroke
+        val opacity = attrs.fillOpacity ?: attrs.strokeOpacity
+        // The marks rise out of the field; they are not drawn on top of it.
+        val markOpacity = min(
+            opacity,
+            opacity * ServerRendererFill.UNDERLAY_OPACITY_RATIO *
+                ServerRendererFill.TEXTURE_CONTRAST * ServerRendererFill.fillContrast(ins)
+        )
+        val gridStep = gridStepPx(weight, unit)
+        val hand = ServerRendererFill.fillHand(ins)
+        val baseAngle = ServerRendererGeometry.fillScanAngle(seedStr)
+        val spread = ServerRendererFill.angleAmplitude(hand)
+        val reach = width * (ServerRendererFill.REACH_WIDTHS_MIN + ServerRendererFill.REACH_WIDTHS_SPAN * hand)
+        val sb = StringBuilder("""<g class="fill-texture-v1 marks-${points.size}">""")
+        for ((index, point) in points.withIndex()) {
+            val (px, py) = point
+            // The marks run the region's one direction, wobbling by the few
+            // degrees the hand gives -- the same band the scan branch draws
+            // from. What makes this branch a rubbed tone is where the marks
+            // are put, which is a scatter, not which way they run.
+            val angle = baseAngle + (ServerRendererGeometry.hash01(index, seedStr, "fill-texture-angle") - 0.5) * 2 * spread
+            val half = spanLimit
+            val dx = kotlin.math.cos(angle)
+            val dy = kotlin.math.sin(angle)
+            val span = ServerRendererFill.lineSpans(contour, px to py, dx to dy)
+                .firstOrNull { it.first <= 0.0 && 0.0 <= it.second } ?: continue
+            val r0 = if (ServerRendererGeometry.hash01(index, seedStr, "fill-texture-reach-start") >= 0.5) reach else -reach
+            val r1 = if (ServerRendererGeometry.hash01(index, seedStr, "fill-texture-reach-end") >= 0.5) reach else -reach
+            val start = max(-half, span.first - r0)
+            val end = min(half, span.second + r1)
+            if (end - start <= width) continue
+            // One tone per mark, drawn from a band centred on the branch
+            // contrast. The mean is unchanged; what is new is that two
+            // neighbouring marks are no longer the same grey.
+            var tone = markOpacity * (
+                1.0 + (ServerRendererGeometry.hash01(index, seedStr, "fill-texture-tone") - 0.5) * 2 * ServerRendererFill.TEXTURE_TONE_SPREAD
+                )
+            tone = min(opacity, tone)
+            val length = end - start
+            val samples = max(2, ServerRendererGeometry.strokeSampleCount(length, unit))
+            val centerline = (0 until samples).map { i ->
+                val t = start + length * i / (samples - 1).toDouble()
+                (px + dx * t) to (py + dy * t)
+            }
+            val d = ServerStrokeEngine.contourStrokePath(
+                ServerStrokeEngine.synthesizeAlong(
+                    centerline = centerline,
+                    baseWidth = width,
+                    weight = weight,
+                    seed = ServerRendererGeometry.fillStrokeSeed(seedStr, index),
+                    closed = false,
+                    gridStep = gridStep,
+                    wild = wild,
+                    terminal = "loaded"
+                )
+            )
+            val textureFilterWeights = setOf("pencil", "crayon", "chalk", "brush_thin", "brush_thick", "drypoint")
+            val filterAttr = if (weight in textureFilterWeights && weight != "drypoint") """ filter="url(#texture-$weight)"""" else ""
+            sb.append("""<path d="$d" fill="$color" fill-opacity="${fmt(tone)}" stroke="none"$filterAttr/>""")
+        }
+        sb.append("</g>")
+        return sb.toString()
     }
 
     internal fun renderFillDab(
@@ -1884,6 +2081,22 @@ class DefaultSvgRenderer : SvgRenderer {
         return """<g class="fill-dab-v1"><path d="$d" fill="${attrs.stroke}" fill-opacity="${fmt(opacity)}" stroke="none"$filterAttr/></g>"""
     }
 
+    /**
+     * The interior, and whether it degraded to a region fill.
+     *
+     * Engine 22 puts an underlay under the marks and splits what goes on top:
+     * scan lines where the tool is wide enough for them to become a field,
+     * scattered marks where it is not. The underlay is common to both branches
+     * -- the threshold decides only what sits on it -- because the works the
+     * author named as striped were drawn with pen, crayon and pencil, and a
+     * design that gave the underlay to the wide branch alone would reach none
+     * of them.
+     *
+     * A dab is not a filled area, so it gets no underlay. It is one touch of
+     * the tool, it has no scan strokes to let off the contour, and an underlay
+     * would put back exactly the flat region fill engine 16 took out of tiny
+     * shapes.
+     */
     internal fun interiorFill(
         ins: JSONObject,
         attrs: SvgAttrs,
@@ -1897,10 +2110,36 @@ class DefaultSvgRenderer : SvgRenderer {
         if (!regionFill) return null to false
         val weight = ins.optString("weight", "pen")
         if (!usesHandStroke(weight)) return null to true
-        val fillGroup = renderFillStrokes(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
-        if (fillGroup != null) return fillGroup to false
-        val dabGroup = renderFillDab(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
-        return if (dabGroup == null) null to true else dabGroup to false
+        if (contour.size < 3) return null to true
+        val seedStr = instructionSeed ?: seedForInstruction(ins, renderSeed)
+
+        if (!ServerRendererFill.isScannable(ins, contour, unit, seedStr)) {
+            val dab = renderFillDab(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
+            return if (dab == null) null to true else dab to false
+        }
+
+        val scanBranch = ServerRendererFill.takesScanBranch(ins, unit)
+        val marks = if (scanBranch) {
+            renderFillStrokes(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
+        } else {
+            renderFillTexture(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
+        }
+        if (marks == null) {
+            // Nothing survived the minimum-length filter. Fall through to the
+            // dab rather than leaving a bare underlay: an area with no mark on
+            // it is the flat fill this engine has been taking apart since 9.
+            val dab = renderFillDab(ins, attrs, contour, unit, renderSeed, wild, instructionSeed)
+            return if (dab == null) null to true else dab to false
+        }
+
+        // The field's mottling is the texture branch's, and only its. The scan
+        // branch packs to the coverage the author set and its own strokes
+        // already leave the field uneven, so a second mechanism here would be
+        // doing what that one already does.
+        val tones = if (scanBranch) emptyList() else ServerRendererFill.fieldTones(contour, seedStr)
+        val opacity = attrs.fillOpacity ?: attrs.strokeOpacity
+        val underlay = ServerRendererFill.underlaySvg(contour, attrs.stroke, opacity, tones)
+        return """<g class="fill-v2">$underlay$marks</g>""" to false
     }
 
     private fun renderArcHandStroke(

@@ -14,6 +14,9 @@ import org.json.JSONObject
 internal object ServerRendererGeometry {
     const val MASTER_GRID_DECIMALS: Int = 6
 
+    /** Engine 21's pitch jitter, kept as the default `scanlineSegments` uses. */
+    const val FILL_SPACING_JITTER: Double = 0.24
+
     fun px(value: Double, scale: Double): Double = min(max(value, 0.0), 1.0) * scale
 
     fun fmt(value: Double): String {
@@ -481,11 +484,18 @@ internal object ServerRendererGeometry {
         return raw
     }
 
+    /**
+     * `jitter` is the full width of the uniform pitch multiplier, so the
+     * coefficient of variation of the gaps is `jitter / sqrt(12)`. The default
+     * is the engine-21 value; the fill branch passes its own, drawn from the
+     * tool's hand.
+     */
     fun scanlineSegments(
         contour: List<Pair<Double, Double>>,
         angle: Double,
         spacing: Double,
-        seed: Any
+        seed: Any,
+        jitterWidth: Double = FILL_SPACING_JITTER
     ): List<Triple<Int, Pair<Double, Double>, Pair<Double, Double>>> {
         if (contour.isEmpty()) return emptyList()
         val ux = cos(angle)
@@ -499,7 +509,6 @@ internal object ServerRendererGeometry {
         var offset = lo + spacing * 0.5
         var index = 0
         val n = contour.size
-        val fillSpacingJitter = 0.24
         while (offset < hi && index < 4096) {
             val hits = mutableListOf<Double>()
             for (edge in 0 until n) {
@@ -528,7 +537,7 @@ internal object ServerRendererGeometry {
                     )
                 )
             }
-            val jitter = 1.0 + (hash01(index, seed, "fill-spacing") - 0.5) * fillSpacingJitter
+            val jitter = 1.0 + (hash01(index, seed, "fill-spacing") - 0.5) * jitterWidth
             offset += spacing * jitter
             index += 1
         }

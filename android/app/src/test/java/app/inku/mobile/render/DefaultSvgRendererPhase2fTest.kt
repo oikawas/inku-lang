@@ -388,20 +388,16 @@ class DefaultSvgRendererPhase2fTest {
 
             assertEquals("Case $caseId count must match", expectedCount, expanded.size)
 
+            // The renderer's own `anchor`, not a second reading of the same
+            // rule: the expected values come from the server's `_anchor`, so
+            // comparing against the production one is still a real gate, and a
+            // copy here would drift. The copy this replaced knew only about
+            // `circle` and `line` and answered (0.5, 0.5) for everything else,
+            // which was right for every group the corpus held until the angle
+            // cases arrived and silently wrong the day they did.
             val actualAnchors = expanded.map { mark ->
-                val p = mark.optString("primitive", "line")
-                val center = mark.optJSONArray("center")
-                if (p == "circle" && center != null) {
-                    listOf(center.getDouble(0), center.getDouble(1))
-                } else {
-                    val from = mark.optJSONArray("from_") ?: mark.optJSONArray("from")
-                    val to = mark.optJSONArray("to")
-                    if (p == "line" && from != null && to != null) {
-                        listOf((from.getDouble(0) + to.getDouble(0)) / 2.0, (from.getDouble(1) + to.getDouble(1)) / 2.0)
-                    } else {
-                        listOf(0.5, 0.5)
-                    }
-                }
+                val (ax, ay) = renderer.anchor(mark)
+                listOf(ax, ay)
             }
 
             assertEquals("Case $caseId anchors count must match", expectedAnchors.length(), actualAnchors.size)

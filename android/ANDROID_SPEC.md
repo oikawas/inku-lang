@@ -2464,3 +2464,101 @@ third job in `reference-corpus.yml` **requires byte identity**.
 **T-8 is a regenerated record, not a check of a property.** It says nothing about whether the tokens
 are right. **That is why it sits paired with T-4..T-7** — one side holds "literals do not come
 back", the other holds "the Claude Design copy does not go stale". **Neither one alone is enough.**
+
+## 2026-08-08 Putting the work first (UI redesign, stage B / android `2.1.4-android.19`)
+
+**The work sat in the fourth band of the screen.** The first held model and condition chips, the
+second magnification, the third the switch tabs — **seeing what you had drawn always took a scroll.**
+Stage A gave the values names; **this stage uses those names to rebuild the layout and the
+wayfinding.** Judgement stays server-conformant; what moved is placement and wayfinding.
+
+### Three families
+
+| Family | What | Where |
+|---|---|---|
+| **Work information** | hash, favourite, lineage, the drawing / Prompt / JSON switch, the way into full screen | around the canvas |
+| **Drawing settings** | model, sketch from life, canvas ratio, color catalog, the description/batch switch | one place, directly above the description |
+| **Export** | three SVG profiles, PNG template, template editing | one entry → bottom sheet |
+
+**There were three ways into the model selector.** Separate composables each opened the same screen,
+so every one of them landed in the same place. **A count of entry points is not a count of choices** —
+they were folded into one.
+
+**⚠ `DDL` was not added to the work-information switch.** The contract's family table listed
+"drawing / Prompt / JSON / DDL", but DDL is readable from the `interpretation` field and the DDL
+editor. **A fourth tab would be adding vocabulary**, so whether to add it is left as a ruling.
+
+### The mascot became a state display
+
+**The condition for showing it is web's `RunStatus` condition — "something is running"** (a single
+drawing, a batch, the demo, the DDL editor, the lineage). When nothing runs, the row disappears
+entirely. **Choosing the mascot (Incu / Yuragi) stays in settings** — that is a preference, not a
+state display.
+
+**`uiMode` (full / simple) means something different now.** The only differences used to be the
+mascot and a duplicated chip row, and **this stage removes both, so the distinction was empty.**
+Simple now folds away `interpretation` (the DDL field and drawing from DDL). **The contract did not
+specify this; it is the implementation's judgement.**
+
+### Viewing gathers in the full-screen view
+
+Pinch 0.25×–10×, pan, double tap to toggle fit ⇄ actual size, back key to leave, and a button in the
+top-right corner as the way in. **Zoom in the normal view was removed, condition and all** — vertical
+scrolling and a one-finger drag were competing for the same gesture.
+
+**Swipe direction is unified as right = previous, left = next.** Only the full-screen view had it
+reversed, so **the same finger movement meant two different things in two states of one screen.**
+
+**Double tap computes "actual size" from the work itself** (SVG `viewBox` width ÷ the width actually
+drawn), dropping to 2.0× when the work is already at or beyond actual size — **a double tap that does
+nothing reads as broken.**
+
+### The main action sits above the IME
+
+While the description has focus, **Paint is pinned directly above the IME** and the description field
+moves upward. **Nothing is bound to the IME action key** — in Japanese input the return key confirms
+a conversion, so **the drawing would start on a keystroke meant to confirm text.**
+
+### ⚠ "Visible above the IME" cannot be measured under instrumentation
+
+The contract wrote T-11 as "while the IME is up, Paint **is displayed**". **That form never went
+green.**
+
+| What was measured | Result |
+|---|---|
+| `ComponentActivity` + `setContent { InkuApp() }` | the bar sits at **y=2269** in a 2424px window (behind the keyboard) |
+| switching to the shipping `MainActivity` | **same y=2269** |
+| waiting on the IME inset via `ViewCompat.getRootWindowInsets` | **same y=2269** |
+
+**Compose pins window insets to 0 while instrumented** (the mechanism that makes tests
+deterministic), so `imePadding()` lifts nothing. **The gate stayed red whether the perturbation was
+applied or not** — it was measuring the test host, not the product.
+
+**The re-seated form** (author's ruling) is three claims: **① the main action exists exactly once
+② it sits outside the scroll ③ the bottom bar has yielded its place.** All three hold with a 0 inset,
+and all three fail when the focus wiring is cut. **That it clears the keyboard is evidenced by a
+screenshot from the real device** — what instrumentation cannot measure is not restated in a form
+instrumentation can and then called settled.
+
+**Two facts that occur only under instrumentation came out of this** (both left as comments in the
+test): **a work arriving on the canvas takes focus away from the description**, and **focus travels
+through the ViewModel's flow into composition, so `waitForIdle` does not wait for it.**
+
+### Dimensions and type
+
+**Three heights** (56 / 40 / 32), **two corner radii** (card 16dp and pill), **four spacing steps**
+(4 / 8 / 16 / 24), **smallest type 12sp**. `Dimens` goes from **56 `Dp` declarations to 41**, and
+**literals off the 4dp grid from 22 to 0** (the 1dp hairline is the one exception). **Cross-family
+borrowing was undone** as well (`radiusCard = spaceXxl` and friends now carry their own values).
+
+**⚠ Folding the declarations does not fold the call sites.** With the radii apparently reduced to
+two, 18 call sites still passed `RoundedCornerShape(Dimens.spaceXs)` and 16 more `(Dimens.spaceM)`,
+so **there were really four (4 / 8 / 16 / pill)**. **The gate was extended to count call sites** —
+**a check that reads only the token list waves through every way of not using the tokens.**
+
+### Items still carrying no gate
+
+**Where the back key goes, the 48dp touch target, spacing being exactly four steps, and the canvas
+being topmost** have **no T in the contract and no observation point in this stage** (they were
+confirmed by eye). **The spacing claim can be seated as "the `Dimens` spacing family holds four
+values"** — today's T-7 goes no further than the grid.

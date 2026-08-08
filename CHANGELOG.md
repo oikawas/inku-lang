@@ -4382,3 +4382,59 @@ of improvement plan #5.**
   byte-identical. **The Android reference fixtures gained `render-engine-26/` (55 files) and not one
   line of Kotlin changed** — Android reads only the directory of the version it names. **JVM 238 /
   0 failed, unchanged.**
+
+### Android `2.1.4-android.19` — putting the work first (UI redesign, stage B; android Build 148106, 2026-08-08)
+
+**The first band of the screen was the drawing settings, and the work sat in the fourth.** Stage A
+gave the values names; **this stage uses those names to rebuild the layout and the wayfinding** —
+the work moves to the top, and the settings gather directly above the description.
+
+- **Three families: work information, drawing settings, export.** The model selector goes from
+  **three entry points to one**, and export becomes **a single bottom sheet**. Magnification and
+  canvas ratio each move into the family they belong to.
+- **The mascot appears only while something runs.** A row matching web's `RunStatus` (mascot, model
+  name, elapsed time, stop) was added, and **the condition for showing it is web's — "something is
+  running."** Choosing the mascot stays in settings: that is a preference, not a state display.
+- **Viewing gathers in the full-screen view.** Pinch 0.25×–10×, pan, double tap to toggle fit ⇄
+  actual size, back key to leave. **Zoom in the normal view was removed, condition and all.** The
+  swipe direction is unified as **right = previous, left = next** (only the full-screen view had it
+  reversed).
+- **While the IME is up, Paint stays pinned directly above the keyboard.** The description field
+  moves to the top of the screen when focused. **Nothing is bound to the IME action key** — in
+  Japanese input the return key confirms a conversion, so the drawing would start on a keystroke
+  meant to confirm text.
+- **The bottom bar goes from five destinations to four** (description, history, lineage, settings).
+  **Running the demo moved into settings.**
+- **The dimension and type systems were folded down.** Button heights **5 steps → 3** (56 / 40 / 32),
+  corner radii **4 kinds → 2** (card 16dp and pill), spacing **4 steps** (4 / 8 / 16 / 24), smallest
+  type **11sp → 12sp**. `Dimens` goes from **56 `Dp` declarations to 41**, and **literals off the 4dp
+  grid from 22 to 0** (the 1dp hairline is the one exception). **Tokens no longer borrow across
+  families.**
+- **⚠ `uiMode` (full / simple) means something different now.** The only differences used to be the
+  mascot and a duplicated chip row, and **this stage removes both, so the distinction was empty.**
+  Simple now folds away `interpretation` (the DDL field and drawing from DDL).
+- **⚠ "Visible above the IME" cannot be measured under instrumentation.** Compose pins window insets
+  to 0 while instrumented, so `imePadding()` lifts nothing and **the gate stays red whether the
+  perturbation is applied or not** — it was measuring the test host, not the product. The gate was
+  re-seated as **"the main action exists exactly once, sits outside the scroll, and the bottom bar
+  has yielded its place"** (true even with a 0 inset, false when the focus wiring is cut).
+  **That it clears the keyboard is evidenced by a screenshot from the real device.**
+- **⚠ Instrumentation wiped the app's data on the device once.** `gradle
+  :app:connectedDebugAndroidTest` **uninstalls the app after the run by default**, so running it on a
+  device holding real works takes the database with it. **Recovery was luck** — the database had been
+  copied off before the work started, to measure a baseline. The flag
+  (`-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`) was measured to avoid it, and
+  **how to write that into the conventions is filed as ledger item [I-162].**
+- **All eleven perturbations turned their named gate red** (no misses, no misnamed gates). The three
+  extra failures were all **stage A's T-8, the design-preview byte comparison** — **a regenerated
+  record, not a check on a property** (moving any token turns it red by construction).
+- **⚠ `DDL` was not added to the work-information switch** (the contract's family table listed four).
+  DDL is readable from the `interpretation` field and the DDL editor, so **a fourth tab would be
+  adding vocabulary.**
+- **⚠ Some items still carry no gate** — where the back key goes, the 48dp touch target, spacing
+  being exactly four steps, and the canvas being topmost. **The contract had no T for them either,
+  and this stage did not measure them** (they were confirmed by eye only).
+- **Checks:** **server pytest 2,476 passed / 31 skipped** (measured on merged main: 2,466 plus the
+  ten T-1–T-10), **JVM 238 / 0 failed (45 classes)**, **instrumentation 96 / 0 failed** (Pixel 9,
+  20 classes, measured by the implementing session), ruff clean. **Only `android/VERSION` moves one
+  step** — `APP_VERSION` and `web/BUILD_NUMBER` stay put, and nothing is deployed to pentala.

@@ -242,10 +242,9 @@ def _dimens_page() -> str:
     return _page(
         "Dimens",
         "inku Android — Dimens",
-        "Every distance the app measures with. These are not on a 4dp grid — 22 of the "
-        "53 sit off it — because pulling them onto one would move the drawing. That work "
-        "belongs to the stage that rebuilds the screens. Bars are drawn to scale, "
-        "clamped at 320dp.",
+        "Every distance the app measures with. Stage B pulled them onto a 4dp grid: the "
+        "1dp hairline is the only value off it, and the spacing family is four steps "
+        "(4 / 8 / 16 / 24). Bars are drawn to scale, clamped at 320dp.",
         body,
     )
 

@@ -43,7 +43,7 @@ design record is kept separately in [`CHANGELOG.md`](CHANGELOG.md).
 - The material of writing is itself the name -- structurally the same idea as
   DDL's concept that the description is the work
 - The association with 墨 (sumi): the world of calligraphy and ink painting,
-  echoed by the "shades of sumi" of the color palette
+  echoed by the "shades of sumi" of the color catalogs
 - The `-lang` suffix places it as a language project, beside rust-lang, go-lang
   and the like
 
@@ -167,7 +167,7 @@ wide / byobu / vertical.
 
 `Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
 
-The core color vocabulary is the nine abstract colors that authors can write: white, black, blue, red, green, gray, yellow, orange, and purple. Color catalogs are server-owned metadata that change how those nine colors are resolved at render time; they are not vocabulary extensions. **Yellow, orange, and purple were added in v2.9.11.** Catalog palettes already carried twelve yellows, a nominal 13.6%, yet yellow reached only 0.6% of what was actually drawn: there was no word to leave by. The three are peers of the other abstract colors, and `color_hint` remains the place for nuance that no abstract color holds. **From v2.9.12 (render engine 17) the nine are assigned deterministically from the catalog's `palette`, once per work**, from `(render_seed, catalog_id, abstract color)` and nothing else: the six chromatic words by OKLCh hue band (CIELAB cannot separate blue from purple), the three achromatic roles by reserving the hex that equals their own `map` value and then taking the nearest lightness. The background goes through the same assignment, and `color_hint` now acts only as a table that names a band (ASCII matched on word boundaries).
+The core color vocabulary is the nine abstract colors that authors can write: white, black, blue, red, green, gray, yellow, orange, and purple. Color catalogs are server-owned metadata that change how those nine colors are resolved at render time; they are not vocabulary extensions. **Yellow, orange, and purple were added in v2.9.11.** Catalog `palette` entries already carried twelve yellows, a nominal 13.6%, yet yellow reached only 0.6% of what was actually drawn: there was no word to leave by. The three are peers of the other abstract colors, and `color_hint` remains the place for nuance that no abstract color holds. **From v2.9.12 (render engine 17) the nine are assigned deterministically from the catalog's `palette`, once per work**, from `(render_seed, catalog_id, abstract color)` and nothing else: the six chromatic words by OKLCh hue band (CIELAB cannot separate blue from purple), the three achromatic roles by reserving the hex that equals their own `map` value and then taking the nearest lightness. The background goes through the same assignment, and `color_hint` now acts only as a table that names a band (ASCII matched on word boundaries).
 
 Colors in JSON Score are abstract color names.  Rendering resolves them through
 the selected color catalog.  The server is the source of truth for color
@@ -178,7 +178,7 @@ Stage 2 and rendering can resolve the best catalog color without losing intent.
 The default catalog is a neutral baseline, not a cultural default.  Additional
 catalog ids use material-, light-, and technique-based names to avoid presenting
 a country, ethnicity, food, festival, empire, or tourism marker as a complete
-palette identity: `ink_season`, `fresco_study`, `open_air_light`,
+catalog identity: `ink_season`, `fresco_study`, `open_air_light`,
 `ink_porcelain`, `cool_material`, `dye_earth`, `vivid_material`,
 `weathered_heritage`, `sea_stone`, `moss_bark`, `neon_plate`, and
 `lantern_dew`.
@@ -186,7 +186,7 @@ Catalog `map` values must preserve the meaning of the nine abstract colors;
 stronger identity colors belong in `palette` rather than replacing structural
 colors.  Since v2.9.14 (render engine 18) every catalog carries a nine-key
 `map`, and each of those nine names a color from that catalog's own `palette`.
-A catalog holds exactly three achromatic and seven chromatic palette colors, so
+A catalog holds exactly three achromatic and seven chromatic `palette` colors, so
 a description that asks for a band is answered from that band rather than from
 the nearest hue the catalog happened to hold.  One band is left empty on
 purpose: `sea_stone` holds no purple and answers with its `Night Sea`, which is
@@ -199,7 +199,7 @@ quiet prompts, so future tuning should adjust core brightness and saturation
 instead of branching into prompt-specific exceptions.
 Build 266 lightens those three catalogs' core colors to reduce background and
 dark-color dominance.  Catalog `sub` remains the English UI description, while
-`sub_ja` carries the Japanese UI description.  Palette color names use `name` as
+`sub_ja` carries the Japanese UI description.  `palette` color names use `name` as
 the English canonical label and may include `name_ja`; the Japanese UI displays
 those entries as `English（日本語）`, while the English UI displays `name` only.
 
@@ -2973,7 +2973,7 @@ request sets `catalog_mode` to `auto` and carries the default catalog as
 `catalog_id`, which is the fallback the server keeps when the model is
 unreachable or names a catalog that does not exist).  History records store the
 catalog that was actually used, so **refinement and redrawing do not inherit the
-automatic choice: they draw with the artwork's own catalog**.
+automatic choice: they draw with the work's own catalog**.
 
 **The catalog selection is stored per user on the server**
 (`model_settings.color_catalog_id`).  Drawing needs a session, so a browser-wide

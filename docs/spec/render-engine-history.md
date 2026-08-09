@@ -873,10 +873,10 @@ and the seed material are all engine 17's, and `renderer.py` has no diff.
 green and the nearest hue, a yellow, stands in. Across the 7463 stored instructions, **140 asked for
 a band the catalog did not hold**.
 
-- **Thirteen catalogs hold ten palette colors each**, fixed at **exactly three achromatic and
+- **Thirteen catalogs hold ten `palette` colors each**, fixed at **exactly three achromatic and
   exactly seven chromatic**. The seven fill all six bands, one band holding two
 - **The `map` grows from six keys to nine**, and **all nine are drawn from that catalog's own
-  palette** (before, `map` and `palette` could name different colors)
+  `palette`** (before, `map` and `palette` could name different colors)
 - **The swatch strip is derived from the `map`, six chromatic keys first** — Android draws
   `swatches.take(4)` and `take(8)` on two screens, so an achromatic-first order would spend those
   slots on black, gray and white
@@ -895,7 +895,7 @@ a band the catalog did not hold**.
 | Chromatic hits | 2184 / 2455 (89.0%) | **2455 / 2455 (100%)** |
 | Achromatic hits | 4917 / 5008 (98.2%) | **5008 / 5008 (100%)** |
 | Distinct hexes resolved | 79 | **91** |
-| Palette colors never drawn (catalogs in use) | 7 | **9** |
+| `palette` colors never drawn (catalogs in use) | 7 | **9** |
 
 **The never-drawn count rises rather than falls.** The nine in catalogs actually in use are eight
 purples plus `sea_stone/Coral Orange`, because **purple is 0.9% of real demand**. Counting all

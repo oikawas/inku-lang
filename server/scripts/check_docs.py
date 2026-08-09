@@ -1,4 +1,4 @@
-"""Guard the two properties the published documents cannot check for themselves.
+"""Guard the properties the published documents cannot check for themselves.
 
 Nothing in this repository checks documentation. ``npm run lint:i18n`` reads the
 web display strings and never opens a markdown file; CI regenerates the frozen
@@ -14,6 +14,12 @@ documents actually break have both been found by hand, after the fact:
   a link into ``docs/`` or ``no-git-sync/`` resolves on the author's disk and
   404s on GitHub. ``CHANGELOG.md`` has linked to ``docs/inku-dev-conventions.md``
   since Build 634 that way.
+* **the English drifts from the glossary.** ``web/src/lib/i18n/GLOSSARY.md`` is
+  the canonical source for every English word in the project, but the only
+  machine that reads it is ``npm run lint:i18n``, which opens ``en.ts`` and the
+  web components and no markdown file at all. Twenty-four lines across five
+  published documents still said ``artwork`` and ``palette`` on 2026-08-09,
+  while the Japanese originals were already right (ledger I-161).
 
 Run it from ``server/`` before merging a documentation change:
 
@@ -116,6 +122,42 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("CHANGELOG.ja.md", "CHANGELOG.md", "entries", None),
     ("docs/history/changelog-v1.72-v2.4.ja.md", "docs/history/changelog-v1.72-v2.4.md", "entries", None),
     ("docs/history/changelog-v0.1-v1.71.ja.md", "docs/history/changelog-v0.1-v1.71.md", "entries", None),
+)
+
+# The words GLOSSARY.md §5-1 forbids anywhere, restricted to the four that can
+# occur in a document. ``fluctuation``, ``jitter`` and ``okugaki`` are forbidden
+# there too and stand at zero in all twenty documents today, but SPEC may yet
+# explain ``okugaki`` as a concept name and ``jitter`` is a drawing term, so
+# adding them is a separate decision with its own measurement behind it.
+#
+# The §5-2 *restricted* words (``image``, ``prompt``, ``generate``, ``create``,
+# ``render``) are deliberately absent: they are legitimate in technical prose,
+# and a mechanical net over documents would report them by the hundred until
+# nobody read the output.
+FORBIDDEN_WORDS: tuple[str, ...] = ("artwork", "palette", "AI-powered", "magic")
+
+# Documents excluded from the terminology check by the author's ruling of
+# 2026-08-09: a changelog is a frozen record, and one of its entries quotes the
+# forbidden word as the mistake it is recording. **This is "decided not to
+# look", not "no need to look"** -- so the list is named here rather than left
+# implicit, and ``test_terminology_gate.py`` asserts each of the three is out.
+TERMINOLOGY_EXEMPT: frozenset[str] = frozenset(
+    {
+        "CHANGELOG.md",
+        "docs/history/changelog-v1.72-v2.4.md",
+        "docs/history/changelog-v0.1-v1.71.md",
+    }
+)
+
+# A span between backticks is a code identifier, and an identifier is a
+# legitimate use: `Artwork` is a Kotlin enum member and `palette` is a field of
+# the catalog JSON. Dropping these spans before matching is what lets the check
+# ask about prose only -- see GLOSSARY.md:146, which warns against aiming for
+# "zero grep hits", since that erases the legitimate uses along with the rest.
+BACKTICK_SPAN = re.compile(r"`[^`]*`")
+FORBIDDEN = re.compile(
+    r"\b(?:" + "|".join(re.escape(word) for word in FORBIDDEN_WORDS) + r")s?\b",
+    re.IGNORECASE,
 )
 
 # Unpublished documents that published documents already name, frozen as they
@@ -231,6 +273,56 @@ def _summarise(shape: list[int]) -> str:
     return " ".join(f"h{level}={n}" for level, n in counts.items())
 
 
+def terminology_targets() -> tuple[str, ...]:
+    """The English side of every pair that is not exempt.
+
+    Derived from ``PAIRS`` rather than listed again: a document that leaves the
+    parity check must not keep a terminology check that names it by hand, and a
+    pair added later is looked at without anyone remembering this list.
+    """
+    return tuple(en for _, en, _, _ in PAIRS if en not in TERMINOLOGY_EXEMPT)
+
+
+def forbidden_hits(text: str) -> list[tuple[int, str]]:
+    """Every (line number, matched word) in ``text`` outside a backtick span.
+
+    Fenced blocks are read, unlike everywhere else in this file. The one line
+    inside a fence that this catches -- the pipeline diagram in
+    ``PROJECT_CONTEXT.md`` -- is prose drawn as a diagram, and skipping fences
+    would leave it unchecked. Inside a fence the backticks are literal text
+    rather than markup, so a genuine code sample that must print the field name
+    has no way to say so; none exists today, and the way out would be a ruling
+    like the declared exceptions above rather than a silent pass.
+    """
+    hits = []
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            continue
+        match = FORBIDDEN.search(BACKTICK_SPAN.sub(" ", line))
+        if match:
+            hits.append((number, match.group(0)))
+    return hits
+
+
+def check_terminology() -> list[str]:
+    targets = terminology_targets()
+    problems = []
+    for name in targets:
+        path = REPO_ROOT / name
+        if not path.exists():
+            # An absent English side is check_parity's report to make.
+            continue
+        for number, word in forbidden_hits(path.read_text(encoding="utf-8")):
+            problems.append(
+                f"{name}:{number}: a forbidden word in prose: {word}\n"
+                f"    GLOSSARY.md §5-1 forbids it. If it names the concept, use "
+                f"the canonical word ('work', 'color catalog'); if it names a "
+                f"code identifier, wrap it in backticks and it stops counting."
+            )
+    print(f"  documents checked for forbidden words: {len(targets)}")
+    return problems
+
+
 def check_prose_references(tracked: set[str]) -> list[str]:
     """Freeze the set of internal documents that published documents name.
 
@@ -328,8 +420,10 @@ def main() -> int:
     links = check_links(tracked)
     print("checking that published documents name only published documents")
     prose = check_prose_references(tracked)
+    print("checking that the English follows the glossary")
+    terminology = check_terminology()
 
-    problems = parity + links + prose
+    problems = parity + links + prose + terminology
     if not problems:
         print("documents are consistent.")
         return 0

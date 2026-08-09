@@ -4519,3 +4519,28 @@ flight with it.**
   ruff clean, frozen corpora byte-identical (they compare SVG, which the rasterizer version cannot move),
   `test_version_consistency.py` 8 cases. **⚠ No screen or API key changes.** The version moved so that the
   tree deployed to pentala and the number that names it stay in step.
+
+### 2026-08-09 — The bake asks the corpus whether the fade reaches every member (**no version bump**; checks only)
+
+**Three guards run as the reference corpus is baked, each asking whether a case really sees the mechanism
+it was added for — and the `fade` one was the weak member of the three** (ledger [I-166], author ruling A).
+
+- **What was weak** — the size and angle guards withhold `_apply_member_sizes` / `_apply_member_rotations`,
+  **the mechanism itself**, and compare the drawings. The `fade` guard only rewrote `fade="none"`.
+  **Engine 23 already answered `fade` with one constant for the whole group** (0.40 outward, 0.48
+  directional), **so a renderer carrying no per-member ceiling at all still changes the picture when the
+  declaration goes away — and still passes.**
+- **What was added** — `_assert_fade_reaches_every_member`, which **asks the corpus directly**: some drawn
+  fading group has to hold more than one ceiling, and **the two degenerate groups have to hold none**.
+  **The engine's behaviour is not changed by a single line** (a ring is equidistant from its own centre and
+  so is a pair; ranking them would draw a gradient nobody stated).
+- **⚠ The obvious fix cannot be taken.** `G-fade-radial-edge` and `G-fade-count2-edge` do not fade by
+  construction, so withholding the rule leaves them untouched and a strong form applied to all six always fails.
+- **⚠ The weak guard was kept**, with the new question added beside it, and a check now holds the wiring
+  itself: dropping the call from the bake turns exactly one test red.
+- **Checks:** **server pytest 2,488 passed / 31 skipped** (from 2,486: **+2 tests, +2 cases**), ruff clean,
+  frozen corpora byte-identical (**no drawing moves**). **Three perturbations**: making the fade a
+  pass-through turns 18 red **while the weak guard stays green and the new question goes red** — which is
+  the claim of the item itself; cutting the wiring turns exactly one red; ramping an equidistant group
+  turns three red (the new question plus the ring and the pair). **No version bump** — no version, API key,
+  screen, or drawn pixel changes.

@@ -112,6 +112,23 @@ def _build_date() -> str | None:
         return None
 
 
+def _log_destination() -> str:
+    """What the banner may honestly claim about where the lines go.
+
+    It used to print `/var/log/inku/inku-api.log` unconditionally, while systemd
+    had silently dropped the drop-in that was supposed to fill that file and the
+    file sat at 0 bytes for months (ledger I-167). Ask the policy instead.
+    """
+    from . import db
+    from .logging_setup import log_dir
+
+    try:
+        enabled = bool(db.get_log_retention_settings()["enabled"])
+    except Exception:
+        return "no file (policy unreadable)"
+    return str(log_dir()) if enabled else "no file (retention disabled)"
+
+
 def _startup_banner(*, service_name: str, service_kind: str, emoji: str) -> str:
     build_number = _build_number() or "unknown"
     build_date = _build_date() or "unknown"
@@ -128,7 +145,7 @@ def _startup_banner(*, service_name: str, service_kind: str, emoji: str) -> str:
             f"listen: {host}:{port}",
             f"runtime: Python {platform.python_version()} / {platform.system()} {platform.machine()}",
             f"render engine: {engine.id} v{engine.version}",
-            "log: journal + /var/log/inku/inku-api.log",
+            f"log: stdout + {_log_destination()}",
             f"version: {_APP_VERSION}",
             f"build: {build_number} ({build_date})",
             border,
@@ -189,6 +206,11 @@ app.include_router(feedback.router)
 
 def main() -> None:
     import uvicorn
+
+    from .logging_setup import configure_logging
+
+    # The stored policy is executed here, not copied into systemd by an operator.
+    configure_logging()
 
     host = os.getenv("INKU_SERVER_HOST", "127.0.0.1")
     port = int(os.getenv("INKU_SERVER_PORT", "8100"))

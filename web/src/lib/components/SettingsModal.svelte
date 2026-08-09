@@ -97,9 +97,7 @@
 			rotate: 'daily' | 'weekly' | 'monthly';
 			compress: boolean;
 			log_dir: string;
-			services: string[];
-			systemd_dropins: Record<string, string>;
-			logrotate_config: string;
+			files: string[];
 			note: string;
 		};
 	};
@@ -1201,20 +1199,12 @@
 					</label>
 					<div class="settings-readonly-grid compact">
 						<span>{t().settingsLogRetentionLogDir}</span><code>{settingsStatus.log_retention.log_dir}</code>
-						<span>{t().settingsLogRetentionServices}</span><strong>{settingsStatus.log_retention.services.join(', ')}</strong>
+						<span>{t().settingsLogRetentionFiles}</span
+						><strong>{settingsStatus.log_retention.files.length > 0
+							? settingsStatus.log_retention.files.join(', ')
+							: t().settingsLogRetentionNoFiles}</strong>
 					</div>
 					<div class="db-test-result">{t().settingsOutputSaveNoteLabel}: {t().settingsLogRetentionNote}</div>
-					<div class="settings-config-preview">
-						<div class="settings-config-preview-title">{t().settingsLogRetentionLogrotatePreview}</div>
-						<pre>{settingsStatus.log_retention.logrotate_config}</pre>
-					</div>
-					<div class="settings-config-preview">
-						<div class="settings-config-preview-title">{t().settingsLogRetentionSystemdPreview}</div>
-						{#each Object.entries(settingsStatus.log_retention.systemd_dropins) as [service, config]}
-							<div class="settings-config-service">{service}</div>
-							<pre>{config}</pre>
-						{/each}
-					</div>
 					{#if logRetentionStatus}
 						<div class="inline-message">{logRetentionStatus}</div>
 					{/if}
@@ -2179,38 +2169,6 @@
 	.db-backup-list tr:last-child td { border-bottom: none; }
 	.db-backup-generation,
 	.db-backup-size { text-align: right; }
-	.settings-config-preview {
-		margin-top: 10px;
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-	}
-	.settings-config-preview-title,
-	.settings-config-service {
-		color: var(--fg3);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-	}
-	.settings-config-service {
-		margin-top: 5px;
-		text-transform: none;
-		letter-spacing: 0;
-	}
-	.settings-config-preview pre {
-		max-height: 160px;
-		overflow: auto;
-		margin: 0;
-		padding: 8px;
-		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--bg);
-		color: var(--fg2);
-		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-		font-size: 11px;
-		line-height: 1.45;
-		white-space: pre-wrap;
-	}
 	.server-path-row {
 		display: flex;
 		flex-direction: column;

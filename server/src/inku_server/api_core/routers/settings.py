@@ -12,6 +12,7 @@ from ...limits import DEFAULT_LIMITS, LIMIT_ABSOLUTE_MAX, LIMIT_GROUPS, limits_a
 from ...plugins import plugin_status_items
 from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
 from ... import db as _db
+from ... import logging_setup as _logging_setup
 from ..common import _env_flag
 from ..deps import _admin_user
 from ..models import ModelSettingsResponse
@@ -22,60 +23,25 @@ from ..state import _SAVE_QUEUE_LIMIT, _SAVE_WORKERS, _STAGE_QUEUE_LIMIT, _STAGE
 router = APIRouter(dependencies=[Depends(_admin_user)])
 
 
-_LOG_SERVICE_FILES = {
-    "inku-server": "/var/log/inku/inku-server.log",
-    "inku-api": "/var/log/inku/inku-api.log",
-}
-
-
-_LOG_DIR = "/var/log/inku"
-
-
 def _log_retention_settings() -> dict:
     return _db.get_log_retention_settings()
 
 
-def _log_systemd_dropins(settings: dict) -> dict[str, str]:
-    if not settings["enabled"]:
-        return {}
-    return {
-        service: "\n".join(
-            [
-                "[Service]",
-                "LogsDirectory=inku",
-                f"StandardOutput=journal+append:{path}",
-                f"StandardError=journal+append:{path}",
-                "",
-            ]
-        )
-        for service, path in _LOG_SERVICE_FILES.items()
-    }
-
-
-def _logrotate_config(settings: dict) -> str:
-    if not settings["enabled"]:
-        return "# Log retention is disabled.\n"
-    paths = " ".join(_LOG_SERVICE_FILES.values())
-    lines = [
-        f"{paths} {{",
-        f"    {settings['rotate']}",
-        f"    rotate {settings['retention_days']}",
-        f"    maxage {settings['retention_days']}",
-        "    missingok",
-        "    notifempty",
-    ]
-    if settings["compress"]:
-        lines.extend(["    compress", "    delaycompress"])
-    lines.extend(
-        [
-            "    copytruncate",
-            "    dateext",
-            "    dateformat -%Y%m%d",
-            "}",
-            "",
-        ]
+def _log_retention_status(settings: dict) -> "LogRetentionStatus":
+    """One builder for both the GET and the PUT, so the two cannot drift."""
+    return LogRetentionStatus(
+        enabled=bool(settings["enabled"]),
+        retention_days=int(settings["retention_days"]),
+        rotate=str(settings["rotate"]),
+        compress=bool(settings["compress"]),
+        log_dir=str(_logging_setup.log_dir()),
+        files=_logging_setup.current_log_files(),
+        note=(
+            "The log retention policy is stored in the application DB and the application "
+            "executes it: it writes, rotates and prunes the files itself. Lines keep going "
+            "to stdout as well, so journalctl and docker logs are unchanged."
+        ),
     )
-    return "\n".join(lines)
 
 
 class DatabaseSettingsStatus(BaseModel):
@@ -166,10 +132,12 @@ class LogRetentionStatus(BaseModel):
     retention_days: int
     rotate: str
     compress: bool
+    # Where the application writes, and what is there now. These replace the
+    # systemd drop-in and logrotate snippets the screen used to hand out: the
+    # container distribution has neither, so the policy is executed in process
+    # instead of being copied into the host OS (ledger I-167).
     log_dir: str
-    services: list[str]
-    systemd_dropins: dict[str, str]
-    logrotate_config: str
+    files: list[str]
     note: str
 
 
@@ -265,17 +233,7 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
             **_artifact_save_stats(),
             note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
         ),
-        log_retention=LogRetentionStatus(
-            enabled=bool(log_settings["enabled"]),
-            retention_days=int(log_settings["retention_days"]),
-            rotate=str(log_settings["rotate"]),
-            compress=bool(log_settings["compress"]),
-            log_dir=_LOG_DIR,
-            services=list(_LOG_SERVICE_FILES),
-            systemd_dropins=_log_systemd_dropins(log_settings),
-            logrotate_config=_logrotate_config(log_settings),
-            note="Log retention policy is stored in the application DB. Applying systemd and logrotate files requires server OS privileges.",
-        ),
+        log_retention=_log_retention_status(log_settings),
         render_concurrency=_render_concurrency_status(),
         render_limits=_render_limits_status(),
         stage_execution=StageExecutionStatus(
@@ -596,17 +554,11 @@ def api_settings_update_log_retention(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    return LogRetentionStatus(
-        enabled=bool(log_settings["enabled"]),
-        retention_days=int(log_settings["retention_days"]),
-        rotate=str(log_settings["rotate"]),
-        compress=bool(log_settings["compress"]),
-        log_dir=_LOG_DIR,
-        services=list(_LOG_SERVICE_FILES),
-        systemd_dropins=_log_systemd_dropins(log_settings),
-        logrotate_config=_logrotate_config(log_settings),
-        note="Log retention policy is stored in the application DB. Applying systemd and logrotate files requires server OS privileges.",
-    )
+    # Apply it now. The screen used to end here with a file for the operator to
+    # copy, which meant the stored policy and the running one could disagree
+    # forever -- and on pentala they did, for months.
+    _logging_setup.configure_logging(log_settings)
+    return _log_retention_status(log_settings)
 
 
 @router.post("/api/settings/db-backup/run", response_model=DbBackupResult)

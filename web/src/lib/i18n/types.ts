@@ -537,9 +537,8 @@ export interface LangPack {
 	settingsLogRetentionMonthly: string;
 	settingsLogRetentionCompress: string;
 	settingsLogRetentionLogDir: string;
-	settingsLogRetentionServices: string;
-	settingsLogRetentionLogrotatePreview: string;
-	settingsLogRetentionSystemdPreview: string;
+	settingsLogRetentionFiles: string;
+	settingsLogRetentionNoFiles: string;
 	settingsLogRetentionNote: string;
 	settingsLogRetentionSaved: string;
 	settingsReloadSettings: string;

@@ -21,7 +21,7 @@ RUN cd /app/server && uv sync --frozen --no-dev
 COPY web/BUILD_NUMBER /app/web/BUILD_NUMBER
 
 RUN useradd --create-home --uid 10001 inku \
-    && mkdir -p /data/outputs /data/db-backups /data/cache \
+    && mkdir -p /data/outputs /data/db-backups /data/logs /data/cache \
     && chown -R inku:inku /data
 
 USER inku
@@ -33,6 +33,7 @@ ENV PATH="/app/server/.venv/bin:${PATH}" \
     INKU_SECRET_KEY_FILE=/data/secret.key \
     INKU_OUTPUT_DIR=/data/outputs \
     INKU_DB_BACKUP_DIR=/data/db-backups \
+    INKU_LOG_DIR=/data/logs \
     UV_CACHE_DIR=/data/cache
 
 EXPOSE 8100

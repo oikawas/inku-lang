@@ -1,46 +1,66 @@
 """The drawing must not read the last bit of a libm result.
 
-macOS libm and glibc disagree by one ULP on sin/cos for 7-10 of every 60
-arguments. That is invisible wherever the number is merely printed -- the SVG
-keeps six decimals -- but `_seed_for_instruction` hashes the whole instruction
-dump, so before engine 21 a one-ULP difference produced a different performance
-seed and moved the drawing by 0.08-0.17px. The frozen corpus then could not be
-reproduced on the other platform, which is what kept CI red from 2026-08-01
-(ledger I-111).
+macOS libm and glibc can disagree by one ULP on sin/cos/hypot. Before engine
+21, arrangement coordinates reached a hash and amplified that difference into
+a different performance seed (ledger I-111). Engine 28 exposed a second route:
+paper-contact sampling counted arc length directly, so the last bit could move
+a sample, its sample-derived quantile, and a whole material-outline fragment
+(ledger I-178).
 
-Cross-platform identity cannot be observed from one machine, so these two tests
-stand in for it: perturb sin/cos by exactly one ULP and require the drawing to
-stay put. The second test is what keeps the first from being vacuous -- without
-it, a perturbation that never reached the renderer would also look green.
+Cross-platform identity cannot be observed from one machine, so the main test
+perturbs all three libm calls by exactly one ULP. Its pair removes both platform
+stabilisers and proves that the same perturbation still reaches the drawing.
+The exposure test derives the current material-outline tools from rendered
+corpus inputs, then requires the smaller two-pass sample to cover every tool and
+the six cases that actually split between macOS and Linux under engine 28.
 """
 
 from __future__ import annotations
 
 import functools
 import importlib.util
+import inspect
+import json
 import math
 import pathlib
 
 from inku_server import renderer
-from inku_server.schema import Score
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
 
-# Group G is the whole of the exposure: A-F never state an `arrangement`, so
-# they never reach `_expand_arrangement` and never feed a coordinate to a hash.
-GROUP_PREFIX = "G-"
+ENGINE_28_PLATFORM_SPLITS = frozenset(
+    {
+        "A-pencil-polygon",
+        "B-perlin-medium-circle-pencil",
+        "B-white-broad-arc-pencil",
+        "C-fill-ellipse-pencil",
+        "E-wild-pencil-ellipse",
+        "E-wild-pencil-polygon",
+    }
+)
 
-# Measured on 2026-08-03 against engine 20, before the quantiser existed. Every
-# one of them is a layout that goes through sin/cos: cluster, path=wave, radial.
-MOVED_WITHOUT_QUANTISER = frozenset(
+# Measured on 2026-08-09 against engine 28, before the contact-length
+# quantiser existed. The sixth real platform split is included in the main
+# sample but does not move under this Mac's one-direction ULP perturbation.
+MOVED_WITHOUT_CONTACT_LENGTH_QUANTISER = frozenset(
+    {
+        "B-perlin-medium-circle-pencil",
+        "B-white-broad-arc-pencil",
+        "C-fill-ellipse-pencil",
+        "E-wild-pencil-ellipse",
+        "E-wild-pencil-polygon",
+    }
+)
+
+# Measured on 2026-08-03 against engine 20, before the arrangement quantiser
+# existed. Every case is a layout that goes through sin/cos.
+MOVED_WITHOUT_ARRANGEMENT_QUANTISER = frozenset(
     {
         "G-cluster-center",
         "G-cluster-corner",
         "G-cluster-edge",
         "G-cluster-preserve-edge",
-        # engine 23's composition twins: same score, so the same two layouts
-        # reach sin/cos, only from the seed the case states.
         "G-composition-cluster-center",
         "G-composition-path-wave-edge",
         "G-path-hwave-edge",
@@ -51,15 +71,23 @@ MOVED_WITHOUT_QUANTISER = frozenset(
         "G-radial-nocenter-center",
         "G-radial-nocenter-corner",
         "G-radial-nocenter-edge",
-        # engine 24's fading cases: only the ring reaches sin/cos at all. The
-        # other five are scatter, cluster and path layouts, which do not.
         "G-fade-radial-edge",
     }
 )
 
 
+class _PreviousUlpHypotMath:
+    """math with hypot nudged one ULP towards zero."""
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(math, name)
+
+    def hypot(self, *coordinates: float) -> float:
+        return math.nextafter(math.hypot(*coordinates), 0.0)
+
+
 class _OneUlpMath:
-    """`math` with sin/cos nudged one ULP -- the size of the real libm gap."""
+    """`math` with the three platform-sensitive calls nudged one ULP."""
 
     def __getattr__(self, name: str) -> object:
         return getattr(math, name)
@@ -69,6 +97,9 @@ class _OneUlpMath:
 
     def cos(self, x: float) -> float:
         return math.nextafter(math.cos(x), math.inf)
+
+    def hypot(self, *coordinates: float) -> float:
+        return math.nextafter(math.hypot(*coordinates), math.inf)
 
 
 @functools.lru_cache(maxsize=1)
@@ -81,58 +112,121 @@ def _generator():
 
 
 @functools.lru_cache(maxsize=1)
-def _group_g_inputs() -> tuple[tuple[str, dict], ...]:
-    inputs = _generator().build_inputs()
+def _inputs() -> dict[str, dict]:
+    return _generator().build_inputs()
+
+
+@functools.lru_cache(maxsize=1)
+def _baseline_drawings() -> dict[str, str]:
+    module = _generator()
+    return {
+        case_id: module.render_case(render_input)
+        for case_id, render_input in sorted(_inputs().items())
+    }
+
+
+def _has_material_outline(svg: str) -> bool:
+    return 'class="material-outline' in svg or ' material-outline' in svg
+
+
+@functools.lru_cache(maxsize=1)
+def _material_outline_case_ids() -> tuple[str, ...]:
     return tuple(
-        (case_id, render_input)
-        for case_id, render_input in sorted(inputs.items())
-        if case_id.startswith(GROUP_PREFIX)
+        case_id
+        for case_id, svg in _baseline_drawings().items()
+        if _has_material_outline(svg)
     )
 
 
-def _draw_group_g() -> dict[str, str]:
+def _weight(case_id: str) -> str:
+    return _inputs()[case_id]["score"]["instructions"][0]["weight"]
+
+
+@functools.lru_cache(maxsize=1)
+def _stability_case_ids() -> tuple[str, ...]:
+    exposure = _material_outline_case_ids()
+    representatives = {
+        next(case_id for case_id in exposure if _weight(case_id) == weight)
+        for weight in sorted({_weight(case_id) for case_id in exposure})
+    }
+    return tuple(
+        sorted(
+            representatives
+            | ENGINE_28_PLATFORM_SPLITS
+            | MOVED_WITHOUT_ARRANGEMENT_QUANTISER
+        )
+    )
+
+
+@functools.lru_cache(maxsize=1)
+def _frozen_stability_digests() -> dict[str, str]:
+    manifest = json.loads(_generator().MANIFEST_PATH.read_text(encoding="utf-8"))
+    return {
+        case_id: manifest["cases"][case_id]["digest"]
+        for case_id in _stability_case_ids()
+    }
+
+
+def _draw_stability_cases() -> dict[str, str]:
     module = _generator()
     return {
-        case_id: module._normalized_digest(
-            module.render(
-                Score.model_validate(render_input["score"]),
-                color_map=render_input["color_map"],
-                catalog_id=render_input["catalog_id"],
-                render_seed=render_input["render_seed"],
-                composition_seed=render_input.get("composition_seed"),
-                svg_profile=render_input["svg_profile"],
-                wild=render_input["wild"],
-            )
-        )
-        for case_id, render_input in _group_g_inputs()
+        case_id: module._normalized_digest(module.render_case(_inputs()[case_id]))
+        for case_id in _stability_case_ids()
     }
 
 
 def _moved_under_one_ulp(monkeypatch) -> set[str]:
-    before = _draw_group_g()
+    before = _draw_stability_cases()
     monkeypatch.setattr(renderer, "math", _OneUlpMath())
-    after = _draw_group_g()
+    after = _draw_stability_cases()
     monkeypatch.undo()
     return {case_id for case_id in before if before[case_id] != after[case_id]}
 
 
-def test_group_g_is_the_whole_exposure() -> None:
-    """A gate that measured nothing would still pass the two tests below."""
-    # 50 since engine 26 added its four angle groups, on top of engine 25's
-    # four non-circle ones. None of the eight joins the set below: all are
-    # `scatter`, which never reaches sin/cos.
-    assert len(_group_g_inputs()) == 50
+def test_stability_cases_cover_the_current_exposure() -> None:
+    exposure = set(_material_outline_case_ids())
+    selected = set(_stability_case_ids())
+    assert selected <= exposure
+    assert ENGINE_28_PLATFORM_SPLITS <= selected
+    assert {_weight(case_id) for case_id in selected} == {
+        _weight(case_id) for case_id in exposure
+    }
+
+
+def test_exposure_gate_is_derived_from_rendered_output() -> None:
+    source = inspect.getsource(test_stability_cases_cover_the_current_exposure)
+    assert "_material_outline_case_ids()" in source
+    assert "len(" not in source
+
+
+def test_one_ulp_of_arc_length_does_not_change_fragment_shape(monkeypatch) -> None:
+    points = [(0.0, 0.0), (2.0, 0.0)]
+    before = renderer._contact_fragments(
+        points, coverage=0.2, grain_px=3.0, seed=0, closed=False
+    )
+    monkeypatch.setattr(renderer, "math", _PreviousUlpHypotMath())
+    after = renderer._contact_fragments(
+        points, coverage=0.2, grain_px=3.0, seed=0, closed=False
+    )
+    assert [len(piece) for piece, _ in before] == [
+        len(piece) for piece, _ in after
+    ]
+
+
+def test_stability_cases_match_the_current_frozen_corpus() -> None:
+    assert _draw_stability_cases() == _frozen_stability_digests()
 
 
 def test_one_ulp_of_libm_does_not_move_the_drawing(monkeypatch) -> None:
     assert _moved_under_one_ulp(monkeypatch) == set()
 
 
-def test_without_the_quantiser_the_same_perturbation_is_seen(monkeypatch) -> None:
-    """Keeps the test above honest.
-
-    If this ever goes green, the perturbation stopped reaching the renderer and
-    the test above is no longer measuring anything.
-    """
+def test_without_the_stabilisers_the_same_perturbation_is_seen(monkeypatch) -> None:
+    """Keeps the main test honest by exposing both known platform routes."""
     monkeypatch.setattr(renderer, "_quantise_instructions", lambda items: items)
-    assert _moved_under_one_ulp(monkeypatch) == MOVED_WITHOUT_QUANTISER
+    monkeypatch.setattr(renderer, "_quantise_contact_length", lambda value: value)
+    moved = _moved_under_one_ulp(monkeypatch)
+    assert moved == (
+        MOVED_WITHOUT_ARRANGEMENT_QUANTISER
+        | MOVED_WITHOUT_CONTACT_LENGTH_QUANTISER
+    )

@@ -1,6 +1,8 @@
 package app.inku.mobile.data.refinement
 
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.ui.i18n.InkuStrings
+import app.inku.mobile.ui.i18n.inkuError
 
 /**
  * The one intervention a round of refinement makes.
@@ -10,12 +12,12 @@ import app.inku.mobile.data.db.HistoryItemEntity
  * of flags -- 「系譜の各辺を単一の介入として説明可能にするため」, and a lineage edge
  * whose cause is two things at once cannot be labelled with one kind.
  */
-enum class RefinementElement(val id: String, val labelJa: String, val derivationKind: String) {
-    Touch("touch", "タッチ", "touch_change"),
-    Layout("layout", "配置", "layout_change"),
-    Reading("reading", "読み取り", "reinterpretation"),
-    Color("color", "色カタログ", "catalog_change"),
-    Variation("variation", "変奏", "variation"),
+enum class RefinementElement(val id: String, val derivationKind: String) {
+    Touch("touch", "touch_change"),
+    Layout("layout", "layout_change"),
+    Reading("reading", "reinterpretation"),
+    Color("color", "catalog_change"),
+    Variation("variation", "variation"),
     ;
 
     companion object {
@@ -24,10 +26,10 @@ enum class RefinementElement(val id: String, val labelJa: String, val derivation
 }
 
 /** 強度. Shown only under the variation radio, and only there (SPEC `:614`). */
-enum class VariationAmplitude(val id: String, val labelJa: String) {
-    Small("small", "控えめ"),
-    Medium("medium", "中庸"),
-    Large("large", "大胆"),
+enum class VariationAmplitude(val id: String) {
+    Small("small"),
+    Medium("medium"),
+    Large("large"),
     ;
 
     companion object {
@@ -167,7 +169,7 @@ object RefinementPlanner {
         // give the same touch.
         RefinementElement.Touch -> {
             val to = seedText?.let { SeedFactory.renderSeedFromText(it) }
-                ?: error("タッチを変える言葉を入力してください。")
+                ?: inkuError { it.refinementTouchWordsRequired }
             RefinementPlan(
                 element = element,
                 route = RefinementRoute.RenderFromScore,
@@ -221,7 +223,7 @@ object RefinementPlanner {
         // the catalogue is the only thing that differs.
         RefinementElement.Color -> {
             val to = newCatalogId?.takeIf { it.isNotBlank() && it != parent.catalogId }
-                ?: error("別の色カタログがありません。")
+                ?: inkuError { it.refinementNoOtherCatalog }
             RefinementPlan(
                 element = element,
                 route = RefinementRoute.RenderFromScore,
@@ -270,7 +272,7 @@ object RefinementPlanner {
     fun maxCandidates(element: RefinementElement): Int =
         if (element == RefinementElement.Touch) 1 else 4
 
-    const val TOUCH_FANOUT_REFUSAL = "同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。"
+    val TOUCH_FANOUT_REFUSAL: (InkuStrings) -> String = { it.refinementTouchFanoutRefusal }
 
     /**
      * The catalogues four colour candidates use. 「4案では可能な限り異なるカタログ
@@ -279,7 +281,7 @@ object RefinementPlanner {
      */
     fun catalogCandidateIds(currentId: String, available: List<String>, count: Int): List<String> {
         val others = available.filter { it.isNotBlank() && it != currentId }.shuffled()
-        if (others.isEmpty()) error("別の色カタログがありません。")
+        if (others.isEmpty()) inkuError { it.refinementNoOtherCatalog }
         return List(count) { index -> others[index % others.size] }
     }
 

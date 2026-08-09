@@ -173,7 +173,10 @@ import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
+import app.inku.mobile.ui.i18n.InkuStrings
+import app.inku.mobile.ui.i18n.LocalStrings
 import app.inku.mobile.ui.i18n.LocalUiLanguage
+import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.pipeline.WebDdlSpec
 import java.io.File
@@ -362,6 +365,19 @@ private val saijikiGroupColors = listOf(
     SaijikiGroupMoss,
 )
 
+/**
+ * The wording for a lineage edge's kind.
+ *
+ * A node no edge points at carries no kind, and the answer there is the origin
+ * rather than an unknown -- the same split `derivationKindLabel(kind, isJapanese)`
+ * makes on the web (`derivation.ts:49-51`).
+ */
+@Composable
+internal fun derivationKindLabel(kind: String?): String {
+    val strings = LocalStrings.current
+    return if (kind.isNullOrEmpty()) strings.derivationOrigin else strings.derivationLabel(kind)
+}
+
 /** The pill colour for the category declared at [index]. */
 internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index % saijikiGroupColors.size]
 
@@ -392,7 +408,10 @@ fun InkuApp() {
     // Every reader of `LocalUiLanguage` sits under this, so the setting reaches
     // the wording and the saijiki through one provision rather than a parameter
     // threaded through the screens.
-    CompositionLocalProvider(LocalUiLanguage provides state.uiLanguage) {
+    CompositionLocalProvider(
+        LocalUiLanguage provides state.uiLanguage,
+        LocalStrings provides stringsFor(state.uiLanguage),
+    ) {
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
             bottomBar = {
@@ -1795,8 +1814,12 @@ private fun SvgExportOption(title: String, sub: String, onClick: () -> Unit) {
 // same thing on the destination itself, so the explanation no longer needs a
 // place to be opened from.
 
+@Composable
 private fun exportTemplateDescription(description: String, heightPx: Int): String {
-    return description.ifBlank { "PNG / Y軸 ${heightPx}px" }
+    // The builtin rows are seeded with a blank description on purpose: theirs is
+    // derived from the height, so it is composed here in the reader's language
+    // instead of being frozen into the table at first launch.
+    return description.ifBlank { LocalStrings.current.exportTemplateBuiltinDescription(heightPx) }
 }
 
 /**
@@ -2346,7 +2369,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text(state.refinementSubview.titleJa, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(LocalStrings.current.comparisonKindDescription(state.refinementSubview.id), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             ChipButton("閉じる", onClick = viewModel::closeRefinement)
         }
 
@@ -2354,7 +2377,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             RefinementSubview.entries.forEach { subview ->
                 ChipButton(
-                    text = subview.labelJa,
+                    text = LocalStrings.current.comparisonKindLabel(subview.id),
                     selected = state.refinementSubview == subview,
                     modifier = Modifier.testTag(refinementSubviewTag(subview)),
                     onClick = { viewModel.setRefinementSubview(subview) },
@@ -2435,7 +2458,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         RefinementElement.entries.forEach { element ->
             ChipButton(
-                text = element.labelJa,
+                text = LocalStrings.current.refinementElementLabel(element.id),
                 selected = state.refinementElement == element,
                 onClick = { viewModel.setRefinementElement(element) },
             )
@@ -2447,7 +2470,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             VariationAmplitude.entries.forEach { amplitude ->
                 ChipButton(
-                    text = amplitude.labelJa,
+                    text = LocalStrings.current.variationAmplitudeLabel(amplitude.id),
                     selected = state.refinementAmplitude == amplitude,
                     onClick = { viewModel.setRefinementAmplitude(amplitude) },
                 )
@@ -2480,7 +2503,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         ModelCompareMode.entries.forEach { mode ->
             ChipButton(
-                text = mode.labelJa,
+                text = LocalStrings.current.comparisonModeLabel(mode.id),
                 selected = state.modelCompareMode == mode,
                 modifier = Modifier.testTag(modelCompareModeTag(mode)),
                 onClick = { viewModel.setModelCompareMode(mode) },
@@ -2706,11 +2729,11 @@ private fun LineageNodeCard(
                 Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(LineagePlaceholderSurface))
             }
             Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                // The label of the edge that produced this work. `labelJa` with
-                // no kind is 起点, which is the answer for a node no edge points
-                // at; the wording is the registry's, never this screen's.
+                // The label of the edge that produced this work. A node no edge
+                // points at has no kind, and the answer for that is the origin;
+                // the wording is the pack's, never this screen's.
                 Text(
-                    DerivationKindRegistry.labelJa(derivationKind),
+                    derivationKindLabel(derivationKind),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -2915,7 +2938,11 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
-        SettingsCard("言語", "画面の文言・歳時記・作品の言葉", state.uiLanguage.label) {
+        SettingsCard(
+            LocalStrings.current.settingsLanguageTitle,
+            LocalStrings.current.settingsLanguageSubtitle,
+            state.uiLanguage.label,
+        ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 UiLanguage.entries.forEach { language ->
                     ChipButton(

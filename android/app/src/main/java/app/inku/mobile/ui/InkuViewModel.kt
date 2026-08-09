@@ -5,7 +5,12 @@ import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.inku.mobile.InkuApplication
+import app.inku.mobile.ui.i18n.InkuFailure
+import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.UiLanguage
+import app.inku.mobile.ui.i18n.inkuError
+import app.inku.mobile.ui.i18n.messageFor
+import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
@@ -63,14 +68,14 @@ const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 /** 写生 (Stage 0.5): which of the three states the control was left in. */
 const val SETTING_KEY_SKETCH_MODE = "sketch_mode"
 /** Said by every generating entry point that refuses while candidates are drawn. */
-const val REFINEMENT_IN_PROGRESS = "推敲の候補を生成中です。"
+val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
 /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
 const val MAX_COMPARE_SELECTION = 4
-const val MODEL_SELECT_PROMPT = "比較するモデルを1つ以上選択してください。"
-const val MODEL_FIXED_MISSING = "固定するモデルを選択してください。"
-const val MODEL_CHOICE_BLOCKED = "対象作品と同じ Stage 1/2 の組み合わせは選べません。"
-const val LANGUAGE_SELECT_PROMPT = "比較する組み合わせを1つ以上選択してください。"
-const val LANGUAGE_COMBO_BLOCKED = "対象作品と同じ言語の組み合わせは選べません。"
+val MODEL_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonModelSelectPrompt }
+val MODEL_FIXED_MISSING: (InkuStrings) -> String = { it.comparisonModelFixedMissing }
+val MODEL_CHOICE_BLOCKED: (InkuStrings) -> String = { it.comparisonModelChoiceBlocked }
+val LANGUAGE_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonLanguageSelectPrompt }
+val LANGUAGE_COMBO_BLOCKED: (InkuStrings) -> String = { it.comparisonLanguageComboBlocked }
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
 
@@ -215,10 +220,10 @@ data class InkuUiState(
  * language. They are one screen with three faces rather than three screens,
  * which is what「比較のロジックを複製しない」(SPEC `:688`) asks for.
  */
-enum class RefinementSubview(val id: String, val labelJa: String, val titleJa: String) {
-    Adjust("adjust", "調整", "描画要素を編集する"),
-    Model("model", "モデル", "モデルを編集する"),
-    Language("language", "言語", "言語を編集する"),
+enum class RefinementSubview(val id: String) {
+    Adjust("adjust"),
+    Model("model"),
+    Language("language"),
     ;
 
     companion object {
@@ -731,7 +736,7 @@ class InkuViewModel @JvmOverloads constructor(
             repository.saveExportTemplate(
                 id = "png-custom-${System.currentTimeMillis()}",
                 name = "PNG Custom $index",
-                description = "PNG / Y軸 2160px",
+                description = "",
                 heightPx = 2160,
                 sortOrder = templates.size,
             )
@@ -953,7 +958,7 @@ class InkuViewModel @JvmOverloads constructor(
         // what stops this drawing has to be the refinement rather than whichever
         // reason happens to be found first.
         if (current.refinementBusy) {
-            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS)
+            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
         validateSelectedModels(current)?.let { message ->
@@ -1131,7 +1136,7 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         if (current.refinementBusy) {
-            localState.value = current.copy(message = REFINEMENT_IN_PROGRESS)
+            localState.value = current.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
         // Read before the coroutine starts: the first thing it does is clear
@@ -1149,7 +1154,7 @@ class InkuViewModel @JvmOverloads constructor(
                 ddl = "",
                 ddlEditedAfterGeneration = false,
                 confirmDdlOverwrite = false,
-                message = "Stage 1: DDL生成中...",
+                message = strings().statusStage1,
             )
             runCatching {
                 val interpreted = withContext(Dispatchers.IO) {
@@ -1170,7 +1175,7 @@ class InkuViewModel @JvmOverloads constructor(
                 localState.value = localState.value.copy(
                     ddl = interpreted.ddlForDisplay,
                     ddlEditedAfterGeneration = false,
-                    message = "Stage 2: 画像生成中...",
+                    message = strings().statusStage2,
                 )
                 withContext(Dispatchers.IO) {
                     repository.composeFromDdl(
@@ -1212,7 +1217,7 @@ class InkuViewModel @JvmOverloads constructor(
                 )
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
-                val message = if (error is CancellationException) "停止しました。" else error.message ?: "Draw failed."
+                val message = if (error is CancellationException) strings().statusStopped else messageFor(error, strings(), strings().statusDrawFailed)
                 localState.value = localState.value.copy(isDrawing = false, message = message)
             }
         }
@@ -1221,7 +1226,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun drawFromDdl() {
         val current = state.value
         if (current.refinementBusy) {
-            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS)
+            localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
         validateSelectedModels(current)?.let { message ->
@@ -1233,7 +1238,7 @@ class InkuViewModel @JvmOverloads constructor(
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             val lineage = withPreviewParent(current, declared)
-            localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
+            localState.value = localState.value.copy(isDrawing = true, message = strings().statusComposingFromDdl)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.composeFromDdl(current.prompt, ddl, CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId), current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code)
@@ -1253,7 +1258,7 @@ class InkuViewModel @JvmOverloads constructor(
                 )
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
-                val message = if (error is CancellationException) "停止しました。" else error.message ?: "Compose failed."
+                val message = if (error is CancellationException) strings().statusStopped else messageFor(error, strings(), strings().statusComposeFailed)
                 localState.value = localState.value.copy(isDrawing = false, message = message)
             }
         }
@@ -1273,7 +1278,7 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         if (lines.size > MaxBatchItems) {
-            localState.value = current.copy(message = "バッチは最大 ${MaxBatchItems} 件までです。現在: ${lines.size} 件")
+            localState.value = current.copy(message = strings().batchTooManyItems(MaxBatchItems, lines.size))
             return
         }
         rememberBatchPrompt(current.batchText)
@@ -1304,7 +1309,7 @@ class InkuViewModel @JvmOverloads constructor(
                     batchActiveDdl = null,
                     batchActiveElapsedMs = null,
                     batchElapsedMs = System.currentTimeMillis() - startedAt,
-                    message = "Batch running: ${index + 1}/${lines.size}",
+                    message = strings().batchRunning(index + 1, lines.size),
                 )
                 runCatching {
                     val catalogId = CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId)
@@ -1344,7 +1349,7 @@ class InkuViewModel @JvmOverloads constructor(
                         batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
                         batchElapsedMs = System.currentTimeMillis() - startedAt,
                         batchLatestHashShort = item.renderHashShort,
-                        message = "Batch running: ${index + 1}/${lines.size}",
+                        message = strings().batchRunning(index + 1, lines.size),
                     )
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
@@ -1355,7 +1360,7 @@ class InkuViewModel @JvmOverloads constructor(
                         batchFailures = failures,
                         batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
                         batchElapsedMs = System.currentTimeMillis() - startedAt,
-                        message = "Batch running: ${index + 1}/${lines.size}",
+                        message = strings().batchRunning(index + 1, lines.size),
                     )
                 }
             }
@@ -1372,7 +1377,7 @@ class InkuViewModel @JvmOverloads constructor(
                 batchActiveDdl = null,
                 batchActiveElapsedMs = null,
                 batchElapsedMs = System.currentTimeMillis() - startedAt,
-                message = "Batch completed: 成功 $success / 失敗 ${failures.size} / 全 ${lines.size}",
+                message = strings().batchCompleted(success, failures.size, lines.size),
             )
         }
     }
@@ -1402,7 +1407,7 @@ class InkuViewModel @JvmOverloads constructor(
                 demoCurrentElapsedMs = null,
                 demoTotalElapsedMs = 0L,
                 demoRenderCount = 0,
-                message = "デモ実行中",
+                message = strings().demoRunning,
             )
             var demoCycles = 0
             try {
@@ -1415,7 +1420,7 @@ class InkuViewModel @JvmOverloads constructor(
                         demoGeneratedDdl = null,
                         demoWaitingSeconds = null,
                         demoCurrentElapsedMs = null,
-                        message = "デモ指示文生成中",
+                        message = strings().demoGeneratingPrompt,
                     )
                     val prompt = withContext(Dispatchers.IO) {
                         repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
@@ -1428,7 +1433,7 @@ class InkuViewModel @JvmOverloads constructor(
                         demoCurrentCatalogId = catalogId,
                         demoWaitingSeconds = null,
                         demoCurrentElapsedMs = null,
-                        message = "デモ描画中",
+                        message = strings().demoDrawing,
                     )
                     runCatching {
                         withContext(Dispatchers.IO) {
@@ -1462,7 +1467,7 @@ class InkuViewModel @JvmOverloads constructor(
                             demoCurrentElapsedMs = elapsed,
                             demoTotalElapsedMs = latest.demoTotalElapsedMs + elapsed,
                             demoRenderCount = latest.demoRenderCount + 1,
-                            message = "デモ描画完了 ${item.renderHashShort}",
+                            message = strings().demoDrawn(item.renderHashShort),
                         )
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
@@ -1477,7 +1482,7 @@ class InkuViewModel @JvmOverloads constructor(
                     val waitMs = (state.value.demoIntervalSeconds * 1000L - elapsed).coerceAtLeast(0L)
                     var left = ((waitMs + 999L) / 1000L).toInt()
                     while (left > 0 && isActive) {
-                        localState.value = localState.value.copy(demoWaitingSeconds = left, message = "次の描画まで ${left}秒")
+                        localState.value = localState.value.copy(demoWaitingSeconds = left, message = strings().demoNextIn(left))
                         delay(1000)
                         left -= 1
                     }
@@ -1488,7 +1493,7 @@ class InkuViewModel @JvmOverloads constructor(
                     localState.value = localState.value.copy(
                         isDrawing = false,
                         demoWaitingSeconds = null,
-                        message = if (reachedLimit) "デモ上限 ${MaxDemoCycles} 件で停止しました。" else "停止しました。",
+                        message = if (reachedLimit) strings().demoStoppedAtLimit(MaxDemoCycles) else strings().statusStopped,
                     )
                 }
             }
@@ -1499,7 +1504,7 @@ class InkuViewModel @JvmOverloads constructor(
         drawingRunSerial += 1
         drawingJob?.cancel()
         drawingJob = null
-        localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = "停止しました。")
+        localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = strings().statusStopped)
     }
 
     // ── 推敲 (SPEC :614, :678) ──────────────────────────────
@@ -1595,7 +1600,7 @@ class InkuViewModel @JvmOverloads constructor(
                 targetStage2Model = parent?.stage2Model.orEmpty(),
             )
         ) {
-            localState.value = current.copy(refinementStatus = MODEL_CHOICE_BLOCKED)
+            localState.value = current.copy(refinementStatus = MODEL_CHOICE_BLOCKED(strings()))
             return
         }
         val selected = current.modelCompareSelectedModels
@@ -1612,7 +1617,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (current.refinementBusy) return
         val combo = LanguageCombo.byId(comboId) ?: return
         if (ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLang(current.refinementParent))) {
-            localState.value = current.copy(refinementStatus = LANGUAGE_COMBO_BLOCKED)
+            localState.value = current.copy(refinementStatus = LANGUAGE_COMBO_BLOCKED(strings()))
             return
         }
         val selected = current.languageCompareSelectedCombos
@@ -1677,7 +1682,9 @@ class InkuViewModel @JvmOverloads constructor(
     private data class CandidateJob(val id: String, val label: String, val plan: RefinementPlan)
 
     /** A refusal the author has to read, not a failure: it carries the sentence. */
-    private class CandidateRefusal(override val message: String) : IllegalStateException(message)
+    // A refusal used to be its own exception carrying a finished sentence. It is
+    // an InkuFailure now for the same reason every other message became one: the
+    // sentence reaches the reader, so the language is chosen where it is shown.
 
     /**
      * What to draw, for whichever sub-view is showing.
@@ -1697,12 +1704,12 @@ class InkuViewModel @JvmOverloads constructor(
         val element = current.refinementElement
         val count = current.refinementCount
         if (element == RefinementElement.Touch && current.refinementTouchWords.isBlank()) {
-            throw CandidateRefusal("タッチを変える言葉を入力してください。")
+            inkuError { it.refinementTouchWordsRequired }
         }
         // The same words give the same seed, so four touch candidates would be
         // four copies. web refuses in the same place with the same sentence.
         if (count > RefinementPlanner.maxCandidates(element)) {
-            throw CandidateRefusal(RefinementPlanner.TOUCH_FANOUT_REFUSAL)
+            throw InkuFailure(RefinementPlanner.TOUCH_FANOUT_REFUSAL)
         }
         val catalogIds = if (element == RefinementElement.Color) {
             RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }, count)
@@ -1712,7 +1719,7 @@ class InkuViewModel @JvmOverloads constructor(
         return (0 until count).map { index ->
             CandidateJob(
                 id = "${element.id}-$index",
-                label = "${element.labelJa} ${index + 1}",
+                label = "${strings().refinementElementLabel(element.id)} ${index + 1}",
                 plan = RefinementPlanner.plan(
                     element = element,
                     parent = parent,
@@ -1732,7 +1739,7 @@ class InkuViewModel @JvmOverloads constructor(
         val mode = current.modelCompareMode
         val fixed = current.modelCompareFixedModel
         if (mode != ModelCompareMode.Common && fixed.isBlank()) {
-            throw CandidateRefusal(MODEL_FIXED_MISSING)
+            throw InkuFailure(MODEL_FIXED_MISSING)
         }
         val chosen = current.modelCompareSelectedModels
             .take(MAX_COMPARE_SELECTION)
@@ -1745,7 +1752,7 @@ class InkuViewModel @JvmOverloads constructor(
                     targetStage2Model = current.refinementParent?.stage2Model.orEmpty(),
                 )
             }
-        if (chosen.isEmpty()) throw CandidateRefusal(MODEL_SELECT_PROMPT)
+        if (chosen.isEmpty()) throw InkuFailure(MODEL_SELECT_PROMPT)
         return chosen.map { model ->
             val plan = ComparisonPlanner.modelPlan(mode, fixed, model, parent)
             CandidateJob(
@@ -1761,7 +1768,7 @@ class InkuViewModel @JvmOverloads constructor(
         val chosen = current.languageCompareSelectedCombos
             .mapNotNull { LanguageCombo.byId(it) }
             .filterNot { ComparisonPlanner.isLanguageComboBlocked(it, targetLang) }
-        if (chosen.isEmpty()) throw CandidateRefusal(LANGUAGE_SELECT_PROMPT)
+        if (chosen.isEmpty()) throw InkuFailure(LANGUAGE_SELECT_PROMPT)
         return chosen.map { combo ->
             CandidateJob(
                 id = combo.id,
@@ -1789,8 +1796,8 @@ class InkuViewModel @JvmOverloads constructor(
         // the list of orders, not the drawing, the stopping or the saving.
         val jobs = try {
             candidateJobs(current, parent)
-        } catch (refusal: CandidateRefusal) {
-            localState.value = current.copy(refinementStatus = refusal.message)
+        } catch (refusal: InkuFailure) {
+            localState.value = current.copy(refinementStatus = refusal.text(strings()))
             return
         }
         refinementJob?.cancel()
@@ -1845,7 +1852,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
-                localState.value = localState.value.copy(refinementStatus = error.message ?: "候補の生成に失敗しました。")
+                localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().refinementFailed))
             }
             abortTimer.cancel()
             localState.value = localState.value.copy(refinementBusy = false, refinementCanAbort = false)
@@ -1855,7 +1862,7 @@ class InkuViewModel @JvmOverloads constructor(
                 localState.value = localState.value.copy(
                     refinementBusy = false,
                     refinementCanAbort = false,
-                    refinementStatus = "停止しました。",
+                    refinementStatus = strings().statusStopped,
                 )
             }
         }
@@ -1892,10 +1899,10 @@ class InkuViewModel @JvmOverloads constructor(
                         savedNodeId = item.lineageNodeId,
                     )
                 }
-                localState.value = localState.value.copy(refinementStatus = "保存しました ${item.renderHashShort}")
+                localState.value = localState.value.copy(refinementStatus = strings().statusSaved(item.renderHashShort))
             }.onFailure { error ->
                 updateCandidate(candidateId) { it.copy(saveState = RefinementSaveState.Unsaved) }
-                localState.value = localState.value.copy(refinementStatus = error.message ?: "保存に失敗しました。")
+                localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().statusSaveFailed))
             }
         }
     }
@@ -2014,24 +2021,24 @@ class InkuViewModel @JvmOverloads constructor(
             runCatching {
                 repository.ensureDefaultModelAssets()
             }.onSuccess {
-                localState.value = localState.value.copy(message = "ローカルモデルカタログを更新しました。")
+                localState.value = localState.value.copy(message = strings().modelCatalogRefreshed)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = error.message ?: "モデルリスト取得に失敗しました。")
+                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().modelListFetchFailed))
             }
         }
     }
 
     fun fetchProviderModels(providerId: String) {
         viewModelScope.launch {
-            localState.value = localState.value.copy(message = "$providerId のモデルリストを取得しています...")
+            localState.value = localState.value.copy(message = strings().modelListFetching(providerId))
             runCatching {
                 repository.fetchProviderModels(providerId)
             }.onSuccess { models ->
                 val gemma31b = models.firstOrNull { it.equals("google/gemma-4-31b-it", ignoreCase = true) }
-                val suffix = if (providerId == "nvidia" && gemma31b != null) " Gemma-4-31bを選択できます。" else ""
-                localState.value = localState.value.copy(message = "${models.size}件のモデルを取得しました。$suffix")
+                val suffix = if (providerId == "nvidia" && gemma31b != null) strings().modelListNvidiaSuffix else ""
+                localState.value = localState.value.copy(message = strings().modelListFetched(models.size, suffix))
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = error.message ?: "モデルリスト取得に失敗しました。")
+                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().modelListFetchFailed))
             }
         }
     }
@@ -2055,9 +2062,9 @@ class InkuViewModel @JvmOverloads constructor(
                     publishedModels = publishedModelsText.lines().map { it.trim() }.filter { it.isNotBlank() },
                 )
             }.onSuccess {
-                localState.value = localState.value.copy(message = "モデル設定を保存しました。")
+                localState.value = localState.value.copy(message = strings().modelSettingsSaved)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = error.message ?: "モデル設定の保存に失敗しました。")
+                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().modelSettingsSaveFailed))
             }
         }
     }
@@ -2067,9 +2074,9 @@ class InkuViewModel @JvmOverloads constructor(
             runCatching {
                 repository.clearProviderApiKey(providerId)
             }.onSuccess {
-                localState.value = localState.value.copy(message = "APIキーを削除しました。")
+                localState.value = localState.value.copy(message = strings().apiKeyDeleted)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = error.message ?: "APIキー削除に失敗しました。")
+                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().apiKeyDeleteFailed))
             }
         }
     }
@@ -2079,9 +2086,9 @@ class InkuViewModel @JvmOverloads constructor(
             runCatching {
                 repository.deleteProvider(providerId)
             }.onSuccess {
-                localState.value = localState.value.copy(message = "サービスを削除しました。")
+                localState.value = localState.value.copy(message = strings().serviceDeleted)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = error.message ?: "サービス削除に失敗しました。")
+                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().serviceDeleteFailed))
             }
         }
     }
@@ -2094,17 +2101,17 @@ class InkuViewModel @JvmOverloads constructor(
         val current = state.value
         val selectedModel = current.modelAssets.firstOrNull { it.modelId == modelId }
         if (selectedModel?.licenseAcceptedAt == null) {
-            localState.value = localState.value.copy(message = "先に${selectedModel?.displayName ?: "Gemma"}のライセンス同意を押してください。")
+            localState.value = localState.value.copy(message = strings().modelLicenseFirst(selectedModel?.displayName ?: "Gemma"))
             return
         }
         if (modelDownloadJob?.isActive == true) {
-            localState.value = localState.value.copy(message = "モデル取得はすでに実行中です。")
+            localState.value = localState.value.copy(message = strings().modelDownloadAlreadyRunning)
             return
         }
         modelDownloadJob = viewModelScope.launch {
             localState.value = localState.value.copy(
                 activeModelDownloadId = modelId,
-                message = if (force) "モデルを再取得しています..." else "モデル取得を開始しています...",
+                message = if (force) strings().modelRedownloadStarting else strings().modelDownloadStarting,
             )
             runCatching {
                 repository.markModelDownloadQueued(modelId)
@@ -2112,16 +2119,16 @@ class InkuViewModel @JvmOverloads constructor(
             }.onSuccess {
                 localState.value = localState.value.copy(
                     activeModelDownloadId = null,
-                    message = if (force) "モデル再取得が完了しました。" else "モデル取得が完了しました。",
+                    message = if (force) strings().modelRedownloadFinished else strings().modelDownloadFinished,
                 )
                 warmupLiteRtModels(modelId)
             }.onFailure { error ->
                 if (error is CancellationException) {
                     repository.markModelDownloadCancelled(modelId)
-                    localState.value = localState.value.copy(activeModelDownloadId = null, message = "モデル取得を中断しました。")
+                    localState.value = localState.value.copy(activeModelDownloadId = null, message = strings().modelDownloadCancelled)
                 } else {
                     repository.markModelDownloadFailed(modelId, "failed")
-                    localState.value = localState.value.copy(activeModelDownloadId = null, message = error.message ?: "モデル取得に失敗しました。")
+                    localState.value = localState.value.copy(activeModelDownloadId = null, message = messageFor(error, strings(), strings().modelDownloadFailed))
                 }
             }
         }
@@ -2137,7 +2144,7 @@ class InkuViewModel @JvmOverloads constructor(
         modelDownloadJob = null
         viewModelScope.launch {
             repository.markModelDownloadCancelled(modelId)
-            localState.value = localState.value.copy(activeModelDownloadId = null, message = "モデル取得を中断しました。")
+            localState.value = localState.value.copy(activeModelDownloadId = null, message = strings().modelDownloadCancelled)
         }
     }
 
@@ -2163,9 +2170,9 @@ class InkuViewModel @JvmOverloads constructor(
             .firstNotNullOfOrNull { (stage, modelId) ->
                 if (!modelId.startsWith("local-litert-lm:")) return@firstNotNullOfOrNull null
                 val asset = state.modelAssets.firstOrNull { it.modelId == modelId }
-                    ?: return@firstNotNullOfOrNull "$stage のローカルモデル情報がありません: $modelId"
+                    ?: return@firstNotNullOfOrNull strings().modelLocalInfoMissing(stage, modelId)
                 if (asset.downloadState != "ready") {
-                    "$stage の ${asset.displayName} は未取得です。モデル設定で取得を完了してください。現在: ${asset.downloadState}"
+                    strings().modelNotDownloadedYet(stage, asset.displayName, asset.downloadState)
                 } else {
                     null
                 }
@@ -2265,6 +2272,15 @@ class InkuViewModel @JvmOverloads constructor(
     private fun parseHistorySelection(value: String): HistorySelectionBehavior {
         return if (value == "history") HistorySelectionBehavior.History else HistorySelectionBehavior.Current
     }
+
+    /**
+     * The pack for the language the reader has chosen, read when a message is built.
+     *
+     * The ViewModel sits above the composition and cannot read `LocalStrings`.
+     * Reading the state each time rather than holding a pack is what makes a
+     * message written after the switch come out in the new language.
+     */
+    private fun strings(): InkuStrings = stringsFor(localState.value.uiLanguage)
 
     private fun persistSetting(key: String, valueJson: String) {
         viewModelScope.launch {

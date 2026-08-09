@@ -1,5 +1,6 @@
 package app.inku.mobile.ui
 
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.collectAsState
@@ -212,7 +213,7 @@ class ComparisonScreenTest {
             vm().openRefinement(work, RefinementSubview.Model)
             vm().generateRefinementCandidates()
         }
-        awaitState("the refusal") { it.refinementStatus == MODEL_SELECT_PROMPT }
+        awaitState("the refusal") { it.refinementStatus == MODEL_SELECT_PROMPT(InkuStringsJa) }
         assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())
         assertFalse("and nothing is running", vm().state.value.refinementBusy)
     }
@@ -226,7 +227,7 @@ class ComparisonScreenTest {
             vm().openRefinement(work, RefinementSubview.Language)
             vm().generateRefinementCandidates()
         }
-        awaitState("the refusal") { it.refinementStatus == LANGUAGE_SELECT_PROMPT }
+        awaitState("the refusal") { it.refinementStatus == LANGUAGE_SELECT_PROMPT(InkuStringsJa) }
         assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())
     }
 
@@ -239,7 +240,7 @@ class ComparisonScreenTest {
             vm().openRefinement(work, RefinementSubview.Language)
             vm().toggleLanguageCombo(LanguageCombo("ja", "ja").id)
         }
-        awaitState("the refusal") { it.refinementStatus == LANGUAGE_COMBO_BLOCKED }
+        awaitState("the refusal") { it.refinementStatus == LANGUAGE_COMBO_BLOCKED(InkuStringsJa) }
         assertTrue("nothing was selected", vm().state.value.languageCompareSelectedCombos.isEmpty())
     }
 

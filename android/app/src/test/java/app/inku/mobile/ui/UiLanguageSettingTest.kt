@@ -169,10 +169,17 @@ class UiLanguageSettingTest {
             "the Misc settings pane must offer setUiLanguage",
             Regex("""viewModel\.setUiLanguage\(""").containsMatchIn(app),
         )
+        // Both locals are provided from the SAME state field. Asserting only the
+        // language would let the pack be provided from a constant, and then the
+        // saijiki would follow the setting while the wording never moved.
         assertTrue(
             "the tree must be given the state's language",
-            Regex("""CompositionLocalProvider\(LocalUiLanguage provides state\.uiLanguage\)""")
+            Regex("""CompositionLocalProvider\([\s\S]{0,200}?LocalUiLanguage provides state\.uiLanguage,""")
                 .containsMatchIn(app),
+        )
+        assertTrue(
+            "the tree must be given the pack for that same language",
+            Regex("""LocalStrings provides stringsFor\(state\.uiLanguage\),""").containsMatchIn(app),
         )
     }
 

@@ -1,5 +1,6 @@
 package app.inku.mobile.llm
 
+import app.inku.mobile.ui.i18n.inkuError
 import android.content.Context
 import android.util.Log
 import app.inku.mobile.data.db.ModelAssetDao
@@ -81,13 +82,13 @@ class LocalLiteRtLmProvider(
     }
 
     private suspend fun resolveModelPath(modelId: String): String {
-        val asset = modelAssetDao.getByModelId(modelId) ?: error("モデル情報がありません: $modelId")
+        val asset = modelAssetDao.getByModelId(modelId) ?: inkuError { it.errorModelInfoMissing(modelId) }
         if (asset.downloadState != "ready") {
-            error("${asset.displayName} は未取得です。Settingsで取得を完了してください。")
+            inkuError { it.errorModelNotReady(asset.displayName) }
         }
-        val path = asset.localPath ?: error("${asset.displayName} の保存先がありません。")
+        val path = asset.localPath ?: inkuError { it.errorModelPathMissing(asset.displayName) }
         if (!File(path).isFile) {
-            error("${asset.displayName} のモデルファイルが見つかりません: $path")
+            inkuError { it.errorModelFileMissing(asset.displayName, path) }
         }
         return path
     }

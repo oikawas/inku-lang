@@ -62,7 +62,11 @@ internal object ServerRendererStyle {
         val color = resolveColor(colorKey, colorHint, colorMap)
         val closedShape = primitive in setOf("circle", "ellipse", "square", "triangle", "polygon")
         val fill = if (closedShape || ins.optBoolean("filled", false)) color else "none"
-        val hint = ins.optString("color_hint").lowercase()
+        // The level is read off the RAW hint, before the lowercasing: the server
+        // reads it before `_norm_label`, and a normalisation that replaces the
+        // dot delivers "0 3000" to the consumer with the value gone.
+        val rawHint = ins.optString("color_hint")
+        val hint = rawHint.lowercase()
         var strokeOpacity = strokeOpacity(weight)
         var fillOpacity: Double? = null
         when {
@@ -86,13 +90,32 @@ internal object ServerRendererStyle {
                 strokeOpacity = min(strokeOpacity, 0.44)
                 if (fill != "none") fillOpacity = 0.18
             }
+            // engine 24: the member's own ceiling when the expansion wrote one,
+            // the group-wide constant when it did not -- a degenerate group, or
+            // a fading instruction that never went through an arrangement.
             "fade directional" in hint || "fade=directional" in hint -> {
-                strokeOpacity = min(strokeOpacity, 0.48)
-                if (fill != "none") fillOpacity = 0.30
+                val level = ServerRendererFade.levelFromHint(rawHint)
+                val ceiling = level ?: 0.48
+                strokeOpacity = min(strokeOpacity, ceiling)
+                if (fill != "none") {
+                    fillOpacity = if (level == null) {
+                        0.30
+                    } else {
+                        ServerRendererFade.round4(ceiling * ServerRendererFade.FILL_RATIO_DIRECTIONAL)
+                    }
+                }
             }
             "fade outward" in hint || "fade=outward" in hint -> {
-                strokeOpacity = min(strokeOpacity, 0.40)
-                if (fill != "none") fillOpacity = 0.22
+                val level = ServerRendererFade.levelFromHint(rawHint)
+                val ceiling = level ?: 0.40
+                strokeOpacity = min(strokeOpacity, ceiling)
+                if (fill != "none") {
+                    fillOpacity = if (level == null) {
+                        0.22
+                    } else {
+                        ServerRendererFade.round4(ceiling * ServerRendererFade.FILL_RATIO_OUTWARD)
+                    }
+                }
             }
         }
         if (hint.containsAny("reflection", "反射", "映り")) {

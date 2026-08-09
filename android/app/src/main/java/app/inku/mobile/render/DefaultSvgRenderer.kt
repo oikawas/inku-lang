@@ -57,6 +57,19 @@ class DefaultSvgRenderer : SvgRenderer {
         val textureWeights = textureWeights(instructions)
         val neededBlurs = mutableMapOf<String, Double>()
 
+        // Placement is the composition seed's, the touch stays the performance
+        // seed's (engine 23). Read with `is null` and never with `?:` on the
+        // value: 0 is a seed a caller can legitimately state. Without a
+        // composition seed the placement falls back to the performance seed, so
+        // every drawing made before this split replays.
+        val compositionSeed = request.compositionSeed
+            ?: if (score.has("composition_seed") && !score.isNull("composition_seed")) {
+                score.optLong("composition_seed")
+            } else {
+                null
+            }
+        val placementSeed = if (compositionSeed != null) compositionSeed else renderSeed
+
         val resolvedInstructions = resolvePerformanceScore(instructions, renderSeed)
         val structured = request.svgProfile == "editable"
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
@@ -67,11 +80,11 @@ class DefaultSvgRenderer : SvgRenderer {
             val colorKey = instruction.optString("color", "black")
             val weight = instruction.optString("weight", "pen")
             val insId = "instruction_${"%03d".format(i)}_${primitive}_${colorKey}_${weight}"
-            val expanded = expandArrangement(instruction, renderSeed, canvas)
+            val expanded = expandArrangement(instruction, placementSeed, canvas, renderSeed)
             val insSb = StringBuilder()
             for ((index, mark) in expanded.withIndex()) {
                 val markId = "mark_${"%03d".format(i)}_${"%03d".format(index)}_${primitive}"
-                var elem = renderInstruction(mark, colors, width, height, unit, neededBlurs, i, renderSeed, wild)
+                var elem = renderInstruction(mark, colors, width, height, unit, neededBlurs, i, renderSeed, wild, index)
                 if (structured && elem.startsWith("<g ")) {
                     elem = elem.replaceFirst(">", """ id="$markId">""")
                 } else if (structured && elem.startsWith("<path ")) {
@@ -116,7 +129,7 @@ class DefaultSvgRenderer : SvgRenderer {
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }
 
-    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, unit: Double, neededBlurs: MutableMap<String, Double>, index: Int = 0, renderSeed: Long? = null, wild: Boolean = false): String {
+    private fun renderInstruction(ins: JSONObject, colors: Map<String, String>, width: Double, height: Double, unit: Double, neededBlurs: MutableMap<String, Double>, index: Int = 0, renderSeed: Long? = null, wild: Boolean = false, markIndex: Int = 0): String {
         val primitive = ins.optString("primitive", "line")
         val colorKey = ins.optString("color", "black")
         val weight = ins.optString("weight", "pen")
@@ -404,7 +417,12 @@ class DefaultSvgRenderer : SvgRenderer {
                     size = sw to sh,
                     performanceSeed = seedForInstruction(ins, renderSeed),
                     instructionIndex = index,
-                    markIndex = 0,
+                    // The member's own place in the expanded group. Zero here
+                    // drew every member of a group with the first one's blob;
+                    // the server passes `mark_idx` on this path and 0 only on
+                    // the three that resolve a relation. No case reached it
+                    // until a group was something other than a circle.
+                    markIndex = markIndex,
                     variation = ins.optJSONObject("variation"),
                     weight = weight,
                     pointCount = 49
@@ -547,10 +565,23 @@ class DefaultSvgRenderer : SvgRenderer {
         }
     }
 
-    private fun expandArrangement(ins: JSONObject, renderSeed: Long? = null, canvas: CanvasSize? = null): List<JSONObject> {
+    /**
+     * The two seeds are separate on purpose (engine 23 and 25).
+     * `placementSeed` decides where the members land, which is the composition
+     * seed's business; `performanceSeed` decides how big each one is and which
+     * way it faces, which belongs to the performance. Feeding the size from the
+     * placement seed would make the drawing's shapes follow the composition
+     * seed and undo that split on the day it was made.
+     */
+    internal fun expandArrangement(
+        ins: JSONObject,
+        placementSeed: Long? = null,
+        canvas: CanvasSize? = null,
+        performanceSeed: Long? = null
+    ): List<JSONObject> {
         val arr = ins.optJSONObject("arrangement") ?: return listOf(ins)
         val layout = arr.optString("layout", "horizontal")
-        val expanded = expandArrangementLayout(ins, renderSeed, canvas)
+        val expanded = expandArrangementLayout(ins, placementSeed, canvas, performanceSeed)
         if (expanded.isEmpty()) return expanded
         val hasAt = ins.has("at") && !ins.isNull("at")
         val fitted = if (layout == "grid" && hasAt) {
@@ -561,12 +592,57 @@ class DefaultSvgRenderer : SvgRenderer {
         return fitted.map { quantizeJsonObject(it) }
     }
 
-    private fun expandArrangementLayout(ins: JSONObject, renderSeed: Long? = null, canvas: CanvasSize? = null): List<JSONObject> {
+    /**
+     * The one exit every layout branch takes: fade, size, angle.
+     *
+     * Order matters. The colour cycle rebuilds `color_hint`, so a level written
+     * before it is dropped -- and 43.5% of the groups in production state a
+     * cycle; it is applied inside the layout branches, before this runs.
+     *
+     * Size and angle come last and are read by none of the three before them:
+     * the fade ramp is measured from the anchors and the member count, and
+     * neither the scale nor the turn moves an anchor, so engine 24's ceilings
+     * arrive unchanged. The two are ordered size-then-angle for no reason that
+     * shows: the size rule reads `radius` / `size` / the endpoints and the
+     * angle rule reads `rotation`, so neither can see what the other wrote.
+     *
+     * `center` is the centre the layout laid the group around, for the branches
+     * that have one -- a ring has to pass its own, because the centroid is not it.
+     */
+    private fun finishExpandedGroup(
+        items: List<JSONObject>,
+        arr: JSONObject,
+        center: Pair<Double, Double>? = null,
+        memberSeed: String? = null
+    ): List<JSONObject> {
+        val faded = ServerRendererFade.apply(items, arr, items.map { anchor(it) }, center)
+        return ServerRendererMembers.applyRotations(
+            ServerRendererMembers.applySizes(faded, arr, memberSeed),
+            arr,
+            memberSeed
+        )
+    }
+
+    private fun expandArrangementLayout(
+        ins: JSONObject,
+        placementSeed: Long? = null,
+        canvas: CanvasSize? = null,
+        performanceSeed: Long? = null
+    ): List<JSONObject> {
         val arr = ins.optJSONObject("arrangement") ?: return listOf(ins)
         val count = arr.optInt("count", 1).coerceIn(1, 1000)
         val layout = arr.optString("layout", "horizontal")
         val prepared = ensureLineCoords(ins, layout)
-        if (count == 1) return listOf(applyColorCycle(copyWithoutArrangement(prepared), arr.optJSONArray("color_cycle"), 0))
+        // Derived from the instruction as stated, before any member is shifted,
+        // so every member of one group is drawn from the same sequence.
+        val memberSeed = seedForInstruction(ins, performanceSeed)
+        if (count == 1 && layout != "grid") {
+            return finishExpandedGroup(
+                listOf(applyColorCycle(copyWithoutArrangement(prepared), arr.optJSONArray("color_cycle"), 0)),
+                arr,
+                memberSeed = memberSeed
+            )
+        }
         val path = arr.optString("path", "none")
         val preserveSpace = arr.optBoolean("preserve_space", false)
         val margin = if (preserveSpace) {
@@ -577,7 +653,7 @@ class DefaultSvgRenderer : SvgRenderer {
         val clusterCount = arr.optInt("cluster_count", 0)
         val rhythmSpacing = arr.optString("rhythm_spacing", "none")
         val base = prepared
-        val seed = seedForInstruction(ins, renderSeed)
+        val seed = seedForInstruction(ins, placementSeed)
 
         if (layout == "grid") {
             val (x0, y0, x1, y1) = if (ins.has("at") && !ins.isNull("at")) {
@@ -635,15 +711,25 @@ class DefaultSvgRenderer : SvgRenderer {
                     )
                 }
             }
-            return targets.mapIndexed { i, (tx, ty) ->
-                val shifted = shiftTo(base, tx, ty)
-                shifted.remove("at")
-                shifted.remove("relation")
-                applyColorCycle(shifted, arr.optJSONArray("color_cycle"), i)
-            }
+            return finishExpandedGroup(
+                targets.mapIndexed { i, (tx, ty) ->
+                    val shifted = shiftTo(base, tx, ty)
+                    shifted.remove("at")
+                    shifted.remove("relation")
+                    applyColorCycle(shifted, arr.optJSONArray("color_cycle"), i)
+                },
+                arr,
+                memberSeed = memberSeed
+            )
         }
 
-        return (0 until count).map { i ->
+        // The centre the layout laid the group around, for the one branch that
+        // has one of its own. A ring must be measured from here and not from
+        // the centroid of its marks: the rhythm spans 0 to 1 inclusive, so the
+        // first mark is drawn twice and pulls the mean off the axis.
+        var layoutCenter: Pair<Double, Double>? = null
+
+        val laid = (0 until count).map { i ->
             val t = rhythmT(i, count, seed, rhythmSpacing)
             val target = if (clusterCount > 0 && layout in setOf("scatter", "horizontal", "vertical")) {
                 clusteredPosition(
@@ -676,6 +762,7 @@ class DefaultSvgRenderer : SvgRenderer {
                         // is folded into the default here to match.
                         val declaredRadius = arr.optDouble("radius", 0.0)
                         val r = if (declaredRadius != 0.0) declaredRadius else 0.3
+                        layoutCenter = cx to cy
                         (cx + r * cos(a)) to (cy - r * sin(a))
                     }
                     else -> (margin + t * (1.0 - margin * 2.0)) to 0.5
@@ -684,6 +771,7 @@ class DefaultSvgRenderer : SvgRenderer {
             val shifted = shiftTo(base, target.first, target.second)
             applyColorCycle(shifted, arr.optJSONArray("color_cycle"), i)
         }
+        return finishExpandedGroup(laid, arr, layoutCenter, memberSeed)
     }
 
     private fun copyWithoutArrangement(ins: JSONObject): JSONObject = copyJsonObject(ins).also { it.remove("arrangement") }
@@ -1223,7 +1311,10 @@ class DefaultSvgRenderer : SvgRenderer {
         val rotation = ins.optDouble("rotation", 0.0)
         if (kotlin.math.abs(rotation) < 1e-9 || element.isBlank()) return element
         val center = rotationCenter(ins, width, height, primitive)
-        return """<g transform="rotate($rotation ${center.first} ${center.second})">$element</g>"""
+        // Commas, and the master grid's six decimals: what svgwrite writes on
+        // the server. Spaces are valid SVG and read the same, but the corpus is
+        // compared as text.
+        return """<g transform="rotate(${fmt(rotation)},${fmt(center.first)},${fmt(center.second)})">$element</g>"""
     }
 
     private fun renderPresenceLayer(score: JSONObject, colors: Map<String, String>, width: Double, height: Double): String {

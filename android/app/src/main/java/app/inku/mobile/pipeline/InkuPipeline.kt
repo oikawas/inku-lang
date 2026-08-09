@@ -18,6 +18,7 @@ class InkuPipeline(
                 colorCatalogId = request.colorCatalogId,
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
+                compositionSeed = request.compositionSeed,
             ),
         )
         return PaintResult(
@@ -197,4 +198,8 @@ data class RenderRequest(
     val canvasAspect: String,
     val svgProfile: String,
     val renderSeed: Long? = null,
+    // engine 23: the seed the placement follows, split off the performance
+    // seed. It travels beside the score rather than inside it, the way
+    // `renderer.render(..., composition_seed=...)` takes it on the server.
+    val compositionSeed: Long? = null,
 )

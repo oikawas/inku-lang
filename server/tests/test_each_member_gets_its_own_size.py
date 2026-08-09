@@ -48,8 +48,11 @@ GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
 RENDER_SEED = 12345
 COMPOSITION_SEED = 777
 
-# The ruling (author, 2026-08-08): +/-25%, one amplitude for every hand tool.
-AMPLITUDE = 0.25
+# The ruling (author, 2026-08-08): one amplitude for every hand tool. It was
+# +/-25% when engine 25 froze this file; round 2b of the same day raised it to
+# +/-35%, and engine 27 carries that. The rule these tests hold is unchanged --
+# only how far it swings.
+AMPLITUDE = 0.35
 
 # What engine 24 froze, and what engine 25 does to it.
 ENGINE_24_CASES = 541
@@ -194,7 +197,7 @@ def test_the_members_of_a_group_differ_in_size():
 
 # T-2 --------------------------------------------------------------------
 def test_the_amplitude_is_the_one_that_was_ruled_on():
-    """0.75x..1.25x, and the ends are reached rather than merely respected."""
+    """0.65x..1.35x, and the ends are reached rather than merely respected."""
     base = _instruction(count=400).radius
     factors = sorted(item.radius / base for item in _expand(_instruction(count=400)))
 

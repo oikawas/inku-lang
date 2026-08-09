@@ -1669,7 +1669,15 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # 筆の震えも 1 個ずつ変わる。数値は 1724 個から 1756 個へ増えたが、これは
     # 大きくなった痕で墨の切れ目が増えたぶんである。群の位置は動いていない
     # (寸法の規則はどれも anchor を保存する)。
-    assert digest == "a30a69b8290c67a98b32596e1185c1d5d6967f5fadc398671a3ba72c10f7fd2c"
+    # Resnapped for engine 27 (the hand swings wider). Note what is NOT in this
+    # log: engine 26 gave every member its own angle and left this digest alone,
+    # because all four of these groups are circles and the angle rule excludes a
+    # circle -- an angle cannot be seen on one. So the only amplitude that
+    # reaches here is the size one, raised from +/-25% to +/-35% (author,
+    # 2026-08-08, round 2b), which spreads the five radii over 0.65x..1.35x
+    # instead of 0.75x..1.25x. The group's position is unmoved again, for the
+    # reason engine 25 wrote down: every size rule preserves its anchor.
+    assert digest == "984f771c9a8cd9f3aed32cfbb456a3635d2e3b3055a543fafb8db015b9ba783f"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

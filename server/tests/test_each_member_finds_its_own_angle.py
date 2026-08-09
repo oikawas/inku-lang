@@ -32,6 +32,7 @@ engine 25's sizes and engine 24's fade ceilings arrive untouched (T-11).
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
 import json
 import pathlib
@@ -53,9 +54,18 @@ GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
 RENDER_SEED = 12345
 COMPOSITION_SEED = 777
 
-# The ruling (author, 2026-08-08): +/-12 degrees, one amplitude for every hand
-# tool, stated as the pair "+/-25% and +/-12 degrees".
-AMPLITUDE = 12.0
+# The ruling (author, 2026-08-08): one amplitude for every hand tool, stated as
+# a pair with the size amplitude. It was +/-12 degrees when engine 26 froze this
+# file; round 2b of the same day raised the pair, and engine 27 carries
+# +/-27 degrees. The rule these tests hold is unchanged -- only how far it
+# swings.
+AMPLITUDE = 27.0
+
+# The size amplitude engine 25's own drawings were frozen at, held here so the
+# replay below can put it back. It is deliberately a literal and not an import
+# of `HAND_GROUP_SIZE`: the point is to name the number the frozen record was
+# made with, which stops being today's number the moment the pair is retuned.
+ENGINE_25_SIZE = 0.25
 
 # What engine 25 froze, and what engine 26 does to it. The three that move are
 # the ellipse, square and triangle groups engine 25 itself added: they are the
@@ -422,7 +432,7 @@ def test_the_earlier_stages_do_not_move(primitive, monkeypatch):
     assert [item.rotation for item in engine_26] != [item.rotation for item in engine_25]
 
 
-def test_engine_25s_own_drawings_replay_unchanged():
+def test_engine_25s_own_drawings_replay_unchanged(monkeypatch):
     """The other half of T-11, and the half the comparison above cannot reach.
 
     Withholding the angle step shows that the angle step wrote no size -- but
@@ -434,6 +444,16 @@ def test_engine_25s_own_drawings_replay_unchanged():
     and holds them to the digest engine 25 recorded. Live rendering against a
     frozen record, not manifest against manifest: two frozen files agree with
     each other whatever the renderer is doing today.
+
+    Engine 27 raised the size amplitude to +/-35%, which moves these drawings
+    on purpose, so the replay puts `group_hand` back to the 0.25 engine 25 drew
+    them at. That is the amplitude and nothing else: the angle rule is left
+    running at whatever the tree states, and the digests still land, because
+    none of these cases is one the angle rule reaches. Restoring the number the
+    stage is tuned by is not the same as switching the stage off -- withholding
+    `_apply_member_sizes` here would pass for an implementation that had
+    dropped the per-member size altogether, which is the reading engine 25's
+    own gates exist to reject.
     """
     generator = _load_generator()
     previous = _manifest("25")["cases"]
@@ -458,6 +478,15 @@ def test_engine_25s_own_drawings_replay_unchanged():
         and GRAMMARS[instruction["weight"]].group_hand > 0.0
     ]
     assert len(sized) == 38
+
+    for weight, grammar in GRAMMARS.items():
+        if grammar.group_hand > 0.0:
+            monkeypatch.setitem(
+                GRAMMARS, weight, dataclasses.replace(grammar, group_hand=ENGINE_25_SIZE)
+            )
+    # Not a free pass: the angle amplitude is still the one the tree states, so
+    # a rule that started turning any of these would redden the loop below.
+    assert GRAMMARS["pen"].group_rot == AMPLITUDE
 
     for case_id in replayed:
         svg = generator.render_case(previous[case_id]["input"])

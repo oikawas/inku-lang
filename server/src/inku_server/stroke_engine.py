@@ -43,7 +43,7 @@ class ToolGrammar:
     # exact repetition is the machine's signature, not a defect to sand off.
     fill_hand: float = 0.0
     # How much this tool's members of one repeated group differ in size, as a
-    # fraction either side of the stated dimension (0.25 = 0.75x..1.25x). An
+    # fraction either side of the stated dimension (0.35 = 0.65x..1.35x). An
     # `Arrangement` declares "several of this shape", never "all of them the
     # same size", so the congruence was the engine's addition and this takes it
     # back out. One value for every hand tool rather than one derived from
@@ -54,7 +54,7 @@ class ToolGrammar:
     # is: exact repetition is the machine's signature.
     group_hand: float = 0.0
     # How far this tool's members of one repeated group turn away from the
-    # stated angle, in degrees either side of it (12.0 = -12..+12). The same
+    # stated angle, in degrees either side of it (27.0 = -27..+27). The same
     # argument as `group_hand`: an `Arrangement` says "several of this shape"
     # and never "all of them at the same angle", so the shared angle was the
     # engine's own addition. It is a separate field rather than a multiple of
@@ -74,17 +74,22 @@ class ToolGrammar:
 
 
 # Every hand tool gets the same amount of size variation inside a group. The
-# ruling that set +/-25% was given on samples that used one amplitude for four
-# tools whose `fill_hand` spans 18x, so this is a single constant rather than a
+# ruling that set it was given on samples that used one amplitude for four tools
+# whose `fill_hand` spans 18x, so this is a single constant rather than a
 # per-tool value; a tool-by-tool adjustment is a later change, made once the
 # effect is measured.
-HAND_GROUP_SIZE = 0.25
+# Was +/-25% from engine 25. Raised to +/-35% after the author read round 2b and
+# marked the size variation "slightly short" (author, 2026-08-08).
+HAND_GROUP_SIZE = 0.35
 
 # And the same amount of angle variation, in degrees. The ruling that set the
-# pair (+/-25% and +/-12 degrees, author 2026-08-08) was given on one sample
-# sheet that used one amplitude for every hand tool, so this is a single
-# constant for the same reason `HAND_GROUP_SIZE` is.
-HAND_GROUP_ROT = 12.0
+# pair was given on one sample sheet that used one amplitude for every hand
+# tool, so this is a single constant for the same reason `HAND_GROUP_SIZE` is.
+# Was +/-12 degrees from engine 26. Raised to +/-27 degrees in the same reading,
+# where the author marked the angle variation "short" (author, 2026-08-08). The
+# author's note wrote "+/-27%"; degrees is what was meant, confirmed the same
+# day.
+HAND_GROUP_ROT = 27.0
 
 # `fill_hand` runs with the tool's stiffness: the stiffer the tool, the tighter
 # the hand that fills with it. The two machines are pinned at zero by hand

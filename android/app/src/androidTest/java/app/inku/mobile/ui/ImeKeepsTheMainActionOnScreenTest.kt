@@ -1,5 +1,6 @@
 package app.inku.mobile.ui
 
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -95,19 +96,19 @@ class ImeKeepsTheMainActionOnScreenTest {
         assertTrue(
             "the bottom navigation never gave way to the action: the description took " +
                 "focus and nothing on screen changed, so the keyboard will cover 「" +
-                "$DRAW_ACTION_LABEL」 the way it did before this stage",
+                "${drawActionLabel(InkuStringsJa)}」 the way it did before this stage",
             gaveWay,
         )
 
         val shown = composeTestRule
-            .onAllNodesWithText(DRAW_ACTION_LABEL, substring = true)
+            .onAllNodesWithText(drawActionLabel(InkuStringsJa), substring = true)
             .fetchSemanticsNodes()
         assertTrue(
-            "the description has focus and 「$DRAW_ACTION_LABEL」 is nowhere in the tree",
+            "the description has focus and 「${drawActionLabel(InkuStringsJa)}」 is nowhere in the tree",
             shown.isNotEmpty(),
         )
         assertEquals(
-            "there must be exactly one 「$DRAW_ACTION_LABEL」 while the description is " +
+            "there must be exactly one 「${drawActionLabel(InkuStringsJa)}」 while the description is " +
                 "being written; the in-flow button gives way to the pinned one",
             1,
             shown.size,
@@ -115,7 +116,7 @@ class ImeKeepsTheMainActionOnScreenTest {
 
         val scroll = composeTestRule.onNode(hasScrollAction()).fetchSemanticsNode()
         assertFalse(
-            "「$DRAW_ACTION_LABEL」 is still inside the scrolling content. The keyboard " +
+            "「${drawActionLabel(InkuStringsJa)}」 is still inside the scrolling content. The keyboard " +
                 "lifts the bottom of that scroll and brings nothing with it, so the " +
                 "action leaves the screen exactly when it is wanted",
             shown.single().isDescendantOf(scroll),

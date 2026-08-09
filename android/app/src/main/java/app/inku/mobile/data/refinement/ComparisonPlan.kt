@@ -18,10 +18,10 @@ enum class ComparisonKind { Model, Language }
  * `common` sends the chosen model to both stages; each fixed mode holds one
  * stage on the fixed model and sends the chosen one to the other.
  */
-enum class ModelCompareMode(val id: String, val labelJa: String) {
-    Common("common", "Stage 1/2 共通"),
-    Stage1Fixed("stage1_fixed", "Stage 1 固定 + Stage 2 比較"),
-    Stage2Fixed("stage2_fixed", "Stage 1 比較 + Stage 2 固定"),
+enum class ModelCompareMode(val id: String) {
+    Common("common"),
+    Stage1Fixed("stage1_fixed"),
+    Stage2Fixed("stage2_fixed"),
     ;
 
     companion object {

@@ -100,6 +100,19 @@ data class PaintRequest(
      */
     val instructionLang: String? = null,
     /**
+     * The language the interface is speaking, with the server's key name
+     * (`ui_lang`).
+     *
+     * It is not the language the work is drawn in and it does not override
+     * [instructionLang]: the server only consults it when the request asked for
+     * `auto` and the text names neither script, and then it stands in as the
+     * fallback (`api_core/common.py:68-70`). The web sends it on every paint
+     * (`+page.svelte:2840`) alongside a constant `instruction_lang: 'auto'`
+     * (`:329`). `null` is "the caller did not say", which the server reads the
+     * same way it reads `"fr"` -- as Japanese.
+     */
+    val uiLang: String? = null,
+    /**
      * 写生 (Stage 0.5). The server's three request fields in one value
      * (`render.py:333-336`). The default is the layer switched off, which is
      * `sketch: bool = Field(default=False)` there: a caller that says nothing

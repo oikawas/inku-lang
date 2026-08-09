@@ -43,12 +43,24 @@ class WebDdlSpecTest {
         }
     }
 
+    /**
+     * The Stage 1 prompt must enumerate the touch words the server enumerates.
+     *
+     * This replaces `testStage5dDisplayVocabulary10TermsExactOrder`, which
+     * asserted the DISPLAY list held exactly the ten words of 2026-07-26. The
+     * server returned the silverpoint to the vocabulary the following day
+     * (a2d1d100) and that test then froze the drift in place instead of
+     * reporting it: it was green for two weeks while the screen showed ten words
+     * against the server's eleven. The display list is now generated, and its
+     * gate is `ui/SaijikiIsGeneratedTest`; what is left to check here is the
+     * prompt this file actually writes.
+     */
     @Test
-    fun testStage5dDisplayVocabulary10TermsExactOrder() {
-        val expected = listOf("鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ")
-        val touchGroup = app.inku.mobile.ui.saijikiGroups.firstOrNull { it.label == "てざわり" }
-        org.junit.Assert.assertNotNull("てざわり group must exist", touchGroup)
-        org.junit.Assert.assertEquals("てざわり display terms must match section 3.9 exactly", expected, touchGroup!!.words)
+    fun testStage1PromptEnumeratesEveryTouchWord() {
+        val prompt = WebDdlSpec.buildStage1SystemPrompt("鉛筆で線を引く")
+        for (word in listOf("銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ")) {
+            org.junit.Assert.assertTrue("Stage 1 prompt does not enumerate $word", prompt.contains(word))
+        }
     }
 
     @Test

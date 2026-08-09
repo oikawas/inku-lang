@@ -92,6 +92,8 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -170,7 +172,14 @@ import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.InstructionLanguages
+import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
+import app.inku.mobile.ui.i18n.InkuStrings
+import app.inku.mobile.ui.i18n.LocalStrings
+import app.inku.mobile.ui.i18n.inkuError
+import app.inku.mobile.ui.i18n.LocalUiLanguage
+import app.inku.mobile.ui.i18n.stringsFor
+import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.pipeline.WebDdlSpec
 import java.io.File
 import java.io.FileOutputStream
@@ -193,8 +202,14 @@ private const val RUN_STATUS_TICK_MS = 100L
 /** The description field. The instrumented IME test needs to reach it by name. */
 internal const val DESCRIPTION_INPUT_TAG = "description_input"
 
-/** What the main action says, in both the in-flow button and the IME bar. */
-internal const val DRAW_ACTION_LABEL = "描画する"
+/**
+  * What the main action says, in both the in-flow button and the IME bar.
+  *
+  * It was a `const` that instrumentation read directly. It is a lookup now
+  * because the word is the reader's, and the instrumentation asks for the
+  * language it set up with rather than for a fixed string.
+  */
+internal fun drawActionLabel(strings: InkuStrings): String = strings.paint
 
 /**
  * What the double tap goes to when the artwork is already at or above its own
@@ -222,7 +237,7 @@ private val DeviceRotation.clockwiseDegrees: Int
         DeviceRotation.LandscapeRight -> 270
     }
 
-internal data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
+internal data class SaijikiGroup(val key: String, val label: String, val en: String, val words: List<String>)
 private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
@@ -304,17 +319,46 @@ private object ArtworkBitmapCache {
     }
 }
 
-internal val saijikiGroups = listOf(
-    SaijikiGroup("かたち", "forms", listOf("円", "楕円", "三角", "四角", "線", "弧")),
-    SaijikiGroup("てざわり", "touches", listOf("鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ")),
-    SaijikiGroup("つらなり", "continuity", listOf("実線", "破線", "点線", "一点鎖線")),
-    SaijikiGroup("いろ", "colors", listOf("白", "黒", "青", "赤", "緑", "灰")),
-    SaijikiGroup("ゆらぎ", "movements", listOf("細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む")),
-    SaijikiGroup("ばしょ", "places", listOf("上", "下", "中央", "左端", "右端", "上端", "下端", "中心", "隅")),
-    SaijikiGroup("うごき", "motions", listOf("置く", "並べる", "埋める", "散らす", "引く")),
-    SaijikiGroup("かたむき", "angles", listOf("水平", "垂直", "斜め", "右上がり", "右下がり", "回転")),
-    SaijikiGroup("わりあい", "proportions", listOf("縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月")),
-)
+/**
+ * The vocabulary the dialog displays, in one language.
+ *
+ * Both category names are carried in either language because the web shows them
+ * together and switches only the words (`SaijikiInline.svelte:60-61`); a client
+ * that hid one of the names in English would be making its own choice.
+ *
+ * This used to be a hand-copied list. It fell a version behind the day after it
+ * was written -- the server returned the silverpoint to the vocabulary on
+ * 2026-07-27 (a2d1d100) and nothing here noticed -- so the words now come from
+ * `SaijikiGenerated.kt`, which `server/scripts/gen_saijiki_kt.py` bakes from the
+ * same table the server reads.
+ */
+internal fun saijikiGroups(lang: UiLanguage): List<SaijikiGroup> =
+    SaijikiGenerated.CATEGORIES.map { category ->
+        SaijikiGroup(
+            key = category.key,
+            label = category.nameJa,
+            en = category.nameEn,
+            words = if (lang.isEnglish) category.wordsEn else category.wordsJa,
+        )
+    }
+
+/**
+ * Every surface of every word, in both languages, paired with its category.
+ *
+ * Recognising a word in the DDL is not the same question as which words to
+ * offer: `highlight.ts:41-42` builds its matcher from the Japanese AND the
+ * English lists whatever the interface language is, because a work's language
+ * is chosen separately from the reader's. Matching only the displayed language
+ * would stop highlighting a Japanese DDL as soon as the reader switched to
+ * English.
+ */
+internal fun saijikiDetectionWords(lang: UiLanguage): List<Pair<String, SaijikiGroup>> {
+    val display = saijikiGroups(lang).associateBy { it.key }
+    return SaijikiGenerated.CATEGORIES.flatMap { category ->
+        val group = display.getValue(category.key)
+        (category.wordsJa + category.wordsEn).map { word -> word to group }
+    }
+}
 
 private val saijikiGroupColors = listOf(
     SaijikiGroupSand,
@@ -326,7 +370,36 @@ private val saijikiGroupColors = listOf(
     SaijikiGroupAmber,
     SaijikiGroupSlate,
     SaijikiGroupBlossom,
+    SaijikiGroupMoss,
 )
+
+/**
+ * The wording for a lineage edge's kind.
+ *
+ * A node no edge points at carries no kind, and the answer there is the origin
+ * rather than an unknown -- the same split `derivationKindLabel(kind, isJapanese)`
+ * makes on the web (`derivation.ts:49-51`).
+ */
+@Composable
+internal fun derivationKindLabel(kind: String?): String {
+    val strings = LocalStrings.current
+    return if (kind.isNullOrEmpty()) strings.derivationOrigin else strings.derivationLabel(kind)
+}
+
+/**
+ * The wording, in the language the composition is being drawn in.
+ *
+ * A `@Composable` getter rather than a parameter threaded through the screens:
+ * the same shape `MaterialTheme.colorScheme` has, and for the same reason --
+ * every one of these functions would otherwise carry an argument it only passes
+ * on. Readers recompose when the reader switches because `LocalStrings` is a
+ * `compositionLocalOf`.
+ */
+private val S: InkuStrings
+    @Composable @ReadOnlyComposable get() = LocalStrings.current
+
+/** The pill colour for the category declared at [index]. */
+internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index % saijikiGroupColors.size]
 
 @Composable
 fun InkuApp() {
@@ -352,6 +425,13 @@ fun InkuApp() {
     }
     BackHandler(enabled = backTarget != null) { backTarget?.invoke() }
 
+    // Every reader of `LocalUiLanguage` sits under this, so the setting reaches
+    // the wording and the saijiki through one provision rather than a parameter
+    // threaded through the screens.
+    CompositionLocalProvider(
+        LocalUiLanguage provides state.uiLanguage,
+        LocalStrings provides stringsFor(state.uiLanguage),
+    ) {
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
             bottomBar = {
@@ -409,14 +489,15 @@ fun InkuApp() {
             }
         }
     }
+    }
 }
 
 @Composable
 private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
     AlertDialog(
         onDismissRequest = viewModel::cancelDdlOverwrite,
-        title = { Text("DDLの編集結果が失われます") },
-        text = { Text("通常の描画を実行すると、現在の解釈（正規化DDL）は Stage 1 の結果で上書きされます。") },
+        title = { Text(S.ddlOverwriteTitle) },
+        text = { Text(S.ddlOverwriteBody) },
         confirmButton = {
             TextButton(onClick = viewModel::confirmDdlOverwriteRegenerate) {
                 Text("OK")
@@ -425,10 +506,10 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 TextButton(onClick = viewModel::cancelDdlOverwrite) {
-                    Text("キャンセル")
+                    Text(S.cancel)
                 }
                 TextButton(onClick = viewModel::confirmDdlOverwriteRenderEdited) {
-                    Text("DDLから描画")
+                    Text(S.drawFromDdl)
                 }
             }
         },
@@ -442,20 +523,22 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     }
     var vocabularyOpen by remember { mutableStateOf(false) }
     var vocabularyQuery by remember { mutableStateOf("") }
-    val vocabularyTokens = rememberDdlVocabularyTokens()
+    val lang = LocalUiLanguage.current
+    val vocabularyTokens = rememberDdlVocabularyTokens(lang)
     val allVocabularyWords = remember(vocabularyTokens) { vocabularyTokens.map { it.word } }
-    val detectedWords = remember(editorValue.text) {
+    val detectedWords = remember(editorValue.text, vocabularyTokens) {
         vocabularyTokens.filter { editorValue.text.contains(it.word) }
     }
     val selectedWord = remember(editorValue.selection, editorValue.text, vocabularyTokens) {
         selectedVocabularyToken(editorValue, vocabularyTokens)
     }
-    val filteredGroups = remember(vocabularyQuery) {
+    val filteredGroups = remember(vocabularyQuery, lang) {
         val query = vocabularyQuery.trim()
+        val groups = saijikiGroups(lang)
         if (query.isBlank()) {
-            saijikiGroups
+            groups
         } else {
-            saijikiGroups.mapNotNull { group ->
+            groups.mapNotNull { group ->
                 val words = group.words.filter { word ->
                     word.contains(query, ignoreCase = true) ||
                         group.label.contains(query, ignoreCase = true) ||
@@ -497,10 +580,10 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
-                    Text("DDL編集", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(S.ddlEdit, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = viewModel::closeDdlEditor) {
-                        Text("閉じる")
+                        Text(S.close)
                     }
                     TextButton(
                         onClick = {
@@ -509,7 +592,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                         },
                         enabled = !state.isDrawing,
                     ) {
-                        Text("描画")
+                        Text(S.renderTabArtwork)
                     }
                 }
                 DdlSelectedVocabularyHeader(selectedWord)
@@ -541,12 +624,13 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun rememberDdlVocabularyTokens(): List<DdlVocabularyToken> {
-    return remember {
-        saijikiGroups.flatMapIndexed { index, group ->
-            group.words.map { word ->
-                DdlVocabularyToken(word = word, group = group, color = saijikiGroupColors[index % saijikiGroupColors.size])
-            }
+private fun rememberDdlVocabularyTokens(lang: UiLanguage): List<DdlVocabularyToken> {
+    return remember(lang) {
+        val colorForKey = SaijikiGenerated.CATEGORIES.mapIndexed { index, category ->
+            category.key to saijikiGroupColorAt(index)
+        }.toMap()
+        saijikiDetectionWords(lang).map { (word, group) ->
+            DdlVocabularyToken(word = word, group = group, color = colorForKey.getValue(group.key))
         }.distinctBy { it.word }.sortedByDescending { it.word.length }
     }
 }
@@ -559,20 +643,20 @@ private fun DdlSelectedVocabularyHeader(selectedWord: DdlVocabularyToken?) {
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         Text(
-            "選択中",
+            S.selected,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (selectedWord != null) {
             DdlVocabularyPill(token = selectedWord, selected = true, onClick = {})
             Text(
-                "候補タップで置換",
+                S.candidateTapToReplace,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             Text(
-                "本文の歳時記語をタップ",
+                S.tapSaijikiWord,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -661,9 +745,11 @@ private fun DdlVocabularyBar(
         if (selectedWord == null) {
             groups
         } else {
+            // Ordered by category key, not by the displayed name: the name is
+            // one of the things that changes with the language.
             groups.sortedWith(
-                compareByDescending<SaijikiGroup> { it.label == selectedWord.group.label }
-                    .thenBy { group -> saijikiGroups.indexOfFirst { it.label == group.label }.let { if (it < 0) Int.MAX_VALUE else it } },
+                compareByDescending<SaijikiGroup> { it.key == selectedWord.group.key }
+                    .thenBy { group -> SaijikiGenerated.CATEGORIES.indexOfFirst { it.key == group.key }.let { if (it < 0) Int.MAX_VALUE else it } },
             )
         }
     }
@@ -673,13 +759,13 @@ private fun DdlVocabularyBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            MiniPill(if (open) "素材を閉じる" else "素材", selected = open, onClick = onToggle)
+            MiniPill(if (open) S.materialsClose else S.materials, selected = open, onClick = onToggle)
             if (selectedWord != null) {
                 DdlVocabularyPill(token = selectedWord, selected = true, onClick = { onSelectDetected(selectedWord.word) })
-                Text("を置換", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(S.replaceSuffix, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Text(
-                    "本文の語をタップで選択",
+                    S.tapWordToSelect,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -708,13 +794,13 @@ private fun DdlVocabularyBar(
                     DenseSingleLineInput(
                         value = query,
                         onValueChange = onQueryChange,
-                        placeholder = "検索",
+                        placeholder = S.search,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     prioritizedGroups.forEach { group ->
                         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                             Text(
-                                if (selectedWord?.group?.label == group.label) "${group.label} / 代替候補" else group.label,
+                                if (selectedWord?.group?.label == group.label) S.groupAlternatives(group.label) else group.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -761,15 +847,15 @@ private fun isLightColor(color: Color): Boolean {
 private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
     AlertDialog(
         onDismissRequest = viewModel::cancelModelSelection,
-        title = { Text("モデル選択") },
+        title = { Text(S.modelSelection) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.modelDialogMaxHeight).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
             ) {
                 WebStyleModelStageEditor(
-                    title = "描画モデル",
-                    sub = "Stage 1 / Stage 2 共通",
+                    title = S.drawingModel,
+                    sub = S.stagesShared,
                     state = state,
                     selectedModelId = state.selectedModelId,
                     onSelectModel = viewModel::setSelectedModel,
@@ -777,7 +863,7 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 if (state.selectedModelId.contains("qwen3")) {
                     SettingCheckRow(
                         checked = state.includeThinking,
-                        text = "思考を表示",
+                        text = S.showThinking,
                         onCheckedChange = viewModel::setIncludeThinking,
                     )
                 }
@@ -790,7 +876,7 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
         },
         dismissButton = {
             TextButton(onClick = viewModel::cancelModelSelection) {
-                Text("キャンセル")
+                Text(S.cancel)
             }
         },
     )
@@ -801,7 +887,7 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
     val current = ColorCatalogs.get(state.selectedCatalogId)
     AlertDialog(
         onDismissRequest = viewModel::confirmCatalogSelection,
-        title = { Text("色カタログ") },
+        title = { Text(S.colorCatalog) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().height(Dimens.colorCatalogDialogHeight).verticalScroll(rememberScrollState()),
@@ -828,7 +914,7 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                         }
                     }
                 }
-                SettingsSectionHeader(current.name.uppercase(), "カタログ詳細")
+                SettingsSectionHeader(current.name.uppercase(), S.catalogDetail)
                 current.map.forEach { (name, code) ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                         Box(
@@ -844,10 +930,10 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
             }
         },
         confirmButton = {
-            TextButton(onClick = viewModel::confirmCatalogSelection) { Text("決定") }
+            TextButton(onClick = viewModel::confirmCatalogSelection) { Text(S.confirm) }
         },
         dismissButton = {
-            TextButton(onClick = viewModel::cancelCatalogSelection) { Text("キャンセル") }
+            TextButton(onClick = viewModel::cancelCatalogSelection) { Text(S.cancel) }
         },
     )
 }
@@ -856,7 +942,7 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
 private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
     AlertDialog(
         onDismissRequest = viewModel::closeTransientPanel,
-        title = { Text("キャンバス") },
+        title = { Text(S.canvas) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().height(Dimens.aspectDialogHeight).verticalScroll(rememberScrollState()),
@@ -894,7 +980,7 @@ private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewM
             }
         },
         confirmButton = {
-            TextButton(onClick = viewModel::closeTransientPanel) { Text("閉じる") }
+            TextButton(onClick = viewModel::closeTransientPanel) { Text(S.close) }
         },
     )
 }
@@ -910,7 +996,8 @@ private fun WebStyleModelStageEditor(
     val providers = modelProviderGroupsFor(state)
     val selectedProviderId = providerOfModelId(selectedModelId, state)
     val selectedProvider = providers.firstOrNull { it.providerId == selectedProviderId } ?: providers.firstOrNull()
-    val models = modelOptionsForProvider(state, selectedProviderId)
+    val strings = S
+    val models = modelOptionsForProvider(state, selectedProviderId, strings)
     var providerMenuOpen by remember(title, selectedProviderId) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         SettingsSectionHeader(title.uppercase(), sub)
@@ -945,7 +1032,7 @@ private fun WebStyleModelStageEditor(
                         },
                         onClick = {
                             providerMenuOpen = false
-                            modelOptionsForProvider(state, provider.providerId).firstOrNull()?.let { option ->
+                            modelOptionsForProvider(state, provider.providerId, strings).firstOrNull()?.let { option ->
                                 onSelectModel(option.qualifiedId)
                             }
                         },
@@ -955,7 +1042,7 @@ private fun WebStyleModelStageEditor(
         }
         CompactLabel("Model")
         if (models.isEmpty()) {
-            Text("公開モデルは未選択です。接続先設定でモデルを選択してください。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(S.noPublishedModelsLong, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 models.forEach { option ->
@@ -992,9 +1079,9 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-            Text("歳時記", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-            Text("語を押すと DDL 編集欄へ挿入します。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            saijikiGroups.forEach { group ->
+            Text(S.saijiki, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+            Text(S.saijikiTapNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            saijikiGroups(LocalUiLanguage.current).forEach { group ->
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     Text("${group.label} / ${group.en}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
@@ -1054,10 +1141,10 @@ private fun BottomNavigationBar(selected: AppTab, viewModel: InkuViewModel) {
         ) {
             AppTab.entries.forEach { tab ->
                 val label = when (tab) {
-                    AppTab.Compose -> "記述"
-                    AppTab.History -> "履歴"
-                    AppTab.Lineage -> "系譜"
-                    AppTab.Settings -> "設定"
+                    AppTab.Compose -> S.description
+                    AppTab.History -> S.history
+                    AppTab.Lineage -> S.lineage
+                    AppTab.Settings -> S.settings
                 }
                 val mark = when (tab) {
                     AppTab.Compose -> "✎"
@@ -1089,8 +1176,8 @@ private fun ComposeModeTabs(selected: ComposeMode, viewModel: InkuViewModel) {
         ComposeMode.entries.forEach { tab ->
             val active = selected == tab
             val label = when (tab) {
-                ComposeMode.Write -> "記述"
-                ComposeMode.Batch -> "バッチ"
+                ComposeMode.Write -> S.description
+                ComposeMode.Batch -> S.batch
             }
             Surface(
                 modifier = Modifier
@@ -1226,8 +1313,8 @@ private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier:
     ) {
         Box(modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM)) {
             DrawingActionButton(
-                idleText = "▶  $DRAW_ACTION_LABEL",
-                runningText = "■  描画中",
+                idleText = "▶  ${drawActionLabel(S)}",
+                runningText = S.drawingButton,
                 state = state,
                 onClick = viewModel::draw,
                 onStop = viewModel::stopDrawing,
@@ -1272,7 +1359,7 @@ private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
             MascotWidget(mascotKind = state.mascotKind)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(
-                    state.message?.takeIf { it.isNotBlank() } ?: "描画中",
+                    state.message?.takeIf { it.isNotBlank() } ?: S.drawing,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1292,7 +1379,7 @@ private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
                 )
             }
             MiniPill(
-                text = "停止",
+                text = S.stop,
                 onClick = if (state.refinementBusy) viewModel::abortRefinementCandidates else viewModel::stopDrawing,
             )
         }
@@ -1316,10 +1403,10 @@ private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            CompactLabel("描画設定")
+            CompactLabel(S.drawingSettings)
             Spacer(Modifier.weight(1f))
             MiniPill(
-                "新規作成",
+                S.newWork,
                 onClick = if (state.composeMode == ComposeMode.Batch) viewModel::clearBatchText else viewModel::clearPrompt,
             )
         }
@@ -1429,20 +1516,20 @@ private fun CanvasHeroCard(
                         item?.let {
                             MiniPill(text = if (it.starred) "★" else "☆", selected = it.starred, onClick = { viewModel.toggleStar(it) })
                             ProvenanceTooltipTarget(
-                                tooltipText = "作品の来歴ハッシュ",
+                                tooltipText = S.provenanceHash,
                                 contentLabel = "F${it.renderHashShort}",
                                 onContentClick = {
                                     clipboard.setText(AnnotatedString(it.renderHashShort))
                                     canvasMessage = "Hash copied."
                                 },
                             )
-                            MiniPill(text = "系譜", onClick = { viewModel.setTab(AppTab.Lineage) })
+                            MiniPill(text = S.lineage, onClick = { viewModel.setTab(AppTab.Lineage) })
                         }
                     }
                     // A double tap enters the full screen too, but a gesture that
                     // nothing on screen mentions is a gesture nobody finds.
                     MiniPill(
-                        text = "⛶ 全画面",
+                        text = S.fullScreen,
                         onClick = viewModel::enterCanvasPresentationMode,
                         modifier = Modifier.align(Alignment.CenterEnd),
                     )
@@ -1553,7 +1640,7 @@ private fun CanvasHeroCard(
                             border = BorderStroke(Dimens.hairline, HeroOverlayHairline),
                         ) {
                             Text(
-                                "残り ${state.demoWaitingSeconds}秒",
+                                S.remainingSeconds(state.demoWaitingSeconds ?: 0),
                                 modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = HeroOverlayInk,
@@ -1612,7 +1699,7 @@ private fun CanvasHeroCard(
                     RenderTab.entries.forEach { tab ->
                         MiniPill(
                             text = when (tab) {
-                                RenderTab.Artwork -> "描画"
+                                RenderTab.Artwork -> S.renderTabArtwork
                                 RenderTab.Prompt -> "Prompt"
                                 RenderTab.Json -> "JSON"
                             },
@@ -1621,7 +1708,7 @@ private fun CanvasHeroCard(
                         )
                     }
                     Spacer(Modifier.weight(1f))
-                    MiniPill(text = "⬆ 書き出し", onClick = { exportSheetOpen = true })
+                    MiniPill(text = S.exportButton, onClick = { exportSheetOpen = true })
                 }
             }
         }
@@ -1708,11 +1795,11 @@ private fun ExportSheet(
                 .padding(bottom = Dimens.spaceL),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text("書き出し  F${item.renderHashShort}", style = MaterialTheme.typography.titleMedium)
+            Text(S.exportOf(item.renderHashShort), style = MaterialTheme.typography.titleMedium)
             CompactLabel("SVG")
-            SvgExportOption(title = "表示用SVG", sub = "Web表示向けの標準SVG", onClick = { onExportSvg("display") })
-            SvgExportOption(title = "編集用SVG", sub = "編集用メタデータとIDを含む", onClick = { onExportSvg("editable") })
-            SvgExportOption(title = "汎用SVG", sub = "互換性重視のポータブルSVG", onClick = { onExportSvg("compat") })
+            SvgExportOption(title = S.svgDisplay, sub = S.svgDisplayNote, onClick = { onExportSvg("display") })
+            SvgExportOption(title = S.svgEditable, sub = S.svgEditableNote, onClick = { onExportSvg("editable") })
+            SvgExportOption(title = S.svgGeneric, sub = S.svgPortableNote, onClick = { onExportSvg("compat") })
             CompactLabel("PNG")
             templates.forEach { template ->
                 SvgExportOption(
@@ -1721,7 +1808,7 @@ private fun ExportSheet(
                     onClick = { onExportPng(template.heightPx) },
                 )
             }
-            SecondarySmallButton(text = "テンプレートを編集", onClick = onEditTemplates)
+            SecondarySmallButton(text = S.templateEdit, onClick = onEditTemplates)
         }
     }
 }
@@ -1748,8 +1835,12 @@ private fun SvgExportOption(title: String, sub: String, onClick: () -> Unit) {
 // same thing on the destination itself, so the explanation no longer needs a
 // place to be opened from.
 
+@Composable
 private fun exportTemplateDescription(description: String, heightPx: Int): String {
-    return description.ifBlank { "PNG / Y軸 ${heightPx}px" }
+    // The builtin rows are seeded with a blank description on purpose: theirs is
+    // derived from the height, so it is composed here in the reader's language
+    // instead of being frozen into the table at first launch.
+    return description.ifBlank { LocalStrings.current.exportTemplateBuiltinDescription(heightPx) }
 }
 
 /**
@@ -1767,7 +1858,7 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-        CompactLabel("写生")
+        CompactLabel(S.sketchFromLife)
         Spacer(Modifier.weight(1f))
         Sketches.MODES.forEach { mode ->
             val note = Sketches.modeNote(mode, isJapanese = true)
@@ -1802,7 +1893,7 @@ private fun DrawPanel(
     onDescriptionPositioned: (Float) -> Unit = {},
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        CompactLabel("記述")
+        CompactLabel(S.description)
         DenseMultilineInput(
             value = state.prompt,
             onValueChange = viewModel::setPrompt,
@@ -1818,8 +1909,8 @@ private fun DrawPanel(
         // 「描画する」 on one screen is a question about which one draws.
         if (!state.descriptionFocused) {
             DrawingActionButton(
-                idleText = "▶  $DRAW_ACTION_LABEL",
-                runningText = "■  描画中",
+                idleText = "▶  ${drawActionLabel(S)}",
+                runningText = S.drawingButton,
                 state = state,
                 onClick = viewModel::draw,
                 onStop = viewModel::stopDrawing,
@@ -1842,7 +1933,7 @@ private fun DrawPanel(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                     ) {
-                        CompactLabel("解釈")
+                        CompactLabel(S.interpretation)
                         Spacer(Modifier.weight(1f))
                         DdlActionRow(state, viewModel)
                     }
@@ -1855,8 +1946,8 @@ private fun DrawPanel(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     DrawingActionButton(
-                        idleText = "▶  DDLから描画",
-                        runningText = "■  描画中",
+                        idleText = S.drawFromDdlButton,
+                        runningText = S.drawingButton,
                         state = state,
                         onClick = viewModel::drawFromDdl,
                         onStop = viewModel::stopDrawing,
@@ -1876,7 +1967,7 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-        CompactLabel("バッチ")
+        CompactLabel(S.batch)
         NumberedBatchTextField(
             value = state.batchText,
             onValueChange = viewModel::setBatchText,
@@ -1889,18 +1980,18 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Text(
-                "${nonEmpty}件/100件",
+                S.ofOneHundred(nonEmpty),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (!state.isDrawing) {
             if (state.batchPromptHistory.isNotEmpty()) {
-                CompactLabel("バッチ指示履歴")
+                CompactLabel(S.batchHistory)
                 WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                     state.batchPromptHistory.forEach { prompt ->
                         MiniPill(
-                            text = prompt.lineSequence().firstOrNull()?.take(22) ?: "履歴",
+                            text = prompt.lineSequence().firstOrNull()?.take(22) ?: S.history,
                             onClick = { viewModel.restoreBatchPrompt(prompt) },
                         )
                     }
@@ -1911,8 +2002,8 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
             BatchProgressPanel(state, viewModel)
         } else {
             DrawingActionButton(
-                idleText = "▶  バッチ描画",
-                runningText = "■  実行中",
+                idleText = S.batchDrawButton,
+                runningText = S.runningButton,
                 state = state,
                 onClick = viewModel::runBatch,
                 onStop = viewModel::stopDrawing,
@@ -2018,23 +2109,23 @@ private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                    Text("進捗 ${state.batchCurrent} / ${state.batchTotal}", style = MaterialTheme.typography.titleSmall)
+                    Text(S.batchProgress(state.batchCurrent, state.batchTotal), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "累計 ${formatDuration(state.batchElapsedMs)} / 成功 ${state.batchSuccess} / 失敗 ${state.batchFailures.size}",
+                        S.batchElapsedTally(formatDuration(state.batchElapsedMs), state.batchSuccess, state.batchFailures.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     state.batchLatestHashShort?.let {
-                        Text("最新 F$it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(S.latestOf(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                SecondarySmallButton(text = "停止", onClick = viewModel::stopDrawing)
+                SecondarySmallButton(text = S.stop, onClick = viewModel::stopDrawing)
             }
             state.batchActiveLine?.let { line ->
-                Text("${line}行目", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                Text(S.lineNumber(line), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             }
             RenderTextView(
-                state.batchActiveDdl ?: "解釈を待機中...",
+                state.batchActiveDdl ?: S.awaitingInterpretation,
                 modifier = Modifier.fillMaxWidth().height(Dimens.batchProgressHeight),
             )
         }
@@ -2045,11 +2136,11 @@ private fun BatchProgressPanel(state: InkuUiState, viewModel: InkuViewModel) {
 private fun BatchFailureSummary(state: InkuUiState) {
     Surface(color = FailureSummaryWash, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-            Text("成功 ${state.batchSuccess} / 失敗 ${state.batchFailures.size} / 全 ${state.batchTotal}", style = MaterialTheme.typography.titleSmall)
-            Text("失敗した行", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(S.batchTally(state.batchSuccess, state.batchFailures.size, state.batchTotal), style = MaterialTheme.typography.titleSmall)
+            Text(S.failedLines, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.batchFailures.forEach { failure ->
                 Text(
-                    "${failure.line}行目  ${failure.input}  ${failure.message}",
+                    S.batchFailureLine(failure.line, failure.input, failure.message),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -2074,7 +2165,7 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
             canvasAspectOverride = DemoCanvasAspectId,
         )
 
-        CompactLabel("生成された指示文")
+        CompactLabel(S.producedInstructions)
         Surface(
             color = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(Dimens.radiusCard),
@@ -2091,15 +2182,15 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
         }
 
         DrawingActionButton(
-            idleText = "▶  デモ開始",
-            runningText = "■  デモ実行中",
+            idleText = S.demoStartButton,
+            runningText = S.demoRunningButton,
             state = state,
             onClick = viewModel::startDemo,
             onStop = viewModel::stopDrawing,
         )
 
         if (state.demoGeneratedDdl != null) {
-            CompactLabel("生成された解釈")
+            CompactLabel(S.producedInterpretation)
             RenderTextView(
                 state.demoGeneratedDdl,
                 modifier = Modifier.fillMaxWidth().height(Dimens.demoPanelHeight),
@@ -2210,13 +2301,13 @@ private fun HistoryHeader(
         ImeAwareOutlinedTextField(
             value = state.historySearchQuery,
             onValueChange = viewModel::setHistorySearchQuery,
-            label = "プロンプト・ハッシュ・モデルで検索",
+            label = S.searchPlaceholderLong,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
-            ChipButton("★ 星のみ", selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
-            Text("${filteredCount}/${sourceCount}件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ChipButton(S.starredOnly, selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
+            Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -2263,17 +2354,17 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text("作品の系譜", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(S.workLineage, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             // web puts the same button in the same place, at the right of the
             // panel header (LineagePanel.svelte:788). The wording is web's.
-            ChipButton("新しい起点にする", onClick = viewModel::detachLineage)
+            ChipButton(S.makeNewOrigin, onClick = viewModel::detachLineage)
         }
         when {
             state.refinementOpen -> RefinementPanel(state, viewModel)
             state.lineageLoading && graph == null ->
-                Text("系譜を読み込み中…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(S.lineageLoading, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             graph == null || graph.nodes.isEmpty() ->
-                Text("保存すると、ここに系譜が表示されます。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(S.lineageEmpty, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> LineageColumns(graph, viewModel)
         }
     }
@@ -2281,7 +2372,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
 
 /**
  * 推敲 -- the port of web's 推敲 tab, cut to the one entry SPEC `:618` puts on a
- * lineage card ("描画要素"). The comparison sub-views beside it there belong to
+ * lineage card (S.refinementElements). The comparison sub-views beside it there belong to
  * other contracts.
  *
  * The radio is the whole of the exclusivity the SPEC asks for: one element at a
@@ -2299,15 +2390,15 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text(state.refinementSubview.titleJa, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            ChipButton("閉じる", onClick = viewModel::closeRefinement)
+            Text(LocalStrings.current.comparisonKindDescription(state.refinementSubview.id), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            ChipButton(S.close, onClick = viewModel::closeRefinement)
         }
 
         // 調整・モデル・言語 (SPEC :616, :686). Three faces of one screen.
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             RefinementSubview.entries.forEach { subview ->
                 ChipButton(
-                    text = subview.labelJa,
+                    text = LocalStrings.current.comparisonKindLabel(subview.id),
                     selected = state.refinementSubview == subview,
                     modifier = Modifier.testTag(refinementSubviewTag(subview)),
                     onClick = { viewModel.setRefinementSubview(subview) },
@@ -2317,10 +2408,10 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
 
         Text(
             when (state.refinementSubview) {
-                RefinementSubview.Adjust -> "1 回の推敲で変えられるのは 1 種類だけです。"
-                RefinementSubview.Model -> "対象作品と同じ Stage 1/2 の組み合わせだけが選べません。"
-                RefinementSubview.Language -> "Stage 1 と Stage 2 の言語の組を選びます。"
-            } + (parent?.let { " 親: ${it.renderHashShort} / ${ColorCatalogs.get(it.colorCatalogId).name}" } ?: ""),
+                RefinementSubview.Adjust -> S.refineOneKindOnly
+                RefinementSubview.Model -> S.sameStagePairBlocked
+                RefinementSubview.Language -> S.languageComboNote
+            } + (parent?.let { S.parentSuffix(it.renderHashShort, ColorCatalogs.get(it.colorCatalogId).name) } ?: ""),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -2338,14 +2429,14 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             if (state.refinementSubview == RefinementSubview.Adjust) {
                 listOf(1, 4).forEach { count ->
                     ChipButton(
-                        text = "${count}案",
+                        text = S.optionCount(count),
                         selected = state.refinementCount == count,
                         onClick = { viewModel.setRefinementCount(count) },
                     )
                 }
             }
             ChipButton(
-                text = if (state.refinementBusy) "生成中…" else "候補を作る",
+                text = if (state.refinementBusy) S.working else S.makeCandidates,
                 modifier = Modifier.testTag(REFINE_GENERATE_TAG),
                 onClick = { if (!state.refinementBusy) viewModel.generateRefinementCandidates() },
             )
@@ -2353,7 +2444,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
 
         // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
         if (state.refinementCanAbort) {
-            ChipButton("停止", modifier = Modifier.testTag(REFINE_STOP_TAG), onClick = viewModel::abortRefinementCandidates)
+            ChipButton(S.stop, modifier = Modifier.testTag(REFINE_STOP_TAG), onClick = viewModel::abortRefinementCandidates)
         }
 
         state.refinementStatus?.let {
@@ -2388,7 +2479,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         RefinementElement.entries.forEach { element ->
             ChipButton(
-                text = element.labelJa,
+                text = LocalStrings.current.refinementElementLabel(element.id),
                 selected = state.refinementElement == element,
                 onClick = { viewModel.setRefinementElement(element) },
             )
@@ -2400,7 +2491,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             VariationAmplitude.entries.forEach { amplitude ->
                 ChipButton(
-                    text = amplitude.labelJa,
+                    text = LocalStrings.current.variationAmplitudeLabel(amplitude.id),
                     selected = state.refinementAmplitude == amplitude,
                     onClick = { viewModel.setRefinementAmplitude(amplitude) },
                 )
@@ -2412,7 +2503,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
         OutlinedTextField(
             value = state.refinementTouchWords,
             onValueChange = viewModel::setRefinementTouchWords,
-            label = { Text("タッチを変える言葉") },
+            label = { Text(S.touchWords) },
             singleLine = true,
             enabled = !state.refinementBusy,
             modifier = Modifier.fillMaxWidth(),
@@ -2433,7 +2524,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         ModelCompareMode.entries.forEach { mode ->
             ChipButton(
-                text = mode.labelJa,
+                text = LocalStrings.current.comparisonModeLabel(mode.id),
                 selected = state.modelCompareMode == mode,
                 modifier = Modifier.testTag(modelCompareModeTag(mode)),
                 onClick = { viewModel.setModelCompareMode(mode) },
@@ -2443,7 +2534,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
 
     if (state.modelCompareMode != ModelCompareMode.Common) {
         Text(
-            if (state.modelCompareMode == ModelCompareMode.Stage1Fixed) "固定する Stage 1 モデル" else "固定する Stage 2 モデル",
+            if (state.modelCompareMode == ModelCompareMode.Stage1Fixed) S.fixedStage1Model else S.fixedStage2Model,
             style = MaterialTheme.typography.labelMedium,
         )
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
@@ -2457,7 +2548,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
         }
     }
 
-    Text("比較するモデル (最大 ${MAX_COMPARE_SELECTION})", style = MaterialTheme.typography.labelMedium)
+    Text(S.modelsToCompare(MAX_COMPARE_SELECTION), style = MaterialTheme.typography.labelMedium)
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         choices.forEach { choice ->
             val blocked = ComparisonPlanner.isModelChoiceBlocked(
@@ -2468,7 +2559,7 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
                 targetStage2Model = state.refinementParent?.stage2Model.orEmpty(),
             )
             ChipButton(
-                text = if (blocked) "${choice.label}（対象と同じ）" else choice.label,
+                text = if (blocked) S.choiceSameAsTarget(choice.label) else choice.label,
                 selected = choice.id in state.modelCompareSelectedModels,
                 modifier = Modifier.testTag(modelChoiceTag(choice.id)),
                 onClick = { viewModel.toggleModelCompareSelection(choice.id) },
@@ -2490,7 +2581,7 @@ private fun LanguageInspectionControls(state: InkuUiState, viewModel: InkuViewMo
         LanguageCombo.ALL.forEach { combo ->
             val blocked = ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLangOf(state.refinementParent))
             ChipButton(
-                text = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}" + if (blocked) "（対象と同じ）" else "",
+                text = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}" + if (blocked) S.sameAsTargetSuffix else "",
                 selected = combo.id in state.languageCompareSelectedCombos,
                 modifier = Modifier.testTag(languageComboTag(combo.id)),
                 onClick = { viewModel.toggleLanguageCombo(combo.id) },
@@ -2546,9 +2637,9 @@ private fun RefinementCandidateCard(
                 // first one is a button that does anything.
                 when (candidate.saveState) {
                     RefinementSaveState.Unsaved ->
-                        ChipButton("保存", modifier = Modifier.testTag(REFINE_SAVE_TAG), onClick = onSave)
-                    RefinementSaveState.Saving -> Text("保存中…", style = MaterialTheme.typography.labelSmall)
-                    RefinementSaveState.Saved -> Text("保存済み", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        ChipButton(S.save, modifier = Modifier.testTag(REFINE_SAVE_TAG), onClick = onSave)
+                    RefinementSaveState.Saving -> Text(S.saving, style = MaterialTheme.typography.labelSmall)
+                    RefinementSaveState.Saved -> Text(S.saved, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -2659,18 +2750,18 @@ private fun LineageNodeCard(
                 Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(LineagePlaceholderSurface))
             }
             Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                // The label of the edge that produced this work. `labelJa` with
-                // no kind is 起点, which is the answer for a node no edge points
-                // at; the wording is the registry's, never this screen's.
+                // The label of the edge that produced this work. A node no edge
+                // points at has no kind, and the answer for that is the origin;
+                // the wording is the pack's, never this screen's.
                 Text(
-                    DerivationKindRegistry.labelJa(derivationKind),
+                    derivationKindLabel(derivationKind),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    history?.lineageGeneration?.let { "第${it}世代" } ?: "—",
+                    history?.lineageGeneration?.let { S.generationOf(it) } ?: "—",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -2691,9 +2782,9 @@ private fun LineageNodeCard(
                 // (SPEC :688). A tombstone has no work to refine, which is why
                 // this hangs off `history`.
                 if (history != null) {
-                    ChipButton("描画要素", modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
-                    ChipButton("モデル", modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
-                    ChipButton("言語", modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
+                    ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
+                    ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
+                    ChipButton(S.language, modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
                 }
             }
         }
@@ -2726,15 +2817,15 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text("設定", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
+            Text(S.settings, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
         }
-        SettingsListItem(mark = "◇", title = "モデル設定", sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
-        SettingsListItem(mark = "◉", title = "デモ", sub = "実行とシードフレーズ", onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
-        SettingsListItem(mark = "⬚", title = "エクスポート", sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
-        SettingsListItem(mark = "◐", title = "その他", sub = "言語・テーマ・密度", onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
+        SettingsListItem(mark = "◇", title = S.modelSettings, sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
+        SettingsListItem(mark = "◉", title = S.demo, sub = S.demoRunAndSeed, onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
+        SettingsListItem(mark = "⬚", title = S.export, sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
+        SettingsListItem(mark = "◐", title = S.settingsMisc, sub = S.miscSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(
             mark = "#",
-            title = "バージョン情報",
+            title = S.versionInfo,
             sub = "Android ${BuildConfig.VERSION_NAME} · build ${BuildConfig.BUILD_NUMBER}",
             onClick = { viewModel.setSettingsPane(SettingsPane.Version) },
         )
@@ -2772,11 +2863,11 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text("モデル選択", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            SecondarySmallButton(text = "取消", onClick = viewModel::cancelModelSelection)
-            PrimarySmallButton(text = "決定", onClick = viewModel::confirmModelSelection)
+            Text(S.modelSelection, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            SecondarySmallButton(text = S.cancelShort, onClick = viewModel::cancelModelSelection)
+            PrimarySmallButton(text = S.confirm, onClick = viewModel::confirmModelSelection)
         }
-        SettingsCard("描画モデル", "Stage 1 / Stage 2 共通", selectedModelLabel(state)) {
+        SettingsCard(S.drawingModel, S.stagesShared, selectedModelLabel(state)) {
             ModelChoiceRow(
                 choices = modelChoices,
                 selectedValue = state.selectedModelId,
@@ -2784,11 +2875,11 @@ private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, mo
             )
         }
         Text(
-            "内部保存と履歴メタデータはserver互換のstage1_model / stage2_modelを維持し、Android UIでは同じモデルを両Stageへ適用します。",
+            S.unifiedModelNote,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SecondaryActionButton(text = "接続先設定を開く", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
+        SecondaryActionButton(text = S.openProviderSettings, onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
     }
 }
 
@@ -2803,7 +2894,7 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         // for the places one returns to, and the demo is started now and then,
         // so the running of it sits here with the settings it runs under.
         DemoPanel(state, viewModel)
-        SettingsCard("シードフレーズ", "デモ指示文生成", "保存済み") {
+        SettingsCard(S.seedPhrase, S.demoPromptWriting, S.saved) {
             ImeAwareOutlinedTextField(
                 value = state.demoSeed,
                 onValueChange = viewModel::setDemoSeed,
@@ -2811,16 +2902,16 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 minLines = 5,
                 maxLines = 8,
             )
-            SecondarySmallButton(text = "デフォルト値に戻す", onClick = viewModel::resetDemoSeed)
+            SecondarySmallButton(text = S.restoreDefaults, onClick = viewModel::resetDemoSeed)
         }
-        SettingsCard("表示間隔", "デモ表示", "${state.demoIntervalSeconds}秒") {
+        SettingsCard(S.demoInterval, S.demoView, S.seconds(state.demoIntervalSeconds)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                 SecondarySmallButton(
                     text = "−",
                     onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds - 5) },
                     enabled = state.demoIntervalSeconds > 1,
                 )
-                Text("${state.demoIntervalSeconds}秒", style = MaterialTheme.typography.labelMedium)
+                Text(S.seconds(state.demoIntervalSeconds), style = MaterialTheme.typography.labelMedium)
                 SecondarySmallButton(
                     text = "+",
                     onClick = { viewModel.setDemoIntervalSeconds(state.demoIntervalSeconds + 5) },
@@ -2828,10 +2919,10 @@ private fun DemoSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 )
             }
         }
-        SettingsCard("描画表現", "脱・規則化", if (state.renderWild) "ON (Wild)" else "OFF (Standard)") {
+        SettingsCard(S.renderExpression, S.renderExpressionSubtitle, if (state.renderWild) "ON (Wild)" else "OFF (Standard)") {
             SettingCheckRow(
                 checked = state.renderWild,
-                text = "暴れる（演奏上限の解除） / Wild (unleashed performance)",
+                text = S.wildToggle,
                 onCheckedChange = viewModel::setRenderWild,
             )
         }
@@ -2845,17 +2936,17 @@ private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mo
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
-        SettingsCard("PNG / SVG", "Web版の出力設定", "保存済み") {
+        SettingsCard("PNG / SVG", S.exportSubtitle, S.saved) {
             SettingCheckRow(
                 checked = state.pngAlphaWhite,
-                text = "PNG透過時の白背景",
+                text = S.pngAlphaWhite,
                 onCheckedChange = viewModel::setPngAlphaWhite,
             )
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 state.exportTemplates.forEach { template ->
                     ExportTemplateRow(template, viewModel)
                 }
-                SecondarySmallButton(text = "テンプレート追加", onClick = viewModel::addExportTemplate)
+                SecondarySmallButton(text = S.templateAdd, onClick = viewModel::addExportTemplate)
             }
         }
     }
@@ -2868,30 +2959,45 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
-        SettingsCard("表示モード", "UIの表示密度・構成", state.uiMode) {
+        SettingsCard(
+            LocalStrings.current.settingsLanguageTitle,
+            LocalStrings.current.settingsLanguageSubtitle,
+            state.uiLanguage.label,
+        ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                ChipButton("フルモード", selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })
-                ChipButton("シンプルモード", selected = state.uiMode == "simple", onClick = { viewModel.setUiMode("simple") })
+                UiLanguage.entries.forEach { language ->
+                    ChipButton(
+                        language.label,
+                        selected = state.uiLanguage == language,
+                        onClick = { viewModel.setUiLanguage(language) },
+                    )
+                }
             }
         }
-        SettingsCard("マスコット選択", "Incu (立方体) または Yuragi (蟹)", state.mascotKind) {
+        SettingsCard(S.uiModeTitle, S.uiModeSubtitle, state.uiMode) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                ChipButton("Incu (立方体)", selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
-                ChipButton("Yuragi (蟹)", selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
+                ChipButton(S.uiModeFull, selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })
+                ChipButton(S.uiModeSimple, selected = state.uiMode == "simple", onClick = { viewModel.setUiMode("simple") })
             }
         }
-        SettingsCard("履歴選択", "Web版の履歴反映設定", "保存済み") {
+        SettingsCard(S.mascotTitle, S.mascotSubtitle, state.mascotKind) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                ChipButton(S.mascotIncu, selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
+                ChipButton(S.mascotYuragi, selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
+            }
+        }
+        SettingsCard(S.historySelection, S.historySelectionSubtitle, S.saved) {
             SettingChoiceRow(
-                title = "キャンバス",
+                title = S.canvas,
                 selected = state.historySelectionCanvas,
                 onSelect = viewModel::setHistorySelectionCanvas,
             )
             SettingChoiceRow(
-                title = "色カタログ",
+                title = S.colorCatalog,
                 selected = state.historySelectionCatalog,
                 onSelect = viewModel::setHistorySelectionCatalog,
             )
-            SettingCheckRow(state.saveReplayAsNewVersion, "DDL再描画を新しい履歴として保存", viewModel::setSaveReplayAsNewVersion)
+            SettingCheckRow(state.saveReplayAsNewVersion, S.ddlReplaySaveAsNew, viewModel::setSaveReplayAsNewVersion)
         }
     }
 }
@@ -2905,7 +3011,7 @@ internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Mod
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(SettingsPane.Version, viewModel)
-        SettingsCard("inku Android", "アプリケーション", BuildConfig.VERSION_NAME) {
+        SettingsCard("inku Android", S.application, BuildConfig.VERSION_NAME) {
             VersionInfoRow("versionName", BuildConfig.VERSION_NAME)
             VersionInfoRow("versionCode", BuildConfig.VERSION_CODE.toString())
             VersionInfoRow("build number", BuildConfig.BUILD_NUMBER.toString())
@@ -3001,30 +3107,30 @@ private fun ProviderConnectionCard(
     val publishedModelIds = remember(provider.providerId, provider.publishedModelsJson) {
         parsePublishedModelIds(provider.publishedModelsJson)
     }
-    val apiKeyState = if (keySet) "APIキー設定済み" else "APIキー未設定"
+    val apiKeyState = if (keySet) S.apiKeySetAlready else S.apiKeyUnset
     SettingsCard(
         provider.displayName,
         "Service ID: ${provider.providerId}",
         "",
         titleAction = {
-            SecondarySmallButton(text = "変更", onClick = { editNameOpen = true })
+            SecondarySmallButton(text = S.change, onClick = { editNameOpen = true })
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             ModelSettingValueRow(
                 label = "Base URL",
                 value = baseUrl.ifBlank { provider.baseUrl ?: "-" },
-                action = "編集",
+                action = S.edit,
                 onAction = { editBaseUrlOpen = true },
             )
             if (provider.isDefaultLocal) {
                 SettingCheckRow(
                     checked = litertStage1PromptOptimization,
-                    text = "プロンプト最適化",
+                    text = S.promptOptimization,
                     onCheckedChange = onLiteRtStage1PromptOptimizationChange,
                 )
                 Text(
-                    "ONの場合、LiteRT-LMのStage 1だけ圧縮版system promptを使用します。server互換モデルには影響しません。",
+                    S.promptOptimizationNote,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -3036,14 +3142,14 @@ private fun ProviderConnectionCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("APIキー", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(S.apiKey, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                             Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
-                            if (!keySet) Text("ローカルLLMの場合、APIキー無しで利用可能な場合があります。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (!keySet) Text(S.apiKeyLocalNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     SecondarySmallButton(
-                        text = if (keySet) "削除" else "追加",
+                        text = if (keySet) S.delete else S.add,
                         onClick = {
                             if (keySet) confirmClearKey = true else editApiKeyOpen = true
                         },
@@ -3056,11 +3162,11 @@ private fun ProviderConnectionCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("ユーザーに公開するモデル", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    SecondarySmallButton(text = "モデル選択", onClick = { modelPickerOpen = true })
+                    Text(S.publishedModels, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SecondarySmallButton(text = S.modelSelection, onClick = { modelPickerOpen = true })
                 }
                 if (publishedModelIds.isEmpty()) {
-                    Text("公開モデルは未選択です。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(S.noPublishedModels, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         publishedModelIds.forEach { modelId ->
@@ -3077,15 +3183,15 @@ private fun ProviderConnectionCard(
                     shape = RoundedCornerShape(Dimens.radiusCard),
                     contentPadding = PaddingValues(horizontal = Dimens.spaceM, vertical = 0.dp),
                 ) {
-                    Text("サービス削除", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    Text(S.serviceDeleteTitle, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
             }
         }
     }
     if (editNameOpen) {
         TextEditDialog(
-            title = "サービス名を変更",
-            label = "サービス名",
+            title = S.serviceNameChange,
+            label = S.serviceName,
             initialValue = displayName,
             onDismiss = { editNameOpen = false },
             onSave = { value ->
@@ -3097,7 +3203,7 @@ private fun ProviderConnectionCard(
     }
     if (editBaseUrlOpen) {
         TextEditDialog(
-            title = "Base URLを変更",
+            title = S.baseUrlChange,
             label = "Base URL",
             initialValue = baseUrl,
             onDismiss = { editBaseUrlOpen = false },
@@ -3110,8 +3216,8 @@ private fun ProviderConnectionCard(
     }
     if (editApiKeyOpen) {
         TextEditDialog(
-            title = "APIキーを設定",
-            label = "新しいAPIキー",
+            title = S.apiKeySet,
+            label = S.newApiKey,
             initialValue = apiKey,
             onDismiss = { editApiKeyOpen = false },
             onSave = { value ->
@@ -3158,29 +3264,29 @@ private fun ProviderConnectionCard(
     if (confirmClearKey) {
         AlertDialog(
             onDismissRequest = { confirmClearKey = false },
-            title = { Text("APIキーを削除") },
-            text = { Text("${provider.displayName} の保存済みAPIキーを削除します。") },
+            title = { Text(S.apiKeyDelete) },
+            text = { Text(S.apiKeyDeleteBody(provider.displayName)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmClearKey = false
                     onClearApiKey()
-                }) { Text("削除") }
+                }) { Text(S.delete) }
             },
-            dismissButton = { TextButton(onClick = { confirmClearKey = false }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { confirmClearKey = false }) { Text(S.cancel) } },
         )
     }
     if (confirmDeleteService) {
         AlertDialog(
             onDismissRequest = { confirmDeleteService = false },
-            title = { Text("サービスを削除") },
-            text = { Text("${provider.displayName} をモデル接続先から削除します。") },
+            title = { Text(S.serviceDeleteAction) },
+            text = { Text(S.serviceDeleteBody(provider.displayName)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDeleteService = false
                     onDelete()
-                }) { Text("削除") }
+                }) { Text(S.delete) }
             },
-            dismissButton = { TextButton(onClick = { confirmDeleteService = false }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { confirmDeleteService = false }) { Text(S.cancel) } },
         )
     }
 }
@@ -3240,10 +3346,10 @@ private fun TextEditDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onSave(value.trim()) }) { Text("保存") }
+            TextButton(onClick = { onSave(value.trim()) }) { Text(S.save) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("キャンセル") }
+            TextButton(onClick = onDismiss) { Text(S.cancel) }
         },
     )
 }
@@ -3277,14 +3383,14 @@ private fun ProviderModelPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-                    ModelPickerActionButton(text = "モデルリスト取得", onClick = onFetchModels, modifier = Modifier.weight(1.5f))
-                    ModelPickerActionButton(text = "全選択", onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f))
-                    ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.weight(1f))
+                    ModelPickerActionButton(text = S.modelListFetch, onClick = onFetchModels, modifier = Modifier.weight(1.5f))
+                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f))
+                    ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f))
                 }
                 ImeAwareOutlinedTextField(
                     value = search,
                     onValueChange = { search = it },
-                    label = "モデル検索",
+                    label = S.modelSearch,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -3312,16 +3418,16 @@ private fun ProviderModelPickerDialog(
                         }
                     }
                 }
-                statusMessage?.takeIf { it.contains("モデル") || it.contains(provider.providerId) }?.let {
+                statusMessage?.takeIf { it.contains(S.model) || it.contains(provider.providerId) }?.let {
                     Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }) { Text("保存") }
+            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }) { Text(S.save) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("キャンセル") }
+            TextButton(onClick = onDismiss) { Text(S.cancel) }
         },
     )
 }
@@ -3363,11 +3469,11 @@ private fun LocalModelManagementDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("LiteRT-LM", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
-                        Text("ローカルモデル", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(S.localModels, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                        ModelPickerActionButton(text = "全選択", onClick = { selected = assetIds }, modifier = Modifier.width(Dimens.modelActionWidth))
-                        ModelPickerActionButton(text = "全解除", onClick = { selected = emptySet() }, modifier = Modifier.width(Dimens.modelActionWidth))
+                        ModelPickerActionButton(text = S.selectAll, onClick = { selected = assetIds }, modifier = Modifier.width(Dimens.modelActionWidth))
+                        ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.width(Dimens.modelActionWidth))
                     }
                 }
 
@@ -3389,7 +3495,7 @@ private fun LocalModelManagementDialog(
                     }
                 }
 
-                statusMessage?.takeIf { it.contains("モデル") || it.contains("Gemma") || it.contains("LiteRT") }?.let {
+                statusMessage?.takeIf { it.contains(S.model) || it.contains("Gemma") || it.contains("LiteRT") }?.let {
                     Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
 
@@ -3398,8 +3504,8 @@ private fun LocalModelManagementDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("キャンセル") }
-                    TextButton(onClick = { onSave(selected.filter { it in assetIds }) }) { Text("保存") }
+                    TextButton(onClick = onDismiss) { Text(S.cancel) }
+                    TextButton(onClick = { onSave(selected.filter { it in assetIds }) }) { Text(S.save) }
                 }
             }
         }
@@ -3459,7 +3565,7 @@ private fun LocalModelAssetRow(
                 )
             }
             Text(
-                "状態: ${modelStatusLabel(asset.downloadState)}$progress",
+                S.downloadStateOf(modelStatusLabel(asset.downloadState), progress),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -3472,15 +3578,15 @@ private fun LocalModelAssetRow(
             ) {
                 when {
                     asset.licenseAcceptedAt == null -> {
-                        SecondarySmallButton(text = "ライセンス同意", onClick = onAcceptModelLicense)
+                        SecondarySmallButton(text = S.licenseAccept, onClick = onAcceptModelLicense)
                     }
                     isReady -> {
-                        SecondarySmallButton(text = "再取得", onClick = onRedownloadModel, enabled = !isBusy)
+                        SecondarySmallButton(text = S.downloadAgain, onClick = onRedownloadModel, enabled = !isBusy)
                     }
                     else -> {
-                        SecondarySmallButton(text = "再取得", onClick = onRedownloadModel, enabled = !isBusy)
+                        SecondarySmallButton(text = S.downloadAgain, onClick = onRedownloadModel, enabled = !isBusy)
                         Spacer(modifier = Modifier.width(Dimens.spaceM))
-                        PrimarySmallButton(text = if (isBusy) "取得中" else "ダウンロード", onClick = onDownloadModel, enabled = !isBusy)
+                        PrimarySmallButton(text = if (isBusy) S.downloading else S.download, onClick = onDownloadModel, enabled = !isBusy)
                     }
                 }
             }
@@ -3510,26 +3616,26 @@ private fun AddProviderCard(
     var kind by remember { mutableStateOf("openai-compatible") }
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
-    SecondaryActionButton(text = "AIサービスを追加", onClick = { open = true })
+    SecondaryActionButton(text = S.providerAdd, onClick = { open = true })
     if (open) {
         AlertDialog(
             onDismissRequest = { open = false },
-            title = { Text("AIサービスを追加") },
+            title = { Text(S.providerAdd) },
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth().height(Dimens.addProviderCardHeight).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
-                    ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = "サービスID", modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    ImeAwareOutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = "サービス名", modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    CompactLabel("接続形式")
+                    ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = S.serviceId, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    ImeAwareOutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = S.serviceName, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    CompactLabel(S.providerKind)
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         listOf("openai-compatible" to "OpenAI compatible", "anthropic" to "Claude API", "gemini" to "Gemini API").forEach { (value, label) ->
                             MiniPill(label, selected = kind == value, onClick = { kind = value })
                         }
                     }
                     ImeAwareOutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = "Base URL", modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    ImeAwareOutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = "APIキー", modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    ImeAwareOutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = S.apiKey, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 }
             },
             confirmButton = {
@@ -3539,10 +3645,10 @@ private fun AddProviderCard(
                         open = false
                     },
                     enabled = providerId.isNotBlank(),
-                ) { Text("追加") }
+                ) { Text(S.add) }
             },
             dismissButton = {
-                TextButton(onClick = { open = false }) { Text("キャンセル") }
+                TextButton(onClick = { open = false }) { Text(S.cancel) }
             },
         )
     }
@@ -3575,23 +3681,25 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
     }
 }
 
+@Composable
 private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
-    SettingsPane.Home -> "設定"
-    SettingsPane.ModelSelection -> "モデル選択"
-    SettingsPane.Models -> "モデル設定"
-    SettingsPane.Demo -> "デモ"
-    SettingsPane.Export -> "エクスポート"
-    SettingsPane.Misc -> "その他"
-    SettingsPane.Version -> "バージョン情報"
+    SettingsPane.Home -> S.settings
+    SettingsPane.ModelSelection -> S.modelSelection
+    SettingsPane.Models -> S.modelSettings
+    SettingsPane.Demo -> S.demo
+    SettingsPane.Export -> S.export
+    SettingsPane.Misc -> S.settingsMisc
+    SettingsPane.Version -> S.versionInfo
 }
 
+@Composable
 private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
-    SettingsPane.ModelSelection -> "Stage 1 / Stage 2 共通"
+    SettingsPane.ModelSelection -> S.stagesShared
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
-    SettingsPane.Demo -> "実行 / seed phrase / interval"
+    SettingsPane.Demo -> S.demoSubtitle
     SettingsPane.Export -> "PNG / SVG templates"
-    SettingsPane.Misc -> "言語・テーマ・密度"
+    SettingsPane.Misc -> S.miscSubtitle
     SettingsPane.Version -> "version / build"
 }
 
@@ -3617,11 +3725,11 @@ private fun SettingChoiceRow(
         CompactLabel(title)
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
             if (selected == HistorySelectionBehavior.History) {
-                PrimarySmallButton("履歴の値", onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
-                SecondarySmallButton("現在値を維持", onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
+                PrimarySmallButton(S.historyValue, onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
+                SecondarySmallButton(S.keepCurrentValue, onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
             } else {
-                SecondarySmallButton("履歴の値", onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
-                PrimarySmallButton("現在値を維持", onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
+                SecondarySmallButton(S.historyValue, onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
+                PrimarySmallButton(S.keepCurrentValue, onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -3638,17 +3746,17 @@ private fun ExportTemplateRow(template: app.inku.mobile.data.db.ExportTemplateEn
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-            ImeAwareOutlinedTextField(name, { name = it }, label = "名前", modifier = Modifier.fillMaxWidth(), singleLine = true)
-            ImeAwareOutlinedTextField(description, { description = it }, label = "説明", modifier = Modifier.fillMaxWidth(), singleLine = true)
-            ImeAwareOutlinedTextField(height, { height = it.filter(Char::isDigit) }, label = "Y軸px", modifier = Modifier.fillMaxWidth(), singleLine = true)
+            ImeAwareOutlinedTextField(name, { name = it }, label = S.name, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            ImeAwareOutlinedTextField(description, { description = it }, label = S.descriptionField, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            ImeAwareOutlinedTextField(height, { height = it.filter(Char::isDigit) }, label = S.exportHeightPx, modifier = Modifier.fillMaxWidth(), singleLine = true)
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                 SecondarySmallButton(
-                    text = "削除",
+                    text = S.delete,
                     onClick = { viewModel.removeExportTemplate(template.id) },
                     modifier = Modifier.weight(1f),
                 )
                 PrimarySmallButton(
-                    text = "保存",
+                    text = S.save,
                     onClick = { viewModel.updateExportTemplate(template, name, description, height.toIntOrNull() ?: template.heightPx) },
                     modifier = Modifier.weight(1f),
                 )
@@ -3667,7 +3775,7 @@ private fun ModelChoiceRow(
         WrapRow {
             choices.forEach { choice ->
                 val rec = app.inku.mobile.data.model.ModelRecommendations.items.find { it.modelId == choice.id }
-                val badgeText = if (rec != null) " (推奨: S${rec.recommendedStage})" else ""
+                val badgeText = if (rec != null) S.recommendedStageSuffix(rec.recommendedStage) else ""
                 MiniPill(
                     text = "${choice.providerName.take(10)} / ${choice.label.take(18)}$badgeText",
                     selected = choice.id == selectedValue,
@@ -3788,14 +3896,19 @@ private fun modelProviderGroupsFor(state: InkuUiState): List<app.inku.mobile.dat
     return (local + remote).distinctBy { it.providerId }
 }
 
-private fun modelOptionsForProvider(state: InkuUiState, providerId: String): List<ModelOptionChoice> {
+/**
+ * The pack is a parameter here, not `S`: one caller is an `onClick`, which runs
+ * outside composition. A `@Composable` version would compile until something
+ * called it from a callback.
+ */
+private fun modelOptionsForProvider(state: InkuUiState, providerId: String, strings: InkuStrings): List<ModelOptionChoice> {
     if (providerId == "local-litert-lm") {
         return state.modelAssets.map { asset ->
             ModelOptionChoice(
                 rawId = asset.modelId,
                 qualifiedId = asset.modelId,
                 label = "${asset.displayName} ${asset.qualityTier}",
-                notes = modelChoiceStatusLabel(asset.downloadState),
+                notes = modelChoiceStatusLabel(asset.downloadState, strings),
             )
         }
     }
@@ -3818,11 +3931,11 @@ private fun providerOfModelId(modelId: String, state: InkuUiState): String {
     return "local-litert-lm"
 }
 
-private fun modelChoiceStatusLabel(downloadState: String): String {
+private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings): String {
     return when (downloadState) {
         "ready" -> "ready"
-        "ready_to_download" -> "取得可能"
-        "license_required" -> "ライセンス同意が必要"
+        "ready_to_download" -> strings.downloadable
+        "license_required" -> strings.licenseRequired
         else -> downloadState
     }
 }
@@ -3936,10 +4049,10 @@ private fun ModelAssetControls(
             )
             PrimarySmallButton(
                 text = when {
-                    isReady -> "ライセンス/取得済み"
-                    isBusy -> "取得状況"
-                    asset.licenseAcceptedAt != null -> "ダウンロード"
-                    else -> "ライセンス/ダウンロード"
+                    isReady -> S.licenseAndDownloaded
+                    isBusy -> S.downloadState
+                    asset.licenseAcceptedAt != null -> S.download
+                    else -> S.licenseAndDownload
                 },
                 onClick = onOpenLicenseDownload,
                 modifier = Modifier.fillMaxWidth(),
@@ -3966,17 +4079,17 @@ private fun ModelAssetLicenseDownloadDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${asset.displayName} の取得") },
+        title = { Text(S.downloadOf(asset.displayName)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                Text("LiteRT-LM でローカル実行する Gemma モデルです。")
-                Text("品質: ${asset.qualityTier}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("状態: ${modelStatusLabel(asset.downloadState)}$progress", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(S.localModelNote)
+                Text(S.qualityTier(asset.qualityTier), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(S.downloadStateOf(modelStatusLabel(asset.downloadState), progress), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     if (asset.licenseAcceptedAt != null) {
-                        "ライセンスは同意済みです。"
+                        S.licenseAccepted
                     } else {
-                        "ダウンロード前に Gemma のライセンス同意が必要です。"
+                        S.licenseBeforeDownload
                     },
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -3991,7 +4104,7 @@ private fun ModelAssetLicenseDownloadDialog(
                     onClick = onRedownload,
                     enabled = asset.licenseAcceptedAt != null && !isBusy,
                 ) {
-                    Text("再取得")
+                    Text(S.downloadAgain)
                 }
                 TextButton(
                     onClick = onDownload,
@@ -3999,9 +4112,9 @@ private fun ModelAssetLicenseDownloadDialog(
                 ) {
                     Text(
                         when {
-                            isReady -> "取得済み"
-                            isBusy -> "取得中"
-                            else -> "ダウンロード"
+                            isReady -> S.downloaded
+                            isBusy -> S.downloading
+                            else -> S.download
                         },
                     )
                 }
@@ -4009,9 +4122,9 @@ private fun ModelAssetLicenseDownloadDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                TextButton(onClick = onDismiss) { Text("閉じる") }
+                TextButton(onClick = onDismiss) { Text(S.close) }
                 TextButton(onClick = onAccept, enabled = asset.licenseAcceptedAt == null) {
-                    Text(if (asset.licenseAcceptedAt != null) "同意済み" else "ライセンス同意")
+                    Text(if (asset.licenseAcceptedAt != null) S.accepted else S.licenseAccept)
                 }
             }
         },
@@ -4162,8 +4275,8 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 RenderTab.entries.forEach { tab ->
                     Text(
                         when (tab) {
-                            RenderTab.Artwork -> "描画"
-                            RenderTab.Prompt -> "プロンプト"
+                            RenderTab.Artwork -> S.renderTabArtwork
+                            RenderTab.Prompt -> S.promptLabel
                             RenderTab.Json -> "JSON"
                         },
                         modifier = Modifier.clickable { viewModel.setRenderTab(tab) },
@@ -4194,7 +4307,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    state.message ?: "LLM ${selectedModelLabel(state)} · 指示文生成/Stage1/2共通",
+                    state.message ?: S.llmSummary(selectedModelLabel(state)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -4330,9 +4443,9 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
     val height = targetHeight.coerceIn(64, MaxPngExportHeightPx)
     val width = (height * documentWidth / documentHeight).toInt().coerceAtLeast(64)
     val estimatedBytes = width.toLong() * height.toLong() * 4L
-    require(estimatedBytes <= MaxPngExportBitmapBytes) {
-        "PNG出力サイズが大きすぎます。キャンバス比率または出力サイズを下げてください。"
-    }
+    // Not `require`: this sentence reaches the reader, so the language is
+    // chosen where it is shown rather than here (see InkuFailure).
+    if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(bitmap)
     svg.setDocumentWidth(width.toFloat())
@@ -4484,6 +4597,7 @@ private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -
     }
 }
 
+@Composable
 private fun historyTitle(item: HistoryListItem): String {
     val original = item.originalInput.trim()
     if (original.isNotBlank() && !original.startsWith("{") && !original.startsWith("[")) {
@@ -4493,7 +4607,7 @@ private fun historyTitle(item: HistoryListItem): String {
     if (normalized.isNotBlank() && !normalized.startsWith("{") && !normalized.startsWith("[")) {
         return normalized
     }
-    return "DDLから描画"
+    return S.drawFromDdl
 }
 
 @Composable
@@ -4514,14 +4628,14 @@ private fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(reques
 @Composable
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-        MiniPill("歳時記", selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
-        MiniPill("補正", selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
+        MiniPill(S.saijiki, selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
+        MiniPill(S.autoRepair, selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
     }
 }
 
 @Composable
 private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val vocabularyTokens = rememberDdlVocabularyTokens()
+    val vocabularyTokens = rememberDdlVocabularyTokens(LocalUiLanguage.current)
     val visualTransformation = remember(vocabularyTokens) {
         DdlKeywordHighlightTransformation(vocabularyTokens)
     }
@@ -4559,7 +4673,7 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
             decorationBox = { innerTextField ->
                 if (value.isBlank()) {
                     Text(
-                        "解釈を待機中...",
+                        S.awaitingInterpretation,
                         style = MaterialTheme.typography.bodySmall.copy(lineHeight = TypeScale.denseLineHeight),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -4850,7 +4964,7 @@ private fun MetaPanel(
     val canvasAspect = canvasLabelFor(canvasAspectOverride ?: state.selectedCanvasAspect)
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-            Text("LLM · ${selectedModelLabel(state)} · 指示文生成/Stage1/2共通", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(S.llmSummaryDot(selectedModelLabel(state)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Color · $catalogName   Canvas · $canvasAspect", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.message?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
@@ -4944,7 +5058,7 @@ private fun PresentationControls(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
-            PresentationControlButton("最新", enabled = canGoLatest, wide = true, onClick = onGoLatest)
+            PresentationControlButton(S.latest, enabled = canGoLatest, wide = true, onClick = onGoLatest)
             PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
             Text(
                 counter,
@@ -5116,7 +5230,7 @@ private fun DrawingActionButton(
                     }
                 }
             }
-            SecondaryActionButton(text = "停止", onClick = onStop, modifier = Modifier.width(Dimens.chipWidth))
+            SecondaryActionButton(text = S.stop, onClick = onStop, modifier = Modifier.width(Dimens.chipWidth))
         }
     } else if (tonal) {
         SecondaryActionButton(text = idleText, onClick = onClick, modifier = modifier)
@@ -5619,8 +5733,8 @@ internal fun ProvenanceTooltipTarget(
 internal fun UiModeContainer(
     uiMode: String,
     modifier: Modifier = Modifier,
-    fullContent: @Composable () -> Unit = { Text("フルモード表示") },
-    simpleContent: @Composable () -> Unit = { Text("シンプルモード表示") },
+    fullContent: @Composable () -> Unit = { Text(S.uiModeFullLong) },
+    simpleContent: @Composable () -> Unit = { Text(S.uiModeSimpleLong) },
 ) {
     Box(modifier = modifier) {
         if (uiMode == "simple") {

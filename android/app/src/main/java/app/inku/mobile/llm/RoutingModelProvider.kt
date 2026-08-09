@@ -1,5 +1,6 @@
 package app.inku.mobile.llm
 
+import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.data.AndroidSecretBox
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.ProviderSettingEntity
@@ -21,9 +22,9 @@ class RoutingModelProvider(
     }
 
     suspend fun fetchModels(providerId: String): List<String> {
-        val provider = database.providerSettingDao().get(providerId) ?: error("サービスが見つかりません: $providerId")
+        val provider = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
         if (provider.kind != "openai-compatible" && provider.kind != "openai_compatible") {
-            error("${provider.displayName} のモデル取得はAndroid版では未対応です。")
+            inkuError { it.errorProviderModelsUnsupported(provider.displayName) }
         }
         return remoteProvider(provider).fetchModels()
     }
@@ -35,14 +36,14 @@ class RoutingModelProvider(
         providers.firstOrNull { provider ->
             parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
         }?.let { return it }
-        error("モデルに対応する接続先が見つかりません: $modelId")
+        inkuError { it.errorProviderNotFoundForModel(modelId) }
     }
 
     private fun remoteProvider(provider: ProviderSettingEntity): OpenAiCompatibleProvider {
-        val baseUrl = provider.baseUrl?.trim()?.ifBlank { null } ?: error("${provider.displayName} のBase URLが未設定です。")
+        val baseUrl = provider.baseUrl?.trim()?.ifBlank { null } ?: inkuError { it.errorProviderBaseUrlMissing(provider.displayName) }
         val apiKey = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
         if (provider.providerId in setOf("openai", "nvidia") && apiKey.isNullOrBlank()) {
-            error("${provider.displayName} のAPIキーが未設定です。")
+            inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
         }
         return OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
     }

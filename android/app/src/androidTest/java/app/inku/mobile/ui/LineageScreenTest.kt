@@ -1,5 +1,6 @@
 package app.inku.mobile.ui
 
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.collectAsState
@@ -51,7 +52,7 @@ import org.junit.runner.RunWith
  * screen sends back -- opening a node and starting a new root.
  *
  * The labels are read off the screen and compared with
- * [DerivationKindRegistry.labelJa], so a screen that wrote its own wording is
+ * [InkuStrings.derivationLabel], so a screen that wrote its own wording is
  * red here even when it wrote the same words the registry holds today.
  *
  * Nothing here runs inside `runBlocking` except the database calls. Wrapping a
@@ -286,10 +287,10 @@ class LineageScreenTest {
         // The two edges, named on the cards they point at. Compared with the
         // registry rather than with a literal: a screen that invented its own
         // wording fails even if it happens to agree today.
-        composeTestRule.onNodeWithText(DerivationKindRegistry.labelJa(FIRST_KIND)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(DerivationKindRegistry.labelJa(SECOND_KIND)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(InkuStringsJa.derivationLabel(FIRST_KIND)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(InkuStringsJa.derivationLabel(SECOND_KIND)).assertIsDisplayed()
         // And the node no edge points at, which the registry answers for too.
-        composeTestRule.onNodeWithText(DerivationKindRegistry.labelJa(null)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(InkuStringsJa.derivationOrigin).assertIsDisplayed()
 
         // The generation is the depth from the root, and it is on the cards.
         composeTestRule.onNodeWithText("第1世代").assertIsDisplayed()
@@ -317,7 +318,7 @@ class LineageScreenTest {
         awaitCards(3)
 
         // The root card names itself: it is the one node no edge points at.
-        composeTestRule.onNodeWithText(DerivationKindRegistry.labelJa(null)).performClick()
+        composeTestRule.onNodeWithText(InkuStringsJa.derivationOrigin).performClick()
         awaitState("the tap to open the root") { it.selectedHistory?.id == root.id }
 
         assertFalse("picking a node drops the detach", vm().state.value.lineageDetached)

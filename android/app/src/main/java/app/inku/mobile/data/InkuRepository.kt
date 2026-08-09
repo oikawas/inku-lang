@@ -1,5 +1,6 @@
 package app.inku.mobile.data
 
+import app.inku.mobile.ui.i18n.inkuError
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -280,7 +281,7 @@ class InkuRepository(
         enabled: Boolean = true,
     ) {
         val cleanId = providerId.trim().lowercase()
-        require(cleanId.matches(Regex("[a-z0-9][a-z0-9_-]*"))) { "Service ID は英数字・_・- で入力してください。" }
+        if (!cleanId.matches(Regex("[a-z0-9][a-z0-9_-]*"))) inkuError { it.errorServiceIdFormat }
         val cleanBaseUrl = baseUrl?.trim()?.ifBlank { null }
         if (cleanId != "local-litert-lm" && cleanBaseUrl != null) {
             ProviderUrlValidator.validateRemoteBaseUrl(cleanBaseUrl)
@@ -313,7 +314,7 @@ class InkuRepository(
     suspend fun fetchProviderModels(providerId: String): List<String> {
         ensureDefaultProviderSettings()
         val models = modelRouter.fetchModels(providerId)
-        val existing = database.providerSettingDao().get(providerId) ?: error("サービスが見つかりません: $providerId")
+        val existing = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
         val fetchedIds = models.toSet()
         val selected = parseModelIds(existing.publishedModelsJson).filter { it in fetchedIds }
         database.settingsDao().upsert(
@@ -390,7 +391,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -410,13 +411,14 @@ class InkuRepository(
                 variationSeed = seeds.variationSeed,
                 seedText = seeds.seedText,
                 instructionLang = instructionLang,
+                uiLang = uiLang,
                 sketch = sketch,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText)
     }
 
-    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, sketch: SketchInput = SketchInput()): InterpretResult {
+    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput()): InterpretResult {
         val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
@@ -429,12 +431,13 @@ class InkuRepository(
                 autoRepair = autoRepair,
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
                 instructionLang = instructionLang,
+                uiLang = uiLang,
                 sketch = sketch,
             ),
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -454,6 +457,7 @@ class InkuRepository(
                 variationSeed = seeds.variationSeed,
                 seedText = seeds.seedText,
                 instructionLang = instructionLang,
+                uiLang = uiLang,
                 sketch = sketch,
             ),
         )
@@ -477,7 +481,7 @@ class InkuRepository(
             .lineSequence()
             .map { it.trim().removePrefix("-").trim() }
             .firstOrNull { it.isNotBlank() }
-            ?: error("デモ指示文生成が空でした。")
+            ?: inkuError { it.demoPromptGenerationEmpty }
     }
 
     suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null): HistoryItemEntity {
@@ -883,9 +887,13 @@ class InkuRepository(
     private fun defaultExportTemplates(): List<ExportTemplateEntity> {
         val now = System.currentTimeMillis()
         return listOf(
-            ExportTemplateEntity("png-1080", "PNG 1080px", "PNG / Y軸 1080px", 1080, 0, true, now),
-            ExportTemplateEntity("png-2160", "PNG 2160px", "PNG / Y軸 2160px", 2160, 1, true, now),
-            ExportTemplateEntity("png-4320", "PNG 4320px", "PNG / Y軸 4320px", 4320, 2, true, now),
+            // The description is left empty for the builtin rows: it is derived from
+            // the height, so the screen composes it in the reader's language
+            // (`exportTemplateDescription`). A row written in one language at
+            // first launch would keep that language for good.
+            ExportTemplateEntity("png-1080", "PNG 1080px", "", 1080, 0, true, now),
+            ExportTemplateEntity("png-2160", "PNG 2160px", "", 2160, 1, true, now),
+            ExportTemplateEntity("png-4320", "PNG 4320px", "", 4320, 2, true, now),
         )
     }
 }

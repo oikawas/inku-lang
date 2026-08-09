@@ -51,6 +51,11 @@ android_only = pytest.mark.skipif(
 
 
 VERSION_DIRECTORY = re.compile(r"^(render-engine|ddl-engine)-(\d+)$")
+# The primitives `renderer._anchor` answers with a stored coordinate. The rest
+# derive theirs by a sum, which carries no quantum. See F-2 (ledger I-165).
+QUANTISED_ANCHOR_PRIMITIVES = frozenset(
+    {"circle", "ellipse", "arc", "polygon", "cloudform"}
+)
 
 
 def _load_generator(out_dir: pathlib.Path):
@@ -116,13 +121,32 @@ def test_arrangement_anchors_carry_the_quantum_the_renderer_uses() -> None:
     Engine 21 moves two of the 33 cases by 4.9e-10 and nothing else, so a port
     that skips the quantisation is only visible if the expected values really
     carry nine decimals and the comparison is exact.
+
+    Asked of the primitives whose anchor IS a stored coordinate. `_anchor`
+    returns the saved `center` for those, and for `square`/`triangle` it returns
+    `position + size/2` and for `line` the midpoint of the ends -- sums, which
+    the quantum does not survive even though every term carries it. Sixteen
+    decimals there is the rule working, not a port skipping it, and the values
+    themselves are still held: the fixture says "compare exactly, no tolerance"
+    and the port does. Until the corpus grew a group that was not a circle the
+    claim happened to be true of all of it. Ledger I-165, author ruling A,
+    2026-08-09.
     """
     fixture = json.loads(_fixture_path("renderer_arrangement.json").read_text())
     assert fixture["arrangement_quantum"] == renderer.ARRANGEMENT_QUANTUM
 
+    stored = [
+        case
+        for case in fixture["cases"]
+        if case["instruction"]["primitive"] in QUANTISED_ANCHOR_PRIMITIVES
+    ]
+    # A narrowed population is a gate only while something is left in it: a
+    # rename on either side would empty this and turn the claim vacuous.
+    assert stored, "no case carries a stored anchor; the quantum is unmeasured"
+
     decimals = max(
         len(str(value).partition(".")[2])
-        for case in fixture["cases"]
+        for case in stored
         for anchor in case["anchors"]
         for value in anchor
     )

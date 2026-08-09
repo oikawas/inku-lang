@@ -4956,3 +4956,42 @@ three responses — compose, paint and render-score — and only the specificati
 v2.11.16. **Both keys were added, along with one sentence in each language** saying that they name the DDL layer that
 decided the picture, and that among saved works only rows written before those versions were recorded lack them (the two
 `history` columns are nullable, and `db.py` puts them in the response only when they have a value). **No code changed.**
+
+### v2.11.17 — The same grain is counted on every machine (Build 873, 2026-08-09, render engine 29)
+
+**This one thing is why main's CI was red, and it was not a regression** (ledger I-178). **Engine 28's frozen
+corpus was baked on a Mac, and rebaking it on Linux produced different bytes for 6 of the 549 cases.** The
+generator's identity guard exits 1, so every push added another red run.
+
+- **All six were pencil, and only in the `material-outline stratum-1` polyline**; the contour itself agreed on
+  both platforms. **There were two kinds of split** — **three that differ in structure** (down to the number of
+  points and fragments) and **three of identical file length whose coordinates differ**.
+- **The fix belongs on the counting side.** The **segment length, total arc length, sampling step, grain width
+  and fragment length** the contact decision reads now sit on **the same six-decimal pixel lattice the SVG
+  writes** (`CONTACT_LENGTH_QUANTUM = 6`). **Rounding the coordinates would not have been enough**: one ULP that
+  adds a sample **jumps the threshold, which is a quantile of the samples themselves**, and the crossing position
+  and the `length < 0.6` cutoff move with it. The three cases whose point counts move would have stayed broken.
+- **`render_engine_version` 28 to 29, and `render-engine-29/` was baked** (`render-engine-28/` was not touched by
+  a byte). **454 of the 549 cases move and 95 do not.** **The 454 that moved are exactly the 454 that carry a
+  `material-outline` under engine 28** (pen 235, pencil 83, brush_thick 71, crayon 31, chalk 18, brush_thin 16).
+  **The 95 that did not are the five tools with no material outline** — the same 95 as under engine 28.
+- **The platform-stability gate now looks at the current exposure.** Its subject was group G's 50 cases, and
+  **none of the six splits were in it**. It now **derives the exposure from rendered output** (draw all 549 and
+  count the 454 that emit a `material-outline`) and **draws a 27-case sample twice** (15 arrangement cases, the 6
+  that split under engine 28, and one representative per tool). **A guard reads the gate's own source** and goes
+  red if the exposure check returns to a hand-written count.
+- **The Android reference fixtures for `render-engine-29/` were baked** (64 files). **The server-side F-1 check
+  requires the current version's directory, and no existing directory moved.** **The Kotlin side's catch-up stays
+  with I-177.**
+- **Checks:** **server 2,658 to 2,661 passed / 31 skipped** (two removed, five added), **ruff clean**,
+  **`check_frozen_corpora.py` byte-identical on darwin**, **Android JVM 263 tests, no failures**, and
+  `check_docs.py` consistent.
+- **The implementation came from Codex (a different model), so every test and perturbation was re-run on the
+  accepting side** — **all six perturbations turned red as predicted**. **⚠ Three of them turned more red than
+  reported** (the implementation ran only part of the gate): **P-2 fails 3 tests**, not only the direct one,
+  **P-3 fails 2**, and **P-5 fails 2**.
+- **⚠ The report's "26 cases" in the main sample is 27** — one representative is taken for each of the six tools,
+  and pencil's (`A-pencil-arc`) is not among the six that split.
+- **Acceptance reproduced the Linux rebake** — `server` and `shared` were rsynced to `/tmp/opus5-i178/` on
+  pentala and the generator run there, with **zero differing entries in `render-engine-29/`** (the deployment
+  tree was not touched).

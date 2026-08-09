@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **29** | v2.11.17 | 873 | 2026-08-09 | 549 | **454** | **95** |
 | **28** | v2.11.13 | 869 | 2026-08-09 | 549 | **454** | **95** |
 | **27** | v2.11.10 | 866 | 2026-08-09 | 549 | **45** | **504** |
 | **26** | v2.11.8 | 864 | 2026-08-08 | 549 | **7** | **542** |
@@ -126,14 +127,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `26` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `29` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `9` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.16 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.17 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 872 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 873 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -400,6 +401,61 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 29 — the same grain is counted on every machine (v2.11.17)
+
+**Engine 28's frozen corpus was baked on a Mac, and rebaking it on Linux produced different bytes for 6 of
+the 549 cases.** **That is what kept main's CI red** (the `reference-corpus` workflow's "Regenerate current
+render corpus" hit the generator's identity guard and exited 1; ledger I-178). **It was not a regression but a
+second exposure that engine 28 created.**
+
+**All six were pencil, and only in the `material-outline stratum-1` polyline; the contour itself agreed on both
+platforms.** **There were two kinds of split** — **three that differ in structure** (`A-pencil-polygon` 191 to
+192 points, `E-wild-pencil-ellipse` 194 to 187 points and 50 to 48 fragments, `E-wild-pencil-polygon` 201 to 200
+points) and **three of identical file length whose coordinates differ** (`B-white-broad-arc-pencil`,
+`C-fill-ellipse-pencil`, `B-perlin-medium-circle-pencil`).
+
+### The fix belongs on the counting side
+
+**Every length the contact decision reads now sits on the same six-decimal pixel lattice the SVG writes**
+(`CONTACT_LENGTH_QUANTUM = 6`). **Segment length, total arc length, sampling step, grain width and fragment
+length share that lattice**, so `_resample_by_length` and `_contact_fragments` read the same numbers.
+
+**Why rounding the coordinates is not enough:** one ULP can flip the boundary of "does one more sample fit",
+which adds a point to `len(walk)`. **The threshold is a quantile of the samples themselves, so one more sample
+jumps it to a different sample value**, and the crossing interpolation and the `length < 0.6` cutoff move with
+it. **Rounding only the output coordinates leaves the three cases whose point counts move.**
+**I-111 (engine 21, `ARRANGEMENT_QUANTUM`) closed a different route, and it is untouched.**
+
+### 454 cases move and 95 do not
+
+**The 454 that moved are exactly the 454 that carry a `material-outline` when engine 28 draws them** (by tool:
+pen 235, pencil 83, brush_thick 71, crayon 31, chalk 18, brush_thin 16; by group: A 48, B 72, C 59, D 19, E 79,
+F 128, G 49). **The 95 that did not are the five tools that carry no material outline** — the same 95 as under
+engine 28. **The one case in group G's 50 that does not move is `G-fade-rotring-edge`**, and rotring carries no
+material outline.
+
+### The platform-stability gate now looks at the current exposure
+
+**This gate did not see engine 28's exposure.** Its subject was group G's 50 cases, **none of the six splits
+were in it**, and `test_group_g_is_the_whole_exposure` **only asserted `len(...) == 50`, never that G was the
+whole of the exposure**.
+
+Its shape now:
+
+- **The exposure set is derived from rendered output** — draw all 549 once and count the 454 that emit a
+  `material-outline`.
+- **The main sample is 27 cases drawn twice** — the union of the 15 arrangement cases, the 6 that split between
+  machines under engine 28, and one representative (`A-*-arc`) for each of the six tools that carry the layer.
+- **A guard reads the gate's own source** and goes red if the exposure check returns to a hand-written count.
+- **The paired test removes both stabilisers** (arrangement and contact length) and requires the same
+  perturbation to move the same cases.
+
+### Version and corpus
+
+**Only `render-engine-29/` was baked; `render-engine-28/` was not touched by a byte.** **Both the implementation
+and the acceptance confirmed on pentala's `/tmp` that a Linux rebake is byte-identical** — not the deployment
+tree, and no service was restarted.
 
 ## engine 28 — the mark stays on its line (v2.11.13)
 

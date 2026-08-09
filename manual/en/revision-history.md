@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.17 unreleased baseline (Web Build 873)
+
+The 13 places that name a version were updated to v2.11.17 / Build 873. **No manual text changed** — no screen action, CLI flag, setting or response key moved.
+
+- **The drawings do change.** The fray — the part of a stroke drawn only where the tool meets the paper — is computed differently, so **the edges of strokes drawn with the six tools that carry a material layer (pen, pencil, thick brush, crayon, chalk, thin brush) shift slightly**. The shape and position of the stroke itself do not move.
+- **The same work now draws the same picture on any machine.** Until now the same input could differ **very slightly depending on the server's operating system**. Lengths are counted the same way everywhere, and that difference is gone.
+- **Drawings made with the five tools that carry no material layer (rotring, drypoint, silverpoint, computer, burin) do not change by a byte.**
+- **Nothing was added to the interface.** How you write a description, and every flag, are unchanged.
+
 ## 2026-08-09 — v2.11.16 unreleased baseline (Web Build 872)
 
 Updated the 13 places that name a version to v2.11.16 / Build 872, and **added one sentence to "Input and output" in the `inku-cli` reference**.

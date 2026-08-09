@@ -5,6 +5,7 @@ import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.inku.mobile.InkuApplication
+import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
@@ -56,6 +57,7 @@ const val DemoHistoryInputPrefix = "[demo] "
 /** The same, for a batch line: `#<line number> <prose>`. */
 private val BatchHistoryInputPrefix = Regex("^#\\d+\\s+")
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
+const val SETTING_KEY_UI_LANGUAGE = "ui_lang"
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 /** 写生 (Stage 0.5): which of the three states the control was left in. */
@@ -158,6 +160,7 @@ data class InkuUiState(
     val composeMode: ComposeMode = ComposeMode.Write,
     val renderTab: RenderTab = RenderTab.Artwork,
     val uiMode: String = "full",
+    val uiLanguage: UiLanguage = UiLanguage.DEFAULT,
     val mascotKind: String = "incu",
     val canvasZoom: Float = 1.0f,
     val canvasPanX: Float = 0f,
@@ -774,6 +777,20 @@ class InkuViewModel @JvmOverloads constructor(
         persistSetting("ui_mode", JSONObject().put("value", normalized).toString())
     }
 
+    /**
+     * The reader picks the language the interface speaks.
+     *
+     * Three things change together, which is why this is one call and not three:
+     * the wording, the saijiki words, and -- through [InkuUiState.uiLanguage]
+     * reaching `resolveWithUiLang` -- which language a work asking for `auto`
+     * gets drawn in. On the web the third one is the server's answer to the
+     * `ui_lang` the page sends; here the same judgement is made on the device.
+     */
+    fun setUiLanguage(language: UiLanguage) {
+        localState.value = localState.value.copy(uiLanguage = language, message = null)
+        persistSetting(SETTING_KEY_UI_LANGUAGE, JSONObject().put("value", language.code).toString())
+    }
+
     fun setMascotKind(kind: String) {
         val normalized = if (kind == "yuragi") "yuragi" else "incu"
         localState.value = localState.value.copy(mascotKind = normalized, message = null)
@@ -1144,6 +1161,8 @@ class InkuViewModel @JvmOverloads constructor(
                         current.selectedStage2ModelId,
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
+                        instructionLang = InstructionLanguages.AUTO,
+                        uiLang = current.uiLanguage.code,
                         sketch = sketchRequest,
                     )
                 }
@@ -1164,6 +1183,8 @@ class InkuViewModel @JvmOverloads constructor(
                         current.ddlAutoRepairEnabled,
                         current.litertStage1PromptOptimization,
                         lineage = lineage,
+                        instructionLang = InstructionLanguages.AUTO,
+                        uiLang = current.uiLanguage.code,
                         // 0.5 ran in the step above and is not run again: what it
                         // produced -- and what it did, including a fallback the
                         // prose cannot show -- travels to the save from there.
@@ -1215,7 +1236,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(isDrawing = true, message = "DDLからScoreを構成しています...")
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId), current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage)
+                    repository.composeFromDdl(current.prompt, ddl, CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId), current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code)
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -1297,6 +1318,8 @@ class InkuViewModel @JvmOverloads constructor(
                             autoRepair = current.ddlAutoRepairEnabled,
                             historyInput = "#$lineNumber $prompt",
                             litertStage1PromptOptimization = current.litertStage1PromptOptimization,
+                            instructionLang = InstructionLanguages.AUTO,
+                            uiLang = current.uiLanguage.code,
                             // The prose without the line number: the same split
                             // the server keeps between `input` and `source_text`.
                             sourceText = prompt,
@@ -1418,6 +1441,8 @@ class InkuViewModel @JvmOverloads constructor(
                                 autoRepair = cycle.ddlAutoRepairEnabled,
                                 historyInput = "$DemoHistoryInputPrefix$prompt",
                                 litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
+                                instructionLang = InstructionLanguages.AUTO,
+                                uiLang = cycle.uiLanguage.code,
                                 // The prose without the demo marker, for the
                                 // same reason the batch line strips its number.
                                 sourceText = prompt,
@@ -2167,6 +2192,12 @@ class InkuViewModel @JvmOverloads constructor(
         val ddlAutoRepair = settings["ddl_auto_repair"]?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
         val litertPromptOptimization = settings["litert_stage1_prompt_optimization"]?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
+        // A stored code that is not one of the two falls back to Japanese
+        // rather than being rejected -- the same thing the server does with an
+        // unrecognised `ui_lang` (`api_core/common.py:68-70`).
+        val uiLanguage = settings[SETTING_KEY_UI_LANGUAGE]
+            ?.let { UiLanguage.fromCode(JSONObject(it).optString("value")) }
+            ?: current.uiLanguage
         val mascotKind = settings[SETTING_KEY_MASCOT_KIND]?.let { JSONObject(it).optString("value", current.mascotKind) } ?: current.mascotKind
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
@@ -2197,6 +2228,7 @@ class InkuViewModel @JvmOverloads constructor(
             ddlAutoRepairEnabled = ddlAutoRepair,
             litertStage1PromptOptimization = litertPromptOptimization,
             uiMode = uiMode,
+            uiLanguage = uiLanguage,
             mascotKind = mascotKind,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),

@@ -56,7 +56,7 @@ class LocalFallbackPipeline(
         // sketch here instead would let the layer choose the language it is
         // written in.
         val requestedLang = InstructionLanguages.normalize(request.instructionLang)
-        val resolvedLang = InstructionLanguages.resolveWithUiLang(request.description, requestedLang)
+        val resolvedLang = InstructionLanguages.resolveWithUiLang(request.description, requestedLang, request.uiLang)
         val sketch = SketchFromLife.resolve(
             input = request.sketch,
             description = request.description,
@@ -113,6 +113,7 @@ class LocalFallbackPipeline(
         val resolvedLang = InstructionLanguages.resolveWithUiLang(
             request.description.ifEmpty { ddl },
             requestedLang,
+            request.uiLang,
         )
         // This path begins at Stage 2, so 0.5 never runs here. When the caller
         // carries a prose (a candidate, a redraw of a saved work) it stands in

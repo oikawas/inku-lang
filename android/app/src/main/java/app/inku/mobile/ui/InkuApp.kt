@@ -92,6 +92,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -388,6 +389,10 @@ fun InkuApp() {
     }
     BackHandler(enabled = backTarget != null) { backTarget?.invoke() }
 
+    // Every reader of `LocalUiLanguage` sits under this, so the setting reaches
+    // the wording and the saijiki through one provision rather than a parameter
+    // threaded through the screens.
+    CompositionLocalProvider(LocalUiLanguage provides state.uiLanguage) {
     MaterialTheme(colorScheme = InkuColors) {
         Scaffold(
             bottomBar = {
@@ -444,6 +449,7 @@ fun InkuApp() {
                 }
             }
         }
+    }
     }
 }
 
@@ -2909,6 +2915,17 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
+        SettingsCard("言語", "画面の文言・歳時記・作品の言葉", state.uiLanguage.label) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                UiLanguage.entries.forEach { language ->
+                    ChipButton(
+                        language.label,
+                        selected = state.uiLanguage == language,
+                        onClick = { viewModel.setUiLanguage(language) },
+                    )
+                }
+            }
+        }
         SettingsCard("表示モード", "UIの表示密度・構成", state.uiMode) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 ChipButton("フルモード", selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })

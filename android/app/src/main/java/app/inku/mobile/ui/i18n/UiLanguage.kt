@@ -12,9 +12,15 @@ import androidx.compose.runtime.compositionLocalOf
  * when the request asked for `auto`. Collapsing them here would make the client
  * decide something the server decides in two steps.
  */
-enum class UiLanguage(val code: String) {
-    Ja("ja"),
-    En("en"),
+enum class UiLanguage(val code: String, val label: String) {
+    /**
+     * [label] is each language's name in itself, never translated: that is
+     * `ja.ts:5` / `en.ts:5`, which the web rail reads straight out of the pack
+     * so that a reader who cannot read the current language can still find
+     * their own (`AppRail.svelte:172-174`).
+     */
+    Ja("ja", "日本語"),
+    En("en", "English"),
     ;
 
     val isEnglish: Boolean get() = this == En

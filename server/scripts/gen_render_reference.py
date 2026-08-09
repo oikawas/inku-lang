@@ -21,7 +21,7 @@ from inku_server import renderer
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import render
-from inku_server.schema import Score
+from inku_server.schema import Instruction, Score
 
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 ENGINE = current_render_engine()
@@ -651,6 +651,59 @@ def _assert_fade_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
             raise AssertionError(f"{case_id}: the drawing does not read `fade`")
 
 
+# The two that must come out with no ceiling at all, and stay that way.
+DEGENERATE_FADE_CASES = ("G-fade-radial-edge", "G-fade-count2-edge")
+
+
+def _assert_fade_reaches_every_member(inputs: dict[str, dict[str, Any]]) -> None:
+    """At least one drawn fading group carries more than one ceiling.
+
+    The check above cannot ask this. Dropping the declaration takes the whole
+    group's fade away, and engine 23 already drew that difference with a single
+    constant for the whole group -- so an implementation that carries no
+    per-member ceiling at all still passes it. The corpus is asked directly
+    instead: some drawn group has to hold distinct per-member levels, or `fade`
+    is pinned only where the rule declines to fire.
+
+    And the two degenerate groups have to hold none: a ring is equidistant from
+    its own centre and so is a pair, and ranking them would draw a gradient
+    nobody stated. Author ruling A on ledger I-166, 2026-08-09; the engine's
+    behaviour is not changed, only asked about.
+    """
+    def levels(case_id: str) -> list[float | None]:
+        render_input = inputs[case_id]
+        instruction = Instruction.model_validate(
+            render_input["score"]["instructions"][0]
+        )
+        performance_seed = render_input["render_seed"]
+        # The placement seed is the composition seed's when the case states one:
+        # read with "is it stated", never with a falsy test, because 0 is a seed
+        # a caller can legitimately give.
+        placement_seed = render_input.get("composition_seed")
+        if placement_seed is None:
+            placement_seed = performance_seed
+        return [
+            renderer._fade_level_from_hint(item.color_hint)
+            for item in renderer._expand_arrangement(
+                instruction, placement_seed, performance_seed=performance_seed
+            )
+        ]
+
+    ramped = [
+        case_id
+        for case_id in FADE_CASES
+        if len({level for level in levels(case_id) if level is not None}) > 1
+    ]
+    if not ramped:
+        raise AssertionError(
+            "no drawn fading group carries a per-member ceiling; the corpus "
+            "pins `fade` only where the rule declines to fire"
+        )
+    for case_id in DEGENERATE_FADE_CASES:
+        if any(level is not None for level in levels(case_id)):
+            raise AssertionError(f"{case_id}: a group that cannot fade was ramped")
+
+
 SIZE_CASES = (
     "G-size-line-edge",
     "G-size-square-edge",
@@ -755,6 +808,7 @@ def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
     _assert_fade_cases_discriminate(inputs)
+    _assert_fade_reaches_every_member(inputs)
     _assert_size_cases_discriminate(inputs)
     _assert_angle_cases_discriminate(inputs)
 

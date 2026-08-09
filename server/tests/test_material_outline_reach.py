@@ -21,7 +21,13 @@ from xml.etree import ElementTree
 import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
-from inku_server.renderer import render
+from inku_server.renderer import (
+    MATERIAL_OUTLINE_MAX_WIDTH_RATIO,
+    _MATERIAL_OUTLINE_SPECS,
+    _material_outline_profile,
+    _stroke_width_px,
+    render,
+)
 from inku_server.schema import Score
 
 RENDER_SEED = 12345
@@ -306,3 +312,70 @@ def test_d11_drypoint_burr_is_still_a_single_stratum(primitive: str) -> None:
         drypoint.get(tag, 0) - burin.get(tag, 0) for tag in ("polyline", "polygon")
     )
     assert extra == 1
+
+
+# --- engine 28: トーンは道具自身の痕の一部である ---------------------------
+#
+# 作者裁定 (2026-08-09)「四角の装飾は濃すぎる、道具の性質にあった調整が必要」。
+# 装飾が幾何の側に居たあいだ、痕との関係はたまたま決まるものだったので、表は
+# 絶対値を持っていた。墨に沿うようになって初めて、その値が痕に対して何になるかが
+# 見えた —— brush_thin は層が自分の痕の 0.47 倍 (全道具中いちばん太い)、
+# オフセットが半幅の 1.07 倍 (いちばん近い) だった。
+#
+# **この 2 つの規則を赤くするのは、いまのところ焼き直される digest だけである。**
+# 記録は検査ではないので、肯定形の観測点をここに置く。
+
+MATERIAL_TOOLS = sorted(_MATERIAL_OUTLINE_SPECS)
+
+
+@pytest.mark.parametrize("weight", MATERIAL_TOOLS)
+@pytest.mark.parametrize("thinness", [None, "fine", "extra_fine"])
+def test_no_stratum_is_wider_than_its_share_of_the_tool(weight: str, thinness) -> None:
+    """層は自分の痕の 0.33 倍より太くならない。
+
+    上限が読むのは**公称の**線幅である。トーンの太さは道具自身の粗さで、細く
+    引いても紙の目や粉の粒は細らない (`test_material_outline_absolute_widths_do_not_move`)。
+    """
+    nominal = _stroke_width_px(weight, CANVAS)
+    for _, width, _, _ in _material_outline_profile(weight, CANVAS, thinness):
+        assert width <= nominal * MATERIAL_OUTLINE_MAX_WIDTH_RATIO + 1e-9, (weight, width)
+
+
+def test_the_width_cap_actually_binds_on_the_tool_it_was_set_for() -> None:
+    """上限が空振りでないこと。
+
+    どの道具も上限に触れていなければ、この規則は書いてあるだけで何もしていない。
+    触れるのは brush_thin と chalk で、他は元から下に居る (裁定の材料に載せた表)。
+    """
+    at_cap = {
+        weight
+        for weight in MATERIAL_TOOLS
+        for _, width, _, _ in _material_outline_profile(weight, CANVAS)
+        if abs(width - _stroke_width_px(weight, CANVAS) * MATERIAL_OUTLINE_MAX_WIDTH_RATIO) < 1e-9
+    }
+    assert {"brush_thin", "chalk"} <= at_cap, at_cap
+
+
+@pytest.mark.parametrize("weight", MATERIAL_TOOLS)
+@pytest.mark.parametrize("thinness", [None, "fine", "extra_fine"])
+def test_no_stratum_sits_inside_the_mark(weight: str, thinness) -> None:
+    """層の中心は痕の内側に来ない。
+
+    内側にある層はトーンになりようがなく、痕を太らせるだけである。ここが読むのは
+    **実際の**線幅 —— どこに置くかは実際の痕に対する問いだからで、太さの側とは
+    読む幅が違う。
+    """
+    half = _stroke_width_px(weight, CANVAS, thinness) / 2.0
+    for offset, _, _, _ in _material_outline_profile(weight, CANVAS, thinness):
+        assert abs(offset) >= half - 1e-9, (weight, thinness, offset, half)
+
+
+def test_the_offset_floor_actually_binds_on_the_tools_it_was_set_for() -> None:
+    """床が空振りでないこと。触れるのは brush_thick と crayon の中の層。"""
+    at_floor = {
+        weight
+        for weight in MATERIAL_TOOLS
+        for offset, _, _, _ in _material_outline_profile(weight, CANVAS)
+        if abs(abs(offset) - _stroke_width_px(weight, CANVAS) / 2.0) < 1e-9
+    }
+    assert {"brush_thick", "crayon"} <= at_floor, at_floor

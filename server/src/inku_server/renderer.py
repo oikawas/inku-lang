@@ -4541,6 +4541,7 @@ def _material_outline_profile(
     base_width = _stroke_width_px(weight, canvas, thinness)
     offset_gain = _material_gain("outline_offset")
     opacity_gain = _material_gain("outline_opacity")
+    nominal_width = _stroke_width_px(weight, canvas)
     half = base_width / 2.0
     out = []
     for offset, abs_width, width_ratio, opacity, dash in spec:
@@ -4551,9 +4552,14 @@ def _material_outline_profile(
         # brush_thin's second stratum was 0.47 of its own mark (the widest of any
         # tool) and sat 1.07 half-widths out (the closest), so the tone read as a
         # second mark rather than as tone. Author's ruling: fit the tool.
+        # The cap reads the tool's nominal stroke, not the thinned one. How wide
+        # the tone is belongs to the tool's own grain -- paper tooth and powder
+        # do not get finer because the line was drawn finer, which is what
+        # `test_material_outline_absolute_widths_do_not_move` holds. Where it
+        # sits is a different question, and that one is asked of the actual mark.
         width = min(
             abs_width * scale + base_width * width_ratio,
-            base_width * MATERIAL_OUTLINE_MAX_WIDTH_RATIO,
+            nominal_width * MATERIAL_OUTLINE_MAX_WIDTH_RATIO,
         )
         placed = _outline_offset_px(offset * scale * offset_gain, canvas)
         # A stratum centred inside the mark cannot be tone beside it; it only

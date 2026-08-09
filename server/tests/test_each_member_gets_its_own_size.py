@@ -248,8 +248,15 @@ def test_grid_repeats_exactly(monkeypatch):
     """An even tiling is the one arrangement whose point is that the cells
     match (author ruling, 2026-08-08)."""
     generator = _load_generator()
+    # engine 28 で据え直した。ここは旧い版の manifest の input を**実演で**描き直して
+    # 旧い版の digest と比べていた。engine 28 は材質層の作り方と揺らぎの物差しを
+    # 動かしたので、旧い版のバイトは実演では二度と再現できない。**版どうしの
+    # 比較（manifest 対 manifest）は当時の主張のまま残し、実演の側だけ現行版へ
+    # 向ける** —— 実演が見ているのは「いまの renderer が焼いたものを再現するか」
+    # であって、当時の姿ではない。
     engine_24 = _manifest("24")["cases"]
     engine_25 = _manifest("25")["cases"]
+    latest = _manifest("28")["cases"]
     grids = sorted(
         case_id
         for case_id, case in engine_24.items()
@@ -263,7 +270,7 @@ def test_grid_repeats_exactly(monkeypatch):
             generator._normalized_digest(
                 generator.render_case(engine_24[case_id]["input"])
             )
-            == engine_24[case_id]["digest"]
+            == latest[case_id]["digest"]
         ), case_id
 
     tiling = _instruction(layout="grid", count=16, rows=4, cols=4)
@@ -614,12 +621,13 @@ def test_a_score_with_no_arrangement_is_byte_identical(monkeypatch):
         for case_id in sample
     }
     assert len({w for w in weights if GRAMMARS[w].group_hand > 0}) >= 4, weights
+    latest = _manifest("28")["cases"]
     for case_id in sample:
         assert (
             generator._normalized_digest(
                 generator.render_case(previous[case_id]["input"])
             )
-            == previous[case_id]["digest"]
+            == latest[case_id]["digest"]
         ), case_id
 
     single = Score.model_validate(

@@ -24,6 +24,7 @@ import pathlib
 
 from inku_server.renderer import (
     FRAME_HI,
+    _uses_material_outline,
     FRAME_LO,
     _anchor,
     _expand_arrangement,
@@ -354,9 +355,20 @@ def test_a_score_without_an_arrangement_is_engine_19():
 
     Engine 22 rebuilt the fill layer, so the 32 filled cases of A-F are no
     longer engine 19 and are excluded by name, and it raised how hard the sheet
-    refuses chalk, which excludes 14 more. The other 447 still are: the claim
-    this test carries -- that a score with no arrangement is untouched by
-    everything the layout work added -- is unaffected by either.
+    refuses chalk, which excludes 14 more.
+
+    Engine 28 is a larger exception and is stated as a rule rather than a list.
+    The material layer no longer draws itself on the ideal geometry, and the
+    wobble is measured in stroke widths -- so every case drawn with a tool that
+    has a material layer moved, which is 401 of the 493. What is left is the 92
+    the change cannot reach: `burin`, `drypoint`, `silverpoint`, `rotring` and
+    `computer` have no material layer at all, and no case here has a variation.
+
+    **The claim is thinner than it was**: 447 cases carried "a score with no
+    arrangement is untouched by everything the layout work added", and 92 carry
+    it now. The layout work is still what is being tested -- none of engine 20's
+    expander runs on these -- but the byte-identity evidence for it is a fifth of
+    what it was. That is worth a ledger entry, not a silent edit.
     """
     generator = _generator()
     frozen = json.loads(ENGINE_19_MANIFEST.read_text(encoding="utf-8"))["cases"]
@@ -374,6 +386,8 @@ def test_a_score_without_an_arrangement_is_engine_19():
         assert render_input["score"]["instructions"][0]["arrangement"] is None
         if case_id in ENGINE_22_FILL_CASES or case_id in ENGINE_22_CHALK_CASES:
             continue
+        if _uses_material_outline(render_input["score"]["instructions"][0]["weight"]):
+            continue
         svg = render(
             Score.model_validate(render_input["score"]),
             color_map=render_input["color_map"],
@@ -384,7 +398,7 @@ def test_a_score_without_an_arrangement_is_engine_19():
         )
         assert generator._normalized_digest(svg) == case["digest"], case_id
         checked += 1
-    assert checked == 447
+    assert checked == 92
 
 
 # T-6 --------------------------------------------------------------------

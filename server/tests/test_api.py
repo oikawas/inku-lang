@@ -152,7 +152,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["build_number"]
     assert data["developer_mode"] is False
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "27"
+    assert data["render_engine_version"] == "28"
     assert data["ddl_version"] == "3"
     assert data["ddl_engine_version"] == "7"
 
@@ -1481,7 +1481,7 @@ def test_compose_hands_coerce_the_ddl_alone_over_http(monkeypatch, auth_context)
         "standard": "IEC 61966-2-1:1999",
     }
     assert r.json()["render_engine_id"] == "default"
-    assert r.json()["render_engine_version"] == "27"
+    assert r.json()["render_engine_version"] == "28"
     assert r.json()["ddl_version"] == "3"
     assert r.json()["ddl_engine_version"] == "7"
     assert r.json()["render_canvas_aspect"] == "square"
@@ -1518,7 +1518,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
         "standard": "IEC 61966-2-1:1999",
     }
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "27"
+    assert data["render_engine_version"] == "28"
     assert data["ddl_version"] == "3"
     assert data["ddl_engine_version"] == "7"
     assert data["render_canvas_aspect"] == "square"
@@ -2212,7 +2212,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_build_number"] == data["render_build_number"]
     assert item["render_color_profile"]["id"] == "srgb"
     assert item["render_engine_id"] == "default"
-    assert item["render_engine_version"] == "27"
+    assert item["render_engine_version"] == "28"
     assert item["ddl_version"] == "3"
     assert item["ddl_engine_version"] == "7"
     assert item["render_canvas_aspect"] == "wide"

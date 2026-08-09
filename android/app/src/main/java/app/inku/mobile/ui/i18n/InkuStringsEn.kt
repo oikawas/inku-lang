@@ -107,7 +107,10 @@ object InkuStringsEn : InkuStrings {
         }
     }
 
-    override val derivationOrigin = "Root"
+    // 起点 = origin (GLOSSARY :93). web answers "Root" here (`derivation.ts:50`),
+    // which its own glossary contradicts; that file is outside what
+    // `lint:i18n` reads, so the divergence has never been reported.
+    override val derivationOrigin = "Origin"
     override val derivationUnknown = "Unknown"
     override val derivationLabel: (String) -> String = { kind ->
         // The twelve web already names come from `web/src/lib/derivation.ts:34-47`
@@ -365,7 +368,9 @@ object InkuStringsEn : InkuStrings {
     override val description = "Description"
     override val settings = "Settings"
     override val saijikiTapNote = "Tap a word to insert it into the instructions."
-    override val descriptionField = "Description"
+    // 説明 is a template's note, not the 記述 the author writes. Sharing
+    // "Description" with it would put two concepts under one word.
+    override val descriptionField = "Details"
     override val add = "Add"
     override val ddlOverwriteBody = "Painting normally replaces the current interpretation (the normalized DDL) with what Stage 1 produces."
     override val selected = "Selected"

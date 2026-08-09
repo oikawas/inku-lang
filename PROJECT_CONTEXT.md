@@ -51,7 +51,7 @@ instruction
   -> Stage 2: JSON Score
   -> coerce / validation: boundary handling with a drop-only preference
   -> Render Engine: SVG performance
-  -> history and artwork lineage
+  -> history and work lineage
 ```
 
 - `server/`: FastAPI backend for APIs, authentication, DB access, interpretation, composition, coercion, rendering, and lineage.

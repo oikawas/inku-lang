@@ -154,7 +154,7 @@ Implemented:
   - prompt and DDL interpretation below the canvas
   - fixed-height drawing CTAs with an in-place generating state and progress
     indicator, avoiding layout jumps during local LLM work
-  - render sub-tabs: Artwork, Prompt, JSON
+  - render sub-tabs: `Artwork`, `Prompt`, `Json`
   - explicit button rows for model, color catalog, and canvas selection
   - dedicated History screen with search/filter placeholders and two-column
     thumbnail cards
@@ -406,7 +406,7 @@ component unless marked as a local single-user equivalent.
 | `DdlEditor.svelte` / `DdlEditPanel.svelte` | Ported as inline DDL editor, editor dialog, auto-repair toggle, Stage 2 replay, and stop action. |
 | `SaijikiInline.svelte` | Ported as the inline Saijiki panel using the same word groups. |
 | `SaijikiDrawer.svelte` | Mobile equivalent is the inline Saijiki panel; drawer layout is not used on Android. |
-| `CanvasPanel.svelte` | Ported for artwork/prompt/score tabs, star, hash copy, render metadata, zoom/pan controls, SVG share, and PNG share. |
+| `CanvasPanel.svelte` | Ported for `artwork`/`prompt`/`score` tabs, star, hash copy, render metadata, zoom/pan controls, SVG share, and PNG share. |
 | `OutputTabsContent.svelte` | Ported as prompt and JSON views from the saved Room history item. |
 | `HistoryStrip.svelte` | Android removes the unused bottom history strip and consolidates history access into the history-grid tab and selected render controls. |
 | `HistoryManager.svelte` | Ported for thumbnails/list modes, search, starred filter, selection, trash, restore, and permanent delete. |
@@ -550,11 +550,11 @@ UI requirements from this update:
 
 - The draw tab prioritizes the S1 Compose writing flow: canvas, condition
   chips, prompt input, and normalized DDL should be easy to inspect in order.
-- Controls and menus must not be overlaid on top of the artwork preview.
+- Controls and menus must not be overlaid on top of the work preview.
   - Star, render hash, and zoom controls are placed above the image.
-  - Artwork / Prompt / JSON / SVG / PNG controls are placed below the image.
+  - `Artwork` / `Prompt` / `Json` / SVG / PNG controls are placed below the image.
   - SVG / PNG expanded choices are shown inline below the image, not as
-    popups covering the artwork.
+    popups covering the work.
 - Tapping the image itself has no action.
 - The image gesture surface is used only for pinch zoom and panning while
   zoomed.
@@ -589,7 +589,7 @@ Verification:
 - `gradle :app:assembleDebug` succeeded.
 - The debug APK was installed and launched on Pixel 9.
 - Screenshots confirmed that controls and menus are not overlaid on top of the
-  artwork.
+  work.
 - PNG 1080px export opened the Android share sheet.
 - logcat after PNG export did not show `FATAL EXCEPTION`, `ANR in`, or
   `Input dispatching timed out`.
@@ -739,10 +739,10 @@ On Android, double-tapping the drawing image opens a presentation view.
   Only when SVG dimensions cannot be read does Android fall back to the saved
   history `canvas_aspect` resolved through `CanvasAspects`.
 - Landscape canvases are rotated 90 or 270 degrees on Pixel 9 portrait screens
-  so the artwork's long edge always aligns with the screen's long edge.
+  so the work's long edge always aligns with the screen's long edge.
 - While presentation view is active, Android detects the device's physical
-  up/down orientation and dynamically adjusts the artwork's visual up direction
-  to match. For landscape artwork, long-edge alignment takes precedence, so the
+  up/down orientation and dynamically adjusts the work's visual up direction
+  to match. For a landscape work, long-edge alignment takes precedence, so the
   rendered rotation remains either 90 or 270 degrees.
 - The presentation-view margin background follows the displayed SVG's
   background `rect fill`, treating that fill as the drawing's dominant
@@ -758,7 +758,7 @@ On Android, double-tapping the drawing image opens a presentation view.
 - While presentation view is active, pinch and pan transforms are disabled.
   Double-tapping returns to the normal view.
 - In presentation view, double-tap and left/right swipes are active across the
-  whole presentation surface, including margins outside the displayed artwork.
+  whole presentation surface, including margins outside the displayed work.
 - Presentation-view left/right swipes are interpreted relative to the current
   physical device orientation. Even though `MainActivity` remains portrait
   locked, holding the device sideways or upside down changes which screen-axis
@@ -1301,8 +1301,8 @@ rules.
   streamed byte count exceeds the limit.
 - History thumbnail decoding is allowed only for canonical paths under
   `files/thumbnails`, preventing unexpected file decoding if the DB is damaged.
-- Compose artwork and history-thumbnail caches are limited by estimated bitmap
-  bytes rather than entry count.
+- Compose work-preview and history-thumbnail caches are limited by estimated
+  bitmap bytes rather than entry count.
 - Android build number increments only for package-producing tasks such as APK,
   bundle, and install tasks. Avoid running assemble/install for checks that need
   a clean worktree.
@@ -1310,7 +1310,7 @@ rules.
 ## 2026-05-10 Android Performance Optimizations
 
 The Android app implements the following optimizations to improve Pixel 9
-history browsing, artwork previews, and first local-model render latency.
+history browsing, work previews, and first local-model render latency.
 
 - The history grid loads a `HistoryListItem` DTO and does not select
   `display_svg`, `expanded_ddl`, `score_json`, or `render_metadata_json` for
@@ -1325,7 +1325,7 @@ history browsing, artwork previews, and first local-model render latency.
   rows per startup pass.
 - This schema change uses Room version 2 and `MIGRATION_1_2` to add the three
   thumbnail columns. Destructive migration remains prohibited.
-- Main artwork previews in Compose and History reuse bitmap output through an
+- Main work previews in Compose and History reuse bitmap output through an
   `LruCache` keyed by history item, display size, and presentation rotation,
   instead of re-rendering SVG on every recomposition.
 - The renderer hot path avoids unnecessary JSON stringify/parse deep copies

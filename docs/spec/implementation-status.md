@@ -197,7 +197,7 @@ to the stage's provider instead of silently to one that answered `/health` long
 after it had stopped serving models. That provider, Intel OVMS, was withdrawn
 altogether on 2026-07-30; a withdrawn provider is dropped from stored settings on
 read, is offered nowhere, and raises rather than accepting a connection, while its
-model ids stay readable so artworks made on it are still named.
+model ids stay readable so works made on it are still named.
 Wherever a model is named on screen — the running indicator, the work's Stage 1
 and Stage 2 lines, the history table, the lineage node details — it is named as
 `<provider> / <model>`, because a model id alone does not say where it runs and,

@@ -2002,6 +2002,13 @@ def _compose_payload(
         "auto_repair": True,
         "render_seed": getattr(args, "render_seed", None),
         "composition_seed": getattr(args, "composition_seed", None),
+        # `/api/compose` has accepted this since the trace was added, but the CLI
+        # never named it, so `--trace` silently did nothing in ddl input mode and
+        # the Stage 2 raw response was unreachable from here. `or None` for the
+        # same reason as in `_paint_payload`: the filter below drops None, not
+        # False, and sending a bare False would change the request shape of every
+        # existing bench.
+        "include_trace": getattr(args, "trace", False) or None,
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -2055,6 +2062,9 @@ def _compose_response_as_paint_result(
         "coerce_relation_dropped_count": result.get("coerce_relation_dropped_count"),
         "coerce_warnings": result.get("coerce_warnings"),
         "catalog_id": result.get("render_color_catalog_id"),
+        # Only present when --trace asked for it; the saver writes the file when
+        # this is not None, and skips it otherwise.
+        "trace": result.get("trace"),
         # /api/compose never runs Stage 0.5, so these stay empty here. They are
         # present so that a paint artifact and a ddl-mode artifact have the same
         # key set and a reader does not have to know which route wrote the file.
@@ -3676,7 +3686,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument(
         "--trace",
         action="store_true",
-        help="request RAW per-layer intermediates and save them as <prefix>-trace.json",
+        help="request RAW per-layer intermediates and save them as <prefix>-trace.json; in --input-mode ddl this is the only way to read what Stage 2 wrote before coerce repaired it",
     )
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")

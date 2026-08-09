@@ -546,7 +546,20 @@ def test_coerce_score_keeps_bamboo_green_as_primary_contour():
     assert "bamboo green kept as primary contour" in (repaired.note or "")
 
 
-def test_coerce_score_keeps_withered_grass_as_muted_green_gray():
+def test_coerce_score_reads_withered_grass_as_green_without_halving_the_group():
+    """ddl-engine 10 took the gray half of this away, and that is the point.
+
+    Until engine 9 the muted reading was carried by a two-color cycle, so the
+    renderer handed gray to every other member: half the marks were gray because
+    coerce read `枯れ` that way. The description names one color. A description
+    that names one color is drawn in one color, and the share nobody chose goes
+    -- the reading survives as `color`, not as a split down the middle.
+
+    The note still records the reading, which is a wart worth naming: it says
+    the withered grass was kept as muted green-gray, and the branch that folds
+    the cycle says the cycle went. Both are true as a log of what ran; neither
+    describes the drawing on its own.
+    """
     score = Score.model_validate(
         {
             "instructions": [
@@ -563,13 +576,13 @@ def test_coerce_score_keeps_withered_grass_as_muted_green_gray():
     fixed = coerce_score(score, ddl="枯れ草の低い波を横に散らす。")
 
     repaired = fixed.instructions[0]
-    # The muted reading is carried by the cycle holding both, which is unchanged.
     # The primary stroke became the requested green at ddl-engine 9, when the
-    # repair moved in front of the promotion.
+    # repair moved in front of the promotion. It stays green here.
     assert repaired.color == "green"
     assert repaired.arrangement is not None
-    assert repaired.arrangement.color_cycle == ["gray", "green"]
+    assert repaired.arrangement.color_cycle == []
     assert "withered grass kept as muted green-gray" in (repaired.note or "")
+    assert "color_cycle dropped because the DDL names green alone" in (repaired.note or "")
 
 
 def test_coerce_score_does_not_repair_green_from_words_false_positive():

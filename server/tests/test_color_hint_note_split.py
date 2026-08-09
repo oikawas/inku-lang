@@ -126,6 +126,13 @@ def test_h01_promotes_the_delivered_color_on_the_first_pass() -> None:
     the promotion landed on the *second* pass and coerce was not a fixed point.
     Asserting only "H-01 is idempotent" would pass an implementation that never
     promotes at all, so the promotion is named here.
+
+    The note carries the weight from ddl-engine 10 on. H-01 names one color, so
+    the exit branch empties the cycle and writes `color` itself -- which means
+    `color == "yellow"` no longer says the promotion ran, and the cycle is gone
+    to be inspected. Only `_with_primary_color_delivery` writes the promotion
+    note, and only when it moved a color, so that line is what still separates
+    "promoted on the first pass" from "not promoted at all".
     """
     case = _golden_cases()["H-01"]
 
@@ -135,7 +142,9 @@ def test_h01_promotes_the_delivered_color_on_the_first_pass() -> None:
     assert data["color"] == "yellow"
     assert "yellow restored in color_cycle from DDL color intent" in data["note"]
     assert "yellow promoted to primary stroke from DDL color intent" in data["note"]
-    assert "yellow" in data["arrangement"]["color_cycle"]
+    # Both ran, and then the exit folded what they built: one named color.
+    assert data["arrangement"]["color_cycle"] == []
+    assert "color_cycle dropped because the DDL names yellow alone" in data["note"]
 
 
 def test_ddl_coerce_outputs_keep_machine_diagnostics_out_of_color_hint() -> None:
@@ -195,7 +204,10 @@ def test_the_57_write_sites_remain_split_by_role() -> None:
     # three fallback sites still write descriptive markers to color_hint, the
     # rest write machine notes, and the carry site preserves both fields.
     assert len(re.findall(r'\["note"\]\s*=', compose_source)) == 4
-    assert len(re.findall(r"_append_note\(", compose_source)) - 1 == 20
+    # 21 since ddl-engine 10: `_without_unrequested_color_cycle` writes a machine
+    # note like the rest, in one clause -- `_append_note` dedupes by splitting on
+    # ";", so a note carrying its own semicolon is appended again on every pass.
+    assert len(re.findall(r"_append_note\(", compose_source)) - 1 == 21
     assert len(re.findall(r'"note"\s*:', compose_source)) == 11
     assert len(re.findall(r'\["color_hint"\]\s*=', compose_source)) == 3
     assert len(re.findall(r'"color_hint"\s*:', compose_source)) == 5

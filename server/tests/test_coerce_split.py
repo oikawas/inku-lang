@@ -48,6 +48,10 @@ EXPECTED_BRANCH_ORDER = [
     "with_literal_grid_fidelity",
     "drop_invalid_relations",
     "without_explicit_region_support",
+    # Last, and on both exits (ddl-engine 10). It reads the cycle the delivery
+    # branches above have finished writing, so it cannot sit among them: run
+    # earlier, it would fold a cycle a later branch then rebuilds.
+    "without_unrequested_color_cycle",
 ]
 
 

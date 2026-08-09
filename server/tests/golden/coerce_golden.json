@@ -27,7 +27,8 @@
   "with_unintentional_filled_shape_tempering",
   "with_visual_event_type_hints",
   "without_explicit_region_support",
-  "without_spontaneous_grid"
+  "without_spontaneous_grid",
+  "without_unrequested_color_cycle"
  ],
  "branches_with_a_witness": [
   "coerce_and_repair_instruction",
@@ -57,7 +58,8 @@
   "with_unintentional_filled_shape_tempering",
   "with_visual_event_type_hints",
   "without_explicit_region_support",
-  "without_spontaneous_grid"
+  "without_spontaneous_grid",
+  "without_unrequested_color_cycle"
  ],
  "cases": {
   "H-01": {
@@ -70,7 +72,7 @@
      "instructions": [
       {
        "primitive": "square",
-       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; hard ceiling 400 applied to the whole work",
+       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names yellow alone; hard ceiling 400 applied to the whole work",
        "from": null,
        "to": null,
        "center": null,
@@ -110,11 +112,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [
-         "red",
-         "black",
-         "yellow"
-        ],
+        "color_cycle": [],
         "margin": 0.08,
         "center": null,
         "radius": null,
@@ -337,7 +335,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -768,7 +767,7 @@
       },
       {
        "primitive": "ellipse",
-       "note": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation; material inferred from DDL: pencil",
+       "note": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation; material inferred from DDL: pencil; color_cycle dropped because the DDL names green alone",
        "from": null,
        "to": null,
        "center": [
@@ -790,7 +789,7 @@
        "weight": "pencil",
        "mode": "additive",
        "carve_depth": null,
-       "color": "red",
+       "color": "green",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -808,11 +807,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [
-         "red",
-         "gray",
-         "green"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": null,
         "radius": null,
@@ -829,7 +824,7 @@
       },
       {
        "primitive": "line",
-       "note": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement",
+       "note": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names green alone",
        "from": [
         0.11149999999999999,
         0.385
@@ -868,10 +863,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [
-         "green",
-         "gray"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": [
          0.8230000000000001,
@@ -920,7 +912,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 2
     }
    },
    "input": {
@@ -1592,7 +1585,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -2007,7 +2001,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -2280,7 +2275,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -2353,7 +2349,7 @@
      "instructions": [
       {
        "primitive": "arc",
-       "note": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; green promoted to primary stroke from DDL color intent",
+       "note": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; green promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names green alone",
        "from": null,
        "to": null,
        "center": [
@@ -2390,10 +2386,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [
-         "black",
-         "green"
-        ],
+        "color_cycle": [],
         "margin": 0.16,
         "center": null,
         "radius": null,
@@ -2600,7 +2593,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -3042,7 +3036,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -3395,7 +3390,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -3805,7 +3801,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -4498,7 +4495,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -4857,7 +4855,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent",
+       "note": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent; color_cycle dropped because the DDL names white alone",
        "from": [
         0.48,
         0.5
@@ -4889,10 +4887,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [
-         "white",
-         "black"
-        ],
+        "color_cycle": [],
         "margin": 0.1,
         "center": null,
         "radius": null,
@@ -4938,7 +4933,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -5015,7 +5011,7 @@
      "instructions": [
       {
        "primitive": "arc",
-       "note": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation",
+       "note": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; color_cycle dropped because the DDL names white alone",
        "from": null,
        "to": null,
        "center": [
@@ -5034,7 +5030,7 @@
        "weight": "pencil",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -5052,11 +5048,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [
-         "black",
-         "blue",
-         "white"
-        ],
+        "color_cycle": [],
         "margin": 0.45,
         "center": null,
         "radius": null,
@@ -5203,7 +5195,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -5286,7 +5279,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
        "from": [
         0.1,
         0.1
@@ -5308,7 +5301,7 @@
        "weight": "brush_thick",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "gray",
        "color_hint": "bell ringer pull",
        "variation": {
         "amplitude": "medium",
@@ -5326,10 +5319,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [
-         "black",
-         "gray"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": [
          0.726,
@@ -5440,7 +5430,7 @@
       },
       {
        "primitive": "square",
-       "note": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement",
+       "note": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
        "from": null,
        "to": null,
        "center": null,
@@ -5462,7 +5452,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "blue",
+       "color": "gray",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -5480,10 +5470,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [
-         "blue",
-         "gray"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": [
          0.34,
@@ -5503,7 +5490,7 @@
       },
       {
        "primitive": "line",
-       "note": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement",
+       "note": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
        "from": [
         0.0575,
         0.16086
@@ -5543,10 +5530,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [
-         "gray",
-         "black"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": [
          0.729,
@@ -5595,7 +5579,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 3
     }
    },
    "input": {
@@ -6164,7 +6149,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -6503,7 +6489,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -6834,7 +6821,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -7127,7 +7115,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -7319,7 +7308,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190",
+       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190; color_cycle dropped because the DDL names red alone",
        "from": [
         0.5,
         0.5
@@ -7358,10 +7347,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "left_to_right",
-        "color_cycle": [
-         "red",
-         "black"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": [
          0.193,
@@ -7381,7 +7367,7 @@
       },
       {
        "primitive": "ellipse",
-       "note": "blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space; single arrangement density clustered to preserve negative space; original count 321",
+       "note": "blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space; single arrangement density clustered to preserve negative space; original count 321; color_cycle dropped because the DDL names red alone",
        "from": null,
        "to": null,
        "center": [
@@ -7421,10 +7407,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [
-         "red",
-         "blue"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": null,
         "radius": null,
@@ -7470,7 +7453,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 2
     }
    },
    "input": {
@@ -7734,7 +7718,7 @@
       },
       {
        "primitive": "arc",
-       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement",
+       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names green alone",
        "from": null,
        "to": null,
        "center": [
@@ -7771,10 +7755,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [
-         "green",
-         "black"
-        ],
+        "color_cycle": [],
         "margin": 0.24,
         "center": [
          0.272,
@@ -7823,7 +7804,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -8221,7 +8203,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 1,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -8397,7 +8380,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
+       "note": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
        "from": [
         0.4455,
         0.4372
@@ -8437,10 +8420,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [
-         "gray",
-         "black"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": [
          0.253,
@@ -8530,7 +8510,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -8712,7 +8693,7 @@
       },
       {
        "primitive": "arc",
-       "note": "coverage from DDL clause: 静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space",
+       "note": "coverage from DDL clause: 静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; color_cycle dropped because the DDL names white alone",
        "from": null,
        "to": null,
        "center": [
@@ -8731,7 +8712,7 @@
        "weight": "brush_thin",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "white",
        "color_hint": null,
        "variation": {
         "amplitude": "medium",
@@ -8749,10 +8730,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [
-         "black",
-         "white"
-        ],
+        "color_cycle": [],
         "margin": 0.22,
         "center": null,
         "radius": null,
@@ -8896,7 +8874,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -8937,7 +8916,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent",
+       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names green alone",
        "from": [
         0.2,
         0.5
@@ -8969,10 +8948,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [
-         "black",
-         "green"
-        ],
+        "color_cycle": [],
         "margin": 0.16,
         "center": null,
         "radius": null,
@@ -9081,7 +9057,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -9184,7 +9161,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -9231,7 +9209,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent",
+       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names green alone",
        "from": [
         0.2,
         0.5
@@ -9263,10 +9241,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [
-         "black",
-         "green"
-        ],
+        "color_cycle": [],
         "margin": 0.16,
         "center": null,
         "radius": null,
@@ -9375,7 +9350,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -9592,7 +9568,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -9715,7 +9692,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -9847,7 +9825,8 @@
      "with_unintentional_filled_shape_tempering": 1,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -9953,7 +9932,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -10073,7 +10053,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -10195,7 +10176,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -10309,7 +10291,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -10447,7 +10430,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -10577,7 +10561,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -10711,7 +10696,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -10749,7 +10735,7 @@
      "instructions": [
       {
        "primitive": "circle",
-       "note": "blue restored in color_cycle from DDL color intent",
+       "note": "blue restored in color_cycle from DDL color intent; color_cycle dropped because the DDL names blue alone",
        "from": [
         0.2,
         0.5
@@ -10774,7 +10760,7 @@
        "weight": "pen",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "blue",
        "color_hint": null,
        "variation": null,
        "arrangement": {
@@ -10784,10 +10770,7 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [
-         "black",
-         "blue"
-        ],
+        "color_cycle": [],
         "margin": 0.1,
         "center": null,
         "radius": null,
@@ -10833,7 +10816,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 1
+     "without_spontaneous_grid": 1,
+     "without_unrequested_color_cycle": 1
     }
    },
    "input": {
@@ -10944,7 +10928,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -11068,7 +11053,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -11302,7 +11288,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -11478,7 +11465,8 @@
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 1,
      "without_explicit_region_support": 0,
-     "without_spontaneous_grid": 0
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
     }
    },
    "input": {
@@ -11514,7 +11502,7 @@
    "targets": "with_visual_event_type_hints"
   }
  },
- "commit": "4da4d7852fc31099ca0d493c17489a6d0e377248",
+ "commit": "bf76331c5e3c6810593dbf7b0827e86f730307b1",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

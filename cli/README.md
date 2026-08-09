@@ -314,7 +314,9 @@ options:
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
   --trace               request RAW per-layer intermediates and save them as
-                        <prefix>-trace.json
+                        <prefix>-trace.json; in --input-mode ddl this is the
+                        only way to read what Stage 2 wrote before coerce
+                        repaired it
   --full-json           print the full paint response
 
 ```
@@ -421,7 +423,9 @@ options:
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
   --trace               request RAW per-layer intermediates and save them as
-                        <prefix>-trace.json
+                        <prefix>-trace.json; in --input-mode ddl this is the
+                        only way to read what Stage 2 wrote before coerce
+                        repaired it
   --continue-on-error
   --summary-json SUMMARY_JSON
                         write batch summary JSON to this path (default:

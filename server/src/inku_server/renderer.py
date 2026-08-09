@@ -247,11 +247,18 @@ FRAME_HI = 0.98
 
 # SPEC §13.8: 揺らぎは Renderer 層で生成する (JSON Score は決定的な楽譜)
 #
-# 揺らぎ・滲みは「図形の代表寸法に対する比率」で定義する (v2.1)。
+# 滲みは「図形の代表寸法に対する比率」で定義する (v2.1)。
 # 絶対 px だと小図形は壊れ大図形は静止して見えるため、運動語彙 (fine/medium/
 # broad) が図形に対する相対量として意味を持つようにする。
 # 比率は v2.1 キャリブレーション (Build 637) で作者が候補 P3 を選択した値。
-AMPLITUDE_RATIO: dict[str, float] = {"fine": 0.025, "medium": 0.08, "broad": 0.18}
+#
+# The wander, unlike the bleed, is measured in stroke widths (engine 28).
+# It is a property of the tool meeting the paper, not of how big the figure is:
+# scaling it by the figure made a large arc leave its own line by eleven widths
+# while a small one stayed on it, because the same 8% of a radius is invisible
+# under a brush and a different line under a pencil. The vocabulary is unchanged
+# (fine/medium/broad); only the ruler the words are read against moved.
+AMPLITUDE_WIDTHS: dict[str, float] = {"fine": 0.35, "medium": 0.9, "broad": 2.0}
 FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
 
 # 滲む (quality=pink): feGaussianBlur の stdDeviation も代表寸法比
@@ -756,12 +763,19 @@ def _clamped_representative_px(ins: Instruction, canvas: CanvasSize) -> float:
 
 
 def _amplitude_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> float:
-    """揺らぎ振幅 (px) を図形の代表寸法から決める。"""
+    """Wobble amplitude (px), measured in stroke widths of the mark itself.
+
+    `_stroke_width_px` is a pure function of the instruction, so this can ask it
+    directly rather than having the seven call sites thread the width through.
+    The representative-size clamp stays: it is the safety valve that keeps a
+    figure smaller than its own mark from wandering further than it is wide.
+    """
+    width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     rep = _clamped_representative_px(ins, canvas)
-    ratio = AMPLITUDE_RATIO[variation.amplitude] * PRIMITIVE_AMP_GAIN.get(
+    amp = AMPLITUDE_WIDTHS[variation.amplitude] * PRIMITIVE_AMP_GAIN.get(
         ins.primitive, 1.0
     )
-    return min(ratio * rep, AMPLITUDE_CLAMP_RATIO * rep)
+    return min(amp * width, AMPLITUDE_CLAMP_RATIO * rep)
 
 
 def _blur_std_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> float:

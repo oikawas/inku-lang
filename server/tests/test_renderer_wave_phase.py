@@ -12,7 +12,6 @@ import re
 import pytest
 
 from inku_server.renderer import (
-    AMPLITUDE_RATIO,
     _arc_points_with_variation,
     _edge_contour_with_variation,
     _sample_offset_periodic,
@@ -25,9 +24,12 @@ from inku_server.schema import Instruction, Score, Variation
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 
 CANVAS = canvas_size_for_aspect(None)
-# 弧: 半径 200px が代表寸法 / 多角形: 800px 角の短辺 1/2 = 400px が代表寸法
-ARC_AMP = AMPLITUDE_RATIO["broad"] * 200.0
-POLY_AMP = AMPLITUDE_RATIO["broad"] * 400.0
+# These helpers take the amplitude as an argument, so the magnitude here is the
+# test's own choice and not a statement about how the renderer derives it. They
+# are deliberately far larger than any real amplitude: what is under test is the
+# seam continuity and the pinning, which a small offset would let slip by.
+ARC_AMP = 36.0
+POLY_AMP = 72.0
 EDGE_SEGMENTS = _segment_count(800.0, CANVAS)
 
 WAVE = {

@@ -20,7 +20,7 @@ from inku_server.geometry_thresholds import (
 from inku_server.plugins import CANVAS_ASPECTS, plugin_status_items
 from inku_server.plugins.document_format import _CORE_MARKERS, _REGIONS
 from inku_server.renderer import (
-    AMPLITUDE_RATIO,
+    AMPLITUDE_WIDTHS,
     BLUR_RATIO,
     SVG_PROFILES,
     WEIGHT_TO_STROKE_WIDTH,
@@ -174,7 +174,7 @@ def test_performance_tables_match_sources() -> None:
     assert [a["id"] for a in performance["canvas_aspects"]] == [
         aspect.id for aspect in CANVAS_ASPECTS
     ]
-    assert performance["amplitude_ratio"] == dict(AMPLITUDE_RATIO)
+    assert performance["amplitude_widths"] == dict(AMPLITUDE_WIDTHS)
     assert performance["blur_ratio"] == dict(BLUR_RATIO)
     assert performance["svg_profiles"] == sorted(SVG_PROFILES)
 

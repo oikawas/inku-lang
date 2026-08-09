@@ -56,7 +56,7 @@ from .plugins.document_format import (
 from .plugins.system.canvas_aspect import CANVAS_BASE_PX
 from .renderer import (
     AMPLITUDE_CLAMP_RATIO,
-    AMPLITUDE_RATIO,
+    AMPLITUDE_WIDTHS,
     BLUR_RATIO,
     CANVAS_PX,
     FREQUENCY_CYCLES,
@@ -409,7 +409,7 @@ def _performance() -> dict[str, Any]:
         "default_canvas_aspect_id": DEFAULT_CANVAS_ASPECT_ID,
         "canvas_base_px": CANVAS_BASE_PX,
         "svg_profiles": sorted(SVG_PROFILES),
-        "amplitude_ratio": dict(AMPLITUDE_RATIO),
+        "amplitude_widths": dict(AMPLITUDE_WIDTHS),
         "amplitude_clamp_ratio": AMPLITUDE_CLAMP_RATIO,
         "representative_min_ratio": REPRESENTATIVE_MIN_RATIO,
         "frequency_cycles": dict(FREQUENCY_CYCLES),
@@ -694,7 +694,7 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
             ["default_canvas_aspect_id", performance["default_canvas_aspect_id"]],
             ["canvas_base_px", performance["canvas_base_px"]],
             ["svg_profiles", performance["svg_profiles"]],
-            ["amplitude_ratio", performance["amplitude_ratio"]],
+            ["amplitude_widths", performance["amplitude_widths"]],
             ["amplitude_clamp_ratio", performance["amplitude_clamp_ratio"]],
             ["representative_min_ratio", performance["representative_min_ratio"]],
             ["frequency_cycles", performance["frequency_cycles"]],

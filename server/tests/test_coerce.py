@@ -510,7 +510,13 @@ def test_coerce_score_repairs_multiple_missing_colors_without_overwriting_green(
     fixed = coerce_score(score, ddl="青い夜の森に赤い落ち葉を散らす。")
 
     repaired = fixed.instructions[0]
-    assert repaired.color == "gray"
+    # `red` rather than the `gray` it arrived with: since ddl-engine 9 the repair
+    # runs before the promotion, so a color delivered into the cycle reaches the
+    # primary stroke on this pass instead of the next one. Only one of the three
+    # is promoted -- an instruction has one primary stroke, and promoting a
+    # second onto it would undo the first.
+    assert repaired.color == "red"
+    assert (repaired.note or "").count("promoted to primary stroke") == 1
     assert repaired.arrangement is not None
     assert repaired.arrangement.color_cycle == ["gray", "red", "blue", "green"]
     assert "red/blue/green restored in color_cycle from DDL color intent" in (repaired.note or "")
@@ -557,7 +563,10 @@ def test_coerce_score_keeps_withered_grass_as_muted_green_gray():
     fixed = coerce_score(score, ddl="枯れ草の低い波を横に散らす。")
 
     repaired = fixed.instructions[0]
-    assert repaired.color == "gray"
+    # The muted reading is carried by the cycle holding both, which is unchanged.
+    # The primary stroke became the requested green at ddl-engine 9, when the
+    # repair moved in front of the promotion.
+    assert repaired.color == "green"
     assert repaired.arrangement is not None
     assert repaired.arrangement.color_cycle == ["gray", "green"]
     assert "withered grass kept as muted green-gray" in (repaired.note or "")
@@ -1299,7 +1308,11 @@ def test_coerce_score_governs_unrequested_saturated_background_in_presence_scene
     fixed = coerce_score(score, ddl="雨のバス停で、待つ人の気配が透明な膜になっている。")
 
     assert fixed.background == "white"
-    assert fixed.instructions[0].color == "black"
+    # The governor's own subject is the background, and it still drops the
+    # unrequested blue to white. The mark became `blue` at ddl-engine 9: the DDL
+    # asks for it, the repair delivers it into the cycle, and the promotion now
+    # runs after the repair rather than a pass behind it.
+    assert fixed.instructions[0].color == "blue"
     assert "white foreground made visible" in (fixed.instructions[0].note or "")
 
 

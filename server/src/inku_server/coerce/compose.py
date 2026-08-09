@@ -721,9 +721,17 @@ def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: 
         descriptive_hint = (ins.color_hint or "").lower()
         if "five-sense" in descriptive_hint or "scent layer" in descriptive_hint:
             continue
-        if "crescent" in descriptive_hint and "sensory layer" in descriptive_hint and ins.color == "green":
+        # The green can sit in either place, so both are asked about. Keying the
+        # whole branch on `ins.color` made the cycle cleanup a side effect of the
+        # primary color happening to be green, and a later stage that rewrites
+        # `color` -- the promotion to a primary stroke, once it ran early enough
+        # to reach this -- left the green in the cycle for the renderer to draw.
+        cycle = list(ins.arrangement.color_cycle) if ins.arrangement is not None else []
+        carries_green = ins.color == "green" or "green" in cycle
+        if "crescent" in descriptive_hint and "sensory layer" in descriptive_hint and carries_green:
             data = ins.model_dump(by_alias=True)
-            data["color"] = "blue" if background != "blue" else "white"
+            if ins.color == "green":
+                data["color"] = "blue" if background != "blue" else "white"
             if isinstance(data.get("note"), str):
                 data["note"] = (
                     data["note"]
@@ -1077,8 +1085,12 @@ def _score_contains_primary_color(instructions: list[Instruction], color: str) -
 
 
 def _color_repair_order(colors: set[str]) -> list[str]:
+    # A known order, for determinism -- not a ranking. The table below is not a
+    # statement about which color matters more: nothing in the description says
+    # that, and inventing it here would be the house style this layer must not
+    # add. Colors the table does not name follow it rather than falling out.
     ordered = [color for color in ("red", "blue", "green", "white", "black", "gray") if color in colors]
-    return ordered or sorted(colors)
+    return ordered + [color for color in sorted(colors) if color not in ordered]
 
 
 def _green_intent_context(ddl: str | None) -> str | None:
@@ -1108,7 +1120,11 @@ def _with_color_cycle_delivery(ins: Instruction, colors: list[str], *, ddl: str 
     if green_context and "bamboo" in green_context:
         data["color"] = "green"
         base_color = "green"
-    if isinstance(base_color, str):
+    # The cycle hands one color to each member in turn, so a color listed twice
+    # takes twice the members. That weighting was never asked for: it fell out
+    # of inserting the base color without looking, and its size depends on how
+    # long the cycle happens to be. The two lines below already look.
+    if isinstance(base_color, str) and base_color not in cycle:
         cycle.insert(0, base_color)
     if green_context and "withered" in green_context and "gray" not in cycle:
         cycle.insert(0, "gray")
@@ -1170,6 +1186,15 @@ def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | 
         return instructions
 
     repaired = list(instructions)
+    # A stroke already carrying a color the description asked for is not taken
+    # for another one. An instruction has a single primary stroke, so promoting
+    # onto it a second time undoes the first: within one pass that left the last
+    # requested color standing and a note for each that no longer held, and
+    # across passes red and blue traded the same stroke back and forth forever.
+    # Either way the winner would be decided by where the words sit in
+    # `_color_repair_order`, which is a known order for determinism, not a
+    # ranking -- the thing this layer must not invent.
+    wanted = set(requested)
     for color in requested:
         if _score_contains_primary_color(repaired, color):
             continue
@@ -1177,7 +1202,8 @@ def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | 
             (
                 index
                 for index, ins in enumerate(repaired)
-                if ins.arrangement is not None
+                if ins.color not in wanted
+                and ins.arrangement is not None
                 and color in ins.arrangement.color_cycle
                 and ins.primitive in ("line", "arc", "ellipse", "square", "triangle", "polygon")
             ),

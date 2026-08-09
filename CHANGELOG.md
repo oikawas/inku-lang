@@ -4575,3 +4575,39 @@ reads `"26"`. **`APP_VERSION` and `web/BUILD_NUMBER` do not move.**
 - **Checks:** **Android JVM 243 passed, 0 red, 0 skipped (46 classes; exactly +5 from 238)**, **96 of 96
   instrumentation tests green on a physical Pixel 9 (20 classes)**, **server pytest 2,488 passed / 31
   skipped**, ruff clean. **All nine perturbations turned red as predicted; none missed.**
+
+### v2.11.10 — The hand swings wider (Build 866, 2026-08-09; render engine 27)
+
+**The two amplitudes engines 25 and 26 introduced were widened after the round-2b viewing**
+(author ruling, 2026-08-08). **No rule and no exclusion changed. Only how far the hand swings did.**
+
+- **Per-member size goes from +/-25% to +/-35%** (`HAND_GROUP_SIZE` 0.25 -> 0.35) and
+  **per-member angle from +/-12 to +/-27 degrees** (`HAND_GROUP_ROT` 12.0 -> 27.0).
+  **All nine hand tools carry the same amplitude**, and **`rotring` and `computer` stay at 0**
+  (a machine repeating itself exactly is a signature, not a defect).
+- **Not one line of the exclusions moved** — `grid`, single-member groups, the machine tools, `line`,
+  `circle`, and groups that state a `rotation`. **A circle looks the same turned**, so it is still not turned.
+- **The corpus moves on 45 of its 549 cases and holds the other 504** (`render-engine-27`).
+  **No case was added** (`added` = 0). The 45 are circle 37, ellipse 3, line 1, square 1, triangle 1,
+  arc 1, cloudform 1, and **only 5 of them are reached by the angle rule as well**.
+- **The frame correction did not fire on more groups.** The prediction when the work was commissioned was
+  that a wider swing would push more groups into it; **the measurement says it fires on the same 40 of 50
+  groups as engine 26, and on the same set.** `_fit_group_to_anchor` **reads only the members' anchors**;
+  `_scale_member` preserves the anchor through three coordinate corrections, and `_turn_member` turns about
+  the anchor, so it moves no coordinate. **However wide the swing, the input the frame correction reads is
+  bit-for-bit the same.**
+- **"Marks stay inside the frame" was never true, with or without the wider swing.** The frame
+  `[0.02, 0.98]` is a contract about anchors, not about how far a mark spreads. **At engine 26, 41 of 50
+  groups already had member outlines crossing the canvas `[0,1]`**, and **engine 27 has the same 41**;
+  the one that reaches furthest got 0.4% of a canvas deeper (0.050187 -> 0.054262).
+- **The check that replays engine 25's frozen drawings now puts the size amplitude back to 0.25** rather
+  than withholding `_apply_member_sizes`. **Withholding it would pass for an implementation that had
+  dropped per-member size altogether — the reading engine 25's own gates exist to reject.** The angle
+  amplitude is left at whatever the tree states, and **the 43 digests still land**, which re-confirms that
+  the angle rule reaches none of those cases.
+- **Checks:** **server pytest 2,501 passed / 31 skipped** (+13, 0 red; **+5 test functions, 0 deleted**),
+  ruff clean, **frozen corpora byte-identical**. **Seven perturbations, none missed.**
+  **One predicted gate did not turn red, though:** a check that compares manifest 26 against manifest 27
+  does not move when a product constant is put back. **That is a regenerated record, not a check on a
+  property.** What turned red through the product was the existing
+  `test_group_g_matches_the_current_renderer`, on all six of the product perturbations.

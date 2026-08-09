@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.10 unreleased baseline (Web Build 866)
+
+The 13 places that name a version were updated to v2.11.10 / Build 866. **No manual text changed** — no screen action, CLI flag, setting or response key moved.
+
+- **The drawings do change.** Render engine 27 **widens the swing within a group drawn with a hand tool**. Each member's size now varies by 35% either way instead of 25%, and each member's angle by **27 degrees** either way instead of 12. **No rule changed** — only how far the hand swings.
+- **Rotring and computer stay exactly as they were.** A machine repeating itself precisely is kept deliberately, as those two tools' signature.
+- **What did not turn still does not turn:** lines and circles, grids, single-member groups, and any group whose angle the description states. **A circle looks the same turned.**
+- **Nothing was added to the interface.** How you write a description is unchanged.
+- **Redrawing the same description with the same seed changes only groups that state repetition and are drawn with a hand tool.** A work that states no repetition is identical to the pixel.
+
 ## 2026-08-09 — v2.11.9 unreleased baseline (Web Build 865)
 
 The 13 places that name a version were updated to v2.11.9 / Build 865. **No manual text changed** — no screen action, setting or response key moved.

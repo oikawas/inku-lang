@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **27** | v2.11.10 | 866 | 2026-08-09 | 549 | **45** | **504** |
 | **26** | v2.11.8 | 864 | 2026-08-08 | 549 | **7** | **542** |
 | **25** | v2.11.7 | 863 | 2026-08-08 | 545 | **41** | **504** |
 | **24** | v2.11.6 | 862 | 2026-08-08 | 541 | **7** | **534** |
@@ -129,9 +130,9 @@ but never asserts "the output will change"**.
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.9 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.10 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 865 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 866 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -398,6 +399,51 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 27 — the hand swings wider (v2.11.10)
+
+**Engines 25 and 26 introduced two amplitudes. Engine 27 only widens them.**
+
+**No rule and no exclusion changed.** `HAND_GROUP_SIZE` goes **0.25 -> 0.35** and
+`HAND_GROUP_ROT` **12.0 -> 27.0**. **All nine hand tools carry the same amplitude**, and
+**`rotring` and `computer` stay at 0**. The exclusions are engine 26's, untouched: `grid`,
+single-member groups, the machine tools, `line`, `circle`, and groups that state a `rotation`.
+
+**The corpus moves on 45 of its 549 cases and holds the other 504. No case was added.**
+The 45 are circle 37, ellipse 3, line 1, square 1, triangle 1, arc 1, cloudform 1, and
+**only 5 of them are reached by the angle rule as well** (the other 40 changed size alone).
+
+### The frame correction fired on not one more group
+
+**This is where the prediction was most wrong.** The expectation when the work was commissioned was
+that a wider swing would push more groups into the frame correction. **The measurement says it fires
+on the same 40 of 50 groups as engine 26, and on the same set.**
+
+The reason is in the wiring. `_fit_group_to_anchor` **reads only the members' anchors**.
+`_scale_member` preserves the anchor through three coordinate corrections, and `_turn_member` turns
+about the anchor, so it moves no coordinate. **However wide the swing, the input the frame correction
+reads is bit-for-bit the same.** Anchors matched exactly across both amplitudes in 47 of 50 cases, and
+the three that did not differ by at most 1.0e-9 (`square` and `triangle`, whose anchors are rebuilt
+from a bbox, and `line`, whose anchor comes from its two ends — one step of the nine-digit grid, the
+same phenomenon the existing `ANCHOR_TOLERANCE = 2e-9` covers).
+
+### "Marks stay inside the frame" was not true before this version either
+
+The frame `[0.02, 0.98]` is a contract about anchors, not about how far a mark spreads. Measured,
+**41 of 50 groups already had member outlines crossing the canvas `[0,1]` at engine 26** (furthest
+0.050187). **Engine 27 has the same 41**, with the furthest at **0.054262** — the count did not grow,
+and the one that reaches furthest got 0.4% of a canvas deeper.
+
+**No check in the current code corresponds to this fact.**
+
+### Replaying a frozen record puts back the amplitude, and nothing else
+
+The check that replays engine 25's 43 frozen drawings through today's product and compares digests
+turns red the moment the amplitude rises. **It now puts `group_hand` back to 0.25** rather than
+withholding `_apply_member_sizes`. **Withholding it would pass for an implementation that had dropped
+per-member size altogether — the reading engine 25's own gates exist to reject.** The angle amplitude
+is left at whatever the tree states (27.0), and **the 43 digests still land**, which re-confirms that
+the angle rule reaches none of those cases.
 
 ## engine 26 — every member of a group finds its own angle (v2.11.8)
 

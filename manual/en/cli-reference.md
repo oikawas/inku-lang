@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions of regular users, group leads, and administrators.
 
-It covers inku v2.11.9 (Web Build 865).
+It covers inku v2.11.10 (Web Build 866).
 
 ## Basics
 

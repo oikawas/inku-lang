@@ -149,7 +149,7 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 - 作品の SVG / PNG / アニメーション書き出し。
 落とし口は 1 本で、利用者が選んだフォルダへ書ける（File System Access API を持つブラウザのみ。
 持たないブラウザはブラウザ既定へ落ちる）
-- 日英の UI。英語の用語は `web/src/lib/i18n/GLOSSARY.md` が正本で、`npm run lint:i18n` が強制する
+- 日英の UI。英語の用語は `web/src/lib/i18n/GLOSSARY.md` が正本で、**web の表示文字列は `npm run lint:i18n` が、公開文書の英語は `server/scripts/check_docs.py` が**強制する
 
 UI の寸法は `+page.svelte` の `:root` のトークン（`--btn-sm-*`）が、色は `--action-*` と `--accent*` が正本で、px と色の直書きは退行として扱う。
 
@@ -196,7 +196,7 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 - **`cli/tests`** — pytest。
 - **`npm run check`** と **`lint:i18n`** / **`lint:models`** / **`lint:recommendations`** — web の型と用語とモデル解決。
 - **`npm run test:unit`** — web の純関数の単体テスト（Node の `node:test`。依存を足していない）。
-- **`scripts/check_docs.py`** — 公開文書の内部参照。
+- **`scripts/check_docs.py`** — 公開文書の内部参照と、日英の見出し形状と、**英語側の禁止語**（`GLOSSARY.md` §5-1 の 4 語。バックティックの中は識別子として除く）。
 
 **決定的な層**（`coerce/`・`ddl_expander.py`・`renderer.py`・`stroke_engine.py`・`schema.py`・`saijiki.py`・`language_support/{ja,en}.py`）に触れたときは、凍結コーパスの照合を必ず通す。
 
@@ -225,6 +225,7 @@ pytest も ruff も `npm run check` も CI では走らないので、**コー�
 - 仕様変更は `SPEC.ja.md` を先に更新し、**同じ内容を節ごとに** `SPEC.md` へ反映する。
 片方にしか無い節は置かない（2026-08-02 裁定。**正本が日本語である点は変わらない**）。
 `server/scripts/check_docs.py` が見出し形状の一致を見る唯一のゲートで、マージ前に走らせる。
+同じゲートが英語側の禁止語も見る（バックティックで囲んだ識別子は対象外）。
 - 現行の構造や重要契約が変わる場合は、本書と `PROJECT_CONTEXT.md` も更新する。
 - リリース／Buildの履歴は `CHANGELOG.ja.md` を先に更新し、公開上必要な内容を `CHANGELOG.md` に反映する。
 - 実装だけの細部を仕様本文へ無制限に積み増さない。

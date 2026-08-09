@@ -3234,6 +3234,13 @@ When updating the specification:
 6. `server/scripts/check_docs.py` checks that the two files have the same
    heading shape.  It is the only gate on this rule, and it must be run before
    a documentation change is merged.
+7. The same gate also reads the **forbidden words on the English side**
+   (`artwork`, `palette`, `AI-powered`, `magic`, from §5-1 of
+   `web/src/lib/i18n/GLOSSARY.md`).  A span wrapped in backticks is treated as
+   an identifier and is not checked — an enum member or a JSON field keeps its
+   real spelling even inside English prose.  `CHANGELOG.md` and
+   `docs/history/changelog-*.md` are frozen records and are a declared
+   exemption.
 
 ---
 

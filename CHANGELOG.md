@@ -4611,3 +4611,49 @@ reads `"26"`. **`APP_VERSION` and `web/BUILD_NUMBER` do not move.**
   does not move when a product constant is put back. **That is a regenerated record, not a check on a
   property.** What turned red through the product was the existing
   `test_group_g_matches_the_current_renderer`, on all six of the product perturbations.
+
+### 2026-08-09 — The English documents now answer to the glossary (**no version bump**, documents and checks only)
+
+**`web/src/lib/i18n/GLOSSARY.md` is canonical for all of inku's English, but the only thing a machine
+compared against it was the web display strings** (ledger [I-161]; the author ruled that the check reads
+the documents that are still updated). `npm run lint:i18n` reads `en.ts` and the web components —
+**not one of the English documents** (README, SPEC, the manual, ANDROID_SPEC). `check_docs.py` does look
+at both languages, but **only at the heading shape, never at the words inside**. So "green while the
+terminology is wrong" kept happening.
+
+- **Twenty-four lines across five English documents were corrected. Not one character of the Japanese
+  changed** — the Japanese was already right (`SPEC.ja.md` carries 22 occurrences of the concept word
+  against three `palette`, all three inside backticks), and **only the English still held the old
+  vocabulary**. Fixing the English is what makes the two languages agree
+- **There are only two ways to fix such a line.** Fifteen lines named a **concept** (the work itself, the
+  color catalog itself) and **the word was changed**; nine named a **code identifier** (an enum member, a
+  JSON field, a tab's internal name) and **the word was wrapped in backticks instead**.
+  **"Zero grep hits" is not the goal** — an identifier should stay an identifier, and wrapping it is what
+  takes it out of the machine's view. `Artwork` in `ANDROID_SPEC.md` is a Kotlin enum member that
+  **never reaches the screen** (zero hits in `strings.xml`); renaming it would make the specification lie
+  about the implementation
+- **The gate went into `check_docs.py`**, because that is the one gate the conventions require before every
+  merge — CI only regenerates the frozen corpora. It reads **the English side of the 17 `PAIRS`** for
+  **four words** (`artwork`, `palette`, `AI-powered`, `magic`). **`CHANGELOG.md` and
+  `docs/history/changelog-*.md` are frozen records and are a declared exemption.** The number of documents
+  read is printed on every run, so a shrinking table cannot hide behind exit 0
+- **⚠ It reads inside fenced blocks**, unlike every other check in that file. **One of the 24 lines,
+  `PROJECT_CONTEXT.md:54`, lived inside a fence** (a pipeline drawn as `text`, whose content is prose);
+  skipping fences would leave that line unwatched. **The cost** is that a future revision showing a real
+  catalog JSON example has no way to escape by wrapping, and will need a declared exemption instead
+- **Twenty-seven checks read the configuration tables themselves** (`test_terminology_gate.py`).
+  **They do not assert a total.** Each of the four words is asserted on its own, each of the 17 documents
+  is asserted on its own, **the three exempt documents are asserted to be absent** as a control,
+  `main()` is asserted to consume the result, a backticked word is asserted not to be a violation, and a
+  bare one is asserted to be found. Deleting a single row would otherwise leave `check_docs.py` at exit 0,
+  simply looking at less
+- **Checks:** **server pytest 2,528 passed / 31 skipped** (**+27, 0 red, 0 deleted**), ruff clean,
+  `check_docs.py` green (**17 documents, 55 internal references**). **Six perturbations**, one of them a
+  control: adding a bare forbidden word to the exempt `CHANGELOG.md` turns nothing red, and **the same
+  sentence placed in `README.md` does turn it red**, so the silence is the exemption working rather than a
+  miss. **⚠ P-2 was the one that disagreed with the prediction** — removing `artwork` from the word list was
+  predicted to redden one check and reddened two, because **the example sentence in the "a bare forbidden
+  word is found" check uses that very word**. That is coupling rather than a defect, and it errs toward more
+  red, so the gate is not weaker. **The deterministic layers and `web/`, `cli/`, `shared/`, `server/src`,
+  `android/app` did not move by a single byte**
+- **No version bump** — no version number, API field name, screen, or drawn mark changes

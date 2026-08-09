@@ -263,12 +263,20 @@ grep -rhE -o "getLang\(\) === 'ja' \? '[^']*'" web/src | LC_ALL=C sort | md5
 
 ## 9. まだ揃っていないもの（既知の食い違い）
 
-- **README.md（英語）・SPEC.md・`manual/en/` は旧語彙のまま。** ただし**禁止語はもう残っていない**
-  （2026-07-31 実測: `artwork` / `Okugaki` / `Unleashed` / `Generation Info` は 3 文書とも **0 件**。
-  旧記載の「`artwork` 53 件」等は古い）。残るのは **`SPEC.md` の `palette` 10 件**で、
-  これはカタログのフィールド名＝コード識別子である。**動いていないのは概念語のほう**で、
-  `manual/en/` は generate 13 / generation 25 / create 14 / image 9 に対し perform 7。
-  ドキュメント側の追随は別作業。
+- **英語の文書の禁止語は 2026-08-09 に 0 件にした**（枝 `1c0cf1cf` で 24 行を直し、
+  以後は `server/scripts/check_docs.py` が機械で見る）。**「0 件である」ではなく「0 件にした」と書く** —
+  **旧記載の「2026-07-31 実測: `artwork` は 3 文書とも 0 件」は誤りだった**。
+  同じ日に `SPEC.md:2976` と `PROJECT_CONTEXT.md:54` に裸の `artwork` が在り、
+  **9 日間このまま腐っていた**（台帳 [I-161]）。
+  - **機械が見るのは `check_docs.py` の `PAIRS` 17 対の英語側**（**`CHANGELOG.md` と
+    `docs/history/changelog-*.md` の 3 本は凍った記録なので宣言された除外**）で、
+    **語は 4 つ**（`artwork` / `palette` / `AI-powered` / `magic`）。
+    **バックティックで囲んだ span は検査しない** — 識別子は識別子のまま残すのが正しい
+  - **`palette` は消していない。** カタログの**フィールド名を指す 9 行はバックティックで囲んだ**ので、
+    grep すればいまも現れる。**「grep 残存ゼロ」は目標ではない**（§5-1 の但し書きと同じ）
+- **制限語（`generate` / `create` / `image` ほか §5-2）は機械の対象外で、`manual/en/` は旧語彙のまま**
+  （2026-07-31 実測: generate 13 / generation 25 / create 14 / image 9 に対し perform 7。
+  **この数字は 2026-08-09 に測り直していない**）。ドキュメント側の追随は別作業。
 - **本辞書は英語表示文字列の正本であって、日本語の正本ではない**（`lint:i18n` が見るのは `en.ts` だけ）。
   **日本語 UI は旧語彙のまま**である（2026-07-31 実測: `ja.ts` に 生成 29 / 画像 7。
   `manualRefineGenerateButton` は ja「生成する」/ en "Refine"、`historyImageHeader` は ja「画像」/ en "Work"）。

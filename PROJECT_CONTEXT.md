@@ -180,7 +180,7 @@ colophon
 One code path drops every file, and it can write to a folder the user picked (browsers with the File
 System Access API; the rest fall back to the browser default)
 - A Japanese and English UI.
-`web/src/lib/i18n/GLOSSARY.md` is canonical for English terminology and `npm run lint:i18n` enforces it.
+`web/src/lib/i18n/GLOSSARY.md` is canonical for English terminology; **`npm run lint:i18n` enforces it over the web display strings, and `server/scripts/check_docs.py` enforces it over the English public documents**.
 
 UI dimensions come from the `:root` tokens in `+page.svelte` (`--btn-sm-*`) and colors from
 `--action-*` and `--accent*`; literal px values and literal colors are treated as regressions.
@@ -243,7 +243,7 @@ held by its own `manifest.json` of names and digests.
 terminology, and model resolution.
 - **`npm run test:unit`** — unit tests over web's pure functions (Node's `node:test`; no new
 dependency).
-- **`scripts/check_docs.py`** — internal references in public documents.
+- **`scripts/check_docs.py`** — internal references in public documents, the heading shape of each Japanese/English pair, and the **forbidden words on the English side** (the four words of `GLOSSARY.md` §5-1; a backticked span is an identifier and is skipped).
 
 The **deterministic layers** are `coerce/`, `ddl_expander.py`, `renderer.py`, `stroke_engine.py`,
 `schema.py`, `saijiki.py`, and `language_support/{ja,en}.py`.
@@ -272,7 +272,7 @@ A separate developer-facing register holds them, with state.
 
 ## Documentation Update Rules
 
-- Update `SPEC.ja.md` first for a specification change, then carry **the same content, section for section**, into `SPEC.md`. Neither language may hold a section the other lacks (the author's ruling of 2026-08-02; **Japanese remains canonical**). `server/scripts/check_docs.py` is the only gate on this and must be run before merging.
+- Update `SPEC.ja.md` first for a specification change, then carry **the same content, section for section**, into `SPEC.md`. Neither language may hold a section the other lacks (the author's ruling of 2026-08-02; **Japanese remains canonical**). `server/scripts/check_docs.py` is the only gate on this and must be run before merging. The same gate also reads the forbidden words on the English side (a backticked identifier is not checked).
 - When current architecture or a major contract changes, update both project-context files.
 - Update `CHANGELOG.ja.md` first for release/Build history, then reflect publicly relevant content in `CHANGELOG.md`.
 - Keep current contracts in the specification and chronological implementation detail in the changelog.

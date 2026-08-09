@@ -427,6 +427,17 @@ def _material_gain(key: str) -> float:
     return MATERIAL_INTENSITY[MATERIAL_INTENSITY_LEVEL].get(key, 0.0)
 
 
+def _outline_wander_px(offset_px: float, canvas: CanvasSize) -> float:
+    """How far a stratum drifts off its own offset along the path.
+
+    Strata that stay exactly parallel read as engraved rails rather than as a
+    tool's own edges. Both emitters (the straight tools and the performed
+    contours) ask here, so the amount is stated once and a test can bound the
+    layer's distance to the ink without restating the formula.
+    """
+    return 0.35 * abs(offset_px) + 0.6 * _unit_scale(canvas)
+
+
 def _outline_offset_px(offset: float, canvas: CanvasSize) -> float:
     """材質輪郭の法線オフセット。符号を保ったまま下限を課す。
 
@@ -4449,7 +4460,12 @@ def _polygon_points(
 
 
 def _outline_attrs(
-    attrs: dict, *, stroke_width: float, opacity: float, dash: str | None = None
+    attrs: dict,
+    *,
+    stroke_width: float,
+    opacity: float,
+    dash: str | None = None,
+    stratum: int | None = None,
 ) -> dict:
     result = _copy_attrs(attrs)
     result["fill"] = "none"
@@ -4457,7 +4473,15 @@ def _outline_attrs(
     result["stroke_opacity"] = opacity
     # 材質装飾であることを明示する。読み手 (弧抽出・ラスタライザ等) が主線と
     # 装飾を区別するのに opacity の大小へ頼らずに済ませるため。
-    result["class"] = "material-outline"
+    #
+    # engine 28: a stratum index rides along. A tool's strata used to be one
+    # element each, so "the pen leaves two split nibs" could be read off the
+    # element count; contact broke each stratum into fragments, and their widths
+    # are not distinct either once the width cap folds two of them together. The
+    # index keeps the claim observable instead of leaving it to arithmetic.
+    result["class"] = (
+        "material-outline" if stratum is None else f"material-outline stratum-{stratum}"
+    )
     if dash is not None:
         result["stroke_dasharray"] = dash
     else:
@@ -4822,7 +4846,7 @@ def _add_material_performed_outline(
             offset,
             closed,
             center,
-            wander=0.35 * abs(offset) + 0.6 * scale,
+            wander=_outline_wander_px(offset, canvas),
             wander_period=60.0 * scale,
             seed=layer_seed,
         )
@@ -4837,7 +4861,10 @@ def _add_material_performed_outline(
                 element(
                     points=piece,
                     **_outline_attrs(
-                        attrs, stroke_width=width, opacity=opacity * weight
+                        attrs,
+                        stroke_width=width,
+                        opacity=opacity * weight,
+                        stratum=k,
                     ),
                 )
             )
@@ -4941,14 +4968,14 @@ def _material_line_group(
         # the contact field decides where.
         la = _copy_attrs(layer_attrs)
         la["fill"] = "none"
-        la["class_"] = "material-outline"
+        la["class_"] = f"material-outline stratum-{k}"
         # Same reason as `_outline_attrs`: the tool's own `WEIGHT_STYLE` dash
         # would cut the fragments a second time, on a fixed cadence.
         la.pop("stroke_dasharray", None)
         base_opacity = la.get("stroke_opacity", 1.0)
         off_px = _layer_offset(amount)
         layer_seed = seed + k * 7919
-        wander = 0.35 * abs(off_px) + 0.6 * scale
+        wander = _outline_wander_px(off_px, canvas)
         pts = _offset_polyline(
             path, off_px, wander=wander, wander_period=60.0 * scale, seed=layer_seed
         )

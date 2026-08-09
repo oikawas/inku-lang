@@ -15,7 +15,12 @@ import re
 from xml.etree import ElementTree
 
 from inku_server.plugins import canvas_size_for_aspect
-from inku_server.renderer import _material_outline_profile, render
+from inku_server.renderer import (
+    _material_outline_profile,
+    _outline_wander_px,
+    _stroke_width_px,
+    render,
+)
 from inku_server.schema import Score
 from inku_server.stroke_engine import synthesize_along
 
@@ -132,12 +137,14 @@ LAYER_DISTANCE_SLACK_PX = 1.0
 def _outline_layers(root) -> list[tuple[str, tuple]]:
     """The material strata as (tag, geometry) — the element type is part of it.
 
-    A circle keeps its `<circle>`, a square its `<rect>`; only a layer built
-    from the performance becomes a polyline of points.
+    Before engine 28 a circle kept its `<circle>` and a square its `<rect>`, and
+    only a layer built from the performance became a polyline; now every layer
+    is built from the performance, so the type is part of what turned over.
+    The class carries a stratum token as well, so the match is on the token.
     """
     layers = []
     for node in root.iter():
-        if node.attrib.get("class") != "material-outline":
+        if "material-outline" not in (node.attrib.get("class") or "").split():
             continue
         geometry = tuple(
             (name, node.attrib[name]) for name in _GEOMETRY_ATTRS if name in node.attrib
@@ -222,10 +229,18 @@ def _outline_distances_to_ink(instruction: dict, *, wild: bool) -> list[float]:
     root = ElementTree.fromstring(_svg(instruction, wild=wild))
     closed = instruction["primitive"] != "arc"
     runs = _band_centerlines(root, closed=closed)
+    if closed:
+        # The reconstruction returns the ring as an open list, so the segment
+        # that joins its last point back to its first is missing. A vertex
+        # sitting over that seam is measured against a distant endpoint instead
+        # of against the ink under it -- with the ~20px spacing of the run that
+        # is a spurious 10px, which is larger than anything the layer's own
+        # offset can produce. Close the ring before measuring.
+        runs = [run + run[:1] for run in runs]
     distances: list[float] = []
     over_a_gap = 0
     for node in root.iter():
-        if node.attrib.get("class") != "material-outline":
+        if "material-outline" not in (node.attrib.get("class") or "").split():
             continue
         if "points" in node.attrib:
             vertices = _points_of(node.attrib["points"])
@@ -277,34 +292,65 @@ def _frozen_outline_layers(case_id: str) -> list[tuple[str, tuple]]:
     raise AssertionError(f"no frozen SVG for {case_id}")
 
 
-def test_material_outline_follows_the_ink_when_wild_and_stays_put_when_not() -> None:
+def test_material_outline_follows_the_ink_whether_or_not_wild_is_on() -> None:
+    """engine 28: the layer is beside the ink in both states.
+
+    Until engine 27 this test asserted the opposite half -- with wild off the
+    layer was the frozen geometric one, attribute for attribute -- and that is
+    worth keeping in view, because it means the old behaviour was not an
+    oversight: it was held in place deliberately, for byte compatibility with
+    the frozen corpora. The author's ruling (2026-08-09) is that the decoration
+    takes its offset from the ink itself, so the wild gate is gone and the
+    frozen comparison with it.
+    """
+    # The mark has to actually leave its geometry, or the two readings cannot be
+    # told apart: on an unvaried shape the ink sits on the ideal line, so a layer
+    # drawn from either one lands in the same place and the bound below is
+    # satisfied by a renderer that never changed.
+    wander = {
+        "amplitude": "broad",
+        "frequency": "medium",
+        "quality": "wave",
+        "dimensions": ["position_x", "position_y", "radius"],
+    }
     for primitive in ("circle", "arc", "square"):
         for tool in ("pencil", "brush_thick", "crayon"):
-            instruction = {"primitive": primitive, "weight": tool, **GEOMETRY[primitive]}
+            instruction = {
+                "primitive": primitive,
+                "weight": tool,
+                "variation": wander,
+                **GEOMETRY[primitive],
+            }
             off = _outline_layers(ElementTree.fromstring(_svg(instruction, wild=False)))
             on = _outline_layers(ElementTree.fromstring(_svg(instruction, wild=True)))
-            assert off and len(off) == len(on), (primitive, tool)
-            # Every layer moves. A layer left on the geometry reads as a ruled
-            # line behind a stroke that has walked away from it.
-            assert all(a != b for a, b in zip(off, on)), (primitive, tool)
-            # With the toggle off the layer is the frozen one, attribute for
-            # attribute.
-            assert off == _frozen_outline_layers(f"A-{tool}-{primitive}"), (primitive, tool)
-            # And with it on the layer is still beside the ink, not beside the
-            # geometry the ink left behind.
+            assert off and on, (primitive, tool)
+            # Wild still moves the ink, so the layer that rides it moves too.
+            assert off != on, (primitive, tool)
+            # The layer is beside the ink in BOTH states, not only when wild.
+            # This is the half that engine 28 turned over.
+            # engine 28 gives each stratum a low-frequency drift off its own
+            # offset, so the bound asks the renderer for it rather than
+            # restating the formula: a test that hard-codes it stops tracking
+            # the design the moment the design moves.
+            canvas = canvas_size_for_aspect("square")
+            # The slack carries the reconstruction, not the design: the band's
+            # centreline is recovered from the drawn band at ~20px spacing and
+            # with the envelope's own wobble, and that error grows with the
+            # tool's width, so the tool's stroke is part of it.
             bound = (
                 max(
-                    abs(offset)
-                    for offset, _, _, _ in _material_outline_profile(
-                        tool, canvas_size_for_aspect("square")
-                    )
+                    abs(offset) + _outline_wander_px(offset, canvas)
+                    for offset, _, _, _ in _material_outline_profile(tool, canvas)
                 )
+                + _stroke_width_px(tool, canvas)
                 + LAYER_DISTANCE_SLACK_PX
             )
-            assert max(_outline_distances_to_ink(instruction, wild=True)) < bound, (
-                primitive,
-                tool,
-            )
+            for wild in (False, True):
+                assert max(_outline_distances_to_ink(instruction, wild=wild)) < bound, (
+                    primitive,
+                    tool,
+                    wild,
+                )
 
 
 def _polygon_area(points: list[tuple[float, float]]) -> float:

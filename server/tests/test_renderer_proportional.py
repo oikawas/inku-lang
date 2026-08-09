@@ -197,6 +197,57 @@ def test_open_curve_amplitude_does_not_scale_with_shape_size():
     assert deviation(0.3) / deviation(0.15) == pytest.approx(1.0, rel=0.1)
 
 
+@pytest.mark.parametrize("thinness", (None, "fine"))
+@pytest.mark.parametrize("weight", ("pencil", "pen", "brush_thick", "crayon"))
+def test_the_drawn_arc_leaves_its_line_by_its_ruled_share_of_its_own_width(
+    weight: str, thinness: str | None
+):
+    """描いた絵の上で、ずれが「その道具自身の線幅の 0.6 倍」であること。
+
+    ここだけが定数と絵を結びつける。`_amplitude_px` の単体検査は定数と関数の
+    一致しか見ず、大きさ間の不変性を見る 2 本は「振幅を定数に落とした実装」でも
+    通る (どちらの図形でも同じずれが出るため)。道具と thinness で線幅を振って
+    絵の上の比を測ると、線幅を経由していない実装はここで初めて赤くなる。
+
+    契約 the-mark-stays-on-its-line.md の T-1 (ずれ / 線幅 <= 1.2) と
+    T-2 (>= 0.3) は「描いた絵で」測ることを求めていた。engine 27 ではこの比が
+    半径の 7.9〜8.5% (2.88〜12.21 線幅) で、半径に比例していた。
+    """
+    variation = {
+        "quality": "wave",
+        "amplitude": "medium",
+        "frequency": "medium",
+        "dimensions": ["radius"],
+    }
+
+    def ratio(radius: float) -> float:
+        instruction: dict = {
+            "primitive": "arc",
+            "center": [0.5, 0.5],
+            "radius": radius,
+            "angle_start": 0,
+            "angle_end": 180,
+            "weight": weight,
+            "variation": variation,
+        }
+        if thinness is not None:
+            instruction["thinness"] = thinness
+        score = Score.model_validate({"instructions": [instruction]})
+        # 雑音系ではなく wave なので 1 引きで決まるが、包絡線の推定量である
+        # ことは変わらないので複数 seed の中央値を取る。
+        deviations = [
+            _max_radial_deviation(render(score, render_seed=seed), radius * 1000.0)
+            for seed in (1, 2, 3, 7, 11)
+        ]
+        return statistics.median(deviations) / _stroke_width_px(weight, SQUARE, thinness)
+
+    expected = AMPLITUDE_WIDTHS["medium"]
+    for radius in (0.12, 0.36):
+        assert ratio(radius) == pytest.approx(expected, rel=0.05)
+    # 契約の両端。上限は「痕の上に戻ったこと」、下限は「揺らぎを消していないこと」。
+    assert 0.3 <= ratio(0.24) <= 1.2
+
+
 def test_amplitude_vocabulary_keeps_its_order():
     """fine < medium < broad の順序は比例化後も保たれる。"""
     devs = [

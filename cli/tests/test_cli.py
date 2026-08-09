@@ -2212,7 +2212,11 @@ def _render_score_client(info=None, *, info_fails=False, render_headers=None):
                 )
                 response = {
                     "score": score,
-                    "svg": "<svg></svg>",
+                    "svg": (
+                        "<svg data-ddl='true'></svg>"
+                        if sent.get("ddl")
+                        else "<svg></svg>"
+                    ),
                     "render_hash": f"rh3:{payload.get('render_engine_version', 'missing')}:{bool(sent.get('ddl'))}",
                     "render_hash_short": "ABCD",
                     "render_build_number": payload.get("build_number"),
@@ -2381,8 +2385,8 @@ def test_render_score_without_a_ddl_flag_sends_no_ddl(monkeypatch, capsys):
 
     result = _run_render_score(monkeypatch, capsys, client, "--full-json")
 
-    assert "ddl" not in client.sent[-1]
     assert result["svg"] == "<svg></svg>"
+    assert "ddl" not in client.sent[-1]
 
 
 def test_render_score_without_ddl_changes_only_server_owned_output_keys(

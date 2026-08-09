@@ -4838,3 +4838,37 @@ saijiki vocabulary comes from the server's generator, and the reader picks a lan
 - **⚠ One terminology conflict is left open.** The glossary and Android call a lineage origin `Origin`;
   **web prints `Root`** (`web/src/lib/derivation.ts`). **Filed in the ledger, to be fixed in a week that
   touches web.**
+
+### v2.11.14 — A redraw reads the description too (Build 870, 2026-08-09)
+
+**Web had been sending the description (the DDL) with every redraw, and the server had been throwing it away.**
+`/api/render-score` sat on the side that does **not** hand the DDL to coerce, so the same work was repaired
+one way when it was first drawn and another way when it was redrawn.
+**Site 4 is now wired, and the judgment matches `/api/paint`** (author ruling, 2026-08-09, option A-1).
+
+- **⚠ This changes pictures.** On the two refine paths — changing the touch by words, and redrawing with
+  another catalog — **a count or a relation stated in the description now reaches the picture**. 29 of the
+  40 golden cases move and 9 change the number of figures.
+- **The production footprint was measured before the ruling was asked for** (2,817 works, 218 lineage edges):
+  **20 of the 36 `catalog_change` edges have a DDL on the child work**, and **all 22 saved `touch_change`
+  children carry none**. **Around 20 works are in reach.**
+- **An empty DDL walks the same path as no DDL at all** (web sends `ddl ?? ''`). The accepting session called
+  the API directly: **omitting it and sending `""` return an identical score, svg and render_hash.**
+- **`inku-cli render-score` now talks to the endpoint it is named after** (author ruling B-1). It had been
+  posting to `/api/render-svg`, so the subcommand and its destination disagreed.
+- **Two flags were added** — `--ddl-text` and `--ddl-file` (`-` reads stdin); naming both is an error.
+  **The CLI can now walk coerce's DDL branch without going through an LLM**, which is what the conventions
+  ask for when they say feature tests run through `inku-cli`.
+- **`RenderScoreRequest` gained `svg_profile`** so the moved CLI keeps its existing `--svg-profile`. **The
+  default is `display`, which is the profile `/api/render-score` already drew with**, so neither web path moves.
+- **⚠ Three keys in the CLI's artifact move**, as a consequence of the new destination: **`score` goes from
+  what was sent to what coerce returned**, and **`render_hash` / `render_hash_short` go from the CLI's own
+  rh2 to the server's rh3**. **With the seed pinned, the `svg` is byte-identical** (measured in acceptance).
+- **⚠ Without `--render-seed`, `render_seed` moves too** — from `null` to the seed the picture was actually
+  drawn with. **The accepting session found this fourth difference; the completion report listed three.**
+  An artifact that names its own seed is an improvement, but the value does change.
+- **⚠ Two functions in the CLI are now unreachable** — `_server_render_versions` and `_render_hash_for_score`
+  lost their only caller when the server started returning the versions and the hash. **Filed in the ledger.**
+- **Checks:** **server 2,626 → 2,631 passed / 31 skipped**, **cli 188 → 195 passed** (nothing removed), ruff
+  clean on both, and **the frozen corpora and `coerce_golden.json` do not move by a byte** — the positive form
+  of "coerce itself was not touched". **All seven perturbations were re-applied by the accepting session.**

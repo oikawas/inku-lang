@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.14 unreleased baseline (Web Build 870)
+
+Updated the 13 places that name a version to v2.11.14 / Build 870, and **added two flags to "Input and output" in the `inku-cli` reference**.
+
+- **`--ddl-text DDL` and `--ddl-file PATH`** — both are `render-score` only and **hand the instructions to coerce**. With them, the same repairs that run in paint (a stated count, a stated relation) run here too. `--ddl-file -` reads standard input, and naming both is an error. **Omit them and nothing changes.**
+- **Redrawn pictures change.** "Change the touch by words" and "redraw with another catalog" **were already sending the description to the server, which was not reading it**. Now it does, so **a redraw is repaired the same way the first drawing was**.
+- **Nothing was added to the interface.** The Web UI steps are unchanged.
+
 ## 2026-08-09 — v2.11.13 unreleased baseline (Web Build 869)
 
 The 13 places that name a version were updated to v2.11.13 / Build 869. **No manual text changed** — no screen action, CLI flag, setting or response key moved.

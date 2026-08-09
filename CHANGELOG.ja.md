@@ -4539,3 +4539,35 @@ server の生成物へ移し、読み手が設定から言語を選べるよう�
   `testTheSettingsScreenOffersTheChoiceAndTheTreeIsProvided` だけが赤くなることを確認した）
 - **⚠ 用語の食い違いを 1 件残した** — 系譜の起点を、辞書と Android は `Origin`・
   **web は `Root`** と出している（`web/src/lib/derivation.ts`）。**台帳へ起票し、web を触る周に直す**
+
+### v2.11.14 — 描き直しも、記述を読む（Build 870、2026-08-09）
+
+**web は描き直しのたびに記述（DDL）を server へ送っていたのに、server が受け取って捨てていた。**
+`/api/render-score` は coerce を呼ぶ 5 箇所のうち **DDL を渡していない側**にいたので、
+同じ作品でも「最初に描く」ときと「描き直す」ときで補修の判定が違っていた。
+**site 4 を結線し、判定を `/api/paint` と揃えた**（作者裁定 2026-08-09・A-1）。
+
+- **⚠ これは絵が変わる改修である。** 言葉でタッチを変える経路と、別のカタログで描き直す経路で、
+  **記述に書いた本数や関係が絵に届くようになった**。golden 40 中 29 が動き、9 は図形の本数まで変わる
+- **本番の足跡を測ってから裁定を仰いだ**（2,817 作品 / 系譜の辺 218 本）—
+  **`catalog_change` 36 辺のうち子作品に DDL があるのは 20**、
+  **`touch_change` 25 辺のうち保存された 22 件は DDL が全部 NULL**。**動きうるのは 20 作品規模である**
+- **空の DDL は「渡さない」と同じ道を通る**（web は `ddl ?? ''` を送る）。
+  受け入れで API を直接叩いて確かめた —— **省略と `""` で score・svg・render_hash が完全一致**
+- **`inku-cli render-score` が自分の名前の宛先を叩くようになった**（作者裁定 B-1）。
+  これまで `render-score` は `/api/render-svg` を叩いており、名前と宛先が食い違っていた
+- **旗を 2 つ足した** —— `--ddl-text` と `--ddl-file`（`-` は標準入力）。同時指定はエラー。
+  **これで「LLM を通らずに coerce の DDL 分岐を踏む」経路が CLI にできた**（実行規約「機能テストは `inku-cli` を通す」）
+- **`RenderScoreRequest` に `svg_profile` を足した** —— 宛先を移した CLI が既存の `--svg-profile` を保つため。
+  **既定は `display` で、これは移す前に `/api/render-score` が描いていたプロファイルと同じ**（web の 2 経路は 1 バイトも変わらない）
+- **⚠ CLI の成果物の鍵が 3 つ動く**（宛先が変わった帰結）:
+  **`score` は送った物から coerce 後へ**、**`render_hash` / `render_hash_short` は CLI 計算の rh2 から server 計算の rh3 へ**。
+  **seed を固定すれば `svg` はバイト一致する**（受け入れで実測）
+- **⚠ `--render-seed` を渡さない場合、`render_seed` も動く** —— **`null` から実際に描いた seed へ**。
+  **これは受け入れで見つけた 4 つ目の差で、完了レポートには挙がっていなかった**。
+  成果物が「描かれた seed」を名乗るようになるので**改善だが、鍵の値は変わる**
+- **⚠ CLI に遊んだ関数が 2 つ残った** —— `_server_render_versions` と `_render_hash_for_score` は
+  どこからも呼ばれなくなった（版数の問い合わせと hash 計算を server が返すようになったため）。**台帳へ起票した**
+- **検査:** **server 2,626 → 2,631 passed / 31 skipped**・**cli 188 → 195 passed**（削除 0）・ruff 両方 clean・
+  **凍結コーパスと `coerce_golden.json` は 1 バイトも動いていない**（coerce の判定を触っていないことの肯定形）。
+  **摂動 7 本は受け入れ側で全部当て直した**

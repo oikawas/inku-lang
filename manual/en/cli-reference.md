@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions of regular users, group leads, and administrators.
 
-It covers inku v2.11.13 (Web Build 869).
+It covers inku v2.11.14 (Web Build 870).
 
 ## Basics
 
@@ -52,6 +52,8 @@ paint and batch take the same flags. **A flag you omit falls back to the server 
 | `--png` | Also write PNG when `--out-dir` is set |
 | `--svg-profile {display,editable,compat}` | SVG profile for saved files |
 | `--input-mode {paint,ddl}` | `paint` sends prose through Stage 1; `ddl` sends instructions straight to Stage 2 and the performance |
+| `--ddl-text DDL` | **`render-score` only.** Hands the instructions to coerce, so the instruction-driven repairs run as they do in paint (a stated count or relation reaches the picture). **Omit it and those repairs stay off, as before** |
+| `--ddl-file PATH` | **`render-score` only.** Reads the instructions from a file; `-` means stdin. Cannot be combined with `--ddl-text` |
 | `--save-history` | Save to the server's history |
 | `--save-artifacts` / `--no-save-artifacts` | Whether the server stores artifacts |
 | `--full-json` | Print the full response |

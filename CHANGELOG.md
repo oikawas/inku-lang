@@ -4872,3 +4872,38 @@ one way when it was first drawn and another way when it was redrawn.
 - **Checks:** **server 2,626 → 2,631 passed / 31 skipped**, **cli 188 → 195 passed** (nothing removed), ruff
   clean on both, and **the frozen corpora and `coerce_golden.json` do not move by a byte** — the positive form
   of "coerce itself was not touched". **All seven perturbations were re-applied by the accepting session.**
+
+### v2.11.15 — The cycle does not invent an order (Build 871, 2026-08-09, ddl-engine 8, 9)
+
+**A `color_cycle` hands one color to each member in turn. It has no head and no ranking** — and yet coerce
+had been writing two kinds of order into it ([I-060]).
+
+- **① The same color was landing in it twice.** `_with_color_cycle_delivery` inserted the instruction's own
+  color at the front **without looking**, so a color already in the cycle **took twice the members**. Nobody
+  asked for that weighting, and **its size depended on how long the cycle happened to be**. **207 of the
+  3,391 production cycles (6.1%), across 204 works (7.4%), had this shape.**
+- **② New colors were being dropped entirely.** `_color_repair_order` filtered the requested colors through
+  **a six-word table that predates yellow, orange and purple**, so **naming one old color threw all the new
+  ones away** (`{red, yellow}` → `[red]`). The table is now **a known order for determinism rather than a
+  ranking**, and **colors it does not name follow it instead of falling out**.
+- **③ A delivered color could not reach a primary stroke on the same pass** (ddl-engine 9, an author ruling
+  that widened the contract). **The promotion can only see colors a cycle already carries**, yet it ran
+  **before** the repair that puts them there. Production makes one pass, so **running the same input through
+  coerce twice gave two different scores**. The two now run **repair, then promote**.
+- **The promotion no longer takes a stroke that already carries a color the description asked for.** An
+  instruction has a single primary stroke, so promoting onto it a second time undoes the first — **across
+  passes, red and blue traded the same stroke back and forth forever**.
+- **The crescent guard now looks at the cycle's green as well.** It stopped firing the moment an earlier
+  promotion rewrote `color`, and **the green stayed in the cycle for the renderer to draw**.
+- **`ddl_engine_version` 7 → 9.** `ddl-engine-8/` and `ddl-engine-9/` were baked. **From 8 to 9, 8 of the 21
+  b_coerce cases and 4 golden cases move, and the 13 a_expand cases do not move by a byte.** **Non-idempotent
+  cases go from 5 to 3** (the remaining three move coordinates and `weight`, not color, by another mechanism).
+- **⚠ Raising the version turns six places red** that had written down "7" (`test_ddl_reference.py` 1,
+  `test_api.py` 4, and one Android reference fixture). **The contract did not predict this.**
+- **⚠ Android's `ReferenceCorpus.kt` still says `7`** and is now two versions behind the server. **It does not
+  go red, because the reference fixtures live in per-version directories**; catching up belongs to the Android track.
+- **Checks:** **server 2,631 → 2,658 passed / 31 skipped** (nothing removed, 27 added), **cli 195 passed**
+  (unchanged), **Android JVM 263 green**, ruff clean on server and cli, and **the frozen corpora are
+  byte-identical on darwin**. **Ten perturbations were applied to ten acceptance tests.** **⚠ Removing the
+  promotion guard does not turn the idempotence tests red** — only the two `test_t10_*` tests hold it, so
+  **deleting those two leaves the guard with no observation point.**

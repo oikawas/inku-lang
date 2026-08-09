@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.15 unreleased baseline (Web Build 871)
+
+The 13 places that name a version were updated to v2.11.15 / Build 871. **No manual text changed** — no screen action, CLI flag, setting or response key moved.
+
+- **The drawings do change.** When a description names two or more colors, **how they are handed out** changes. Colors go to the elements one at a time in turn, so **there is no first color and no ranking**. Two kinds of order were being added anyway.
+- **Mixing an old color with a new one no longer loses the new one.** Writing something like "red and yellow" — **any of white, black, blue, red, green, gray together with any of yellow, orange, purple — used to drop the latter entirely**. Both now arrive.
+- **Naming the same color twice no longer gives it twice the elements.** How much extra weight it got **depended on how many colors happened to be in the cycle**, so it never meant what was written.
+- **A color the description asks for reaches a primary stroke within the same drawing.** It used to need a second pass over the same description, so **one input produced two different results.**
+- **Nothing was added to the interface.** How you write a description is unchanged.
+
 ## 2026-08-09 — v2.11.14 unreleased baseline (Web Build 870)
 
 Updated the 13 places that name a version to v2.11.14 / Build 870, and **added two flags to "Input and output" in the `inku-cli` reference**.

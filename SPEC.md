@@ -3078,17 +3078,24 @@ and compresses rotated logs.
 
 The server stores this policy in `app_settings.log_retention_settings` as
 `enabled`, `retention_days`, `rotate`, and `compress`.  `INKU_LOG_RETENTION_DAYS`
-and `INKU_LOG_ROTATE` provide initial values.  `GET /api/settings/status`
-returns the current policy with generated `logrotate` and `systemd` drop-in
-previews for `inku-server` and `inku-api`; `PUT /api/settings/log-retention` is
-admin-only and updates the stored policy.  Applying those generated files to the
-host OS remains an operational task that requires server privileges.
+and `INKU_LOG_ROTATE` provide initial values.  `PUT /api/settings/log-retention`
+is admin-only and updates the stored policy.
 
-The generated systemd preview uses
-`StandardOutput=journal+append:/var/log/inku/<service>.log` and the matching
-`StandardError` value so operators can follow logs through both
-`journalctl -fu <service>` and retained file logs.  `inku-api` and `inku-server`
-also print startup banners wrapped in 60-character `=` borders; the banners
+**The application executes this policy itself.**  The server writes its log files
+under `INKU_LOG_DIR` (`~/.local/share/inku/logs` by default, `/data/logs` in the
+container image), keeps one generation per retained day, gzips rotated files when
+compression is on, and prunes older generations on its own.
+`GET /api/settings/status` returns the current policy together with **the log
+directory and the files present in it**.  **There are no generated files to apply
+to the host OS.**  This matches the shape of the database backup policy, and it
+was chosen because a policy the platform executes cannot be the same policy in the
+container distribution, which has neither systemd nor logrotate.
+
+**The same lines keep going to stdout**, so operators can follow logs through
+`journalctl -fu <service>` and through `docker logs` as before.  In the container
+distribution, `logging` in `compose.yaml` caps what the daemon collects from
+stdout.  `inku-api` and `inku-server` also print startup banners wrapped in
+60-character `=` borders; the banners
 include the service role, application version, build number, build date, mode,
 listen host/port, runtime / platform, and log destination.  The API banner
 includes the active render engine ID and version.  The API and web UI use

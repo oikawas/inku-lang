@@ -1985,9 +1985,11 @@ CLI の `paint` と `batch` も、保存する SVG ファイルのために `--s
 
 **サーバーログの保持も管理者が管理するサーバー全体の設定である。** 設定ダイアログは管理者専用の「ログ保持」タブを持ち、アプリケーションログの保持の有効化・無効化、保持日数、日次／週次／月次のローテーション間隔、ローテーション済みログの圧縮を扱う。既定の方針は有効・日次ローテーション・90 日保持・圧縮あり。
 
-サーバーはこの方針を `app_settings.log_retention_settings` に `enabled`・`retention_days`・`rotate`・`compress` として保存する。`INKU_LOG_RETENTION_DAYS` と `INKU_LOG_ROTATE` が初期値を与える。`GET /api/settings/status` は現在の方針を、`inku-server` と `inku-api` 向けに生成した `logrotate` と `systemd` の drop-in のプレビューとともに返す。`PUT /api/settings/log-retention` は管理者専用で、保存された方針を更新する。**生成されたファイルをホスト OS へ当てるのは、サーバー権限を要する運用作業のままである。**
+サーバーはこの方針を `app_settings.log_retention_settings` に `enabled`・`retention_days`・`rotate`・`compress` として保存する。`INKU_LOG_RETENTION_DAYS` と `INKU_LOG_ROTATE` が初期値を与える。`PUT /api/settings/log-retention` は管理者専用で、保存された方針を更新する。
 
-生成される systemd のプレビューは `StandardOutput=journal+append:/var/log/inku/<service>.log` と対応する `StandardError` を使うので、運用者は `journalctl -fu <service>` と保持されたファイルログの両方からログを追える。`inku-api` と `inku-server` は 60 文字の `=` で囲んだ起動バナーも出す。バナーはサービスの役割・アプリケーション版数・Build 番号・ビルド日・モード・待ち受けのホストとポート・実行環境／プラットフォーム・ログの出力先を含む。API のバナーは有効な render engine の ID と版数を含む。API と Web UI は役割に合った異なる絵文字の組を使う。
+**この方針を実行するのはアプリケーション自身である。** サーバーはログファイルを `INKU_LOG_DIR`（既定は `~/.local/share/inku/logs`、コンテナ配布版のイメージは `/data/logs`）へ書き、保存日数ぶんの世代を保ち、圧縮が有効なら回転済みを gzip にし、古い世代を自分で削除する。`GET /api/settings/status` は現在の方針を、**書き出し先といまあるファイルの一覧**とともに返す。**ホスト OS へ当てる生成ファイルは無い。** これは DB バックアップの方針と同じ形であり、**プラットフォームが実行する方針は systemd も logrotate も持たないコンテナ配布版で同じにならない**ため、こちらへ揃えた。
+
+**同じ行は標準出力にも出続ける**ので、運用者は `journalctl -fu <service>` とコンテナの `docker logs` をこれまでどおり使える。コンテナ配布版では、daemon が標準出力から集めるぶんの上限を `compose.yaml` の `logging` が持つ。`inku-api` と `inku-server` は 60 文字の `=` で囲んだ起動バナーも出す。バナーはサービスの役割・アプリケーション版数・Build 番号・ビルド日・モード・待ち受けのホストとポート・実行環境／プラットフォーム・ログの出力先を含む。API のバナーは有効な render engine の ID と版数を含む。API と Web UI は役割に合った異なる絵文字の組を使う。
 
 ---
 

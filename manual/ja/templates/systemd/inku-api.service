@@ -13,9 +13,9 @@ Environment=UV_CACHE_DIR=/tmp/inku-uv-cache
 ExecStart=/usr/local/bin/uv run inku-server
 Restart=on-failure
 RestartSec=5
-LogsDirectory=inku
-StandardOutput=journal+append:/var/log/inku/inku-api.log
-StandardError=journal+append:/var/log/inku/inku-api.log
+# Logging: the application writes and rotates its own file under INKU_LOG_DIR,
+# and these lines also go to the journal. Do not add StandardOutput=journal+append:
+# -- systemd cannot parse that specifier and ignores the whole line.
 
 [Install]
 WantedBy=multi-user.target

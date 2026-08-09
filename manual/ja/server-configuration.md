@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v2.11.11（Web Build 867）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v2.11.12（Web Build 868）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -237,7 +237,7 @@ Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費
 | DB | 履歴、系譜、ユーザー、設定の正本 |
 | `INKU_SECRET_KEY_FILE` | provider key復号に必須 |
 | `/etc/inku/inku-api.env` | runtime設定 |
-| systemd／reverse proxy／logrotate | service復旧 |
+| systemd／reverse proxy | service復旧 |
 | artifact | 再生成可能だが運用上必要な場合 |
 
 SQLite backup directoryは`INKU_DB_BACKUP_DIR`で変更できます。Web管理UIの手動／定期backupには世代管理があります。外部backupも併用し、DBと暗号化鍵を同じ復旧点で保管します。
@@ -260,7 +260,7 @@ journalctl -u inku-api.service -n 100 --no-pager
 journalctl -u inku-server.service -n 100 --no-pager
 ```
 
-`manual/ja/templates/logrotate/inku`はdaily、90世代、compress、copytruncateの例です。管理UIのlog policyはpreviewと設定記録であり、OSへの適用は管理者が行います。
+管理UIのlog policy（有効／保存日数／周期／圧縮）は**アプリ自身が実行します**。書き出し先は`INKU_LOG_DIR`（既定は`~/.local/share/inku/logs`、コンテナ配布版は`/data/logs`）で、回転・圧縮・古い世代の削除もアプリが行います。logrotateの設定は不要です。**同じ行が標準出力にも出続けます**ので、`journalctl`とコンテナの`docker logs`はこれまでどおり使えます。コンテナ配布版では、daemonが標準出力から集めるぶんの上限を`compose.yaml`の`logging`が持ちます。
 
 ## 10. systemd
 

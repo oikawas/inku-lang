@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.12 unreleased baseline (Web Build 868)
+
+Updated the 13 places that name a version to v2.11.12 / Build 868, and **corrected the logging guidance and the bundled templates**.
+
+- **Rewrote the logging section of `Server configuration`.** The log policy in the admin UI (enabled / retention days / interval / compression) is **executed by the application itself**. Files are written under `INKU_LOG_DIR` (`~/.local/share/inku/logs` by default, `/data/logs` in the container distribution), and the application rotates, compresses and prunes them. **No logrotate configuration is needed any more.**
+- **Removed the two `StandardOutput=journal+append:` lines from the two bundled systemd templates.** **That specifier does not exist in systemd**; it was ignored on every start. File output is the application's job now, so no systemd directive is required.
+- **Retired the `logrotate example` template and removed its link from `README`.**
+- **Output to stdout is unchanged.** `journalctl` and `docker logs` work as before. In the container distribution, `compose.yaml` now caps what the daemon collects from stdout.
+
 ## 2026-08-09 — v2.11.11 unreleased baseline (Web Build 867)
 
 The 13 places that name a version were updated to v2.11.11 / Build 867, and **two passages changed**.

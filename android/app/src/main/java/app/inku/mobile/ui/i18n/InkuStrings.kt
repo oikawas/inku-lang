@@ -125,6 +125,200 @@ interface InkuStrings {
     val errorBaseUrlInvalid: String
     val errorBaseUrlInsecure: String
 
+    // --- Screens (InkuApp.kt) ----------------------------------------------
+    val refineOneKindOnly: String
+    val providerAdd: String
+    val apiKey: String
+    val apiKeyDelete: String
+    val apiKeySet: String
+    val apiKeyUnset: String
+    val apiKeySetAlready: String
+    val baseUrlChange: String
+    val drawFromDdl: String
+    val ddlOverwriteTitle: String
+    val ddlReplaySaveAsNew: String
+    val ddlEdit: String
+    val mascotSubtitle: String
+    val mascotIncu: String
+    val localModelNote: String
+    val promptOptimizationNote: String
+    val exportPngTooLarge: String
+    val pngAlphaWhite: String
+    val stagesShared: String
+    val languageComboNote: String
+    val uiModeSubtitle: String
+    val exportSubtitle: String
+    val historySelectionSubtitle: String
+    val svgDisplayNote: String
+    val mascotYuragi: String
+    val exportHeightPx: String
+    val demoRunningButton: String
+    val runningButton: String
+    val drawingButton: String
+    val drawFromDdlButton: String
+    val demoStartButton: String
+    val batchDrawButton: String
+    val starredOnly: String
+    val fullScreen: String
+    val exportButton: String
+    val settingsMisc: String
+    val replaceSuffix: String
+    val application: String
+    val export: String
+    val catalogDetail: String
+    val cancel: String
+    val canvas: String
+    val serviceId: String
+    val serviceDeleteAction: String
+    val serviceDeleteTitle: String
+    val serviceName: String
+    val serviceNameChange: String
+    val uiModeSimple: String
+    val uiModeSimpleLong: String
+    val seedPhrase: String
+    val touchWords: String
+    val download: String
+    val licenseBeforeDownload: String
+    val templateEdit: String
+    val templateAdd: String
+    val restoreDefaults: String
+    val demo: String
+    val demoPromptWriting: String
+    val demoView: String
+    val batch: String
+    val batchHistory: String
+    val versionInfo: String
+    val uiModeFull: String
+    val uiModeFullLong: String
+    val promptLabel: String
+    val searchPlaceholderLong: String
+    val promptOptimization: String
+    val mascotTitle: String
+    val model: String
+    val modelListFetch: String
+    val modelSearch: String
+    val modelSettings: String
+    val modelSelection: String
+    val publishedModels: String
+    val licenseAndDownload: String
+    val licenseAndDownloaded: String
+    val licenseAccepted: String
+    val licenseAccept: String
+    val licenseRequired: String
+    val apiKeyLocalNote: String
+    val localModels: String
+    val svgPortableNote: String
+    val provenanceHash: String
+    val workLineage: String
+    val save: String
+    val lineageEmpty: String
+    val saving: String
+    val saved: String
+    val makeCandidates: String
+    val candidateTapToReplace: String
+    val stop: String
+    val selectNone: String
+    val selectAll: String
+    val noPublishedModels: String
+    val noPublishedModelsLong: String
+    val unifiedModelNote: String
+    val downloadAgain: String
+    val sketchFromLife: String
+    val delete: String
+    val downloading: String
+    val downloadable: String
+    val downloaded: String
+    val downloadState: String
+    val cancelShort: String
+    val accepted: String
+    val name: String
+    val fixedStage1Model: String
+    val fixedStage2Model: String
+    val change: String
+    val failedLines: String
+    val demoSubtitle: String
+    val demoRunAndSeed: String
+    val sameStagePairBlocked: String
+    val history: String
+    val historyValue: String
+    val historySelection: String
+    val showThinking: String
+    val openProviderSettings: String
+    val providerKind: String
+    val paint: String
+    val drawingModel: String
+    val drawing: String
+    val renderExpression: String
+    val refinementElements: String
+    val drawingSettings: String
+    val newApiKey: String
+    val makeNewOrigin: String
+    val newWork: String
+    val wildToggle: String
+    val latest: String
+    val tapSaijikiWord: String
+    val tapWordToSelect: String
+    val search: String
+    val saijiki: String
+    val svgGeneric: String
+    val confirm: String
+    val keepCurrentValue: String
+    val producedInstructions: String
+    val producedInterpretation: String
+    val working: String
+    val lineage: String
+    val lineageLoading: String
+    val materials: String
+    val materialsClose: String
+    val edit: String
+    val svgEditable: String
+    val svgEditableNote: String
+    val renderExpressionSubtitle: String
+    val colorCatalog: String
+    val uiModeTitle: String
+    val svgDisplay: String
+    val demoInterval: String
+    val autoRepair: String
+    val interpretation: String
+    val awaitingInterpretation: String
+    val language: String
+    val miscSubtitle: String
+    val description: String
+    val settings: String
+    val saijikiTapNote: String
+    val descriptionField: String
+    val add: String
+    val ddlOverwriteBody: String
+    val selected: String
+    val close: String
+    val sameAsTargetSuffix: String
+    val renderTabArtwork: String
+    val recommendedStageSuffix: (Int) -> String
+    val parentSuffix: (String, String) -> String
+    val downloadOf: (String) -> String
+    val choiceSameAsTarget: (String) -> String
+    val optionCount: (Int) -> String
+    val batchFailureLine: (Int, String, String) -> String
+    val filteredOfTotal: (Int, Int) -> String
+    val groupAlternatives: (String) -> String
+    val lineNumber: (Int) -> String
+    val ofOneHundred: (Int) -> String
+    val apiKeyDeleteBody: (String) -> String
+    val serviceDeleteBody: (String) -> String
+    val seconds: (Int) -> String
+    val llmSummary: (String) -> String
+    val llmSummaryDot: (String) -> String
+    val qualityTier: (String) -> String
+    val batchTally: (Int, Int, Int) -> String
+    val exportOf: (String) -> String
+    val latestOf: (String) -> String
+    val remainingSeconds: (Int) -> String
+    val modelsToCompare: (Int) -> String
+    val downloadStateOf: (String, String) -> String
+    val generationOf: (Int) -> String
+    val batchElapsedTally: (String, Int, Int) -> String
+    val batchProgress: (Int, Int) -> String
+
     // --- Export -------------------------------------------------------------
     val exportTemplateBuiltinDescription: (Int) -> String
 }

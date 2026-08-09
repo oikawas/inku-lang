@@ -144,8 +144,8 @@ Android ワークスペースには、namespace `app.inku.mobile` の build 可�
 - SVG / render metadata レベルの reference compatibility tests。
   **Score レベルは 2026-07-23 に着手済み**（`ServerScoreParityTest.kt` が
   `server/tests/fixtures/stage2/` の 15 ケースと `dh1` / `rh2` の値一致を検証する。末尾の節を参照）。
-- web/server v2 世代への追随（Renderer engine 2 → 21、変奏、プラグイン、系譜）。
-  **描画層は engine 21 まで到達している**（2026-08-05 実測）。
+- web/server v2 世代への追随（Renderer engine 2 → 26、変奏、プラグイン、系譜）。
+  **描画層は engine 26 まで到達している**（2026-08-09 実測。engine 22 の塗りと道具・23 の配置 seed・24 の fade・25 の大きさ・26 の角度）。
   系譜はデータ層まで移植済みで、**UI が親を宣言する部分は未着手**（台帳の領域 `android` を参照）。
   **添景水準は v2.11.0 で軸ごと畳まれたので、追随の対象から外れた**（末尾の 2026-08-05 の節を参照）。
 

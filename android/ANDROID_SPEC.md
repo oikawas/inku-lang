@@ -180,8 +180,8 @@ Not implemented yet:
   **Score-level parity started on 2026-07-23** (`ServerScoreParityTest.kt` checks the 15
   cases in `server/tests/fixtures/stage2/` plus exact `dh1` / `rh2` values; see the final
   section).
-- Catching up with the web/server v2 generation (renderer engine 2 → 21, variation,
-  plugins, lineage). **The drawing layer has reached engine 21** (measured 2026-08-05).
+- Catching up with the web/server v2 generation (renderer engine 2 → 26, variation,
+  plugins, lineage). **The drawing layer has reached engine 26** (measured 2026-08-09: engine 22's fill and tools, 23's placement seed, 24's fade, 25's sizes, 26's angles).
   Lineage is ported as far as the data layer; **the UI does not yet declare a parent**
   (see the `android` area of the issue ledger).
   **The staffage level was folded away as an axis in v2.11.0, so it is no longer

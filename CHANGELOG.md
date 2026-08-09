@@ -4544,3 +4544,34 @@ it was added for — and the `fade` one was the weak member of the three** (ledg
   the claim of the item itself; cutting the wiring turns exactly one red; ramping an equidistant group
   turns three red (the new question plus the ring and the pair). **No version bump** — no version, API key,
   screen, or drawn pixel changes.
+
+### Android `2.1.4-android.20` — the port catches up to render engine 26 (android Build 148106, 2026-08-09)
+
+**The Kotlin drawing layer still declared engine 21, five versions behind.** Engine 22 (the fill underlay and
+the tools), 23 (the placement seed), 24 (`fade` reaching every member), 25 (per-member sizes) and 26
+(per-member angles) were all carried over in one pass, and `CompatibilityConstants.renderEngineVersion` now
+reads `"26"`. **`APP_VERSION` and `web/BUILD_NUMBER` do not move.**
+
+- **⚠ Before the catch-up, the corpus turned out to be unable to SEE five of those versions.** All 34 grouped
+  cases in the reference fixtures were circles, so only the rules that apply to a circle were ever walked.
+  **The mechanisms were not missing; the cases were.** An `arc`, a `cloudform`, a `square` and two groups that
+  state their own angle were added among others: **34 → 42 cases, 42 → 51 SVGs.**
+- **The four bake-time guards were ported.** Three map one-to-one onto the server's; the fourth was added
+  because **the `fade` guard proved weak** — it only withholds the declaration — **and the server side was
+  fixed the same day** (ledger [I-166]).
+- **Two pre-existing divergences surfaced**, both invisible while every group was a circle: the cloudform
+  contour was generated with a hard-coded `markIndex = 0`, so **every member of a group was drawn with the
+  first member's blob**, and `rotate()` was written with spaces and raw doubles.
+- **Every tool's texture filter was weaker than the server's** — the Kotlin side wrote the raw spec without
+  the material-strength coefficient (pencil 0.7 vs 1.96, crayon 1.8 vs 5.04, chalk 2.2 vs 6.16). It is a
+  display-only path, and **nothing held it.**
+- **⚠ `drypoint`'s texture filter was NOT added**: both Kotlin lookup tables name only four tools, so a
+  definition alone would be read by nobody, and **no acceptance gate could be placed on it.**
+- **⚠ Adding the non-circle cases turned one server test red.** F-2 of the Android fixture check requires
+  every anchor to carry nine decimals; a `square` anchor is `position + size/2`, **a sum, so sixteen decimals
+  there is the rule working rather than a port skipping it** — and the claim only held while the corpus was
+  all circles. **By author ruling A (ledger [I-165]) F-2 now asks it of the primitives whose anchor is a
+  stored coordinate.**
+- **Checks:** **Android JVM 243 passed, 0 red, 0 skipped (46 classes; exactly +5 from 238)**, **96 of 96
+  instrumentation tests green on a physical Pixel 9 (20 classes)**, **server pytest 2,488 passed / 31
+  skipped**, ruff clean. **All nine perturbations turned red as predicted; none missed.**

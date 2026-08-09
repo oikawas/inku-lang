@@ -4487,3 +4487,34 @@ the two machines** (resvg 0.3.3), and `inku_analysis` imports on pentala with no
   two from acceptance), **cli pytest 182** (from 176), ruff clean across `server`, `cli` and
   `shared/src`, `check_docs.py` green, frozen corpora byte-identical. **No version bump** — web
   behaviour and the API are unchanged, and **no server path imports `rasterize_batch`.**
+
+### 2026-08-09 — Eight old works stop taking the process down when exported (**no version bump**; one dependency line in `shared/`)
+
+**Eight of production's 2,769 works aborted the whole server process when asked for a PNG** (ledger I-075,
+filed 2026-08-01). The cause is a Rust assertion inside `resvg` (`filter/displacement_map.rs`), and **a Rust
+panic is not a Python exception, so `try: … except Exception:` catches none of it.** The PNG save at
+`api_core/rendering.py:85` is written in exactly that shape — **it looked defended and was not.** `inku-api`
+runs as **a single uvicorn worker** (no `--workers`), so **one export killed the API and every request in
+flight with it.**
+
+**Raising `resvg-py` from `>=0.3.3` to `>=0.3.4` fixes all eight.**
+
+- **0.3.4 was published 2026-08-02 — the day after the ticket.** Raising the version was not an option when
+  the ticket was written.
+- **Measured as a pair, through the call the product makes** (`svg_to_bytes(svg_string=…, width=…)`):
+  **0.3.4 burns all eight at no width, 320 and 2160; 0.3.3 fails six, eight and six of them.**
+  **⚠ Which ones fail depends on the width**, so "it fails at every size" was imprecise.
+- **The pixels do not move.** 120 SVGs carrying `feDisplacementMap` are byte-identical under both versions;
+  **the Mac and pentala agree 24/24 under 0.3.4** (as they did under 0.3.3); and the 24 PNGs burned under
+  0.3.3 are byte-identical to the 24 burned under 0.3.4.
+- **⚠ Only old works abort.** **None of the 1,065 filter-bearing works at render engine 11 or later fail**
+  (7 of 790 at engine 10 or earlier, 1 of 89 with no recorded version). Recent engines carry *more*
+  filter-bearing works, so this is not a skewed population: **the renderer stopped emitting the shape that
+  trips the assertion somewhere before engine 11.**
+- **The regression fixture is one of the eight** (production `4c257de0`, engine 4, Build 591) rather than
+  something built from a Score, **because that shape is no longer generated.** It burns through
+  `rasterize_dir` — one child process per file — so **a returning panic lands as one red test instead of
+  killing pytest.**
+- **Checks:** **server pytest 2,486 passed / 31 skipped** (from 2,485: **+1 test, +1 case**), **cli 182**,
+  ruff clean, frozen corpora byte-identical (they compare SVG, which the rasterizer version cannot move).
+  **No version bump** — no version number, API key or screen changes.

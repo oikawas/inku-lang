@@ -91,7 +91,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
 | Render Engine | 28 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 7 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.20` | `android/VERSION`（web / server とは別の名前空間） |
+| Android | `2.1.4-android.21` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
 
 ### 語彙
@@ -192,6 +192,8 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 詳細の正本は `android/ANDROID_SPEC.ja.md`。
 **server を正本として後から追随する形であり、server の設計を Android に合わせて曲げない。**
 追随の遅れは常にありうるので、Android の版数と server の版数を同じものとして読まない。
+UI は日英で、切替は設定画面から行う（既定は `ja`）。
+画面の文言は Kotlin の言語パックが、歳時記の語彙は `server/scripts/gen_saijiki_kt.py` の生成物が持つ。
 
 ### 検査面
 

@@ -369,8 +369,10 @@ Function-level parity table from prompt to rendering:
 | History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | Store the same user-visible data: input, DDL, Score, SVG, metadata, model IDs, catalog/canvas, hash, and timestamps. |
 | Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | Let both server and Android save history, and keep history_id, DDL, hash, and catalog in summaries. |
 
-Saijiki parity is checked category by category. Android UI word groups must
-match `web/src/lib/saijiki.ts` and `web/src/lib/i18n/ja.ts`. Server Stage 1 is
+Saijiki parity is held by generation. The Android UI word groups are not copied
+by hand: `server/scripts/gen_saijiki_kt.py` bakes `SaijikiGenerated.kt` out of
+`saijiki.py` (10 categories and 73 words in each language) and the screen reads
+that. `server/tests/test_saijiki_kt_is_current.py` keeps it fresh. Server Stage 1 is
 checked against the saijiki list and allowed action verbs in `interpreter.py`.
 The verb `draw` / `描く`, which is not exposed by the web UI, is not exposed as
 an independent Android word either; it is handled only when it appears in DDL or

@@ -4790,3 +4790,51 @@ where the tool meets the paper.
   invariance checks would pass for an implementation that returned a fixed amplitude** (full marks 8;
   eight red when the yardstick goes back to the representative size, four when `thinness` stops
   reaching the width).
+
+### Android `2.1.4-android.21` — the interface speaks the reader's language (android Build 148106, 2026-08-09)
+
+**Android alone was pinned to Japanese.** The wording of the interface now comes from a language pack, the
+saijiki vocabulary comes from the server's generator, and the reader picks a language in the settings
+(default `ja`; ledger [I-065]). **`APP_VERSION` and `web/BUILD_NUMBER` do not move.**
+
+- **The saijiki went from a hand copy to a generated file** — `server/scripts/gen_saijiki_kt.py` bakes
+  `SaijikiGenerated.kt` out of `saijiki.py`, in the same shape as web's `gen_saijiki_ts.py`. **The vocabulary
+  the screen holds went from 9 categories and 62 words (Japanese only) to 10 categories and 73 words in
+  both languages.**
+- **⚠ Why it had drifted is now known.** Android synchronised its "touch" category to ten words on
+  2026-07-26, **and a test asserting those exact ten words was written the same week.** **The server put
+  silverpoint back into the vocabulary the next day**, and **because the test held the previous day's value
+  as its expectation, it stayed green while guarding the drift.** That test now reads the Stage 1 prompt's
+  enumeration instead, silverpoint included.
+- **The interface reads its wording from a pack** — `InkuStrings` as an interface plus `InkuStringsJa` and
+  `InkuStringsEn`, **254 keys each**. No `res/values-en/`: that would follow the device locale. **Errors are
+  translated where they are shown, not where they are thrown** (`InkuFailure`); thirteen call sites had been
+  putting `error.message` straight on screen.
+- **The new lint counts 446 hardcoded strings at the branch point and 0 after** (452 Japanese literals less
+  6 named exclusions).
+- **Choosing a language changes three things at once** — the wording, the saijiki vocabulary, and the
+  language a work is written in. The stored key is `ui_lang`, the same name the server uses, and an unknown
+  stored value falls back to `ja` rather than raising.
+- **⚠ Drawing behaviour changed.** Android never passed `instructionLang`, so it never entered the `auto`
+  branch and **drew even an English description with the Japanese Stage 1 prompt.** Web sends the constant
+  `'auto'` every time and the server uses `ui_lang` as the fallback for `auto`. **All five drawing paths now
+  send `AUTO` and `uiLang` explicitly**, which is the "same judgment" the conventions require (§2-4). **An
+  English description is now read as English even while the interface is in Japanese** (author ruling,
+  2026-08-09).
+- **⚠ One of the sixteen files the contract forbade was changed, by two lines** (author ruling, 2026-08-09).
+  `LocalFallbackPipeline.kt` holds both calls to `resolveWithUiLang` and was the only place the wiring could
+  land. **The change passes an argument and nothing else: the Japanese literals across those sixteen files
+  stand at 1,386, unchanged**, counted at the branch point and at the branch tip by the accepting session.
+- **The saijiki had nine colours for ten categories**, and `index % size` made the tenth collide with the
+  first instead of failing. A tenth colour was added and `android/design/preview/color.html` was rebaked.
+- **Checks:** **Android JVM 263 passed, 0 red, 0 skipped (49 classes, up 20 from 243)**, **96 of 96
+  instrumentation tests green on a physical Pixel 9** (measured on the branch; **`app/src/main` and
+  `app/src/androidTest` in the merged tree hash identically to the branch**), **server pytest 2,626 passed /
+  31 skipped**, ruff clean. **The implementation ran ten perturbations** (the nine predicted plus one:
+  **P-5, deleting a key from the English pack, fails to compile before any test runs, so the observation
+  point moved to "the English pack answers in Japanese"**) **and the accepting session added one more** —
+  **stage 3 ① had no perturbation aimed at it**; pinning the pack to a constant turns exactly
+  `testTheSettingsScreenOffersTheChoiceAndTheTreeIsProvided` red.
+- **⚠ One terminology conflict is left open.** The glossary and Android call a lineage origin `Origin`;
+  **web prints `Root`** (`web/src/lib/derivation.ts`). **Filed in the ledger, to be fixed in a week that
+  touches web.**

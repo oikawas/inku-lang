@@ -104,7 +104,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 28 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 7 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.20` | `android/VERSION` (a namespace separate from web and server) |
+| Android | `2.1.4-android.21` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -232,6 +232,9 @@ device.
 `android/ANDROID_SPEC.ja.md` is canonical for its detail.
 **It follows server as the source of truth and server design is never bent to match Android.**
 It can lag at any time, so an Android version number must not be read as the server version.
+Its interface is bilingual and the language is chosen in the settings screen (default `ja`).
+A Kotlin language pack holds the wording; `server/scripts/gen_saijiki_kt.py` generates the saijiki
+vocabulary.
 
 ### Verification surfaces
 

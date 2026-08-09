@@ -318,8 +318,9 @@ web/server との parity を優先する。
 | History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | saved input、DDL、Score、SVG、metadata、model IDs、catalog/canvas、hash、timestamps を同じ user-visible data として保持する。 |
 | Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | server/android とも履歴保存可能にし、summary に history_id、DDL、hash、catalog を残す。 |
 
-Saijiki parity は category-by-category で確認する。Android UI の word groups は
-`web/src/lib/saijiki.ts` / `web/src/lib/i18n/ja.ts` と一致させる。server Stage 1 は
+Saijiki parity は生成で担保する。Android UI の word groups は手で写さず、
+`server/scripts/gen_saijiki_kt.py` が `saijiki.py` から焼く `SaijikiGenerated.kt`（日英各 10 分類 73 語）
+を画面が読む。鮮度は `server/tests/test_saijiki_kt_is_current.py` が見る。server Stage 1 は
 `interpreter.py` の saijiki list と allowed action verbs を参照する。Web UI が exposed していない
 `描く` は Android UI でも独立 word としては出さず、DDL / model output に現れた場合のみ pipeline で扱う。
 Score coercion / fallback / repair では、`katachi` を primitive、`tezawari` を weight、

@@ -141,12 +141,16 @@ def api_history_svg(
         svg = item.get("svg", "")
     else:
         try:
-            svg = _render_score_svg(
+            # The work is already in hand here, so it supplies its own colors:
+            # this redraw is the same work, and re-resolving the id would give
+            # it today's definition instead of the one it was drawn with.
+            svg, _, _ = _render_score_svg(
                 item.get("score", {}),
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,
                 composition_seed=item.get("composition_seed"),
                 wild=bool(item.get("render_wild")),
+                work=item,
             )
         except HTTPException:
             raise

@@ -556,7 +556,8 @@ usage: inku-cli render-score [-h] [--base-url BASE_URL]
                              [--render-seed RENDER_SEED]
                              [--composition-seed COMPOSITION_SEED]
                              [--catalog-id CATALOG_ID]
-                             [--color-catalog COLOR_CATALOG] [--full-json]
+                             [--color-catalog COLOR_CATALOG]
+                             [--from-work WORK_ID] [--full-json]
                              [score]
 
 positional arguments:
@@ -583,6 +584,9 @@ options:
                         color catalog id (legacy alias)
   --color-catalog COLOR_CATALOG
                         server color catalog id
+  --from-work WORK_ID   draw in the colors that work was drawn in, not in
+                        today's definition of its catalog; a renamed or
+                        retired catalog still draws
   --full-json           print SVG and Score as well
 
 ```

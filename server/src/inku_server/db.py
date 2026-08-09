@@ -20,6 +20,7 @@ from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, Fore
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
 from .identity import description_hash
 from .limits import normalize_limits
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
@@ -605,7 +606,32 @@ def _migrate_columns() -> None:
                 except Exception as exc:  # noqa: BLE001
                     raise RuntimeError(f"failed to create migration index {index_name}") from exc
         _backfill_render_hashes(conn)
+        _migrate_renamed_catalog_nameplates(conn)
         _migrate_history_search(conn)
+
+
+def _migrate_renamed_catalog_nameplates(conn) -> None:
+    """Point the display column at the id a renamed catalog answers to today.
+
+    Only `catalog_id` moves. `render_color_catalog_id` is the id the work was
+    DRAWN with, and the renderer hashes it into the seed that assigns each
+    chromatic work color, so rewriting it would repaint the work out of its own
+    unchanged snapshot -- the very silence this whole change exists to end
+    (author's ruling 2026-08-09). `render_color_map` is never touched by
+    anything here.
+
+    Idempotent: after the first pass no row matches an old id any more.
+    """
+    for old_id, new_id in RENAMED_COLOR_CATALOG_IDS.items():
+        try:
+            conn.execute(
+                text("UPDATE history SET catalog_id = :new_id WHERE catalog_id = :old_id"),
+                {"new_id": new_id, "old_id": old_id},
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                f"failed to migrate renamed color catalog nameplate: {old_id} -> {new_id}"
+            ) from exc
 
 
 def _migrate_history_search(conn) -> None:

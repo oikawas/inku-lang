@@ -17,6 +17,29 @@ SWATCH_KEY_ORDER = (
     "red", "orange", "yellow", "green", "blue", "purple", "black", "gray", "white",
 )
 
+# Catalogs that were renamed. Works saved before a rename still carry the old
+# id, and this table is the only thing that can read it back.
+#
+# It is a nameplate table, never a color one. The colors a work was drawn in
+# live in that work's own snapshot, and the id is also seed material for the
+# chromatic work-color assignment (renderer._WORK_COLOR_SEED_FIELDS), so
+# rewriting the id a work was DRAWN with would repaint it out of the very same
+# map -- measured 2026-08-09: 38-70% of seeds land on a different assignment
+# across these nine pairs. Hence the migration that uses this touches the
+# display column only, and this table is otherwise read at display time.
+RENAMED_COLOR_CATALOG_IDS: dict[str, str] = {
+    "japanese": "ink_season",
+    "mexican": "vivid_material",
+    "indian": "dye_earth",
+    "british": "weathered_heritage",
+    "egyptian": "desert_mineral",
+    "impressionism": "open_air_light",
+    "greek": "sea_stone",
+    "renaissance": "fresco_study",
+    "nordic": "cool_material",
+    "chinese": "ink_porcelain",
+}
+
 _CATALOG_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {
         "id": "default",
@@ -301,6 +324,19 @@ def get_color_catalog(catalog_id: str | None) -> dict[str, Any] | None:
         if catalog["id"] == resolved:
             return dict(catalog)
     return None
+
+
+def current_color_catalog_id(catalog_id: str | None) -> str | None:
+    """Today's id for a possibly-renamed one.
+
+    Returns None when nothing current answers to it -- a retired catalog. That
+    is a fact about the nameplate only: a work carrying a retired id still
+    draws, because its colors come from its own snapshot.
+    """
+    if catalog_id is None:
+        return DEFAULT_COLOR_CATALOG_ID
+    resolved = RENAMED_COLOR_CATALOG_IDS.get(catalog_id, catalog_id)
+    return resolved if get_color_catalog(resolved) is not None else None
 
 
 def render_color_map_for_catalog(catalog_id: str | None) -> dict[str, str] | None:

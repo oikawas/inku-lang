@@ -8,7 +8,7 @@ import urllib.request
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from ...color_catalogs import color_catalogs
+from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 from ...languages import stage_prompts_for_lang
 from ...plugins import DOCUMENT_PLUGIN_MANAGER
@@ -48,6 +48,10 @@ class AppInfoResponse(BaseModel):
 class ColorCatalogsResponse(BaseModel):
     default_catalog_id: str
     catalogs: list[dict]
+    # Old id -> the id it answers to today. A client holding a work saved
+    # before a rename has no other way to name the catalog it was drawn with;
+    # an id in neither `catalogs` nor here is retired.
+    renamed_catalog_ids: dict[str, str]
 
 
 class DemoInstructionBody(BaseModel):
@@ -84,7 +88,11 @@ def api_info() -> AppInfoResponse:
 
 @router.get("/api/color-catalogs", response_model=ColorCatalogsResponse)
 def api_color_catalogs() -> ColorCatalogsResponse:
-    return ColorCatalogsResponse(default_catalog_id="default", catalogs=color_catalogs())
+    return ColorCatalogsResponse(
+        default_catalog_id="default",
+        catalogs=color_catalogs(),
+        renamed_catalog_ids=dict(RENAMED_COLOR_CATALOG_IDS),
+    )
 
 
 @router.get("/api/models", response_model=ModelSettingsResponse)

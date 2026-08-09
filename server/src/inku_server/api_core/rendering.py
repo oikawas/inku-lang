@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import HTTPException
-from ..color_catalogs import get_color_catalog, render_color_map_for_catalog
+from ..color_catalogs import DEFAULT_COLOR_CATALOG_ID, get_color_catalog, render_color_map_for_catalog
 from ..coerce import coerce_score
 from ..ddl_expander import VARIATION_AMPLITUDES
 from ..interpreter import _sanitize_placement_words
@@ -158,7 +158,13 @@ def _render_score_svg(
     render_seed: int | None = None,
     composition_seed: int | None = None,
     wild: bool = False,
-) -> str:
+    work: dict | None = None,
+) -> tuple[str, str, str]:
+    """Render a Score to SVG.
+
+    Returns the SVG, the catalog id that actually decided its colors, and which
+    source that id came from.
+    """
     # Site 1 of 5. `using_limits` covers Score.model_validate, whose count clamp
     # cannot take an argument; `limits=` covers coerce. Both come from one read.
     limits = _effective_limits()
@@ -167,9 +173,11 @@ def _render_score_svg(
     canvas = _validated_canvas_aspect_override(canvas_aspect)
     if canvas is not None:
         score = _score_with_canvas(score, canvas)
-    render_metadata = _render_metadata(_resolved_catalog_id(catalog_id))
+    render_metadata, resolved_catalog_id, color_source = _color_render_metadata(
+        work=work, catalog_id=catalog_id
+    )
     with _render_capacity():
-        return current_render_engine().render(
+        svg = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
             catalog_id=render_metadata.get("render_color_catalog_id"),
@@ -178,6 +186,7 @@ def _render_score_svg(
             composition_seed=_composition_seed(composition_seed),
             wild=wild,
         ).svg
+    return svg, resolved_catalog_id, color_source
 
 
 def _history_output_prefix(item: dict) -> Path:
@@ -283,11 +292,7 @@ def _score_canvas_aspect_value(score: Score) -> str:
     return str(score.canvas or "square")
 
 
-def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None) -> dict:
-    catalog = get_color_catalog(catalog_id)
-    color_map = render_color_map_for_catalog(catalog_id)
-    if catalog is None or color_map is None:
-        raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
+def _base_render_metadata(canvas_aspect: str | None) -> dict:
     metadata = {
         "ddl_version": DDL_VERSION,
         "ddl_engine_version": DDL_ENGINE_VERSION,
@@ -299,6 +304,15 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
         metadata["render_canvas_aspect"] = canvas_aspect_id
         metadata["render_canvas_aspect_id"] = canvas_aspect_id
         metadata["render_canvas_aspect_ratio"] = canvas_aspect_ratio_for_aspect(canvas_aspect_id)
+    return metadata
+
+
+def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None) -> dict:
+    catalog = get_color_catalog(catalog_id)
+    color_map = render_color_map_for_catalog(catalog_id)
+    if catalog is None or color_map is None:
+        raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
+    metadata = _base_render_metadata(canvas_aspect)
     metadata.update({
         "render_color_catalog_id": str(catalog["id"]),
         "render_color_catalog_name": str(catalog["name"]),
@@ -334,6 +348,88 @@ def _resolved_catalog_id(catalog_id: str | None) -> str:
     if catalog is None:
         raise HTTPException(status_code=422, detail=f"unsupported color catalog: {catalog_id}")
     return str(catalog["id"])
+
+
+# What decided the colors of one render. Reported so that a caller which asked
+# for a work's own colors can tell whether it got them: a work saved before the
+# snapshot existed still draws, but from today's definition, and the two are
+# not the same picture.
+COLOR_SOURCE_SNAPSHOT = "snapshot"
+COLOR_SOURCE_CATALOG = "catalog"
+# /api/render-svg answers with the picture itself, so these ride in headers.
+# The id is here too because a caller that sent a work reference did NOT decide
+# the catalog -- the work did -- and cannot otherwise learn which one drew it.
+COLOR_SOURCE_HEADER = "X-Inku-Color-Source"
+COLOR_CATALOG_ID_HEADER = "X-Inku-Color-Catalog-Id"
+
+
+def _work_for_color_snapshot(actor: dict, work_id: str) -> dict:
+    """The work whose colors are being asked for.
+
+    Read under the caller's own user id, so a work_id naming someone else's
+    work is indistinguishable here from one naming nothing at all: both leave
+    `get_items` empty and answer 404. That is the authorization point for this
+    key -- there is no second path to a stored snapshot.
+    """
+    items = _db.get_items(actor["id"], [work_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="unknown work")
+    return items[0]
+
+
+def _snapshot_render_metadata(item: dict, *, canvas_aspect: str | None = None) -> dict | None:
+    """Render metadata built from what the work recorded, not from the catalog.
+
+    Returns None when the row carries no snapshot; the caller then falls to the
+    current definition and says so. The catalog id is carried through unchanged
+    because it is not only a nameplate: the renderer hashes it into the seed
+    that picks each chromatic work color (`_WORK_COLOR_SEED_FIELDS`), so a work
+    redrawn under a different id gets a different assignment out of the very
+    same map.
+    """
+    color_map = item.get("render_color_map")
+    if not isinstance(color_map, dict) or not color_map:
+        return None
+    drawn_with = item.get("render_color_catalog_id") or item.get("catalog_id") or DEFAULT_COLOR_CATALOG_ID
+    catalog = get_color_catalog(drawn_with)
+    metadata = _base_render_metadata(canvas_aspect)
+    metadata.update({
+        "render_color_catalog_id": str(drawn_with),
+        "render_color_catalog_name": str(
+            item.get("render_color_catalog_name") or (catalog["name"] if catalog else drawn_with)
+        ),
+        "render_color_catalog_sub": str(
+            item.get("render_color_catalog_sub") or (catalog["sub"] if catalog else "")
+        ),
+    })
+    metadata["render_color_map"] = {str(key): str(value) for key, value in color_map.items()}
+    return metadata
+
+
+def _color_render_metadata(
+    *,
+    work: dict | None,
+    catalog_id: str | None,
+    canvas_aspect: str | None = None,
+) -> tuple[dict, str, str]:
+    """The colors this render will use, and where they came from.
+
+    With no work reference this is the path every drawing took before: the id
+    picks today's definition, and an id today's build does not know is a 422.
+    With one, the work's own snapshot wins and `_resolved_catalog_id` is never
+    reached -- which is what lets a retired or since-renamed id still draw.
+    """
+    if work is not None:
+        snapshot = _snapshot_render_metadata(work, canvas_aspect=canvas_aspect)
+        if snapshot is not None:
+            return snapshot, str(snapshot["render_color_catalog_id"]), COLOR_SOURCE_SNAPSHOT
+        # A work with no snapshot falls to the current definition rather than
+        # 422: refusing here would leave exactly the works that predate the
+        # snapshot unable to be redrawn at all.
+        resolved = _resolved_catalog_id(catalog_id) if get_color_catalog(catalog_id) else DEFAULT_COLOR_CATALOG_ID
+        return _render_metadata(resolved, canvas_aspect=canvas_aspect), resolved, COLOR_SOURCE_CATALOG
+    resolved = _resolved_catalog_id(catalog_id)
+    return _render_metadata(resolved, canvas_aspect=canvas_aspect), resolved, COLOR_SOURCE_CATALOG
 
 
 def _validated_canvas_aspect(value: str | None) -> str:

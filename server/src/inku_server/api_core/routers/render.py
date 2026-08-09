@@ -41,7 +41,7 @@ from ...sketch import (
 from ... import db as _db
 from ..common import _is_qualified_model_id, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user, _logger
-from ..rendering import _effective_limits, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude
+from ..rendering import COLOR_CATALOG_ID_HEADER, COLOR_SOURCE_HEADER, _color_render_metadata, _effective_limits, _add_history_item, _output_prefix, _render_hash_metadata, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _score_canvas_aspect_value, _score_with_canvas, _submit_history_artifact_save, _validated_canvas_aspect, _validated_canvas_aspect_override, _validated_variation_amplitude, _work_for_color_snapshot
 from ..state import _increment_stage_stat, _stage_executor, _stage_slots
 
 
@@ -423,6 +423,10 @@ class PaintResponse(BaseModel):
 
 class RenderSvgRequest(BaseModel):
     score: dict
+    # The work being redrawn. Its own recorded colors decide this render, so a
+    # definition that has since changed, been renamed, or been retired does not
+    # silently repaint it. Absent means "a new drawing": catalog_id decides.
+    work_id: str | None = Field(default=None, description="Id of the work being redrawn; its recorded colors decide this render")
     catalog_id: str | None = None
     canvas_aspect: str | None = None
     svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
@@ -436,6 +440,8 @@ class RenderScoreRequest(BaseModel):
     score: dict
     input: str = ""
     ddl: str | None = None
+    # Same key, same rule as RenderSvgRequest.
+    work_id: str | None = Field(default=None, description="Id of the work being redrawn; its recorded colors decide this render")
     catalog_id: str | None = None
     canvas_aspect: str | None = None
     render_seed: int | None = None
@@ -467,6 +473,10 @@ class RenderScoreResponse(BaseModel):
     interpretation_seed: str | None = None
     seed_text: str | None = None
     render_hash: str
+    # Which source decided the colors: the work's own snapshot, or today's
+    # catalog. A work that predates the snapshot still draws, but not in the
+    # colors it was drawn in, and only this field says so.
+    render_color_source: str
     # The limits that governed this work. Present only when the row recorded
     # them; absent means "drawn before they were recorded", not "the defaults".
     render_limits: dict[str, int] | None = None
@@ -1642,8 +1652,11 @@ def _fallback_ddl_from_text(text: str, *, lang: str) -> str:
 
 
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
-def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_user)) -> RenderScoreResponse:
+def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
+    # Outside the try: a 404 for an unknown work is the answer, not a render
+    # failure to be relabelled 422 by the handler below.
+    work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
     try:
         # Site 4 of 5.
         limits = _effective_limits()
@@ -1655,9 +1668,13 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
         canvas_aspect = _validated_canvas_aspect_override(req.canvas_aspect)
         if canvas_aspect is not None:
             score = _score_with_canvas(score, canvas_aspect)
-        catalog_id = _resolved_catalog_id(req.catalog_id)
+        color_metadata, catalog_id, color_source = _color_render_metadata(
+            work=work,
+            catalog_id=req.catalog_id,
+            canvas_aspect=_score_canvas_aspect_value(score),
+        )
         render_metadata = {
-            **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+            **color_metadata,
             "render_seed": render_seed,
             "render_wild": req.wild,
             "composition_seed": req.composition_seed,
@@ -1685,16 +1702,18 @@ def api_render_score(req: RenderScoreRequest, _actor: dict = Depends(_current_us
         score=score,
         svg=svg,
         catalog_id=catalog_id,
+        render_color_source=color_source,
         render_limit_notes=limit_notes or None,
         **render_metadata,
     )
 
 
 @router.post("/api/render-svg")
-def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user)) -> Response:
+def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) -> Response:
     render_seed, _ = _render_seed_from_text(req.seed_text, req.render_seed)
+    work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
     try:
-        svg = _render_score_svg(
+        svg, resolved_catalog_id, color_source = _render_score_svg(
             req.score,
             catalog_id=req.catalog_id,
             canvas_aspect=req.canvas_aspect,
@@ -1702,12 +1721,22 @@ def api_render_svg(req: RenderSvgRequest, _actor: dict = Depends(_current_user))
             render_seed=render_seed,
             composition_seed=req.composition_seed,
             wild=req.wild,
+            work=work,
         )
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("svg render", 422) from e
-    return Response(content=svg, media_type="image/svg+xml; charset=utf-8")
+    # The body of this endpoint is the SVG itself, so the one thing a caller
+    # cannot read off it -- whether it got the work's own colors -- rides here.
+    return Response(
+        content=svg,
+        media_type="image/svg+xml; charset=utf-8",
+        headers={
+            COLOR_SOURCE_HEADER: color_source,
+            COLOR_CATALOG_ID_HEADER: resolved_catalog_id,
+        },
+    )
 
 
 def _paint_events(

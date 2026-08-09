@@ -2167,9 +2167,17 @@ SERVER_INFO = {
 }
 
 
-def _render_score_client(info=None, *, info_fails=False):
+class _FakeResponse:
+    """Just the headers: /api/render-svg says in them what the SVG cannot."""
+
+    def __init__(self, headers):
+        self.headers = dict(headers)
+
+
+def _render_score_client(info=None, *, info_fails=False, render_headers=None):
     """A client for `render-score`: catalogs, the drawing, and /api/info."""
     payload = SERVER_INFO if info is None else info
+    headers = {} if render_headers is None else dict(render_headers)
 
     class FakeClient:
         def __init__(self, *args, **kwargs):
@@ -2188,10 +2196,10 @@ def _render_score_client(info=None, *, info_fails=False):
                 return payload, None
             raise AssertionError(f"unexpected request: {method} {path}")
 
-        def request_text(self, method, path, **kwargs):
+        def request_raw(self, method, path, **kwargs):
             assert path == "/api/render-svg", path
             FakeClient.sent.append(kwargs.get("data") or {})
-            return "<svg></svg>"
+            return b"<svg></svg>", _FakeResponse(headers)
 
     FakeClient.sent = []
     return FakeClient
@@ -2399,3 +2407,115 @@ def test_rasterize_reports_the_files_it_could_not_burn(monkeypatch, capsys, tmp_
     assert (summary["attempted"], summary["written"], summary["failed"]) == (2, 1, 1)
     assert summary["unresolved"] == [{"source": "two.svg", "reason": "child killed by signal 11"}]
     assert "UNRESOLVED two.svg" in captured.err
+
+
+# --from-work: the work's own colors ------------------------------------------
+#
+# The flag has to reach the drawing, not a log line. Each test below names a
+# place where dropping it would change the output, so an argument that is
+# parsed and then discarded cannot pass them (contract perturbation P-6).
+
+
+def _run_render_score_from_work(monkeypatch, capsys, client, *extra_argv):
+    """Like `_run_render_score`, minus the catalog: --from-work refuses both."""
+    monkeypatch.setattr(cli, "ApiClient", client)
+    parser = cli.build_parser()
+    args = parser.parse_args([
+        "render-score",
+        json.dumps({"version": "0.1.0", "background": "white", "instructions": []}),
+        "--render-seed", "4242",
+        *extra_argv,
+    ])
+    assert cli.command_render_score(args) == 0
+    return json.loads(capsys.readouterr().out)
+
+
+def test_from_work_sends_the_work_reference(monkeypatch, capsys):
+    """The server cannot read a work's recorded colors without being told which work.
+
+    Nothing in the SVG says which colors decided it, so a flag that stopped at
+    argparse would look exactly like one that worked.
+    """
+    client = _render_score_client(render_headers={"X-Inku-Color-Source": "snapshot"})
+    _run_render_score_from_work(monkeypatch, capsys, client, "--from-work", "history-77")
+
+    assert client.sent[-1]["work_id"] == "history-77"
+
+
+def test_from_work_leaves_the_catalog_to_the_work(monkeypatch, capsys):
+    """It must not also name a catalog.
+
+    `_resolved_color_catalog` refuses any id outside today's list, so resolving
+    one here would refuse exactly the works this flag exists for: the ones whose
+    catalog has since been renamed or retired.
+    """
+    client = _render_score_client(render_headers={"X-Inku-Color-Source": "snapshot"})
+    _run_render_score_from_work(monkeypatch, capsys, client, "--from-work", "history-77")
+
+    assert client.sent[-1]["catalog_id"] is None
+
+
+def test_from_work_records_the_catalog_the_server_drew_with(monkeypatch, capsys):
+    """The id in the output is the one that drew, not the one that was asked for.
+
+    With --from-work the CLI asked for nothing, and the render hash below names
+    this id: reading it off the response is the only way the hash can describe
+    the picture that came back.
+    """
+    client = _render_score_client(
+        render_headers={
+            "X-Inku-Color-Source": "snapshot",
+            "X-Inku-Color-Catalog-Id": "japanese",
+        }
+    )
+    result = _run_render_score_from_work(monkeypatch, capsys, client, "--from-work", "history-77")
+
+    assert result["render_color_catalog_id"] == "japanese"
+    assert result["render_color_source"] == "snapshot"
+
+
+def test_render_score_without_from_work_still_names_its_own_catalog(monkeypatch, capsys):
+    """The control. Without the flag nothing about the old path moves.
+
+    A change that simply stopped resolving catalogs would pass every test above
+    and fail this one.
+    """
+    client = _render_score_client()
+    result = _run_render_score(monkeypatch, capsys, client)
+
+    assert client.sent[-1]["work_id"] is None
+    assert client.sent[-1]["catalog_id"] == CATALOG_DATA["default_catalog_id"]
+    assert result["render_color_source"] == "catalog"
+
+
+def test_from_work_refuses_to_also_be_given_a_catalog(monkeypatch, capsys):
+    """Two answers to one question: say so rather than silently pick one."""
+    client = _render_score_client()
+    monkeypatch.setattr(cli, "ApiClient", client)
+    parser = cli.build_parser()
+    args = parser.parse_args([
+        "render-score",
+        json.dumps({"version": "0.1.0", "background": "white", "instructions": []}),
+        "--from-work", "history-77",
+        "--color-catalog", "ink_season",
+    ])
+
+    with pytest.raises(cli.CliError):
+        cli.command_render_score(args)
+
+
+def test_from_work_does_not_resolve_colors_in_the_cli(monkeypatch, capsys):
+    """`_render_color_map` is the CLI resolving colors for itself.
+
+    The snapshot path must not pass through it: a client that builds its own
+    color map is a client that can disagree with the work.
+    """
+    calls = []
+    original = cli._render_color_map
+    monkeypatch.setattr(
+        cli, "_render_color_map", lambda catalog: calls.append(catalog) or original(catalog)
+    )
+    client = _render_score_client(render_headers={"X-Inku-Color-Source": "snapshot"})
+    _run_render_score_from_work(monkeypatch, capsys, client, "--from-work", "history-77")
+
+    assert calls == []

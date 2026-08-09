@@ -225,10 +225,10 @@ def test_all_four_stages_of_the_way_in_carry_the_composition_seed():
     assert meta_a != meta_b
 
     # 4. _render_score_svg, the other entrance into the engine
-    svg_a = _render_score_svg(
+    svg_a, _, _ = _render_score_svg(
         payload, catalog_id=None, svg_profile="editable", composition_seed=COMPOSITION_SEED
     )
-    svg_b = _render_score_svg(
+    svg_b, _, _ = _render_score_svg(
         payload,
         catalog_id=None,
         svg_profile="editable",

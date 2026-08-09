@@ -2889,13 +2889,20 @@ def command_render_score(args: argparse.Namespace) -> int:
         raise CliError("score must be valid JSON") from exc
     if not isinstance(score, dict):
         raise CliError("score JSON must be an object")
-    catalog_data = _fetch_color_catalogs(client)
-    color_catalog = _resolved_color_catalog(args, config, catalog_data)
-    svg = client.request_text(
+    from_work = getattr(args, "from_work", None)
+    # Without --from-work the CLI names the catalog, as it always has. With it
+    # the work names it, and asking for one here would only be able to fail:
+    # the id a work carries may have been renamed or retired since, and
+    # _resolved_color_catalog refuses anything not in today's list.
+    color_catalog = None if from_work else _resolved_color_catalog(args, config, _fetch_color_catalogs(client))
+    if from_work and (args.color_catalog or args.catalog_id):
+        raise CliError("--from-work draws in the work's own colors; do not also name a catalog")
+    svg, response = client.request_raw(
         "POST",
         "/api/render-svg",
         data={
             "score": score,
+            "work_id": from_work,
             "catalog_id": color_catalog,
             "canvas_aspect": args.canvas_aspect,
             "svg_profile": args.svg_profile,
@@ -2905,7 +2912,14 @@ def command_render_score(args: argparse.Namespace) -> int:
             # and without this line they would name a seed the picture was not drawn with.
             "composition_seed": args.composition_seed,
         },
+        headers={"Accept": "image/svg+xml,text/plain,*/*"},
     )
+    svg = svg.decode("utf-8")
+    # The server decided the catalog when --from-work was given, so read it back
+    # rather than repeating what was asked for: the render hash below names it,
+    # and the two must be the same id or the hash describes another picture.
+    color_source = response.headers.get("X-Inku-Color-Source") or "catalog"
+    color_catalog = response.headers.get("X-Inku-Color-Catalog-Id") or color_catalog
     # The server drew this SVG, so the server names the versions it drew with.
     # These three used to be a literal "2", a literal "default", and the build
     # number of whatever checkout the CLI happened to be run from. The engine
@@ -2935,6 +2949,8 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_engine_id": server_versions["render_engine_id"],
         "render_engine_version": server_versions["render_engine_version"],
         "render_color_catalog_id": color_catalog,
+        "render_color_source": color_source,
+        "work_id": from_work,
         "render_canvas_aspect": args.canvas_aspect,
         "render_canvas_aspect_id": args.canvas_aspect,
         "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
@@ -3794,6 +3810,11 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")
     render_score.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     render_score.add_argument("--color-catalog", help="server color catalog id")
+    render_score.add_argument(
+        "--from-work",
+        metavar="WORK_ID",
+        help="draw in the colors that work was drawn in, not in today's definition of its catalog; a renamed or retired catalog still draws",
+    )
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
     render_score.set_defaults(func=command_render_score)
 

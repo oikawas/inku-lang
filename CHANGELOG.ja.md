@@ -4633,3 +4633,11 @@ server の生成物へ移し、読み手が設定から言語を選べるよう�
 - **受け入れで `inku-cli` を隔離 API へ通した** —— `--ddl-file` あり／なしの 2 本とも成果物へ
   **`ddl_version` 3 / `ddl_engine_version` 9** が載り、`/api/info` と一致した。
   **前版の CLI が書いた同じ経路の成果物は版の鍵を 3 つしか持っていない**（`render_build_number`・`render_engine_id`・`render_engine_version`）
+
+### 2026-08-09 — 仕様の列挙が、応答が実際に返している鍵に追いついた（**採番なし**・文書のみ）
+
+**`SPEC.ja.md` §「render JSON が記録する描画文脈」の列挙に `ddl_version` と `ddl_engine_version` が無かった。**
+server は `api_core/rendering.py` の `_base_render_metadata` で**両方を必ず積んでいる**（compose / paint / render-score の 3 応答すべて）のに、
+仕様側の一覧だけが v2.11.16 より前から欠けていた。**列挙へ 2 鍵を足し、それが「絵を決めた DDL 層の版」であることと、
+保存済み作品では版を記録する前の古い行にだけ欠けることを日英とも 1 文で述べた**（`history` の 2 列は nullable で、
+`db.py` は値があるときだけ応答へ載せる）。**コードは 1 行も変えていない。**

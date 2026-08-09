@@ -215,12 +215,16 @@ Render JSON produced by the server records the concrete render context.  Paint,
 compose, the JSON tab, and saved artifact JSON include the resolved
 `stage1_model` / `stage2_model` that were actually used, plus
 `render_build_number`, `render_color_profile`, `render_engine_id`,
-`render_engine_version`, `render_canvas_aspect`, `render_hash`,
+`render_engine_version`, `ddl_version`, `ddl_engine_version`,
+`render_canvas_aspect`, `render_hash`,
 `render_hash_short`, `render_color_catalog_id`, `render_color_catalog_name`,
 `render_color_catalog_sub`, `render_color_map`,
 `instruction_lang_requested`, `instruction_lang_resolved`, `ui_lang`, and `render_seed`, where
 abstract colors and `palette:<name>` entries are expanded to the exact
-`#RRGGBB` codes used for SVG rendering.  The current engine metadata is
+`#RRGGBB` codes used for SVG rendering.  `ddl_version` and `ddl_engine_version`
+name the DDL layer that decided the picture; a render response always carries
+both, and among saved works only rows written before those versions were
+recorded lack them.  The current engine metadata is
 `render_engine_id: "default"` and
 `render_engine_version: "1"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the

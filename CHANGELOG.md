@@ -4947,3 +4947,12 @@ alone could not say which coerce drew it** ([I-182]).
   **`ddl_version` 3 and `ddl_engine_version` 9** into the artifact, matching `/api/info`. **Artifacts written by the
   previous CLI on the same route carry only three version keys** (`render_build_number`, `render_engine_id`,
   `render_engine_version`).
+
+### 2026-08-09 — The specification's list caught up with the keys the responses already return (**no version bump**, documents only)
+
+**The list under "render JSON records the concrete render context" in `SPEC.md` did not name `ddl_version` or
+`ddl_engine_version`.** The server **always puts both** in `_base_render_metadata` (`api_core/rendering.py`), across all
+three responses — compose, paint and render-score — and only the specification's list was missing them, from before
+v2.11.16. **Both keys were added, along with one sentence in each language** saying that they name the DDL layer that
+decided the picture, and that among saved works only rows written before those versions were recorded lack them (the two
+`history` columns are nullable, and `db.py` puts them in the response only when they have a value). **No code changed.**

@@ -1713,7 +1713,8 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # move. And the wobble amplitude is a multiple of the stroke width rather
     # than 8% of the figure, which for these circles is a smaller displacement.
     # The group's position is unmoved for the third engine running.
-    assert digest == "925d202d66e4e5b5e3e0b0c90d2aef9f5e64d47c8a1487eac35a9e3e2ebe5c0a"
+    # Resnapped for engine 29 after paper-contact lengths joined the SVG lattice.
+    assert digest == "874c486750889d1d554fc4e0abde8e32e6d9891af686495d7782eb8106c574e0"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

@@ -482,9 +482,10 @@ def test_a_group_that_declares_no_fade_is_byte_identical(monkeypatch):
     # 無効化なしで読む —— **この半分は焼き直される記録であって検査ではない**
     # （主張そのものは上の 1 行が持っている。件数 35 は母集団の番人として残す）。
     generator = _load_generator()
-    previous = _manifest("28")
+    # Engine 29 resnaps the live half; the fade population is unchanged.
+    current = _manifest("29")
     checked = 0
-    for case_id, case in sorted(previous["cases"].items()):
+    for case_id, case in sorted(current["cases"].items()):
         if not case_id.startswith("G-"):
             continue
         arrangement = case["input"]["score"]["instructions"][0]["arrangement"]

@@ -170,7 +170,10 @@ import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.InstructionLanguages
+import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
+import app.inku.mobile.ui.i18n.LocalUiLanguage
+import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.pipeline.WebDdlSpec
 import java.io.File
 import java.io.FileOutputStream
@@ -222,7 +225,7 @@ private val DeviceRotation.clockwiseDegrees: Int
         DeviceRotation.LandscapeRight -> 270
     }
 
-internal data class SaijikiGroup(val label: String, val en: String, val words: List<String>)
+internal data class SaijikiGroup(val key: String, val label: String, val en: String, val words: List<String>)
 private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
@@ -304,17 +307,46 @@ private object ArtworkBitmapCache {
     }
 }
 
-internal val saijikiGroups = listOf(
-    SaijikiGroup("かたち", "forms", listOf("円", "楕円", "三角", "四角", "線", "弧")),
-    SaijikiGroup("てざわり", "touches", listOf("鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆", "太筆", "ビュラン", "ドライポイント", "コンピュータ")),
-    SaijikiGroup("つらなり", "continuity", listOf("実線", "破線", "点線", "一点鎖線")),
-    SaijikiGroup("いろ", "colors", listOf("白", "黒", "青", "赤", "緑", "灰")),
-    SaijikiGroup("ゆらぎ", "movements", listOf("細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "震える", "滲む")),
-    SaijikiGroup("ばしょ", "places", listOf("上", "下", "中央", "左端", "右端", "上端", "下端", "中心", "隅")),
-    SaijikiGroup("うごき", "motions", listOf("置く", "並べる", "埋める", "散らす", "引く")),
-    SaijikiGroup("かたむき", "angles", listOf("水平", "垂直", "斜め", "右上がり", "右下がり", "回転")),
-    SaijikiGroup("わりあい", "proportions", listOf("縦長", "横長", "全幅", "半幅", "半円", "上弦", "下弦", "三日月")),
-)
+/**
+ * The vocabulary the dialog displays, in one language.
+ *
+ * Both category names are carried in either language because the web shows them
+ * together and switches only the words (`SaijikiInline.svelte:60-61`); a client
+ * that hid one of the names in English would be making its own choice.
+ *
+ * This used to be a hand-copied list. It fell a version behind the day after it
+ * was written -- the server returned the silverpoint to the vocabulary on
+ * 2026-07-27 (a2d1d100) and nothing here noticed -- so the words now come from
+ * `SaijikiGenerated.kt`, which `server/scripts/gen_saijiki_kt.py` bakes from the
+ * same table the server reads.
+ */
+internal fun saijikiGroups(lang: UiLanguage): List<SaijikiGroup> =
+    SaijikiGenerated.CATEGORIES.map { category ->
+        SaijikiGroup(
+            key = category.key,
+            label = category.nameJa,
+            en = category.nameEn,
+            words = if (lang.isEnglish) category.wordsEn else category.wordsJa,
+        )
+    }
+
+/**
+ * Every surface of every word, in both languages, paired with its category.
+ *
+ * Recognising a word in the DDL is not the same question as which words to
+ * offer: `highlight.ts:41-42` builds its matcher from the Japanese AND the
+ * English lists whatever the interface language is, because a work's language
+ * is chosen separately from the reader's. Matching only the displayed language
+ * would stop highlighting a Japanese DDL as soon as the reader switched to
+ * English.
+ */
+internal fun saijikiDetectionWords(lang: UiLanguage): List<Pair<String, SaijikiGroup>> {
+    val display = saijikiGroups(lang).associateBy { it.key }
+    return SaijikiGenerated.CATEGORIES.flatMap { category ->
+        val group = display.getValue(category.key)
+        (category.wordsJa + category.wordsEn).map { word -> word to group }
+    }
+}
 
 private val saijikiGroupColors = listOf(
     SaijikiGroupSand,
@@ -326,7 +358,11 @@ private val saijikiGroupColors = listOf(
     SaijikiGroupAmber,
     SaijikiGroupSlate,
     SaijikiGroupBlossom,
+    SaijikiGroupMoss,
 )
+
+/** The pill colour for the category declared at [index]. */
+internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index % saijikiGroupColors.size]
 
 @Composable
 fun InkuApp() {
@@ -442,20 +478,22 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     }
     var vocabularyOpen by remember { mutableStateOf(false) }
     var vocabularyQuery by remember { mutableStateOf("") }
-    val vocabularyTokens = rememberDdlVocabularyTokens()
+    val lang = LocalUiLanguage.current
+    val vocabularyTokens = rememberDdlVocabularyTokens(lang)
     val allVocabularyWords = remember(vocabularyTokens) { vocabularyTokens.map { it.word } }
-    val detectedWords = remember(editorValue.text) {
+    val detectedWords = remember(editorValue.text, vocabularyTokens) {
         vocabularyTokens.filter { editorValue.text.contains(it.word) }
     }
     val selectedWord = remember(editorValue.selection, editorValue.text, vocabularyTokens) {
         selectedVocabularyToken(editorValue, vocabularyTokens)
     }
-    val filteredGroups = remember(vocabularyQuery) {
+    val filteredGroups = remember(vocabularyQuery, lang) {
         val query = vocabularyQuery.trim()
+        val groups = saijikiGroups(lang)
         if (query.isBlank()) {
-            saijikiGroups
+            groups
         } else {
-            saijikiGroups.mapNotNull { group ->
+            groups.mapNotNull { group ->
                 val words = group.words.filter { word ->
                     word.contains(query, ignoreCase = true) ||
                         group.label.contains(query, ignoreCase = true) ||
@@ -541,12 +579,13 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun rememberDdlVocabularyTokens(): List<DdlVocabularyToken> {
-    return remember {
-        saijikiGroups.flatMapIndexed { index, group ->
-            group.words.map { word ->
-                DdlVocabularyToken(word = word, group = group, color = saijikiGroupColors[index % saijikiGroupColors.size])
-            }
+private fun rememberDdlVocabularyTokens(lang: UiLanguage): List<DdlVocabularyToken> {
+    return remember(lang) {
+        val colorForKey = SaijikiGenerated.CATEGORIES.mapIndexed { index, category ->
+            category.key to saijikiGroupColorAt(index)
+        }.toMap()
+        saijikiDetectionWords(lang).map { (word, group) ->
+            DdlVocabularyToken(word = word, group = group, color = colorForKey.getValue(group.key))
         }.distinctBy { it.word }.sortedByDescending { it.word.length }
     }
 }
@@ -661,9 +700,11 @@ private fun DdlVocabularyBar(
         if (selectedWord == null) {
             groups
         } else {
+            // Ordered by category key, not by the displayed name: the name is
+            // one of the things that changes with the language.
             groups.sortedWith(
-                compareByDescending<SaijikiGroup> { it.label == selectedWord.group.label }
-                    .thenBy { group -> saijikiGroups.indexOfFirst { it.label == group.label }.let { if (it < 0) Int.MAX_VALUE else it } },
+                compareByDescending<SaijikiGroup> { it.key == selectedWord.group.key }
+                    .thenBy { group -> SaijikiGenerated.CATEGORIES.indexOfFirst { it.key == group.key }.let { if (it < 0) Int.MAX_VALUE else it } },
             )
         }
     }
@@ -994,7 +1035,7 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Text("歳時記", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
             Text("語を押すと DDL 編集欄へ挿入します。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            saijikiGroups.forEach { group ->
+            saijikiGroups(LocalUiLanguage.current).forEach { group ->
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     Text("${group.label} / ${group.en}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
@@ -4521,7 +4562,7 @@ private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
 
 @Composable
 private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val vocabularyTokens = rememberDdlVocabularyTokens()
+    val vocabularyTokens = rememberDdlVocabularyTokens(LocalUiLanguage.current)
     val visualTransformation = remember(vocabularyTokens) {
         DdlKeywordHighlightTransformation(vocabularyTokens)
     }

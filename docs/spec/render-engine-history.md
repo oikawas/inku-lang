@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **28** | v2.11.13 | 869 | 2026-08-09 | 549 | **454** | **95** |
 | **27** | v2.11.10 | 866 | 2026-08-09 | 549 | **45** | **504** |
 | **26** | v2.11.8 | 864 | 2026-08-08 | 549 | **7** | **542** |
 | **25** | v2.11.7 | 863 | 2026-08-08 | 545 | **41** | **504** |
@@ -130,9 +131,9 @@ but never asserts "the output will change"**.
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.12 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.13 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 868 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 869 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -207,7 +208,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-21/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 525 (32 SVG) |
+| Drawing | `server/reference/render-engine-28/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 549 (454 SVG) |
 | Deterministic DDL layers | `server/reference/ddl-engine-5/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 33 (A 15 / B 18) |
 
 **The DDL side splits into A and B because the deterministic layers are not
@@ -399,6 +400,80 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 28 — the mark stays on its line (v2.11.13)
+
+**Four rules move in one version, and every one of them is about what happens where the tool meets
+the paper.**
+
+1. **The wander is measured in stroke widths, not in the figure's representative size**
+   (`AMPLITUDE_WIDTHS` = fine 0.35, medium 0.6, broad 2.0; the author chose the 0.6 from sheets drawn
+   at 0.6 and 0.9)
+2. **The material outline takes its offset from the performed ink rather than the intended geometry**
+   (it is no longer a `wild`-only behaviour)
+3. **The fray drops `stroke-dasharray`**: the stroke is drawn only where a contact field standing for
+   the paper's tooth crosses a threshold
+4. **A stratum is never wider than 0.33 of the tool's own mark, and its centre is never inside it**
+
+**The corpus moves on 454 of its 549 cases and holds 95.** **The 95 are every case drawn with the
+five tools that carry no material outline** (rotring 22, drypoint 21, silverpoint 19, computer 17,
+burin 16), which is the measurement behind the sentence "this is the version of the six tools that
+carry one".
+
+### The yardstick is the mark, not the figure
+
+**Through engine 27 the wander's amplitude never once looked at how thick the mark was.** At 8% of
+the representative size (`medium`), **a thin pencil drawing a large arc left its own mark by eleven
+widths.** Measured at the branch point, the drift over the stroke width on eight arcs ran **2.88 to
+12.21**, and **all eight sat at 7.9-8.5% of their radius** — they agree although the tools
+(`energy_lateral` 0.42 against 0.12) and the widths (1.40 to 2.07 px) do not, which is the proof that
+the mark was not being read.
+
+**At engine 28 the drift over the stroke width lands between 0.595 and 0.600** across six tools, two
+thinnesses and four radii, and **it is flat in the radius**. **The clamp at 0.40 of the representative
+size stays**: it is the safety valve that keeps a figure smaller than its own mark from wandering
+further than it is wide, and it does not bind in ordinary use.
+
+### What read as heavy was the position, not the quantity
+
+**When the author called the square's decoration too heavy, the quantity was measured first.** The
+decoration was **already laying down less ink than at engine 27** (962 -> 803 px² on the square).
+**Read against the tool's own mark there were two outliers, and `brush_thin` had the widest stratum
+of any tool at 0.47 of its mark and the closest offset at 1.07 half-widths.**
+
+**The two rules deliberately read different widths.** **The cap reads the nominal stroke** — paper
+tooth and powder do not get finer because the line was drawn finer, which is what
+`test_material_outline_absolute_widths_do_not_move` holds. **The floor reads the actual stroke** —
+where the tone sits is a question about the mark that was drawn.
+
+**Pushing the stratum further from the edge produced the same picture** (673.1 against 672.9 px² on
+the square). **The width was what mattered, not the distance.**
+
+### A record that holds an older version cannot be replayed across one
+
+**Six checks re-drew an older version's inputs and compared them against that version's digests, and
+every one of them reached the older version by withholding a layer that had landed since.** Engine 28
+moves both the material layer and the wander, so **that shape cannot agree in principle**. Where the
+claim was about a feature, it was rewritten as **on-versus-off inside one version**.
+
+**Two of the six are a loss, not a replacement.** `test_surface_stroke` lost its attribution
+observation point (comparing the engine 15 and 16 manifests directly does not restate it either — all
+eight digests differ, on thickness). `test_anchor_authority` held "a Score that declares no placement
+is left alone" over **447 cases**; **401 of them move under a tool with a material outline**, so the
+exclusion was rewritten as a rule and **the hold thinned to 92 cases**.
+
+### The cap changed after the bake (found in acceptance)
+
+**One frozen case could no longer be reproduced by the code that shipped.**
+`C-fill-circle-chalk-extra_fine` was baked while the cap read the **actual** stroke width and holds
+0.346500, while the code now reads the **nominal** one and draws 0.990000. **It is the only one of the
+549 cases where a tool with a material outline meets a thinness**, so the other 453 that move and the
+95 that hold did not shift by a byte. **The re-bake was done on the acceptance side.**
+
+**The manifest's `reason` comes from a constant in the generator, so it does not follow a version
+bump.** Engine 28's manifest shipped carrying engine 27's story, and acceptance rewrote it. **A table
+is corrected automatically; a sentence someone wrote is not, and a byte-identity gate does not read
+for lies.**
 
 ## engine 27 — the hand swings wider (v2.11.10)
 

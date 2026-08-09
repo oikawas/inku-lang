@@ -2,6 +2,18 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.13 unreleased baseline (Web Build 869)
+
+The 13 places that name a version were updated to v2.11.13 / Build 869. **No manual text changed** — no screen action, CLI flag, setting or response key moved.
+
+- **The drawings do change.** Render engine 28 makes **the sway of a line and the tool's tone read how thick that tool's mark is**.
+- **How far a line sways no longer depends on how large the figure is.** It used to be a fraction of the figure's representative size, so **a thin pen drawing a large arc left its own line by eleven times its width, and the arc stopped looking like an arc**. It is now **a multiple of that line's width** (0.35 fine, 0.6 medium, 2.0 broad). **A small figure and a large one both sway by about as much as they are thick.**
+- **The tool's tone (the material outline) now follows the ink that was drawn.** It used to be taken from where the figure was meant to be, so when the ink swayed the tone was left behind. **The distance from the tone to the ink falls from 16.1 px to 3.2 px on a large arc.**
+- **The fray looks different.** It used to be an evenly spaced dashed line; now the stroke is drawn **only where it crosses a field standing for the paper's tooth**. **How much of a stroke each tool touches is unchanged** — a pen stays nearly continuous and a pencil keeps its gaps.
+- **The tone's weight was fitted to the tool.** A layer is **never thicker than 0.33 of that tool's mark** and **never sits inside the mark**. The heaviness seen with the thicker brush settles down.
+- **Nothing was added to the interface.** How you write a description is unchanged.
+- **Redrawing the same description with the same seed changes the drawings made with the six hand tools** (pencil, pen, crayon, chalk, thin brush, thick brush). The other five — rotring, silverpoint, computer, burin and drypoint — carry no material outline and do not change by a pixel.
+
 ## 2026-08-09 — v2.11.12 unreleased baseline (Web Build 868)
 
 Updated the 13 places that name a version to v2.11.12 / Build 868, and **corrected the logging guidance and the bundled templates**.

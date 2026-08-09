@@ -2167,10 +2167,15 @@ The JSON Score's `variation` field is structured by dimension.
 layer, generates it from the combination of motion words, weight, and plugins.
 
 In the current implementation the sway of a line is expressed by turning it into a
-polyline in the renderer. Amplitude is a ratio against the shape's representative
-dimension — `fine=0.025` / `medium=0.08` / `broad=0.18` (v2.1.0; before that,
-absolute pixels of 7 / 12 / 30 against a 1000px canvas) — so that the perception
-of a sway word stays constant regardless of how large the shape is.
+polyline in the renderer. Amplitude is a multiple of **the stroke's own width** —
+`fine=0.35` / `medium=0.6` / `broad=2.0` (render engine 28; from v2.1.0 through
+engine 27 it was a ratio against the shape's representative dimension, 0.025 /
+0.08 / 0.18, and before that absolute pixels of 7 / 12 / 30 against a 1000px
+canvas). **A sway happens where the tool meets the paper, so it is measured in
+marks, not in figures** — read against the representative dimension, the same 8%
+was invisible under a brush and a different line under a thin pencil. The clamp at
+0.40 of the representative dimension stays, as the safety valve for a figure
+smaller than its own mark.
 
 `quality` is chosen roughly as follows:
 

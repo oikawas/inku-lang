@@ -4726,3 +4726,67 @@ and a logrotate snippet for an administrator to paste, and the drop-in said
   `log: journal + /var/log/inku/inku-api.log` as a constant, naming a file nothing was writing
 - **The broken specifier was removed from the four systemd templates in `manual/`, and the logrotate
   template was retired** (both languages -- the published manual was handing out the same setting)
+
+### v2.11.13 — The mark stays on its line (Build 869, 2026-08-09; render engine 28)
+
+**Four rules move in one version, in answer to the author's request of 2026-08-09: trace the main line
+exactly, and add the tool's tone just outside its width.** Every one of them is about what happens
+where the tool meets the paper.
+
+- **The wander is measured in stroke widths, not in the figure's representative size.** The amplitude
+  is now **`AMPLITUDE_WIDTHS` (fine 0.35, medium 0.6, broad 2.0) times the stroke width**. It used to
+  be 8% of the representative size at `medium`, so **a thin pencil drawing a large arc left its own
+  mark by eleven widths**. **The 0.6 was chosen by the author from sheets drawn at 0.6 and 0.9**
+  (2026-08-09). **The clamp at 0.40 of the representative size stays** as the safety valve for a
+  figure smaller than its own mark. **Measured: on drawn arcs the drift over the stroke width lands
+  between 0.595 and 0.600 across six tools, two thinnesses and four radii, and is flat in the
+  radius** (engine 27 held it at 7.9-8.5% of a radius, which is 2.88 to 12.21 widths).
+- **The material outline -- the tool's tone -- takes its offset from the performed ink rather than
+  from the intended geometry, for every work and not only for `wild`.** The median distance from a
+  decoration vertex to the ink band falls from **16.09 / 5.99 / 8.11 / 6.09 px (large arc, small arc,
+  circle, square) to 3.21 / 2.26 / 3.07 / 2.80 px**. **The line was already on its ink at engine 27**
+  (0.86 -> 3.20 px): the straight tool was the one that had been right, and the other figures caught up.
+- **The fray is no longer a `stroke-dasharray`.** The stroke is drawn only where a contact field
+  standing for the paper's tooth crosses a threshold. **How much of a stroke touches is still read per
+  tool from the old dash table**, so a pen stays nearly continuous and a pencil keeps its gaps. **In a
+  192-fragment sample sheet one pair of fragments shares a length, 2.6% land on a multiple of the
+  sampling step, and there are no `stroke-dasharray` attributes left.**
+- **Two rules fit the tone's weight to the tool**, in answer to the author's ruling that the square's
+  decoration was too heavy: **a stratum is never wider than 0.33 of the tool's own mark** (the cap
+  reads the **nominal** stroke, because paper tooth and powder do not get finer because the line was
+  drawn finer) and **a stratum's centre is never inside the mark** (that floor reads the **actual**
+  stroke, because where the tone sits is a question about the mark that was drawn). **The ink a
+  decoration lays down falls by 25% for pencil, 12% for pen, 22% for crayon, 29% for chalk, 32% for
+  brush_thin and 17% for brush_thick.** **Measured first: the decoration was already laying down less
+  ink than at engine 27** (962 -> 803 px² on the square) -- **what read as heavy was the position, not
+  the quantity**. **Pushing it further from the edge changed nothing** (673.1 against 672.9 px² on the
+  square): **the width was what mattered, not the distance.**
+- **The corpus moves on 454 of its 549 cases and holds 95** (`render-engine-28`). **The 95 are every
+  case drawn with the five tools that carry no material outline** (rotring 22, drypoint 21,
+  silverpoint 19, computer 17, burin 16). **The contract predicted 54**, which was the number of cases
+  where the wander reaches the geometry; **that every drawing by the six tools with a material outline
+  would move was not counted until the premise changed.**
+- **Six checks that replayed an older version's frozen record were re-seated.** All of them reached the
+  older version by withholding a layer that had landed since, which engine 28 makes impossible in
+  principle. **Where the claim was about a feature, it was rewritten as on-versus-off within one
+  version** (fade, angle, composition seed, per-member size). **Two of the six are a loss, not a
+  replacement:** `test_surface_stroke` lost its attribution observation point, and
+  `test_anchor_authority` went from holding **447 cases to holding 92** (the five tools with no
+  material outline). **Both say so in the code, and both are in the ledger.**
+- **Android gains a `render-engine-28/` reference fixture directory** (64 files). **The port still
+  resolves 27 through `CompatibilityConstants.renderEngineVersion`, so a directory was added and
+  nothing the port compares against moved** (catching up is its own contract).
+- **Checks:** **on the merged tree, server pytest 2,624 passed / 31 skipped / 0 failed**
+  (**+15 test functions against the branch point `dc46dd1a`, 9 turned over, 0 deleted**; one of the 15
+  was added in acceptance). **On the branch the count went 2,559 -> 2,598 (+39)**, measured by the
+  implementation session. **cli 188 passed**, ruff clean, **frozen corpora byte-identical**, **eight
+  perturbations with none missed**. **One thing was repaired during acceptance:** one frozen case could
+  no longer be reproduced by the code that shipped (`C-fill-circle-chalk-extra_fine` held 0.346500 from
+  when the cap read the actual stroke width, while the code now reads the nominal one and draws
+  0.990000). **It was re-baked; the other 453 that move and the 95 that hold did not shift by a byte.**
+- **One check was added during acceptance:** it reads the drift off a **drawn** arc for four tools at
+  two thinnesses and holds it to 0.6 of that tool's own width. Nothing had put the constant and a
+  picture inside one assertion: **the unit test compared the function against the constant, and the two
+  invariance checks would pass for an implementation that returned a fixed amplitude** (full marks 8;
+  eight red when the yardstick goes back to the representative size, four when `thinness` stops
+  reaching the width).

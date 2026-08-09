@@ -2287,6 +2287,122 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     assert alternate_data["svg"] != data["svg"]
 
 
+def _h16_coerce_input() -> tuple[dict, str]:
+    cases = json.loads(
+        (REPO_ROOT / "server/tests/golden/coerce_golden.json").read_text(encoding="utf-8")
+    )
+    case = cases["cases"]["H-16"]["input"]
+    return case["score"], case["ddl"]
+
+
+def test_render_score_hands_ddl_to_coerce(auth_context):
+    headers, _, _ = auth_context
+    score, ddl = _h16_coerce_input()
+
+    without_ddl = client.post(
+        "/api/render-score",
+        json={"score": score, "render_seed": 123},
+        headers=headers,
+    )
+    with_ddl = client.post(
+        "/api/render-score",
+        json={"score": score, "ddl": ddl, "render_seed": 123},
+        headers=headers,
+    )
+
+    assert without_ddl.status_code == 200
+    assert with_ddl.status_code == 200
+    assert len(without_ddl.json()["score"]["instructions"]) == 1
+    assert len(with_ddl.json()["score"]["instructions"]) == 4
+
+
+def test_render_score_passes_the_request_ddl_at_the_coerce_call_site(
+    auth_context, monkeypatch
+):
+    headers, _, _ = auth_context
+    score, ddl = _h16_coerce_input()
+    seen: list[str | None] = []
+    original = render_routes.coerce_score
+
+    def recording_coerce(score_value, *args, ddl=None, **kwargs):
+        seen.append(ddl)
+        return original(score_value, *args, ddl=ddl, **kwargs)
+
+    monkeypatch.setattr(render_routes, "coerce_score", recording_coerce)
+
+    response = client.post(
+        "/api/render-score",
+        json={"score": score, "ddl": ddl, "render_seed": 123},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert seen == [ddl]
+
+
+def test_render_score_empty_ddl_draws_the_same_svg_as_no_ddl(auth_context):
+    headers, _, _ = auth_context
+    score, _ = _h16_coerce_input()
+    payload = {"score": score, "render_seed": 123}
+
+    absent = client.post("/api/render-score", json=payload, headers=headers)
+    empty = client.post(
+        "/api/render-score", json={**payload, "ddl": ""}, headers=headers
+    )
+
+    assert absent.status_code == 200
+    assert empty.status_code == 200
+    assert empty.json()["score"] == absent.json()["score"]
+    assert empty.json()["svg"] == absent.json()["svg"]
+
+
+def test_render_score_without_ddl_matches_the_old_render_svg_drawing(auth_context):
+    headers, _, _ = auth_context
+    score, _ = _h16_coerce_input()
+    payload = {
+        "score": score,
+        "catalog_id": "default",
+        "canvas_aspect": "square",
+        "svg_profile": "display",
+        "render_seed": 123,
+        "composition_seed": 456,
+    }
+
+    old_endpoint = client.post("/api/render-svg", json=payload, headers=headers)
+    named_endpoint = client.post("/api/render-score", json=payload, headers=headers)
+
+    assert old_endpoint.status_code == 200
+    assert named_endpoint.status_code == 200
+    assert named_endpoint.json()["svg"] == old_endpoint.text
+
+
+def test_render_score_keeps_the_requested_svg_profile(auth_context):
+    headers, _, _ = auth_context
+
+    response = client.post(
+        "/api/render-score",
+        json={
+            "score": {
+                "instructions": [
+                    {
+                        "primitive": "line",
+                        "from": [0.0, 0.5],
+                        "to": [1.0, 0.5],
+                        "weight": "pencil",
+                    }
+                ]
+            },
+            "svg_profile": "editable",
+            "render_seed": 123,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert 'id="layer_10_content"' in response.json()["svg"]
+    assert 'id="mark_000_000_line"' in response.json()["svg"]
+
+
 def test_render_svg_endpoint_generates_editable_profile(auth_context):
     headers, _, _ = auth_context
     r = client.post(

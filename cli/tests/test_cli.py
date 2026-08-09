@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
@@ -2175,7 +2176,7 @@ class _FakeResponse:
 
 
 def _render_score_client(info=None, *, info_fails=False, render_headers=None):
-    """A client for `render-score`: catalogs, the drawing, and /api/info."""
+    """A client for `render-score`: catalogs and the JSON drawing response."""
     payload = SERVER_INFO if info is None else info
     headers = {} if render_headers is None else dict(render_headers)
 
@@ -2190,16 +2191,50 @@ def _render_score_client(info=None, *, info_fails=False, render_headers=None):
                     "default_catalog_id": CATALOG_DATA["default_catalog_id"],
                     "catalogs": list(CATALOG_DATA["catalogs"].values()),
                 }, None
-            if path == "/api/info":
+            if path == "/api/render-score":
                 if info_fails:
                     raise cli.CliError("connection refused")
-                return payload, None
+                sent = kwargs.get("data") or {}
+                FakeClient.sent.append(sent)
+                score = json.loads(json.dumps(sent["score"]))
+                score.setdefault("canvas", "square")
+                if sent.get("ddl"):
+                    score["instructions"] = [
+                        *score.get("instructions", []),
+                        {"primitive": "line"},
+                        {"primitive": "circle"},
+                        {"primitive": "square"},
+                    ]
+                catalog_id = (
+                    headers.get("X-Inku-Color-Catalog-Id")
+                    or sent.get("catalog_id")
+                    or CATALOG_DATA["default_catalog_id"]
+                )
+                response = {
+                    "score": score,
+                    "svg": (
+                        "<svg data-ddl='true'></svg>"
+                        if sent.get("ddl")
+                        else "<svg></svg>"
+                    ),
+                    "render_hash": f"rh3:{payload.get('render_engine_version', 'missing')}:{bool(sent.get('ddl'))}",
+                    "render_hash_short": "ABCD",
+                    "render_build_number": payload.get("build_number"),
+                    "render_engine_id": payload.get("render_engine_id"),
+                    "render_engine_version": payload.get("render_engine_version"),
+                    "render_color_catalog_id": catalog_id,
+                    "render_color_source": headers.get("X-Inku-Color-Source") or "catalog",
+                    "render_canvas_aspect": sent.get("canvas_aspect") or "square",
+                    "render_canvas_aspect_id": sent.get("canvas_aspect") or "square",
+                    "render_canvas_aspect_ratio": 1.0,
+                    "render_seed": sent.get("render_seed") or 1,
+                    "composition_seed": sent.get("composition_seed"),
+                }
+                return response, _FakeResponse(headers)
             raise AssertionError(f"unexpected request: {method} {path}")
 
         def request_raw(self, method, path, **kwargs):
-            assert path == "/api/render-svg", path
-            FakeClient.sent.append(kwargs.get("data") or {})
-            return b"<svg></svg>", _FakeResponse(headers)
+            raise AssertionError(f"unexpected raw request: {method} {path}")
 
     FakeClient.sent = []
     return FakeClient
@@ -2293,7 +2328,7 @@ def test_render_score_refuses_to_guess_when_the_server_will_not_say(monkeypatch)
         json.dumps({"version": "0.1.0", "background": "white", "instructions": []}),
         "--color-catalog", "default",
     ])
-    with pytest.raises(cli.CliError, match="/api/info"):
+    with pytest.raises(cli.CliError, match="/api/render-score"):
         cli.command_render_score(args)
 
     incomplete = {key: value for key, value in SERVER_INFO.items() if key != "render_engine_version"}
@@ -2314,6 +2349,115 @@ def test_render_score_hashes_with_the_server_engine_version(monkeypatch, capsys)
     )
 
     assert first["render_hash"] != other["render_hash"]
+
+
+def test_render_score_hands_ddl_to_the_named_endpoint(monkeypatch, capsys):
+    client = _render_score_client()
+
+    result = _run_render_score(
+        monkeypatch,
+        capsys,
+        client,
+        "--ddl-text",
+        "Draw the explicit DDL constraints.",
+        "--full-json",
+    )
+
+    assert len(result["score"]["instructions"]) == 3
+
+
+def test_render_score_sends_the_ddl_field_to_the_server(monkeypatch, capsys):
+    client = _render_score_client()
+
+    _run_render_score(
+        monkeypatch,
+        capsys,
+        client,
+        "--ddl-text",
+        "Draw the explicit DDL constraints.",
+    )
+
+    assert client.sent[-1]["ddl"] == "Draw the explicit DDL constraints."
+
+
+def test_render_score_without_a_ddl_flag_sends_no_ddl(monkeypatch, capsys):
+    client = _render_score_client()
+
+    result = _run_render_score(monkeypatch, capsys, client, "--full-json")
+
+    assert result["svg"] == "<svg></svg>"
+    assert "ddl" not in client.sent[-1]
+
+
+def test_render_score_without_ddl_changes_only_server_owned_output_keys(
+    monkeypatch, capsys
+):
+    result = _run_render_score(
+        monkeypatch, capsys, _render_score_client(), "--full-json"
+    )
+    input_score = {
+        "version": "0.1.0",
+        "background": "white",
+        "instructions": [],
+    }
+    old_hash = cli._render_hash_for_score(
+        input_score,
+        render_seed=4242,
+        composition_seed=None,
+        render_build_number=SERVER_INFO["build_number"],
+        render_engine_id=SERVER_INFO["render_engine_id"],
+        render_engine_version=SERVER_INFO["render_engine_version"],
+        render_color_catalog_id=CATALOG_DATA["default_catalog_id"],
+    )
+    origin = {
+        **result,
+        "score": input_score,
+        "render_hash": old_hash,
+        "render_hash_short": old_hash[-4:].upper(),
+    }
+
+    changed = {key for key in result if result[key] != origin[key]}
+
+    assert changed == {"score", "render_hash", "render_hash_short"}
+    assert result["svg"] == origin["svg"]
+
+
+def test_render_score_rejects_both_ddl_sources(monkeypatch):
+    monkeypatch.setattr(cli, "ApiClient", _render_score_client())
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        [
+            "render-score",
+            json.dumps({"version": "0.1.0", "background": "white", "instructions": []}),
+            "--ddl-text",
+            "inline",
+            "--ddl-file",
+            "ddl.txt",
+        ]
+    )
+
+    with pytest.raises(cli.CliError, match="--ddl-text and --ddl-file"):
+        cli.command_render_score(args)
+
+
+def test_render_score_reads_ddl_from_standard_input(monkeypatch, capsys):
+    client = _render_score_client()
+    monkeypatch.setattr(sys, "stdin", io.StringIO("DDL from stdin\n"))
+
+    _run_render_score(monkeypatch, capsys, client, "--ddl-file", "-")
+
+    assert client.sent[-1]["ddl"] == "DDL from stdin"
+
+
+def test_the_manual_lists_both_render_score_ddl_flags():
+    header = "### `inku-cli render-score`\n\n```\n"
+    region = _marked_region()
+    start = region.index(header)
+    end = region.index("\n```\n", start + len(header))
+    render_score_help = region[start:end]
+
+    assert "--ddl-text" in render_score_help
+    assert "--ddl-file" in render_score_help
 
 
 # `rasterize` -- the CLI is the thin door onto inku_analysis.rasterize_batch, which

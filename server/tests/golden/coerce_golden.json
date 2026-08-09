@@ -70,7 +70,7 @@
      "instructions": [
       {
        "primitive": "square",
-       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; hard ceiling 400 applied to the whole work",
+       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; hard ceiling 400 applied to the whole work",
        "from": null,
        "to": null,
        "center": null,
@@ -92,7 +92,7 @@
        "weight": "crayon",
        "mode": "additive",
        "carve_depth": null,
-       "color": "red",
+       "color": "yellow",
        "color_hint": "黄色い蝋燭の灯",
        "variation": {
         "amplitude": "medium",
@@ -327,7 +327,7 @@
      "with_motion_energy": 0,
      "with_per_instruction_density_budget": 0,
      "with_presence_auxiliary_shape_repair": 0,
-     "with_primary_color_delivery": 0,
+     "with_primary_color_delivery": 1,
      "with_repetition_event_variation": 0,
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
@@ -6978,7 +6978,7 @@
       },
       {
        "primitive": "line",
-       "note": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement; gray promoted to primary stroke from DDL color intent",
+       "note": "visual event type vanishing_outline restored as a fading contour; visual event counterweight preserved through opposing placement",
        "from": [
         0.36,
         0.54
@@ -7000,7 +7000,7 @@
        "weight": "silverpoint",
        "mode": "additive",
        "carve_depth": null,
-       "color": "gray",
+       "color": "black",
        "color_hint": null,
        "variation": {
         "amplitude": "fine",
@@ -7117,7 +7117,7 @@
      "with_motion_energy": 1,
      "with_per_instruction_density_budget": 0,
      "with_presence_auxiliary_shape_repair": 0,
-     "with_primary_color_delivery": 1,
+     "with_primary_color_delivery": 0,
      "with_repetition_event_variation": 0,
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
@@ -8937,7 +8937,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "green restored in color_cycle from DDL color intent",
+       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent",
        "from": [
         0.2,
         0.5
@@ -8959,7 +8959,7 @@
        "weight": "pen",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "green",
        "color_hint": null,
        "variation": null,
        "arrangement": {
@@ -9071,7 +9071,7 @@
      "with_motion_energy": 0,
      "with_per_instruction_density_budget": 0,
      "with_presence_auxiliary_shape_repair": 0,
-     "with_primary_color_delivery": 0,
+     "with_primary_color_delivery": 1,
      "with_repetition_event_variation": 0,
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
@@ -9231,7 +9231,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "green restored in color_cycle from DDL color intent",
+       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent",
        "from": [
         0.2,
         0.5
@@ -9253,7 +9253,7 @@
        "weight": "pen",
        "mode": "additive",
        "carve_depth": null,
-       "color": "black",
+       "color": "green",
        "color_hint": null,
        "variation": null,
        "arrangement": {
@@ -9365,7 +9365,7 @@
      "with_motion_energy": 0,
      "with_per_instruction_density_budget": 0,
      "with_presence_auxiliary_shape_repair": 0,
-     "with_primary_color_delivery": 0,
+     "with_primary_color_delivery": 1,
      "with_repetition_event_variation": 0,
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
@@ -11514,7 +11514,7 @@
    "targets": "with_visual_event_type_hints"
   }
  },
- "commit": "1c10d470f08ac279b5a4a112db67e50656c0259c",
+ "commit": "4da4d7852fc31099ca0d493c17489a6d0e377248",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

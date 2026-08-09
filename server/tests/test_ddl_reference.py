@@ -52,7 +52,7 @@ def test_ddl_reference_versions_and_parts() -> None:
     # input the corpus already held. **That is the point of listing only three** --
     # the corpus could not have caught the behaviour this version changed, because
     # no case here ever had the shape production was passing.
-    assert DDL_ENGINE_VERSION == "8"
+    assert DDL_ENGINE_VERSION == "9"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -76,10 +76,22 @@ def test_ddl_reference_versions_and_parts() -> None:
     # the corpus reaches this layer 14 times through a cycle, and only these two
     # carry the shapes -- a base color already in the cycle, and old and new
     # color words in one description.
+    # Engine 9 (2026-08-09): coerce becomes a fixed point for a color it delivers.
+    # The promotion to a primary stroke ran before the repair that puts a color in
+    # a cycle, and it can only promote what a cycle already carries, so a delivered
+    # color waited for a second pass over the same DDL. 8 coerce cases move and no
+    # expand case does. **The eight are the whole of it, and they are all the same
+    # shape**: a DDL names a color, this layer delivers it into a cycle, and the
+    # instruction's own `color` was left at the black it started with. Engine 8 is
+    # why five of them are new -- until the six-word table stopped dropping yellow,
+    # orange, and purple, those cases could not reach either stage.
     assert len(manifest["cases"]) == 34
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
     assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 21
-    assert manifest["changed_from_previous"] == ["B-presence-from-ddl", "B-production-fill-clause"]
+    assert manifest["changed_from_previous"] == [
+        "B-leaf-grain-words", "B-orange-from-ddl", "B-presence-from-ddl", "B-purple-from-ddl",
+        "B-quiet-water", "B-trigger", "B-yellow-from-ddl", "B-yellow-from-ddl-en",
+    ]
     assert not any(
         manifest["cases"][case]["part"] == "a_expand" for case in manifest["changed_from_previous"]
     )
@@ -156,9 +168,20 @@ def test_ddl_reference_coerce_discriminators() -> None:
         # The three B-trigger-* cases separated the staffage levels; with the axis
         # folded away (v2.11.0) they are one case, and what fires on it is repair
         # and delivery alone -- no composition anchor, no motion floor.
-        "B-trigger": {"coerce_and_repair_instruction", "with_color_delivery_repair", "with_motion_energy"},
-        "B-quiet-water": {"with_color_delivery_repair"},
-        "B-presence-from-ddl": {"presence_from_ddl", "with_color_delivery_repair"},
+        # `with_primary_color_delivery` joins the delivery cases at ddl-engine 9.
+        # It is the same eight everywhere -- these entries, and the manifest's
+        # `changed_from_previous` above. The promotion always could have fired on
+        # them; it ran before the repair that puts the color in a cycle, and it
+        # can only promote what a cycle already carries, so it found nothing and
+        # the work waited for a second pass that production never made.
+        "B-trigger": {
+            "coerce_and_repair_instruction", "with_color_delivery_repair",
+            "with_primary_color_delivery", "with_motion_energy",
+        },
+        "B-quiet-water": {"with_color_delivery_repair", "with_primary_color_delivery"},
+        "B-presence-from-ddl": {
+            "presence_from_ddl", "with_color_delivery_repair", "with_primary_color_delivery",
+        },
         "B-grid": {"with_literal_grid_fidelity"},
         "B-dense-forty": set(),
         "B-cloudform": set(),
@@ -169,11 +192,15 @@ def test_ddl_reference_coerce_discriminators() -> None:
         # 落ち葉 / 森 used to summon a leaf-grain energy instruction AND a motif.
         # The energy was invention and is gone; the motif is what the DDL asked
         # for, so `with_complex_motif_repair` still delivers it.
-        "B-leaf-grain-words": {"with_color_delivery_repair", "with_complex_motif_repair"},
-        "B-yellow-from-ddl": {"with_color_delivery_repair"},
-        "B-orange-from-ddl": {"with_color_delivery_repair", "with_motion_energy"},
-        "B-purple-from-ddl": {"with_color_delivery_repair"},
-        "B-yellow-from-ddl-en": {"with_color_delivery_repair"},
+        "B-leaf-grain-words": {
+            "with_color_delivery_repair", "with_primary_color_delivery", "with_complex_motif_repair",
+        },
+        "B-yellow-from-ddl": {"with_color_delivery_repair", "with_primary_color_delivery"},
+        "B-orange-from-ddl": {
+            "with_color_delivery_repair", "with_primary_color_delivery", "with_motion_energy",
+        },
+        "B-purple-from-ddl": {"with_color_delivery_repair", "with_primary_color_delivery"},
+        "B-yellow-from-ddl-en": {"with_color_delivery_repair", "with_primary_color_delivery"},
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired, case_id

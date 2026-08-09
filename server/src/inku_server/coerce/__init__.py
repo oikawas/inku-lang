@@ -113,11 +113,16 @@ def coerce_score(
     instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background, limits=limits)
     _record_branch_fire(branch_report, "with_ddl_coverage", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)
-    _record_branch_fire(branch_report, "with_primary_color_delivery", _branch_before, instructions)
-    _branch_before = instructions
+    # The repair runs first because the promotion can only read what is already
+    # in a cycle: `_with_primary_color_delivery` looks for the requested color
+    # among the `color_cycle`s, and `_with_color_delivery_repair` is what puts it
+    # there. In the other order a delivered color could not be promoted until a
+    # second pass over the same DDL, which made coerce not a fixed point.
     instructions = _with_color_delivery_repair(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "with_color_delivery_repair", _branch_before, instructions)
+    _branch_before = instructions
+    instructions = _with_primary_color_delivery(instructions, ddl=ddl, background=background)
+    _record_branch_fire(branch_report, "with_primary_color_delivery", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_shape_delivery_repair(instructions, ddl=ddl, background=background)
     _record_branch_fire(branch_report, "with_shape_delivery_repair", _branch_before, instructions)

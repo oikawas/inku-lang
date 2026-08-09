@@ -1,5 +1,13 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 9 (2026-08-09): coerce becomes a fixed point for a color it delivers. The
+# promotion to a primary stroke ran before the repair that puts a color in a
+# cycle, and it can only promote what a cycle already carries -- so a color the
+# DDL asked for and this layer delivered could not be promoted until a second
+# pass over the same DDL. Running the same input through coerce twice gave two
+# different scores. The two now run repair-then-promote. Engine 8 made this
+# visible rather than causing it: at engine 7 the six-word table dropped yellow
+# before it could reach either stage, so only the older colors could show it.
 # 8 (2026-08-09): the color cycle stops inventing an order. The cycle hands one
 # color to each member in turn, so it has no head and no ranking, yet coerce was
 # writing two kinds of order into it. It inserted the instruction's own color
@@ -27,7 +35,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "8"
+DDL_ENGINE_VERSION = "9"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

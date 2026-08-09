@@ -1,4 +1,4 @@
-"""ddl-engine 8: the color cycle stops inventing an order.
+"""ddl-engine 8 and 9: the color cycle stops inventing an order.
 
 `arrangement.color_cycle` hands one color to each member of a group in turn --
 `cycle[i % len(cycle)]` in `renderer.py`. A pure cycle has no head and no
@@ -21,6 +21,14 @@ the three things the table now does and does not do: it drops nothing, it keeps
 the relative order of the words it names, and it puts the words it does not name
 after them rather than in front. T-8 is a control on the one caller this change
 deliberately leaves alone.
+
+T-9 is ddl-engine 9, which fixing the other two brought into view. The two color
+stages ran promote-then-repair, and the promotion can only see colors a cycle
+already carries -- so a color this layer delivered was promoted one pass late,
+and coerce was not a fixed point for its own output. They now run in the order
+they read in. Engine 8 did not cause that; it made it reachable, because until
+the six-word table stopped dropping yellow no new color got as far as either
+stage.
 
 What this does NOT do: it does not remove a duplicate the input already carried.
 `_with_color_cycle_delivery` copies an existing cycle through as it is, so a
@@ -237,6 +245,42 @@ def test_t7_colors_the_table_does_not_name_are_ordered_deterministically() -> No
     # order the author wrote them in is already gone by the time this is called.
     ordered = _color_repair_order({"yellow", "orange", "purple"})
     assert ordered == sorted(ordered)
+
+
+# T-9 (ddl-engine 9): the delivered color reaches the primary stroke in one pass.
+
+
+def _delivered_yellow() -> Score:
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.18, 0.08], "color": "black"},
+            ],
+        }
+    )
+    return coerce_score(score, ddl="黄色い小さな四角を点々と散らす。")
+
+
+def test_t9_a_delivered_color_is_promoted_on_the_same_pass() -> None:
+    # `_with_color_delivery_repair` puts yellow in a cycle and
+    # `_with_primary_color_delivery` promotes it. The promotion can only see
+    # colors a cycle already carries, so it has to run second -- and until
+    # ddl-engine 9 it ran first, which put the promotion one whole pass late.
+    marked = _delivered_yellow().instructions[0]
+
+    assert marked.arrangement is not None
+    assert "yellow" in marked.arrangement.color_cycle
+    assert marked.color == "yellow"
+    assert "yellow promoted to primary stroke from DDL color intent" in (marked.note or "")
+
+
+def test_t9_coerce_is_a_fixed_point_for_a_color_it_delivers() -> None:
+    # The negative half. T-9's first test alone would pass an implementation
+    # that promotes twice or keeps moving; this says one pass is the whole of it.
+    first = _delivered_yellow()
+    second = coerce_score(first, ddl="黄色い小さな四角を点々と散らす。")
+
+    assert second.model_dump(mode="json", by_alias=True) == first.model_dump(mode="json", by_alias=True)
 
 
 # T-8: control. The color-only path is not part of this change.

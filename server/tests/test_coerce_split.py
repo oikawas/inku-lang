@@ -19,8 +19,14 @@ EXPECTED_BRANCH_ORDER = [
     "without_spontaneous_grid",
     "dedupe_instructions",
     "with_ddl_coverage",
-    "with_primary_color_delivery",
+    # These two are not interchangeable, and were swapped at ddl-engine 9. The
+    # repair is what puts a requested color into a `color_cycle`; the promotion
+    # searches the cycles for that color and can only find what is already
+    # there. Run the other way round, a delivered color is promoted one pass
+    # late and coerce is not a fixed point for its own output. Reordering this
+    # pair again is a decision about that, not a reshuffle of an inventory.
     "with_color_delivery_repair",
+    "with_primary_color_delivery",
     "with_shape_delivery_repair",
     "with_complex_motif_repair",
     "with_structural_duplicate_repair",

@@ -41,18 +41,16 @@ DIAGNOSTIC_FRAGMENTS = (
     "counterweight preserved",
 )
 
-# H-01 left this list at ddl-engine 8 and is pinned by the test below instead.
-# The layer is not a fixed point for a color it *delivers*: coerce runs
-# `_with_primary_color_delivery` before `_with_color_delivery_repair`, so a
-# color that only reaches a cycle on pass 1 can only be promoted to a primary
-# stroke on pass 2. That ordering predates this change -- at ddl-engine 7 the
-# same two passes move a score for `blue`, and H-08, H-12, and H-20 already sat
-# outside this list for it. What changed is only which colors reach the path:
-# `_color_repair_order` used to drop yellow whenever an old color was present,
-# so H-01's yellow never got that far.
+# H-20 joined this list at ddl-engine 9, which is when the two color stages were
+# put in the order they read in: the repair puts a color in a cycle, and only
+# then does the promotion look through the cycles for it. Before that a delivered
+# color could not be promoted until a second pass over the same DDL, so H-01 and
+# H-20 each came out of coerce differently the second time. H-08, H-12 and
+# S-background-governor are still outside this list, for an unrelated reason --
+# what moves on their second pass is geometry and `weight`, not color.
 IDEMPOTENT_CASE_IDS = (
-    "H-02", "H-03", "H-05", "H-06", "H-07",
-    "H-09", "H-11", "H-13", "H-14", "H-16", "H-18",
+    "H-01", "H-02", "H-03", "H-05", "H-06", "H-07",
+    "H-09", "H-11", "H-13", "H-14", "H-16", "H-18", "H-20",
     "S-crescent-sensory", "S-dedupe-identical", "S-explicit-constraint",
     "S-filled-tempering", "S-invalid-relation", "S-literal-grid",
     "S-per-instruction-density", "S-presence-auxiliary", "S-presence-from-ddl",
@@ -119,37 +117,25 @@ def test_all_coerce_golden_inputs_are_idempotent_after_one_ddl_pass() -> None:
         ), case_id
 
 
-def test_h01_second_pass_moves_only_the_yellow_promotion_and_then_settles() -> None:
-    """Pin what H-01 loses by leaving IDEMPOTENT_CASE_IDS, so it is not a hole.
+def test_h01_promotes_the_delivered_color_on_the_first_pass() -> None:
+    """The positive half of the ordering: one pass is enough (ddl-engine 9).
 
-    Dropping a case from an allowlist hides whatever else drifts with it. The
-    second pass is allowed to do exactly one thing -- promote the yellow the DDL
-    asked for to a primary stroke -- and the third pass must do nothing.
+    H-01's DDL asks for yellow and its score has none, so this layer delivers
+    yellow into a cycle and then promotes it to a primary stroke. Until engine 9
+    the promotion ran first and could only see cycles that already existed, so
+    the promotion landed on the *second* pass and coerce was not a fixed point.
+    Asserting only "H-01 is idempotent" would pass an implementation that never
+    promotes at all, so the promotion is named here.
     """
     case = _golden_cases()["H-01"]
-    ddl = case["input"]["ddl"]
 
     first = _replay(case)
-    second = coerce_score(first, ddl=ddl)
-    third = coerce_score(second, ddl=ddl)
+    data = first.model_dump(mode="json", by_alias=True)["instructions"][0]
 
-    a = first.model_dump(mode="json", by_alias=True)
-    b = second.model_dump(mode="json", by_alias=True)
-    assert a != b
-
-    moved = [
-        (index, field)
-        for index, (before, after) in enumerate(zip(a["instructions"], b["instructions"]))
-        for field in before
-        if before[field] != after.get(field)
-    ]
-    assert moved == [(0, "note"), (0, "color")], moved
-    assert a["instructions"][0]["color"] == "red"
-    assert b["instructions"][0]["color"] == "yellow"
-    assert "yellow promoted to primary stroke from DDL color intent" in b["instructions"][0]["note"]
-    assert "yellow promoted to primary stroke" not in (a["instructions"][0]["note"] or "")
-
-    assert third.model_dump(mode="json", by_alias=True) == b
+    assert data["color"] == "yellow"
+    assert "yellow restored in color_cycle from DDL color intent" in data["note"]
+    assert "yellow promoted to primary stroke from DDL color intent" in data["note"]
+    assert "yellow" in data["arrangement"]["color_cycle"]
 
 
 def test_ddl_coerce_outputs_keep_machine_diagnostics_out_of_color_hint() -> None:

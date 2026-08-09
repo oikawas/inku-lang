@@ -1883,11 +1883,12 @@
       "part": "b_coerce"
     },
     "B-leaf-grain-words": {
-      "bytes": 4107,
-      "digest": "4c03db5d122bfa030f0481110d82353e",
+      "bytes": 4163,
+      "digest": "82173f1605e541b0d9640c912549a4a0",
       "fired_branches": {
         "with_color_delivery_repair": 1,
-        "with_complex_motif_repair": 2
+        "with_complex_motif_repair": 2,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "森の落ち葉が湿った土に重なる。",
@@ -1940,11 +1941,12 @@
       "part": "b_coerce"
     },
     "B-orange-from-ddl": {
-      "bytes": 2791,
-      "digest": "2125f9fb0f34244623021b4b9f89e707",
+      "bytes": 2849,
+      "digest": "83c6cbf5c76421113be530ac2a601dcc",
       "fired_branches": {
         "with_color_delivery_repair": 1,
-        "with_motion_energy": 1
+        "with_motion_energy": 1,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "橙の灯火が揺れる。",
@@ -1997,11 +1999,12 @@
       "part": "b_coerce"
     },
     "B-presence-from-ddl": {
-      "bytes": 2800,
-      "digest": "e73e4343c63855451034b087c8846422",
+      "bytes": 2854,
+      "digest": "f1499d74457a5ed9aed37c604405ace0",
       "fired_branches": {
         "presence_from_ddl": 1,
-        "with_color_delivery_repair": 1
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "金色の三日月が右上に浮かび、水面が細かく震え、岸辺に草が群れる。",
@@ -2332,10 +2335,11 @@
       "part": "b_coerce"
     },
     "B-purple-from-ddl": {
-      "bytes": 2545,
-      "digest": "c93af2bc14c84e0369845993d4a4e504",
+      "bytes": 2603,
+      "digest": "e7e248623743ff005d4bb7733b3b6b20",
       "fired_branches": {
-        "with_color_delivery_repair": 1
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "紫の菫が咲く。",
@@ -2388,10 +2392,11 @@
       "part": "b_coerce"
     },
     "B-quiet-water": {
-      "bytes": 2541,
-      "digest": "69a1696847cd80b7ba5fa2f71354aa10",
+      "bytes": 2595,
+      "digest": "aa28a21b25a6d13748cd9c0a301107b2",
       "fired_branches": {
-        "with_color_delivery_repair": 1
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "静かな水面。",
@@ -2498,12 +2503,13 @@
       "part": "b_coerce"
     },
     "B-trigger": {
-      "bytes": 2785,
-      "digest": "dc429d9a5be80c72d2425514a299e707",
+      "bytes": 2837,
+      "digest": "4b35787e5e89e6251efdb6be0937a24a",
       "fired_branches": {
         "coerce_and_repair_instruction": 1,
         "with_color_delivery_repair": 1,
-        "with_motion_energy": 1
+        "with_motion_energy": 1,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "赤い円を三つ散らす。ゆっくり波打つ。",
@@ -2665,10 +2671,11 @@
       "part": "b_coerce"
     },
     "B-yellow-from-ddl": {
-      "bytes": 2545,
-      "digest": "1500cd775b25f062e19f886e7aa104a8",
+      "bytes": 2603,
+      "digest": "d4a792bf2830ccc2eb103a84f7d1bed4",
       "fired_branches": {
-        "with_color_delivery_repair": 1
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "黄色い円を三つ散らす。",
@@ -2721,10 +2728,11 @@
       "part": "b_coerce"
     },
     "B-yellow-from-ddl-en": {
-      "bytes": 2545,
-      "digest": "1500cd775b25f062e19f886e7aa104a8",
+      "bytes": 2603,
+      "digest": "d4a792bf2830ccc2eb103a84f7d1bed4",
       "fired_branches": {
-        "with_color_delivery_repair": 1
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1
       },
       "input": {
         "ddl": "Scatter three yellow circles.",
@@ -2778,15 +2786,21 @@
     }
   },
   "changed_from_previous": [
+    "B-leaf-grain-words",
+    "B-orange-from-ddl",
     "B-presence-from-ddl",
-    "B-production-fill-clause"
+    "B-purple-from-ddl",
+    "B-quiet-water",
+    "B-trigger",
+    "B-yellow-from-ddl",
+    "B-yellow-from-ddl-en"
   ],
-  "commit": "1c10d470f08ac279b5a4a112db67e50656c0259c",
+  "commit": "4da4d7852fc31099ca0d493c17489a6d0e377248",
   "corpus_format_version": "1",
   "ddl_version": "3",
-  "engine_version": "8",
+  "engine_version": "9",
   "frozen_at": "2026-08-09",
   "layer": "ddl-engine",
-  "reason": "The color cycle stops inventing an order. coerce inserted an instruction's own color into its cycle without looking, so a color already there took twice the members, and `_color_repair_order` filtered the requested colors through a six-word table that predates yellow, orange, and purple, so a work naming an old color and a new one lost the new one. The table is now a known order for determinism rather than a ranking, and unnamed colors follow it instead of falling out. None of the 13 expand cases moved -- the change is entirely inside coerce -- and 2 of the 21 coerce cases moved: B-production-fill-clause loses the duplicated white, and B-presence-from-ddl keeps a color the table used to drop.",
+  "reason": "coerce becomes a fixed point for a color it delivers. The promotion to a primary stroke ran before the repair that puts a color in a cycle, and it can only promote what a cycle already carries -- so a color the DDL asked for and this layer delivered could not be promoted until a second pass over the same DDL, and running one input through coerce twice gave two different scores. The two now run repair-then-promote. Engine 8 made this visible rather than causing it: at engine 7 the six-word table dropped yellow before it could reach either stage. None of the 13 expand cases moved -- the change is entirely inside coerce -- and 8 of the 21 coerce cases did: in each one a color the DDL named was delivered into a cycle and now reaches the primary stroke on the same pass, so `color` stops being the black it was left at.",
   "schema_version": "0.1.0"
 }

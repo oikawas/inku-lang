@@ -721,9 +721,17 @@ def _with_crescent_sensory_suppression(instructions: list[Instruction], *, ddl: 
         descriptive_hint = (ins.color_hint or "").lower()
         if "five-sense" in descriptive_hint or "scent layer" in descriptive_hint:
             continue
-        if "crescent" in descriptive_hint and "sensory layer" in descriptive_hint and ins.color == "green":
+        # The green can sit in either place, so both are asked about. Keying the
+        # whole branch on `ins.color` made the cycle cleanup a side effect of the
+        # primary color happening to be green, and a later stage that rewrites
+        # `color` -- the promotion to a primary stroke, once it ran early enough
+        # to reach this -- left the green in the cycle for the renderer to draw.
+        cycle = list(ins.arrangement.color_cycle) if ins.arrangement is not None else []
+        carries_green = ins.color == "green" or "green" in cycle
+        if "crescent" in descriptive_hint and "sensory layer" in descriptive_hint and carries_green:
             data = ins.model_dump(by_alias=True)
-            data["color"] = "blue" if background != "blue" else "white"
+            if ins.color == "green":
+                data["color"] = "blue" if background != "blue" else "white"
             if isinstance(data.get("note"), str):
                 data["note"] = (
                     data["note"]
@@ -1178,6 +1186,15 @@ def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | 
         return instructions
 
     repaired = list(instructions)
+    # A stroke already carrying a color the description asked for is not taken
+    # for another one. An instruction has a single primary stroke, so promoting
+    # onto it a second time undoes the first: within one pass that left the last
+    # requested color standing and a note for each that no longer held, and
+    # across passes red and blue traded the same stroke back and forth forever.
+    # Either way the winner would be decided by where the words sit in
+    # `_color_repair_order`, which is a known order for determinism, not a
+    # ranking -- the thing this layer must not invent.
+    wanted = set(requested)
     for color in requested:
         if _score_contains_primary_color(repaired, color):
             continue
@@ -1185,7 +1202,8 @@ def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | 
             (
                 index
                 for index, ins in enumerate(repaired)
-                if ins.arrangement is not None
+                if ins.color not in wanted
+                and ins.arrangement is not None
                 and color in ins.arrangement.color_cycle
                 and ins.primitive in ("line", "arc", "ellipse", "square", "triangle", "polygon")
             ),

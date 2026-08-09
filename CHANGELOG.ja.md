@@ -4602,3 +4602,34 @@ server の生成物へ移し、読み手が設定から言語を選べるよう�
   **Android JVM 263 件 緑**・ruff は server / cli とも clean・**凍結コーパスは darwin でバイト一致**。
   **受入 10 本に摂動 10 本を当てた**。**⚠ 昇格の番人を外す摂動は冪等性テストを赤くしない** ——
   留めているのは `test_t10_*` の 2 本だけなので、**この 2 本を消すと番人の観測点が無くなる**
+
+### v2.11.16 — 成果物が、自分を描いた層の名を書く（Build 872、2026-08-09）
+
+**`inku-cli` が手元へ書く成果物 JSON は、その絵を描いた層のうち renderer の版しか名乗っていなかった。**
+`render-score` に `--ddl-text` / `--ddl-file` が付いた（v2.11.14）ことで**この経路の絵は DDL 層の版に依存する**のに、
+成果物には `render_engine_version` しか無く、**あとから JSON だけを見てもどの coerce が描いたのか分からなかった**（[I-182]）。
+
+- **成果物が `ddl_version` と `ddl_engine_version` を記録する。** 書き出し口は 5 つあり、
+  **`render-score` の成果物・compose 応答から作る paint 結果・履歴 payload・履歴 export の 2 箇所**すべてに載せた。
+  値は server の応答をそのまま写す（server は 3 つの応答すべてで既に返していた。CLI が捨てていただけである）
+- **古い作品では鍵は載るが値は `null` になる** —— `ddl_engine_version` は `history` の nullable 列で、
+  server は値があるときだけ応答へ載せる。**履歴 export は `item.get(...)` の形にして、鍵を持たない行でも落ちない**
+- **⚠ 古い server に当てると `render-score` が止まるようになった** —— `command_render_score` の
+  `required` に両鍵を足したため、**両鍵を返さない server では `null` を書かずに `CliError` で停止する**。
+  **版を名乗らない成果物を書くより、書かないほうがよいという既存の判断に揃えた**（`render_engine_version` と同じ扱い）
+- **呼び出し元を失った道具を製品コードから外した**（[I-180]）—— `_SERVER_RENDER_VERSION_KEYS`・
+  `_server_render_versions`・`_render_hash_for_score` の 3 定義と、**道連れの `_canonical_json` と `import hashlib`**。
+  v2.11.14 で版数の問い合わせと hash 計算を server が返すようになった後始末である
+- **「どの鍵が動いたか」を示す検査は残した** —— rh2 の計算を**テスト側のヘルパへ写して**、
+  `test_render_score_without_ddl_changes_only_server_owned_output_keys` が
+  **旧 rh2 と server の rh3 が違うことを示し続ける**。消えた関数そのものを見ていた検査 1 本だけを削除した
+- **manual の日英「入力と出力」に、成果物が DDL 層の版を記録することを 1 文ずつ足した**。旗は 1 つも増えていない
+- **検査:** **cli 195 → 197 passed**（削除 1・新規 3）・**server 2,658 passed / 31 skipped 据え置き**
+  （**server は 1 バイトも動いていない**。`web` `shared` `android` `docs` も同じ）・ruff は server / cli とも clean・
+  `check_docs.py` は consistent。**受入 6 本・摂動 7 本**
+- **実装は Codex（別モデル）なので、受け入れ側で T も摂動も全部当て直した** —— **摂動 7 本は全部予告どおり赤くなり、空振り 0**。
+  **⚠ P-5（履歴 export を `item[...]` の添字へ戻す）は、新設の受入だけでなく既存の
+  `test_history_export_writes_contact_sheet_and_evaluation_json` も赤くする**。実装の報告は対象を絞って測っていたので 1 件だった
+- **受け入れで `inku-cli` を隔離 API へ通した** —— `--ddl-file` あり／なしの 2 本とも成果物へ
+  **`ddl_version` 3 / `ddl_engine_version` 9** が載り、`/api/info` と一致した。
+  **前版の CLI が書いた同じ経路の成果物は版の鍵を 3 つしか持っていない**（`render_build_number`・`render_engine_id`・`render_engine_version`）

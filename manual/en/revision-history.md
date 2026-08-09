@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.16 unreleased baseline (Web Build 872)
+
+Updated the 13 places that name a version to v2.11.16 / Build 872, and **added one sentence to "Input and output" in the `inku-cli` reference**.
+
+- **The JSON artifacts the CLI writes now name the version of the DDL layer that drew the picture.** They carry `ddl_version` and `ddl_engine_version`, so **the JSON alone tells you which interpretation drew the picture**. Until now only the render engine was named.
+- **Older works leave the values empty.** Exporting a work made before these versions were recorded gives you the keys with nothing in them.
+- **⚠ `render-score` stops against an older server.** When the server will not say which versions it used, the CLI **stops rather than write an artifact that names no version**.
+- **Nothing was added to the interface.** No flag and no screen step changed.
+
 ## 2026-08-09 — v2.11.15 unreleased baseline (Web Build 871)
 
 The 13 places that name a version were updated to v2.11.15 / Build 871. **No manual text changed** — no screen action, CLI flag, setting or response key moved.

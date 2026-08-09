@@ -4907,3 +4907,43 @@ had been writing two kinds of order into it ([I-060]).
   byte-identical on darwin**. **Ten perturbations were applied to ten acceptance tests.** **⚠ Removing the
   promotion guard does not turn the idempotence tests red** — only the two `test_t10_*` tests hold it, so
   **deleting those two leaves the guard with no observation point.**
+
+### v2.11.16 — The artifact names the layer that drew it (Build 872, 2026-08-09)
+
+**The artifact JSON `inku-cli` writes named only the renderer's version, out of all the layers that drew the
+picture.** Since `render-score` gained `--ddl-text` / `--ddl-file` in v2.11.14, **the pictures on that route
+depend on the version of the DDL layer**, yet the artifact carried only `render_engine_version`, so **the JSON
+alone could not say which coerce drew it** ([I-182]).
+
+- **Artifacts now record `ddl_version` and `ddl_engine_version`.** There are five places that write them out —
+  **the `render-score` artifact, the paint result built from a compose response, the history payload, and the two
+  history-export summaries** — and all five carry the keys. The values are copied from the server response as they
+  are (the server already returned them in all three responses; the CLI was throwing them away).
+- **Older works keep the keys with a `null` value.** `ddl_engine_version` is a nullable column in `history`, and
+  the server puts it in the response only when it has a value, so **the history export reads it with `item.get(...)`
+  and does not fall over on rows that lack the key**.
+- **⚠ `render-score` now stops against an older server.** Both keys were added to the `required` tuple in
+  `command_render_score`, so **a server that does not return them raises `CliError` instead of writing `null`**.
+  This matches the existing judgement for `render_engine_version`: writing no artifact beats writing one that names
+  no version.
+- **Tools that had lost their callers left the product code** ([I-180]) — the three definitions
+  `_SERVER_RENDER_VERSION_KEYS`, `_server_render_versions` and `_render_hash_for_score`, along with
+  **`_canonical_json` and `import hashlib`, which they took with them**. This finishes the move made in v2.11.14,
+  where asking for versions and computing the hash became the server's job.
+- **The check that shows which keys moved stays.** The rh2 computation **moved into a helper on the test side**, so
+  `test_render_score_without_ddl_changes_only_server_owned_output_keys` **still shows that the old rh2 and the
+  server's rh3 differ**. Only the one test that examined the deleted function itself was removed.
+- **The Japanese and English manuals gained one sentence each** under "Input and output", saying that artifacts
+  record the versions of the DDL layer. No flag was added.
+- **Checks:** **cli 195 → 197 passed** (one removed, three added), **server 2,658 passed / 31 skipped, unchanged**
+  (**the server did not move by a byte**; neither did `web`, `shared`, `android` or `docs`), ruff clean on server and
+  cli, and `check_docs.py` consistent. **Six acceptance tests, seven perturbations.**
+- **The implementation came from Codex (a different model), so every test and perturbation was re-run on the
+  accepting side** — **all seven perturbations turned red as predicted, none missed**. **⚠ P-5 (putting the history
+  export back to the `item[...]` subscript) also turns the existing
+  `test_history_export_writes_contact_sheet_and_evaluation_json` red**, not only the new acceptance test; the
+  implementation report measured a narrowed selection and so recorded one.
+- **Acceptance drove `inku-cli` against an isolated API.** Both runs, with and without `--ddl-file`, wrote
+  **`ddl_version` 3 and `ddl_engine_version` 9** into the artifact, matching `/api/info`. **Artifacts written by the
+  previous CLI on the same route carry only three version keys** (`render_build_number`, `render_engine_id`,
+  `render_engine_version`).

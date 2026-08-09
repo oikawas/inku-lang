@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、一般ユーザー、グループリード、管理者それぞれの権限判定はサーバーが行います。
 
-対象はinku v2.11.15（Web Build 871）です。
+対象はinku v2.11.16（Web Build 872）です。
 
 ## 基本操作
 
@@ -44,7 +44,7 @@ paintとbatchは同じ旗を受け取ります。**旗を書かなければサ�
 
 ### 入力と出力
 
-JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_engine_version` に記録する。
+JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_engine_version` に記録します。
 
 | 旗 | 内容 |
 |---|---|

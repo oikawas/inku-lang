@@ -4416,3 +4416,30 @@ web の表示文字列だけだった**（台帳 [I-161]・作者裁定「更新
   `npm run check` 0 errors・`lint:i18n` 0 errors・`check_docs.py` 緑・
   **凍結コーパスはバイト一致**（決定的な層に触れていない）。
   **摂動 13 本**（契約の 7 本 ＋ 実装が足した 6 本）。**空振りは 1 本 = P-2 で、理由は上の通り**
+
+### v2.11.12 — ログの方針を、アプリ自身が実行する（Build 868、2026-08-09）
+
+**設定画面はログの方針（有効／保存日数／周期／圧縮）をアプリ DB に保存しながら、
+実行だけを OS へ投げていた。** 投げ方は `systemd` の drop-in と `logrotate` の設定文を
+**生成して管理者に貼らせる**形で、その drop-in が
+`StandardOutput=journal+append:/var/log/inku/inku-api.log` だった（台帳 [I-167]）。
+
+- **`journal+append:` は systemd に存在しない出力指定子である。** systemd 249 は毎起動
+  `Failed to parse output specifier, ignoring` を記録して行ごと捨て、既定の `journal` に落ちていた。
+  **`/var/log/inku/*.log` は 2026-05-07 から 0 バイト**で、それを前提にした 90 日保持も空振りしていた
+- **コンテナ配布版には貼る先が無い** — systemd も logrotate も無いので、
+  **プラットフォームが実行する方針は、2 つの配布形態で同じにならない**
+- **DB バックアップと同じ作りへ寄せた。** 方針は DB に置いたまま、**アプリ自身が書き出し・回転・圧縮・
+  古い世代の削除を行う**（`server/src/inku_server/logging_setup.py`）。
+  置き場は **`INKU_LOG_DIR`**（既定 `~/.local/share/inku/logs`、コンテナ配布版は **`/data/logs`**）で、
+  イメージが `inku-data` ボリュームを指すので**再起動しても残る**
+- **標準出力には出し続ける** — `journalctl -u inku-api` と `docker logs` はこれまでどおり使える。
+  コンテナ配布版では、daemon が標準出力から集めるぶんの上限を `compose.yaml` の `logging` が持つ
+  （既定は無制限だった）
+- **設定画面から 2 つのプレビュー欄を撤去した**（systemd drop-in と logrotate 設定）。
+  代わりに**書き出し先といまあるファイル**を出す。API の `log_retention` も
+  `systemd_dropins` / `logrotate_config` / `services` を落とし、`log_dir` / `files` を持つ
+- **起動バナーが名乗る宛先も、方針から引くようにした** — それまで
+  `log: journal + /var/log/inku/inku-api.log` と、**書けていないファイルを固定文字列で名乗っていた**
+- **`manual/` の systemd 雛形 4 本から壊れた指定子を外し、logrotate の雛形は撤去した**
+  （日英とも。**公開文書が同じ設定を配っていた**）

@@ -258,9 +258,7 @@
 			rotate: 'daily' | 'weekly' | 'monthly';
 			compress: boolean;
 			log_dir: string;
-			services: string[];
-			systemd_dropins: Record<string, string>;
-			logrotate_config: string;
+			files: string[];
 			note: string;
 		};
 	};

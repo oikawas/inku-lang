@@ -26,6 +26,14 @@ services:
     volumes:
       - inku-data:/data
     restart: unless-stopped
+    # The default json-file driver keeps every line forever. The application's
+    # own retention only covers the files it writes under /data/logs; what the
+    # daemon collects from stdout needs its own ceiling (ledger I-167).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=3)"]
       interval: 15s
@@ -45,6 +53,11 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   inku-data:

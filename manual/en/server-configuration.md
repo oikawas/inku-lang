@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.11.11 (Web Build 867). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.11.12 (Web Build 868). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -237,7 +237,7 @@ Back up at least:
 | DB | Source of truth for history, lineage, users, and settings |
 | `INKU_SECRET_KEY_FILE` | Required to decrypt provider keys |
 | `/etc/inku/inku-api.env` | Runtime configuration |
-| systemd, reverse proxy, and logrotate | Service recovery |
+| systemd and reverse proxy | Service recovery |
 | Artifacts | Rebuildable, but potentially required operationally |
 
 Change the SQLite backup directory with `INKU_DB_BACKUP_DIR`. The Web admin UI supports manual and scheduled backups with generation retention. Use external backups as well, keeping the DB and encryption key at the same recovery point.
@@ -260,7 +260,7 @@ journalctl -u inku-api.service -n 100 --no-pager
 journalctl -u inku-server.service -n 100 --no-pager
 ```
 
-`manual/en/templates/logrotate/inku` is an example using daily rotation, 90 generations, compression, and `copytruncate`. Log policy in the admin UI is a preview and stored policy; applying OS configuration remains an administrator task.
+The log policy in the admin UI (enabled / retention days / interval / compression) is **executed by the application itself**. Files are written under `INKU_LOG_DIR` (`~/.local/share/inku/logs` by default, `/data/logs` in the container distribution), and the application rotates, compresses and prunes them. No logrotate configuration is needed. **The same lines keep going to stdout**, so `journalctl` and `docker logs` are unchanged. In the container distribution, `logging` in `compose.yaml` caps what the daemon collects from stdout.
 
 ## 10. systemd
 

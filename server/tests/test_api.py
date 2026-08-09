@@ -2621,9 +2621,11 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
     assert data["log_retention"]["retention_days"] == 90
     assert data["log_retention"]["rotate"] == "daily"
     assert data["log_retention"]["compress"] is True
-    assert data["log_retention"]["services"] == ["inku-server", "inku-api"]
-    assert "/var/log/inku/inku-api.log" in data["log_retention"]["logrotate_config"]
-    assert "OS privileges" in data["log_retention"]["note"]
+    # The screen used to hand out a systemd drop-in and a logrotate snippet; it
+    # now names the directory the application writes to itself (ledger I-167).
+    assert data["log_retention"]["log_dir"]
+    assert isinstance(data["log_retention"]["files"], list)
+    assert "the application executes it" in data["log_retention"]["note"]
     assert data["stage_execution"]["workers"] >= 1
     assert data["stage_execution"]["queue_limit"] >= data["stage_execution"]["workers"]
     assert {"submitted", "completed", "failed", "timed_out", "rejected"} <= set(data["stage_execution"])
@@ -3443,8 +3445,10 @@ def test_log_retention_settings_are_admin_only():
         assert data["retention_days"] == 30
         assert data["rotate"] == "weekly"
         assert data["compress"] is False
-        assert "rotate 30" in data["logrotate_config"]
-        assert "compress" not in data["logrotate_config"]
+        # The stored policy is applied in process now, so the response describes
+        # where it landed instead of what the operator should paste.
+        assert data["log_dir"]
+        assert "systemd" not in data
 
         status_r = client.get("/api/settings/status", headers=admin_headers)
         assert status_r.status_code == 200

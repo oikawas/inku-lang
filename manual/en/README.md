@@ -1,6 +1,6 @@
 # inku User and Operations Manual
 
-This manual explains how to use and operate the unreleased inku v2.11.11 baseline (Web Build 867). It is intended for first-time creators and system administrators who deploy and maintain the application. The canonical product specification is `SPEC.ja.md` at the repository root.
+This manual explains how to use and operate the unreleased inku v2.11.12 baseline (Web Build 868). It is intended for first-time creators and system administrators who deploy and maintain the application. The canonical product specification is `SPEC.ja.md` at the repository root.
 
 ## Audience
 
@@ -21,7 +21,6 @@ This manual explains how to use and operate the unreleased inku v2.11.11 baselin
 - [Environment variable template](./templates/inku-api.env.example)
 - [FastAPI systemd service example](./templates/systemd/inku-api.service)
 - [SvelteKit / Vite systemd service example](./templates/systemd/inku-server.service)
-- [logrotate example](./templates/logrotate/inku)
 
 The templates are generic examples. Keep real hostnames, user names, paths, and secrets in server-side configuration files, not in Git-tracked documentation.
 

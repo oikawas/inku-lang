@@ -1,6 +1,6 @@
 # inku 運用・利用マニュアル
 
-このディレクトリは、未リリース版inku v2.11.11（Web Build 867）を初めて使う人が作品を作成できることと、システム管理者がアプリケーションを安全に展開・運用できることを目的にしたマニュアルです。製品仕様の正本はリポジトリ直下の`SPEC.ja.md`です。
+このディレクトリは、未リリース版inku v2.11.12（Web Build 868）を初めて使う人が作品を作成できることと、システム管理者がアプリケーションを安全に展開・運用できることを目的にしたマニュアルです。製品仕様の正本はリポジトリ直下の`SPEC.ja.md`です。
 
 ## 対象読者
 
@@ -21,7 +21,6 @@
 - [環境変数テンプレート](./templates/inku-api.env.example)
 - [FastAPI systemd サービス例](./templates/systemd/inku-api.service)
 - [SvelteKit / Vite systemd サービス例](./templates/systemd/inku-server.service)
-- [logrotate 設定例](./templates/logrotate/inku)
 
 テンプレートは汎用例です。実際のホスト名、ユーザー名、パス、秘密情報はローカル運用ファイルやサーバー側の安全な場所で管理してください。
 

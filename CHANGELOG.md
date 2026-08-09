@@ -4697,3 +4697,32 @@ decide the colors.** So **changing a catalog silently repainted every work that 
   `lint:i18n` 0 errors, `check_docs.py` green, **frozen corpora byte-identical** (no deterministic
   layer was touched). **Thirteen perturbations** (the contract's seven plus six the implementation
   added). **One miss, P-2, for the reason above**
+
+### v2.11.12 — The application executes its own log policy (Build 868, 2026-08-09)
+
+**The settings screen stored the log policy (enabled / retention / interval / compression) in the
+application DB but delegated execution to the host OS.** It did so by generating a systemd drop-in
+and a logrotate snippet for an administrator to paste, and the drop-in said
+`StandardOutput=journal+append:/var/log/inku/inku-api.log` (ledger I-167).
+
+- **`journal+append:` is not a systemd output specifier.** systemd 249 logged
+  `Failed to parse output specifier, ignoring` on every start, dropped the line and fell back to
+  `journal`. **`/var/log/inku/*.log` had been 0 bytes since 2026-05-07**, and the 90-day retention
+  that depended on those files had nothing to rotate
+- **The container distribution has nowhere to paste either file** — no systemd, no logrotate — so a
+  policy the platform executes can never be the same policy on both deployments
+- **Logs now work the way DB backups already did.** The policy stays in the DB and the application
+  writes, rotates, compresses and prunes the files itself
+  (`server/src/inku_server/logging_setup.py`). The directory is **`INKU_LOG_DIR`**
+  (`~/.local/share/inku/logs` by default, **`/data/logs`** in the image), which points at the
+  `inku-data` volume so the files survive a restart
+- **Every line still goes to stdout**, so `journalctl -u inku-api` and `docker logs` are unchanged.
+  In the container distribution, `logging` in `compose.yaml` now caps what the daemon collects from
+  stdout; it was uncapped
+- **The two preview panes were removed from the settings screen** (systemd drop-in and logrotate).
+  It shows the log directory and the files present instead. The `log_retention` API dropped
+  `systemd_dropins`, `logrotate_config` and `services`, and carries `log_dir` and `files`
+- **The startup banner asks the policy for its destination** as well; it used to print
+  `log: journal + /var/log/inku/inku-api.log` as a constant, naming a file nothing was writing
+- **The broken specifier was removed from the four systemd templates in `manual/`, and the logrotate
+  template was retired** (both languages -- the published manual was handing out the same setting)

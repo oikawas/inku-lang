@@ -112,13 +112,22 @@ def test_without_compression_the_rotated_file_stays_plain():
 # T-6 -- journalctl and docker logs must keep working. Writing files is an
 # addition, not a move.
 def test_lines_keep_going_to_the_stream_as_well():
-    logging_setup.configure_logging(_policy())
+    # Start from a root with no handlers at all. Asserting "a StreamHandler is
+    # present" against the ambient root passes on pytest's own capture handler,
+    # so removing the product code that installs one changed nothing -- measured
+    # 2026-08-09, the perturbation was a miss until this line was added.
     root = logging.getLogger()
-    assert any(
-        isinstance(h, logging.StreamHandler)
-        and not isinstance(h, logging.FileHandler)
-        for h in root.handlers
-    ), "the stream handler is what journalctl and docker logs read"
+    borrowed = list(root.handlers)
+    root.handlers[:] = []
+    try:
+        logging_setup.configure_logging(_policy())
+        streams = [
+            h for h in root.handlers
+            if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+        ]
+        assert streams, "the stream handler is what journalctl and docker logs read"
+    finally:
+        root.handlers[:] = borrowed
 
 
 # T-7 -- the directory follows the environment, the way INKU_DB_BACKUP_DIR does.
@@ -162,10 +171,20 @@ def test_the_banner_names_the_destination_the_policy_chose(monkeypatch):
 
     monkeypatch.setattr(db_module, "get_log_retention_settings", lambda: {"enabled": True})
     assert api_module._log_destination() == str(logging_setup.log_dir())
-    assert "/var/log/inku" not in api_module._log_destination()
 
     monkeypatch.setattr(db_module, "get_log_retention_settings", lambda: {"enabled": False})
     assert "no file" in api_module._log_destination()
+
+    # ...and the banner has to be the thing that says it. Reading _log_destination()
+    # on its own leaves the printed line free to keep its old hardcoded path, which
+    # is exactly what it did: the perturbation that restored the constant was a miss
+    # until this walked the banner itself (measured 2026-08-09).
+    monkeypatch.setattr(db_module, "get_log_retention_settings", lambda: {"enabled": True})
+    printed = api_module._startup_banner(
+        service_name="inku-api", service_kind="test", emoji="*"
+    )
+    assert str(logging_setup.log_dir()) in printed
+    assert "/var/log/inku" not in printed
 
 
 # T-10 -- the container is pointed at the data volume, so the files survive a

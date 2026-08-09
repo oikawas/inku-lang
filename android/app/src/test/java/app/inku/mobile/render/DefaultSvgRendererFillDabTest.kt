@@ -139,11 +139,17 @@ class DefaultSvgRendererFillDabTest {
             assertEquals("$name region-fill branch", item.getBoolean("interior_region_fill"), actual.second)
         }
 
+        // Either side of the boundary engine 16 measured go opposite ways, and
+        // since engine 22 the scanned side is an underlay with marks on it
+        // rather than the marks alone: `fill-v2` wraps the field and whichever
+        // branch the coverage chose. A dab has no underlay -- it is one touch
+        // of the tool, and giving it one would put back the flat region fill
+        // engine 16 took out of tiny shapes.
         assertEquals("fill-dab-v1", actualByName.getValue("boundary_below_pen").first)
-        assertEquals("fill-stroke-v1 strokes-3", actualByName.getValue("boundary_above_pen").first)
+        assertEquals("fill-v2", actualByName.getValue("boundary_above_pen").first)
         assertEquals(null, actualByName.getValue("tiny_circle_rotring").first)
         assertTrue(actualByName.getValue("tiny_circle_rotring").second)
-        assertEquals("fill-stroke-v1 strokes-33", actualByName.getValue("large_circle_pen").first)
+        assertEquals("fill-v2", actualByName.getValue("large_circle_pen").first)
     }
 
     @Test

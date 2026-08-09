@@ -19,20 +19,83 @@ data class ToolGrammar(
     val gesture: Double,
     val periodic: Boolean = false,
     val quantize: Double = 0.0,
-    val widthSteps: Int = 0
+    val widthSteps: Int = 0,
+    // How loose the hand is when this tool fills an area, from 0 (a machine:
+    // every scan line parallel, every endpoint on the contour) to 1 (the
+    // loosest brush). The renderer reads it for the three quantities that made
+    // a fill read as a raster -- the scan angle, the pitch, and how far each
+    // stroke reaches past the contour. Zero for `rotring` and `computer`:
+    // exact repetition is the machine's signature, not a defect to sand off.
+    val fillHand: Double = 0.0,
+    // How much this tool's members of one repeated group differ in size, as a
+    // fraction either side of the stated dimension (0.25 = 0.75x..1.25x).
+    val groupHand: Double = 0.0,
+    // How far this tool's members of one repeated group turn away from the
+    // stated angle, in degrees either side of it (12.0 = -12..+12). A separate
+    // field rather than a multiple of `groupHand`: the two amplitudes were
+    // ruled on together as a pair and either could be retuned without the other.
+    val groupRot: Double = 0.0,
+    // How far this tool's fill marks stand out from the field they sit on, as
+    // a multiple of whichever branch contrast applies. 1.0 leaves the tool on
+    // the branch's own value.
+    val fillContrast: Double = 1.0
 )
 
+// Every hand tool gets the same amount of size variation inside a group, and
+// the same amount of angle variation in degrees. One constant each rather than
+// a per-tool value: the ruling was given on samples that used one amplitude
+// for four tools whose `fillHand` spans 18x.
+const val HAND_GROUP_SIZE: Double = 0.25
+const val HAND_GROUP_ROT: Double = 12.0
+
+// `fillHand` runs with the tool's stiffness: the stiffer the tool, the tighter
+// the hand that fills with it. The two machines are pinned at zero by hand
+// rather than derived, because zero has to be exact.
 val GRAMMARS: Map<String, ToolGrammar> = mapOf(
-    "silverpoint" to ToolGrammar(0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012),
-    "pencil" to ToolGrammar(0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05),
-    "pen" to ToolGrammar(0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022),
-    "rotring" to ToolGrammar(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    "crayon" to ToolGrammar(0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06),
-    "chalk" to ToolGrammar(0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07),
-    "brush_thin" to ToolGrammar(0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10),
-    "brush_thick" to ToolGrammar(0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13),
-    "burin" to ToolGrammar(0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018),
-    "drypoint" to ToolGrammar(0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05),
+    "silverpoint" to ToolGrammar(
+        0.93, 0.90, 0.08, 0.05, 0.04, 0.05, 0.02, 0.012,
+        fillHand = 0.05, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
+    "pencil" to ToolGrammar(
+        0.58, 0.68, 0.34, 0.42, 0.55, 0.12, 0.14, 0.05,
+        fillHand = 0.60, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
+    "pen" to ToolGrammar(
+        0.82, 0.80, 0.16, 0.12, 0.12, 0.08, 0.06, 0.022,
+        fillHand = 0.25, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
+    "rotring" to ToolGrammar(
+        1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        groupHand = 0.0, groupRot = 0.0
+    ),
+    "crayon" to ToolGrammar(
+        0.48, 0.60, 0.38, 0.34, 0.75, 0.14, 0.18, 0.06,
+        fillHand = 0.72, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
+    // chalk carries the one `fillContrast` above 1.0: it and crayon sit either
+    // side of the coverage threshold and read almost alike otherwise, so the
+    // separation has to be asked for rather than fall out of the widths.
+    "chalk" to ToolGrammar(
+        0.42, 0.56, 0.42, 0.38, 0.90, 0.18, 0.20, 0.07,
+        fillHand = 0.80, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT,
+        fillContrast = 1.13
+    ),
+    "brush_thin" to ToolGrammar(
+        0.36, 0.52, 0.66, 0.48, 0.48, 0.88, 0.28, 0.10,
+        fillHand = 0.90, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
+    "brush_thick" to ToolGrammar(
+        0.30, 0.48, 0.78, 0.55, 0.58, 0.92, 0.34, 0.13,
+        fillHand = 1.00, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
+    "burin" to ToolGrammar(
+        0.91, 0.86, 0.58, 0.09, 0.08, 0.98, 1.0, 0.018,
+        fillHand = 0.10, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
+    "drypoint" to ToolGrammar(
+        0.68, 0.70, 0.44, 0.20, 0.45, 0.55, 0.48, 0.05,
+        fillHand = 0.45, groupHand = HAND_GROUP_SIZE, groupRot = HAND_GROUP_ROT
+    ),
     "computer" to ToolGrammar(
         1.0,
         1.0,
@@ -44,12 +107,31 @@ val GRAMMARS: Map<String, ToolGrammar> = mapOf(
         0.06,
         periodic = true,
         quantize = 0.018,
-        widthSteps = 4
+        widthSteps = 4,
+        groupHand = 0.0,
+        groupRot = 0.0
     )
 )
 
 const val WILD_GAIN: Double = 3.5
 const val GESTURE_EDGE: Double = 0.16
+
+// The terminal is a property of the ROLE, not of the tool. The same brush ends
+// a contour thin (`taper`, what the edge window gives) and ends a fill stroke
+// heavy, because laying down paint is heaviest the moment the brush lands:
+// 1.45x where it lands, settling over a tenth of the run, and only the lift
+// narrowing, to 0.55.
+private const val LOADED_LANDING: Double = 0.45
+private const val LOADED_SETTLE: Double = 0.10
+private const val LOADED_LIFT_AT: Double = 0.94
+private const val LOADED_LIFT_TO: Double = 0.55
+
+internal fun loadedProfile(t: Double): Double {
+    val landing = 1.0 + LOADED_LANDING * kotlin.math.exp(-t / LOADED_SETTLE)
+    if (t < LOADED_LIFT_AT) return landing
+    val span = 1.0 - LOADED_LIFT_AT
+    return landing * (LOADED_LIFT_TO + (1.0 - LOADED_LIFT_TO) * (1.0 - t) / span)
+}
 
 data class StrokeSample(
     val t: Double,
@@ -97,7 +179,11 @@ val TOOL_SUPPORT_BIAS: Map<String, Pair<Double, Double>> = mapOf(
     "brush_thick" to Pair(1.00, 0.15),
     "crayon" to Pair(0.10, 1.00),
     "pencil" to Pair(0.10, 1.00),
-    "chalk" to Pair(0.10, 1.00),
+    // chalk is refused harder than the other two waxy tools. At 1.00 it showed
+    // the same 4.8% bare paper as crayon and pencil, which is 1.25 gaps in a
+    // stroke; at 1.30 it shows 9.5% in 1.65 gaps. Above 1.0 the sheet refuses
+    // this tool more than fully, which is what the tool is.
+    "chalk" to Pair(0.10, 1.30),
     "pen" to Pair(0.15, 0.15),
     "silverpoint" to Pair(0.05, 0.25),
     "drypoint" to Pair(0.00, 0.35),
@@ -640,7 +726,8 @@ object ServerStrokeEngine {
         anchors: Set<Int> = emptySet(),
         gridStep: Double = 0.0,
         wild: Boolean = false,
-        support: Support = DEFAULT_SUPPORT
+        support: Support = DEFAULT_SUPPORT,
+        terminal: String = "taper"
     ): ContourStrokeResult {
         val points = centerline
         val count = points.size
@@ -724,11 +811,20 @@ object ServerStrokeEngine {
             }
 
             var profile = 1.0
-            if (grammar.taper != 0.0) {
-                profile *= (1.0 - grammar.taper) + grammar.taper * envelope
-            }
-            if (grammar.bulge != 0.0) {
-                profile *= 1.0 + grammar.bulge * envelope
+            if (terminal == "loaded" && !grammar.periodic) {
+                // The loaded envelope replaces the taper/bulge shaping
+                // outright: it is a different terminal, not a modifier on top
+                // of the old one. `periodic` is excluded here rather than
+                // earlier so the machine never leaves the branch that keeps it
+                // byte-identical.
+                profile = loadedProfile(t)
+            } else {
+                if (grammar.taper != 0.0) {
+                    profile *= (1.0 - grammar.taper) + grammar.taper * envelope
+                }
+                if (grammar.bulge != 0.0) {
+                    profile *= 1.0 + grammar.bulge * envelope
+                }
             }
 
             var width = Math.max(

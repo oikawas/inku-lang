@@ -1444,6 +1444,550 @@
       "#ffffff"
     ]
   },
+  "43_arrangement_angle_arc_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "arc",
+          "weight": "pen",
+          "arrangement": {
+            "count": 12,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          },
+          "center": [
+            0.85,
+            0.85
+          ],
+          "radius": 0.06,
+          "angle_start": 15.0,
+          "angle_end": 285.0
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 20161,
+    "counts": {
+      "path": 48,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 17
+    },
+    "classes": [
+      "arc-stroke-v1 controls-17 events-0",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "44_arrangement_angle_cloudform_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "cloudform",
+          "weight": "pen",
+          "arrangement": {
+            "count": 12,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          },
+          "center": [
+            0.85,
+            0.85
+          ],
+          "size": [
+            0.1,
+            0.06
+          ]
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 321020,
+    "counts": {
+      "path": 24,
+      "polyline": 0,
+      "polygon": 24,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 29
+    },
+    "classes": [
+      "cloudform contour-v1 stroke-engine-touch",
+      "contour-stroke-v1 controls-245 events-0",
+      "contour-stroke-v1 controls-245 events-1",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "45_arrangement_angle_stated_zero_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "ellipse",
+          "weight": "pen",
+          "arrangement": {
+            "count": 12,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          },
+          "center": [
+            0.85,
+            0.85
+          ],
+          "size": [
+            0.1,
+            0.06
+          ],
+          "rotation": 0.0
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 19536,
+    "counts": {
+      "path": 12,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 36,
+      "line": 0,
+      "rect": 1,
+      "g": 29
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "contour-stroke-v1 controls-17 events-1",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "46_arrangement_angle_stated_30_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "ellipse",
+          "weight": "pen",
+          "arrangement": {
+            "count": 12,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          },
+          "center": [
+            0.85,
+            0.85
+          ],
+          "size": [
+            0.1,
+            0.06
+          ],
+          "rotation": 30.0
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 20127,
+    "counts": {
+      "path": 12,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 36,
+      "line": 0,
+      "rect": 1,
+      "g": 29
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "47_arrangement_size_square_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "square",
+          "weight": "pen",
+          "arrangement": {
+            "count": 12,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          },
+          "position": [
+            0.81,
+            0.81
+          ],
+          "size": [
+            0.08,
+            0.08
+          ]
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 49684,
+    "counts": {
+      "path": 12,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 0,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 37,
+      "g": 29
+    },
+    "classes": [
+      "contour-stroke-v1 controls-68 events-0",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "48_arrangement_fade_radial_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.85,
+            0.85
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 12,
+            "layout": "radial",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "outward",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 18874,
+    "counts": {
+      "path": 12,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 36,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 29
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "49_arrangement_fade_count2_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.85,
+            0.85
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 2,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "outward",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 3704,
+    "counts": {
+      "path": 2,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 6,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 9
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
+  "50_arrangement_composition_scatter_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.85,
+            0.85
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 60,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "none",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 91620,
+    "counts": {
+      "path": 60,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 180,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 125
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "contour-stroke-v1 controls-17 events-1",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ],
+    "composition_seed": 777
+  },
+  "51_arrangement_scatter_fade_edge": {
+    "score": {
+      "instructions": [
+        {
+          "primitive": "circle",
+          "weight": "pen",
+          "center": [
+            0.85,
+            0.85
+          ],
+          "radius": 0.03,
+          "arrangement": {
+            "count": 60,
+            "layout": "scatter",
+            "rows": null,
+            "cols": null,
+            "jitter": 0.12,
+            "path": "none",
+            "color_cycle": [],
+            "margin": 0.1,
+            "center": null,
+            "radius": null,
+            "density": "none",
+            "cluster_count": null,
+            "fade": "outward",
+            "preserve_space": false,
+            "rhythm_spacing": "none"
+          }
+        }
+      ]
+    },
+    "render_seed": 12345,
+    "svg_profile": "editable",
+    "wild": false,
+    "color_catalog_id": "default",
+    "bytes": 91643,
+    "counts": {
+      "path": 60,
+      "polyline": 0,
+      "polygon": 0,
+      "circle": 180,
+      "ellipse": 0,
+      "line": 0,
+      "rect": 1,
+      "g": 125
+    },
+    "classes": [
+      "contour-stroke-v1 controls-17 events-0",
+      "contour-stroke-v1 controls-17 events-1",
+      "material-outline"
+    ],
+    "stroke_colors": [
+      "#111111"
+    ],
+    "fill_colors": [
+      "#111111",
+      "#ffffff"
+    ]
+  },
   "15_line_brush_wild": {
     "score": {
       "instructions": [

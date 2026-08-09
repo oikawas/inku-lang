@@ -44,7 +44,16 @@
     "40_arrangement_radial_nocenter_corner.svg": "b63fe9563df15f29f8ef45fb3e5d19ba2092ac219f18aac05ffd46594fd0bf0c",
     "41_arrangement_grid_region_edge.svg": "80f35821bad107cdc5a514861674fa946f1db0f263cc1df0bab951d14c712e32",
     "42_arrangement_cluster_center.svg": "63a9bddd94fa7a07ec74b8199e368380032eb5f916f3c9b20713f968bb6976cf",
-    "renderer_arrangement.json": "d625347fc2de876c5b98a0f80a00ff9af03a3c3ad7b1bc2e847f5b017f39fb96",
+    "43_arrangement_angle_arc_edge.svg": "8956405f3534fa1b5b505782e50f1d9e5cf59cd8d258529460fa15c4bbc97da8",
+    "44_arrangement_angle_cloudform_edge.svg": "adc353b97aca26a91b0da38aae78431eeb5a0b3d01cc1ae89264e59598cc3c2d",
+    "45_arrangement_angle_stated_zero_edge.svg": "68b8350fcfedb4047350cc1a409fa37ab165e751d231a8e8413f13c5ecefae2e",
+    "46_arrangement_angle_stated_30_edge.svg": "8b3e7b9f63915ed04490ec73575fe8e2035a00c10f3eab65f6597f9789330be0",
+    "47_arrangement_size_square_edge.svg": "fb56f0740c06d537f9bff96c9665f6d5c10a8ca2c23aebe3b5f2dff695f59931",
+    "48_arrangement_fade_radial_edge.svg": "5cff127b1f822c649cd8e9c2a8ffac5cf5c87eedaaa51a2e3dfa7246f54244c9",
+    "49_arrangement_fade_count2_edge.svg": "9b683aacb2694daaec89ffaf242a3bbd6205886ac89ebbc5a9cec2f825ebe5c1",
+    "50_arrangement_composition_scatter_edge.svg": "88e4a42fabae440b529107f7886f07df0a6e20b71ff4980057601e27cf098012",
+    "51_arrangement_scatter_fade_edge.svg": "363dcae73d54f5b0ec0a7592867d5860c0027186b3fb266fb1ce757437ccb5c5",
+    "renderer_arrangement.json": "355b10e0455e20cc81937ca1d0032dc8a271dc6c743a0a3861c6d3ccc08a8cc9",
     "renderer_cloudform_and_relations.json": "81bb88881d5e6062197646329e07df2a20186e9eda1c37ea899eff1876ebbfb4",
     "renderer_color_assignment.json": "34b8ca35f33bcc85d603ad32785cef8e53035c505ed3c23bda1f707975eac4da",
     "renderer_fill_and_arc.json": "22c1004b0718d3097622208be61fc4d536207786a1bc99c753149ab816395b27",
@@ -55,6 +64,6 @@
     "stroke_engine_primitives.json": "13dadef6ca451434a7f67f49d958924f6a1f519b548e71202a9c0996f489f252",
     "stroke_engine_synthesize_along.json": "161888f02e50fe85d3ff5c54bebdb1d34d1d24295b649fea5e52563a6b38e007",
     "stroke_engine_synthesize_stroke.json": "b143c16de61949b326b65838a6b069e3ac424a33f19b7c4a2058be59a90c75be",
-    "svg_index.json": "10ab6e0213425b2758c559a0e01398a2c26c9e55ba7f5830b91b9a90e67b12cf"
+    "svg_index.json": "e57dda4c3431a0a46a5537c10c56e0a2454a98c08d1deb4f923bc432ec68112f"
   }
 }

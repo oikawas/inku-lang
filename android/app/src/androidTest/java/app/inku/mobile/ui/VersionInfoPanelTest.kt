@@ -28,6 +28,6 @@ class VersionInfoPanelTest {
         composeTestRule.onNodeWithText("render engine").assertIsDisplayed()
         // Pinned to a literal on purpose: leaving it stale has to fail here. It went
         // stale across engines 18-21 because nothing ran this source set.
-        composeTestRule.onNodeWithText("default 21").assertIsDisplayed()
+        composeTestRule.onNodeWithText("default 26").assertIsDisplayed()
     }
 }

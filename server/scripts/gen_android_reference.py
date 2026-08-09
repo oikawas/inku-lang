@@ -34,12 +34,14 @@ the hatch spacing (`surface-stroke-v1 hatch-spacing-22.500`).
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import hashlib
 import json
 import math
 import pathlib
 import re
+from collections.abc import Iterator
 
 from inku_server import arc_geometry as ag
 from inku_server.ddl_expander import (
@@ -547,11 +549,13 @@ def svg_fixtures() -> None:
         for name, (catalog_id, raw) in CATALOG_SCORES.items()
     ]
     for name, raw, wild, source, catalog_id in cases:
+        composition_seed = SVG_COMPOSITION_SEEDS.get(name)
         svg = renderer.render(
             Score.model_validate(raw),
             color_map=render_color_map_for_catalog(catalog_id),
             catalog_id=catalog_id,
             render_seed=RENDER_SEED,
+            composition_seed=composition_seed,
             svg_profile=SVG_PROFILE,
             wild=wild,
         )
@@ -570,6 +574,8 @@ def svg_fixtures() -> None:
         }
         if source is not None:
             index[name]["wild_off_twin"] = source
+        if composition_seed is not None:
+            index[name]["composition_seed"] = composition_seed
     out_path("svg_index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2))
 
 
@@ -1766,13 +1772,18 @@ BASE_ARRANGEMENT: dict = {
 
 
 def arrangement_cases() -> dict[str, dict]:
-    """The 32 cases of the server's group G, plus one that states a region.
+    """The cases of the server's group G, plus one that states a region.
 
     These mirror `gen_render_reference.py` case for case, so the two corpora
     move together; the extra `G-grid-region-edge` exists because engine 20's one
     carve-out (a grid that tiles a stated region does NOT go through the second
     stage) has no case in group G, and a port that runs every layout through the
     fit would stay green without it.
+
+    Every case here was a `circle` until engine 26, which is the one shape the
+    per-member angle leaves alone -- so the corpus could not see engines 23, 24
+    or 26 at all, not for want of a mechanism but for want of a case. The eight
+    borrowed from group G at the bottom are that hole, one per mechanism.
     """
     cases: dict[str, dict] = {}
 
@@ -1783,6 +1794,22 @@ def arrangement_cases() -> dict[str, dict]:
             "primitive": "circle", "weight": "pen",
             "center": list(G_ANCHORS[anchor]), "radius": 0.03,
             "arrangement": arrangement,
+        }
+
+    def g_shape(case_id: str, primitive: str, geometry: dict, **changes) -> None:
+        """A group of something other than a circle, on the `edge` anchor.
+
+        The anchor is in the coordinates rather than in an argument because
+        `gen_render_reference.py` writes these the same way: an arc states a
+        centre and a radius, a square a corner and a size, and the two cannot
+        share one anchor parameter. All of them sit where `G_ANCHORS["edge"]`
+        does, which is the anchor under which the frame correction fires.
+        """
+        arrangement = copy.deepcopy(BASE_ARRANGEMENT)
+        arrangement.update(changes)
+        cases[case_id] = {
+            "primitive": primitive, "weight": "pen",
+            "arrangement": arrangement, **geometry,
         }
 
     for anchor in G_ANCHORS:
@@ -1816,7 +1843,64 @@ def arrangement_cases() -> dict[str, dict]:
 
     g("G-grid-region-edge", "edge", layout="grid", count=16, rows=4, cols=4)
     cases["G-grid-region-edge"]["at"] = {"region": [0.55, 0.05, 0.95, 0.45]}
+
+    # engine 26: the per-member angle. `arc` is the largest target there is in
+    # production (377 groups against `ellipse`'s 373) and `cloudform` (64) the
+    # next the corpus had never carried; both are shapes the rule turns.
+    g_shape("G-angle-arc-edge", "arc",
+            {"center": [0.85, 0.85], "radius": 0.06,
+             "angle_start": 15.0, "angle_end": 285.0}, count=12)
+    g_shape("G-angle-cloudform-edge", "cloudform",
+            {"center": [0.85, 0.85], "size": [0.10, 0.06]}, count=12)
+    # The pair that separates `rotation is not None` from `if ins.rotation:`.
+    # A group that names its own angle is left alone, and `rotation: 0` names
+    # one -- it says "do not tilt these", which is an answer and not a missing
+    # one. 141 groups in production give exactly that answer, and a truthy test
+    # would turn every one of them. Both of these must come out unturned; only
+    # the zero one changes under the wrong reading, which is why the thirty is
+    # here beside it rather than alone.
+    g_shape("G-angle-stated-zero-edge", "ellipse",
+            {"center": [0.85, 0.85], "size": [0.10, 0.06], "rotation": 0.0},
+            count=12)
+    g_shape("G-angle-stated-30-edge", "ellipse",
+            {"center": [0.85, 0.85], "size": [0.10, 0.06], "rotation": 30.0},
+            count=12)
+    # engine 25: the per-member size on something other than a circle. A circle
+    # reaches only `radius x k`; a square reaches the bbox rule, where growing
+    # `size` has to pull `position` back by half the growth to leave the anchor
+    # where it was.
+    g_shape("G-size-square-edge", "square",
+            {"position": [0.81, 0.81], "size": [0.08, 0.08]}, count=12)
+    # engine 24: the fade reaches every member. `G-scatter-fade-edge` above is
+    # the only fading route the corpus walked, and it is one of the thirty that
+    # are never drawn -- the ceiling lands on `color_hint` and `anchors` cannot
+    # see it. These two are drawn. `radial` is the ring whose own centre the
+    # ramp has to be measured from, and `count=2` is the shortest group that
+    # fades at all.
+    g("G-fade-radial-edge", "edge", fade="outward", layout="radial", count=12)
+    g("G-fade-count2-edge", "edge", fade="outward", count=2)
+    # engine 23: the placement seed. This case is identical to `G-scatter-edge`
+    # in every field; what makes it a different drawing is the composition seed
+    # handed to `render()` beside the score, which is why the seed lives in
+    # `ARRANGEMENT_COMPOSITION_SEEDS` and not in the instruction.
+    g("G-composition-scatter-edge", "edge")
     return cases
+
+
+# engine 23 split the placement seed off the performance seed. Nothing in an
+# `Instruction` carries it -- it arrives as an argument to `render()` -- so the
+# cases that state one are listed here beside the case ids, the way
+# `gen_render_reference.py` keeps it beside its own case records.
+#
+# The value matches the server's `G_COMPOSITION_SEED` so the two corpora can be
+# read against each other.
+G_COMPOSITION_SEED = 777
+# A performance seed that is neither of the two above, for the half of the
+# claim that says the placement does NOT follow it.
+OTHER_PERFORMANCE_SEED = 54321
+ARRANGEMENT_COMPOSITION_SEEDS: dict[str, int] = {
+    "G-composition-scatter-edge": G_COMPOSITION_SEED,
+}
 
 
 def arrangement_fixtures() -> None:
@@ -1833,6 +1917,11 @@ def arrangement_fixtures() -> None:
     (`G-vertical-nopath-center`, `G-horizontal-nopath-center`) are moved by
     nothing but engine 21's nine-decimal quantisation, 4.9e-10, and a tolerance
     of 1e-6 lets a port skip engine 21 and stay green on all 33.
+
+    The placement seed is the composition seed's since engine 23, and the two
+    were the same number here until now -- both `RENDER_SEED` -- so no fixture
+    in this corpus could tell which of them the expansion was reading. The
+    `composition_seed_split` block at the bottom is the only place they differ.
     """
     out: dict = {
         "note": "anchors of every expanded mark; compare exactly, no tolerance",
@@ -1842,15 +1931,57 @@ def arrangement_fixtures() -> None:
     }
     for case_id, raw in arrangement_cases().items():
         ins = Instruction.model_validate(raw)
-        expanded = renderer._expand_arrangement(
-            ins, RENDER_SEED, None, performance_seed=RENDER_SEED
+        composition_seed = ARRANGEMENT_COMPOSITION_SEEDS.get(case_id)
+        # `renderer.render` reads this with `is None` and never with `or`,
+        # because 0 is a seed a caller can legitimately state (renderer.py:3354).
+        placement_seed = (
+            composition_seed if composition_seed is not None else RENDER_SEED
         )
-        out["cases"].append({
+        expanded = renderer._expand_arrangement(
+            ins, placement_seed, None, performance_seed=RENDER_SEED
+        )
+        case: dict = {
             "case_id": case_id,
             "instruction": ins.model_dump(mode="json"),
             "count": len(expanded),
             "anchors": [list(renderer._anchor(item)) for item in expanded],
-        })
+        }
+        if composition_seed is not None:
+            case["composition_seed"] = composition_seed
+        out["cases"].append(case)
+
+    # engine 23, stated as the difference it makes rather than as one more row.
+    # One instruction, three expansions: the placement moves when the seed that
+    # feeds the placement moves, and stays put when the other one does. A port
+    # that reads the layout off the performance seed passes the third and fails
+    # the second; a port that reads the sizes off the placement seed fails
+    # neither, which is why the anchors and not the geometry are compared -- the
+    # anchors are what the split is about.
+    split_id = "G-composition-scatter-edge"
+    split_ins = Instruction.model_validate(arrangement_cases()[split_id])
+
+    def anchors(placement_seed: int, performance_seed: int) -> list[list[float]]:
+        return [
+            list(renderer._anchor(item))
+            for item in renderer._expand_arrangement(
+                split_ins, placement_seed, None, performance_seed=performance_seed
+            )
+        ]
+
+    out["composition_seed_split"] = {
+        "note": (
+            "placement follows the composition seed and nothing else does; "
+            "compare exactly"
+        ),
+        "case_id": split_id,
+        "instruction": split_ins.model_dump(mode="json"),
+        "render_seed": RENDER_SEED,
+        "composition_seed": G_COMPOSITION_SEED,
+        "other_performance_seed": OTHER_PERFORMANCE_SEED,
+        "anchors_no_composition_seed": anchors(RENDER_SEED, RENDER_SEED),
+        "anchors_with_composition_seed": anchors(G_COMPOSITION_SEED, RENDER_SEED),
+        "anchors_other_performance_seed": anchors(RENDER_SEED, OTHER_PERFORMANCE_SEED),
+    }
     out_path("renderer_arrangement.json").write_text(
         json.dumps(out, ensure_ascii=False, indent=2)
     )
@@ -1861,16 +1992,197 @@ def arrangement_fixtures() -> None:
 # still lose it downstream, and the walk over `svg_index.json` reaches these the
 # day they exist. One per mechanism: the frame correction, the radial centre,
 # the grid carve-out, and a cluster (the second largest route in production).
-ARRANGEMENT_SCORES: dict[str, dict] = {
-    f"{name}": {"instructions": [arrangement_cases()[case_id]]}
-    for name, case_id in (
+ARRANGEMENT_SVG_CASES: tuple[tuple[str, str], ...] = (
         ("39_arrangement_scatter_small_edge", "G-scatter-small-edge"),
         ("40_arrangement_radial_nocenter_corner", "G-radial-nocenter-corner"),
         ("41_arrangement_grid_region_edge", "G-grid-region-edge"),
         ("42_arrangement_cluster_center", "G-cluster-center"),
-    )
+        # engines 23, 24 and 26 reach no drawing in this corpus without these.
+        # 43 and 44 are the two shapes the per-member angle turns; 45 and 46 the
+        # pair that tells `is not None` from a truthy test, and they must come
+        # out identical to a run with the rule switched off. 47 is the per-member
+        # size away from a circle, 48 and 49 the fade that has to reach every
+        # member, and 50 the placement seed.
+        ("43_arrangement_angle_arc_edge", "G-angle-arc-edge"),
+        ("44_arrangement_angle_cloudform_edge", "G-angle-cloudform-edge"),
+        ("45_arrangement_angle_stated_zero_edge", "G-angle-stated-zero-edge"),
+        ("46_arrangement_angle_stated_30_edge", "G-angle-stated-30-edge"),
+        ("47_arrangement_size_square_edge", "G-size-square-edge"),
+        ("48_arrangement_fade_radial_edge", "G-fade-radial-edge"),
+        ("49_arrangement_fade_count2_edge", "G-fade-count2-edge"),
+        ("50_arrangement_composition_scatter_edge", "G-composition-scatter-edge"),
+        # The positive half of engine 24, and the reason 48 and 49 cannot carry
+        # it: those two are the groups the fade must leave alone -- a ring is
+        # equidistant from its own centre and so is a pair, so both come out
+        # with no ceiling at all, and a port that never fades matches them.
+        # `G-scatter-fade-edge` is the case engine 24 actually moved: it is the
+        # one of the server's 535 frozen cases whose drawing changed
+        # (`test_one_case_of_the_frozen_corpus_moved`). It has been in this
+        # corpus since engine 20, on the side that is never drawn.
+        ("51_arrangement_scatter_fade_edge", "G-scatter-fade-edge"),
+)
+ARRANGEMENT_SCORES: dict[str, dict] = {
+    name: {"instructions": [arrangement_cases()[case_id]]}
+    for name, case_id in ARRANGEMENT_SVG_CASES
+}
+ARRANGEMENT_SVG_NAME_BY_CASE: dict[str, str] = {
+    case_id: name for name, case_id in ARRANGEMENT_SVG_CASES
 }
 
+# The composition seed travels beside the score rather than inside it, so the
+# one drawing that states one needs it written down here as well -- and read
+# back out of `svg_index.json` by whatever re-renders these.
+SVG_COMPOSITION_SEEDS: dict[str, int] = {
+    "50_arrangement_composition_scatter_edge": G_COMPOSITION_SEED,
+}
+
+
+# --- can these drawings fail? ------------------------------------------------
+# Ported one for one from `gen_render_reference.py`, which has carried these
+# since engine 24. A case that draws the same picture whether the mechanism runs
+# or not records that nothing broke and nothing else, and this corpus has just
+# been shown to be able to hold such a case for five engine versions without
+# anyone noticing. The checks run at bake time, on the bake's own call, so a
+# case that cannot fail cannot be written.
+#
+# What each mechanism is withheld BY is the whole of the check's strength. The
+# size and angle guards replace the engine function itself, so they separate
+# engine 26 from engine 24. The fade guard drops the declaration instead, which
+# is the shape the server's has -- and it is weaker: engine 23 answered `fade`
+# with one constant for the whole group, so a port that fades a group flatly
+# still passes it. `_assert_fade_reaches_every_member` below is the other half,
+# and it asks the corpus a question rather than changing what the engine does.
+ANGLE_CASES = ("G-angle-arc-edge", "G-angle-cloudform-edge")
+STATED_ANGLE_CASES = ("G-angle-stated-zero-edge", "G-angle-stated-30-edge")
+# Every drawn group the size rule reaches. `G-grid-region-edge` is not here:
+# a grid is the tiling whose point is that the cells match, and it is excluded.
+SIZE_CASES = (
+    "G-scatter-small-edge", "G-radial-nocenter-corner", "G-cluster-center",
+    "G-size-square-edge",
+)
+FADE_CASES = ("G-fade-radial-edge", "G-fade-count2-edge", "G-scatter-fade-edge")
+# The two that must come out with no ceiling at all, and stay that way.
+DEGENERATE_FADE_CASES = ("G-fade-radial-edge", "G-fade-count2-edge")
+
+
+def _render_arrangement_case(raw: dict, composition_seed: int | None = None) -> str:
+    """Draw one group exactly the way `svg_fixtures` draws it."""
+    return renderer.render(
+        Score.model_validate({"instructions": [raw]}),
+        color_map=render_color_map_for_catalog(DEFAULT_COLOR_CATALOG_ID),
+        catalog_id=DEFAULT_COLOR_CATALOG_ID,
+        render_seed=RENDER_SEED,
+        composition_seed=composition_seed,
+        svg_profile=SVG_PROFILE,
+        wild=False,
+    )
+
+
+@contextlib.contextmanager
+def _withheld(name: str) -> Iterator[None]:
+    """Draw as the previous engine did, by making one rule a pass-through."""
+    original = getattr(renderer, name)
+    setattr(renderer, name, lambda items, arr, member_seed: items)
+    try:
+        yield
+    finally:
+        setattr(renderer, name, original)
+
+
+def _assert_size_cases_discriminate(cases: dict[str, dict]) -> None:
+    """Withholding the per-member size has to change every drawn size case."""
+    for case_id in SIZE_CASES:
+        drawn = _render_arrangement_case(cases[case_id])
+        with _withheld("_apply_member_sizes"):
+            withheld = _render_arrangement_case(cases[case_id])
+        if drawn == withheld:
+            raise AssertionError(f"{case_id}: the drawing does not read the member size")
+
+
+def _assert_angle_cases_discriminate(cases: dict[str, dict]) -> None:
+    """The turning pair has to move when the angle is withheld; the stating pair
+    has to stay put -- and still has to read `rotation`, or it records nothing.
+
+    Dropping the stated angle is what separates `rotation: 0` from an unstated
+    angle: neither draws a `rotate()` of its own, so the exclusion is the only
+    place the difference shows.
+    """
+    primitives = {cases[case_id]["primitive"] for case_id in ANGLE_CASES}
+    if primitives != {"arc", "cloudform"}:
+        raise AssertionError(
+            f"the turning pair does not reach the missing shapes: {sorted(primitives)}"
+        )
+    for case_id in ANGLE_CASES:
+        drawn = _render_arrangement_case(cases[case_id])
+        with _withheld("_apply_member_rotations"):
+            if _render_arrangement_case(cases[case_id]) == drawn:
+                raise AssertionError(f"{case_id}: the drawing does not read the member angle")
+    for case_id in STATED_ANGLE_CASES:
+        drawn = _render_arrangement_case(cases[case_id])
+        with _withheld("_apply_member_rotations"):
+            if _render_arrangement_case(cases[case_id]) != drawn:
+                raise AssertionError(f"{case_id}: a group that states its angle was turned")
+        dropped = copy.deepcopy(cases[case_id])
+        dropped["rotation"] = None
+        if _render_arrangement_case(dropped) == drawn:
+            raise AssertionError(f"{case_id}: the drawing does not read `rotation`")
+
+
+def _assert_fade_cases_discriminate(cases: dict[str, dict]) -> None:
+    """Every drawn fading case has to notice `fade` before it is written."""
+    for case_id in FADE_CASES:
+        stated = cases[case_id]
+        withheld = copy.deepcopy(stated)
+        withheld["arrangement"]["fade"] = "none"
+        if _render_arrangement_case(stated) == _render_arrangement_case(withheld):
+            raise AssertionError(f"{case_id}: the drawing does not read `fade`")
+
+
+def _assert_fade_reaches_every_member(cases: dict[str, dict]) -> None:
+    """At least one drawn fading group carries more than one ceiling.
+
+    The check above cannot ask this: dropping the declaration takes the whole
+    group's fade away, and engine 23 already drew that difference with a single
+    constant. So the corpus is asked directly -- some drawn group has to hold
+    distinct per-member levels, or `fade` is pinned only where it is absent.
+
+    And the two degenerate groups have to hold none: a ring is equidistant from
+    its own centre and so is a pair, and ranking them would draw a gradient
+    nobody stated.
+    """
+    def levels(case_id: str) -> list[float | None]:
+        ins = Instruction.model_validate(cases[case_id])
+        return [
+            renderer._fade_level_from_hint(item.color_hint)
+            for item in renderer._expand_arrangement(
+                ins, RENDER_SEED, None, performance_seed=RENDER_SEED
+            )
+        ]
+
+    ramped = [
+        case_id for case_id in FADE_CASES
+        if len({level for level in levels(case_id) if level is not None}) > 1
+    ]
+    if not ramped:
+        raise AssertionError(
+            "no drawn fading group carries a per-member ceiling; the corpus "
+            "pins `fade` only where the rule declines to fire"
+        )
+    for case_id in DEGENERATE_FADE_CASES:
+        if any(level is not None for level in levels(case_id)):
+            raise AssertionError(f"{case_id}: a group that cannot fade was ramped")
+
+
+def assert_arrangement_cases_discriminate() -> None:
+    cases = arrangement_cases()
+    drawn = set(ARRANGEMENT_SVG_NAME_BY_CASE)
+    for case_id in (*SIZE_CASES, *ANGLE_CASES, *STATED_ANGLE_CASES, *FADE_CASES):
+        if case_id not in drawn:
+            raise AssertionError(f"{case_id} is checked here but never drawn")
+    _assert_size_cases_discriminate(cases)
+    _assert_angle_cases_discriminate(cases)
+    _assert_fade_cases_discriminate(cases)
+    _assert_fade_reaches_every_member(cases)
 
 
 def coerce_governor_fixtures() -> None:
@@ -2107,6 +2419,8 @@ def main() -> None:
     SCORES.update(VARIATION_SCORES)
     SCORES.update(CLOUDFORM_SCORES)
     SCORES.update(ARRANGEMENT_SCORES)
+    # Before anything is written: a case that cannot fail must not be baked.
+    assert_arrangement_cases_discriminate()
     stroke_engine_fixtures()
     variation_fixtures()
     proportional_fixtures()

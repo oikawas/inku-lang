@@ -144,6 +144,7 @@ class LocalFallbackPipeline(
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
                 renderSeed = renderSeed,
+                compositionSeed = request.compositionSeed,
             ),
         )
         Log.i(
@@ -222,6 +223,7 @@ class LocalFallbackPipeline(
                 canvasAspect = request.canvasAspect,
                 svgProfile = "display",
                 renderSeed = renderSeed,
+                compositionSeed = request.compositionSeed,
             ),
         )
         val metadataJson = withRenderSeed(render.metadataJson, renderSeed)

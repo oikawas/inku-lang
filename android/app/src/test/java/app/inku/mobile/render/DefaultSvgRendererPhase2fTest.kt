@@ -38,6 +38,15 @@ class DefaultSvgRendererPhase2fTest {
             canvasOpt is JSONObject -> canvasOpt.optString("aspect", "square")
             else -> "square"
         }
+        // engine 23: the composition seed travels beside the score, so the
+        // corpus keeps it beside the score too. A walk that dropped it would
+        // draw the one case that states one at the performance seed's placement
+        // and compare it against a picture laid out at another.
+        val compositionSeed = if (entry.has("composition_seed") && !entry.isNull("composition_seed")) {
+            entry.getLong("composition_seed")
+        } else {
+            null
+        }
         val renderer = DefaultSvgRenderer()
         val result = renderer.render(
             RenderRequest(
@@ -46,6 +55,7 @@ class DefaultSvgRendererPhase2fTest {
                 canvasAspect = aspect,
                 svgProfile = "editable",
                 renderSeed = renderSeed,
+                compositionSeed = compositionSeed,
             )
         )
         return result.svg
@@ -372,7 +382,6 @@ class DefaultSvgRendererPhase2fTest {
         val cases = arrRefObj.getJSONArray("cases")
 
         val renderer = DefaultSvgRenderer()
-        val expandArrangementMethod = DefaultSvgRenderer::class.java.declaredMethods.first { it.name == "expandArrangement" && it.parameterCount == 3 }.apply { isAccessible = true }
         var gridRegionEdgeAnchorInRegion = false
         var gridEdgeAnchorInRegion = false
 
@@ -382,26 +391,30 @@ class DefaultSvgRendererPhase2fTest {
             val ins = caseObj.getJSONObject("instruction")
             val expectedCount = caseObj.getInt("count")
             val expectedAnchors = caseObj.getJSONArray("anchors")
+            // The placement seed is the composition seed's when the case states
+            // one, and the render seed's when it does not -- read with "is it
+            // stated", never with a falsy test, because 0 is a seed a caller can
+            // legitimately give.
+            val placementSeed = if (caseObj.has("composition_seed") && !caseObj.isNull("composition_seed")) {
+                caseObj.getLong("composition_seed")
+            } else {
+                renderSeed
+            }
 
-            @Suppress("UNCHECKED_CAST")
-            val expanded = expandArrangementMethod.invoke(renderer, ins, renderSeed, null) as List<JSONObject>
+            val expanded = renderer.expandArrangement(ins, placementSeed, null, renderSeed)
 
             assertEquals("Case $caseId count must match", expectedCount, expanded.size)
 
+            // The renderer's own `anchor`, not a second reading of the same
+            // rule: the expected values come from the server's `_anchor`, so
+            // comparing against the production one is still a real gate, and a
+            // copy here would drift. The copy this replaced knew only about
+            // `circle` and `line` and answered (0.5, 0.5) for everything else,
+            // which was right for every group the corpus held until the angle
+            // cases arrived and silently wrong the day they did.
             val actualAnchors = expanded.map { mark ->
-                val p = mark.optString("primitive", "line")
-                val center = mark.optJSONArray("center")
-                if (p == "circle" && center != null) {
-                    listOf(center.getDouble(0), center.getDouble(1))
-                } else {
-                    val from = mark.optJSONArray("from_") ?: mark.optJSONArray("from")
-                    val to = mark.optJSONArray("to")
-                    if (p == "line" && from != null && to != null) {
-                        listOf((from.getDouble(0) + to.getDouble(0)) / 2.0, (from.getDouble(1) + to.getDouble(1)) / 2.0)
-                    } else {
-                        listOf(0.5, 0.5)
-                    }
-                }
+                val (ax, ay) = renderer.anchor(mark)
+                listOf(ax, ay)
             }
 
             assertEquals("Case $caseId anchors count must match", expectedAnchors.length(), actualAnchors.size)

@@ -6,9 +6,13 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class Engine19VersionTest {
+// Named for what it checks rather than for the engine that was current when it
+// was written: the class was still called `Engine19VersionTest` five engines
+// later, and a name that carries a version number goes stale the first time the
+// version moves.
+class RenderEngineVersionTest {
     @Test
-    fun testRendererMetadataDeclaresEngine21() {
+    fun testRendererMetadataDeclaresTheCurrentEngine() {
         val result = DefaultSvgRenderer().render(
             app.inku.mobile.pipeline.RenderRequest(
                 scoreJson = """{"instructions":[]}""",
@@ -17,7 +21,7 @@ class Engine19VersionTest {
                 svgProfile = "editable",
             )
         )
-        assertEquals("21", JSONObject(result.metadataJson).getString("render_engine_version"))
+        assertEquals("26", JSONObject(result.metadataJson).getString("render_engine_version"))
     }
 
     @Test
@@ -47,13 +51,13 @@ class Engine19VersionTest {
         val missing = hash(JSONObject())
         val blank = hash(JSONObject().put("render_engine_version", ""))
         assertEquals(missing, blank)
-        org.junit.Assert.assertNotEquals(hash(JSONObject().put("render_engine_version", "21")), missing)
+        org.junit.Assert.assertNotEquals(hash(JSONObject().put("render_engine_version", "26")), missing)
     }
 
     // The version the UI shows is pinned to a literal so that leaving it stale fails here.
     @Test
-    fun testCompatibilityConstantsDeclareEngine21() {
-        assertEquals("21", CompatibilityConstants.renderEngineVersion)
+    fun testCompatibilityConstantsDeclareTheCurrentEngine() {
+        assertEquals("26", CompatibilityConstants.renderEngineVersion)
         assertEquals("default", CompatibilityConstants.renderEngineId)
     }
 

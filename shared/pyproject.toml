@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Read-only composition mirrors and SVG rasterization shared by inku server and CLI"
 requires-python = ">=3.12"
 dependencies = [
-    "resvg-py>=0.3.3",
+    "resvg-py>=0.3.4",
 ]
 
 [build-system]

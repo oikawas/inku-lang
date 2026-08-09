@@ -73,6 +73,9 @@ export interface LangPack {
 	batchHistoryApply: string;
 	colorCatalogAuto: string;
 	colorCatalogAutoSub: string;
+	colorCatalogRetired: string;
+	colorCatalogNoRecord: string;
+	colorCatalogNote: (name: string, notes: string[]) => string;
 	batchSummary: (success: number, failed: number, total: number) => string;
 	batchFailureTitle: string;
 	batchFailureLine: (line: number) => string;

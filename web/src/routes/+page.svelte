@@ -40,7 +40,7 @@
 	} from '$lib/models';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { initMascot } from '$lib/mascot.svelte';
-	import { FALLBACK_CATALOG, catalogById, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
+	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '$lib/demo';
 	import { createElapsed } from '$lib/elapsed.svelte';
 	import { DEFAULT_EXPORT_TEMPLATES, normalizeExportTemplates, type ExportTemplate } from '$lib/exportTemplates';
@@ -705,6 +705,8 @@
 	function setRefineWild(value: boolean | null) { refineWildOverride = value; }
 	let colorCatalogs = $state<ColorCatalog[]>([FALLBACK_CATALOG]);
 	let defaultCatalogId = $state('default');
+	// Old catalog id -> the id it answers to today, served by /api/color-catalogs.
+	let renamedCatalogIds = $state<Record<string, string>>({});
 	const currentCatalog = $derived(catalogById(colorCatalogs, colorCatalogSettings.effectiveId) ?? colorCatalogs[0] ?? FALLBACK_CATALOG);
 
 	// ── Settings tabs ────────────────────────────────────────
@@ -1507,6 +1509,7 @@
 			if (!Array.isArray(data.catalogs) || data.catalogs.length === 0) throw new Error('empty color catalog list');
 			colorCatalogs = data.catalogs;
 			defaultCatalogId = data.default_catalog_id || 'default';
+			renamedCatalogIds = data.renamed_catalog_ids ?? {};
 			if (!colorCatalogSettings.isAuto && !catalogById(colorCatalogs, colorCatalogSettings.selected)) colorCatalogSettings.selected = defaultCatalogId;
 		} catch (e) {
 			console.warn('failed to load color catalogs', e);
@@ -4113,6 +4116,7 @@ if (unreadWords.length > 0) {
 					canvas_aspect: canvasId,
 					render_seed: replaySeed,
 					seed_text: it.seed_text,
+					...workReferencePayload(it.id),
 					...renderSettingsPayload('render-svg', { ...colorCatalogOverride(catalogId), ...wildOverride(Boolean(it.render_wild)) }),
 				})
 			});
@@ -4876,6 +4880,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					canvas_aspect: refinementCanvasAspectId(),
 					render_seed: nextSeed,
 					composition_seed: placementSeed,
+					...workReferencePayload(refinementWorkId()),
 					...renderSettingsPayload('render-svg', colorCatalogOverride(refinementCatalogId())),
 				})
 			});
@@ -5011,6 +5016,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return result?.render_color_catalog_id ?? displayedHistoryItem?.catalog_id ?? defaultCatalogId;
 	}
 
+	// The saved work a redraw is a redraw OF. The server reads that work's own
+	// recorded colors, so a catalog definition that has since changed, been
+	// renamed, or been retired no longer repaints it. The catalog id keeps being
+	// sent alongside -- it is the nameplate, and only the colors moved.
+	//
+	// Null means there is no saved work yet: an unsaved result was just drawn
+	// from today's definition, so today's definition is the one it remembers.
+	function refinementWorkId(): string | null {
+		return result?.history_id ?? displayedHistoryItem?.id ?? null;
+	}
+
+	function workReferencePayload(workId: string | null | undefined): Record<string, string> {
+		return workId ? { work_id: workId } : {};
+	}
+
 	// The two in-place redraws (vary the layout, reinterpret) keep the artwork's
 	// catalog but have never carried the level or the switch: they omit the level
 	// so the parent's is inherited, and draw tame. Preserved as-is.
@@ -5053,6 +5073,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				composition_seed: result.composition_seed ?? result.render_seed ?? null,
 				interpretation_seed: result.interpretation_seed,
 				seed_text: normalizedSeedText,
+				...workReferencePayload(refinementWorkId()),
 				...renderSettingsPayload('render-score', colorCatalogOverride(refinementCatalogId())),
 			}),
 		});
@@ -5518,9 +5539,25 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	const nextStage1Model = $derived(statusModelName(qualifiedModelId(stage1Provider, stage1Model)));
 	const nextStage2Model = $derived(statusModelName(qualifiedModelId(stage2Provider, stage2Model)));
 	const nextCatalogName = $derived(colorCatalogSettings.isAuto ? t().colorCatalogAuto : currentCatalog.name);
-	const statusCatalogName = $derived(displayedHistoryItem
-		? (displayedHistoryItem.render_color_catalog_name ?? catalogName(displayedHistoryItem.render_color_catalog_id ?? displayedHistoryItem.catalog_id))
-		: (result?.render_color_catalog_name ?? (result?.render_color_catalog_id ? catalogName(result.render_color_catalog_id) : '-')));
+	// The catalog a work was drawn with, named as it stands today. Two things
+	// the bare name cannot say are said here instead of being papered over: an
+	// id nothing current answers to is marked retired rather than shown as the
+	// default, and a work saved before the colors were recorded is marked as
+	// having no record -- that one draws from today's definition, not its own.
+	const statusCatalogName = $derived.by(() => {
+		const work = displayedHistoryItem ?? result ?? null;
+		if (!work) return '-';
+		const catalogId = work.render_color_catalog_id
+			?? (displayedHistoryItem ? displayedHistoryItem.catalog_id : null)
+			?? null;
+		if (!catalogId) return '-';
+		const plate = catalogNameplate(colorCatalogs, renamedCatalogIds, catalogId, work.render_color_catalog_name);
+		const notes: string[] = [];
+		if (plate.retired) notes.push(t().colorCatalogRetired);
+		const colorMap = work.render_color_map;
+		if (!colorMap || Object.keys(colorMap).length === 0) notes.push(t().colorCatalogNoRecord);
+		return notes.length ? t().colorCatalogNote(plate.name, notes) : plate.name;
+	});
 	const currentCanvasAspect = $derived(getCanvasAspectOption(effectiveCanvasAspectId()));
 	const nextCanvasName = $derived(currentCanvasAspect.label);
 	const displayCanvasAspect = $derived(svgAspect(result?.svg) ?? currentCanvasAspect);

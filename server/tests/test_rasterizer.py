@@ -207,3 +207,33 @@ def test_resvg_renders_the_material_filters():
     """The reason this module exists. A rasterizer that drops feTurbulence /
     feDisplacementMap returns the filtered and unfiltered circles as one image."""
     assert svg_to_png(FILTERED_SVG, width=256) != svg_to_png(PLAIN_SVG, width=256)
+
+
+def test_a_work_that_used_to_abort_the_process_now_burns(tmp_path):
+    """resvg 0.3.3 aborted the interpreter on eight of production's 2,769 works.
+
+    The panic was a Rust assertion in `filter/displacement_map.rs`, so no Python
+    `except` caught it: the process died, and on the API -- a single uvicorn
+    worker -- that took every in-flight request with it. Ledger I-075. The fix is
+    the dependency floor, resvg-py >= 0.3.4, and this is what says so.
+
+    The fixture is one of those eight (production `4c257de0`, render engine 4,
+    Build 591), kept because the shape that trips the assertion stopped being
+    generated somewhere before engine 11: nothing the renderer writes today would
+    reproduce it, so it cannot be built from a Score.
+
+    It burns through `rasterize_dir` rather than `svg_to_png` on purpose. If the
+    panic ever returns, an in-process call kills pytest itself and the run reports
+    nothing; one child process per file turns the same event into one red test.
+    """
+    from inku_analysis.rasterize_batch import rasterize_dir
+
+    src = tmp_path / "svg"
+    src.mkdir()
+    fixture = Path(__file__).parent / "fixtures" / "i075-resvg-panic-4c257de0.svg"
+    (src / fixture.name).write_text(fixture.read_text(encoding="utf-8"), encoding="utf-8")
+
+    report = rasterize_dir(src, tmp_path / "png", width=320)
+
+    assert not report.failed, [(f.source.name, f.reason) for f in report.failed]
+    assert report.succeeded == 1

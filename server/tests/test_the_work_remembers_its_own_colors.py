@@ -72,6 +72,36 @@ RENAMED_OLD_ID = "japanese"
 # so a test that wants the id to matter has to name a seed where it does.
 SEED_WHERE_THE_IDS_DISAGREE = 1
 
+# The colors one work recorded, frozen as a literal.
+#
+# Building this out of today's catalog would make the gates below compare a
+# definition against itself: the very edit they perturb would move the
+# "recorded" colors too, and a build that read the catalog instead of the row
+# would stay green throughout. #111111 is the black `ink_season` actually
+# carried when these works were saved; today's definition says #141210.
+RECORDED_COLORS = {
+    "white": "#fffff0",
+    "black": "#111111",
+    "gray": "#565656",
+    "red": "#cc3311",
+    "orange": "#ee9911",
+    "yellow": "#887722",
+    "green": "#007744",
+    "blue": "#115588",
+    "purple": "#aa88cc",
+    "palette:Pine Soot": "#111111",
+    "palette:Warm Paper": "#fffff0",
+    "palette:Soft Soot": "#565656",
+    "palette:Vermilion Accent": "#cc3311",
+    "palette:Evergreen": "#007744",
+    "palette:Indigo Shade": "#115588",
+    "palette:Uguisu": "#887722",
+    "palette:Golden Flower": "#ee9911",
+    "palette:Pale Violet": "#aa88cc",
+    "palette:Madder": "#992211",
+}
+RECORDED_BLACK = "#111111"
+
 SCORE = {
     "version": "0.1.0",
     "canvas": {"aspect": "square", "ground": None},
@@ -169,15 +199,17 @@ def test_a_work_keeps_its_colors_when_todays_definition_is_repainted(actor):
     The picture itself has to hold still while the catalog underneath it moves.
     """
     user, headers = actor
-    work = _work(user["id"], snapshot=render_color_map_for_catalog(DRAWN_WITH))
+    work = _work(user["id"], snapshot=RECORDED_COLORS)
 
     _, before, _ = _render_svg(headers, work_id=work["id"], render_seed=7)
     with _repainted(DRAWN_WITH):
         _, after, _ = _render_svg(headers, work_id=work["id"], render_seed=7)
 
     assert before == after
-    # Not vacuous: the drawing really does carry the recorded colors.
-    assert "#141210" in before
+    # Not vacuous, twice over: the drawing carries the colors the WORK recorded,
+    # and that black is not the one today's catalog would have supplied.
+    assert RECORDED_BLACK in before
+    assert render_color_map_for_catalog(DRAWN_WITH)["black"] not in before
 
 
 def test_without_a_work_reference_the_repaint_reaches_the_picture(actor):
@@ -203,14 +235,13 @@ def test_a_retired_catalog_still_draws_for_a_work_that_recorded_its_colors(actor
     them answered 422. The colors were on the row the whole time.
     """
     user, headers = actor
-    snapshot = render_color_map_for_catalog(DRAWN_WITH)
-    work = _work(user["id"], catalog_id=RETIRED_ID, snapshot=snapshot)
+    work = _work(user["id"], catalog_id=RETIRED_ID, snapshot=RECORDED_COLORS)
 
     status, svg, response_headers = _render_svg(headers, work_id=work["id"], render_seed=7)
 
     assert status == 200
     assert response_headers[COLOR_SOURCE_HEADER.lower()] == "snapshot"
-    assert "#141210" in svg
+    assert RECORDED_BLACK in svg
 
 
 def test_a_retired_catalog_is_still_refused_when_no_work_is_named(actor):
@@ -229,17 +260,13 @@ def test_a_retired_catalog_is_still_refused_when_no_work_is_named(actor):
 def test_a_renamed_catalog_still_draws_for_a_work_that_recorded_its_colors(actor):
     """57 works carry an id that was renamed out from under them."""
     user, headers = actor
-    work = _work(
-        user["id"],
-        catalog_id=RENAMED_OLD_ID,
-        snapshot=render_color_map_for_catalog(DRAWN_WITH),
-    )
+    work = _work(user["id"], catalog_id=RENAMED_OLD_ID, snapshot=RECORDED_COLORS)
 
     status, svg, response_headers = _render_svg(headers, work_id=work["id"], render_seed=7)
 
     assert status == 200
     assert response_headers[COLOR_SOURCE_HEADER.lower()] == "snapshot"
-    assert "#141210" in svg
+    assert RECORDED_BLACK in svg
 
 
 def test_a_work_with_no_snapshot_falls_to_todays_definition_and_says_so(actor):
@@ -282,11 +309,7 @@ def test_render_svg_names_the_catalog_it_actually_drew_with(actor):
     would describe a picture that was not drawn.
     """
     user, headers = actor
-    work = _work(
-        user["id"],
-        catalog_id=RENAMED_OLD_ID,
-        snapshot=render_color_map_for_catalog(DRAWN_WITH),
-    )
+    work = _work(user["id"], catalog_id=RENAMED_OLD_ID, snapshot=RECORDED_COLORS)
 
     _, _, response_headers = _render_svg(headers, work_id=work["id"], render_seed=7)
 
@@ -296,8 +319,7 @@ def test_render_svg_names_the_catalog_it_actually_drew_with(actor):
 def test_render_score_names_the_source_of_its_colors(actor):
     """Same statement as the header, on the endpoint that answers JSON."""
     user, headers = actor
-    snapshot = render_color_map_for_catalog(DRAWN_WITH)
-    work = _work(user["id"], snapshot=snapshot)
+    work = _work(user["id"], snapshot=RECORDED_COLORS)
 
     with_work = client.post(
         "/api/render-score",
@@ -312,7 +334,7 @@ def test_render_score_names_the_source_of_its_colors(actor):
 
     assert with_work["render_color_source"] == "snapshot"
     assert without["render_color_source"] == "catalog"
-    assert with_work["render_color_map"] == snapshot
+    assert with_work["render_color_map"] == RECORDED_COLORS
 
 
 def test_render_score_draws_a_new_work_exactly_as_it_always_did(actor):
@@ -340,7 +362,7 @@ def test_the_work_supplies_the_catalog_id_that_seeds_its_own_colors(actor):
     repainted out of the very same map.
     """
     user, headers = actor
-    snapshot = render_color_map_for_catalog(DRAWN_WITH)
+    snapshot = RECORDED_COLORS
     work = _work(user["id"], catalog_id=RENAMED_OLD_ID, snapshot=snapshot)
 
     body = client.post(
@@ -369,14 +391,14 @@ def test_the_editable_redraw_of_a_saved_work_uses_the_works_own_colors(actor):
     same silent repaint, on a route that takes no new key at all.
     """
     user, headers = actor
-    work = _work(user["id"], snapshot=render_color_map_for_catalog(DRAWN_WITH))
+    work = _work(user["id"], snapshot=RECORDED_COLORS)
 
     before = client.get(f"/api/history/{work['id']}/svg?profile=editable", headers=headers).text
     with _repainted(DRAWN_WITH):
         after = client.get(f"/api/history/{work['id']}/svg?profile=editable", headers=headers).text
 
     assert before == after
-    assert "#141210" in before
+    assert RECORDED_BLACK in before
 
 
 # 段 1: authorization ---------------------------------------------------------
@@ -415,7 +437,7 @@ def test_another_users_work_is_not_readable_through_the_colors(actor):
 def test_a_trashed_work_is_not_readable_through_the_colors(actor):
     """Same rule as every other id-addressable route (ledger I-094)."""
     user, headers = actor
-    work = _work(user["id"], snapshot=render_color_map_for_catalog(DRAWN_WITH))
+    work = _work(user["id"], snapshot=RECORDED_COLORS)
     db.trash_items(user["id"], [work["id"]])
 
     status, _, _ = _render_svg(headers, work_id=work["id"], render_seed=7)
@@ -529,7 +551,7 @@ def test_the_migration_does_not_touch_the_id_a_work_was_drawn_with(tmp_path):
 
 def test_rewriting_the_drawn_with_id_would_repaint_the_work():
     """Why the test above exists, stated as a measurement rather than a comment."""
-    snapshot = render_color_map_for_catalog(DRAWN_WITH)
+    snapshot = RECORDED_COLORS
     differing = sum(
         1
         for seed in range(200)

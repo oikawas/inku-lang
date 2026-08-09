@@ -44,6 +44,8 @@ paintとbatchは同じ旗を受け取ります。**旗を書かなければサ�
 
 ### 入力と出力
 
+JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_engine_version` に記録する。
+
 | 旗 | 内容 |
 |---|---|
 | `--file FILE` / `-f` | 記述をUTF-8ファイルから読む。paintは `-` で標準入力。batchは空行以外の1行が1作品 |

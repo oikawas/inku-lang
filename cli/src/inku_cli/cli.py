@@ -6,7 +6,6 @@ import argparse
 import base64
 import io
 import getpass
-import hashlib
 import json
 import math
 import os
@@ -350,30 +349,6 @@ def _cli_build_number() -> str | None:
     return None
 
 
-_SERVER_RENDER_VERSION_KEYS = ("build_number", "render_engine_id", "render_engine_version")
-
-
-def _server_render_versions(client: ApiClient) -> dict[str, str]:
-    """The versions the server drew with, asked of the server.
-
-    There is no fallback to a local default here, for the same reason there is
-    none in `_rasterize_png`: an artifact that names a version nobody checked
-    still gets used to decide things, and unlike a dropped filter a wrong
-    version number is invisible in the drawing itself.
-    """
-    try:
-        info, _ = client.request("GET", "/api/info", auth=False)
-    except CliError as exc:
-        raise CliError(
-            "the server must answer GET /api/info to name the versions it drew with"
-        ) from exc
-    if not isinstance(info, dict):
-        raise CliError("/api/info did not return an object")
-    missing = [key for key in _SERVER_RENDER_VERSION_KEYS if not info.get(key)]
-    if missing:
-        raise CliError(f"/api/info did not report {', '.join(missing)}")
-    return {key: str(info[key]) for key in _SERVER_RENDER_VERSION_KEYS}
-
 def _app_version() -> str | None:
     # web/APP_VERSION is the single source the UI and the server also read. An
     # installed CLI with no repository tree above it simply reports nothing,
@@ -385,31 +360,6 @@ def _app_version() -> str | None:
         except OSError:
             continue
     return None
-
-def _canonical_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-def _render_hash_for_score(
-    score: dict[str, Any],
-    *,
-    render_seed: int | None = None,
-    composition_seed: int | None = None,
-    render_build_number: str | None = None,
-    render_engine_id: str | None = None,
-    render_engine_version: str | None = None,
-    render_color_catalog_id: str | None = None,
-) -> str:
-    payload = {
-        "version": "rh2",
-        "score": score or {},
-        "render_seed": render_seed,
-        "composition_seed": composition_seed,
-        "render_build_number": render_build_number,
-        "render_engine_id": render_engine_id,
-        "render_engine_version": render_engine_version,
-        "render_color_catalog_id": render_color_catalog_id,
-    }
-    return "rh2:" + hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 def _render_color_map(catalog: dict[str, Any]) -> dict[str, str]:
     base = catalog.get("map")
@@ -1324,6 +1274,8 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
             "render_build_number": item.get("render_build_number"),
             "render_engine_id": item.get("render_engine_id"),
             "render_engine_version": item.get("render_engine_version"),
+            "ddl_version": item.get("ddl_version"),
+            "ddl_engine_version": item.get("ddl_engine_version"),
             "render_canvas_aspect": item.get("render_canvas_aspect"),
             "render_canvas_aspect_id": item.get("render_canvas_aspect_id"),
             "render_canvas_aspect_ratio": item.get("render_canvas_aspect_ratio"),
@@ -1347,6 +1299,8 @@ def _history_export_summary(items: list[dict[str, Any]], paths: dict[str, Any]) 
             "render_build_number": item.get("render_build_number"),
             "render_engine_id": item.get("render_engine_id"),
             "render_engine_version": item.get("render_engine_version"),
+            "ddl_version": item.get("ddl_version"),
+            "ddl_engine_version": item.get("ddl_engine_version"),
             "render_canvas_aspect": item.get("render_canvas_aspect"),
             "render_canvas_aspect_id": item.get("render_canvas_aspect_id"),
             "render_canvas_aspect_ratio": item.get("render_canvas_aspect_ratio"),
@@ -2072,6 +2026,8 @@ def _compose_response_as_paint_result(
         "render_color_profile": result.get("render_color_profile"),
         "render_engine_id": result.get("render_engine_id"),
         "render_engine_version": result.get("render_engine_version"),
+        "ddl_version": result.get("ddl_version"),
+        "ddl_engine_version": result.get("ddl_engine_version"),
         "render_color_catalog_id": result.get("render_color_catalog_id"),
         "render_color_catalog_name": result.get("render_color_catalog_name"),
         "render_color_catalog_sub": result.get("render_color_catalog_sub"),
@@ -2132,6 +2088,8 @@ def _history_payload_from_result(
         "render_color_profile": result.get("render_color_profile"),
         "render_engine_id": result.get("render_engine_id"),
         "render_engine_version": result.get("render_engine_version"),
+        "ddl_version": result.get("ddl_version"),
+        "ddl_engine_version": result.get("ddl_engine_version"),
         "render_color_catalog_id": result.get("render_color_catalog_id"),
         "render_color_catalog_name": result.get("render_color_catalog_name"),
         "render_color_catalog_sub": result.get("render_color_catalog_sub"),
@@ -2933,6 +2891,8 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_build_number",
         "render_engine_id",
         "render_engine_version",
+        "ddl_version",
+        "ddl_engine_version",
         "render_color_catalog_id",
         "render_color_source",
         "render_canvas_aspect",
@@ -2952,6 +2912,8 @@ def command_render_score(args: argparse.Namespace) -> int:
         "render_build_number": rendered["render_build_number"],
         "render_engine_id": rendered["render_engine_id"],
         "render_engine_version": rendered["render_engine_version"],
+        "ddl_version": rendered["ddl_version"],
+        "ddl_engine_version": rendered["ddl_engine_version"],
         "render_color_catalog_id": rendered["render_color_catalog_id"],
         "render_color_source": rendered["render_color_source"],
         "work_id": from_work,

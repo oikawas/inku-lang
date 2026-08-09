@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -202,6 +203,8 @@ def test_history_payload_from_compose_result():
         "tokens_in_stage2": 10,
         "tokens_out_stage2": 20,
         "render_engine_id": "default",
+        "ddl_version": "3",
+        "ddl_engine_version": "9",
     }
 
     payload = cli._history_payload_from_result(
@@ -221,6 +224,8 @@ def test_history_payload_from_compose_result():
     assert payload["stage2_model"] == "s2"
     assert payload["tokens_in"] == 10
     assert payload["tokens_out"] == 20
+    assert payload["ddl_version"] == "3"
+    assert payload["ddl_engine_version"] == "9"
     assert payload["save_artifacts"] is True
     assert payload["count_generation"] is True
 
@@ -247,6 +252,8 @@ def test_compose_response_as_paint_result_uses_effective_ddl():
     result = cli._compose_response_as_paint_result(
         {
             "ddl": "展開後DDL。",
+            "ddl_version": "3",
+            "ddl_engine_version": "9",
             "score": {"instructions": []},
             "svg": "<svg></svg>",
             "elapsed_ms": 500,
@@ -261,6 +268,8 @@ def test_compose_response_as_paint_result_uses_effective_ddl():
     assert result["ddl"] == "展開後DDL。"
     assert result["stage1_model"] is None
     assert result["stage2_model"] == "resolved"
+    assert result["ddl_version"] == "3"
+    assert result["ddl_engine_version"] == "9"
     assert result["elapsed_stage1_ms"] == 0
     assert result["elapsed_total_ms"] == 500
 
@@ -939,6 +948,30 @@ def test_history_export_writes_contact_sheet_and_evaluation_json(tmp_path, monke
     assert summary["results"][0]["score_primitive_counts"] == {"ellipse": 1}
 
 
+def test_history_export_names_the_ddl_layer_and_accepts_older_rows():
+    summary = cli._history_export_summary(
+        [
+            {"id": "old", "score": {"instructions": []}},
+            {
+                "id": "current",
+                "score": {"instructions": []},
+                "ddl_version": "3",
+                "ddl_engine_version": "9",
+            },
+        ],
+        {},
+    )
+
+    assert summary["results"][0]["ddl_version"] is None
+    assert summary["results"][0]["ddl_engine_version"] is None
+    assert summary["ai_evaluation"]["items"][0]["ddl_version"] is None
+    assert summary["ai_evaluation"]["items"][0]["ddl_engine_version"] is None
+    assert summary["results"][1]["ddl_version"] == "3"
+    assert summary["results"][1]["ddl_engine_version"] == "9"
+    assert summary["ai_evaluation"]["items"][1]["ddl_version"] == "3"
+    assert summary["ai_evaluation"]["items"][1]["ddl_engine_version"] == "9"
+
+
 def test_aggregate_quality_metrics_reports_average_and_fallback_quality():
     results = [
         {
@@ -1120,41 +1153,6 @@ def test_paper_words_do_not_request_white_by_themselves():
     assert "white" not in trace["requested_colors"]
     assert trace["missing_requested_colors"] == []
 
-
-
-def test_render_hash_for_score_uses_rh2_semantics():
-    score = {"instructions": [{"primitive": "line", "from": [0, 0.5], "to": [1, 0.5]}]}
-
-    render_hash = cli._render_hash_for_score(
-        score,
-        render_seed=1,
-        composition_seed=2,
-        render_build_number="449",
-        render_engine_id="default",
-        render_engine_version="2",
-        render_color_catalog_id="default",
-    )
-
-    assert render_hash.startswith("rh2:")
-    assert len(render_hash) == 68
-    assert cli._render_hash_for_score(
-        score,
-        render_seed=1,
-        composition_seed=2,
-        render_build_number="449",
-        render_engine_id="default",
-        render_engine_version="2",
-        render_color_catalog_id="default",
-    ) == render_hash
-    assert cli._render_hash_for_score(
-        score,
-        render_seed=2,
-        composition_seed=2,
-        render_build_number="449",
-        render_engine_id="default",
-        render_engine_version="2",
-        render_color_catalog_id="default",
-    ) != render_hash
 
 
 def test_paint_payload_includes_render_seed():
@@ -2156,6 +2154,13 @@ def test_the_manual_lists_the_rasterize_command():
     )
 
 
+def test_cli_product_source_has_no_orphaned_render_version_or_hash_helpers():
+    source = Path(cli.__file__).read_text(encoding="utf-8")
+
+    for name in ("_SERVER_RENDER_VERSION_KEYS", "_server_render_versions", "_render_hash_for_score"):
+        assert name not in source, f"{name} remains in cli/src"
+
+
 SERVER_INFO = {
     "name": "inku-server",
     "version": "v2.11.4",
@@ -2222,6 +2227,8 @@ def _render_score_client(info=None, *, info_fails=False, render_headers=None):
                     "render_build_number": payload.get("build_number"),
                     "render_engine_id": payload.get("render_engine_id"),
                     "render_engine_version": payload.get("render_engine_version"),
+                    "ddl_version": payload.get("ddl_version"),
+                    "ddl_engine_version": payload.get("ddl_engine_version"),
                     "render_color_catalog_id": catalog_id,
                     "render_color_source": headers.get("X-Inku-Color-Source") or "catalog",
                     "render_canvas_aspect": sent.get("canvas_aspect") or "square",
@@ -2264,6 +2271,14 @@ def test_render_score_names_the_engine_version_the_server_drew_with(monkeypatch,
     result = _run_render_score(monkeypatch, capsys, _render_score_client())
 
     assert result["render_engine_version"] == "22"
+
+
+def test_render_score_names_the_ddl_layer_versions_the_server_drew_with(monkeypatch, capsys):
+    info = {**SERVER_INFO, "ddl_version": "13", "ddl_engine_version": "29"}
+    result = _run_render_score(monkeypatch, capsys, _render_score_client(info))
+
+    assert result["ddl_version"] == "13"
+    assert result["ddl_engine_version"] == "29"
 
 
 def test_render_score_sends_the_composition_seed_it_records(monkeypatch, capsys):
@@ -2336,6 +2351,11 @@ def test_render_score_refuses_to_guess_when_the_server_will_not_say(monkeypatch)
     with pytest.raises(cli.CliError, match="render_engine_version"):
         cli.command_render_score(args)
 
+    incomplete = {key: value for key, value in SERVER_INFO.items() if key != "ddl_engine_version"}
+    monkeypatch.setattr(cli, "ApiClient", _render_score_client(incomplete))
+    with pytest.raises(cli.CliError, match="ddl_engine_version"):
+        cli.command_render_score(args)
+
 
 def test_render_score_hashes_with_the_server_engine_version(monkeypatch, capsys):
     """The version is material to the hash, not decoration beside it.
@@ -2389,6 +2409,32 @@ def test_render_score_without_a_ddl_flag_sends_no_ddl(monkeypatch, capsys):
     assert "ddl" not in client.sent[-1]
 
 
+def _legacy_render_hash_for_score(
+    score,
+    *,
+    render_seed,
+    composition_seed,
+    render_build_number,
+    render_engine_id,
+    render_engine_version,
+    render_color_catalog_id,
+):
+    payload = {
+        "version": "rh2",
+        "score": score or {},
+        "render_seed": render_seed,
+        "composition_seed": composition_seed,
+        "render_build_number": render_build_number,
+        "render_engine_id": render_engine_id,
+        "render_engine_version": render_engine_version,
+        "render_color_catalog_id": render_color_catalog_id,
+    }
+    canonical = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return "rh2:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def test_render_score_without_ddl_changes_only_server_owned_output_keys(
     monkeypatch, capsys
 ):
@@ -2400,7 +2446,7 @@ def test_render_score_without_ddl_changes_only_server_owned_output_keys(
         "background": "white",
         "instructions": [],
     }
-    old_hash = cli._render_hash_for_score(
+    old_hash = _legacy_render_hash_for_score(
         input_score,
         render_seed=4242,
         composition_seed=None,

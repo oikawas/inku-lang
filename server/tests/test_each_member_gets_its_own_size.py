@@ -256,7 +256,8 @@ def test_grid_repeats_exactly(monkeypatch):
     # であって、当時の姿ではない。
     engine_24 = _manifest("24")["cases"]
     engine_25 = _manifest("25")["cases"]
-    latest = _manifest("28")["cases"]
+    # Engine 29 resnaps the live side after contact-length stabilisation.
+    latest = _manifest("29")["cases"]
     grids = sorted(
         case_id
         for case_id, case in engine_24.items()
@@ -621,7 +622,8 @@ def test_a_score_with_no_arrangement_is_byte_identical(monkeypatch):
         for case_id in sample
     }
     assert len({w for w in weights if GRAMMARS[w].group_hand > 0}) >= 4, weights
-    latest = _manifest("28")["cases"]
+    # Engine 29 resnaps the live side after contact-length stabilisation.
+    latest = _manifest("29")["cases"]
     for case_id in sample:
         assert (
             generator._normalized_digest(

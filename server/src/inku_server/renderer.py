@@ -4177,6 +4177,16 @@ def _contact_field(t: float, seed: int) -> float:
     )
 
 
+# Paper-contact decisions share the SVG's six-decimal length lattice. A libm
+# ULP is far below this precision, but before engine 29 it could add a sample,
+# move the sample-derived quantile, and replace a whole fragment.
+CONTACT_LENGTH_QUANTUM = 6
+
+
+def _quantise_contact_length(value: float) -> float:
+    return round(value, CONTACT_LENGTH_QUANTUM)
+
+
 def _resample_by_length(
     points: list[tuple[float, float]], step: float, closed: bool
 ) -> list[tuple[float, float]]:
@@ -4186,13 +4196,14 @@ def _resample_by_length(
     vertices are. The contact field is read against distance on the paper, so it
     needs a walk that is even in length.
     """
+    step = _quantise_contact_length(step)
     if step <= 0 or len(points) < 2:
         return list(points)
     path = points + [points[0]] if closed else points
     out = [path[0]]
     carry = 0.0
     for (ax, ay), (bx, by) in zip(path, path[1:]):
-        seg = math.hypot(bx - ax, by - ay)
+        seg = _quantise_contact_length(math.hypot(bx - ax, by - ay))
         if seg <= 1e-9:
             continue
         travelled = step - carry
@@ -4233,13 +4244,18 @@ def _contact_fragments(
 
     # Three samples per grain resolves a skip; the cap keeps a long contour from
     # turning into thousands of SVG vertices.
-    total = sum(
-        math.hypot(b[0] - a[0], b[1] - a[1])
-        for a, b in zip(points, points[1:] + points[:1] if closed else points[1:])
+    total = _quantise_contact_length(
+        sum(
+            _quantise_contact_length(math.hypot(b[0] - a[0], b[1] - a[1]))
+            for a, b in zip(
+                points, points[1:] + points[:1] if closed else points[1:]
+            )
+        )
     )
     if total <= 1e-6:
         return []
-    step = max(grain_px / 3.0, total / 600.0, 0.8)
+    grain_px = _quantise_contact_length(grain_px)
+    step = _quantise_contact_length(max(grain_px / 3.0, total / 600.0, 0.8))
     walk = _resample_by_length(points, step, closed)
     if len(walk) < 3:
         return [(list(points), 1.0)]
@@ -4291,8 +4307,11 @@ def _contact_fragments(
             piece.append(_crossing(run[-1] + 1, run[-1]))
         if len(piece) < 2:
             continue
-        length = sum(
-            math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(piece, piece[1:])
+        length = _quantise_contact_length(
+            sum(
+                _quantise_contact_length(math.hypot(b[0] - a[0], b[1] - a[1]))
+                for a, b in zip(piece, piece[1:])
+            )
         )
         if length < 0.6:
             continue

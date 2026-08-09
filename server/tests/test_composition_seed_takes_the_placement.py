@@ -395,8 +395,9 @@ def test_the_added_cases_can_tell_the_two_seeds_apart(monkeypatch):
     generator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(generator)
     inputs = generator.build_inputs()
+    # Engine 29 is the current live replay after contact-length stabilisation.
     manifest = json.loads(
-        (REFERENCE_ROOT / "render-engine-28" / "manifest.json").read_text(encoding="utf-8")
+        (REFERENCE_ROOT / "render-engine-29" / "manifest.json").read_text(encoding="utf-8")
     )
 
     for case_id, twin_id in COMPOSITION_TWINS.items():

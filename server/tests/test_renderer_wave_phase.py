@@ -139,12 +139,13 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # 変わったのは 2 つ: 装飾が意図した幾何ではなく演奏された墨からオフセットを取るように
 # なったこと (作者裁定 2026-08-09) と、`stroke-dasharray` を捨てて接触の場が
 # 断片を決めるようになったこと。
+# Resnapped for engine 29: contact lengths now share the SVG's six-decimal lattice.
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "ac99861c7009682b9770e1500107d7f3",
-    "chalk_square": "22be70b9ed29d3240e13599cea443b2f",
-    "crayon_arc": "ce1d49b76545340b3ff78ce406cebcf3",
-    "pencil_circle": "9f80791861ad99530b6169e064a3c6bc",
-    "pencil_ellipse": "85955f2fc4aa9e36e81700da2e45122c",
+    "brush_thin_line": "1fca9a2c9b52b733f6bb0fdbce255aff",
+    "chalk_square": "412b73b9a92a26ddee76d1e8bbd9efc6",
+    "crayon_arc": "38b654a51d7b556928b89937636911fe",
+    "pencil_circle": "bc6fcc5b38107ecfec341761968a0df6",
+    "pencil_ellipse": "53d0d01e60fc0b4bfe43f037b912c8fe",
 }
 
 

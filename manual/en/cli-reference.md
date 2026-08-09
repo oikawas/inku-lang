@@ -44,6 +44,8 @@ paint and batch take the same flags. **A flag you omit falls back to the server 
 
 ### Input and output
 
+JSON artifacts record the version of the DDL layer that drew the work in `ddl_version` and `ddl_engine_version`.
+
 | Flag | Contents |
 |---|---|
 | `--file FILE` / `-f` | Read the description from a UTF-8 file; `-` means stdin for paint. For batch, each non-empty line is one work |

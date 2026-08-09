@@ -4488,7 +4488,7 @@ the two machines** (resvg 0.3.3), and `inku_analysis` imports on pentala with no
   `shared/src`, `check_docs.py` green, frozen corpora byte-identical. **No version bump** — web
   behaviour and the API are unchanged, and **no server path imports `rasterize_batch`.**
 
-### 2026-08-09 — Eight old works stop taking the process down when exported (**no version bump**; one dependency line in `shared/`)
+### v2.11.9 — Eight old works stop taking the process down when exported (Build 865, 2026-08-09)
 
 **Eight of production's 2,769 works aborted the whole server process when asked for a PNG** (ledger I-075,
 filed 2026-08-01). The cause is a Rust assertion inside `resvg` (`filter/displacement_map.rs`), and **a Rust
@@ -4516,5 +4516,6 @@ flight with it.**
   `rasterize_dir` — one child process per file — so **a returning panic lands as one red test instead of
   killing pytest.**
 - **Checks:** **server pytest 2,486 passed / 31 skipped** (from 2,485: **+1 test, +1 case**), **cli 182**,
-  ruff clean, frozen corpora byte-identical (they compare SVG, which the rasterizer version cannot move).
-  **No version bump** — no version number, API key or screen changes.
+  ruff clean, frozen corpora byte-identical (they compare SVG, which the rasterizer version cannot move),
+  `test_version_consistency.py` 8 cases. **⚠ No screen or API key changes.** The version moved so that the
+  tree deployed to pentala and the number that names it stay in step.

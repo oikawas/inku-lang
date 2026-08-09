@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.9 unreleased baseline (Web Build 865)
+
+The 13 places that name a version were updated to v2.11.9 / Build 865. **No manual text changed** — no screen action, setting or response key moved.
+
+- **Eight older works could take the whole server down when exported as PNG.** A fault in the rasterizer used for drawing (resvg) **stopped the server the moment the export was requested, taking any other work in progress with it.** This is fixed.
+- **Eight of 2,769 works were affected, all of them painted long ago.** None of the 1,065 works painted by recent drawing engines are affected. **It was never a problem for pictures you paint today.**
+- **No picture changes by a single pixel.** The same works were burned before and after the fix, and the images are identical — on the development server and on the Mac alike.
+
 ## 2026-08-09 — `rasterize` was added to the CLI (still v2.11.8 / Web Build 864)
 
 **The 13 places that name a version were not touched.** Nothing in the web interface or the server's responses changed, and no version was numbered. **One line of manual text changed.**

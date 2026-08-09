@@ -187,6 +187,27 @@ def test_the_banner_names_the_destination_the_policy_chose(monkeypatch):
     assert "/var/log/inku" not in printed
 
 
+# T-13 -- the entry point has to walk the wiring. Everything above tests
+# configure_logging(); none of it notices if main() stops calling it, which is
+# the exact failure this whole issue was: a policy that is stored and never run.
+def test_the_entry_point_applies_the_policy_before_serving(monkeypatch):
+    from inku_server import api as api_module
+
+    called: list[str] = []
+    monkeypatch.setattr(
+        "inku_server.logging_setup.configure_logging",
+        lambda *a, **k: called.append("configured"),
+    )
+    import uvicorn
+
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: called.append("served"))
+    api_module.main()
+
+    assert called == ["configured", "served"], (
+        "main() must apply the stored log policy, and do it before serving"
+    )
+
+
 # T-10 -- the container is pointed at the data volume, so the files survive a
 # restart exactly as the DB backups do.
 def test_the_image_points_the_log_directory_at_the_data_volume():

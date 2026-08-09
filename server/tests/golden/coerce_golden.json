@@ -112,7 +112,6 @@
         "path": "none",
         "color_cycle": [
          "red",
-         "red",
          "black",
          "yellow"
         ],
@@ -6961,7 +6960,6 @@
         "path": "diagonal",
         "color_cycle": [
          "black",
-         "black",
          "white"
         ],
         "margin": 0.1,
@@ -11516,7 +11514,7 @@
    "targets": "with_visual_event_type_hints"
   }
  },
- "commit": "060ee7228489f3c7f1c692cfcc74e87f759b6ff1",
+ "commit": "1c10d470f08ac279b5a4a112db67e50656c0259c",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

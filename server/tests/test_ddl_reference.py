@@ -52,7 +52,7 @@ def test_ddl_reference_versions_and_parts() -> None:
     # input the corpus already held. **That is the point of listing only three** --
     # the corpus could not have caught the behaviour this version changed, because
     # no case here ever had the shape production was passing.
-    assert DDL_ENGINE_VERSION == "7"
+    assert DDL_ENGINE_VERSION == "8"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -65,12 +65,24 @@ def test_ddl_reference_versions_and_parts() -> None:
     # 32 cases whose Score moved: 9 of the b_coerce digests moved only because
     # the branch report lost a name. The Score itself moved in 10 expand cases
     # and 9 coerce ones (plus the merged-away B-trigger-auto / -sparse).
+    # Engine 8 (2026-08-09): the color cycle stops inventing an order. coerce no
+    # longer doubles a color that is already in a cycle, and `_color_repair_order`
+    # no longer drops yellow, orange, or purple when an older color is present.
+    # Two cases move and neither is an expand case: this change lives entirely
+    # inside coerce, so all 13 a_expand digests are byte-identical. The two are
+    # one per half -- `B-production-fill-clause` loses the duplicated white, and
+    # `B-presence-from-ddl` keeps a yellow the six-word table used to drop.
+    # **19 of the 21 coerce cases not moving is the measurement, not a gap**:
+    # the corpus reaches this layer 14 times through a cycle, and only these two
+    # carry the shapes -- a base color already in the cycle, and old and new
+    # color words in one description.
     assert len(manifest["cases"]) == 34
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
     assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 21
-    assert len(manifest["changed_from_previous"]) == 32
-    assert "A-base-en" not in manifest["changed_from_previous"]
-    assert "A-plugin-enabled" not in manifest["changed_from_previous"]
+    assert manifest["changed_from_previous"] == ["B-presence-from-ddl", "B-production-fill-clause"]
+    assert not any(
+        manifest["cases"][case]["part"] == "a_expand" for case in manifest["changed_from_previous"]
+    )
 
 def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     generator = _generator()

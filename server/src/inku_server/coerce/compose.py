@@ -1077,8 +1077,12 @@ def _score_contains_primary_color(instructions: list[Instruction], color: str) -
 
 
 def _color_repair_order(colors: set[str]) -> list[str]:
+    # A known order, for determinism -- not a ranking. The table below is not a
+    # statement about which color matters more: nothing in the description says
+    # that, and inventing it here would be the house style this layer must not
+    # add. Colors the table does not name follow it rather than falling out.
     ordered = [color for color in ("red", "blue", "green", "white", "black", "gray") if color in colors]
-    return ordered or sorted(colors)
+    return ordered + [color for color in sorted(colors) if color not in ordered]
 
 
 def _green_intent_context(ddl: str | None) -> str | None:
@@ -1108,7 +1112,11 @@ def _with_color_cycle_delivery(ins: Instruction, colors: list[str], *, ddl: str 
     if green_context and "bamboo" in green_context:
         data["color"] = "green"
         base_color = "green"
-    if isinstance(base_color, str):
+    # The cycle hands one color to each member in turn, so a color listed twice
+    # takes twice the members. That weighting was never asked for: it fell out
+    # of inserting the base color without looking, and its size depends on how
+    # long the cycle happens to be. The two lines below already look.
+    if isinstance(base_color, str) and base_color not in cycle:
         cycle.insert(0, base_color)
     if green_context and "withered" in green_context and "gray" not in cycle:
         cycle.insert(0, "gray")

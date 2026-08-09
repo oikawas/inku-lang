@@ -41,8 +41,17 @@ DIAGNOSTIC_FRAGMENTS = (
     "counterweight preserved",
 )
 
+# H-01 left this list at ddl-engine 8 and is pinned by the test below instead.
+# The layer is not a fixed point for a color it *delivers*: coerce runs
+# `_with_primary_color_delivery` before `_with_color_delivery_repair`, so a
+# color that only reaches a cycle on pass 1 can only be promoted to a primary
+# stroke on pass 2. That ordering predates this change -- at ddl-engine 7 the
+# same two passes move a score for `blue`, and H-08, H-12, and H-20 already sat
+# outside this list for it. What changed is only which colors reach the path:
+# `_color_repair_order` used to drop yellow whenever an old color was present,
+# so H-01's yellow never got that far.
 IDEMPOTENT_CASE_IDS = (
-    "H-01", "H-02", "H-03", "H-05", "H-06", "H-07",
+    "H-02", "H-03", "H-05", "H-06", "H-07",
     "H-09", "H-11", "H-13", "H-14", "H-16", "H-18",
     "S-crescent-sensory", "S-dedupe-identical", "S-explicit-constraint",
     "S-filled-tempering", "S-invalid-relation", "S-literal-grid",
@@ -108,6 +117,39 @@ def test_all_coerce_golden_inputs_are_idempotent_after_one_ddl_pass() -> None:
         assert second.model_dump(mode="json", by_alias=True) == first.model_dump(
             mode="json", by_alias=True
         ), case_id
+
+
+def test_h01_second_pass_moves_only_the_yellow_promotion_and_then_settles() -> None:
+    """Pin what H-01 loses by leaving IDEMPOTENT_CASE_IDS, so it is not a hole.
+
+    Dropping a case from an allowlist hides whatever else drifts with it. The
+    second pass is allowed to do exactly one thing -- promote the yellow the DDL
+    asked for to a primary stroke -- and the third pass must do nothing.
+    """
+    case = _golden_cases()["H-01"]
+    ddl = case["input"]["ddl"]
+
+    first = _replay(case)
+    second = coerce_score(first, ddl=ddl)
+    third = coerce_score(second, ddl=ddl)
+
+    a = first.model_dump(mode="json", by_alias=True)
+    b = second.model_dump(mode="json", by_alias=True)
+    assert a != b
+
+    moved = [
+        (index, field)
+        for index, (before, after) in enumerate(zip(a["instructions"], b["instructions"]))
+        for field in before
+        if before[field] != after.get(field)
+    ]
+    assert moved == [(0, "note"), (0, "color")], moved
+    assert a["instructions"][0]["color"] == "red"
+    assert b["instructions"][0]["color"] == "yellow"
+    assert "yellow promoted to primary stroke from DDL color intent" in b["instructions"][0]["note"]
+    assert "yellow promoted to primary stroke" not in (a["instructions"][0]["note"] or "")
+
+    assert third.model_dump(mode="json", by_alias=True) == b
 
 
 def test_ddl_coerce_outputs_keep_machine_diagnostics_out_of_color_hint() -> None:

@@ -247,11 +247,25 @@ FRAME_HI = 0.98
 
 # SPEC §13.8: 揺らぎは Renderer 層で生成する (JSON Score は決定的な楽譜)
 #
-# 揺らぎ・滲みは「図形の代表寸法に対する比率」で定義する (v2.1)。
+# 滲みは「図形の代表寸法に対する比率」で定義する (v2.1)。
 # 絶対 px だと小図形は壊れ大図形は静止して見えるため、運動語彙 (fine/medium/
 # broad) が図形に対する相対量として意味を持つようにする。
 # 比率は v2.1 キャリブレーション (Build 637) で作者が候補 P3 を選択した値。
-AMPLITUDE_RATIO: dict[str, float] = {"fine": 0.025, "medium": 0.08, "broad": 0.18}
+#
+# The wander, unlike the bleed, is measured in stroke widths (engine 28).
+# It is a property of the tool meeting the paper, not of how big the figure is:
+# scaling it by the figure made a large arc leave its own line by eleven widths
+# while a small one stayed on it, because the same 8% of a radius is invisible
+# under a brush and a different line under a pencil. The vocabulary is unchanged
+# (fine/medium/broad); only the ruler the words are read against moved.
+AMPLITUDE_WIDTHS: dict[str, float] = {"fine": 0.35, "medium": 0.6, "broad": 2.0}
+
+# The material layer is a tone beside the mark, not a second mark: no stratum may
+# be wider than this share of the tool's own stroke. The tools that already state
+# their strata as a ratio chose 0.20-0.28, and the absolute ones land between
+# 0.17 and 0.47; the cap is set where pencil and chalk already sit, so it moves
+# the two outliers and leaves the rest untouched (author's ruling, 2026-08-09).
+MATERIAL_OUTLINE_MAX_WIDTH_RATIO = 0.33
 FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
 
 # 滲む (quality=pink): feGaussianBlur の stdDeviation も代表寸法比
@@ -411,6 +425,17 @@ TEXTURE_FILTER_WEIGHTS = frozenset(TEXTURE_SPECS)
 def _material_gain(key: str) -> float:
     """材質強度候補の係数を返す。floor 系の既定は 0 (下限なし)。"""
     return MATERIAL_INTENSITY[MATERIAL_INTENSITY_LEVEL].get(key, 0.0)
+
+
+def _outline_wander_px(offset_px: float, canvas: CanvasSize) -> float:
+    """How far a stratum drifts off its own offset along the path.
+
+    Strata that stay exactly parallel read as engraved rails rather than as a
+    tool's own edges. Both emitters (the straight tools and the performed
+    contours) ask here, so the amount is stated once and a test can bound the
+    layer's distance to the ink without restating the formula.
+    """
+    return 0.35 * abs(offset_px) + 0.6 * _unit_scale(canvas)
 
 
 def _outline_offset_px(offset: float, canvas: CanvasSize) -> float:
@@ -756,12 +781,19 @@ def _clamped_representative_px(ins: Instruction, canvas: CanvasSize) -> float:
 
 
 def _amplitude_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> float:
-    """揺らぎ振幅 (px) を図形の代表寸法から決める。"""
+    """Wobble amplitude (px), measured in stroke widths of the mark itself.
+
+    `_stroke_width_px` is a pure function of the instruction, so this can ask it
+    directly rather than having the seven call sites thread the width through.
+    The representative-size clamp stays: it is the safety valve that keeps a
+    figure smaller than its own mark from wandering further than it is wide.
+    """
+    width = _stroke_width_px(ins.weight, canvas, ins.thinness)
     rep = _clamped_representative_px(ins, canvas)
-    ratio = AMPLITUDE_RATIO[variation.amplitude] * PRIMITIVE_AMP_GAIN.get(
+    amp = AMPLITUDE_WIDTHS[variation.amplitude] * PRIMITIVE_AMP_GAIN.get(
         ins.primitive, 1.0
     )
-    return min(ratio * rep, AMPLITUDE_CLAMP_RATIO * rep)
+    return min(amp * width, AMPLITUDE_CLAMP_RATIO * rep)
 
 
 def _blur_std_px(variation: Variation, ins: Instruction, canvas: CanvasSize) -> float:
@@ -4115,19 +4147,159 @@ def _offset_polyline(
     return out
 
 
-def _varied_dash_pattern(dash_units: float, mark: float, gap: float, seed: int) -> str:
-    """A long, seed-varied dash pattern (unscaled) whose period spans the whole
-    line, so no repeating dash cadence is visible. Pairs vary per index and per
-    stratum seed; feed through `_scale_dash` to size and format it."""
-    period = max(1.0, mark + gap)
-    count = max(6, min(28, int(dash_units / period) + 3))
-    vals: list[str] = []
-    for i in range(count):
-        m = mark * (0.5 + 1.3 * _hash01(i, seed, "dash-mark"))
-        g = gap * (0.45 + 1.5 * _hash01(i, seed, "dash-gap"))
-        vals.append(f"{m:.3f}")
-        vals.append(f"{g:.3f}")
-    return ",".join(vals)
+
+def _dash_spec_stats(dash: str | None) -> tuple[float, float]:
+    """The coverage and grain a tool's dash pattern implies.
+
+    The patterns in `_MATERIAL_OUTLINE_SPECS` carry a tool's character -- the pen
+    is nearly continuous, the pencil is mostly gap -- and that tuning is worth
+    keeping once the cadence is gone. Coverage is the share of the path the
+    pattern marked; grain is its natural wavelength, in unscaled units.
+    """
+    if not dash:
+        return 1.0, 0.0
+    values = [abs(float(v)) for v in dash.split(",") if v.strip()]
+    if not values or sum(values) <= 0:
+        return 1.0, 0.0
+    # An odd-length pattern swaps marks and gaps on every repeat, so read it twice.
+    if len(values) % 2:
+        values = values + values
+    marks, gaps = values[0::2], values[1::2]
+    coverage = sum(marks) / sum(values)
+    grain = sum(marks) / len(marks) + sum(gaps) / len(gaps)
+    return coverage, grain
+
+
+def _contact_field(t: float, seed: int) -> float:
+    """The paper's tooth at two scales, read along the path. Roughly 0..1."""
+    return 0.62 * _value_noise_1d(t, seed) + 0.38 * _value_noise_1d(
+        t * 2.7 + 13.1, seed + 977
+    )
+
+
+def _resample_by_length(
+    points: list[tuple[float, float]], step: float, closed: bool
+) -> list[tuple[float, float]]:
+    """Walk a polyline and emit a point every `step` px of arc length.
+
+    `_resample_points` picks by index, which is even only when the source
+    vertices are. The contact field is read against distance on the paper, so it
+    needs a walk that is even in length.
+    """
+    if step <= 0 or len(points) < 2:
+        return list(points)
+    path = points + [points[0]] if closed else points
+    out = [path[0]]
+    carry = 0.0
+    for (ax, ay), (bx, by) in zip(path, path[1:]):
+        seg = math.hypot(bx - ax, by - ay)
+        if seg <= 1e-9:
+            continue
+        travelled = step - carry
+        while travelled <= seg:
+            f = travelled / seg
+            out.append((ax + (bx - ax) * f, ay + (by - ay) * f))
+            travelled += step
+        carry = (carry + seg) % step
+    return out
+
+
+def _contact_fragments(
+    points: list[tuple[float, float]],
+    *,
+    coverage: float,
+    grain_px: float,
+    seed: int,
+    closed: bool,
+) -> list[tuple[list[tuple[float, float]], float]]:
+    """The pieces of an outline where the tool actually met the paper.
+
+    A dasharray repeats. However long the pattern, a long contour walks through
+    it several times and the eye finds the cadence -- and the material layer is
+    not a dotted line, it is where a tool dragged across a grain and kept losing
+    the paper. So presence is a smooth noise field read along the arc length, and
+    the outline exists where the field clears a threshold.
+
+    The threshold is the (1 - coverage) quantile of the field's own samples, not
+    a constant: that way each tool keeps the share of the path its dash pattern
+    used to mark, while nothing about the spacing repeats. Fragments come back
+    with a weight, so the thinly-touching ones are fainter than the ones the tool
+    bore down on.
+    """
+    if len(points) < 2:
+        return []
+    if grain_px <= 0 or coverage >= 0.999:
+        return [(list(points), 1.0)]
+
+    # Three samples per grain resolves a skip; the cap keeps a long contour from
+    # turning into thousands of SVG vertices.
+    total = sum(
+        math.hypot(b[0] - a[0], b[1] - a[1])
+        for a, b in zip(points, points[1:] + points[:1] if closed else points[1:])
+    )
+    if total <= 1e-6:
+        return []
+    step = max(grain_px / 3.0, total / 600.0, 0.8)
+    walk = _resample_by_length(points, step, closed)
+    if len(walk) < 3:
+        return [(list(points), 1.0)]
+
+    field = [_contact_field(i * step / grain_px, seed) for i in range(len(walk))]
+    ordered = sorted(field)
+    index = min(len(ordered) - 1, max(0, int((1.0 - coverage) * len(ordered))))
+    threshold = ordered[index]
+    span = max(1e-6, ordered[-1] - threshold)
+
+    runs: list[list[int]] = []
+    current: list[int] = []
+    for i, value in enumerate(field):
+        if value >= threshold:
+            current.append(i)
+        elif current:
+            runs.append(current)
+            current = []
+    if current:
+        runs.append(current)
+    # On a closed path the seam is not an end: a run that touches both ends is
+    # one fragment that happens to be written in two halves.
+    if closed and len(runs) > 1 and runs[0][0] == 0 and runs[-1][-1] == len(field) - 1:
+        runs[0] = runs[-1] + runs[0]
+        runs.pop()
+
+    def _crossing(outside: int, inside: int) -> tuple[float, float]:
+        """Where the field crosses the threshold between two samples.
+
+        Without this the ends of every fragment land on a sample, so every
+        length is a multiple of `step` and the lengths themselves become the
+        cadence -- the regularity comes back through the sampling instead of
+        through the pattern.
+        """
+        f_out, f_in = field[outside], field[inside]
+        if abs(f_in - f_out) < 1e-9:
+            return walk[inside]
+        f = min(1.0, max(0.0, (threshold - f_out) / (f_in - f_out)))
+        ax, ay = walk[outside]
+        bx, by = walk[inside]
+        return (ax + (bx - ax) * f, ay + (by - ay) * f)
+
+    fragments: list[tuple[list[tuple[float, float]], float]] = []
+    for run in runs:
+        piece = [walk[i] for i in run]
+        if run[0] - 1 >= 0:
+            piece.insert(0, _crossing(run[0] - 1, run[0]))
+        if run[-1] + 1 < len(field):
+            piece.append(_crossing(run[-1] + 1, run[-1]))
+        if len(piece) < 2:
+            continue
+        length = sum(
+            math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(piece, piece[1:])
+        )
+        if length < 0.6:
+            continue
+        margin = sum(field[i] - threshold for i in run) / len(run)
+        weight = min(1.0, 0.55 + 0.75 * (margin / span))
+        fragments.append((piece, weight))
+    return fragments
 
 
 def _polyline_sample(
@@ -4288,7 +4460,12 @@ def _polygon_points(
 
 
 def _outline_attrs(
-    attrs: dict, *, stroke_width: float, opacity: float, dash: str | None = None
+    attrs: dict,
+    *,
+    stroke_width: float,
+    opacity: float,
+    dash: str | None = None,
+    stratum: int | None = None,
 ) -> dict:
     result = _copy_attrs(attrs)
     result["fill"] = "none"
@@ -4296,9 +4473,24 @@ def _outline_attrs(
     result["stroke_opacity"] = opacity
     # 材質装飾であることを明示する。読み手 (弧抽出・ラスタライザ等) が主線と
     # 装飾を区別するのに opacity の大小へ頼らずに済ませるため。
-    result["class"] = "material-outline"
+    #
+    # engine 28: a stratum index rides along. A tool's strata used to be one
+    # element each, so "the pen leaves two split nibs" could be read off the
+    # element count; contact broke each stratum into fragments, and their widths
+    # are not distinct either once the width cap folds two of them together. The
+    # index keeps the claim observable instead of leaving it to arithmetic.
+    result["class"] = (
+        "material-outline" if stratum is None else f"material-outline stratum-{stratum}"
+    )
     if dash is not None:
         result["stroke_dasharray"] = dash
+    else:
+        # The body attrs carry the tool's own broken quality (`WEIGHT_STYLE`,
+        # e.g. pencil "1,3"). While this helper always overwrote it there was
+        # nothing to strip; now that contact decides where the outline exists,
+        # an inherited pattern would cut the fragments a second time on a fixed
+        # cadence -- exactly the regularity the fragments are there to remove.
+        result.pop("stroke_dasharray", None)
     return result
 
 
@@ -4349,15 +4541,39 @@ def _material_outline_profile(
     base_width = _stroke_width_px(weight, canvas, thinness)
     offset_gain = _material_gain("outline_offset")
     opacity_gain = _material_gain("outline_opacity")
-    return [
-        (
-            _outline_offset_px(offset * scale * offset_gain, canvas),
+    nominal_width = _stroke_width_px(weight, canvas)
+    half = base_width / 2.0
+    out = []
+    for offset, abs_width, width_ratio, opacity, dash in spec:
+        # engine 28: both of these are read against the tool's own mark now.
+        # While the layer sat on the ideal geometry its distance to the band was
+        # incidental, so the table could carry absolute numbers and nobody saw
+        # what they came to beside the ink. Riding the band, two of them showed:
+        # brush_thin's second stratum was 0.47 of its own mark (the widest of any
+        # tool) and sat 1.07 half-widths out (the closest), so the tone read as a
+        # second mark rather than as tone. Author's ruling: fit the tool.
+        # The cap reads the tool's nominal stroke, not the thinned one. How wide
+        # the tone is belongs to the tool's own grain -- paper tooth and powder
+        # do not get finer because the line was drawn finer, which is what
+        # `test_material_outline_absolute_widths_do_not_move` holds. Where it
+        # sits is a different question, and that one is asked of the actual mark.
+        width = min(
             abs_width * scale + base_width * width_ratio,
-            _outline_opacity(opacity * opacity_gain),
-            _scale_dash(dash, scale),
+            nominal_width * MATERIAL_OUTLINE_MAX_WIDTH_RATIO,
         )
-        for offset, abs_width, width_ratio, opacity, dash in spec
-    ]
+        placed = _outline_offset_px(offset * scale * offset_gain, canvas)
+        # A stratum centred inside the mark cannot be tone beside it; it only
+        # thickens the mark. Put it on the edge and let the wander take it out.
+        placed = math.copysign(max(abs(placed), half), placed)
+        out.append(
+            (
+                placed,
+                width,
+                _outline_opacity(opacity * opacity_gain),
+                _scale_dash(dash, scale),
+            )
+        )
+    return out
 
 
 def _speck_profile(
@@ -4544,21 +4760,37 @@ def _offset_performed_path(
     amount: float,
     closed: bool,
     center: tuple[float, float],
+    *,
+    wander: float = 0.0,
+    wander_period: float = 1.0,
+    seed: int = 0,
 ) -> list[tuple[float, float]]:
     """演奏後の中心線を法線方向へ amount だけずらす。正が外側。
 
     法線の符号は輪郭の生成順で変わる (円は内向き、弧は外向き) ので、図形の中心に
     対して一度だけ多数決で決める。幾何版の `r + offset` と向きを揃えるため。
+
+    `wander` adds a low-frequency drift to the offset along the arc length, the
+    same way `_offset_polyline` does it for the straight tools: strata that stay
+    exactly parallel read as engraved rails rather than as a tool's own edges.
     """
     normals = centerline_normals(path, closed)
     votes = 0
     for (x, y), (nx, ny) in zip(path, normals):
         votes += 1 if nx * (x - center[0]) + ny * (y - center[1]) >= 0 else -1
     sign = 1.0 if votes >= 0 else -1.0
-    return [
-        (x + nx * amount * sign, y + ny * amount * sign)
-        for (x, y), (nx, ny) in zip(path, normals)
-    ]
+    out: list[tuple[float, float]] = []
+    arc = 0.0
+    for i, ((x, y), (nx, ny)) in enumerate(zip(path, normals)):
+        off = amount
+        if wander:
+            off += wander * (
+                _value_noise_1d(arc / max(1e-6, wander_period), seed) * 2 - 1
+            )
+        out.append((x + nx * off * sign, y + ny * off * sign))
+        if i + 1 < len(path):
+            arc += math.hypot(path[i + 1][0] - x, path[i + 1][1] - y)
+    return out
 
 
 def _closed_path_length(path: list[tuple[float, float]]) -> float:
@@ -4596,21 +4828,52 @@ def _add_material_performed_outline(
     """材質輪郭と粉を、幾何ではなく演奏後の中心線から作る。
 
     幾何から引くと、墨が暴れたときに材質層だけが元の位置に罫線として取り残される
-    (engine 12 が直線で直したのと同じ型の不具合)。呼ぶのは wild のときだけで、
-    OFF の出力は幾何版のまま 1 バイトも動かさない。
+    (engine 12 が直線で直したのと同じ型の不具合)。
+
+    engine 28: **すべての描画がここを通る**。以前は wild のときだけで、OFF は幾何版の
+    `r + offset` を使っていた —— つまり装飾が意図した幾何に貼りついたまま墨だけが
+    離れ、破線の幽霊が絵の中に露出していた。作者裁定 (2026-08-09):
+    **装飾は墨の実態に対してオフセットを取る。**
+
+    掠れも同じ裁定で変わった。装飾は道具が紙の地と接したときの掠れであって、
+    規則的な点線ではない。dasharray は捨て、`_contact_fragments` が返す
+    「触れていた区間」だけを描く。
     """
     seed = _seed_for_instruction(ins, render_seed)
-    for offset, width, opacity, dash in _material_outline_profile(ins.weight, canvas, ins.thinness):
-        points = _offset_performed_path(path, offset, closed, center)
-        element = dwg.polygon if closed else dwg.polyline
-        group.add(
-            element(
-                points=points,
-                **_outline_attrs(
-                    attrs, stroke_width=width, opacity=opacity, dash=dash
-                ),
-            )
+    scale = _unit_scale(canvas)
+    element = dwg.polyline
+    for k, (offset, width, opacity, dash) in enumerate(
+        _material_outline_profile(ins.weight, canvas, ins.thinness)
+    ):
+        layer_seed = seed + k * 7919
+        coverage, grain = _dash_spec_stats(dash)
+        points = _offset_performed_path(
+            path,
+            offset,
+            closed,
+            center,
+            wander=_outline_wander_px(offset, canvas),
+            wander_period=60.0 * scale,
+            seed=layer_seed,
         )
+        for piece, weight in _contact_fragments(
+            points,
+            coverage=coverage,
+            grain_px=grain * scale,
+            seed=layer_seed,
+            closed=closed,
+        ):
+            group.add(
+                element(
+                    points=piece,
+                    **_outline_attrs(
+                        attrs,
+                        stroke_width=width,
+                        opacity=opacity * weight,
+                        stratum=k,
+                    ),
+                )
+            )
     specks = _speck_profile(ins.weight, path_len_px, canvas)
     if specks is not None:
         count, spread, radius, opacity = specks
@@ -4697,27 +4960,41 @@ def _material_line_group(
     def _layer_offset(amount: float) -> float:
         return _outline_offset_px(amount * scale * offset_gain, canvas)
 
-    dash_units = length / max(1e-6, scale)
 
     def _emit_layer(
         amount: float, layer_attrs: dict, mark: float, gap: float, k: int
     ) -> None:
-        # Each stratum gets its own seed, so its weave and its dash pattern are
-        # out of step with the others; the pattern is long enough to span the
-        # line, so no repeating dash cadence is visible.
+        # Each stratum gets its own seed, so its weave and its contact are out of
+        # step with the others.
+        #
+        # engine 28: the dasharray is gone. Its pattern was long, but a pattern
+        # still repeats, and this layer is the tool losing the paper's grain --
+        # not a dotted line (author's ruling, 2026-08-09). `mark` and `gap` now
+        # say what share of the line the tool held and at what wavelength, and
+        # the contact field decides where.
         la = _copy_attrs(layer_attrs)
         la["fill"] = "none"
-        la["class_"] = "material-outline"
+        la["class_"] = f"material-outline stratum-{k}"
+        # Same reason as `_outline_attrs`: the tool's own `WEIGHT_STYLE` dash
+        # would cut the fragments a second time, on a fixed cadence.
+        la.pop("stroke_dasharray", None)
+        base_opacity = la.get("stroke_opacity", 1.0)
         off_px = _layer_offset(amount)
         layer_seed = seed + k * 7919
-        wander = 0.35 * abs(off_px) + 0.6 * scale
+        wander = _outline_wander_px(off_px, canvas)
         pts = _offset_polyline(
             path, off_px, wander=wander, wander_period=60.0 * scale, seed=layer_seed
         )
-        la["stroke_dasharray"] = _scale_dash(
-            _varied_dash_pattern(dash_units, mark, gap, layer_seed), scale
-        )
-        group.add(dwg.polyline(points=pts, **la))
+        for piece, weight in _contact_fragments(
+            pts,
+            coverage=mark / max(1e-6, mark + gap),
+            grain_px=(mark + gap) * scale,
+            seed=layer_seed,
+            closed=False,
+        ):
+            frag = _copy_attrs(la)
+            frag["stroke_opacity"] = base_opacity * weight
+            group.add(dwg.polyline(points=piece, **frag))
 
     if include_base:
         base = _copy_attrs(attrs)
@@ -6273,36 +6550,22 @@ def _render_arc_hand_stroke(
         group.add(dwg.polyline(**burr_attrs))
 
     if _uses_material_outline(ins.weight):
-        if wild:
-            arc_len = r * abs(
-                math.radians(ins.angle_end) - math.radians(ins.angle_start)
-            )
-            _add_material_performed_outline(
-                dwg,
-                group,
-                ins,
-                attrs,
-                [(sample.x, sample.y) for sample in stroke.samples],
-                canvas,
-                render_seed,
-                closed=False,
-                path_len_px=arc_len,
-                center=(cx, cy),
-            )
-        else:
-            _add_material_arc_outline(
-                dwg,
-                group,
-                ins,
-                attrs,
-                cx,
-                cy,
-                r,
-                ins.angle_start,
-                ins.angle_end,
-                canvas,
-                render_seed,
-            )
+        # engine 28: the band's own samples, not the ideal arc. The geometric
+        # helper stayed on `r + offset` and was left behind whenever the ink
+        # wandered, which is the ghost the author saw beside the mark.
+        arc_len = r * abs(math.radians(ins.angle_end) - math.radians(ins.angle_start))
+        _add_material_performed_outline(
+            dwg,
+            group,
+            ins,
+            attrs,
+            [(sample.x, sample.y) for sample in stroke.samples],
+            canvas,
+            render_seed,
+            closed=False,
+            path_len_px=arc_len,
+            center=(cx, cy),
+        )
     return _apply_rotation(group, ins, canvas)
 
 
@@ -6477,7 +6740,7 @@ def _render_instruction(
                 )
                 group.add(contour_group)
             if _uses_material_outline(ins.weight):
-                if wild and performed is not None:
+                if performed is not None:
                     _add_material_performed_outline(
                         dwg,
                         group,
@@ -6566,7 +6829,7 @@ def _render_instruction(
                 )
                 group.add(contour_group)
             if _uses_material_outline(ins.weight):
-                if wild and performed is not None:
+                if performed is not None:
                     _add_material_performed_outline(
                         dwg,
                         group,
@@ -6720,7 +6983,7 @@ def _render_instruction(
                 )
                 group.add(contour_group)
             if _uses_material_outline(ins.weight):
-                if wild and performed is not None:
+                if performed is not None:
                     _add_material_performed_outline(
                         dwg,
                         group,

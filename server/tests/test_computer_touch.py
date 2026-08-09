@@ -58,7 +58,7 @@ def test_computer_repeats_width_and_dash_across_render_seeds() -> None:
         [
             node.attrib["stroke-dasharray"]
             for node in root.iter()
-            if node.attrib.get("class") == "material-outline"
+            if "material-outline" in (node.attrib.get("class") or "").split()
         ]
         for root in roots
     ]
@@ -208,7 +208,7 @@ def test_computer_has_no_material_outline_layer() -> None:
         render(_line_score("computer", count=4), render_seed=77)
     )
     assert not [
-        node for node in root.iter() if node.attrib.get("class") == "material-outline"
+        node for node in root.iter() if "material-outline" in (node.attrib.get("class") or "").split()
     ]
     assert not any(node.tag.endswith("circle") for node in root.iter())
     assert "texture-computer" not in ElementTree.tostring(root, encoding="unicode")
@@ -217,7 +217,7 @@ def test_computer_has_no_material_outline_layer() -> None:
     # reach into `_MATERIAL_OUTLINE_SPECS` for anyone else.
     pencil = ElementTree.fromstring(render(_line_score("pencil"), render_seed=77))
     assert [
-        node for node in pencil.iter() if node.attrib.get("class") == "material-outline"
+        node for node in pencil.iter() if "material-outline" in (node.attrib.get("class") or "").split()
     ]
 
 

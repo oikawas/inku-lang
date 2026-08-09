@@ -30,7 +30,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from inku_server import db, renderer
+from inku_server import db
 from inku_server.api import app
 from inku_server.api_core.rendering import (
     _render_metadata,
@@ -380,23 +380,23 @@ def test_the_added_cases_can_tell_the_two_seeds_apart(monkeypatch):
     Without this the corpus would record that engine 23 changed no picture,
     which is true and says nothing about whether the split happened.
 
-    Engine 25's per-member size is taken back out first. It moves these four
-    drawings for a reason that has nothing to do with which seed placed them,
-    and it is engine 23's frozen bytes that this reads against; without the
-    step below the test would stop measuring the split and start measuring the
-    size. The yardstick stays the frozen body -- what is neutralised is the
-    later layer.
+    Engine 25's per-member size used to be taken back out here, because the
+    yardstick was engine 23's frozen bytes and the size moved them for a reason
+    that has nothing to do with which seed placed them. engine 28 moved the
+    material layer and the wobble as well, so reaching engine 23 that way would
+    mean rebuilding two more engines inside a fixture. The bake's own call is
+    checked against the current corpus instead, which is what "survives the trip
+    the generator makes" was ever about; the split itself is measured below by
+    dropping the seed and watching the picture move, and that half never needed
+    a frozen body at all.
     """
-    monkeypatch.setattr(
-        renderer, "_apply_member_sizes", lambda items, arr, member_seed: items
-    )
     spec = importlib.util.spec_from_file_location("gen_render_reference", GENERATOR_PATH)
     assert spec is not None and spec.loader is not None
     generator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(generator)
     inputs = generator.build_inputs()
     manifest = json.loads(
-        (REFERENCE_ROOT / "render-engine-23" / "manifest.json").read_text(encoding="utf-8")
+        (REFERENCE_ROOT / "render-engine-28" / "manifest.json").read_text(encoding="utf-8")
     )
 
     for case_id, twin_id in COMPOSITION_TWINS.items():

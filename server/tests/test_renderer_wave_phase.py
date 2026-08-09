@@ -12,7 +12,6 @@ import re
 import pytest
 
 from inku_server.renderer import (
-    AMPLITUDE_RATIO,
     _arc_points_with_variation,
     _edge_contour_with_variation,
     _sample_offset_periodic,
@@ -25,9 +24,12 @@ from inku_server.schema import Instruction, Score, Variation
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
 
 CANVAS = canvas_size_for_aspect(None)
-# 弧: 半径 200px が代表寸法 / 多角形: 800px 角の短辺 1/2 = 400px が代表寸法
-ARC_AMP = AMPLITUDE_RATIO["broad"] * 200.0
-POLY_AMP = AMPLITUDE_RATIO["broad"] * 400.0
+# These helpers take the amplitude as an argument, so the magnitude here is the
+# test's own choice and not a statement about how the renderer derives it. They
+# are deliberately far larger than any real amplitude: what is under test is the
+# seam continuity and the pinning, which a small offset would let slip by.
+ARC_AMP = 36.0
+POLY_AMP = 72.0
 EDGE_SEGMENTS = _segment_count(800.0, CANVAS)
 
 WAVE = {
@@ -129,12 +131,20 @@ MATERIAL_SHAPES: dict[str, dict] = {
 # 1 バイトも変わっていない。**ここでも残る 4 件が対照**で、blur は道具ごとの値
 # なので他へこぼれていれば赤くなる。凍結コーパスは `editable` で焼いており
 # filter が出ないため、そちらは 1 バイトも動いていない。
+# engine 28 で 5 件すべて再採取。**ここで初めて 5 件が同時に動く。** これまでの
+# 再採取はどれも 1 件だけで、残る 4 件が「道具ごとの値が他へこぼれていない」ことの
+# 対照になっていた。今回は道具ごとの値ではなく**材質層の作り方そのもの**が変わった
+# ので、材質層を持つ 5 件が揃って動くのが正しい —— 逆に 1 件でも残っていたら、
+# その道具に変更が届いていないという赤である。
+# 変わったのは 2 つ: 装飾が意図した幾何ではなく演奏された墨からオフセットを取るように
+# なったこと (作者裁定 2026-08-09) と、`stroke-dasharray` を捨てて接触の場が
+# 断片を決めるようになったこと。
 MATERIAL_NONE_SEED_DIGESTS = {
-    "brush_thin_line": "896b28849045ca35bbdd94605ba4a5cf",
-    "chalk_square": "8d3a46f5c1224ec6f357a7403744b2b8",
-    "crayon_arc": "67cdabd624a76ad7059118d46448e730",
-    "pencil_circle": "e950ff63e16c5859100c9ffa4f85d978",
-    "pencil_ellipse": "21859684c56809933104f8efdcf0197f",
+    "brush_thin_line": "ac99861c7009682b9770e1500107d7f3",
+    "chalk_square": "22be70b9ed29d3240e13599cea443b2f",
+    "crayon_arc": "ce1d49b76545340b3ff78ce406cebcf3",
+    "pencil_circle": "9f80791861ad99530b6169e064a3c6bc",
+    "pencil_ellipse": "85955f2fc4aa9e36e81700da2e45122c",
 }
 
 

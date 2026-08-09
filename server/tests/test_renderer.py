@@ -17,7 +17,20 @@ from inku_server.renderer import (
 )
 from inku_server.schema import Instruction, Score
 
-_MATERIAL_OUTLINE_ELEMENT = re.compile(r'<[a-z]+[^>]*class="material-outline"[^>]*/>')
+# engine 28 appends a stratum token to the class, so the match is on the token.
+_MATERIAL_OUTLINE_ELEMENT = re.compile(
+    r'<[a-z]+[^>]*class="material-outline(?: [^"]*)?"[^>]*/>'
+)
+
+
+def _strata(svg: str) -> set[str]:
+    """The stratum indices the material layer emitted (engine 28).
+
+    A tool's strata used to be one element each, so they could be counted by
+    element type; contact broke each into fragments and the width cap folds two
+    of them to the same width, so the index is the only handle left.
+    """
+    return set(re.findall(r'class="material-outline stratum-(\d+)"', svg))
 
 
 def _ink_only(svg: str) -> str:
@@ -257,7 +270,8 @@ def test_render_pencil_line_uses_material_texture():
     assert 'fill-opacity="0.660000"' in svg
     # Material strata are aperiodic-dashed polylines along the centreline.
     assert svg.count("<polyline") >= 2
-    assert "stroke-dasharray=" in svg
+    # engine 28: the strata carry no dash pattern; contact decides where they exist.
+    assert "stroke-dasharray=" not in svg
     assert 'id="texture-pencil"' in svg
     assert 'filter="url(#texture-pencil)"' in svg
     assert svg.count("<circle") >= _expected_specks(18, 1000.0)
@@ -280,7 +294,8 @@ def test_render_chalk_line_uses_blurred_powder_texture():
     assert 'id="texture-chalk"' in svg
     assert 'filter="url(#texture-chalk)"' in svg
     assert svg.count("<polyline") >= 2
-    assert "stroke-dasharray=" in svg
+    # engine 28: the strata carry no dash pattern; contact decides where they exist.
+    assert "stroke-dasharray=" not in svg
     assert "<feTurbulence" in svg
     assert "<feDisplacementMap" in svg
     assert svg.count("<circle") >= _expected_specks(34, 1000.0)
@@ -303,7 +318,8 @@ def test_render_crayon_line_adds_rubbed_layers():
     # Material texture layers ride the (gestured) centreline as polylines now.
     assert svg.count("<polyline") >= 4
     assert "stroke-engine-v1" in svg
-    assert "stroke-dasharray=" in svg
+    # engine 28: the strata carry no dash pattern; contact decides where they exist.
+    assert "stroke-dasharray=" not in svg
     assert 'id="texture-crayon"' in svg
     assert svg.count("<circle") >= _expected_specks(26, 1000.0)
 
@@ -502,7 +518,8 @@ def test_render_brush_lines_use_layered_material_texture():
     # Material texture layers ride the (gestured) centreline as polylines now.
     assert svg.count("<polyline") >= 5
     assert svg.count("stroke-engine-v1") == 2
-    assert "stroke-dasharray=" in svg
+    # engine 28: the strata carry no dash pattern; contact decides where they exist.
+    assert "stroke-dasharray=" not in svg
     assert 'id="texture-brush_thick"' in svg
 
 
@@ -520,9 +537,12 @@ def test_render_circle_material_applies_outline_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<circle") >= 2 + _expected_specks(36, 2 * math.pi * 180.0)
+    # engine 28: the two strata are polylines drawn from the performed ink, so
+    # the circles left in the SVG are the specks alone.
+    assert svg.count("<circle") >= _expected_specks(36, 2 * math.pi * 180.0)
+    assert _strata(svg) == {"0", "1"}
     assert 'id="texture-chalk"' in svg
-    assert 'stroke-dasharray="8.000000,12.000000,1.000000,8.000000"' in svg
+    assert "stroke-dasharray=" not in svg
 
 
 def test_render_ellipse_material_applies_outline_texture():
@@ -539,10 +559,11 @@ def test_render_ellipse_material_applies_outline_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<ellipse") >= 4
+    # engine 28: the three strata are polylines drawn from the performed ink.
+    assert _strata(svg) == {"0", "1", "2"}
     assert svg.count("<circle") >= _expected_specks(28, _ellipse_perimeter(200.0, 100.0))
     assert 'id="texture-crayon"' in svg
-    assert 'stroke-dasharray="2.000000,5.000000,9.000000,7.000000"' in svg
+    assert "stroke-dasharray=" not in svg
 
 
 def test_render_square_material_applies_outline_texture():
@@ -559,10 +580,11 @@ def test_render_square_material_applies_outline_texture():
         }
     )
     svg = render(score)
-    assert svg.count("<rect") >= 4
+    # engine 28: the two strata are polylines drawn from the performed ink.
+    assert _strata(svg) == {"0", "1"}
     assert svg.count("<circle") >= _expected_specks(18, 4 * 300.0)
     assert 'id="texture-pencil"' in svg
-    assert 'stroke-dasharray="1.000000,7.000000"' in svg
+    assert "stroke-dasharray=" not in svg
 
 
 def test_render_circle():
@@ -918,7 +940,7 @@ def test_render_circle_with_pink_variation_emits_blur_filter():
     assert 'filter="url(#blur-medium-60)"' in svg
     assert 'stdDeviation="6.000000"' in svg
     assert "<circle" in svg
-    assert "<polyline" not in svg
+    assert "<polyline" not in _ink_only(svg)
 
 
 def test_render_textured_pink_variation_keeps_valid_svg_filter_attribute():
@@ -940,7 +962,14 @@ def test_render_textured_pink_variation_keeps_valid_svg_filter_attribute():
     # v2.2 (engine 8): 塗り本体と輪郭の帯がそれぞれ質感 filter を持つ。
     # engine 15 で triangle にも材質輪郭が届いた分だけ 2 つ増え、square / circle と
     # 同じ 4 になった (どちらも以前から 4 だった)。
-    assert svg.count('filter="url(#texture-chalk)"') == 4
+    #
+    # engine 28: 層は接触ごとの断片に割れたので、要素を数えると断片の数を数える
+    # ことになる。主張は「本体と材質層の両方が質感 filter を持つ」だったので、
+    # 数ではなくその主張を見る。
+    outline = re.findall(r'<[a-z]+[^>]*class="material-outline[^"]*"[^>]*/>', svg)
+    assert outline
+    assert all('filter="url(#texture-chalk)"' in tag for tag in outline)
+    assert 'filter="url(#texture-chalk)"' in _ink_only(svg)
     assert svg.count('filter="url(#blur-medium)"') == 0
 
 
@@ -1677,7 +1706,14 @@ def test_legacy_arrangement_layouts_keep_golden_output():
     # 2026-08-08, round 2b), which spreads the five radii over 0.65x..1.35x
     # instead of 0.75x..1.25x. The group's position is unmoved again, for the
     # reason engine 25 wrote down: every size rule preserves its anchor.
-    assert digest == "984f771c9a8cd9f3aed32cfbb456a3635d2e3b3055a543fafb8db015b9ba783f"
+    # Resnapped for engine 28 (the decoration rides the ink, and it skips like
+    # paper). Two things reach this digest. The material layer no longer draws a
+    # dashed circle on the ideal geometry: it is fragments offset from each
+    # member's performed band, so both the element type and the coordinates
+    # move. And the wobble amplitude is a multiple of the stroke width rather
+    # than 8% of the figure, which for these circles is a smaller displacement.
+    # The group's position is unmoved for the third engine running.
+    assert digest == "925d202d66e4e5b5e3e0b0c90d2aef9f5e64d47c8a1487eac35a9e3e2ebe5c0a"
 
 
 def test_every_emitted_number_sits_on_the_master_grid():

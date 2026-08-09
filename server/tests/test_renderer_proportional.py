@@ -17,7 +17,7 @@ from inku_server.renderer import (
     AMPLITUDE_CLAMP_RATIO,
     MATERIAL_INTENSITY,
     MATERIAL_INTENSITY_LEVEL,
-    AMPLITUDE_RATIO,
+    AMPLITUDE_WIDTHS,
     BLUR_RATIO,
     SEGMENT_COUNT_MAX,
     SEGMENT_COUNT_MIN,
@@ -25,6 +25,7 @@ from inku_server.renderer import (
     STYLE_TO_DASH,
     WEIGHT_TO_STROKE_WIDTH,
     _amplitude_px,
+    _clamped_representative_px,
     _material_outline_profile,
     _performance_touch_filter,
     _segment_count,
@@ -74,38 +75,80 @@ def _max_radial_deviation(svg: str, r: float) -> float:
 
 
 # --------------------------------------------------------------------------- #
-# 1. 振幅が図形寸法に比例する                                                   #
+# 1. 振幅が痕の線幅に比例する (engine 28)                                       #
 # --------------------------------------------------------------------------- #
-def test_amplitude_px_is_exactly_proportional_to_representative_size():
-    """振幅そのものは代表寸法に厳密比例する (語彙 → 物理量の定義)。"""
+def test_amplitude_px_is_exactly_proportional_to_stroke_width():
+    """振幅そのものは線幅に厳密比例し、図形の大きさでは動かない。
+
+    engine 27 まで、この場所は「代表寸法への厳密比例」を守っていた
+    (test_amplitude_px_is_exactly_proportional_to_representative_size)。物差しが
+    入れ替わったことが記録に残るよう、同じ場所で逆向きの性質を見る。
+    """
     variation = Variation(
         amplitude="medium", frequency="medium", quality="wave", dimensions=["radius"]
     )
     small = _circle_score(0.1).instructions[0]
     large = _circle_score(0.2).instructions[0]
     assert _amplitude_px(variation, small, SQUARE) == pytest.approx(
-        AMPLITUDE_RATIO["medium"] * 100.0
+        AMPLITUDE_WIDTHS["medium"] * _stroke_width_px("pen", SQUARE)
     )
-    assert _amplitude_px(variation, large, SQUARE) == 2 * _amplitude_px(
-        variation, small, SQUARE
+    # 図形が 2 倍になっても振幅は動かない (engine 27 ではここが 2 倍だった)。
+    assert _amplitude_px(variation, large, SQUARE) == pytest.approx(
+        _amplitude_px(variation, small, SQUARE)
     )
+
+
+def test_amplitude_px_follows_the_tool_and_the_thinness():
+    """同じ図形でも、道具が変われば・細く引けば振幅が変わる。
+
+    線幅を決める 2 つの入力 (weight / thinness) の両方が振幅へ届いていることを
+    見る。片方だけを配線しても通る検査にしない。
+    """
+    variation = Variation(
+        amplitude="medium", frequency="medium", quality="wave", dimensions=["radius"]
+    )
+
+    def amp(**fields) -> float:
+        ins = Score.model_validate(
+            {
+                "instructions": [
+                    {
+                        "primitive": "circle",
+                        "center": [0.5, 0.5],
+                        "radius": 0.2,
+                        **fields,
+                    }
+                ]
+            }
+        ).instructions[0]
+        return _amplitude_px(variation, ins, SQUARE)
+
+    pen = amp(weight="pen")
+    brush = amp(weight="brush_thick")
+    pen_fine = amp(weight="pen", thinness="fine")
+    assert brush == pytest.approx(
+        pen
+        * WEIGHT_TO_STROKE_WIDTH["brush_thick"]
+        / WEIGHT_TO_STROKE_WIDTH["pen"]
+    )
+    assert pen_fine == pytest.approx(pen * 0.6)
+    assert pen_fine < pen < brush
 
 
 # perlin / white は seed が命令ごとに変わるため雑音の実現値が図形間で異なる。
-# 振幅は厳密比例でも観測される最大変位はばらつくので、決定的な wave だけ
-# 厳密に、雑音系は幅を持たせて検査する。
+# 振幅は厳密に等しくても観測される最大変位はばらつくので、決定的な wave だけ
+# 狭く、雑音系は幅を持たせて検査する。
 @pytest.mark.parametrize(
     ("quality", "tolerance"), [("wave", 0.02), ("perlin", 0.25), ("white", 0.25)]
 )
-def test_closed_contour_amplitude_scales_with_shape_size(
+def test_closed_contour_amplitude_does_not_scale_with_shape_size(
     quality: str, tolerance: float
 ):
-    """図形サイズ 2 倍 → 揺らぎオフセットの絶対量も約 2 倍 (閉輪郭)。
+    """図形サイズ 2 倍でも揺らぎオフセットの絶対量は変わらない (閉輪郭)。
 
-    比は 1 回の演奏では決まらない。最大変位は包絡線の推定量にすぎず、雑音系は
-    引きによって大きく振れる (engine 15 の材料で 8 seed を測ると 1.41〜4.02、
-    engine 16 で 0.92〜2.23)。単一の draw で留めると「たまたま当たった引き」を
-    留めることになるので、seed をまたいだ中央値で見る。
+    engine 27 まではここが「約 2 倍」だった。比は 1 回の演奏では決まらない
+    (最大変位は包絡線の推定量にすぎず、雑音系は引きによって大きく振れる) ので、
+    seed をまたいだ中央値で見る作法はそのまま残す。
     """
     variation = {
         "quality": quality,
@@ -123,11 +166,11 @@ def test_closed_contour_amplitude_scales_with_shape_size(
             render(_circle_score(0.2, **variation), **kwargs), 200.0
         )
         ratios.append(large / small)
-    assert statistics.median(ratios) == pytest.approx(2.0, rel=tolerance)
+    assert statistics.median(ratios) == pytest.approx(1.0, rel=tolerance)
 
 
-def test_open_curve_amplitude_scales_with_shape_size():
-    """開曲線 (arc) でも図形サイズ 2 倍で振幅が約 2 倍になる。"""
+def test_open_curve_amplitude_does_not_scale_with_shape_size():
+    """開曲線 (arc) でも図形サイズ 2 倍で振幅は変わらない。"""
 
     def deviation(radius: float) -> float:
         score = Score.model_validate(
@@ -151,7 +194,7 @@ def test_open_curve_amplitude_scales_with_shape_size():
         )
         return _max_radial_deviation(render(score), radius * 1000.0)
 
-    assert deviation(0.3) / deviation(0.15) == pytest.approx(2.0, rel=0.1)
+    assert deviation(0.3) / deviation(0.15) == pytest.approx(1.0, rel=0.1)
 
 
 def test_amplitude_vocabulary_keeps_its_order():
@@ -253,9 +296,44 @@ def test_large_shape_amplitude_stays_within_clamp():
     assert _max_radial_deviation(svg, r) <= r * AMPLITUDE_CLAMP_RATIO + 1e-6
 
 
-def test_amplitude_ratio_defaults_stay_below_the_clamp():
-    """既定の比率はクランプに触れない (クランプは異常値の保険)。"""
-    assert max(AMPLITUDE_RATIO.values()) < AMPLITUDE_CLAMP_RATIO
+def test_the_clamp_spares_ordinary_figures_and_binds_on_tiny_ones():
+    """クランプは異常値の保険であって、常用域では効かない。
+
+    engine 27 まではここが `max(AMPLITUDE_RATIO) < AMPLITUDE_CLAMP_RATIO` の
+    定数比較だった。物差しが線幅になった今、どちらが効くかは図形の大きさで
+    決まるので、両側を実際に測る。片側だけだと、クランプが常時効いていても
+    ・一度も効かなくても通ってしまう。
+    """
+    variation = Variation(
+        amplitude="broad", frequency="medium", quality="wave", dimensions=["radius"]
+    )
+
+    def parts(radius: float) -> tuple[float, float, float]:
+        ins = Score.model_validate(
+            {
+                "instructions": [
+                    {
+                        "primitive": "circle",
+                        "center": [0.5, 0.5],
+                        "radius": radius,
+                        "weight": "brush_thick",
+                    }
+                ]
+            }
+        ).instructions[0]
+        width = AMPLITUDE_WIDTHS["broad"] * _stroke_width_px("brush_thick", SQUARE)
+        cap = AMPLITUDE_CLAMP_RATIO * _clamped_representative_px(ins, SQUARE)
+        return _amplitude_px(variation, ins, SQUARE), width, cap
+
+    # 常用域 (半径 200px): 線幅の側が効き、クランプには触れない。
+    amp, width, cap = parts(0.2)
+    assert amp == pytest.approx(width)
+    assert width < cap
+
+    # 自分の痕より小さい図形: クランプの側が効く。
+    amp, width, cap = parts(0.004)
+    assert amp == pytest.approx(cap)
+    assert cap < width
 
 
 # --------------------------------------------------------------------------- #

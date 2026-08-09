@@ -214,7 +214,7 @@ def test_variation_is_performed_before_the_stroke(name: str):
 def test_material_outline_and_specks_survive(name: str):
     """材質輪郭・speck は帯と併存する (置き換えられるのは本体の輪郭だけ)。"""
     svg = _render(name, weight="chalk", render_seed=11)
-    assert 'class="material-outline"' in svg
+    assert 'class="material-outline' in svg
     assert "contour-stroke-v1" in svg
     assert svg.count("<circle") >= 2
 

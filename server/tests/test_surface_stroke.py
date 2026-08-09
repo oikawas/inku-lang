@@ -23,6 +23,7 @@ import pytest
 
 import inku_server.renderer as renderer
 import inku_server.stroke_engine as stroke_engine
+from inku_server.render_engines import current_render_engine
 from inku_server.renderer import (
     _point_in_polygon,
     _surface_contour,
@@ -75,6 +76,15 @@ def _normalized_digest(svg: str) -> str:
 
 def _engine_15_cases() -> dict[str, dict]:
     return json.loads(ENGINE_15_MANIFEST.read_text())["cases"]
+
+
+def _current_cases() -> dict[str, dict]:
+    path = (
+        ENGINE_15_MANIFEST.parent.parent
+        / f"render-engine-{current_render_engine().version}"
+        / "manifest.json"
+    )
+    return json.loads(path.read_text())["cases"]
 
 
 def _surface_body(svg: str) -> str:
@@ -168,8 +178,22 @@ def test_s1_performed_surface_reaches_every_hand_tool(texture: str) -> None:
 # --- S-2 陰性: hatch / crosshatch は engine 15 と 1 バイトも変わらない ------ #
 
 
-def test_s2_hatch_and_crosshatch_cases_are_byte_identical_to_engine_15() -> None:
-    """段 1 の帰属の担保。ここが動いたら既に正しかった経路を壊している。"""
+def test_s2_hatch_and_crosshatch_cases_are_not_touched_by_the_surface_stroke() -> None:
+    """段 1 の帰属の担保。ここが動いたら既に正しかった経路を壊している。
+
+    engine 28 で作り直した。ここは engine 15 の凍結バイトを物差しにし、後から載った
+    層（太さの軸）を無効化して比べていた。engine 28 は材質層の作り方と揺らぎの
+    物差しの両方を動かしたので、engine 15 のバイトは実演では二度と再現できない ——
+    **同じやり方を続けるには engine 16〜27 を丸ごと作り直すことになる。**
+
+    **⚠ この半分は検査ではなく焼き直される記録になった。** 帰属を留めていたのは
+    「engine 15 の seed 材料へ戻せば engine 15 のバイトが出る」という装置で、
+    その装置は engine 28 の変更まではカバーできない。engine 15 と 16 の manifest を
+    直接比べても 8 件とも digest が違う（差は太さの軸で、surface のストロークでは
+    ない）ので、版どうしの比較で帰属を言い直すこともできない。
+    **失われた観測点として台帳へ起票すること。** ここは現行コーパスとの一致だけを
+    見る（母集団 8 件の番人としては効く）。
+    """
     cases = _engine_15_cases()
     pinned = sorted(
         case_id
@@ -177,11 +201,11 @@ def test_s2_hatch_and_crosshatch_cases_are_byte_identical_to_engine_15() -> None
         if "surface-" in case_id and ("-hatch-" in case_id or "-crosshatch-" in case_id)
     )
     assert len(pinned) == 8, pinned
-    with _engine_15_seed_material():
-        for case_id in pinned:
-            assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"], (
-                case_id
-            )
+    current = _current_cases()
+    for case_id in pinned:
+        assert _normalized_digest(_replay(cases[case_id])) == current[case_id]["digest"], (
+            case_id
+        )
 
 
 def test_s2_the_other_surface_cases_did_move() -> None:

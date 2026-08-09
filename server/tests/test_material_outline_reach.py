@@ -21,7 +21,13 @@ from xml.etree import ElementTree
 import pytest
 
 from inku_server.plugins.system.canvas_aspect import canvas_size_for_aspect
-from inku_server.renderer import render
+from inku_server.renderer import (
+    MATERIAL_OUTLINE_MAX_WIDTH_RATIO,
+    _MATERIAL_OUTLINE_SPECS,
+    _material_outline_profile,
+    _stroke_width_px,
+    render,
+)
 from inku_server.schema import Score
 
 RENDER_SEED = 12345
@@ -53,8 +59,23 @@ def _svg(primitive: str, weight: str, *, wild: bool = False) -> str:
 
 
 def _outline_nodes(svg: str) -> list[ElementTree.Element]:
+    # engine 28: the class carries a stratum token as well, so the match is on
+    # the token and not on the whole attribute.
     root = ElementTree.fromstring(svg)
-    return [n for n in root.iter() if n.attrib.get("class") == "material-outline"]
+    return [
+        n for n in root.iter()
+        if "material-outline" in (n.attrib.get("class") or "").split()
+    ]
+
+
+def _strata(primitive: str, weight: str) -> set[str]:
+    """The stratum indices present, e.g. {"0", "1"} for the pen's two nibs."""
+    out = set()
+    for node in _outline_nodes(_svg(primitive, weight)):
+        for token in (node.attrib.get("class") or "").split():
+            if token.startswith("stratum-"):
+                out.add(token.removeprefix("stratum-"))
+    return out
 
 
 def _outline_count(primitive: str, weight: str) -> int:
@@ -98,38 +119,36 @@ def test_d6_tools_without_a_material_outline_did_not_gain_one(
     assert _outline_count(primitive, weight) == 0
 
 
-# engine 14 で凍結されていた `square` の材質輪郭。`_render_corner_shape` へ寄せた
-# 副作用で square が動いていないことの恒等検査 (D-7)。
-SQUARE_OUTLINE_DASHES: dict[str, list[str]] = {
-    "pencil": ["1.000000,7.000000", "1.000000,5.000000"],
-    "chalk": [
-        "8.000000,12.000000,1.000000,8.000000",
-        "5.000000,10.000000,1.000000,6.000000",
-    ],
-    "brush_thin": ["22.000000,9.000000", "14.000000,8.000000"],
-    "brush_thick": [
-        "18.000000,7.000000,3.000000,11.000000",
-        "11.000000,9.000000",
-    ],
-    "crayon": [
-        "2.000000,5.000000,9.000000,7.000000",
-        "4.000000,8.000000",
-        "2.000000,5.000000,9.000000,7.000000",
-    ],
+# engine 14 が凍結していた square の dash 表 (`SQUARE_OUTLINE_DASHES`) は engine 28
+# で消えた。装飾は紙の地との接触で切れるものであって規則的な点線ではない、という
+# 作者裁定 (2026-08-09) で `stroke-dasharray` そのものを捨てたためである。
+# 表を消したままにすると「dash が無いこと」を誰も見なくなるので、同じ場所で逆向きの
+# 性質を見る: どの道具の層にも dasharray が無く、層の数は表のままであること。
+SQUARE_OUTLINE_STRATA: dict[str, int] = {
+    "pencil": 2,
+    "chalk": 2,
+    "brush_thin": 2,
+    "brush_thick": 2,
+    "crayon": 3,
 }
 
 
 @pytest.mark.parametrize("weight", FROZEN_MATERIAL_TOOLS)
-def test_d7_square_material_outline_is_unchanged(weight: str) -> None:
-    """D-7 (恒等): square の材質輪郭は本数も dash も engine 14 のまま。"""
-    assert _dashes("square", weight) == SQUARE_OUTLINE_DASHES[weight]
+def test_d7_square_material_outline_carries_no_dash_pattern(weight: str) -> None:
+    """D-7 (裏返し): square の層は dasharray を持たず、層の数は表のまま。"""
+    assert _dashes("square", weight) == [None] * len(_dashes("square", weight))
+    assert len(_strata("square", weight)) == SQUARE_OUTLINE_STRATA[weight]
 
 
 @pytest.mark.parametrize("weight", FROZEN_MATERIAL_TOOLS)
-def test_d7b_square_material_outline_keeps_its_element_type(weight: str) -> None:
-    """D-7 の対: square の層は `<rect>` のまま (演奏由来の polygon になっていない)。"""
+def test_d7b_square_material_outline_is_drawn_from_the_performed_ink(weight: str) -> None:
+    """D-7 の対 (裏返し): square の層は `<polyline>`。
+
+    engine 27 まではここが `<rect>` であることを見ていた —— 幾何の矩形に貼りついて
+    いたということである。演奏された墨から引くようになったので、要素は折れ線になる。
+    """
     tags = {n.tag.rsplit("}", 1)[-1] for n in _outline_nodes(_svg("square", weight))}
-    assert tags == {"rect"}
+    assert tags == {"polyline"}
 
 
 # --- 段 4b: D-8 / D-9 / D-12 -------------------------------------------------
@@ -163,8 +182,13 @@ def test_d9_the_other_tools_did_not_gain_a_material_outline(
     ("line", "arc", "circle", "ellipse", "square", "triangle", "polygon", "cloudform"),
 )
 def test_d12_pen_leaves_two_strata_and_silverpoint_none(primitive: str) -> None:
-    """D-12 (判別): `pen` = 2 本の穂先。`silverpoint` は材質層を持たないので 0 本。"""
-    assert _outline_count(primitive, "pen") == 2
+    """D-12 (判別): `pen` = 2 本の穂先。`silverpoint` は材質層を持たないので 0 本。
+
+    engine 28 で層は接触ごとの断片に割れたので、要素の数では穂先を数えられない
+    (幅でも数えられない —— 上限に触れた道具は 2 本が同じ幅に畳まれる)。
+    層の印で数える。
+    """
+    assert _strata(primitive, "pen") == {"0", "1"}
     assert _outline_count(primitive, "silverpoint") == 0
 
 
@@ -288,3 +312,70 @@ def test_d11_drypoint_burr_is_still_a_single_stratum(primitive: str) -> None:
         drypoint.get(tag, 0) - burin.get(tag, 0) for tag in ("polyline", "polygon")
     )
     assert extra == 1
+
+
+# --- engine 28: トーンは道具自身の痕の一部である ---------------------------
+#
+# 作者裁定 (2026-08-09)「四角の装飾は濃すぎる、道具の性質にあった調整が必要」。
+# 装飾が幾何の側に居たあいだ、痕との関係はたまたま決まるものだったので、表は
+# 絶対値を持っていた。墨に沿うようになって初めて、その値が痕に対して何になるかが
+# 見えた —— brush_thin は層が自分の痕の 0.47 倍 (全道具中いちばん太い)、
+# オフセットが半幅の 1.07 倍 (いちばん近い) だった。
+#
+# **この 2 つの規則を赤くするのは、いまのところ焼き直される digest だけである。**
+# 記録は検査ではないので、肯定形の観測点をここに置く。
+
+MATERIAL_TOOLS = sorted(_MATERIAL_OUTLINE_SPECS)
+
+
+@pytest.mark.parametrize("weight", MATERIAL_TOOLS)
+@pytest.mark.parametrize("thinness", [None, "fine", "extra_fine"])
+def test_no_stratum_is_wider_than_its_share_of_the_tool(weight: str, thinness) -> None:
+    """層は自分の痕の 0.33 倍より太くならない。
+
+    上限が読むのは**公称の**線幅である。トーンの太さは道具自身の粗さで、細く
+    引いても紙の目や粉の粒は細らない (`test_material_outline_absolute_widths_do_not_move`)。
+    """
+    nominal = _stroke_width_px(weight, CANVAS)
+    for _, width, _, _ in _material_outline_profile(weight, CANVAS, thinness):
+        assert width <= nominal * MATERIAL_OUTLINE_MAX_WIDTH_RATIO + 1e-9, (weight, width)
+
+
+def test_the_width_cap_actually_binds_on_the_tool_it_was_set_for() -> None:
+    """上限が空振りでないこと。
+
+    どの道具も上限に触れていなければ、この規則は書いてあるだけで何もしていない。
+    触れるのは brush_thin と chalk で、他は元から下に居る (裁定の材料に載せた表)。
+    """
+    at_cap = {
+        weight
+        for weight in MATERIAL_TOOLS
+        for _, width, _, _ in _material_outline_profile(weight, CANVAS)
+        if abs(width - _stroke_width_px(weight, CANVAS) * MATERIAL_OUTLINE_MAX_WIDTH_RATIO) < 1e-9
+    }
+    assert {"brush_thin", "chalk"} <= at_cap, at_cap
+
+
+@pytest.mark.parametrize("weight", MATERIAL_TOOLS)
+@pytest.mark.parametrize("thinness", [None, "fine", "extra_fine"])
+def test_no_stratum_sits_inside_the_mark(weight: str, thinness) -> None:
+    """層の中心は痕の内側に来ない。
+
+    内側にある層はトーンになりようがなく、痕を太らせるだけである。ここが読むのは
+    **実際の**線幅 —— どこに置くかは実際の痕に対する問いだからで、太さの側とは
+    読む幅が違う。
+    """
+    half = _stroke_width_px(weight, CANVAS, thinness) / 2.0
+    for offset, _, _, _ in _material_outline_profile(weight, CANVAS, thinness):
+        assert abs(offset) >= half - 1e-9, (weight, thinness, offset, half)
+
+
+def test_the_offset_floor_actually_binds_on_the_tools_it_was_set_for() -> None:
+    """床が空振りでないこと。触れるのは brush_thick と crayon の中の層。"""
+    at_floor = {
+        weight
+        for weight in MATERIAL_TOOLS
+        for offset, _, _, _ in _material_outline_profile(weight, CANVAS)
+        if abs(abs(offset) - _stroke_width_px(weight, CANVAS) / 2.0) < 1e-9
+    }
+    assert {"brush_thick", "crayon"} <= at_floor, at_floor

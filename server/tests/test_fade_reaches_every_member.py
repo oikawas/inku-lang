@@ -56,7 +56,11 @@ ENGINE_23_OUTWARD, ENGINE_23_DIRECTIONAL = 0.40, 0.48
 
 # The last version that froze a body for this case; its digest is still the one
 # engine 23's manifest carries, which is checked in T-11 before it is used.
-ENGINE_23_FADE_BODY = REFERENCE_ROOT / "render-engine-21" / "G-scatter-fade-edge.svg"
+# engine 28 で再取得。材質層の作り方そのものが変わったので (装飾が演奏された墨から
+# オフセットを取り、dasharray を捨てた)、engine 21 が書いた本体との比較は
+# 材質層の差で必ず落ちる。**比べている主張は「fade の段は配置にも筆致にも触れない」**
+# であって版の同一性ではないので、現行版の本体へ据え直す。
+FROZEN_FADE_BODY = REFERENCE_ROOT / "render-engine-28" / "G-scatter-fade-edge.svg"
 
 OPACITY_ATTR = re.compile(r'\s(?:fill|stroke)-opacity="[^"]*"')
 MATERIAL_OUTLINE = re.compile(r"<[^>]*material-outline[^>]*>")
@@ -109,7 +113,7 @@ def _draw(score: dict) -> str:
     )
 
 
-def _draw_as_engine_23(score: dict, monkeypatch) -> str:
+def _draw_as_frozen(score: dict, monkeypatch) -> str:
     """The same drawing with the per-member levels withheld.
 
     Engine 24 is engine 23 plus this one step: with no level on the hint the
@@ -230,12 +234,12 @@ def test_the_surface_texture_does_not_move(monkeypatch):
 
     faded = _draw(score)
     assert "surface_000_000_wash" in faded
-    engine_23 = _draw_as_engine_23(copy.deepcopy(score), monkeypatch)
+    frozen = _draw_as_frozen(copy.deepcopy(score), monkeypatch)
 
-    assert faded != engine_23
+    assert faded != frozen
     # Only the opacity attributes differ -- every coordinate is where engine 23
     # put it, the surface strokes included.
-    assert OPACITY_ATTR.sub("", faded) == OPACITY_ATTR.sub("", engine_23)
+    assert OPACITY_ATTR.sub("", faded) == OPACITY_ATTR.sub("", frozen)
 
 
 # T-4 --------------------------------------------------------------------
@@ -306,7 +310,7 @@ def test_the_two_single_member_exits_cannot_fade(monkeypatch):
     assert all("fade_level=" not in (hint or "") for hint in _hints(score))
     faded = _draw(score)
     assert len(_mark_ceilings(faded)) == 1
-    assert faded == _draw_as_engine_23(copy.deepcopy(score), monkeypatch)
+    assert faded == _draw_as_frozen(copy.deepcopy(score), monkeypatch)
 
 
 # T-7 --------------------------------------------------------------------
@@ -317,7 +321,7 @@ def test_the_two_single_member_exits_cannot_fade(monkeypatch):
         ("pair", {"layout": "scatter", "count": 2}),
     ],
 )
-def test_a_group_that_cannot_fade_is_left_where_engine_23_left_it(
+def test_a_group_that_cannot_fade_is_left_where_frozen_left_it(
     name, changes, monkeypatch
 ):
     """A ring is equidistant from its own centre, and so is a pair. Ranking
@@ -330,7 +334,7 @@ def test_a_group_that_cannot_fade_is_left_where_engine_23_left_it(
     ceilings = set(_mark_ceilings(faded))
     assert len(ceilings) == 1
     assert ceilings.pop() == pytest.approx(ENGINE_23_OUTWARD, abs=5e-5)
-    assert faded == _draw_as_engine_23(copy.deepcopy(score), monkeypatch)
+    assert faded == _draw_as_frozen(copy.deepcopy(score), monkeypatch)
 
 
 # T-8 --------------------------------------------------------------------
@@ -388,23 +392,30 @@ def test_the_hand_does_not_feel_the_level(monkeypatch):
     `color_hint` is the carriage exactly because it is outside
     `_SEED_INSTRUCTION_FIELDS`. Written to a field inside that list, the same
     number would move every performance seed in the group and the coordinates
-    below would move with it. Measured against engine 23's own frozen bytes.
+    below would move with it. Measured against the current corpus's own bytes.
     """
     assert "color_hint" not in renderer._SEED_INSTRUCTION_FIELDS
 
-    manifest = _manifest("23")
-    case = manifest["cases"]["G-scatter-fade-edge"]
+    # engine 28 で据え直した。これは以前 engine 23 の凍結バイトを物差しにし、
+    # 後から載った層 (engine 25 の成員ごとの寸法) を無効化して比べていた。
+    # engine 28 は材質層の作り方と揺らぎの物差しの両方を動かしたので、同じやり方を
+    # 続けるには engine 28 を丸ごと無効化することになる —— それは物差しを作り直す
+    # のと変わらない。**主張は「fade の段は配置にも筆致にも触れない」**なので、
+    # 版を挟まずに fade の入・切そのものを比べる。凍結バイトへの依存が無くなり、
+    # 次の engine でも同じ検査がそのまま効く。
+    case = _manifest("28")["cases"]["G-scatter-fade-edge"]
     generator = _load_generator()
-    engine_23 = ENGINE_23_FADE_BODY.read_text(encoding="utf-8")
-    # The frozen body is engine 23's, even though engine 21 wrote it: the corpus
-    # keeps one body per case, in the version where it last moved.
-    assert generator._normalized_digest(engine_23) == case["digest"]
 
-    _without_member_sizes(monkeypatch)
-    engine_24 = generator.render_case(case["input"])
-    assert engine_24 != engine_23
-    assert D_ATTR.findall(engine_24) == D_ATTR.findall(engine_23)
-    assert OPACITY_ATTR.sub("", engine_24) == OPACITY_ATTR.sub("", engine_23)
+    faded = case["input"]
+    plain = copy.deepcopy(faded)
+    assert plain["score"]["instructions"][0]["arrangement"]["fade"] != "none"
+    plain["score"]["instructions"][0]["arrangement"]["fade"] = "none"
+
+    with_fade = generator.render_case(faded)
+    without_fade = generator.render_case(plain)
+    assert with_fade != without_fade
+    assert D_ATTR.findall(with_fade) == D_ATTR.findall(without_fade)
+    assert OPACITY_ATTR.sub("", with_fade) == OPACITY_ATTR.sub("", without_fade)
 
 
 # T-12 -------------------------------------------------------------------
@@ -466,9 +477,12 @@ def test_a_group_that_declares_no_fade_is_byte_identical(monkeypatch):
     """
     assert all("fade_level=" not in (hint or "") for hint in _hints(_score(fade="none")))
 
-    _without_member_sizes(monkeypatch)
+    # engine 28 で据え直した。無効化していたのは engine 25 の層で、engine 23 の
+    # 凍結バイトを物差しにしていたためである。engine 28 の corpus に対しては
+    # 無効化なしで読む —— **この半分は焼き直される記録であって検査ではない**
+    # （主張そのものは上の 1 行が持っている。件数 35 は母集団の番人として残す）。
     generator = _load_generator()
-    previous = _manifest("23")
+    previous = _manifest("28")
     checked = 0
     for case_id, case in sorted(previous["cases"].items()):
         if not case_id.startswith("G-"):
@@ -479,7 +493,11 @@ def test_a_group_that_declares_no_fade_is_byte_identical(monkeypatch):
         digest = generator._normalized_digest(generator.render_case(case["input"]))
         assert digest == case["digest"], case_id
         checked += 1
-    assert checked == 35
+    # 35 -> 43. engine 23 の corpus を読んでいたのを engine 28 のものへ据え直した
+    # ので母集団が増えた (engine 24〜28 が足した G の case のうち fade を宣言しない
+    # もの)。**数える番人としての役目は変わらない** —— 読み手が大半を落としても
+    # 通ってしまうことを防ぐために置いてある。
+    assert checked == 43
 
 
 # T-15 -------------------------------------------------------------------

@@ -20,7 +20,10 @@ _ARC_RE = re.compile(
 )
 
 
-_MATERIAL_OUTLINE_ELEMENT = re.compile(r'<[a-z]+[^>]*class="material-outline"[^>]*/>')
+# engine 28 appends a stratum token to the class, so the match is on the token.
+_MATERIAL_OUTLINE_ELEMENT = re.compile(
+    r'<[a-z]+[^>]*class="material-outline(?: [^"]*)?"[^>]*/>'
+)
 
 
 def _arc_paths(svg: str) -> list[tuple]:

@@ -104,6 +104,18 @@ GEOMETRY: dict[str, dict] = {
 }
 
 
+def _angle_moved_case(previous: dict, current: dict) -> str:
+    """One G case the angle rule does reach, as the positive control."""
+    moved = sorted(
+        case_id
+        for case_id in previous
+        if case_id.startswith("G-")
+        and previous[case_id]["digest"] != current[case_id]["digest"]
+    )
+    assert moved, "engine 26 moved no G case; the control would be vacuous"
+    return moved[0]
+
+
 def _manifest(version: str) -> dict:
     path = REFERENCE_ROOT / f"render-engine-{version}" / "manifest.json"
     return json.loads(path.read_text(encoding="utf-8"))
@@ -479,18 +491,31 @@ def test_engine_25s_own_drawings_replay_unchanged(monkeypatch):
     ]
     assert len(sized) == 38
 
+    # engine 28 で作り直した。ここは engine 25 の凍結バイトを物差しにし、engine 27 が
+    # 動かした寸法の振幅だけを戻して比べていた。engine 28 は材質層の作り方も揺らぎの
+    # 物差しも動かしたので、同じやり方を続けるには engine 27 を丸ごと作り直すことに
+    # なる —— **無効化した層は物差しではない**。
+    #
+    # 主張そのもの（角度の規則はこれらの case に届かない）は版を挟まずに言える。
+    # 角度の規則を止めた絵と動かした絵を比べればよい。凍結バイトへの依存が無くなり、
+    # 次の engine でも同じ検査がそのまま効く。
+    control = _angle_moved_case(previous, current)
+    with_angle = {
+        case_id: generator.render_case(previous[case_id]["input"])
+        for case_id in replayed + [control]
+    }
     for weight, grammar in GRAMMARS.items():
-        if grammar.group_hand > 0.0:
-            monkeypatch.setitem(
-                GRAMMARS, weight, dataclasses.replace(grammar, group_hand=ENGINE_25_SIZE)
-            )
-    # Not a free pass: the angle amplitude is still the one the tree states, so
-    # a rule that started turning any of these would redden the loop below.
-    assert GRAMMARS["pen"].group_rot == AMPLITUDE
-
+        monkeypatch.setitem(GRAMMARS, weight, dataclasses.replace(grammar, group_rot=0.0))
+    without_angle = {
+        case_id: generator.render_case(previous[case_id]["input"])
+        for case_id in replayed + [control]
+    }
     for case_id in replayed:
-        svg = generator.render_case(previous[case_id]["input"])
-        assert generator._normalized_digest(svg) == previous[case_id]["digest"], case_id
+        assert with_angle[case_id] == without_angle[case_id], case_id
+    # Not a free pass: a case the angle rule does reach has to move when it is
+    # switched off, or the loop above would pass on a renderer that no longer
+    # turns anything at all.
+    assert with_angle[control] != without_angle[control], control
 
 
 # T-12 --------------------------------------------------------------------

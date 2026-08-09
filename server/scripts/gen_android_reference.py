@@ -738,7 +738,7 @@ def proportional_fixtures() -> None:
 
     out: dict = {
         "constants": {
-            "AMPLITUDE_RATIO": renderer.AMPLITUDE_RATIO,
+            "AMPLITUDE_WIDTHS": renderer.AMPLITUDE_WIDTHS,
             "BLUR_RATIO": renderer.BLUR_RATIO,
             "BLUR_MIN_RATIO": renderer.BLUR_MIN_RATIO,
             "REPRESENTATIVE_MIN_RATIO": renderer.REPRESENTATIVE_MIN_RATIO,

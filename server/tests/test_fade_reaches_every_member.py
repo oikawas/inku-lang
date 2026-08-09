@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import inspect
 import json
 import math
 import pathlib
@@ -479,3 +480,41 @@ def test_a_group_that_declares_no_fade_is_byte_identical(monkeypatch):
         assert digest == case["digest"], case_id
         checked += 1
     assert checked == 35
+
+
+# T-15 -------------------------------------------------------------------
+def test_the_corpus_holds_a_ramped_group_and_two_that_cannot_fade():
+    """The bake asks the corpus what the weak guard cannot ask it.
+
+    T-9 withholds the declaration, and engine 23 already drew that difference
+    with one constant for the whole group -- so a renderer carrying no
+    per-member ceiling passes it. This is the other half: some drawn fading
+    group has to hold distinct levels, and the two degenerate ones none.
+    Author ruling A on ledger I-166, 2026-08-09.
+    """
+    generator = _load_generator()
+    inputs = generator.build_inputs()
+    assert set(generator.DEGENERATE_FADE_CASES) <= set(generator.FADE_CASES)
+    generator._assert_fade_reaches_every_member(inputs)
+
+    # The question has something to bite on: not every case is degenerate.
+    assert len(generator.DEGENERATE_FADE_CASES) < len(generator.FADE_CASES)
+
+
+# T-16 -------------------------------------------------------------------
+def test_the_bake_runs_every_discriminating_guard_it_defines():
+    """A guard nobody calls is a guard that cannot fail.
+
+    The four live in the generator and are wired into `generate` by hand, and
+    removing one line there would leave every test above green while the corpus
+    went back to being baked unasked.
+    """
+    generator = _load_generator()
+    body = inspect.getsource(generator.generate)
+    for name in (
+        "_assert_fade_cases_discriminate",
+        "_assert_fade_reaches_every_member",
+        "_assert_size_cases_discriminate",
+        "_assert_angle_cases_discriminate",
+    ):
+        assert f"{name}(inputs)" in body, name

@@ -283,6 +283,50 @@ def test_t9_coerce_is_a_fixed_point_for_a_color_it_delivers() -> None:
     assert second.model_dump(mode="json", by_alias=True) == first.model_dump(mode="json", by_alias=True)
 
 
+# T-10 (ddl-engine 9): one stroke is promoted once, so no table decides a winner.
+
+
+def test_t10_a_stroke_already_carrying_a_requested_color_is_not_taken_for_another() -> None:
+    # Three colors are asked for and one group carries all of them. An
+    # instruction has a single primary stroke, so promoting twice would undo the
+    # first promotion and leave whichever color `_color_repair_order` happens to
+    # name last -- a ranking, from a table that is only a known order.
+    score = Score.model_validate(
+        {
+            "instructions": [
+                {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.18, 0.08], "color": "gray"},
+            ],
+        }
+    )
+
+    fixed = coerce_score(score, ddl="青い夜の森に赤い落ち葉を散らす。")
+
+    marked = fixed.instructions[0]
+    assert marked.arrangement is not None
+    assert marked.arrangement.color_cycle == ["gray", "red", "blue", "green"]
+    assert (marked.note or "").count("promoted to primary stroke") == 1
+    assert marked.color == "red"
+
+
+def test_t10_no_corpus_instruction_is_promoted_twice() -> None:
+    """The census runs on the corpus, not the golden set, because a note is a
+    record of having been touched and not of who touched it. The golden H-* cases
+    replay saved works whose scores were written by an older coerce, so their
+    *inputs* already carry promotion notes -- H-07's first instruction arrives
+    with four. Counting those would measure the history the input brought with
+    it. The corpus inputs are synthetic and carry no note at all.
+    """
+    seen = 0
+    for path in sorted(COERCE_CORPUS.glob("*.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for index, instruction in enumerate((document.get("score") or {}).get("instructions") or []):
+            note = instruction.get("note") or ""
+            count = note.count("promoted to primary stroke")
+            seen += count
+            assert count <= 1, f"{path.name} instruction {index}: {note}"
+    assert seen > 0, "no promotion anywhere in the corpus; this census stopped measuring"
+
+
 # T-8: control. The color-only path is not part of this change.
 
 

@@ -258,7 +258,14 @@ FRAME_HI = 0.98
 # while a small one stayed on it, because the same 8% of a radius is invisible
 # under a brush and a different line under a pencil. The vocabulary is unchanged
 # (fine/medium/broad); only the ruler the words are read against moved.
-AMPLITUDE_WIDTHS: dict[str, float] = {"fine": 0.35, "medium": 0.9, "broad": 2.0}
+AMPLITUDE_WIDTHS: dict[str, float] = {"fine": 0.35, "medium": 0.6, "broad": 2.0}
+
+# The material layer is a tone beside the mark, not a second mark: no stratum may
+# be wider than this share of the tool's own stroke. The tools that already state
+# their strata as a ratio chose 0.20-0.28, and the absolute ones land between
+# 0.17 and 0.47; the cap is set where pencil and chalk already sit, so it moves
+# the two outliers and leaves the rest untouched (author's ruling, 2026-08-09).
+MATERIAL_OUTLINE_MAX_WIDTH_RATIO = 0.33
 FREQUENCY_CYCLES: dict[str, float] = {"slow": 2.0, "medium": 6.0, "high": 14.0}
 
 # 滲む (quality=pink): feGaussianBlur の stdDeviation も代表寸法比
@@ -4510,15 +4517,33 @@ def _material_outline_profile(
     base_width = _stroke_width_px(weight, canvas, thinness)
     offset_gain = _material_gain("outline_offset")
     opacity_gain = _material_gain("outline_opacity")
-    return [
-        (
-            _outline_offset_px(offset * scale * offset_gain, canvas),
+    half = base_width / 2.0
+    out = []
+    for offset, abs_width, width_ratio, opacity, dash in spec:
+        # engine 28: both of these are read against the tool's own mark now.
+        # While the layer sat on the ideal geometry its distance to the band was
+        # incidental, so the table could carry absolute numbers and nobody saw
+        # what they came to beside the ink. Riding the band, two of them showed:
+        # brush_thin's second stratum was 0.47 of its own mark (the widest of any
+        # tool) and sat 1.07 half-widths out (the closest), so the tone read as a
+        # second mark rather than as tone. Author's ruling: fit the tool.
+        width = min(
             abs_width * scale + base_width * width_ratio,
-            _outline_opacity(opacity * opacity_gain),
-            _scale_dash(dash, scale),
+            base_width * MATERIAL_OUTLINE_MAX_WIDTH_RATIO,
         )
-        for offset, abs_width, width_ratio, opacity, dash in spec
-    ]
+        placed = _outline_offset_px(offset * scale * offset_gain, canvas)
+        # A stratum centred inside the mark cannot be tone beside it; it only
+        # thickens the mark. Put it on the edge and let the wander take it out.
+        placed = math.copysign(max(abs(placed), half), placed)
+        out.append(
+            (
+                placed,
+                width,
+                _outline_opacity(opacity * opacity_gain),
+                _scale_dash(dash, scale),
+            )
+        )
+    return out
 
 
 def _speck_profile(

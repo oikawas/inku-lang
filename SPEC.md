@@ -190,8 +190,16 @@ A catalog holds exactly three achromatic and seven chromatic `palette` colors, s
 a description that asks for a band is answered from that band rather than from
 the nearest hue the catalog happened to hold.  One band is left empty on
 purpose: `sea_stone` holds no purple and answers with its `Night Sea`, which is
-also its blue.  A retired catalog id resolves to nothing rather than to the
-default, and a stored work naming one is drawn with the default catalog.  The Build 265 review leaves
+also its blue.  **From v2.11.11 the canonical colors for redrawing a stored
+work are the ones the work itself recorded**: when a request names a work (the
+`work_id` field of `/api/render-svg` and `/api/render-score`, or the CLI's
+`--from-work`), the server draws from that row's `render_color_map` and never
+reads today's definition of the catalog.  **A renamed catalog and a retired one
+both draw** this way, because the id is never resolved and so cannot answer 422.
+An older work that recorded no colors falls back to the current definition, and
+that fallback does not answer 422 either.  A request that names no work behaves
+as before: a retired catalog id resolves to nothing rather than to the
+default, so a drawing that asks for one is drawn with the default catalog.  The Build 265 review leaves
 `open_air_light`, `dye_earth`, and `desert_mineral` (retired in v2.9.14) as
 known tuning targets:
 their dark backgrounds, high-chroma accents, or paper/sand tones can dominate

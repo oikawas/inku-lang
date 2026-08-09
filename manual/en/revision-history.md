@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-09 — v2.11.11 unreleased baseline (Web Build 867)
+
+The 13 places that name a version were updated to v2.11.11 / Build 867, and **two passages changed**.
+
+- **One paragraph was added to `Creating Images` §7.** **Redrawing an older work now draws it in the colors it was drawn in, not in today's definition of its catalog.** It still draws if the catalog has been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries `Retired` when the catalog is gone, and `No record of its colors` for an older work that has none.
+- **One flag was added to "Performance and color" in the `inku-cli Reference`** — `--from-work WORK_ID`. It is for `render-score` only and draws in the colors that work was drawn in. It cannot be combined with `--color-catalog` / `--catalog-id`.
+- **Nothing changed in how a new work is painted.** Only the source of the colors for a redraw moved.
+
 ## 2026-08-09 — v2.11.10 unreleased baseline (Web Build 866)
 
 The 13 places that name a version were updated to v2.11.10 / Build 866. **No manual text changed** — no screen action, CLI flag, setting or response key moved.

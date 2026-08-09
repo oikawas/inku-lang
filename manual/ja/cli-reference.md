@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、一般ユーザー、グループリード、管理者それぞれの権限判定はサーバーが行います。
 
-対象はinku v2.11.10（Web Build 866）です。
+対象はinku v2.11.11（Web Build 867）です。
 
 ## 基本操作
 
@@ -82,6 +82,7 @@ paintとbatchは同じ旗を受け取ります。**旗を書かなければサ�
 | `--color-catalog ID` | サーバーの色カタログID |
 | `--catalog-id ID` | `--color-catalog` の旧名 |
 | `--catalog-mode {fixed,auto,random}` | `fixed` は `--color-catalog` を使う、`auto` はサーバーが記述を読んで選ぶ、`random` は `--color-catalog` 以外から引く |
+| `--from-work WORK_ID` | `render-score` 専用。**その作品が描かれた当時の色で描く**（カタログの今日の定義ではなく、作品の行に記録された色を使う）。**改名・引退したカタログの作品も描ける。**`--color-catalog` / `--catalog-id` とは併用できない |
 | `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}` | キャンバスの比率 |
 
 ### seed と再現

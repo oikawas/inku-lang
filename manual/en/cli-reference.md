@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions of regular users, group leads, and administrators.
 
-It covers inku v2.11.10 (Web Build 866).
+It covers inku v2.11.11 (Web Build 867).
 
 ## Basics
 
@@ -82,6 +82,7 @@ paint and batch take the same flags. **A flag you omit falls back to the server 
 | `--color-catalog ID` | Server color catalog id |
 | `--catalog-id ID` | Legacy alias for `--color-catalog` |
 | `--catalog-mode {fixed,auto,random}` | `fixed` uses `--color-catalog`, `auto` lets the server read the description and pick, `random` draws one other than `--color-catalog` |
+| `--from-work WORK_ID` | `render-score` only. **Draws in the colors that work was drawn in** — the colors recorded on the work's own row, not today's definition of its catalog. **A work whose catalog was renamed or retired still draws.** Cannot be combined with `--color-catalog` / `--catalog-id` |
 | `--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}` | Canvas aspect ratio |
 
 ### Seeds and replay

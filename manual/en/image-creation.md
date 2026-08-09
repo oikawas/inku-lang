@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.11.10 (Web Build 866). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.11.11 (Web Build 867). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -161,6 +161,8 @@ The button row on the describe tab applies to the next painting. It is identical
 One model can serve both stages, or each stage can have its own. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately.
 
 The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. The choice is saved per user.
+
+A work records the colors it was drawn in on its own row. **Redrawing an older work therefore draws it in those colors, not in today's definition of its catalog.** It still draws if the catalog has since been renamed, and it still draws if the catalog has been retired. The catalog name in the status area carries a note in those cases: `Retired` when the catalog is gone, and `No record of its colors` for an older work that has no recorded colors — that one is drawn from the current definition.
 
 `Wild` off is the predictable standard; on, the strokes break, curl, and overlap freely. It applies to the whole work, is recorded on it, and replays.
 

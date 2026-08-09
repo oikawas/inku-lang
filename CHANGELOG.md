@@ -4657,3 +4657,43 @@ terminology is wrong" kept happening.
   red, so the gate is not weaker. **The deterministic layers and `web/`, `cli/`, `shared/`, `server/src`,
   `android/app` did not move by a single byte**
 - **No version bump** — no version number, API field name, screen, or drawn mark changes
+
+### v2.11.11 — A work remembers its own colors (Build 867, 2026-08-09)
+
+**A redraw sent the stored catalog id to the server, and the server looked up today's definition to
+decide the colors.** So **changing a catalog silently repainted every work that named it**
+(ledger [I-123]). **1,274 of the 2,769 works in production (46.0%)** were in that group.
+
+- **The canonical colors moved from the catalog id to the record the work carries.** When a request
+  names a work (**`work_id`** on `/api/render-svg` and `/api/render-score`, **`--from-work`** in the
+  CLI), the server draws from that row's `render_color_map` and **never reads today's definition**
+- **A renamed catalog and a retired one now both draw** — this path never resolves the id, so an id
+  no current build knows **no longer answers 422**. An older work that recorded no colors falls back
+  to the current definition, and **that fallback does not answer 422 either** (refusing there would
+  leave exactly the works older than the record unable to be redrawn)
+- **The response says where the colors came from** — `render_color_source` on `/api/render-score`,
+  and two headers on `/api/render-svg` because its body is the SVG (`X-Inku-Color-Source` and
+  `X-Inku-Color-Catalog-Id`). **The second one exists because a caller that names a work names no
+  catalog, and would otherwise have no way to learn which catalog drew the picture**
+- **The nameplate shows the current name**, with `Retired` for a catalog that is gone and
+  `No record of its colors` for an older work that carries none. **It never falls back to the default
+  name**, which would read as "this was drawn with a different catalog"
+- **57 nameplates covering 10 renamed pairs are corrected at startup** (the `catalog_id` column only).
+  **⚠ `render_color_catalog_id` is left alone** — that id is not only a nameplate but **a seed for the
+  color assignment** (`_WORK_COLOR_SEED_FIELDS`), so **rewriting it changes which colors are chosen
+  even when `render_color_map` is byte-identical**. Measured across 200 seeds, all ten pairs disagreed
+  on 38–70% of them. **The two columns therefore disagree on 57 rows, and the drawing is unchanged
+  because `render_color_catalog_id` is the one that wins**
+- **The path for new drawings did not move by a line** (`/api/paint`, `/api/compose`), and no color
+  was pushed to the clients — neither web nor the CLI assembles colors and sends them
+- **⚠ Perturbation P-2, the one the contract named, turned nothing red** — it edits a catalog's `map`,
+  and **the values in `map` do not reach the drawing** (`_work_color_assignment` picks from the
+  `palette:` entries; `map` is only the fallback for a band with no candidate). **The discrimination
+  is established another way**: a work with a record holds still while its catalog is repainted, and
+  the path with no work reference moves under the same repaint — a green pair in opposite directions.
+  **P-1 showed the reverse** (cutting the wiring turned 7 red while the no-reference control stayed green)
+- **Checks:** **server pytest 2,561 passed / 31 skipped** (**+33**, 0 red, 0 deleted), **cli 188**
+  (+6), **web `test:unit` 123** (+6), ruff clean (server and cli), `npm run check` 0 errors,
+  `lint:i18n` 0 errors, `check_docs.py` green, **frozen corpora byte-identical** (no deterministic
+  layer was touched). **Thirteen perturbations** (the contract's seven plus six the implementation
+  added). **One miss, P-2, for the reason above**

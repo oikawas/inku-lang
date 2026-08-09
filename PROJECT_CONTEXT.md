@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.11.10 / Build 866**
+**Target version: v2.11.11 / Build 867**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -150,9 +150,10 @@ The fill rate of an optional field **depends on its declaration order** in the t
 declared last are filled more often.
 - **coerce** — split into `normalize` and `compose`.
 Invalid values prefer drop-only handling, and no house style is injected.
-- **Render Engine 25** — the SVG performance.
+- **Render Engine 27** — the SVG performance.
 It carries closed-shape outlines and fills, arcs, the material layer, ground resistance, and master
 grid quantization of coordinates.
+Each member of a group holds a size (±35%) and a turn (±27°) of its own.
 **A fill sits on an underlay that holds the field as a real element, and what sits on top splits at
 coverage 0.2 into scan lines and rubbings.**
 
@@ -171,6 +172,11 @@ no layer of the drawing, and are greyed in the editors
 - 13 color catalogs (`color_catalogs.py`; every catalog carries all 9 colors) plus "from the
 description", canvas ratios, and display mode. The catalog selection is stored per
 user on the server
+- **The canonical colors for redrawing a stored work are the `render_color_map` the work recorded.**
+When a request names a work (`work_id`), the server draws from that row and never reads today's
+definition of the catalog. **A renamed catalog and a retired one both draw**, and an older work with
+no record falls back to the current definition. The catalog name is shown under its current name,
+with a note when it is retired or when the work holds no record of its colors
 - Per-user history, stars, revision marks, comments, trash, search, lineage groups, and explicit lineage
 nodes and edges.
 The two marks are independent: filtering on both shows only the works that carry both

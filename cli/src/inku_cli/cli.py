@@ -2889,6 +2889,15 @@ def command_render_score(args: argparse.Namespace) -> int:
         raise CliError("score must be valid JSON") from exc
     if not isinstance(score, dict):
         raise CliError("score JSON must be an object")
+    ddl_text = getattr(args, "ddl_text", None)
+    ddl_file = getattr(args, "ddl_file", None)
+    if ddl_text is not None and ddl_file is not None:
+        raise CliError("--ddl-text and --ddl-file cannot be used together")
+    ddl = (
+        _read_text_argument(ddl_text, ddl_file)
+        if ddl_text is not None or ddl_file is not None
+        else None
+    )
     from_work = getattr(args, "from_work", None)
     # Without --from-work the CLI names the catalog, as it always has. With it
     # the work names it, and asking for one here would only be able to fail:
@@ -2897,65 +2906,60 @@ def command_render_score(args: argparse.Namespace) -> int:
     color_catalog = None if from_work else _resolved_color_catalog(args, config, _fetch_color_catalogs(client))
     if from_work and (args.color_catalog or args.catalog_id):
         raise CliError("--from-work draws in the work's own colors; do not also name a catalog")
-    svg, response = client.request_raw(
-        "POST",
-        "/api/render-svg",
-        data={
-            "score": score,
-            "work_id": from_work,
-            "catalog_id": color_catalog,
-            "canvas_aspect": args.canvas_aspect,
-            "svg_profile": args.svg_profile,
-            "render_seed": args.render_seed,
-            # Since render engine 23 this seed decides the placement, so it has to be sent
-            # and not only recorded: the metadata and the render hash below both name it,
-            # and without this line they would name a seed the picture was not drawn with.
-            "composition_seed": args.composition_seed,
-        },
-        headers={"Accept": "image/svg+xml,text/plain,*/*"},
+    request_data = {
+        "score": score,
+        "work_id": from_work,
+        "catalog_id": color_catalog,
+        "canvas_aspect": args.canvas_aspect,
+        "svg_profile": args.svg_profile,
+        "render_seed": args.render_seed,
+        # Since render engine 23 this seed decides placement, so the request and
+        # the metadata returned by the server must name the same value.
+        "composition_seed": args.composition_seed,
+    }
+    if ddl is not None:
+        request_data["ddl"] = ddl
+    try:
+        rendered, _ = client.request("POST", "/api/render-score", data=request_data)
+    except CliError as exc:
+        raise CliError("the server must answer POST /api/render-score") from exc
+    if not isinstance(rendered, dict):
+        raise CliError("/api/render-score did not return an object")
+    required = (
+        "score",
+        "svg",
+        "render_hash",
+        "render_hash_short",
+        "render_build_number",
+        "render_engine_id",
+        "render_engine_version",
+        "render_color_catalog_id",
+        "render_color_source",
+        "render_canvas_aspect",
+        "render_canvas_aspect_id",
+        "render_canvas_aspect_ratio",
+        "render_seed",
     )
-    svg = svg.decode("utf-8")
-    # The server decided the catalog when --from-work was given, so read it back
-    # rather than repeating what was asked for: the render hash below names it,
-    # and the two must be the same id or the hash describes another picture.
-    color_source = response.headers.get("X-Inku-Color-Source") or "catalog"
-    color_catalog = response.headers.get("X-Inku-Color-Catalog-Id") or color_catalog
-    # The server drew this SVG, so the server names the versions it drew with.
-    # These three used to be a literal "2", a literal "default", and the build
-    # number of whatever checkout the CLI happened to be run from. The engine
-    # has since gone from 2 to 22 and the literal never followed, so every
-    # artifact this command wrote claimed an engine twenty versions old; and a
-    # CLI pointed at pentala recorded the Mac's build number for a drawing the
-    # Mac did not make. Every other command already reads these off the
-    # response it got back.
-    server_versions = _server_render_versions(client)
-    render_build_number = server_versions["build_number"]
-    render_hash = _render_hash_for_score(
-        score,
-        render_seed=args.render_seed,
-        composition_seed=args.composition_seed,
-        render_build_number=render_build_number,
-        render_engine_id=server_versions["render_engine_id"],
-        render_engine_version=server_versions["render_engine_version"],
-        render_color_catalog_id=color_catalog,
-    )
+    missing = [key for key in required if rendered.get(key) is None]
+    if missing:
+        raise CliError(f"/api/render-score did not report {', '.join(missing)}")
     result = {
         "status": "ok",
-        "score": score,
-        "svg": svg,
-        "render_hash": render_hash,
-        "render_hash_short": render_hash[-4:].upper(),
-        "render_build_number": render_build_number,
-        "render_engine_id": server_versions["render_engine_id"],
-        "render_engine_version": server_versions["render_engine_version"],
-        "render_color_catalog_id": color_catalog,
-        "render_color_source": color_source,
+        "score": rendered["score"],
+        "svg": rendered["svg"],
+        "render_hash": rendered["render_hash"],
+        "render_hash_short": rendered["render_hash_short"],
+        "render_build_number": rendered["render_build_number"],
+        "render_engine_id": rendered["render_engine_id"],
+        "render_engine_version": rendered["render_engine_version"],
+        "render_color_catalog_id": rendered["render_color_catalog_id"],
+        "render_color_source": rendered["render_color_source"],
         "work_id": from_work,
-        "render_canvas_aspect": args.canvas_aspect,
-        "render_canvas_aspect_id": args.canvas_aspect,
-        "render_canvas_aspect_ratio": _canvas_aspect_ratio(args.canvas_aspect),
-        "render_seed": args.render_seed,
-        "composition_seed": args.composition_seed,
+        "render_canvas_aspect": rendered["render_canvas_aspect"],
+        "render_canvas_aspect_id": rendered["render_canvas_aspect_id"],
+        "render_canvas_aspect_ratio": rendered["render_canvas_aspect_ratio"],
+        "render_seed": rendered["render_seed"],
+        "composition_seed": rendered.get("composition_seed"),
         "svg_profile": args.svg_profile,
     }
     paths = _write_paint_outputs(result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=args.prefix or "score", png=args.png)
@@ -3801,6 +3805,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_server_args(render_score)
     render_score.add_argument("score", nargs="?", help="Score JSON text")
     render_score.add_argument("--file", "-f", help="read Score JSON from a file, or '-'")
+    render_score.add_argument(
+        "--ddl-text",
+        help="hand this DDL to coerce, so DDL-driven repairs run as they do in paint",
+    )
+    render_score.add_argument(
+        "--ddl-file",
+        metavar="PATH",
+        help="hand DDL from a file, or '-' for standard input, to coerce so DDL-driven repairs run",
+    )
     render_score.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     render_score.add_argument("--prefix", help="output filename prefix")
     render_score.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")

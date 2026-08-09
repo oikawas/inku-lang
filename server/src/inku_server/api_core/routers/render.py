@@ -444,6 +444,7 @@ class RenderScoreRequest(BaseModel):
     work_id: str | None = Field(default=None, description="Id of the work being redrawn; its recorded colors decide this render")
     catalog_id: str | None = None
     canvas_aspect: str | None = None
+    svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
     render_seed: int | None = None
     wild: bool = False
     composition_seed: int | None = None
@@ -1663,7 +1664,11 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
         limit_notes: list[str] = []
         with using_limits(limits):
             score = coerce_score(
-                Score.model_validate(req.score), limits=limits, limit_notes=limit_notes
+                Score.model_validate(req.score),
+                # The DDL alone -- see the note at the /api/compose call site.
+                ddl=req.ddl,
+                limits=limits,
+                limit_notes=limit_notes,
             )
         canvas_aspect = _validated_canvas_aspect_override(req.canvas_aspect)
         if canvas_aspect is not None:
@@ -1682,7 +1687,9 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
             "seed_text": seed_text,
             "render_limits": limits_as_dict(limits),
         }
-        svg, render_metadata = _render_with_metadata(score, render_metadata)
+        svg, render_metadata = _render_with_metadata(
+            score, render_metadata, svg_profile=req.svg_profile
+        )
         render_metadata = {
             **render_metadata,
             **_render_hash_metadata(

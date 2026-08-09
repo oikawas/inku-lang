@@ -550,6 +550,7 @@ options:
 ```
 usage: inku-cli render-score [-h] [--base-url BASE_URL]
                              [--timeout-seconds TIMEOUT_SECONDS] [--file FILE]
+                             [--ddl-text DDL_TEXT] [--ddl-file PATH]
                              [--out-dir OUT_DIR] [--prefix PREFIX] [--png]
                              [--svg-profile {display,editable,compat}]
                              [--canvas-aspect CANVAS_ASPECT]
@@ -569,6 +570,10 @@ options:
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
   --file FILE, -f FILE  read Score JSON from a file, or '-'
+  --ddl-text DDL_TEXT   hand this DDL to coerce, so DDL-driven repairs run as
+                        they do in paint
+  --ddl-file PATH       hand DDL from a file, or '-' for standard input, to
+                        coerce so DDL-driven repairs run
   --out-dir OUT_DIR, -o OUT_DIR
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix

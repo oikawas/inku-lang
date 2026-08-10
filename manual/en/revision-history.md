@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-10 — Unreleased v2.11.18 Baseline (Web Build 874)
+
+Updated the 13 places that name a version to v2.11.18 / Build 874. **The manual body is unchanged** — no screen operation, setting, or response key moved.
+
+- **The drawing changes.** When a description names only one color, **that color now goes to every member of a group**. Until now a color the description never named could join the color cycle, so **the named color reached only half the members**.
+- **A description asking for many colors is untouched.** When words such as "colorful" are present, the color cycle stays as it is. The same holds when the description names two or more colors.
+- **The background color does not count as a mark color.** "Fill the background with black. Draw white lines" is read as a description naming one color, white.
+- **`--trace` now works for a batch run with `--input-mode ddl`.** Until now that combination accepted the flag and returned no intermediates, doing nothing silently.
+- **No operation was added.** Neither the way descriptions are written nor any flag changed.
+
 ## 2026-08-09 — v2.11.17 unreleased baseline (Web Build 873)
 
 The 13 places that name a version were updated to v2.11.17 / Build 873. **No manual text changed** — no screen action, CLI flag, setting or response key moved.

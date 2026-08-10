@@ -4995,3 +4995,49 @@ generator's identity guard exits 1, so every push added another red run.
 - **Acceptance reproduced the Linux rebake** — `server` and `shared` were rsynced to `/tmp/opus5-i178/` on
   pentala and the generator run there, with **zero differing entries in `render-engine-29/`** (the deployment
   tree was not touched).
+
+### v2.11.18 — A description that names one color is drawn in one color (Build 874, 2026-08-10, ddl-engine 10)
+
+**[I-173] stage A.** `arrangement.color_cycle` is a pure `cycle[i % len(cycle)]`, so **n colors always
+split the members n ways. A description that names one color still gives that color to half the
+members when the cycle holds two.** This is not the work of giving a description somewhere to state a
+distribution (that is stage B); it removes **a distribution nobody asked for**.
+
+- **A branch was added at coerce's exit** (`without_unrequested_color_cycle`). When the DDL, minus its
+  background clauses, **names exactly one abstract color**, carries **no polychrome phrase**, and the
+  instruction's cycle is **two or more entries holding that color and another**, the cycle **folds to
+  that one color, which is also set as `color`**. **A cycle that never carries the named color is left
+  alone** — that is a failure to deliver, not dilution, and delivery is another layer's work.
+- **There are two exits, so one shared function serves both** (`coerce/__init__.py:88`, the
+  `INKU_COERCE_DISABLE` path, and `:201`, the main one). **No flag says it is fine to hand out a color
+  the description never named**, so this rule holds on that exit for the same reason the hard ceiling does.
+- **⚠ The cycle keeps one entry rather than being emptied.** The contract as issued said to empty it
+  because "the picture is the same", and **that was not true**. `_apply_color_cycle` returns early on
+  `if not cycle`, **skipping the `color_hint` rebuild that follows**. Stored Scores carry old machine
+  notes in `color_hint` (186 of 202 measured), so **emptying the cycle lets a color word inside the note
+  override `color` and the named color disappears** (four works in the area measurement; one went from
+  49.7% to 0.0%). **One entry is not a cycle, and `len(cycle) <= 1` reads that off the Score.**
+- **The Stage 2 prompts, Japanese and English, gained the rule that a description naming one color gets
+  no cycle** (the source is upstream: Stage 2 writes 62.9% of the dilution). **No gate sits here** —
+  the output is not deterministic, so only "it did not fall over" is observable, **which is why the
+  mechanism sits at coerce's exit instead.**
+- **`ddl_engine_version` 9 to 10, and `ddl-engine-10/` was frozen** (34 cases, A 13 / B 21; no byte of
+  `ddl-engine-9/` moved). **⚠ 21 cases differ from the previous version, but only 8 moved their `score`;
+  the other 13 gained the 29th branch's key in `branch_report`.** The golden file has the same shape:
+  **40 cases differ, 13 moved their `score`.**
+- **The two Stage 2 prompts the Kotlin port duplicates were copied over wholesale from the server**
+  (`WebDdlSpec.kt`). **Once the Stage 2 wording moved, `PromptFingerprintTest` was bound to go red** —
+  the fingerprints in `prompts.json` are generated, and a server-side check requires them to match the
+  current server, so **there is no route back to the old fingerprints**.
+  **`android/VERSION` 2.1.4-android.21 to .22** (a namespace separate from the web version).
+- **Checks:** **server 2,661 to 2,679 passed / 31 skipped** (18 added), **ruff clean** for server and cli,
+  **cli 197 passed**, **`check_frozen_corpora.py` byte-identical on darwin**, **Android JVM 263 tests,
+  no failures**, and `check_docs.py` consistent.
+- **⚠ Acceptance found one Android regression.** The completion report had not run Android, and
+  **`PromptFingerprintTest` was red on the merged tree** (44,193 against 44,589). **A contract that says
+  not to touch `android/` does not stop the Kotlin duplicate from falling behind when the server's
+  wording moves.**
+- **⚠ Three perturbations hit nothing and three gates were vacuous, which the implementation found and
+  fixed itself**: T-3's sample named no color at all (condition 1 stopped it first, so condition 2 was
+  never evaluated), T-5's write always agreed with the existing path, and T-6's sample happened to agree
+  with subtracting `background`.

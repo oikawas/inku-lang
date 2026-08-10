@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.11.17 / Build 873**
+**Target version: v2.11.18 / Build 874**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -103,8 +103,8 @@ To learn why something took its current shape, search the changelog by term, ver
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 29 | `server/src/inku_server/render_engines/default.py` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 9 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.21` | `android/VERSION` (a namespace separate from web and server) |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 10 | `server/src/inku_server/layer_versions.py` |
+| Android | `2.1.4-android.22` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -150,6 +150,10 @@ The fill rate of an optional field **depends on its declaration order** in the t
 declared last are filled more often.
 - **coerce** — split into `normalize` and `compose`.
 Invalid values prefer drop-only handling, and no house style is injected.
+**When the description names exactly one abstract color, the color cycle folds to that one color**
+(background clauses do not count, and a polychrome phrase or a cycle without the named color is left
+alone).
+**An even split is a distribution the description never stated, so it is taken back rather than delivered.**
 - **Render Engine 29** — the SVG performance.
 It carries closed-shape outlines and fills, arcs, the material layer, ground resistance, and master
 grid quantization of coordinates.
@@ -246,7 +250,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-29` (549 cases) and `ddl-engine-9` (34 cases) are current, and CI enforces
+`render-engine-29` (549 cases) and `ddl-engine-10` (34 cases) are current, and CI enforces
 byte-identical regeneration.
 - **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
 same way. The port reads the directory for the version it declares, so **raising the server engine

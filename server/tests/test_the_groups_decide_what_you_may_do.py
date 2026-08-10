@@ -185,6 +185,15 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     endpoint/operation/schema counts all stay at 82 through this change, so the
     gate has to name the fields: what left the three user schemas, what arrived,
     and that the other 79 did not move a byte.
+
+    Those 79 are selected BY NAME (2026-08-11). This read `len(everything) == 79`
+    and compared a digest of everything-but-the-three, which measured two claims
+    at once: that the frozen 79 are intact, and that no schema has been added
+    since. The second is not this test's business -- the ACL work added three and
+    turned it red without one of the 79 having moved -- and the frozen file had
+    no name list, so the digest could not be recomputed over the right subset.
+    Selecting by name keeps the real claim and drops the accidental one; a
+    missing name now fails, which the count could not distinguish from a swap.
     """
     # Load the sibling by path rather than by name: the surface is computed in
     # exactly one place, and a copy here would drift from it silently.
@@ -198,8 +207,12 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     before = json.loads(_BEFORE.read_text(encoding="utf-8"))
     after = current_surface()
 
-    others = {k: v for k, v in after["schemas"].items() if k not in _CHANGED_SCHEMAS}
-    assert len(others) == before["unchanged_schema_count"]
+    frozen_names = before["unchanged_schema_names"]
+    assert len(frozen_names) == before["unchanged_schema_count"]
+    missing = [name for name in frozen_names if name not in after["schemas"]]
+    assert not missing, f"schemas that existed before permission groups are gone: {missing}"
+
+    others = {name: after["schemas"][name] for name in frozen_names}
     assert (
         hashlib.sha256(_stable(others).encode()).hexdigest()
         == before["unchanged_schema_digest"]

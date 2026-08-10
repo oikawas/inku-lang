@@ -215,6 +215,53 @@ def test_deleting_a_work_takes_its_guest_list_with_it(world) -> None:
     assert _acl_rows(world.work["id"]) == []
 
 
+# --- stage D: the same list over HTTP ----------------------------------------
+
+
+def test_the_owner_reads_and_writes_the_guest_list_over_http(world) -> None:
+    item_id = world.work["id"]
+    empty = client.get(f"/api/history/{item_id}/acl", headers=world.alice_h)
+    assert empty.status_code == 200, empty.text
+    assert empty.json() == []
+
+    put = client.put(
+        f"/api/history/{item_id}/acl",
+        headers=world.alice_h,
+        json={"entries": [
+            {"subject_type": "user", "subject_id": world.bob["id"], "permission": "read"}
+        ]},
+    )
+    assert put.status_code == 200, put.text
+    assert [(e["subject_id"], e["permission"]) for e in put.json()] == [(world.bob["id"], "read")]
+    assert item_id in _listed_ids(world.bob_h)
+
+    # An empty list is a revocation, not a no-op.
+    cleared = client.put(f"/api/history/{item_id}/acl", headers=world.alice_h, json={"entries": []})
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json() == []
+    assert item_id not in _listed_ids(world.bob_h)
+
+
+def test_a_stranger_gets_the_same_answer_as_for_a_work_that_does_not_exist(world) -> None:
+    """404 rather than 403: a 403 confirms the work exists."""
+    missing = client.get(f"/api/history/{uuid.uuid4()}/acl", headers=world.bob_h)
+    unreadable = client.get(f"/api/history/{world.work['id']}/acl", headers=world.bob_h)
+    assert missing.status_code == unreadable.status_code == 404
+    assert missing.json() == unreadable.json()
+
+
+def test_the_http_route_refuses_a_permission_it_does_not_know(world) -> None:
+    response = client.put(
+        f"/api/history/{world.work['id']}/acl",
+        headers=world.alice_h,
+        json={"entries": [
+            {"subject_type": "user", "subject_id": world.bob["id"], "permission": "delete"}
+        ]},
+    )
+    assert response.status_code == 422, response.text
+    assert _acl_rows(world.work["id"]) == []
+
+
 # --- the default is empty ----------------------------------------------------
 
 

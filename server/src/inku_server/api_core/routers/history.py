@@ -45,6 +45,31 @@ class HistoryForRevisionBody(BaseModel):
     for_revision: bool = False
 
 
+class HistoryAclEntry(BaseModel):
+    """One guest on one work's list."""
+
+    subject_type: Literal["user", "org_group"]
+    subject_id: str = Field(..., min_length=1, max_length=100)
+    permission: Literal["read", "write"]
+
+
+class HistoryAclEntryOut(HistoryAclEntry):
+    id: str
+    history_id: str
+    at: int
+
+
+class HistoryAclBody(BaseModel):
+    """The whole list, not a patch.
+
+    Sending the complete list is what makes revoking expressible: a subject the
+    caller leaves out loses its access. A patch shape would need a separate
+    delete verb, and a client that never learned it would never revoke anything.
+    """
+
+    entries: list[HistoryAclEntry] = Field(default_factory=list, max_length=200)
+
+
 @router.get("/api/history", response_model=HistoryListResponse, response_model_exclude_none=True)
 def api_history_get(
     offset: int = Query(default=0, ge=0),
@@ -306,6 +331,29 @@ def api_history_for_revision(
     if not item:
         raise HTTPException(status_code=404, detail="history item not found")
     return HistoryItem(**item)
+
+
+@router.get("/api/history/{item_id}/acl", response_model=list[HistoryAclEntryOut])
+def api_history_acl_get(item_id: str, actor: dict = Depends(_current_user)) -> list[HistoryAclEntryOut]:
+    entries = _db.list_history_acl(actor["id"], item_id)
+    if entries is None:
+        # 404 rather than 403 throughout: telling a caller who may not see a work
+        # that it exists is itself a disclosure.
+        raise HTTPException(status_code=404, detail="history item not found")
+    return [HistoryAclEntryOut(**entry) for entry in entries]
+
+
+@router.put("/api/history/{item_id}/acl", response_model=list[HistoryAclEntryOut])
+def api_history_acl_put(
+    item_id: str, body: HistoryAclBody, actor: dict = Depends(_current_user)
+) -> list[HistoryAclEntryOut]:
+    try:
+        entries = _db.replace_history_acl(actor["id"], item_id, [e.model_dump() for e in body.entries])
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if entries is None:
+        raise HTTPException(status_code=404, detail="history item not found")
+    return [HistoryAclEntryOut(**entry) for entry in entries]
 
 
 @router.post("/api/history/rebuild-output-files")

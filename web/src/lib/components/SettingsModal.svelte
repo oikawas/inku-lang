@@ -144,6 +144,7 @@
 	};
 
 	type Props = {
+		singleUserMode: boolean;
 		settingsMode: SettingsMode;
 		settingsTab: SettingsTab;
 		stage1Provider: Provider;
@@ -256,6 +257,7 @@
 	};
 
 	let {
+		singleUserMode,
 		settingsMode,
 		settingsTab,
 		stage1Provider,
@@ -1359,8 +1361,13 @@
 				{:else}
 					<div class="user-session-row">
 						<span>{currentUser.username} / {currentUser.role}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
-						<button class="ghost-btn" onclick={onLogout}>{t().logoutButton}</button>
+						{#if !singleUserMode}
+							<button class="ghost-btn" onclick={onLogout}>{t().logoutButton}</button>
+						{/if}
 					</div>
+					{#if singleUserMode}
+						<div class="db-test-result">{t().singleUserPasswordNote}</div>
+					{/if}
 					{#if userSettingsLoading}
 						<div class="inline-message">{t().settingsLoading}</div>
 					{/if}

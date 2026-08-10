@@ -668,6 +668,7 @@ export interface LangPack {
 	userValidationUpdate: string;
 	userPasswordTooShort: string;
 	bootstrapAdminNote: string;
+	singleUserPasswordNote: string;
 	userNamePlaceholder: string;
 	userEmailPlaceholder: string;
 	userPasswordPlaceholder: string;

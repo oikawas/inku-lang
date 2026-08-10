@@ -295,15 +295,24 @@ class ApiClient:
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
             request_headers.setdefault("Content-Type", "application/json")
         if auth:
-            if not self.token:
-                raise CliError("not logged in; run `inku-cli login` first")
-            request_headers["Authorization"] = f"Bearer {self.token}"
+            # Having no stored session is not the same as having no access: a
+            # server in single-user mode answers an unauthenticated request as
+            # the one person it belongs to. Refusing here would decide that on
+            # the client, where the mode is not known. Send it, and turn a 401
+            # back into the old advice where the error is handled below.
+            if self.token:
+                request_headers["Authorization"] = f"Bearer {self.token}"
         req = urllib.request.Request(url, data=body, headers=request_headers, method=method.upper())
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
                 raw = response.read()
                 return raw, response
         except urllib.error.HTTPError as exc:
+            if exc.code == 401 and auth and not self.token:
+                # The server does want to know who this is, and nothing was
+                # stored to tell it. Same advice as before single-user mode
+                # existed -- it is just given after asking, not instead.
+                raise CliError("not logged in; run `inku-cli login` first") from exc
             message = exc.reason
             try:
                 parsed_error = json.loads(exc.read().decode("utf-8"))

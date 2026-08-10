@@ -689,6 +689,7 @@ export const en: LangPack = {
 	userValidationUpdate: 'Enter a username and email address.',
 	userPasswordTooShort: 'Enter a password of at least 8 characters.',
 	bootstrapAdminNote: 'An initial admin is created only for a new DB when INKU_BOOTSTRAP_ADMIN_PASSWORD is set.',
+	singleUserPasswordNote: 'This server signs you in as its own single user. Set a password below before turning single-user mode off, or you will not be able to sign back in.',
 	userNamePlaceholder: 'Username',
 	userEmailPlaceholder: 'Email address',
 	userPasswordPlaceholder: 'Password',

@@ -39,6 +39,9 @@ class AppInfoResponse(BaseModel):
     release_version: str
     build_number: str | None = None
     developer_mode: bool = False
+    # Whether this server belongs to one person.  The client reads it to drop
+    # the doors that lead nowhere when there is nobody else to be.
+    single_user_mode: bool = False
     render_engine_id: str
     render_engine_version: str
     ddl_version: str
@@ -79,6 +82,7 @@ def api_info() -> AppInfoResponse:
         release_version=_RELEASE_VERSION,
         build_number=_build_number(),
         developer_mode=_env_flag("INKU_DEVELOPER_MODE"),
+        single_user_mode=_db.single_user_mode_enabled(),
         render_engine_id=engine.id,
         render_engine_version=engine.version,
         ddl_version=DDL_VERSION,

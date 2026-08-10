@@ -131,6 +131,11 @@ options:
 
 ### `inku-cli login`
 
+Not needed against a server in single-user mode (`INKU_SINGLE_USER=1`), which
+belongs to one person and answers an unauthenticated request as them. Every
+command runs without logging in there; against any other server they still ask
+you to log in first, and say so.
+
 ```
 usage: inku-cli login [-h] [--base-url BASE_URL]
                       [--timeout-seconds TIMEOUT_SECONDS] --username USERNAME

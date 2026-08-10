@@ -8,11 +8,19 @@ services:
       INKU_ENV: production
       INKU_SESSION_COOKIE_SECURE: ${INKU_SESSION_COOKIE_SECURE:-0}
       INKU_CORS_ORIGINS: ${INKU_CORS_ORIGINS:-}
+      # A distributed inku belongs to whoever installed it, so it opens without
+      # a login screen. The application default is off -- an existing
+      # deployment must not lose its login screen by upgrading -- and it is
+      # this file, the distribution, that turns it on.
+      INKU_SINGLE_USER: ${INKU_SINGLE_USER:-1}
       INKU_BOOTSTRAP_ADMIN_USERNAME: ${INKU_BOOTSTRAP_ADMIN_USERNAME:-admin}
       INKU_BOOTSTRAP_ADMIN_EMAIL: ${INKU_BOOTSTRAP_ADMIN_EMAIL:-admin@localhost}
-      # Required, because the first startup on an empty volume creates the only
-      # account there is: inku has no self-service registration.
-      INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:?set INKU_BOOTSTRAP_ADMIN_PASSWORD (8 characters or more) in the --env-file}
+      # Needed only when INKU_SINGLE_USER is turned off: with a login screen and
+      # no self-service registration, an empty volume would have nobody to sign
+      # in as. Single-user mode makes its own account instead, and the settings
+      # screen asks for a password there. Compose interpolation cannot express
+      # "required unless", so this is no longer ${...:?} -- see deploy/.env.example.
+      INKU_BOOTSTRAP_ADMIN_PASSWORD: ${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # LLM backend wiring for bench parity with bare metal. Values come from the

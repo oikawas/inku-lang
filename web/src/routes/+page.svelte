@@ -535,6 +535,11 @@
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let renderFanoutLimit = $state(4);
 	let developerMode = $state(false);
+	// This server belongs to one person and signs them in by itself. The doors
+	// that lead nowhere when there is nobody else to be -- signing out, above
+	// all -- are dropped; the way back to a multi-user server (changing the
+	// password) is deliberately kept.
+	let singleUserMode = $state(false);
 	let currentRenderEngineVersion = $state<string | null>(null);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
@@ -2163,8 +2168,9 @@
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean; render_engine_version?: string };
+			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; render_engine_version?: string };
 			developerMode = data.developer_mode === true;
+			singleUserMode = data.single_user_mode === true;
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
 				? data.render_engine_version
 				: null;
@@ -5930,6 +5936,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		{darkMode}
 		buildNumber={__BUILD_NUMBER__}
 		{developerMode}
+		{singleUserMode}
 		showAuxiliary={uiVisibility.auxiliary}
 		{uiMode}
 		{tooltipsEnabled}
@@ -6377,6 +6384,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if settingsOpen}
 	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
 		<SettingsModal
+			{singleUserMode}
 			{settingsMode}
 			{settingsTab}
 			{stage1Provider}

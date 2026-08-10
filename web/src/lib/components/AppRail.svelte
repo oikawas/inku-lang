@@ -16,6 +16,7 @@
 		darkMode: boolean;
 		buildNumber: string;
 		developerMode: boolean;
+		singleUserMode: boolean;
 		showAuxiliary: boolean;
 		uiMode: UiMode;
 		tooltipsEnabled: boolean;
@@ -37,6 +38,7 @@
 		darkMode,
 		buildNumber,
 		developerMode,
+		singleUserMode,
 		showAuxiliary,
 		uiMode,
 		tooltipsEnabled,
@@ -116,7 +118,9 @@
 			{#if userMenuOpen}
 				<div class="rail-user-menu" role="menu">
 					<button type="button" role="menuitem" onclick={onOpenProfile}>{t().profileButton}</button>
-					<button type="button" role="menuitem" onclick={onLogout}>{t().logoutButton}</button>
+					{#if !singleUserMode}
+						<button type="button" role="menuitem" onclick={onLogout}>{t().logoutButton}</button>
+					{/if}
 				</div>
 			{/if}
 		</div>

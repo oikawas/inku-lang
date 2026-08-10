@@ -2291,7 +2291,7 @@ def lineage_wiring_fixtures() -> None:
         from inku_server import db
 
         db.init_db()
-        user = db.add_user("baker", "baker@example.invalid", "pw-not-used", "admin", None)
+        user = db.add_user("baker", "baker@example.invalid", "pw-not-used", ["admins"], None)
         uid = user["id"]
 
         def item(item_id, *, at=1000, **extra):

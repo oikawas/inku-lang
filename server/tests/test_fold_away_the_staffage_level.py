@@ -167,7 +167,7 @@ def db_user():
         username=f"staffage-{suffix}",
         email=f"staffage-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     yield user
@@ -389,7 +389,7 @@ def user_headers():
         username=f"staffage-api-{suffix}",
         email=f"staffage-api-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     token = db.create_session(user["id"])

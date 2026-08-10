@@ -110,7 +110,7 @@ def _user() -> dict:
         f"kind-parity-{suffix}",
         f"kind-parity-{suffix}@example.test",
         "kind-parity-password",
-        "user",
+        ["users"],
         group["id"],
     )
 

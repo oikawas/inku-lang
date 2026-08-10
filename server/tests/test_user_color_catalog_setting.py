@@ -34,7 +34,7 @@ def auth_headers():
         username=f"catalog-{suffix}",
         email=f"catalog-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     token = db.create_session(user["id"])

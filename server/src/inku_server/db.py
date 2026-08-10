@@ -276,6 +276,30 @@ class UserAccountRow(Base):
     at            = Column(BigInteger, nullable=False, index=True)
 
 
+class PermissionGroupRow(Base):
+    """What a member may do. Fixed set of three; not user-creatable."""
+
+    __tablename__ = "permission_groups"
+
+    id   = Column(String, primary_key=True)
+    name = Column(String, nullable=False, unique=True, index=True)   # admins / leaders / users
+    at   = Column(BigInteger, nullable=False, index=True)
+
+
+class UserPermissionGroupRow(Base):
+    """Many-to-many: one member may hold several permission groups."""
+
+    __tablename__ = "user_permission_groups"
+    __table_args__ = (
+        UniqueConstraint("user_id", "permission_group_id", name="uq_user_permission_group"),
+    )
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_accounts.id"), nullable=False, index=True)
+    permission_group_id = Column(String, ForeignKey("permission_groups.id"), nullable=False, index=True)
+    at = Column(BigInteger, nullable=False, index=True)
+
+
 class UserSessionRow(Base):
     __tablename__ = "user_sessions"
 
@@ -309,11 +333,27 @@ class AppSettingRow(Base):
     at    = Column(BigInteger, nullable=False, index=True)
 
 
-USER_ROLES = {"admin", "group_lead", "user"}
-ROLE_LABELS = {
-    "admin": "管理者",
-    "group_lead": "グループリード",
-    "user": "ユーザー",
+# What a member may do.  Fixed on purpose: a user-extensible set would make the
+# authorization branches resolve at runtime, and nothing could be asserted about
+# them.  Per-object sharing is a different mechanism and does not live here.
+PERMISSION_GROUPS = ("admins", "leaders", "users")
+PERMISSION_GROUP_LABELS = {
+    "admins": "管理者",
+    "leaders": "リーダー",
+    "users": "ユーザー",
+}
+
+# The legacy `user_accounts.role` column is kept as a derived mirror so a database
+# taken after this change still starts on a build from before it.  Nothing reads
+# it to decide anything; it is written from the permission groups and never the
+# other way round.
+_ROLE_MIRROR_BY_GROUP = {"admins": "admin", "leaders": "group_lead"}
+# Groups that put a member above the ones a leader may administer.
+_ELEVATED_PERMISSION_GROUPS = ("admins", "leaders")
+_LEGACY_ROLE_TO_PERMISSION_GROUP = {
+    "admin": "admins",
+    "group_lead": "leaders",
+    "user": "users",
 }
 _UNSET = object()
 _HISTORY_COLUMN_MIGRATIONS = {
@@ -507,7 +547,12 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     _migrate_columns()
     _ensure_default_user_group()
+    _ensure_permission_groups()
     _ensure_bootstrap_admin()
+    # After the bootstrap admin, so the account it may have just created is
+    # migrated in the same pass; before anything that resolves an administrator,
+    # because that now asks the permission groups.
+    _migrate_roles_to_permission_groups()
     _assign_unowned_history_to_admin()
     _backfill_history_identity_and_lineage()
 
@@ -872,6 +917,142 @@ def _ensure_default_user_group() -> None:
         session.commit()
 
 
+def has_permission_group(actor: dict, name: str) -> bool:
+    """Membership test against the permission groups the actor holds."""
+    if not actor:
+        return False
+    return name in (actor.get("permission_groups") or ())
+
+
+def _derived_role(names) -> str:
+    """The legacy role column's value, derived from the groups a member holds."""
+    for group, role in _ROLE_MIRROR_BY_GROUP.items():
+        if group in names:
+            return role
+    return "user"
+
+
+def _normalize_permission_groups(names) -> list[str]:
+    """Requested group names, deduplicated and ordered by PERMISSION_GROUPS."""
+    if isinstance(names, str):
+        raise ValueError("permission_groups must be a list")
+    requested = set(names or ())
+    unknown = requested - set(PERMISSION_GROUPS)
+    if unknown:
+        raise ValueError(f"invalid permission group: {sorted(unknown)[0]}")
+    if not requested:
+        raise ValueError("at least one permission group is required")
+    return [name for name in PERMISSION_GROUPS if name in requested]
+
+
+def _permission_group_ids(session) -> dict[str, str]:
+    return {row.name: row.id for row in session.query(PermissionGroupRow).all()}
+
+
+def _permission_groups_of(session, user_id: str) -> list[str]:
+    held = {
+        name
+        for (name,) in session.query(PermissionGroupRow.name)
+        .join(UserPermissionGroupRow, UserPermissionGroupRow.permission_group_id == PermissionGroupRow.id)
+        .filter(UserPermissionGroupRow.user_id == user_id)
+        .all()
+    }
+    return [name for name in PERMISSION_GROUPS if name in held]
+
+
+def _set_permission_groups(session, row: UserAccountRow, names) -> list[str]:
+    """Replace a member's permission groups and refresh the derived role mirror.
+
+    Writes the memberships that decide what the member may do, then the legacy
+    role column that only exists so older builds can still read this database.
+    """
+    wanted = _normalize_permission_groups(names)
+    by_name = _permission_group_ids(session)
+    missing = [name for name in wanted if name not in by_name]
+    if missing:
+        raise ValueError(f"permission group not found: {missing[0]}")
+    session.query(UserPermissionGroupRow).filter(
+        UserPermissionGroupRow.user_id == row.id
+    ).delete(synchronize_session=False)
+    for name in wanted:
+        session.add(
+            UserPermissionGroupRow(
+                id=str(uuid.uuid4()),
+                user_id=row.id,
+                permission_group_id=by_name[name],
+                at=_now_ms(),
+            )
+        )
+    row.role = _derived_role(wanted)
+    return wanted
+
+
+def _holds_no_elevated_group(session):
+    """Filter for the members a leader may administer: no admins, no leaders.
+
+    Asks the memberships rather than the role mirror, so an account whose legacy
+    column still says `user` is judged by what it actually holds.
+    """
+    elevated = (
+        session.query(UserPermissionGroupRow.user_id)
+        .join(PermissionGroupRow, PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id)
+        .filter(PermissionGroupRow.name.in_(_ELEVATED_PERMISSION_GROUPS))
+    )
+    return ~UserAccountRow.id.in_(elevated)
+
+
+def _ensure_permission_groups() -> None:
+    """Seed the three fixed permission groups. Idempotent."""
+    with SessionLocal() as session:
+        existing = {row.name for row in session.query(PermissionGroupRow).all()}
+        added = False
+        for name in PERMISSION_GROUPS:
+            if name in existing:
+                continue
+            session.add(PermissionGroupRow(id=str(uuid.uuid4()), name=name, at=_now_ms()))
+            added = True
+        if added:
+            session.commit()
+
+
+def _migrate_roles_to_permission_groups() -> None:
+    """Give every pre-existing account the one group its legacy role names.
+
+    The mapping is one-to-one on purpose: an admin becomes `admins` and nothing
+    else.  Reading it as "an admin is also a leader" would make the original role
+    unrecoverable, and the many-to-many exists for accounts that are given both
+    deliberately, not for accounts a migration guessed at.
+
+    Idempotent by membership, not by role: an account that already holds any
+    permission group is left alone, so a second run adds nothing and an account
+    later given `admins` + `leaders` is not knocked back down to one.
+    """
+    with SessionLocal() as session:
+        by_name = _permission_group_ids(session)
+        if not by_name:
+            return
+        assigned = {
+            user_id
+            for (user_id,) in session.query(UserPermissionGroupRow.user_id).distinct().all()
+        }
+        added = False
+        for row in session.query(UserAccountRow).all():
+            if row.id in assigned:
+                continue
+            name = _LEGACY_ROLE_TO_PERMISSION_GROUP.get(row.role, "users")
+            session.add(
+                UserPermissionGroupRow(
+                    id=str(uuid.uuid4()),
+                    user_id=row.id,
+                    permission_group_id=by_name[name],
+                    at=_now_ms(),
+                )
+            )
+            added = True
+        if added:
+            session.commit()
+
+
 def _bootstrap_admin_password() -> str | None:
     # An empty value means unset, not a zero-length password: compose interpolation
     # (${VAR:-}) and env-file templates hand one over whenever the operator left the
@@ -897,17 +1078,18 @@ def _ensure_bootstrap_admin() -> None:
         password = _bootstrap_admin_password()
         if password is None:
             return
-        session.add(
-            UserAccountRow(
-                id=str(uuid.uuid4()),
-                username=os.getenv("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
-                email=os.getenv("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
-                password_hash=_hash_password(password),
-                role="admin",
-                group_id=group.id if group else None,
-                at=_now_ms(),
-            )
+        row = UserAccountRow(
+            id=str(uuid.uuid4()),
+            username=os.getenv("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
+            email=os.getenv("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
+            password_hash=_hash_password(password),
+            role=_derived_role(["admins"]),
+            group_id=group.id if group else None,
+            at=_now_ms(),
         )
+        session.add(row)
+        session.commit()
+        _set_permission_groups(session, row, ["admins"])
         session.commit()
 
 
@@ -1376,7 +1558,14 @@ def _oldest_admin_id(session) -> str | None:
     Shared by the history-owner fallback and by single-user mode so the two
     can never drift into naming different people.
     """
-    admin = session.query(UserAccountRow).filter(UserAccountRow.role == "admin").order_by(UserAccountRow.at.asc()).first()
+    admin = (
+        session.query(UserAccountRow)
+        .join(UserPermissionGroupRow, UserPermissionGroupRow.user_id == UserAccountRow.id)
+        .join(PermissionGroupRow, PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id)
+        .filter(PermissionGroupRow.name == "admins")
+        .order_by(UserAccountRow.at.asc())
+        .first()
+    )
     return admin.id if admin else None
 
 
@@ -1433,6 +1622,7 @@ def _create_single_user_account() -> str | None:
     first request would have nobody to be.
     """
     _ensure_default_user_group()
+    _ensure_permission_groups()
     with SessionLocal() as session:
         if session.query(UserAccountRow).first():
             return None
@@ -1447,11 +1637,17 @@ def _create_single_user_account() -> str | None:
             username=os.getenv("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
             email=os.getenv("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
             password_hash=_hash_password(password),
-            role="admin",
+            role=_derived_role(["admins"]),
             group_id=group.id if group else None,
             at=_now_ms(),
         )
         session.add(row)
+        session.commit()
+        # The one account owns the server, so it holds `admins`.  _oldest_admin_id
+        # asks the permission groups now, and it is the same query that resolves
+        # the history owner: leaving this to the role mirror would make the two
+        # name different people.
+        _set_permission_groups(session, row, ["admins"])
         session.commit()
         return row.id
 
@@ -2140,7 +2336,16 @@ def _group_to_dict(row: UserGroupRow) -> dict:
 
 
 def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
+    from sqlalchemy.orm import object_session
     from .model_settings import normalize_user_model_settings
+
+    # Read the memberships through the row's own session rather than defaulting
+    # to an empty list when there is none: an actor that silently came back with
+    # no permission groups would be refused everywhere, and nothing would say why.
+    session = object_session(row)
+    if session is None:
+        raise RuntimeError("_user_to_dict needs an attached row to read permission groups")
+    permission_groups = _permission_groups_of(session, row.id)
 
     try:
         model_settings = json.loads(row.model_settings or "{}")
@@ -2159,8 +2364,10 @@ def _user_to_dict(row: UserAccountRow, group_name: str | None = None) -> dict:
         "id": row.id,
         "username": row.username,
         "email": row.email,
-        "role": row.role,
-        "role_label": ROLE_LABELS.get(row.role, row.role),
+        "permission_groups": permission_groups,
+        "permission_group_labels": [
+            PERMISSION_GROUP_LABELS.get(name, name) for name in permission_groups
+        ],
         "group_id": row.group_id,
         "group_name": group_name,
         "ui_theme": row.ui_theme if row.ui_theme in {"light", "dark"} else "light",
@@ -2546,9 +2753,9 @@ def get_user_by_external_identity(provider: str, subject: str) -> dict | None:
 
 
 def list_users_for_actor(actor: dict) -> list[dict]:
-    if actor["role"] == "admin":
+    if has_permission_group(actor, "admins"):
         return list_users()
-    if actor["role"] == "group_lead" and actor.get("group_id"):
+    if has_permission_group(actor, "leaders") and actor.get("group_id"):
         with SessionLocal() as session:
             rows = (
                 session.query(UserAccountRow, UserGroupRow.name)
@@ -2561,21 +2768,20 @@ def list_users_for_actor(actor: dict) -> list[dict]:
     return []
 
 
-def add_user(username: str, email: str, password: str, role: str, group_id: str | None) -> dict:
+def add_user(username: str, email: str, password: str, permission_groups: list[str], group_id: str | None) -> dict:
     username = username.strip()
     email = email.strip()
     if not username:
         raise ValueError("username is required")
     if not email:
         raise ValueError("email is required")
-    if role not in USER_ROLES:
-        raise ValueError("invalid role")
+    wanted = _normalize_permission_groups(permission_groups)
     row = UserAccountRow(
         id=str(uuid.uuid4()),
         username=username,
         email=email,
         password_hash=_hash_password(password),
-        role=role,
+        role=_derived_role(wanted),
         group_id=group_id,
         at=_now_ms(),
     )
@@ -2583,6 +2789,8 @@ def add_user(username: str, email: str, password: str, role: str, group_id: str 
         if group_id and not session.get(UserGroupRow, group_id):
             raise ValueError("group not found")
         session.add(row)
+        session.commit()
+        _set_permission_groups(session, row, wanted)
         session.commit()
         session.refresh(row)
         group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
@@ -2595,18 +2803,18 @@ def update_user(
     username: str | None = None,
     email: str | None = None,
     password: str | None = None,
-    role: str | None = None,
+    permission_groups: list[str] | None = None,
     group_id: str | None | object = _UNSET,
     actor: dict | None = None,
 ) -> dict | None:
     with SessionLocal() as session:
         query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
-        if actor is not None and actor.get("role") != "admin":
-            if actor.get("role") != "group_lead" or not actor.get("group_id"):
+        if actor is not None and not has_permission_group(actor, "admins"):
+            if not has_permission_group(actor, "leaders") or not actor.get("group_id"):
                 return None
             query = query.filter(
                 UserAccountRow.group_id == actor["group_id"],
-                UserAccountRow.role == "user",
+                _holds_no_elevated_group(session),
             )
         row = query.first()
         if not row:
@@ -2623,10 +2831,8 @@ def update_user(
             row.email = email
         if password is not None and password:
             row.password_hash = _hash_password(password)
-        if role is not None:
-            if role not in USER_ROLES:
-                raise ValueError("invalid role")
-            row.role = role
+        if permission_groups is not None:
+            _set_permission_groups(session, row, permission_groups)
         if group_id is not _UNSET:
             group_id = group_id if isinstance(group_id, str) else None
             if group_id and not session.get(UserGroupRow, group_id):
@@ -3026,12 +3232,12 @@ def update_user_plugin_value(user_id: str, plugin_id: str, value: dict) -> dict 
 def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = None) -> bool:
     with SessionLocal() as session:
         query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
-        if actor is not None and actor.get("role") != "admin":
-            if actor.get("role") != "group_lead" or not actor.get("group_id"):
+        if actor is not None and not has_permission_group(actor, "admins"):
+            if not has_permission_group(actor, "leaders") or not actor.get("group_id"):
                 return False
             query = query.filter(
                 UserAccountRow.group_id == actor["group_id"],
-                UserAccountRow.role == "user",
+                _holds_no_elevated_group(session),
             )
         row = query.first()
         if not row:
@@ -3047,6 +3253,7 @@ def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = Non
         session.query(UnreadWordRow).filter(UnreadWordRow.user_id == user_id).delete()
         session.query(LineageEdgeRow).filter(LineageEdgeRow.user_id == user_id).delete()
         session.query(LineageNodeRow).filter(LineageNodeRow.user_id == user_id).delete()
+        session.query(UserPermissionGroupRow).filter(UserPermissionGroupRow.user_id == user_id).delete()
         session.delete(row)
         session.commit()
         return True

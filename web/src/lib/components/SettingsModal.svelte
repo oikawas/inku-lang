@@ -101,7 +101,7 @@
 			note: string;
 		};
 	};
-	type UserRole = 'admin' | 'group_lead' | 'user';
+	type PermissionGroup = 'admins' | 'leaders' | 'users';
 	type UserGroup = {
 		id: string;
 		name: string;
@@ -111,8 +111,8 @@
 		id: string;
 		username: string;
 		email: string;
-		role: UserRole;
-		role_label: string;
+		permission_groups: PermissionGroup[];
+		permission_group_labels: string[];
 		group_id: string | null;
 		group_name: string | null;
 		image_generation_count: number;
@@ -184,13 +184,13 @@
 		newUserName: string;
 		newUserEmail: string;
 		newUserPassword: string;
-		newUserRole: UserRole;
+		newUserPermissionGroups: PermissionGroup[];
 		newUserGroupId: string;
 		selectedUserId: string | null;
 		editUserName: string;
 		editUserEmail: string;
 		editUserPassword: string;
-		editUserRole: UserRole;
+		editUserPermissionGroups: PermissionGroup[];
 		editUserGroupId: string;
 		newGroupName: string;
 		editGroupId: string | null;
@@ -297,13 +297,13 @@
 		newUserName = $bindable(),
 		newUserEmail = $bindable(),
 		newUserPassword = $bindable(),
-		newUserRole = $bindable(),
+		newUserPermissionGroups = $bindable(),
 		newUserGroupId = $bindable(),
 		selectedUserId,
 		editUserName = $bindable(),
 		editUserEmail = $bindable(),
 		editUserPassword = $bindable(),
-		editUserRole = $bindable(),
+		editUserPermissionGroups = $bindable(),
 		editUserGroupId = $bindable(),
 		newGroupName = $bindable(),
 		editGroupId,
@@ -467,8 +467,19 @@
 		else pluginEditorReasons = reasons;
 	}
 
-	const USER_ROLE_OPTIONS: UserRole[] = ['admin', 'group_lead', 'user'];
-	const isAdmin = $derived(currentUser?.role === 'admin');
+	const PERMISSION_GROUP_OPTIONS: PermissionGroup[] = ['admins', 'leaders', 'users'];
+	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
+	function togglePermissionGroup(held: PermissionGroup[], name: PermissionGroup): PermissionGroup[] {
+		// Never hand back an empty selection: the server refuses it, and a member
+		// who holds nothing would be a member nobody could sign in as.
+		const next = held.includes(name) ? held.filter((item) => item !== name) : [...held, name];
+		return next.length ? PERMISSION_GROUP_OPTIONS.filter((item) => next.includes(item)) : held;
+	}
+	function permissionGroupLabel(name: PermissionGroup): string {
+		if (name === 'admins') return t().permissionGroupAdmins;
+		if (name === 'leaders') return t().permissionGroupLeaders;
+		return t().permissionGroupUsers;
+	}
 	type ModelSelectionTab = 'shared' | 'stage1' | 'stage2' | 'vision';
 	let modelSelectionTab = $state<ModelSelectionTab>('shared');
 	// The tab already knows which stage is being chosen for; before this it was
@@ -1050,8 +1061,8 @@
 				{/if}
 			</div>
 			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>
-				<button class="ghost-btn primary-inline" onclick={onRunDbBackupNow} disabled={settingsStatusLoading || currentUser?.role !== 'admin' || !settingsStatus?.db_backup.supported}>{t().settingsDbBackupRunNow}</button>
+				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReload}</button>
+				<button class="ghost-btn primary-inline" onclick={onRunDbBackupNow} disabled={settingsStatusLoading || !isAdmin || !settingsStatus?.db_backup.supported}>{t().settingsDbBackupRunNow}</button>
 			</div>
 		{:else if settingsTab === 'server_misc'}
 			<div class="popover-group">
@@ -1152,7 +1163,7 @@
 				{/if}
 			</div>
 			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReloadSettings}</button>
+				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReloadSettings}</button>
 			</div>
 		{:else if settingsTab === 'logs'}
 			<div class="popover-group">
@@ -1215,7 +1226,7 @@
 				{/if}
 			</div>
 			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReloadSettings}</button>
+				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReloadSettings}</button>
 			</div>
 		{:else if settingsTab === 'limits'}
 			<div class="popover-group">
@@ -1256,8 +1267,8 @@
 				{/if}
 			</div>
 			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReloadSettings}</button>
-				<button class="ghost-btn" onclick={() => onUpdateRenderLimits(null)} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsRenderLimitsReset}</button>
+				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReloadSettings}</button>
+				<button class="ghost-btn" onclick={() => onUpdateRenderLimits(null)} disabled={settingsStatusLoading || !isAdmin}>{t().settingsRenderLimitsReset}</button>
 			</div>
 		{:else if settingsTab === 'plugins'}
 			<div class="popover-group">
@@ -1343,7 +1354,7 @@
 				{/if}
 			</div>
 			<div class="settings-inline-actions">
-				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || currentUser?.role !== 'admin'}>{t().settingsReload}</button>
+				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReload}</button>
 			</div>
 		{:else if settingsTab === 'users'}
 			<div class="popover-group user-account-group">
@@ -1360,7 +1371,7 @@
 					<div class="db-test-result">{t().bootstrapAdminNote}</div>
 				{:else}
 					<div class="user-session-row">
-						<span>{currentUser.username} / {currentUser.role}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
+						<span>{currentUser.username} / {currentUser.permission_groups.map(permissionGroupLabel).join(' + ')}{currentUser.group_name ? ` / ${currentUser.group_name}` : ''}</span>
 						{#if !singleUserMode}
 							<button class="ghost-btn" onclick={onLogout}>{t().logoutButton}</button>
 						{/if}
@@ -1374,21 +1385,21 @@
 				{/if}
 			</div>
 			{#if currentUser}
-				{#if currentUser.role === 'admin'}
+				{#if isAdmin}
 					<div class="popover-group">
 						<div class="user-management-head">
 							<div>
 								<div class="popover-group-label">{t().settingsUsersLabel}</div>
 								<div class="user-management-count">{t().userCountLabel(users.length)}</div>
 							</div>
-							<button class="ghost-btn" onclick={onLoadUserSettings} disabled={userSettingsLoading || currentUser.role !== 'admin'}>{t().settingsReload}</button>
+							<button class="ghost-btn" onclick={onLoadUserSettings} disabled={userSettingsLoading || !isAdmin}>{t().settingsReload}</button>
 						</div>
 						<div class="user-management-layout">
 							<div class="user-list-panel">
 								<div class="user-list-head">
 									<span>{t().userNamePlaceholder}</span>
 									<span>{t().userEmailPlaceholder}</span>
-									<span>{t().userRoleLabel}</span>
+									<span>{t().permissionGroupLabel}</span>
 									<span>{t().userGroupLabel}</span>
 									<span>{t().userGenerationCountLabel}</span>
 									<span></span>
@@ -1399,7 +1410,7 @@
 											<button class="user-select" onclick={() => onSetEditUser(user)}>
 												<span class="user-cell user-name">{user.username}</span>
 												<span class="user-cell">{user.email}</span>
-												<span class="user-cell">{user.role}</span>
+												<span class="user-cell">{user.permission_groups.map(permissionGroupLabel).join(' + ')}</span>
 												<span class="user-cell">{user.group_name ?? t().userNoGroup}</span>
 												<span class="user-cell user-count-cell">{user.image_generation_count.toLocaleString()}</span>
 											</button>
@@ -1414,14 +1425,21 @@
 									<input bind:value={newUserName} placeholder={t().userNamePlaceholder} />
 									<input bind:value={newUserEmail} type="email" placeholder={t().userEmailPlaceholder} />
 									<input bind:value={newUserPassword} type="password" placeholder={t().userPasswordPlaceholder} />
-									<label class="user-form-field">
-										<span>{t().userRoleSelectLabel}</span>
-										<select bind:value={newUserRole}>
-											{#each USER_ROLE_OPTIONS as role (role)}
-												<option value={role}>{role}</option>
+									<div class="user-form-field">
+										<span>{t().permissionGroupSelectLabel}</span>
+										<div class="permission-group-choices">
+											{#each PERMISSION_GROUP_OPTIONS as name (name)}
+												<label class="permission-group-choice">
+													<input
+														type="checkbox"
+														checked={newUserPermissionGroups.includes(name)}
+														onchange={() => (newUserPermissionGroups = togglePermissionGroup(newUserPermissionGroups, name))}
+													/>
+													<span>{permissionGroupLabel(name)}</span>
+												</label>
 											{/each}
-										</select>
-									</label>
+										</div>
+									</div>
 									<label class="user-form-field">
 										<span>{t().userGroupSelectLabel}</span>
 										<select bind:value={newUserGroupId}>
@@ -1443,14 +1461,21 @@
 										<input bind:value={editUserName} placeholder={t().userNamePlaceholder} />
 										<input bind:value={editUserEmail} type="email" placeholder={t().userEmailPlaceholder} />
 										<input bind:value={editUserPassword} type="password" placeholder={t().userNewPasswordPlaceholder} />
-										<label class="user-form-field">
-											<span>{t().userRoleSelectLabel}</span>
-											<select bind:value={editUserRole}>
-												{#each USER_ROLE_OPTIONS as role (role)}
-													<option value={role}>{role}</option>
+										<div class="user-form-field">
+											<span>{t().permissionGroupSelectLabel}</span>
+											<div class="permission-group-choices">
+												{#each PERMISSION_GROUP_OPTIONS as name (name)}
+													<label class="permission-group-choice">
+														<input
+															type="checkbox"
+															checked={editUserPermissionGroups.includes(name)}
+															onchange={() => (editUserPermissionGroups = togglePermissionGroup(editUserPermissionGroups, name))}
+														/>
+														<span>{permissionGroupLabel(name)}</span>
+													</label>
 												{/each}
-											</select>
-										</label>
+											</div>
+										</div>
 										<label class="user-form-field">
 											<span>{t().userGroupSelectLabel}</span>
 											<select bind:value={editUserGroupId}>
@@ -1478,7 +1503,7 @@
 					</div>
 				{/if}
 			{/if}
-			{#if currentUser?.role === 'admin'}
+			{#if isAdmin}
 				<div class="popover-group">
 					<div class="popover-group-label">{t().userGroupLabel}</div>
 					<div class="plugin-add">
@@ -2920,6 +2945,19 @@
 		width: 100%;
 		text-transform: none;
 		letter-spacing: 0;
+	}
+	.permission-group-choices {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 12px;
+	}
+	.permission-group-choice {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		text-transform: none;
+		letter-spacing: 0;
+		white-space: nowrap;
 	}
 	.user-form-actions {
 		display: flex;

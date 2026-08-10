@@ -37,7 +37,7 @@ def _auth():
         username=f"saij-{suffix}",
         email=f"saij-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     token = db.create_session(user["id"])

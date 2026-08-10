@@ -50,12 +50,15 @@ def _current_user(token: str = Depends(_session_token)) -> dict:
 
 
 def _user_manager(actor: dict = Depends(_current_user)) -> dict:
-    if actor["role"] not in {"admin", "group_lead"}:
+    if not (
+        _db.has_permission_group(actor, "admins")
+        or _db.has_permission_group(actor, "leaders")
+    ):
         raise HTTPException(status_code=403, detail="user management is not permitted")
     return actor
 
 
 def _admin_user(actor: dict = Depends(_current_user)) -> dict:
-    if actor["role"] != "admin":
+    if not _db.has_permission_group(actor, "admins"):
         raise HTTPException(status_code=403, detail="administrator permission is required")
     return actor

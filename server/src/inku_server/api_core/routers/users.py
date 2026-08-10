@@ -31,7 +31,7 @@ class UserAccountCreateBody(BaseModel):
     username: str = Field(..., min_length=1)
     email: str = Field(..., min_length=1)
     password: str = Field(..., min_length=8)
-    role: str = Field(default="user")
+    permission_groups: list[str] = Field(default_factory=lambda: ["users"])
     group_id: str | None = None
 
 
@@ -39,21 +39,21 @@ class UserAccountUpdateBody(BaseModel):
     username: str | None = Field(default=None, min_length=1)
     email: str | None = Field(default=None, min_length=1)
     password: str | None = Field(default=None, min_length=8)
-    role: str | None = None
+    permission_groups: list[str] | None = None
     group_id: str | None = None
 
 
 @router.get("/api/user-groups", response_model=list[UserGroupItem])
 def api_user_groups_list(actor: dict = Depends(_user_manager)) -> list[UserGroupItem]:
     groups = _db.list_user_groups()
-    if actor["role"] == "group_lead":
+    if not _db.has_permission_group(actor, "admins"):
         groups = [group for group in groups if group["id"] == actor.get("group_id")]
     return [UserGroupItem(**group) for group in groups]
 
 
 @router.post("/api/user-groups", response_model=UserGroupItem)
 def api_user_groups_create(body: UserGroupCreateBody, actor: dict = Depends(_user_manager)) -> UserGroupItem:
-    if actor["role"] != "admin":
+    if not _db.has_permission_group(actor, "admins"):
         raise HTTPException(status_code=403, detail="only administrators can create groups")
     try:
         return UserGroupItem(**_db.add_user_group(body.name))
@@ -69,7 +69,7 @@ def api_user_groups_update(
     body: UserGroupUpdateBody,
     actor: dict = Depends(_user_manager),
 ) -> UserGroupItem:
-    if actor["role"] != "admin":
+    if not _db.has_permission_group(actor, "admins"):
         raise HTTPException(status_code=403, detail="only administrators can update groups")
     try:
         group = _db.update_user_group(group_id, body.name)
@@ -84,7 +84,7 @@ def api_user_groups_update(
 
 @router.delete("/api/user-groups/{group_id}")
 def api_user_groups_delete(group_id: str, actor: dict = Depends(_user_manager)) -> dict[str, bool]:
-    if actor["role"] != "admin":
+    if not _db.has_permission_group(actor, "admins"):
         raise HTTPException(status_code=403, detail="only administrators can delete groups")
     try:
         found = _db.delete_user_group(group_id)
@@ -102,15 +102,15 @@ def api_users_list(actor: dict = Depends(_user_manager)) -> list[UserAccountItem
 
 @router.post("/api/users", response_model=UserAccountItem)
 def api_users_create(body: UserAccountCreateBody, actor: dict = Depends(_user_manager)) -> UserAccountItem:
-    if actor["role"] == "group_lead":
-        if body.role != "user" or body.group_id != actor.get("group_id"):
-            raise HTTPException(status_code=403, detail="group leads can create users only in their own group")
+    if not _db.has_permission_group(actor, "admins"):
+        if set(body.permission_groups) != {"users"} or body.group_id != actor.get("group_id"):
+            raise HTTPException(status_code=403, detail="leaders can create members only in their own group")
     try:
         user = _db.add_user(
             username=body.username,
             email=body.email,
             password=body.password,
-            role=body.role,
+            permission_groups=body.permission_groups,
             group_id=body.group_id,
         )
     except ValueError as e:
@@ -126,11 +126,11 @@ def api_users_update(
     body: UserAccountUpdateBody,
     actor: dict = Depends(_user_manager),
 ) -> UserAccountItem:
-    if actor["role"] == "group_lead":
-        if body.role and body.role != "user":
-            raise HTTPException(status_code=403, detail="group leads cannot change user roles")
+    if not _db.has_permission_group(actor, "admins"):
+        if body.permission_groups is not None and set(body.permission_groups) != {"users"}:
+            raise HTTPException(status_code=403, detail="leaders cannot change permission groups")
         if body.group_id is not None and body.group_id != actor.get("group_id"):
-            raise HTTPException(status_code=403, detail="group leads cannot move users outside their group")
+            raise HTTPException(status_code=403, detail="leaders cannot move members outside their group")
     try:
         user = _db.update_user(user_id, actor=actor, **body.model_dump(exclude_unset=True))
     except ValueError as e:

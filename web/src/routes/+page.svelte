@@ -7,6 +7,12 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { pipelineDescription } from '$lib/description-labels';
+	import {
+		canAccessSettingsTab as canAccessSettingsTabFor,
+		defaultSettingsTab as defaultSettingsTabFor,
+		holdsPermissionGroup,
+		type PermissionGroup
+	} from '$lib/permissionGroups';
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import AppRail from '$lib/components/AppRail.svelte';
@@ -263,7 +269,6 @@
 		};
 	};
 
-	type UserRole = 'admin' | 'group_lead' | 'user';
 	type SettingsTab = 'connection' | 'models' | 'db' | 'plugins' | 'users' | 'unread' | 'export' | 'misc' | 'server_misc' | 'logs' | 'limits';
 	type UserModelSettings = {
 		stage1_provider: Provider;
@@ -303,8 +308,8 @@
 		id: string;
 		username: string;
 		email: string;
-		role: UserRole;
-		role_label: string;
+		permission_groups: PermissionGroup[];
+		permission_group_labels: string[];
 		group_id: string | null;
 		group_name: string | null;
 		ui_theme?: 'light' | 'dark';
@@ -741,13 +746,13 @@
 	let newUserName = $state('');
 	let newUserEmail = $state('');
 	let newUserPassword = $state('');
-	let newUserRole = $state<UserRole>('user');
+	let newUserPermissionGroups = $state<PermissionGroup[]>(['users']);
 	let newUserGroupId = $state('');
 	let selectedUserId = $state<string | null>(null);
 	let editUserName = $state('');
 	let editUserEmail = $state('');
 	let editUserPassword = $state('');
-	let editUserRole = $state<UserRole>('user');
+	let editUserPermissionGroups = $state<PermissionGroup[]>(['users']);
 	let editUserGroupId = $state('');
 	let newGroupName = $state('');
 	let editGroupId = $state<string | null>(null);
@@ -757,6 +762,14 @@
 	let userSettingsRequestId = 0;
 	let authToken = $state<string | null>(null);
 	let currentUser = $state<UserItem | null>(null);
+	// What the signed-in member may do, derived once. Every gate below asks these
+	// rather than reading the membership list itself: the per-work sharing rules
+	// land on the same questions, and a condition spelled out in twenty places is
+	// twenty places to keep in step.
+	const isAdmin = $derived(holdsPermissionGroup(currentUser, 'admins'));
+	// Leaders administer members; an admin outranks the distinction, so the
+	// leader-only branches are the ones that must exclude them.
+	const isLeaderOnly = $derived(!isAdmin && holdsPermissionGroup(currentUser, 'leaders'));
 	const tooltipsEnabled = $derived(currentUser?.tooltips_enabled !== false);
 	let uiModeSaving = $state(false);
 	let uiModeSaveError = $state(false);
@@ -1017,12 +1030,11 @@
 	}
 
 	function canAccessSettingsTab(tab: SettingsTab) {
-		if (tab === 'models' || tab === 'db' || tab === 'users' || tab === 'server_misc' || tab === 'logs') return currentUser?.role === 'admin';
-		return tab !== 'connection';
+		return canAccessSettingsTabFor(tab, currentUser);
 	}
 
 	function defaultSettingsTab() {
-		return currentUser?.role === 'admin' ? 'models' : 'plugins';
+		return defaultSettingsTabFor(currentUser);
 	}
 
 	function normalizeBatchPromptHistory(items: string[]): string[] {
@@ -1113,7 +1125,7 @@
 	}
 
 	async function setCanvasAspectEnabled(value: boolean) {
-		if (currentUser?.role !== 'admin') return;
+		if (!isAdmin) return;
 		canvasAspectEnabled = value;
 		canvasAspectMenuOpen = false;
 		if (!value) {
@@ -1128,7 +1140,7 @@
 	}
 
 	async function selectCanvasAspect(id: CanvasAspectId) {
-		if (currentUser?.role !== 'admin') return;
+		if (!isAdmin) return;
 		const nextAspectId = normalizeCanvasAspectId(id);
 		const currentAspectId = effectiveCanvasAspectId();
 		canvasAspectMenuOpen = false;
@@ -1530,7 +1542,7 @@
 	}
 
 	async function loadModelSettings() {
-		if (currentUser?.role !== 'admin') {
+		if (!isAdmin) {
 			modelSettings = null;
 			modelSettingsStatus = t().settingsAdminOnlyMessage;
 			return;
@@ -1605,7 +1617,7 @@
 	}
 
 	async function addModelProvider(provider: Provider, patch: Partial<ModelProviderSetting>) {
-		if (!modelSettings || !provider || currentUser?.role !== 'admin') return;
+		if (!modelSettings || !provider || !isAdmin) return;
 		modelSettingsLoading = true;
 		try {
 			const r = await apiFetch('/api/settings/models', {
@@ -1650,7 +1662,7 @@
 	}
 
 	async function deleteModelProvider(provider: Provider) {
-		if (currentUser?.role !== 'admin') return;
+		if (!isAdmin) return;
 		modelSettingsLoading = true;
 		try {
 			const r = await apiFetch('/api/settings/models', {
@@ -1672,7 +1684,7 @@
 	}
 
 	async function fetchProviderModels(provider: Provider) {
-		if (currentUser?.role !== 'admin') return;
+		if (!isAdmin) return;
 		modelSettingsLoading = true;
 		const nextResults = { ...modelFetchResults };
 		delete nextResults[provider];
@@ -1711,7 +1723,7 @@
 	}
 
 	async function clearModelApiKey(provider: Provider) {
-		if (currentUser?.role !== 'admin') return;
+		if (!isAdmin) return;
 		modelSettingsLoading = true;
 		try {
 			const current = modelSettings?.providers[provider];
@@ -1756,7 +1768,7 @@
 	}
 
 	async function saveModelProviderName(provider: Provider, label: string) {
-		if (!modelSettings || currentUser?.role !== 'admin') return;
+		if (!modelSettings || !isAdmin) return;
 		const providerSettings = modelSettings.providers[provider];
 		if (!providerSettings) return;
 		const nextLabel = label.trim();
@@ -1786,7 +1798,7 @@
 	}
 
 	async function saveModelProviderMemo(provider: Provider, memo: string) {
-		if (!modelSettings || currentUser?.role !== 'admin') return;
+		if (!modelSettings || !isAdmin) return;
 		const providerSettings = modelSettings.providers[provider];
 		if (!providerSettings) return;
 		modelSettingsLoading = true;
@@ -1814,7 +1826,7 @@
 	}
 
 	async function saveModelProvider(provider: Provider, patch: Partial<ModelProviderSetting> = {}) {
-		if (!modelSettings || currentUser?.role !== 'admin') return;
+		if (!modelSettings || !isAdmin) return;
 		const currentProviderSettings = modelSettings.providers[provider];
 		const providerSettings = currentProviderSettings ? { ...currentProviderSettings, ...patch } : null;
 		if (!providerSettings) return;
@@ -1843,7 +1855,7 @@
 	}
 
 	async function saveModelSettings() {
-		if (!modelSettings || currentUser?.role !== 'admin') return;
+		if (!modelSettings || !isAdmin) return;
 		modelSettingsLoading = true;
 		try {
 			const providers = Object.fromEntries(Object.entries(modelSettings.providers).map(([id, provider]) => {
@@ -1882,7 +1894,7 @@
 			applyDownloadFolderSettings(actor);
 			applyUserModelSettings(actor);
 			authToken = 'cookie';
-			if (actor.role !== 'admin') {
+			if (!holdsPermissionGroup(actor, 'admins')) {
 				users = [];
 				groups = [];
 				userSettingsStatus = null;
@@ -1944,7 +1956,7 @@
 	}
 
 	async function loadSettingsStatus() {
-		if (!currentUser || currentUser.role !== 'admin') {
+		if (!currentUser || !isAdmin) {
 			settingsStatus = null;
 			settingsStatusError = currentUser
 				? t().settingsAdminOnlyMessage
@@ -2404,9 +2416,9 @@
 	async function addUser() {
 		const name = newUserName.trim();
 		const email = newUserEmail.trim();
-		if (currentUser?.role === 'group_lead') {
-			newUserRole = 'user';
-			newUserGroupId = currentUser.group_id ?? '';
+		if (isLeaderOnly) {
+			newUserPermissionGroups = ['users'];
+			newUserGroupId = currentUser?.group_id ?? '';
 		}
 		if (!name || !email || newUserPassword.length < 8) {
 			userSettingsStatus = t().userValidationCreate;
@@ -2416,7 +2428,7 @@
 			const r = await apiFetch('/api/users', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username: name, email, password: newUserPassword, role: newUserRole, group_id: newUserGroupId || null })
+				body: JSON.stringify({ username: name, email, password: newUserPassword, permission_groups: newUserPermissionGroups, group_id: newUserGroupId || null })
 			});
 			if (!r.ok) {
 				const d = await r.json().catch(() => ({})) as { detail?: unknown };
@@ -2425,7 +2437,7 @@
 			newUserName = '';
 			newUserEmail = '';
 			newUserPassword = '';
-			newUserRole = 'user';
+			newUserPermissionGroups = ['users'];
 			await loadUserSettings();
 		} catch (e) {
 			userSettingsStatus = e instanceof Error ? e.message : String(e);
@@ -2455,7 +2467,7 @@
 		editUserName = user.username;
 		editUserEmail = user.email;
 		editUserPassword = '';
-		editUserRole = user.role;
+		editUserPermissionGroups = [...user.permission_groups];
 		editUserGroupId = user.group_id ?? '';
 	}
 
@@ -2464,7 +2476,7 @@
 		editUserName = '';
 		editUserEmail = '';
 		editUserPassword = '';
-		editUserRole = 'user';
+		editUserPermissionGroups = ['users'];
 		editUserGroupId = '';
 	}
 
@@ -2484,8 +2496,8 @@
 		const patch: Partial<UserItem> & { password?: string } = {
 			username,
 			email,
-			role: currentUser?.role === 'group_lead' ? 'user' : editUserRole,
-			group_id: currentUser?.role === 'group_lead' ? currentUser.group_id : (editUserGroupId || null),
+			permission_groups: isLeaderOnly ? ['users'] : editUserPermissionGroups,
+			group_id: isLeaderOnly ? (currentUser?.group_id ?? null) : (editUserGroupId || null),
 		};
 		if (editUserPassword) patch.password = editUserPassword;
 		await updateUser(user, patch);
@@ -6424,13 +6436,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			bind:newUserName
 			bind:newUserEmail
 			bind:newUserPassword
-			bind:newUserRole
+			bind:newUserPermissionGroups
 			bind:newUserGroupId
 			{selectedUserId}
 			bind:editUserName
 			bind:editUserEmail
 			bind:editUserPassword
-			bind:editUserRole
+			bind:editUserPermissionGroups
 			bind:editUserGroupId
 			bind:newGroupName
 			bind:editGroupName

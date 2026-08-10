@@ -387,7 +387,7 @@ def test_t7_the_stored_prose_survives_a_round_trip_through_the_database():
         username=f"sketch-{suffix}",
         email=f"sketch-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     try:

@@ -50,7 +50,7 @@ def admin_headers():
         username=f"plugin-admin-{suffix}",
         email=f"plugin-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     return _auth_headers(admin)
@@ -64,7 +64,7 @@ def user_headers():
         username=f"plugin-user-{suffix}",
         email=f"plugin-user-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     return _auth_headers(user)

@@ -13,7 +13,7 @@ def _user() -> dict:
         f"lineage-{suffix}",
         f"lineage-{suffix}@example.test",
         "lineage-test-password",
-        "user",
+        ["users"],
         groups[0]["id"] if groups else None,
     )
 

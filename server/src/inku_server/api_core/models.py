@@ -108,8 +108,8 @@ class UserAccountItem(BaseModel):
     id: str
     username: str
     email: str
-    role: str
-    role_label: str
+    permission_groups: list[str]
+    permission_group_labels: list[str]
     group_id: str | None = None
     group_name: str | None = None
     ui_theme: str = "dark"

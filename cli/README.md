@@ -1109,7 +1109,7 @@ options:
 ### `inku-cli user create`
 
 ```
-usage: inku-cli user create [-h] [--role {user,group_lead,admin}]
+usage: inku-cli user create [-h] [--permission-group {users,leaders,admins}]
                             [--group-id GROUP_ID]
                             username email password
 
@@ -1120,8 +1120,9 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --role {user,group_lead,admin}
-                        user role
+  --permission-group {users,leaders,admins}
+                        what the new member may do; repeat to grant several
+                        (default: users)
   --group-id GROUP_ID   assign to a group ID
 
 ```
@@ -1131,7 +1132,7 @@ options:
 ```
 usage: inku-cli user update [-h] [--username USERNAME] [--email EMAIL]
                             [--password PASSWORD]
-                            [--role {user,group_lead,admin}]
+                            [--permission-group {users,leaders,admins}]
                             [--group-id GROUP_ID]
                             user_id
 
@@ -1143,8 +1144,9 @@ options:
   --username USERNAME   update username
   --email EMAIL         update email
   --password PASSWORD   update password
-  --role {user,group_lead,admin}
-                        update role
+  --permission-group {users,leaders,admins}
+                        replace what the member may do; repeat to grant
+                        several
   --group-id GROUP_ID   update group ID
 
 ```

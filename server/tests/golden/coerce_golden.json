@@ -74,7 +74,7 @@
      "instructions": [
       {
        "primitive": "square",
-       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; color_cycle reduced to yellow alone as the DDL names it alone; hard ceiling 400 applied to the whole work",
+       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; stated count from the clause honoured; color_cycle reduced to yellow alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": null,
@@ -108,7 +108,7 @@
         ]
        },
        "arrangement": {
-        "count": 390,
+        "count": 48,
         "layout": "grid",
         "rows": null,
         "cols": null,
@@ -334,7 +334,7 @@
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
      "with_shape_delivery_repair": 0,
-     "with_stated_count_fidelity": 0,
+     "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
@@ -2850,7 +2850,7 @@
      "instructions": [
       {
        "primitive": "square",
-       "note": "black foreground made visible; red promoted to primary stroke from DDL color intent; blue promoted to primary stroke from DDL color intent; green promoted to primary stroke from DDL color intent; gray promoted to primary stroke from DDL color intent; quiet density governed to preserve lightness; original count 110; motion energy restored through trajectory and rotation",
+       "note": "black foreground made visible; red promoted to primary stroke from DDL color intent; blue promoted to primary stroke from DDL color intent; green promoted to primary stroke from DDL color intent; gray promoted to primary stroke from DDL color intent; quiet density governed to preserve lightness; original count 110; motion energy restored through trajectory and rotation; stated count from the clause honoured",
        "from": null,
        "to": null,
        "center": null,
@@ -2884,7 +2884,7 @@
         ]
        },
        "arrangement": {
-        "count": 64,
+        "count": 200,
         "layout": "scatter",
         "rows": null,
         "cols": null,
@@ -3047,7 +3047,7 @@
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
      "with_shape_delivery_repair": 0,
-     "with_stated_count_fidelity": 0,
+     "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
@@ -4208,7 +4208,7 @@
       },
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement",
+       "note": "material inferred from DDL: brush_thin; quiet vertical density governed to keep membrane/space legible; original count 120; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; visual event counterweight preserved through opposing placement; stated count from the clause honoured",
        "from": [
         0.32999999999999996,
         0.5299999999999999
@@ -4241,7 +4241,7 @@
         ]
        },
        "arrangement": {
-        "count": 48,
+        "count": 120,
         "layout": "vertical",
         "rows": null,
         "cols": null,
@@ -4509,7 +4509,7 @@
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
      "with_shape_delivery_repair": 0,
-     "with_stated_count_fidelity": 0,
+     "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
@@ -5384,7 +5384,7 @@
       },
       {
        "primitive": "ellipse",
-       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; stated count from the clause honoured",
        "from": null,
        "to": null,
        "center": [
@@ -5418,7 +5418,7 @@
         ]
        },
        "arrangement": {
-        "count": 120,
+        "count": 30,
         "layout": "radial",
         "rows": null,
         "cols": null,
@@ -5606,7 +5606,7 @@
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
      "with_shape_delivery_repair": 0,
-     "with_stated_count_fidelity": 0,
+     "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
@@ -7345,7 +7345,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190; color_cycle reduced to red alone as the DDL names it alone",
+       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190; stated count from the clause honoured; color_cycle reduced to red alone as the DDL names it alone",
        "from": [
         0.5,
         0.5
@@ -7378,7 +7378,7 @@
         ]
        },
        "arrangement": {
-        "count": 79,
+        "count": 190,
         "layout": "horizontal",
         "rows": null,
         "cols": null,
@@ -7489,7 +7489,7 @@
      "with_rhythm_variation": 0,
      "with_semantic_visual_event_hints": 0,
      "with_shape_delivery_repair": 0,
-     "with_stated_count_fidelity": 0,
+     "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
@@ -11789,7 +11789,7 @@
    }
   }
  },
- "commit": "fb7bea54bd15c6da9041773aa4fa176e715b61e7",
+ "commit": "e022efb0d1e89fa5fdf4ed9a5a870956be41d29e",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

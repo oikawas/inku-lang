@@ -17,6 +17,7 @@ from .normalize import (
     _coerce_marker_values,
     _cluster_count,
     _expanded_count,
+    _mark_count,
     _shape_extent,
 )
 
@@ -63,14 +64,6 @@ MAX_NEON_BLUR_VERTICAL_COUNT = 18
 
 
 MAX_QUIET_LARGE_SHAPE_COUNT = 16
-
-
-# The band a reader counts by eye, and the band this repair stops at. A small
-# number is a promise -- three bells drawn as two is a broken one, and anybody
-# can see it. A large number is density: nobody counts a hundred and thirty
-# lines, they see how full the picture is. Which of density and the total budget
-# should win above this band has not been ruled on, so the repair stays below it.
-MAX_STATED_COUNT_FIDELITY = 11
 
 
 # Deliberately not the note `_with_explicit_constraint_enforcement` writes. Two
@@ -2587,6 +2580,34 @@ def _group_the_clause_names(
     return figure[0] if len(figure) == 1 else None
 
 
+def _stated_count_fidelity_band(limits: Limits) -> int:
+    """The largest stated number this repair will make true.
+
+    Not a boundary of its own. `literal_count_threshold` already draws the line
+    SPEC defines -- below it a stated number is drawn as stated, at or above it
+    the group is shown as a band because a reader cannot count that many by eye
+    -- and the band this repair honours is the literal side of that same line.
+    Writing the number here as a constant of its own would give one boundary two
+    names, and the day one of them moved nobody would notice the other stay
+    behind.
+    """
+    return limits.literal_count_threshold - 1
+
+
+def _marks_with(instructions: list[Instruction], position: int, replacement: Instruction) -> int:
+    """How many marks the work would draw with `replacement` in `position`.
+
+    Counted with `_mark_count`, which is the reader the hard ceiling at the exit
+    of coerce uses. Any other reader here would let through exactly the works
+    that ceiling then trims -- and a grid is the case that separates them, since
+    it draws rows*cols marks whatever its count says.
+    """
+    return sum(
+        _mark_count(replacement if index == position else ins)
+        for index, ins in enumerate(instructions)
+    )
+
+
 def _with_stated_count(ins: Instruction, count: int) -> Instruction:
     data = ins.model_dump(by_alias=True)
     arrangement = dict(data.get("arrangement") or {})
@@ -2617,8 +2638,19 @@ def _with_stated_count_fidelity(
     It repairs only what pairs unambiguously -- one clause, one group. A clause
     matching two groups or none is left alone: a number pushed onto a guess
     changes the count of a group the clause never named, which is a worse defect
-    than the one being repaired. It also stops at the band a reader can count,
-    because above it a number is read as density rather than as a promise.
+    than the one being repaired. It stops at the literal band, because at
+    `literal_count_threshold` and above SPEC asks for the group to be shown
+    rather than counted, and this branch has no business overruling that.
+
+    It also declines a number it cannot deliver whole. This branch runs after
+    both density budgets, so nothing above it will make room; what does run
+    after it is the hard ceiling at the exit of coerce, and that ceiling trims.
+    A trimmed count is the worst of the three outcomes: 233 asked for and 200
+    drawn is neither the number the description stated, nor the number Stage 2
+    chose, nor a representative count -- it is what a division happened to
+    return, and no reader of the Score can say what it means. When the number
+    will not fit, leaving Stage 2's count where it is at least says something
+    true about how the work was made.
     """
     if not ddl or not instructions:
         return instructions
@@ -2626,7 +2658,7 @@ def _with_stated_count_fidelity(
     stated = {
         value
         for value in every_stated_count
-        if 1 <= value <= MAX_STATED_COUNT_FIDELITY
+        if 1 <= value <= _stated_count_fidelity_band(limits)
     }
     if not stated:
         return instructions
@@ -2646,6 +2678,14 @@ def _with_stated_count_fidelity(
         if len(values) != 1:
             continue
         value = values.pop()
+        # A number larger than one instruction is allowed to carry is a number no
+        # group can hold, so there is nothing here to pair it with. Under the
+        # shipping limits this cannot bind -- the band tops out one below
+        # `literal_count_threshold`, which equals `max_expanded_per_instruction`
+        # -- but the two are separate settings with no rounding between them, so
+        # an install that raises the threshold reaches it.
+        if value > limits.max_expanded_per_instruction:
+            continue
         # A number the Score already carries somewhere is a number this branch
         # has nothing to add to. Moving a second group onto it would answer a
         # request that was answered, and take a count nobody asked to change.
@@ -2665,7 +2705,14 @@ def _with_stated_count_fidelity(
         )
         if target is None:
             continue
-        repaired[target] = _with_stated_count(repaired[target], value)
+        candidate = _with_stated_count(repaired[target], value)
+        # Measured against the work as it stands, so a clause repaired earlier
+        # in this same loop is already counted: two clauses each fitting on
+        # their own can be over the ceiling together, and the second one is the
+        # one that has to give way.
+        if _marks_with(repaired, target, candidate) > limits.max_expanded_primitives:
+            continue
+        repaired[target] = candidate
     return repaired
 
 

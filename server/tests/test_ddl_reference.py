@@ -59,7 +59,14 @@ def test_ddl_reference_versions_and_parts() -> None:
     # states a count in the 1..11 band beside a group a clause pairs with. The
     # witness for the new branch is in the coerce golden set, which is where
     # `test_every_branch_coerce_reaches_has_a_witness` demands one.
-    assert DDL_ENGINE_VERSION == "11"
+    # Engine 12 (2026-08-10): the same repair stops at `literal_count_threshold`
+    # instead of at eleven, and declines a number the work has no room for.
+    # `changed_from_previous` is TWO, and both are new: no branch was added, so no
+    # digest moved for a report key this time, and **not one of the 21 carried-over
+    # cases states a count above eleven** -- which is exactly why the two were
+    # written. Freezing the 21 alone would have recorded a version of a layer this
+    # change never traversed.
+    assert DDL_ENGINE_VERSION == "12"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -99,15 +106,15 @@ def test_ddl_reference_versions_and_parts() -> None:
     # new branch's key in its branch report whether or not the branch fired, so
     # the digest moves everywhere and the transform moves in eight. No expand case
     # moves; the change lives entirely inside coerce, like engines 8 and 9.
-    assert len(manifest["cases"]) == 34
+    assert len(manifest["cases"]) == 36
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 21
-    # All 21, for the reason above: the branch report is part of the frozen body,
-    # so a new branch moves every digest. The eight whose Score moved are listed
-    # separately below, and they are the ones this version is about.
-    assert manifest["changed_from_previous"] == sorted(
-        case_id for case_id, case in manifest["cases"].items() if case["part"] == "b_coerce"
-    )
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 23
+    # Two, and both new. Engine 11 listed all 21 because it added a branch and the
+    # report is part of the frozen body; this version added none, so a carried-over
+    # case moves only if the widened band actually reached it. None did.
+    assert manifest["changed_from_previous"] == [
+        "B-stated-count-in-the-wide-band", "B-stated-count-over-the-work-budget",
+    ]
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()
@@ -245,6 +252,14 @@ def test_ddl_reference_coerce_discriminators() -> None:
             "with_color_delivery_repair", "with_primary_color_delivery",
             "without_unrequested_color_cycle",
         },
+        # The pair added at ddl-engine 12, and they are asserted here rather than
+        # left to the frozen bytes on purpose: a corpus is a record that gets
+        # regenerated, so a case can quietly stop exercising what it was added
+        # for and the files still match. These two say it out loud -- one where a
+        # stated count above the old band is written, one where the same branch
+        # declines because the work has no room for it.
+        "B-stated-count-in-the-wide-band": {"with_stated_count_fidelity"},
+        "B-stated-count-over-the-work-budget": set(),
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired, case_id
@@ -337,8 +352,9 @@ def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> No
         )
         checked += 1
     # Say how many were looked at: a gate that silently checked nothing reads
-    # exactly like a gate that passed.
-    assert checked == 13
+    # exactly like a gate that passed. 15 at ddl-engine 12, which added two coerce
+    # cases that carry a DDL.
+    assert checked == 15
 
 
 def test_the_corpus_holds_a_case_of_the_production_shape() -> None:
@@ -353,3 +369,43 @@ def test_the_corpus_holds_a_case_of_the_production_shape() -> None:
     assert fill_clause.startswith("背景を")
     assert len([part for part in fill_clause.split("。") if part.strip()]) >= 4
     assert "\n" in cases["B-production-multiline"]["ddl"]
+
+
+def test_the_corpus_holds_a_stated_count_above_the_band_engine_eleven_stopped_at() -> None:
+    """Read from the generator, not from the frozen manifest.
+
+    The manifest is written by this generator, so a case deleted from
+    `build_coerce_inputs()` leaves the frozen files -- and every test that reads
+    them -- untouched until somebody regenerates. Until ddl-engine 12 the corpus
+    held no stated count above eleven at all, which is the state this guards
+    against returning to.
+    """
+    from inku_server.coerce.compose import _explicit_counts_from_ddl
+    from inku_server.limits import DEFAULT_LIMITS
+
+    cases = _generator().build_coerce_inputs()
+    band = DEFAULT_LIMITS.literal_count_threshold - 1
+
+    written = cases["B-stated-count-in-the-wide-band"]
+    stated = _explicit_counts_from_ddl(written["ddl"])
+    assert any(11 < value <= band for value in stated), stated
+    counts = [
+        (ins.get("arrangement") or {}).get("count") or 1
+        for ins in written["score"]["instructions"]
+    ]
+    assert not (set(counts) & stated), "Stage 2 must have missed the count, or nothing is repaired"
+
+    declined = cases["B-stated-count-over-the-work-budget"]
+    stated = _explicit_counts_from_ddl(declined["ddl"])
+    assert any(11 < value <= band for value in stated), stated
+    standing = sum(
+        (ins.get("arrangement") or {}).get("count") or 1
+        for ins in declined["score"]["instructions"]
+    )
+    assert standing <= DEFAULT_LIMITS.max_expanded_primitives, "the case must be legal before the repair"
+    assert any(
+        standing - (
+            (declined["score"]["instructions"][-1].get("arrangement") or {}).get("count") or 1
+        ) + value > DEFAULT_LIMITS.max_expanded_primitives
+        for value in stated
+    ), "and over the budget only once the stated count is written"

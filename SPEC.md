@@ -917,7 +917,13 @@ Major UI areas:
   Saijiki word highlighting and an expanded dialog editor
 - Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
 - History strip: recent works, hover metadata, star markers, pagination
-- History manager: larger history view, trash, restore, permanent delete, star filter
+- History manager: larger history view, trash, restore, permanent delete, star filter, and
+per-work sharing. The sharing dialog picks a recipient and a permission (read or write) and
+lists who currently holds the work. **A work shared by somebody else carries a mark** — this
+is the screen where people select and delete, and without the mark another member's work sits
+there looking exactly like their own. **Recipients can be picked by name among the members of
+your own organisation group**; a member who cannot fetch candidates types an id directly (the
+full roster is not opened)
 - Settings modal: models, color catalogs, DB status, plugin status, export
   templates, users, theme
 
@@ -3134,9 +3140,9 @@ different emoji sets that match their roles.
 
 ## 22. Security and Operations
 
-The web app includes authentication, permission groups, sessions, per-user settings,
-user profile editing, and user management.  Passwords are stored as salted
-PBKDF2-SHA256 hashes.
+The web app includes authentication, permission groups, the visibility scope of a work
+and its sharing, sessions, per-user settings, user profile editing, and user management.
+Passwords are stored as salted PBKDF2-SHA256 hashes.
 
 **Permission groups (v2.12.0).**  What a member may do is decided by the permission
 groups they hold.  The groups are **fixed at three — `admins`, `leaders`, and `users`** —
@@ -3154,6 +3160,32 @@ moves).  **The startup migration is one-to-one and idempotent**, mapping the old
 migration widened indistinguishable from one a person widened on purpose.  **The
 organisation group is a separate thing, one per member**, judged independently of
 permission.
+
+**Visibility and per-work sharing (v2.12.2).**  What a member may do (the permission
+group) and what a member may see are separate axes.  **The default scope follows
+membership** — `admins` see everything, `leaders` their own organisation, `users` their
+own works — and **a per-work ACL adds to it**.  One ACL row is a **triple of (work,
+recipient kind, recipient)** with two permissions, `read` and `write`.  It is a triple so
+that **the same person may hold different permissions on different works**.  **The ACL
+stores ids and not a single name**, so renaming a member or an organisation carries the
+sharing with it.  **Every decision runs through one visibility predicate, and the paths
+written in raw SQL run through it too** — when the full-text search path is left out, it
+shows up **not as "too much is visible" but as "it goes missing when you search"**, which
+a test written in the "now it is visible" direction cannot catch.  **A refused write
+answers 404, or a count of zero, rather than 403** — a 403 would confirm that the work
+exists.  **Settings carry no ACL**: personal settings stay with their owner, and global
+settings stay with `admins`.
+
+**A lineage may cross owners (v2.12.2).**  Any readable work of another member can be a
+parent, and the root id is inherited, so **one group spans two people and the number of
+visible nodes differs per viewer**.  **A node that cannot be read is returned with its
+content withheld**, and `deleted` is **told apart from `not_permitted` in words** — both
+draw as the same empty dashed card, so **without the label a viewer cannot tell "gone for
+good" from "ask its owner"**.  **An edge follows its child, and the consequence is that
+even the parent's owner cannot see the derivations** — an exception there would revive,
+on the parent's side, the very reason the follow-the-parent design was rejected.  **The
+colophon of a shared work is readable even when somebody else wrote it**, because a
+colophon is read as an annotation on the work.
 
 **Single-user mode (v2.11.19).**  For one person on their own machine, the entry
 ceremony a shared server needs is too much.  A server started with
@@ -3226,8 +3258,10 @@ provider calls from creating an unbounded backlog.
 Per-user drawing counters are updated with a single database-side atomic
 increment so simultaneous `/api/paint` requests for the same user do not lose
 generation counts. History listing, retrieval, starring, trashing, restoring,
-and deletion remain scoped by `user_id` so drawing history does not mix across
-users. Admin status responses include `stage_execution` with Stage worker count,
+and deletion are all scoped by the visibility predicate. **Until v2.12.2 that
+scope was a `user_id` match and nothing else**; membership-derived defaults and
+the per-work ACL now add to it. **The path is still a single one, and no route
+goes without a scope.** Admin status responses include `stage_execution` with Stage worker count,
 queue limit, and submitted/completed/failed/timed_out/rejected counters.
 
 Operational details for the author's local server are intentionally not part of

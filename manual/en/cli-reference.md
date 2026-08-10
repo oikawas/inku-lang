@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.12.1 (Web Build 878).
+It covers inku v2.12.2 (Web Build 879).
 
 ## Basics
 
@@ -123,8 +123,24 @@ batch additionally takes `--continue-on-error`.
 | `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` |
 | `history-export` | `--from` / `--to` (a range of hash suffixes) / `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` |
 | `unread-words` | `--all` (administrator-only aggregate) / `--limit` |
+| `history share` | `--to-user` / `--to-group` (one or the other) / `--permission {read,write}` |
+| `history unshare` | `--to-user` / `--to-group` (one or the other) |
+| `history acl` | (the work ID only) shows who else may see or change that work |
+| `history peers` | (no flags) lists the members of your own organisation group with their IDs |
 
 `--for-revision` narrows to works carrying the revision mark. That mark is independent of the star.
+
+    uv run inku-cli history share WORK_ID --to-user USER_ID --permission read
+    uv run inku-cli history share WORK_ID --to-group GROUP_ID --permission write
+    uv run inku-cli history unshare WORK_ID --to-user USER_ID
+    uv run inku-cli history acl WORK_ID
+    uv run inku-cli history peers
+
+**Only the owner of a work and `admins` may share it. Being able to read a work is not
+permission to hand it on.** A recipient is named by ID, and `history peers` is where to find one.
+`--permission` defaults to `read`; `write` also lets the recipient star, trash and delete that work.
+A work shared with you appears in your own history list, carrying a mark that says it is
+somebody else's.
 
 ## Plugins and reference
 
@@ -153,6 +169,8 @@ The colophon is neither an evaluation nor a selection command. It must not be co
 | `group list / create / update / delete` | Manage user groups |
 | `config show` | Show the server's system settings |
 | `config update` | Update the server's system settings |
+| `single-user show` | Show which account a single-user server opens as, and who else could |
+| `single-user set USER_ID` | Move it to another account, which must hold `admins` |
 
 `user` and `group` require a session in `admins` or `leaders`; `config` requires one in `admins`. `user create` takes the permission groups as `--permission-group {users,leaders,admins}`, which may be repeated. Limits, painting concurrency, the log retention policy, and DB backup settings are all `config` subjects. See `Server Configuration` for what the values mean.
 
@@ -169,7 +187,7 @@ APIs without a dedicated command are reached through api. It accepts only relati
 
 --data and --file are mutually exclusive. Non-JSON responses can be written with --output. Endpoints that need no authentication accept --no-auth.
 
-Permissions match the GUI. A member holding only `users` reaches their own works and settings; `leaders` manages the members of the same group; `admins` reaches server settings, all users, and the aggregate unread-word ledger. Calls outside the permission groups return 403, and calls without a session return 401.
+Permissions match the GUI. A member holding only `users` reaches their own works and settings **plus the works shared with them**; `leaders` manages the members of the same group and reaches **their own organisation's works**; `admins` reaches server settings, all users, the aggregate unread-word ledger, and **every work**. Calls outside the permission groups return 403, and calls without a session return 401. **A write naming a work you cannot see answers 404, or a count of zero, rather than 403** — a 403 would confirm that the work exists.
 
 When retrying a write API, passing the same Idempotency-Key prevents a work and its lineage from being saved twice.
 

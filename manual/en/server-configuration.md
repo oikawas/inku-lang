@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.12.1 (Web Build 878). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.12.2 (Web Build 879). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -171,7 +171,17 @@ Lineage connects only explicit creation operations. It is never inferred from si
 
 One member may hold several permission groups; where they overlap the stronger one decides (a member holding `admins` and `leaders` passes as `admins`). A user group — the organisational unit — is a separate thing: one per member, and independent of permission.
 
-Generation, history, lineage, and settings APIs enforce authentication and user scope. Acceptance testing must verify that roots, works, and counts never cross user boundaries.
+**What a member may do (the table above) and what a member may see are separate axes.** Membership decides the default scope of a work.
+
+| Permission group | Works visible by default |
+|---|---|
+| `admins` | All of them |
+| `leaders` | Those of their own organisation group |
+| `users` | Their own |
+
+**Per-work sharing adds to that.** The owner — and `admins` — can hand a work to a chosen recipient, one work at a time, with either `read` (they can open it) or `write` (they can also star, trash and delete it). **Being able to read a work is not permission to hand it on**: a recipient cannot pass it along.
+
+Generation, history, lineage, and settings APIs enforce authentication and the visibility scope. **⚠ Since v2.12.2 a lineage crosses owners** — any readable work of another member can be a parent, and the group's root is inherited, so **the number of visible nodes in one group differs per viewer**. A node that cannot be read comes back with its content withheld, telling `deleted` apart from `not_permitted` in words. Acceptance testing must cover both directions: **a work that was not shared never reaches another member**, and **a work that was shared does reach them**. **Settings carry no sharing**: personal settings stay with their owner, and global settings stay with `admins`.
 
 ## 5. Models and Languages
 

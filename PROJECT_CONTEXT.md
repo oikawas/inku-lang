@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.12.1 / Build 878**
+**Target version: v2.12.2 / Build 879**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -200,6 +200,13 @@ with a note when it is retired or when the work holds no record of its colors
 - Per-user history, stars, revision marks, comments, trash, search, lineage groups, and explicit lineage
 nodes and edges.
 The two marks are independent: filtering on both shows only the works that carry both
+- Per-work sharing.
+A recipient and a permission (`read` or `write`) are chosen one work at a time, and a shared work
+carries a mark in the list.
+Recipients can be picked by name among the members of your own organisation group; the full roster
+stays closed.
+A lineage may cross owners, so a node you cannot read appears as a card with its content withheld,
+and deleted is told apart from private in words
 - Model, language, and drawing-element comparison; generation-info, prompt, and JSON inspectors; the
 colophon
 - SVG, PNG, and animation export.
@@ -219,7 +226,7 @@ so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 
-- The 82 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
+- The 87 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
 `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`).
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
 - `api.py` holds only the `app` assembly, `_lifespan`, middleware, startup calls, and `include_router`
@@ -231,6 +238,12 @@ What a guard asks is membership in a permission group (`admins`, `leaders`, `use
 may hold several. The test lives in a single predicate; the `role` column that remains on the user row
 is a mirror derived from those memberships and is read by no decision. Memberships are assigned through
 the existing user APIs. The organisation group is a separate thing, one per member, independent of permission.
+- **What a member may do** (the permission group) and **what a member may see** (the visibility scope)
+are separate axes, and both run through a single predicate.
+The default scope gives `admins` everything, `leaders` their own organisation and `users` their own
+works, and a per-work ACL adds to it.
+**The paths written in raw SQL run through the same predicate** — when full-text search is left out,
+it shows up not as "too much is visible" but as "it goes missing when you search".
 - The LLM layer reaches both Anthropic and OpenAI-compatible local or cloud backends, and the product
 can be started without a single API key.
 Model reference resolution follows three rules — explicit qualification, sole ownership, then the

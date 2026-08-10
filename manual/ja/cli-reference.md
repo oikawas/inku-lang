@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.12.1（Web Build 878）です。
+対象はinku v2.12.2（Web Build 879）です。
 
 ## 基本操作
 
@@ -123,8 +123,23 @@ batchはさらに `--continue-on-error` を持ちます。
 | `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` |
 | `history-export` | `--from` / `--to`（hash下位桁の範囲）/ `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` |
 | `unread-words` | `--all`（管理者のみの全体集計）/ `--limit` |
+| `history share` | `--to-user` / `--to-group`（どちらか一方）/ `--permission {read,write}` |
+| `history unshare` | `--to-user` / `--to-group`（どちらか一方） |
+| `history acl` | （引数は作品IDのみ）いま誰がその作品を見られる／変えられるかを表示します |
+| `history peers` | （旗なし）自分と同じ組織グループの利用者をIDつきで一覧します |
 
 `--for-revision` は推敲マークの付いた作品だけに絞ります。スターとは別の印です。
+
+    uv run inku-cli history share WORK_ID --to-user USER_ID --permission read
+    uv run inku-cli history share WORK_ID --to-group GROUP_ID --permission write
+    uv run inku-cli history unshare WORK_ID --to-user USER_ID
+    uv run inku-cli history acl WORK_ID
+    uv run inku-cli history peers
+
+共有できるのは**作品の持ち主と`admins`だけ**です。**読めることは渡せることではありません。**
+宛先はIDで指定します。IDは `history peers` で調べられます。`--permission` の既定は `read` で、
+`write` を渡すとその作品の星付け・ゴミ箱への移動・削除もできるようになります。
+共有された作品は自分の履歴一覧に現れ、他人のものだと分かる印が付きます。
 
 ## プラグインと参照
 
@@ -153,6 +168,8 @@ batchはさらに `--continue-on-error` を持ちます。
 | `group list / create / update / delete` | ユーザーグループの管理 |
 | `config show` | サーバーのシステム設定を表示する |
 | `config update` | サーバーのシステム設定を更新する |
+| `single-user show` | 単独利用モードのサーバーがどのアカウントで開くか、ほかに誰を選べるかを表示する |
+| `single-user set USER_ID` | 開くアカウントを移す（移す先は `admins` に属している必要があります） |
 
 `user` と `group` は`admins`または`leaders`、`config` は`admins`のセッションを必要とします。`user create` の権限グループは `--permission-group {users,leaders,admins}` で指定し、複数回渡せます。制限値、描画の並列度、ログ保存ポリシー、DBバックアップ設定は `config` の対象です。値の意味は`サーバー設定方法`を参照してください。
 
@@ -169,7 +186,7 @@ batchはさらに `--continue-on-error` を持ちます。
 
 --data と --file は同時指定できません。JSON以外のresponseは --output へ保存できます。認証不要endpointには --no-auth を指定できます。
 
-権限はGUIと同一です。`users`だけを持つ利用者は本人の作品・設定だけ、`leaders`は同一グループの利用者管理、`admins`はserver設定、全ユーザー管理、全体未読語集計を操作できます。権限グループの外の呼び出しは403、未ログインは401です。
+権限はGUIと同一です。`users`だけを持つ利用者は本人の作品・設定と、**自分に共有された作品**、`leaders`は同一グループの利用者管理と**自分の組織の作品**、`admins`はserver設定、全ユーザー管理、全体未読語集計、**全作品**を操作できます。権限グループの外の呼び出しは403、未ログインは401です。**見えない作品を名指しした書き込みは403ではなく404、または「0件」を返します** —— 403は「その作品は在る」と教えてしまうためです。
 
 保存系APIを再試行する場合は、同じ Idempotency-Key を指定すると作品と系譜の二重保存を防げます。
 

@@ -5237,3 +5237,68 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   were defects in this change; all were version follow-through.** Rebaking the Android fixture moved
   **only the two files in the new version's directory** — no earlier version, and none of the five
   files the engine does not govern, moved a byte.
+
+### v2.12.2 — A work carries its own guest list (Build 879, 2026-08-11, sharing and visibility)
+
+- **A work can now be shared one at a time, with a chosen recipient.** What is stored is
+  **one row per (work, recipient kind, recipient)**, so **the same person may hold different
+  permissions on different works** (measured: granting one work `read` and another `write` to the
+  same member split their starring into a 404 and a 200). The ACL **holds ids and not a single
+  name**, so **renaming a member or an organisation carries the sharing with it** (measured: a
+  rename does not move a byte of the row). **⚠ Deleting an account and recreating it under the
+  same name does not restore anything** — the id changes, and deletion clears the rows.
+- **Every decision about who may see what was routed through one visibility predicate**
+  (behaviour unchanged). **55 sites moved** (49 ORM, 6 raw SQL). **Two of them are the full-text
+  search path**, where a leak shows up not as "too much is visible" but as **"it goes missing when
+  you search"** — a perturbation in the "now it is visible" direction cannot catch that, so it has
+  its own test.
+- **The permission group decides the default scope.** `admins` see everything, `leaders` their own
+  organisation, `users` their own works — **plus whatever has been shared with them.**
+  **⚠ Existing accounts holding `leaders` can see their organisation's works from the moment of the
+  upgrade.** For everyone else **nothing changes until somebody shares something.**
+- **A lineage may cross owners.** Any readable work of another member can be a parent, and the root
+  is inherited, so **one group spans two people and the number of visible nodes differs per viewer.**
+  **A node that cannot be read is rendered as a card with its content withheld** — and `deleted` is
+  **told apart from `not_permitted` in words**. **Both draw as the same empty dashed card, so without
+  the label a viewer cannot tell "gone for good" from "ask its owner".**
+  **⚠ An edge follows its child, and the consequence is that even the parent's owner cannot see the
+  derivations.** Making an exception there revives, on the parent's side, the very reason the
+  follow-the-parent design was rejected.
+- **A shared work is marked as such in the list** (`HistoryItem.shared`). **It is set only when
+  true, so a client that does not know the key sees a byte-identical response.** Without the mark,
+  **another member's work sits in the deletion screen looking exactly like your own.**
+- **Recipients can be picked by name** (`GET /api/auth/me/group-peers`). It returns **`id` and
+  `username` only**, and **only for members of your own organisation group** (a member without one
+  gets an empty list — "no organisation" is not an organisation). **The full roster `/api/users`
+  stays closed** (still 403 for an ordinary member, with **a control test**, without which an
+  implementation that opened the roster to everyone would pass the new tests too).
+- **Single-user mode can be chosen again** (`GET/PUT /api/settings/single-user`).
+- **CLI**: `history share`, `history unshare`, `history acl`, `history peers`, `single-user show`
+  and `single-user set` were added.
+- **An existing database opens unchanged.** The only schema change is **one added table,
+  `history_acl`**; no existing column moves. `create_all` builds it at startup, so **no migration
+  command is needed**. **Measured**: opening an old database with the new code leaves the content
+  hash of `history` and the existing lineage nodes identical, and the row counts of the other ten
+  tables agree. **Rolling back keeps the rows** — sharing simply goes inert, and returns on upgrade.
+- **⚠ The API-surface gate was raised from a count to a declaration.** The previous surface was
+  frozen as `api-surface-before-the-guest-list.json`; **what was added (5 routes, 7 schemas) and
+  what changed (`shared` on `HistoryItem`) are named**, and **the remaining 82 routes and 81 schemas
+  must match the frozen file exactly.** **The previous gate measured two claims at once** — that the
+  frozen 79 were intact, and that nothing had been added since — so **adding three schemas turned it
+  red without one of the 79 having moved.** Selecting by name before comparing digests keeps the real
+  claim and **also catches a name that disappears**, which a bare count could not.
+- **⚠ Three defects found along the way were fixed.** ① `inku-cli refine save` **had never once
+  succeeded**: all four `--kind` values returned 422, because the mapping existed only in
+  `refine perform`. ② The surface gate above. ③ The lineage cleanup on deletion **missed when a work
+  was deleted through an ACL grant** — the row's owner is not the actor, so **the work vanished while
+  its node was never tombstoned.**
+- **Checks:** **server 2,826 passed / 31 skipped** (26 new on the branch; **the other +22 came from
+  main's ddl-engine 12 cycle**), **cli 217 passed**, **`npm run check` 0 errors / 2 warnings** (the
+  two pre-existing a11y ones), **`test:unit` 132**, **`lint:i18n` 0 errors**, **ruff clean** (server
+  and cli). **No deterministic drawing layer was touched, so the reference corpora did not move a
+  byte.** Against **53 new tests** (server 34, cli 14, web 5), **34 perturbations were applied and 32
+  turned red.**
+- **⚠ The two that missed exposed double protection rather than a hole in the tests** — the content
+  of an unreadable node is stopped both by an early return and by a hydration step that admits only
+  readable rows, so **removing either one leaves the other holding.** Removing both turns the tests
+  red, so they do discriminate.

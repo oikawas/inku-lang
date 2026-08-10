@@ -285,7 +285,7 @@ The block cannot be restored, but the prints can be kept. Each time a generation
 - **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
 - **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges
 - **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they expand into core vocabulary only and cannot modify the core
-- **History and editions** — per-user DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs
+- **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs. A work belongs to whoever wrote it, and **can be shared one at a time with a chosen recipient and permission**
 - **Batch / CLI** — `inku-cli` supports login, painting, batch generation, contact sheets, and diversity analysis
 
 ---

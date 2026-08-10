@@ -2,6 +2,18 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.12.2 Baseline (Web Build 879)
+
+The 13 version markers were moved to v2.12.2 / Build 879, and **`Server Configuration` §4 and the history and administration sections of the `inku-cli Reference` were revised now that a work can be handed to another person**.
+
+- **A work can now be shared one at a time, with a chosen recipient.** Each recipient gets either `read` (they can open it) or `write` (they can also star, trash and delete it), and the same person may hold different permissions on different works.
+- **Only the owner of a work and `admins` may share it.** Being able to read a work is not permission to hand it on, so a recipient cannot pass it along.
+- **What a member may do (the permission group) and what a member may see are now separate axes.** By default `admins` see everything, `leaders` see their own organisation's works, and `users` see their own — plus whatever has been shared with them.
+- **⚠ A member holding `leaders` can see their organisation's works from the moment this version is installed.** For everybody else nothing changes until somebody shares something.
+- **A lineage may now cross owners.** Any readable work of another member can be a parent, so **the number of visible nodes in one group differs per viewer**. A work you cannot read appears with its content withheld, telling `deleted` apart from `private` in words.
+- **Renaming a member or an organisation keeps the sharing intact** (it is remembered by internal ID). **Deleting an account and recreating it under the same name does not restore it.**
+- **`inku-cli` gained `history share`, `history unshare`, `history acl`, `history peers`, `single-user show` and `single-user set`.**
+
 ## 2026-08-11 — Unreleased v2.12.1 Baseline (Web Build 878)
 
 Updated the 13 places that name a version to v2.12.1 / Build 878, and **revised `Creating Images` §3 for the wider reach of a written number**.

@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-10 — Unreleased v2.11.20 Baseline (Web Build 876)
+
+Updated the 13 places that name a version to v2.11.20 / Build 876, and **added how a written count is treated to `Creating Images` §3**.
+
+- **A number from one to eleven is now drawn as written.** Until now only an emphatic form such as "three lines only" held a number; **a count written the ordinary way — "place three circles" — could be overwritten by downstream guesswork.**
+- **It takes effect only when the sentence points to a single group.** If several groups share the same shape, colour and weight so that the sentence does not settle on one of them, the count is left alone. **Applying an ambiguous match would break the number some other sentence stated.**
+- **Numbers of twelve and above are unchanged.** (`Stated counts` in `Server Configuration` still governs them.)
+- **Cloud forms are now read as a shape.** Writing "cloud form" could previously be treated as a line.
+
 ## 2026-08-10 — Unreleased v2.11.19 Baseline (Web Build 875)
 
 Updated the 13 places that name a version to v2.11.19 / Build 875, and **revised the body for single-user mode**.

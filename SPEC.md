@@ -2263,6 +2263,18 @@ that is drawn as stated moves with it. Which values a work was drawn under is
 recorded on the work** (`history.render_limits`), so the configuration carries
 reproducibility on the same footing as the version.
 
+**A count of 1 to 11 is drawn as stated even when the wording is not "only" or
+"alone" (v2.11.20, ddl-engine 11).** Before that, only the emphatic form held a
+number; a count written the ordinary way — "three circles in a row" — was
+overwritten by downstream guesswork. **It reaches a group only when exactly one
+group answers to the clause**: the group carrying the (figure, colour, weight)
+triple built from the clause, or failing that the single group with the same
+figure. **With several candidates, or none, nothing happens — forcing an
+ambiguous pairing would break the number some other clause stated.** The band
+stops at 11 because **only what can be counted by eye is in scope**; how this
+relates to crowd representation and the total budget above that band belongs to a
+separate ruling.
+
 **The treatments that reduce density in quiet, membrane, or memory contexts are
 not applied to a group whose count was stated.** Quietness is a reading of the
 scene; a written number is not a reading. Those treatments act only on groups

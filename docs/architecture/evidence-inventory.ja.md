@@ -11,7 +11,7 @@
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.11.18`、`web/BUILD_NUMBER` = `874` |
 | Render Engine | 実装 `default` / `29` |
-| DDL | `ddl_version=3` / `ddl_engine_version=10` |
+| DDL | `ddl_version=3` / `ddl_engine_version=11` |
 | Android | `android/VERSION` = `2.1.4-android.22`、実装が名乗る Render Engine `26` |
 
 「公開可否」は、この表の記述をそのまま公開できるかを示す。環境変数は名前だけを扱い、値、資格情報、実DB、配備先固有の識別子は調査対象外とした。
@@ -51,7 +51,7 @@
 | WEB-I18N | UI語彙・token | 日英UI、英語用語集、CSS token | `web/src/lib/i18n/*`; `GLOSSARY.md`; `+page.svelte` `:root` | §6–7 | 確認済み | 公開可 |
 | OPS-COMPOSE | Compose配布 | API/Webの2 serviceと永続volume | `compose.yaml`; `server/Dockerfile`; `web/Dockerfile` | §22 | 確認済み | 抽象化すれば可 |
 | TEST-SERVER | Server検査 | pytest、API surface、認可、route所在 | `server/tests`; `test_api_surface.py`; `test_route_authorization.py` | §11; Project Context「検査面」 | 確認済み | 公開可 |
-| TEST-CORPUS | 凍結コーパス | render 29の549件、DDL 10の34件を再生成照合 | `server/reference/render-engine-29/manifest.json`; `ddl-engine-10/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
+| TEST-CORPUS | 凍結コーパス | render 29の549件、DDL 11の34件を再生成照合 | `server/reference/render-engine-29/manifest.json`; `ddl-engine-11/manifest.json`; workflow | §11, §22 | 確認済み | 公開可 |
 | TEST-ANDROID | Android参照 | server版ごとのfixtureをmanifest固定 | `android/app/src/test/resources/server_reference/`; `server/tests/test_android_reference_fixtures_are_current.py` | Android仕様メモ | 確認済み | 公開可 |
 | TEST-WEBCLI | Web/CLI検査 | Svelte check/unit/lint、CLI pytest | `web/package.json`; `web/src/**/*.test.ts`; `cli/tests/test_cli.py` | Project Context「検査面」 | 確認済み | 公開可 |
 | CI-GATES | 現在のCI | corpus再生成、Android design preview、tag時image build | `.github/workflows/reference-corpus.yml`; `release.yml` | §11, §22 | 確認済み | 公開可 |

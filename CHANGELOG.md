@@ -5084,3 +5084,51 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   become false; **the measured figure is eight passages** (the two that describe Compose's required check
   and two on the specification side were missing). The gate count also missed: 13 from the issuer and 16
   once the mid-flight rulings were folded in, against **18 measured**.
+
+### v2.11.20 — the number the description states is the number drawn (Build 876, 2026-08-10, ddl-engine 11)
+
+- **A count of 1 to 11 stated in plain words now reaches the group its clause describes.**
+  Until now only the "**only** three" / "three **alone**" path held a count; **a number written the
+  ordinary way — "three black pen circles in a row" — was overwritten by downstream guesswork.**
+- **It is a new branch of its own, `with_stated_count_fidelity`**, deliberately not folded into the
+  existing "only" path: **folding them together would make "which one corrected this work" unreadable
+  in `branch_report` forever.** Its note carries different wording as well, so attribution stays countable.
+- **A clause is paired with a group in two steps, and an ambiguous pairing is left alone.**
+  First the `(figure, color, weight)` triple built from the clause, when exactly one group carries it;
+  otherwise the same figure, when exactly one group carries that; **otherwise nothing happens.**
+  **Forcing the ambiguous ones would raise the number, but only by breaking some other group's count**
+  (measured under perturbation).
+- **Cloud forms are now read as a figure.** `_primitive_from_clause` had no word for them, so they fell
+  through to the default `line` — **12 of the 15 cloud-form clauses in production.** The clause-built
+  shell gained the cloud form's geometry (centre and size) too: **the renderer draws a cloud form only
+  when both are present**, so reading it correctly without that would have turned "the wrong shape"
+  into "no shape at all".
+- **Measured on 214 cases frozen from production: 144 are now correct**, against 0 before the change.
+  **The 70 that did not move are refusals, not misses** — 47 have more than one group answering to the
+  clause, 20 would leave some other stated number without an answer, and in 3 an earlier clause has
+  already answered that group.
+- **Nothing was touched above 11, nor the crowd representation or the total budget** (which of the two
+  takes precedence has not been ruled on yet).
+- **⚠ This is 14 short of the contract's 158, for one reason: the ceiling was measured on stored Scores,
+  while the branch runs at the exit of coerce.** Branches in between move colour, material and figure,
+  so a pairing that was unique when the work was saved is not unique when the correction runs.
+  **The ceiling where the branch actually runs is 147, and 144 of those are reached.**
+- **Three of the eleven perturbations missed, and all three led to a fix in the gate or the code** —
+  **(1) the claim "it sits after the total budget" cannot be measured** (the budget only ever reduces a
+  count, and 1 to 11 is never what it reduces; placing the branch before and after it beside a group of
+  900 gave byte-identical output), so the claim was rewritten to what was measured; **(2) the "leave a
+  group that already satisfies the request alone" guard works, but nothing detected it** — removing it
+  drops the 214 from 144 to 132 while every test stays green — so a case with that discriminating power
+  was added; **(3) the "one group answers one clause" guard was unreachable** and was removed: once an
+  earlier clause answers a group, that group is already the only answer to its number and never reaches
+  a later clause.
+- **The reference corpus `ddl-engine-11/` (A 13 / B 21) was baked.** No Score moved; `branch_report`
+  simply gained a thirtieth key. `coerce_golden.json` moved in all 40 cases because a branch was added.
+  **The Android reference fixture was baked in the same round** — a new version directory, with not one
+  byte changed in the existing ones.
+- **Checks:** **server 2,730 passed / 31 skipped** (26 new), **cli 199 passed**, **Android JVM 263**
+  (debug, 0 failures), **ruff clean** (server and cli), **`npm run check` 0 errors / 2 warnings**
+  (the two pre-existing a11y ones), **frozen corpora byte-identical on darwin**, **`check_docs.py` consistent**.
+- **⚠ One fact remains:** `_primitive_from_clause` reads a figure word from anywhere in the clause, so
+  the "point" inside "focal point" reads as a figure. **This change works around it with a guard; the
+  misreading itself is untouched.**

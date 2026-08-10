@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v2.11.18（Web Build 874）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v2.11.19（Web Build 875）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -55,12 +55,13 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN` | 8文字未満のpasswordを許す。**本番で設定しない** |
 | `INKU_AUTH_LOCAL_ENABLED` | ユーザー名とpasswordによるログイン（既定 `true`） |
 | `INKU_AUTH_GOOGLE_ENABLED` | Googleによるログイン（既定 `false`） |
+| `INKU_SINGLE_USER` | 単独利用モード。利用者を1人に定めて自動的にログイン済みにする（**コードの既定 `0`／配布compose の既定 `1`**）。**管理者が1人も居ないDBでは働かない** |
 
 passwordが設定され、DBにユーザーがいない場合だけ作成します。8文字未満は拒否されます。初回作成後は秘密を環境から除去します。
 
 空文字は未設定と同じ扱いです。env fileの空欄も、composeの `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` 補間が渡す空値も、起動を失敗させません。初回作成後に環境から除去する際は、行を削除しても空欄にしても同じ結果になります。
 
-inkuにはセルフサインアップがありません。アカウントを作れるのは認証済みのadminまたはgroup leadによる `POST /api/users` だけです。したがって**空のDBをbootstrap adminなしで起動すると、誰もログインできないサーバーになります**。復旧はpasswordを設定して再起動するだけです。bootstrap adminはユーザーが0件のときだけ作成を試みるため、既存アカウントのpasswordが上書きされることはありません。
+inkuにはセルフサインアップがありません。アカウントを作れるのは認証済みのadminまたはgroup leadによる `POST /api/users` だけです。したがって**単独利用モードを off にしたうえで空のDBをbootstrap adminなしで起動すると、誰もログインできないサーバーになります**（単独利用モードが on なら、サーバーが利用者を1人作って自動的にログイン済みにします）。復旧はpasswordを設定して再起動するだけです。bootstrap adminはユーザーが0件のときだけ作成を試みるため、既存アカウントのpasswordが上書きされることはありません。
 
 ### 2.3 artifactと同時実行
 

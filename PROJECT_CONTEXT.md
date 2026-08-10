@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.11.18 / Build 874**
+**Target version: v2.11.19 / Build 875**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -174,6 +174,9 @@ or call counts, and without persisting anything.
 ### web (SvelteKit 2 / Svelte 5)
 
 An authenticated single-page application with description, work, batch, demo, and lineage tabs.
+**On a server started with `INKU_SINGLE_USER`, one person is settled on and signed in automatically,
+so the sign-in screen never appears and the sign-out control is hidden** (the multi-user machinery stays
+in place).
 
 - Description entry and reproducible refinement (touch, placement, reading), plus AI autonomous
 refinement and variation. A leading number and a bracketed comment stay in the stored work, reach

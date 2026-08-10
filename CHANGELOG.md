@@ -5041,3 +5041,46 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   fixed itself**: T-3's sample named no color at all (condition 1 stopped it first, so condition 2 was
   never evaluated), T-5's write always agreed with the existing path, and T-6's sample happened to agree
   with subtracting `background`.
+
+### v2.11.19 — The app opens without a ceremony (Build 875, 2026-08-10, single-user mode)
+
+- **A server started with `INKU_SINGLE_USER` settles on one person and signs them in by itself.**
+  Bring up Compose, open the browser, and you can write. **Not one line of the multi-user machinery was
+  removed**: a branch was added only where `_session_token` used to raise 401, and **neither its return
+  type nor the dependency tree changed**. **All 82 routes keep the guards they had.**
+- **The default now lives in two places.** **The code defaults to off**, so a deployment that merely
+  takes the new version does not quietly lose its authentication, and **the distribution defaults to on**
+  (`INKU_SINGLE_USER=1` in `compose.yaml`). The required check on `INKU_BOOTSTRAP_ADMIN_PASSWORD` was
+  relaxed to optional, because **single-user mode needs no bootstrap administrator**.
+  **⚠ Compose interpolation cannot say "required only when single-user mode is off", so an operator who
+  turns it off must set a password themselves**; `deploy/.env.example` states that condition.
+- **The single user is resolved once, as the oldest `admin`, and the result is pinned in `app_settings`.**
+  **No column is added to the account row** — `app_settings` is keyed, so structurally there can be only
+  one single user. **The pin names an id, not a name**, so **renaming does not move it**, and **because
+  the pin is a row in the DB it leaves with a backup and comes back with one.** On a database with no
+  `admin` at all, single-user mode does not engage and requests stay 401.
+- **`/api/info` reports whether the mode is on**, as one more environment-derived flag alongside
+  `developer_mode`. **The API surface counts did not move — endpoints, operations, and schemas are all
+  still 82.** What moved is the digest and the contents of that one response, and what watches it is a
+  set-difference assertion rather than a count.
+- **The web UI hides the one control that would only bounce back — signing out.**
+  **Changing the password and managing users stay visible**: with the distribution default the account's
+  password is a value nobody knows, so that is the only way back from single-user operation to ordinary
+  operation. The settings panel states this in one line, in both languages. **The sign-in screen was not
+  touched at all** — once auto sign-in works, `/api/auth/me` answers 200 and the screen never appears.
+- **`inku-cli` now sends a request even without a token and falls back to the old message only when the
+  server answers 401.** It used to stop on the client side, so **the request never reached a single-user
+  server** — and only the server knows whether the mode is on. Against a server that is not in
+  single-user mode, the wording is unchanged.
+- **Checks:** **server 2,704 passed / 31 skipped** (14 added), **cli 199 passed** (2 added),
+  **web `test:unit` 125** (2 added), **ruff clean** for server and cli,
+  **`npm run check` 0 errors / 2 warnings** (the two pre-existing a11y warnings), and
+  **`lint:i18n` 0 warnings / 0 errors**. **Eleven perturbations turned 24 assertions red, and no gate
+  was left without one.**
+- **⚠ One ruling made mid-flight was wrong, and the implementation overturned it by measuring.**
+  "The CLI needs no follow-up" was drawn from `/api/info` being a public route, and it did not hold for
+  the commands that require authentication.
+- **⚠ Two of the issuer's estimates missed.** The contract expected four documents in two languages to
+  become false; **the measured figure is eight passages** (the two that describe Compose's required check
+  and two on the specification side were missing). The gate count also missed: 13 from the issuer and 16
+  once the mid-flight rulings were folded in, against **18 measured**.

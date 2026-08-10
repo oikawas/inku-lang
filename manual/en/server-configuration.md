@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.11.18 (Web Build 874). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.11.19 (Web Build 875). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -55,12 +55,13 @@ When both encryption variables are set, direct key material has priority. A pers
 | `INKU_ALLOW_INSECURE_BOOTSTRAP_ADMIN` | Permit a password shorter than eight characters. **Do not set this in production** |
 | `INKU_AUTH_LOCAL_ENABLED` | Sign-in with username and password (default `true`) |
 | `INKU_AUTH_GOOGLE_ENABLED` | Sign-in with Google (default `false`) |
+| `INKU_SINGLE_USER` | Single-user mode: settle on one person and sign them in automatically (**code default `0`, distributed compose default `1`**). **Does not engage on a database with no administrator** |
 
 The account is created only when a password is set and the DB contains no users. Passwords shorter than eight characters are rejected. Remove the secret from the environment after initial creation.
 
 A blank value counts as unset. Neither an empty field in an environment file nor the empty value that Compose's `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` interpolation supplies will fail startup. When clearing the secret after initial creation, deleting the line and blanking it have the same effect.
 
-inku has no self-service registration. Accounts are created only through `POST /api/users` by an authenticated administrator or group lead. **Starting an empty database without a bootstrap administrator therefore leaves a server nobody can sign in to.** Recovery is simply to set the password and restart. The bootstrap administrator is attempted only while the DB has no users, so an existing account's password is never overwritten.
+inku has no self-service registration. Accounts are created only through `POST /api/users` by an authenticated administrator or group lead. **Starting an empty database without a bootstrap administrator, with single-user mode off, therefore leaves a server nobody can sign in to.** With single-user mode on, the server creates one account and signs it in by itself. Recovery is simply to set the password and restart. The bootstrap administrator is attempted only while the DB has no users, so an existing account's password is never overwritten.
 
 ### 2.3 Artifacts and Concurrency
 

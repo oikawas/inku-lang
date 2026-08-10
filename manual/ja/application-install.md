@@ -1,6 +1,6 @@
 # アプリケーションインストール
 
-この文書は、未リリース版inku v2.11.18（Web Build 874）をLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。
+この文書は、未リリース版inku v2.11.19（Web Build 875）をLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。
 
 ## 1. 構成
 
@@ -113,7 +113,9 @@ NVIDIA_API_KEY=
 
 `INKU_BOOTSTRAP_ADMIN_PASSWORD`は8文字以上です。新規DBにユーザーがいない場合だけbootstrap adminを作成します。初回作成後は環境ファイルから削除するか、秘密管理システムへ移します。空文字は未設定と同じ扱いなので、行を削除しても空欄にしても構いません。
 
-**この初回設定は省略できません。** inkuにはセルフサインアップがなく、アカウントを作れるのは認証済みのadminまたはgroup leadだけです。bootstrap adminなしで空のDBを起動したサーバーには、ログインする手段がありません。設定を忘れた場合は、passwordを設定して再起動すれば作成されます（ユーザーが0件のときだけ作成を試みるため、既存アカウントには影響しません）。
+**単独利用モード（`INKU_SINGLE_USER=1`。配布物の既定）ではこの初回設定は要りません。** サーバーが利用者を1人作って自動的にログイン済みにします。
+
+**単独利用モードを off にするなら、この初回設定は省略できません。** inkuにはセルフサインアップがなく、アカウントを作れるのは認証済みのadminまたはgroup leadだけです。bootstrap adminなしで空のDBを起動したサーバーには、ログインする手段がありません。設定を忘れた場合は、passwordを設定して再起動すれば作成されます（ユーザーが0件のときだけ作成を試みるため、既存アカウントには影響しません）。
 
 ## 8. 手動起動で確認する
 
@@ -270,7 +272,7 @@ DB、暗号化鍵、出力artifactを削除すると復旧できません。保�
     docker compose up -d
     docker compose ps
 
-`INKU_BOOTSTRAP_ADMIN_PASSWORD` は必須です。値が無いまま `docker compose up` すると、containerを起動する前にcomposeが停止して不足を知らせます。空のdata volumeから起動したサーバーは、この管理者が唯一のログイン手段だからです。
+`INKU_BOOTSTRAP_ADMIN_PASSWORD` は、単独利用モードを off にするときだけ必要です。**composeはこの値を検査しません** —— 単独利用モードが on なら要らないためで、その条件をcomposeの補間では表せないからです。したがって `INKU_SINGLE_USER=0` にするなら、自分でこの値を設定してください。空のdata volumeから起動したサーバーでは、この管理者が唯一のログイン手段になります。
 
 Webは5173番portで公開し、Node serverが同一originの /api requestを内部FastAPI containerへproxyします。SQLite、backup、artifactは inku-data volumeに永続化されます。API containerは非root userで動作します。
 

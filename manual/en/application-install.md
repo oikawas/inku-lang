@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade of the unreleased inku v2.11.18 (Web Build 874) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
+This guide describes a standard new installation or upgrade of the unreleased inku v2.11.19 (Web Build 875) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
 
 ## 1. Components
 
@@ -113,7 +113,9 @@ NVIDIA_API_KEY=
 
 `INKU_BOOTSTRAP_ADMIN_PASSWORD` must be at least eight characters. A bootstrap admin is created only when the DB has no users. Remove the password from the environment after initial creation or move it to a secret manager; a blank value counts as unset, so deleting the line and blanking it are equivalent.
 
-**This first setting cannot be skipped.** inku has no self-service registration, and only an authenticated administrator or group lead can create accounts. A server started against an empty DB without a bootstrap admin offers no way to sign in. If it was missed, set the password and restart: the account is created then, and because creation is attempted only while the DB has no users, existing accounts are unaffected.
+**In single-user mode (`INKU_SINGLE_USER=1`, the distribution default) this first setting is not needed.** The server creates one account and signs it in by itself.
+
+**If you turn single-user mode off, this first setting cannot be skipped.** inku has no self-service registration, and only an authenticated administrator or group lead can create accounts. A server started against an empty DB without a bootstrap admin offers no way to sign in. If it was missed, set the password and restart: the account is created then, and because creation is attempted only while the DB has no users, existing accounts are unaffected.
 
 ## 8. Verify with Manual Startup
 
@@ -270,7 +272,7 @@ The existing uv, npm, and systemd development and operating procedures remain su
     docker compose up -d
     docker compose ps
 
-`INKU_BOOTSTRAP_ADMIN_PASSWORD` is required. Running `docker compose up` without a value stops Compose before any container starts and reports what is missing, because on a server booted from an empty data volume that administrator is the only way in.
+`INKU_BOOTSTRAP_ADMIN_PASSWORD` is needed only when single-user mode is off. **Compose does not check this value** — it is unnecessary while single-user mode is on, and Compose interpolation cannot express that condition. So if you set `INKU_SINGLE_USER=0`, set this value yourself: on a server booted from an empty data volume that administrator is the only way in.
 
 The Web service publishes port 5173. Its Node server proxies same-origin /api requests to the internal FastAPI container. SQLite, backups, and artifacts persist in the inku-data volume. The API container runs as a non-root user.
 

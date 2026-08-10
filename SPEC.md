@@ -3118,6 +3118,25 @@ The web app includes authentication, user roles, sessions, per-user settings,
 user profile editing, and user management.  Passwords are stored as salted
 PBKDF2-SHA256 hashes.
 
+**Single-user mode (v2.11.19).**  For one person on their own machine, the entry
+ceremony a shared server needs is too much.  A server started with
+`INKU_SINGLE_USER` settles on one person and treats them as already signed in.
+**The multi-user machinery is not removed; only the default moves** — the code
+defaults to off, so a deployment that merely takes a new version does not lose
+its authentication, while the distribution defaults to on, so bringing the
+server up and opening a browser is enough to start writing.  The single user is
+resolved once, as the oldest administrator, and that result is recorded by the
+account's id.  **The id rather than the name is recorded so that renaming does
+not move it, and it is recorded in settings rather than on the account row so
+that there can structurally be only one single user.**  Because the record lives
+in the database, it leaves with a backup and comes back with one.  On a database
+with no administrator the mode does not engage and requests stay refused.
+**Even in single-user mode, changing the password and managing users stay
+visible** — under the distribution default the account's password is a value
+nobody knows, so that is the only way back from single-user operation to
+ordinary operation.  The server reports whether the mode is on through the same
+public response that carries the version and build number.
+
 The app rail user menu opens a profile dialog for the signed-in user.  The
 dialog can update the user's email address and password through
 `PATCH /api/auth/me/profile`.  Password changes require the current password,

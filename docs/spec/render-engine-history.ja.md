@@ -120,9 +120,9 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `3` | **語彙の追加・変更・廃止、または文法の追加・変更・廃止**（2026-07-30 作者裁定で明文化。v2 は太さの語で、v3 は黄・橙・紫で上げた） |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
 | `MODEL_CONFIG_VERSION` | モデルカタログの中身 | `2.5.0` | **計測値・推奨度・選択可否が変わったとき**。上げると保存済みカタログの同じ id へ組み込みのメタを貼り直す（保存済みのモデル一覧と有効/無効の選択は残る） |
-| `APP_VERSION` | アプリの版 | v2.11.18 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
+| `APP_VERSION` | アプリの版 | v2.11.19 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
 | `server/pyproject.toml` | 配布物の版 | 2.7.2 | **リリースのタグを打つときだけ**。`/api/info` の `release_version` が返す。リリース保留中はアプリの版から遅れる |
-| `web/BUILD_NUMBER` | ビルド通し番号 | 874 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
+| `web/BUILD_NUMBER` | ビルド通し番号 | 875 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
 
 **「現在」の列は書いた時点の値である。** 版を上げたら、この列も同じ commit で直す。
 
@@ -314,7 +314,7 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 
 リリース版はコンテナイメージで配布する。git タグ `vX.Y.Z` の push を起点に GitHub Actions が `ghcr.io/oikawas/inku-api` / `ghcr.io/oikawas/inku-web` を multi-arch（amd64 / arm64）で build & push し、利用者は `deploy/` の compose と `.env.example` で起動する（Quickstart は `deploy/README.md`）。開発は従来どおり bare metal（rsync + systemd）で行い、コンテナは Release タイミングで更新する。標準プラグイン（`server/plugins/`、現在は Nature.leaves）はイメージに同梱される。
 
-**アカウントの前提**: セルフサインアップの経路は設けない。アカウント作成は認証済み管理者による `POST /api/users` のみで、最初の入口は新規 DB 起動時に作られる bootstrap admin（`INKU_BOOTSTRAP_ADMIN_PASSWORD`、8 文字以上）である。この値が無いまま起動したサーバーは誰もログインできない箱になる（値を設定して再起動すれば復旧する。既存アカウントがある DB では何も起きない）。空文字は「未設定」として扱い（v2.4.0）、配布 compose は値の無い起動を必須チェックで拒否する。
+**アカウントの前提**: セルフサインアップの経路は設けない。アカウント作成は認証済み管理者による `POST /api/users` のみで、最初の入口は新規 DB 起動時に作られる bootstrap admin（`INKU_BOOTSTRAP_ADMIN_PASSWORD`、8 文字以上）である。この値が無いまま起動したサーバーは誰もログインできない箱になる（値を設定して再起動すれば復旧する。既存アカウントがある DB では何も起きない）。空文字は「未設定」として扱う（v2.4.0）。**v2.11.19 以降、この前提は単独利用モードを off にしたときのものである** —— `INKU_SINGLE_USER` を立てたサーバーは利用者を 1 人に定めて自動的にログイン済みにするので、bootstrap admin を要しない。**配布 compose は単独利用モードを既定 on とし、`INKU_BOOTSTRAP_ADMIN_PASSWORD` の必須チェックを外した** —— 「単独利用モードが off のときだけ必須」を compose の補間では表せないためで、off にする運用者が自分で値を設定する。
 
 `/api/info` は版を 2 つ返す（v2.9.25 で分けた）。`version` は**アプリの版**で、`web/APP_VERSION` の 1 ファイルを読む — UI が画面に出す値と必ず一致する。`release_version` は**配布物の版**で、`server/pyproject.toml` を `importlib.metadata` から読む。**両者は別の概念で、リリースを保留している間は一致しない**（2026-08-01 実測でアプリ v2.9.24 に対し配布物 2.7.2）。分ける前は `version` が配布物の版だけを返しており、同じ画面に 2 つの版数が出ていた。
 

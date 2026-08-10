@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-10 — Unreleased v2.11.19 Baseline (Web Build 875)
+
+Updated the 13 places that name a version to v2.11.19 / Build 875, and **revised the body for single-user mode**.
+
+- **The distribution can be used without writing a single environment variable.** A server started with `INKU_SINGLE_USER` (the distributed compose default is `1`) settles on one person and signs them in automatically. **The sign-in screen never appears.**
+- **`INKU_BOOTSTRAP_ADMIN_PASSWORD` is handled differently.** It used to be required, and `docker compose up` stopped before startup without it. **Compose no longer checks this value** — it is unnecessary while single-user mode is on, and Compose interpolation cannot express that condition. **If you set `INKU_SINGLE_USER=0`, set this value yourself.**
+- **"This first setting cannot be skipped" now describes single-user mode being off.** (`Application Installation` §7)
+- **In single-user mode the sign-out control is hidden**, because using it would only sign you back in. **Changing the password and managing users stay visible** — under the distribution default the account's password is a value nobody knows, so that is the only way back from single-user operation to ordinary operation. The settings panel states this in one line.
+- **`inku-cli` now sends requests without having run `login`.** Against a single-user server they go through; against any other server the familiar message appears.
+- **Added `INKU_SINGLE_USER` to the environment variable table.** (`Server Configuration` §2.2)
+
 ## 2026-08-10 — Unreleased v2.11.18 Baseline (Web Build 874)
 
 Updated the 13 places that name a version to v2.11.18 / Build 874. **The manual body is unchanged** — no screen operation, setting, or response key moved.

@@ -132,9 +132,9 @@ but never asserts "the output will change"**.
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.11.18 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.11.19 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 874 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 875 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -377,8 +377,13 @@ bootstrap admin created on first start against a fresh database
 (`INKU_BOOTSTRAP_ADMIN_PASSWORD`, 8 characters or more). A server started
 without it is a box nobody can sign in to (set the value and restart to
 recover; databases that already have accounts are left untouched). An empty
-string is treated as unset (v2.4.0), and the distributed compose file refuses
-to start without a value.
+string is treated as unset (v2.4.0). **From v2.11.19 this premise describes
+single-user mode being off**: a server started with `INKU_SINGLE_USER` settles
+on one person and signs them in by itself, so it needs no bootstrap admin.
+**The distributed compose file now defaults single-user mode to on and no
+longer requires `INKU_BOOTSTRAP_ADMIN_PASSWORD`** — Compose interpolation
+cannot express "required only when single-user mode is off", so an operator
+who turns it off sets the value themselves.
 
 `/api/info` reports two versions, split apart in v2.9.25. `version` is the
 **application version**, read from the single file `web/APP_VERSION`, so it

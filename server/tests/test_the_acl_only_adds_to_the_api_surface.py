@@ -51,6 +51,7 @@ ADDED_OPERATIONS = {
     "PUT /api/history/{item_id}/acl",
     "GET /api/settings/single-user",
     "PUT /api/settings/single-user",
+    "GET /api/auth/me/group-peers",
 }
 
 ADDED_SCHEMAS = {
@@ -60,6 +61,7 @@ ADDED_SCHEMAS = {
     "SingleUserStatus",
     "SingleUserCandidate",
     "SingleUserBody",
+    "GroupPeer",
 }
 
 # One schema that predates this branch is changed rather than added, and it is

@@ -262,6 +262,52 @@ def test_the_http_route_refuses_a_permission_it_does_not_know(world) -> None:
     assert _acl_rows(world.work["id"]) == []
 
 
+# --- naming a person to share with, without opening the directory ------------
+
+
+def test_a_member_can_see_the_names_in_their_own_organisation(world) -> None:
+    """Sharing needs a way to name a person.
+
+    The account directory is a member manager's, and the owner of a work usually
+    is not one -- before this they had to be handed a raw id and paste it. This
+    answers with the caller's own organisation and nothing wider.
+    """
+    response = client.get("/api/auth/me/group-peers", headers=world.alice_h)
+    assert response.status_code == 200, response.text
+    names = {peer["username"] for peer in response.json()}
+    assert world.leader_a["username"] in names, "a fellow member of circle_a is missing"
+    assert world.bob["username"] not in names, "someone from another organisation is listed"
+    assert world.alice["username"] not in names, "the caller lists themselves"
+
+
+def test_the_peer_list_carries_a_name_and_an_id_and_nothing_else(world) -> None:
+    """A share dialog needs to show a name and send an id. Anything more --
+    email, permission groups, generation counts -- would make this a directory
+    by another route."""
+    peers = client.get("/api/auth/me/group-peers", headers=world.alice_h).json()
+    assert peers, "nobody to check against"
+    assert all(set(peer) == {"id", "username"} for peer in peers), peers[0]
+
+
+def test_an_account_with_no_organisation_sees_nobody(world) -> None:
+    """Not everyone. An account outside any organisation has no peers, and the
+    empty answer is the safe one to get wrong in only one direction."""
+    loner, headers, token = _member("acl-loner", ["users"], None)
+    try:
+        response = client.get("/api/auth/me/group-peers", headers=headers)
+        assert response.status_code == 200, response.text
+        assert response.json() == []
+    finally:
+        db.delete_session(token)
+        db.delete_user(loner["id"], cascade=True)
+
+
+def test_the_member_directory_itself_is_still_a_managers(world) -> None:
+    """The control. Without it, the check above would also pass on a build that
+    simply opened /api/users to everyone."""
+    assert client.get("/api/users", headers=world.alice_h).status_code == 403
+
+
 # --- a shared work says so ---------------------------------------------------
 
 

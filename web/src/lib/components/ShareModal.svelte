@@ -31,15 +31,39 @@
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 
+	// Names the caller may offer. `users` arrives full only for a member
+	// manager; everyone else gets their own organisation from the route below,
+	// which is why this is fetched rather than passed down.
+	let peers = $state<Candidate[]>([]);
+
 	let subjectType = $state<'user' | 'org_group'>('user');
 	let subjectId = $state('');
 	let permission = $state<'read' | 'write'>('read');
 
-	const candidates = $derived(subjectType === 'user' ? users : groups);
+	const candidates = $derived(
+		subjectType === 'user' ? (users.length > 0 ? users : peers) : groups,
+	);
 
 	function nameOf(entry: AclEntry): string {
-		const pool = entry.subject_type === 'user' ? users : groups;
+		const pool = entry.subject_type === 'user' ? [...users, ...peers] : groups;
 		return pool.find((c) => c.id === entry.subject_id)?.name ?? entry.subject_id;
+	}
+
+	async function loadPeers() {
+		if (users.length > 0) return;   // a manager already has the whole directory
+		try {
+			const response = await fetch('/api/auth/me/group-peers', {
+				credentials: 'include',
+				cache: 'no-store',
+			});
+			if (!response.ok) return;   // falls back to the id field; not worth an error
+			peers = ((await response.json()) as { id: string; username: string }[]).map((p) => ({
+				id: p.id,
+				name: p.username,
+			}));
+		} catch {
+			// Same: no peers just means the id has to be typed.
+		}
 	}
 
 	async function load() {
@@ -104,6 +128,7 @@
 	$effect(() => {
 		void itemId;
 		void load();
+		void loadPeers();
 	});
 </script>
 

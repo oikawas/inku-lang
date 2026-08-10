@@ -38,11 +38,14 @@ inku-cli history share <item_id> --to-user <user_id> --permission read
 inku-cli history share <item_id> --to-group <group_id> --permission write
 inku-cli history unshare <item_id> --to-user <user_id>
 inku-cli history acl <item_id>
+inku-cli history peers                     # the members of your own organisation, with their IDs
 ```
 
 `read` lets them open the work; `write` also lets them star, trash and delete it.
 Only the owner and an admin may share — being able to read a work is not
-permission to hand it on.
+permission to hand it on. Sharing takes an ID; `history peers` is where to find
+one, and it answers with your own organisation only. The full member directory
+stays where it was, readable by a member manager.
 
 A work you can read can be varied, and the variation keeps the connection rather
 than copying anything: `inku-cli refine perform <their_item_id> …` records their
@@ -675,13 +678,15 @@ usage: inku-cli history [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--offset OFFSET]
                         [--limit LIMIT] [--query QUERY] [--starred]
                         [--for-revision]
-                        {share,unshare,acl} ...
+                        {share,unshare,acl,peers} ...
 
 positional arguments:
-  {share,unshare,acl}
+  {share,unshare,acl,peers}
     share               let another member see or change one work
     unshare             take one member's access to a work away again
     acl                 show who else may see or change one work
+    peers               list the members of your own organisation, to share a
+                        work with
 
 options:
   -h, --help            show this help message and exit
@@ -739,6 +744,16 @@ usage: inku-cli history acl [-h] item_id
 
 positional arguments:
   item_id     the work to inspect
+
+options:
+  -h, --help  show this help message and exit
+
+```
+
+### `inku-cli history peers`
+
+```
+usage: inku-cli history peers [-h]
 
 options:
   -h, --help  show this help message and exit

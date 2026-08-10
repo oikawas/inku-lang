@@ -1,7 +1,7 @@
 {
-  "digest": "32d3b5da21d894105a88465a121d406952cc9757ff0bec3cd372c87e5ccec7be",
-  "endpoint_count": 86,
-  "operation_count": 86,
+  "digest": "e779e460e50ab3c77f1dce34cf865e9a9064223e91ebc459385126c840815c85",
+  "endpoint_count": 87,
+  "operation_count": 87,
   "operations": [
     {
       "method": "GET",
@@ -162,6 +162,20 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "operationId": "api_me_group_peers_api_auth_me_group_peers_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "path": "/api/auth/me/group-peers",
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/GroupPeer\"},\"title\":\"Response Api Me Group Peers Api Auth Me Group Peers Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1246,7 +1260,7 @@
       }
     }
   ],
-  "schema_count": 88,
+  "schema_count": 89,
   "schemas": {
     "AnimationExportBody": "{\"properties\":{\"format\":{\"default\":\"apng\",\"enum\":[\"apng\",\"gif\"],\"title\":\"Format\",\"type\":\"string\"},\"height_px\":{\"anyOf\":[{\"maximum\":12000.0,\"minimum\":64.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Height Px\"},\"hold_seconds\":{\"default\":1.0,\"maximum\":30.0,\"minimum\":0.1,\"title\":\"Hold Seconds\",\"type\":\"number\"},\"ids\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"minItems\":2,\"title\":\"Ids\",\"type\":\"array\"},\"pattern\":{\"default\":\"cut\",\"enum\":[\"cut\",\"crossfade\",\"fade_white\",\"slide\"],\"title\":\"Pattern\",\"type\":\"string\"},\"resolution\":{\"default\":\"1k\",\"enum\":[\"1k\",\"4k\",\"8k\"],\"title\":\"Resolution\",\"type\":\"string\"}},\"required\":[\"ids\"],\"title\":\"AnimationExportBody\",\"type\":\"object\"}",
     "AppInfoResponse": "{\"properties\":{\"build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Build Number\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"developer_mode\":{\"default\":false,\"title\":\"Developer Mode\",\"type\":\"boolean\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"release_version\":{\"title\":\"Release Version\",\"type\":\"string\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"single_user_mode\":{\"default\":false,\"title\":\"Single User Mode\",\"type\":\"boolean\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"name\",\"version\",\"release_version\",\"render_engine_id\",\"render_engine_version\",\"ddl_version\",\"ddl_engine_version\"],\"title\":\"AppInfoResponse\",\"type\":\"object\"}",
@@ -1270,6 +1284,7 @@
     "DemoSettingsBody": "{\"properties\":{\"interval_seconds\":{\"default\":30,\"maximum\":3600.0,\"minimum\":1.0,\"title\":\"Interval Seconds\",\"type\":\"integer\"},\"prompt_model\":{\"default\":\"google/gemma-4-31b-it\",\"minLength\":1,\"title\":\"Prompt Model\",\"type\":\"string\"},\"prompt_provider\":{\"default\":\"nvidia\",\"minLength\":1,\"title\":\"Prompt Provider\",\"type\":\"string\"},\"save_db\":{\"default\":false,\"title\":\"Save Db\",\"type\":\"boolean\"},\"save_files\":{\"default\":false,\"title\":\"Save Files\",\"type\":\"boolean\"},\"seed_phrase\":{\"default\":\"日本の四季を感じさせる文章を40語以内で生成\",\"maxLength\":1000,\"minLength\":1,\"title\":\"Seed Phrase\",\"type\":\"string\"},\"timeout_seconds\":{\"default\":3600,\"maximum\":86400.0,\"minimum\":60.0,\"title\":\"Timeout Seconds\",\"type\":\"integer\"}},\"title\":\"DemoSettingsBody\",\"type\":\"object\"}",
     "ExportTemplateItem": "{\"properties\":{\"description\":{\"default\":\"\",\"maxLength\":240,\"title\":\"Description\",\"type\":\"string\"},\"id\":{\"maxLength\":80,\"minLength\":1,\"title\":\"Id\",\"type\":\"string\"},\"name\":{\"maxLength\":80,\"minLength\":1,\"title\":\"Name\",\"type\":\"string\"},\"y_px\":{\"maximum\":12000.0,\"minimum\":64.0,\"title\":\"Y Px\",\"type\":\"integer\"}},\"required\":[\"id\",\"name\",\"y_px\"],\"title\":\"ExportTemplateItem\",\"type\":\"object\"}",
     "ExportTemplatesBody": "{\"properties\":{\"templates\":{\"items\":{\"$ref\":\"#/components/schemas/ExportTemplateItem\"},\"title\":\"Templates\",\"type\":\"array\"}},\"title\":\"ExportTemplatesBody\",\"type\":\"object\"}",
+    "GroupPeer": "{\"description\":\"A person the caller may name when sharing a work.\",\"properties\":{\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"username\":{\"title\":\"Username\",\"type\":\"string\"}},\"required\":[\"id\",\"username\"],\"title\":\"GroupPeer\",\"type\":\"object\"}",
     "HTTPValidationError": "{\"properties\":{\"detail\":{\"items\":{\"$ref\":\"#/components/schemas/ValidationError\"},\"title\":\"Detail\",\"type\":\"array\"}},\"title\":\"HTTPValidationError\",\"type\":\"object\"}",
     "HistoryAclBody": "{\"description\":\"The whole list, not a patch.\\n\\nSending the complete list is what makes revoking expressible: a subject the\\ncaller leaves out loses its access. A patch shape would need a separate\\ndelete verb, and a client that never learned it would never revoke anything.\",\"properties\":{\"entries\":{\"items\":{\"$ref\":\"#/components/schemas/HistoryAclEntry\"},\"maxItems\":200,\"title\":\"Entries\",\"type\":\"array\"}},\"title\":\"HistoryAclBody\",\"type\":\"object\"}",
     "HistoryAclEntry": "{\"description\":\"One guest on one work's list.\",\"properties\":{\"permission\":{\"enum\":[\"read\",\"write\"],\"title\":\"Permission\",\"type\":\"string\"},\"subject_id\":{\"maxLength\":100,\"minLength\":1,\"title\":\"Subject Id\",\"type\":\"string\"},\"subject_type\":{\"enum\":[\"user\",\"org_group\"],\"title\":\"Subject Type\",\"type\":\"string\"}},\"required\":[\"subject_type\",\"subject_id\",\"permission\"],\"title\":\"HistoryAclEntry\",\"type\":\"object\"}",

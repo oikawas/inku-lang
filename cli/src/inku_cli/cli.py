@@ -3441,6 +3441,13 @@ def command_history_share(args: argparse.Namespace) -> int:
         config.token,
         timeout_seconds=_resolved_timeout_seconds(args, config),
     )
+    if args.history_action == "peers":
+        # Sharing needs an id, and only a member manager may read /api/users.
+        # This answers with the caller's own organisation, which is who they
+        # are likely to be sharing with anyway.
+        data, _ = client.request("GET", "/api/auth/me/group-peers")
+        _print_json(data)
+        return 0
     path = f"/api/history/{args.item_id}/acl"
     if args.history_action == "acl":
         data, _ = client.request("GET", path)
@@ -3948,10 +3955,14 @@ def build_parser() -> argparse.ArgumentParser:
     history_acl = history_sub.add_parser("acl", help="show who else may see or change one work")
     history_acl.add_argument("item_id", help="the work to inspect")
 
+    history_peers = history_sub.add_parser(
+        "peers", help="list the members of your own organisation, to share a work with"
+    )
+
     # No _add_common_server_args here: `history` itself already carries them,
     # so the server flags go before the subcommand, as they do for `user`,
     # `group` and `lineage`.
-    for parser_ in (history_share, history_unshare, history_acl):
+    for parser_ in (history_share, history_unshare, history_acl, history_peers):
         parser_.set_defaults(func=command_history_share)
 
     unread_words = subparsers.add_parser("unread-words", help="report words the interpreter could not confidently read")

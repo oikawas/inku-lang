@@ -2987,3 +2987,26 @@ def test_lineage_show_labels_a_withheld_parent_apart_from_a_deleted_one(monkeypa
     assert "withheld"[:8] in private_line
     assert "gone"[:8] in deleted_line
     assert "my own work" in printed
+
+
+def test_history_peers_asks_for_the_callers_own_organisation(monkeypatch):
+    """Sharing takes an id, and the member directory is a manager's. This is the
+    one route that answers a plain member, and it stops at their organisation."""
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            calls.append((method, path))
+            return [{"id": "peer-1", "username": "carol"}], None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    args = cli.build_parser().parse_args(["history", "peers"])
+    assert cli.command_history_share(args) == 0
+    assert calls == [("GET", "/api/auth/me/group-peers")]
+    # Not the directory: /api/users answers 403 for a plain member anyway, and
+    # asking it here would make the subcommand useless to the people who need it.
+    assert all(path != "/api/users" for _method, path in calls)

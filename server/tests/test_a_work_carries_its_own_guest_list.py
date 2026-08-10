@@ -290,16 +290,24 @@ def test_the_peer_list_carries_a_name_and_an_id_and_nothing_else(world) -> None:
 
 
 def test_an_account_with_no_organisation_sees_nobody(world) -> None:
-    """Not everyone. An account outside any organisation has no peers, and the
-    empty answer is the safe one to get wrong in only one direction."""
+    """Not everyone -- and not each other.
+
+    TWO accounts outside any organisation, because one would not measure this.
+    `group_id == None` compiles to `IS NULL`, so an implementation that dropped
+    the early return and filtered anyway would still answer nothing while only
+    one such account existed, and would begin listing them to each other the day
+    a second was created. "No organisation" is not an organisation.
+    """
     loner, headers, token = _member("acl-loner", ["users"], None)
+    other, _other_headers, other_token = _member("acl-loner-2", ["users"], None)
     try:
         response = client.get("/api/auth/me/group-peers", headers=headers)
         assert response.status_code == 200, response.text
-        assert response.json() == []
+        assert response.json() == [], "an account outside any organisation was given peers"
     finally:
-        db.delete_session(token)
-        db.delete_user(loner["id"], cascade=True)
+        for user, tok in ((loner, token), (other, other_token)):
+            db.delete_session(tok)
+            db.delete_user(user["id"], cascade=True)
 
 
 def test_the_member_directory_itself_is_still_a_managers(world) -> None:

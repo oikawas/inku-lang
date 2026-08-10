@@ -2678,9 +2678,9 @@ def _with_stated_count_fidelity(
         if len(values) != 1:
             continue
         value = values.pop()
-        # More than one instruction may carry at most is a number no group can
-        # hold, so there is nothing to pair it with. Under the shipping limits
-        # this cannot bind -- the band tops out one below
+        # A number larger than one instruction is allowed to carry is a number no
+        # group can hold, so there is nothing here to pair it with. Under the
+        # shipping limits this cannot bind -- the band tops out one below
         # `literal_count_threshold`, which equals `max_expanded_per_instruction`
         # -- but the two are separate settings with no rounding between them, so
         # an install that raises the threshold reaches it.

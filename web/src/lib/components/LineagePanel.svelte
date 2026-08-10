@@ -24,6 +24,11 @@
 		at: number;
 		deleted_at?: number | null;
 		child_count?: number;
+		// Why this node has no contents. 'deleted' is gone for good; 'not_permitted'
+		// still exists and its owner can hand it over. Both draw as an empty dashed
+		// card, so the word is the only thing that separates them -- and the second
+		// is the one where asking gets you somewhere.
+		redacted?: 'deleted' | 'not_permitted' | null;
 		history?: HistoryItem | null;
 	};
 	export type LineageEdge = {
@@ -75,6 +80,17 @@
 		formatHistoryDate: (at: number) => string;
 		historyPreviewText: (text: string) => string;
 	};
+	function withheldLabel(node: LineageNode): string | null {
+		if (node.redacted === 'not_permitted') return isJapanese ? '非公開' : 'Private';
+		if (node.redacted === 'deleted' || node.state === 'tombstone') return isJapanese ? '削除済み' : 'Deleted';
+		return null;
+	}
+
+	function withheldWorkLabel(node: LineageNode): string {
+		if (node.redacted === 'not_permitted') return isJapanese ? '非公開の作品' : 'Private work';
+		return isJapanese ? '削除された作品' : 'Deleted work';
+	}
+
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
 	type LineageOrientation = 'vertical' | 'horizontal';
 	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
@@ -665,7 +681,8 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			return [{
 				id: edge.id,
 				path,
-				tombstone: nodeById.get(edge.parent_node_id)?.state === 'tombstone' || nodeById.get(edge.child_node_id)?.state === 'tombstone',
+				tombstone: [nodeById.get(edge.parent_node_id), nodeById.get(edge.child_node_id)]
+					.some((n) => n?.state === 'tombstone' || n?.redacted === 'not_permitted'),
 			}];
 		});
 	}
@@ -832,7 +849,7 @@ $effect(() => {
 						{#each nodes as node (node.id)}
 							{@const edge = edgeByChild.get(node.id)}
 							{@const childCount = node.child_count ?? childrenByParent.get(node.id)?.length ?? 0}
-							<article use:registerCard={node.id} class="lineage-card" class:focus={node.id === graph.focus_node_id} class:tombstone={node.state === 'tombstone'} class:trashed={!!node.history?.trashed} class:menu-open={node.id === activeMenuNodeId}>
+							<article use:registerCard={node.id} class="lineage-card" class:focus={node.id === graph.focus_node_id} class:tombstone={node.state === 'tombstone' || node.redacted === 'not_permitted'} class:trashed={!!node.history?.trashed} class:menu-open={node.id === activeMenuNodeId}>
 <div class="card-toolbar">
 {#if node.history?.id && !node.history.trashed}
 	<label class="card-check" aria-label={isJapanese ? '一括操作の対象にする' : 'Check for bulk actions'}>
@@ -910,7 +927,7 @@ $effect(() => {
 {/if}
 </div>
 
-								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : (isJapanese ? '削除された作品' : 'Deleted work')} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
+								<button type="button" class="card-main" disabled={!node.history} aria-current={node.id === graph.focus_node_id ? 'true' : undefined} aria-label={node.history ? `${operationLabel(edge?.derivation_kind)}: ${node.history.source_text ?? node.history.input}` : withheldWorkLabel(node)} onclick={() => openNode(node)} ondblclick={() => { if (node.history) void onOpenNodeInCanvas(node); }}>
 									<div class="operation">
 										<span>{operationLabel(edge?.derivation_kind)}</span>
 										<!-- Both stages only when they differ: naming the same model twice
@@ -923,11 +940,11 @@ $effect(() => {
 										{/if}
 									</div>
 									<div class="preview">
-										{#if node.history?.svg}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{isJapanese ? '削除済み' : 'Deleted'}</span>{/if}
+										{#if node.history?.svg}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{withheldLabel(node) ?? (isJapanese ? '削除済み' : 'Deleted')}</span>{/if}
 									</div>
 									{#if node.history?.display_label}<div class="display-label">{node.history.display_label}</div>{/if}
 									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}
-									<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || (isJapanese ? '削除された作品' : 'Deleted work')}</div>
+									<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || withheldWorkLabel(node)}</div>
 								</button>
 								{#if childCount > 0 && !overviewOpen}
 									<button class="branch-toggle" type="button" aria-expanded={expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${childCount}件` : `${childCount} children`}</button>
@@ -972,7 +989,7 @@ $effect(() => {
 		<ol class="sr-only" aria-label={isJapanese ? '作品系譜の階層一覧' : 'Lineage hierarchy of works'}>
 			{#each graph.nodes as node (node.id)}
 				{@const edge = edgeByChild.get(node.id)}
-				<li>{node.id === graph.focus_node_id ? (isJapanese ? '表示中 — ' : 'Displayed — ') : ''}{operationLabel(edge?.derivation_kind)} — {node.history?.source_text ?? node.history?.input ?? (isJapanese ? '削除された作品' : 'Deleted work')}</li>
+				<li>{node.id === graph.focus_node_id ? (isJapanese ? '表示中 — ' : 'Displayed — ') : ''}{operationLabel(edge?.derivation_kind)} — {node.history?.source_text ?? node.history?.input ?? withheldWorkLabel(node)}</li>
 			{/each}
 		</ol>
 	{/if}

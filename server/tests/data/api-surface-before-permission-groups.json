@@ -4,9 +4,9 @@
     "UserAccountItem": "{\"properties\":{\"at\":{\"title\":\"At\",\"type\":\"integer\"},\"download_folder_enabled\":{\"default\":false,\"title\":\"Download Folder Enabled\",\"type\":\"boolean\"},\"download_folder_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Download Folder Name\"},\"email\":{\"title\":\"Email\",\"type\":\"string\"},\"group_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Group Id\"},\"group_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Group Name\"},\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"image_generation_count\":{\"default\":0,\"title\":\"Image Generation Count\",\"type\":\"integer\"},\"model_settings\":{\"additionalProperties\":true,\"title\":\"Model Settings\",\"type\":\"object\"},\"role\":{\"title\":\"Role\",\"type\":\"string\"},\"role_label\":{\"title\":\"Role Label\",\"type\":\"string\"},\"settings_tab\":{\"default\":\"db\",\"title\":\"Settings Tab\",\"type\":\"string\"},\"tooltips_enabled\":{\"default\":true,\"title\":\"Tooltips Enabled\",\"type\":\"boolean\"},\"ui_custom\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Ui Custom\",\"type\":\"object\"},\"ui_mode\":{\"default\":\"simple\",\"title\":\"Ui Mode\",\"type\":\"string\"},\"ui_theme\":{\"default\":\"dark\",\"title\":\"Ui Theme\",\"type\":\"string\"},\"username\":{\"title\":\"Username\",\"type\":\"string\"}},\"required\":[\"id\",\"username\",\"email\",\"role\",\"role_label\",\"at\"],\"title\":\"UserAccountItem\",\"type\":\"object\"}",
     "UserAccountUpdateBody": "{\"properties\":{\"email\":{\"anyOf\":[{\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Email\"},\"group_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Group Id\"},\"password\":{\"anyOf\":[{\"minLength\":8,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Password\"},\"role\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Role\"},\"username\":{\"anyOf\":[{\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Username\"}},\"title\":\"UserAccountUpdateBody\",\"type\":\"object\"}"
   },
-  "note": "Frozen at 84c456f4, before the permission groups replaced the role flag. Never regenerate: T-8 measures the delta against it. | 2026-08-11: added unchanged_schema_names so the gate selects the schemas it froze by NAME. It compared `len(everything) == 79`, which a later change that merely ADDS a schema turns red without anything having moved.",
-  "unchanged_schema_count": 79,
-  "unchanged_schema_digest": "c0059cd0b3817c927244b18ce2de65b1f8f1c4d7b1b58cb95939193373c94ad1",
+  "note": "Frozen at 84c456f4, before the permission groups replaced the role flag. Never regenerate: T-8 measures the delta against it. | 2026-08-11: added unchanged_schema_names so the gate selects the schemas it froze by NAME. It compared `len(everything) == 79`, which a later change that merely ADDS a schema turns red without anything having moved. | 2026-08-11: HistoryItem removed from the frozen set. The guest-list work adds HistoryItem.shared, a change this gate has no opinion about -- it froze the schema only as one of the 79 it was NOT changing. Its own gate (test_the_acl_only_adds_to_the_api_surface) checks that change field by field against the surface at 3450548c, so nothing is unwatched; leaving it here would only mean re-freezing this file on every later change to any schema it happens to name.",
+  "unchanged_schema_count": 78,
+  "unchanged_schema_digest": "374996d4d9d19fe48c5d70d2e34a8eeb430562fb5ed9a804d03789fb79941282",
   "unchanged_schema_names": [
     "AnimationExportBody",
     "AppInfoResponse",
@@ -33,7 +33,6 @@
     "HTTPValidationError",
     "HistoryForRevisionBody",
     "HistoryIdsBody",
-    "HistoryItem",
     "HistoryLineageGroup",
     "HistoryLineageGroupListResponse",
     "HistoryListResponse",

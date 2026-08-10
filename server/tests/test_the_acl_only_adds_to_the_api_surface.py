@@ -6,10 +6,16 @@ record is not a gate: the moment sharing landed, the baseline was rewritten to
 match whatever the code now produces, and any collateral damage in the other 82
 operations was written into the new baseline as if it had always been there.
 
-So the pre-ACL surface is frozen here as a digest, by hand, from the baseline as
-it stood at `3450548c` -- before any of this branch's stages. The check is a set
-difference: strip the operations and schemas this branch is allowed to add, and
-what remains must hash to exactly what was there before.
+So the surface as it stood at `3450548c` -- before any of this branch's stages --
+is kept beside it as a second, frozen file. The check is a set difference: strip
+the operations and schemas this branch is allowed to add, check the one schema it
+is allowed to CHANGE field by field, and what remains must equal the frozen copy
+exactly. Comparing the remainder rather than hashing it means a failure names
+what moved instead of only saying that something did.
+
+The one declared change is `HistoryItem.shared`. The contract expected this
+branch to add routes and touch nothing else; marking a work as somebody else's
+needs a field on the work, and the listing is the thing that has to say it.
 
 What this does NOT cover, and nothing on the surface can: the lineage responses
 (`/api/lineage/{node_id}` and `/api/history/{item_id}/lineage`) declare no
@@ -20,15 +26,20 @@ behaviour alone -- see the lineage tests.
 
 from __future__ import annotations
 
-import hashlib
 import json
+import pathlib
 
 from .test_api_surface import _stable, current_surface
 
+# The surface as it stood at `3450548c`, this branch's starting point. Frozen:
+# never regenerated. `api-surface-baseline.json` tracks the CURRENT surface and
+# is rewritten whenever it legitimately changes, which is exactly what makes it
+# useless for telling an intended addition from collateral damage.
+BASELINE_BEFORE_THE_BRANCH = (
+    pathlib.Path(__file__).parent / "data" / "api-surface-before-the-guest-list.json"
+)
 
-# The 82 operations and 82 schemas as of `3450548c`, the branch point. Measured
-# once from the then-current baseline file; never regenerated.
-PRE_ACL_DIGEST = "9fdae3d3a725dcf7692fd00983c9f5ef51a6a414075b3841890c8a7ba3651d04"
+
 PRE_ACL_OPERATION_COUNT = 82
 PRE_ACL_SCHEMA_COUNT = 82
 
@@ -51,6 +62,15 @@ ADDED_SCHEMAS = {
     "SingleUserBody",
 }
 
+# One schema that predates this branch is changed rather than added, and it is
+# declared here with exactly what may change in it. The contract expected the
+# branch to add routes and touch nothing else; marking a work as somebody else's
+# needs a field on the work itself, and there is nowhere else to put it -- the
+# listing is the thing that has to say it. Declaring the change keeps the check
+# honest: any OTHER movement in HistoryItem, and any movement at all in the
+# remaining 81, still fails.
+CHANGED_SCHEMAS = {"HistoryItem": {"added": {"shared"}, "removed": set()}}
+
 
 def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> None:
     surface = current_surface()
@@ -68,14 +88,26 @@ def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> Non
     for name in ADDED_SCHEMAS:
         schemas.pop(name)
 
-    assert len(operations) == PRE_ACL_OPERATION_COUNT
-    assert len(schemas) == PRE_ACL_SCHEMA_COUNT
+    # The one declared change, checked field by field before being set aside.
+    baseline = json.loads(BASELINE_BEFORE_THE_BRANCH.read_text(encoding="utf-8"))
+    for name, expected in CHANGED_SCHEMAS.items():
+        before = set(json.loads(baseline["schemas"][name])["properties"])
+        after = set(json.loads(schemas.pop(name))["properties"])
+        assert after - before == expected["added"], f"{name} gained {sorted(after - before)}"
+        assert before - after == expected["removed"], f"{name} lost {sorted(before - after)}"
 
-    digest = hashlib.sha256(
-        _stable({"operations": operations, "schemas": schemas}).encode()
-    ).hexdigest()
-    assert digest == PRE_ACL_DIGEST, (
-        "an operation or schema that predates this branch has changed. "
+    assert len(operations) == PRE_ACL_OPERATION_COUNT
+    assert len(schemas) == PRE_ACL_SCHEMA_COUNT - len(CHANGED_SCHEMAS)
+
+    unchanged_before = {
+        name: body for name, body in baseline["schemas"].items() if name not in CHANGED_SCHEMAS
+    }
+    assert schemas == unchanged_before, (
+        "a schema that predates this branch and was not declared as changing has moved: "
+        f"{sorted(set(schemas) ^ set(unchanged_before)) or [n for n in schemas if schemas[n] != unchanged_before.get(n)]}"
+    )
+    assert {f"{op['method']} {op['path']}": _stable(op) for op in baseline["operations"]} == operations, (
+        "an operation that predates this branch has changed. "
         "Adding a route is allowed; altering one that was already there is not."
     )
 

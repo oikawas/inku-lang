@@ -262,6 +262,35 @@ def test_the_http_route_refuses_a_permission_it_does_not_know(world) -> None:
     assert _acl_rows(world.work["id"]) == []
 
 
+# --- a shared work says so ---------------------------------------------------
+
+
+def _listed(headers: dict[str, str], **params) -> list[dict]:
+    response = client.get("/api/history", headers=headers, params={"limit": 100, **params})
+    assert response.status_code == 200, response.text
+    return response.json()["items"]
+
+
+def test_a_shared_work_is_marked_as_someone_elses(world) -> None:
+    """The listing is the thing people select and delete from, so a work that is
+    not theirs has to look different in it."""
+    db.grant_history_acl(world.alice["id"], world.work["id"], "user", world.bob["id"], "read")
+    mine = [item for item in _listed(world.alice_h) if item["id"] == world.work["id"]]
+    theirs = [item for item in _listed(world.bob_h) if item["id"] == world.work["id"]]
+    assert mine and theirs
+
+    assert theirs[0].get("shared") is True
+    # Absent, not false: a client that never learned the field sees no change.
+    assert "shared" not in mine[0]
+
+
+def test_the_mark_follows_the_group_scope_too(world) -> None:
+    """Not only explicit grants. A leader's own listing carries their
+    organisation's works, and those are not theirs either."""
+    theirs = [item for item in _listed(world.leader_a_h) if item["id"] == world.work["id"]]
+    assert theirs and theirs[0].get("shared") is True
+
+
 # --- the default is empty ----------------------------------------------------
 
 

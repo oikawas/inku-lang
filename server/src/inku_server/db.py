@@ -2578,9 +2578,23 @@ def _row_to_dict(row: HistoryRow) -> dict:
     return item
 
 
-def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow]) -> list[dict]:
-    """Attach edge provenance while keeping lineage_edges as the source of truth."""
+def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow], actor: dict | None = None) -> list[dict]:
+    """Attach edge provenance while keeping lineage_edges as the source of truth.
+
+    `actor` marks the works that reached this listing through someone else's
+    permission -- a group scope or a grant -- rather than by being the caller's
+    own. Without the mark, another person's work sits in the listing looking
+    exactly like one of yours, and the first thing anyone does with a listing is
+    select and delete from it.
+
+    Set only when true, so `response_model_exclude_none` keeps it off the wire
+    for the ordinary case of a person looking at their own works.
+    """
     items = [_row_to_dict(row) for row in rows]
+    if actor is not None:
+        for item, row in zip(items, rows):
+            if row.user_id != actor["id"]:
+                item["shared"] = True
     node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
     if not node_ids:
         return items
@@ -3804,7 +3818,7 @@ def _list_items_with_fts(
         return [], int(total)
     order = {item_id: index for index, item_id in enumerate(ids)}
     rows = session.query(HistoryRow).filter(HistoryRow.id.in_(ids)).all()
-    items = _rows_to_dicts_with_lineage(session, rows)
+    items = _rows_to_dicts_with_lineage(session, rows, actor)
     return sorted(items, key=lambda item: order[item["id"]]), int(total)
 
 
@@ -3843,7 +3857,7 @@ def list_items(
             .limit(limit)
             .all()
         )
-        return _rows_to_dicts_with_lineage(session, rows), total
+        return _rows_to_dicts_with_lineage(session, rows, actor), total
 
 
 def list_lineage_groups(
@@ -3927,7 +3941,7 @@ def list_lineage_groups(
         representative_rows = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids)).all()
         representative_by_id = {
             item["id"]: item
-            for item in _rows_to_dicts_with_lineage(session, representative_rows)
+            for item in _rows_to_dicts_with_lineage(session, representative_rows, actor)
         }
         groups = []
         for row in page_rows:
@@ -3992,7 +4006,7 @@ def list_lineage_group_items(
             query = query.filter(_history_search_clause(search))
         total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
         rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit).all()
-        return _rows_to_dicts_with_lineage(session, rows), total
+        return _rows_to_dicts_with_lineage(session, rows, actor), total
 
 
 def item_position(
@@ -4090,7 +4104,7 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
             )
             .all()
         )
-        items = _rows_to_dicts_with_lineage(session, rows)
+        items = _rows_to_dicts_with_lineage(session, rows, actor)
         return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
 

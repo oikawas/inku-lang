@@ -545,6 +545,10 @@
 	// all -- are dropped; the way back to a multi-user server (changing the
 	// password) is deliberately kept.
 	let singleUserMode = $state(false);
+	// The work whose guest list is open, if any. Sharing is offered only when
+	// there is somebody to share with: a single-user server is one person's own,
+	// so the button is withheld there rather than opening onto an empty list.
+	let shareTarget = $state<HistoryItem | null>(null);
 	let currentRenderEngineVersion = $state<string | null>(null);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
@@ -6650,6 +6654,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{apiFetch}
 			currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
 			currentLineageRootId={displayedHistoryItem?.lineage_root_node_id ?? null}
+			isJapanese={getLang() === 'ja'}
+			onShareItem={singleUserMode ? null : (item) => (shareTarget = item)}
+		/>
+	{/await}
+{/if}
+
+{#if shareTarget?.id}
+	{#await import('$lib/components/ShareModal.svelte') then { default: ShareModal }}
+		<ShareModal
+			itemId={shareTarget.id}
+			itemLabel={shareTarget.source_text ?? shareTarget.input ?? shareTarget.id}
+			users={users.map((u) => ({ id: u.id, name: u.username }))}
+			groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+			isJapanese={getLang() === 'ja'}
+			onClose={() => (shareTarget = null)}
 		/>
 	{/await}
 {/if}

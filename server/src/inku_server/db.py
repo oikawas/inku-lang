@@ -1943,6 +1943,51 @@ def single_user_pinned_id() -> str | None:
     return (_read_app_setting(_SINGLE_USER_SETTING_KEY) or {}).get("user_id")
 
 
+def set_single_user_pin(user_id: str) -> dict:
+    """Move the pin to another account. Raises ValueError when it may not move.
+
+    Only an account holding `admins` may receive it. Anyone else would open the
+    app to a settings screen they cannot reach, unable to change the LLM
+    connection -- which is the whole point of a server that belongs to one
+    person.
+
+    Sessions already open are left alone deliberately. The pin decides who the
+    NEXT automatic login becomes; revoking the current one would drop whoever is
+    working right now, and the person moving the pin is usually that person.
+    """
+    if not single_user_mode_enabled():
+        # Nothing reads the pin when the mode is off, so writing it would look
+        # like it had taken effect and change nothing.
+        raise ValueError("single-user mode is not enabled")
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if row is None:
+            raise ValueError("user not found")
+        if "admins" not in _permission_groups_of(session, user_id):
+            raise ValueError("the single user must hold the admins permission group")
+    stored = _read_app_setting(_SINGLE_USER_SETTING_KEY) or {}
+    _write_app_setting(_SINGLE_USER_SETTING_KEY, {**stored, "user_id": user_id})
+    return single_user_pin_status()
+
+
+def single_user_pin_status() -> dict:
+    """Who the app opens as, and who it could open as instead."""
+    pinned_id = single_user_pinned_id()
+    pinned = get_user(pinned_id) if pinned_id else None
+    with SessionLocal() as session:
+        eligible = [
+            {"id": row.id, "username": row.username}
+            for row in session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).all()
+            if "admins" in _permission_groups_of(session, row.id)
+        ]
+    return {
+        "enabled": single_user_mode_enabled(),
+        "user_id": pinned_id,
+        "username": pinned["username"] if pinned else None,
+        "eligible": eligible,
+    }
+
+
 def database_info() -> dict:
     url = engine.url
     db_path = _sqlite_db_path()

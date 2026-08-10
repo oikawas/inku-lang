@@ -38,12 +38,17 @@ PRE_ACL_SCHEMA_COUNT = 82
 ADDED_OPERATIONS = {
     "GET /api/history/{item_id}/acl",
     "PUT /api/history/{item_id}/acl",
+    "GET /api/settings/single-user",
+    "PUT /api/settings/single-user",
 }
 
 ADDED_SCHEMAS = {
     "HistoryAclEntry",
     "HistoryAclEntryOut",
     "HistoryAclBody",
+    "SingleUserStatus",
+    "SingleUserCandidate",
+    "SingleUserBody",
 }
 
 

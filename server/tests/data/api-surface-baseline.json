@@ -1,7 +1,7 @@
 {
-  "digest": "356c771446d9211ce363ee80ef202123ed94f81e44cef35b697ba2af5bb07c12",
-  "endpoint_count": 84,
-  "operation_count": 84,
+  "digest": "6a9597adbd72e095bbefc7d1c85c4e34a27252c0c56245b4994648fc30cc909c",
+  "endpoint_count": 86,
+  "operation_count": 86,
   "operations": [
     {
       "method": "GET",
@@ -1064,6 +1064,34 @@
     },
     {
       "method": "GET",
+      "operationId": "api_settings_single_user_api_settings_single_user_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "path": "/api/settings/single-user",
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "PUT",
+      "operationId": "api_settings_set_single_user_api_settings_single_user_put",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "path": "/api/settings/single-user",
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "GET",
       "operationId": "api_settings_status_api_settings_status_get",
       "params": [
         "cookie:inku_session:opt",
@@ -1218,7 +1246,7 @@
       }
     }
   ],
-  "schema_count": 85,
+  "schema_count": 88,
   "schemas": {
     "AnimationExportBody": "{\"properties\":{\"format\":{\"default\":\"apng\",\"enum\":[\"apng\",\"gif\"],\"title\":\"Format\",\"type\":\"string\"},\"height_px\":{\"anyOf\":[{\"maximum\":12000.0,\"minimum\":64.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Height Px\"},\"hold_seconds\":{\"default\":1.0,\"maximum\":30.0,\"minimum\":0.1,\"title\":\"Hold Seconds\",\"type\":\"number\"},\"ids\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"minItems\":2,\"title\":\"Ids\",\"type\":\"array\"},\"pattern\":{\"default\":\"cut\",\"enum\":[\"cut\",\"crossfade\",\"fade_white\",\"slide\"],\"title\":\"Pattern\",\"type\":\"string\"},\"resolution\":{\"default\":\"1k\",\"enum\":[\"1k\",\"4k\",\"8k\"],\"title\":\"Resolution\",\"type\":\"string\"}},\"required\":[\"ids\"],\"title\":\"AnimationExportBody\",\"type\":\"object\"}",
     "AppInfoResponse": "{\"properties\":{\"build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Build Number\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"developer_mode\":{\"default\":false,\"title\":\"Developer Mode\",\"type\":\"boolean\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"release_version\":{\"title\":\"Release Version\",\"type\":\"string\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"single_user_mode\":{\"default\":false,\"title\":\"Single User Mode\",\"type\":\"boolean\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"name\",\"version\",\"release_version\",\"render_engine_id\",\"render_engine_version\",\"ddl_version\",\"ddl_engine_version\"],\"title\":\"AppInfoResponse\",\"type\":\"object\"}",
@@ -1288,6 +1316,9 @@
     "RenderSvgRequest": "{\"properties\":{\"canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Canvas Aspect\"},\"catalog_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Catalog Id\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Placement seed for arrangements; omitted means the placement follows the performance seed\",\"title\":\"Composition Seed\"},\"render_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Renderer performance seed for reproducible replay\",\"title\":\"Render Seed\"},\"score\":{\"additionalProperties\":true,\"title\":\"Score\",\"type\":\"object\"},\"seed_text\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Explicit text used only to derive the Renderer performance seed\",\"title\":\"Seed Text\"},\"svg_profile\":{\"default\":\"display\",\"description\":\"SVG output profile: display / editable / compat\",\"title\":\"Svg Profile\",\"type\":\"string\"},\"wild\":{\"default\":false,\"description\":\"Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed\",\"title\":\"Wild\",\"type\":\"boolean\"},\"work_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Id of the work being redrawn; its recorded colors decide this render\",\"title\":\"Work Id\"}},\"required\":[\"score\"],\"title\":\"RenderSvgRequest\",\"type\":\"object\"}",
     "Score": "{\"additionalProperties\":false,\"properties\":{\"background\":{\"default\":\"white\",\"description\":\"背景色: white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰 / yellow=黄 / orange=橙 / purple=紫 (省略=white)。「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ\",\"enum\":[\"white\",\"black\",\"blue\",\"red\",\"green\",\"gray\",\"yellow\",\"orange\",\"purple\"],\"title\":\"Background\",\"type\":\"string\"},\"canvas\":{\"anyOf\":[{\"type\":\"string\"},{\"$ref\":\"#/components/schemas/CanvasSpec\"}],\"default\":\"square\",\"description\":\"キャンバス比率ID、または {aspect, ground}。標準値は square。ground は紙目・薄墨地などの支持体質感を保持する\",\"title\":\"Canvas\"},\"instructions\":{\"items\":{\"$ref\":\"#/components/schemas/Instruction\"},\"title\":\"Instructions\",\"type\":\"array\"},\"presence\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Presence\"},{\"type\":\"null\"}],\"description\":\"人・顔・動物・群れなどの対象物を直接描かず、存在感、重心、対称性、視線の圧力、群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止\"},\"version\":{\"const\":\"0.1.0\",\"default\":\"0.1.0\",\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"instructions\"],\"title\":\"Score\",\"type\":\"object\"}",
     "SettingsStatusResponse": "{\"properties\":{\"database\":{\"$ref\":\"#/components/schemas/DatabaseSettingsStatus\"},\"db_backup\":{\"$ref\":\"#/components/schemas/DbBackupStatus\"},\"log_retention\":{\"$ref\":\"#/components/schemas/LogRetentionStatus\"},\"output_save\":{\"$ref\":\"#/components/schemas/OutputSaveStatus\"},\"plugins\":{\"$ref\":\"#/components/schemas/PluginSettingsStatus\"},\"render_concurrency\":{\"$ref\":\"#/components/schemas/RenderConcurrencyStatus\"},\"render_limits\":{\"$ref\":\"#/components/schemas/RenderLimitsStatus\"},\"stage_execution\":{\"$ref\":\"#/components/schemas/StageExecutionStatus\"}},\"required\":[\"database\",\"db_backup\",\"plugins\",\"output_save\",\"log_retention\",\"stage_execution\",\"render_concurrency\",\"render_limits\"],\"title\":\"SettingsStatusResponse\",\"type\":\"object\"}",
+    "SingleUserBody": "{\"properties\":{\"user_id\":{\"maxLength\":100,\"minLength\":1,\"title\":\"User Id\",\"type\":\"string\"}},\"required\":[\"user_id\"],\"title\":\"SingleUserBody\",\"type\":\"object\"}",
+    "SingleUserCandidate": "{\"properties\":{\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"username\":{\"title\":\"Username\",\"type\":\"string\"}},\"required\":[\"id\",\"username\"],\"title\":\"SingleUserCandidate\",\"type\":\"object\"}",
+    "SingleUserStatus": "{\"properties\":{\"eligible\":{\"items\":{\"$ref\":\"#/components/schemas/SingleUserCandidate\"},\"title\":\"Eligible\",\"type\":\"array\"},\"enabled\":{\"title\":\"Enabled\",\"type\":\"boolean\"},\"user_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"User Id\"},\"username\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Username\"}},\"required\":[\"enabled\"],\"title\":\"SingleUserStatus\",\"type\":\"object\"}",
     "StageExecutionStatus": "{\"properties\":{\"completed\":{\"title\":\"Completed\",\"type\":\"integer\"},\"failed\":{\"title\":\"Failed\",\"type\":\"integer\"},\"note\":{\"title\":\"Note\",\"type\":\"string\"},\"queue_limit\":{\"title\":\"Queue Limit\",\"type\":\"integer\"},\"rejected\":{\"title\":\"Rejected\",\"type\":\"integer\"},\"submitted\":{\"title\":\"Submitted\",\"type\":\"integer\"},\"timed_out\":{\"title\":\"Timed Out\",\"type\":\"integer\"},\"workers\":{\"title\":\"Workers\",\"type\":\"integer\"}},\"required\":[\"workers\",\"queue_limit\",\"submitted\",\"completed\",\"failed\",\"timed_out\",\"rejected\",\"note\"],\"title\":\"StageExecutionStatus\",\"type\":\"object\"}",
     "SurfaceSpec": "{\"additionalProperties\":false,\"properties\":{\"bleed\":{\"default\":0.0,\"description\":\"滲み・広がり量 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Bleed\",\"type\":\"number\"},\"density\":{\"default\":0.35,\"description\":\"質感密度 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Density\",\"type\":\"number\"},\"direction\":{\"default\":\"none\",\"description\":\"線状質感の向き: none / horizontal / vertical / diagonal_rising / diagonal_falling\",\"enum\":[\"none\",\"horizontal\",\"vertical\",\"diagonal_rising\",\"diagonal_falling\"],\"title\":\"Direction\",\"type\":\"string\"},\"opacity\":{\"default\":0.28,\"description\":\"質感の不透明度 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Opacity\",\"type\":\"number\"},\"scale\":{\"default\":0.35,\"description\":\"質感粒度・間隔 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Scale\",\"type\":\"number\"},\"seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"任意の質感 seed。省略時は Renderer が演奏 seed から導出\",\"title\":\"Seed\"},\"spacing_gradient\":{\"default\":\"none\",\"description\":\"ハッチ間隔の勾配\",\"enum\":[\"none\",\"coarse_to_dense\",\"dense_to_coarse\"],\"title\":\"Spacing Gradient\",\"type\":\"string\"},\"texture\":{\"default\":\"none\",\"description\":\"面の質感: none=なし / stipple=点 / hatch=平行線 / crosshatch=交差線 / aquatint=段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / bleed=端が滲む / paper_grain=紙目\",\"enum\":[\"none\",\"stipple\",\"hatch\",\"crosshatch\",\"aquatint\",\"grain\",\"wash\",\"bleed\",\"paper_grain\"],\"title\":\"Texture\",\"type\":\"string\"},\"tone_steps\":{\"default\":3,\"description\":\"aquatint の離散調子段数 2-4\",\"maximum\":4.0,\"minimum\":2.0,\"title\":\"Tone Steps\",\"type\":\"integer\"}},\"title\":\"SurfaceSpec\",\"type\":\"object\"}",
     "UnreadWordsBody": "{\"properties\":{\"context\":{\"default\":\"\",\"maxLength\":1000,\"title\":\"Context\",\"type\":\"string\"},\"words\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"title\":\"Words\",\"type\":\"array\"}},\"title\":\"UnreadWordsBody\",\"type\":\"object\"}",

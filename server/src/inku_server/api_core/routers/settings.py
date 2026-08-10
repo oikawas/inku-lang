@@ -568,3 +568,41 @@ def api_settings_run_db_backup(actor: dict = Depends(_admin_user)) -> DbBackupRe
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return DbBackupResult(**result)
+
+
+class SingleUserCandidate(BaseModel):
+    id: str
+    username: str
+
+
+class SingleUserStatus(BaseModel):
+    enabled: bool
+    user_id: str | None = None
+    username: str | None = None
+    eligible: list[SingleUserCandidate] = Field(default_factory=list)
+
+
+class SingleUserBody(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=100)
+
+
+@router.get("/api/settings/single-user", response_model=SingleUserStatus)
+def api_settings_single_user(actor: dict = Depends(_admin_user)) -> SingleUserStatus:
+    return SingleUserStatus(**_db.single_user_pin_status())
+
+
+@router.put("/api/settings/single-user", response_model=SingleUserStatus)
+def api_settings_set_single_user(
+    body: SingleUserBody, actor: dict = Depends(_admin_user)
+) -> SingleUserStatus:
+    """Hand the server to a different account, from the next automatic login on.
+
+    Placed in this stage rather than with single-user mode itself: before the
+    group scope landed, moving the pin made the previous owner's works vanish
+    from the screen, because not even an administrator could see another
+    account's work. It is only safe now.
+    """
+    try:
+        return SingleUserStatus(**_db.set_single_user_pin(body.user_id))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error

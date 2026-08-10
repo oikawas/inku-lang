@@ -186,6 +186,8 @@ Non-determinism lives in exactly two places: the renderer's performance (perform
 
 **The score itself, the vocabulary of each layer, and how surface and ground texture are handled are in [how it works](docs/guide/how-it-works.md).**
 
+Implementation boundaries, DDL processing, APIs, history and lineage, and change impact are documented in [architecture](docs/architecture/README.md).
+
 ---
 
 ## Screens — the back-and-forth of writing and choosing

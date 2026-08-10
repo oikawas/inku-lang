@@ -79,6 +79,7 @@ docs/*
 !docs/spec/
 !docs/history/
 !docs/guide/
+!docs/architecture/
 
 #Codex
 AGENTS.md

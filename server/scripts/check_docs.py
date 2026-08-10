@@ -30,6 +30,7 @@ differ, say so in ``PAIRS`` with a reason. An undeclared difference fails. This
 mirrors ``test_saijiki_golden.py``: the fixture is not regenerated, the
 difference is declared.
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -81,6 +82,70 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
         None,
     ),
     ("docs/guide/revision.ja.md", "docs/guide/revision.md", "shape", None),
+    # Public architecture documentation. The Japanese files preserve the
+    # design account; the English files follow the project glossary. All pairs
+    # are maintained section for section.
+    ("docs/architecture/README.ja.md", "docs/architecture/README.md", "shape", None),
+    (
+        "docs/architecture/evidence-inventory.ja.md",
+        "docs/architecture/evidence-inventory.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/system-context.ja.md",
+        "docs/architecture/system-context.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/runtime-containers.ja.md",
+        "docs/architecture/runtime-containers.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/ddl-processing-pipeline.ja.md",
+        "docs/architecture/ddl-processing-pipeline.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/server-components.ja.md",
+        "docs/architecture/server-components.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/client-boundaries.ja.md",
+        "docs/architecture/client-boundaries.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/data-history-lineage.ja.md",
+        "docs/architecture/data-history-lineage.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/operations-security.ja.md",
+        "docs/architecture/operations-security.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/change-impact-map.ja.md",
+        "docs/architecture/change-impact-map.md",
+        "shape",
+        None,
+    ),
+    (
+        "docs/architecture/known-differences.ja.md",
+        "docs/architecture/known-differences.md",
+        "shape",
+        None,
+    ),
     ("SETUP.ja.md", "SETUP.md", "shape", None),
     ("PROJECT_CONTEXT.ja.md", "PROJECT_CONTEXT.md", "shape", None),
     (
@@ -111,22 +176,47 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("manual/ja/README.md", "manual/en/README.md", "shape", None),
     ("manual/ja/image-creation.md", "manual/en/image-creation.md", "shape", None),
     ("manual/ja/cli-reference.md", "manual/en/cli-reference.md", "shape", None),
-    ("manual/ja/cli-reference-for-ai.md", "manual/en/cli-reference-for-ai.md", "shape", None),
-    ("manual/ja/application-install.md", "manual/en/application-install.md", "shape", None),
-    ("manual/ja/server-configuration.md", "manual/en/server-configuration.md", "shape", None),
+    (
+        "manual/ja/cli-reference-for-ai.md",
+        "manual/en/cli-reference-for-ai.md",
+        "shape",
+        None,
+    ),
+    (
+        "manual/ja/application-install.md",
+        "manual/en/application-install.md",
+        "shape",
+        None,
+    ),
+    (
+        "manual/ja/server-configuration.md",
+        "manual/en/server-configuration.md",
+        "shape",
+        None,
+    ),
     ("manual/ja/revision-history.md", "manual/en/revision-history.md", "shape", None),
     # Split on 2026-07-28. The current file carries v2.5.0 onward and the two
     # languages hold the same 30 entries, so this pair needs no exception any
     # more: every new version must land in both. The backlog did not vanish --
     # it moved into the two archives below, where it is now countable.
     ("CHANGELOG.ja.md", "CHANGELOG.md", "entries", None),
-    ("docs/history/changelog-v1.72-v2.4.ja.md", "docs/history/changelog-v1.72-v2.4.md", "entries", None),
-    ("docs/history/changelog-v0.1-v1.71.ja.md", "docs/history/changelog-v0.1-v1.71.md", "entries", None),
+    (
+        "docs/history/changelog-v1.72-v2.4.ja.md",
+        "docs/history/changelog-v1.72-v2.4.md",
+        "entries",
+        None,
+    ),
+    (
+        "docs/history/changelog-v0.1-v1.71.ja.md",
+        "docs/history/changelog-v0.1-v1.71.md",
+        "entries",
+        None,
+    ),
 )
 
 # The words GLOSSARY.md §5-1 forbids anywhere, restricted to the four that can
 # occur in a document. ``fluctuation``, ``jitter`` and ``okugaki`` are forbidden
-# there too and stand at zero in all twenty documents today, but SPEC may yet
+# there too and stand at zero in all checked documents today, but SPEC may yet
 # explain ``okugaki`` as a concept name and ``jitter`` is a drawing term, so
 # adding them is a separate decision with its own measurement behind it.
 #
@@ -384,8 +474,12 @@ def check_links(tracked: set[str]) -> list[str]:
                 if not resolved:
                     continue
                 if not (REPO_ROOT / resolved).exists():
-                    problems.append(f"{name}:{number}: link to a path that does not exist: {target}")
-                elif resolved not in tracked and not _inside_tracked_dir(resolved, tracked):
+                    problems.append(
+                        f"{name}:{number}: link to a path that does not exist: {target}"
+                    )
+                elif resolved not in tracked and not _inside_tracked_dir(
+                    resolved, tracked
+                ):
                     problems.append(
                         f"{name}:{number}: published document links to an unpublished path: "
                         f"{target}\n    It resolves on this disk but 404s on GitHub."

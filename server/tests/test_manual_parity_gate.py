@@ -46,6 +46,62 @@ MANUAL_PAIRS = (
     ("manual/ja/revision-history.md", "manual/en/revision-history.md", "shape"),
 )
 
+
+# Public architecture pairs added when the internal investigation was published.
+ARCHITECTURE_PAIRS = (
+    ("docs/architecture/README.ja.md", "docs/architecture/README.md", "shape"),
+    (
+        "docs/architecture/evidence-inventory.ja.md",
+        "docs/architecture/evidence-inventory.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/system-context.ja.md",
+        "docs/architecture/system-context.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/runtime-containers.ja.md",
+        "docs/architecture/runtime-containers.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/ddl-processing-pipeline.ja.md",
+        "docs/architecture/ddl-processing-pipeline.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/server-components.ja.md",
+        "docs/architecture/server-components.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/client-boundaries.ja.md",
+        "docs/architecture/client-boundaries.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/data-history-lineage.ja.md",
+        "docs/architecture/data-history-lineage.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/operations-security.ja.md",
+        "docs/architecture/operations-security.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/change-impact-map.ja.md",
+        "docs/architecture/change-impact-map.md",
+        "shape",
+    ),
+    (
+        "docs/architecture/known-differences.ja.md",
+        "docs/architecture/known-differences.md",
+        "shape",
+    ),
+)
+
 # The thirteen pairs that were already there, as the control: adding seven rows
 # must not take an existing one with it.
 EXISTING_PAIRS = (
@@ -102,14 +158,31 @@ def test_manual_pair_is_checked(ja_name: str, en_name: str, mode: str) -> None:
     assert exception is None, f"{ja_name} carries a declared exception: {exception}"
 
 
+@pytest.mark.parametrize(
+    ("ja_name", "en_name", "mode"),
+    ARCHITECTURE_PAIRS,
+    ids=[pair[0] for pair in ARCHITECTURE_PAIRS],
+)
+def test_architecture_pair_is_checked(ja_name: str, en_name: str, mode: str) -> None:
+    """Each public architecture pair remains in the documentation gate."""
+    by_ja = {pair[0]: pair for pair in _pairs()}
+    assert ja_name in by_ja
+    _, actual_en, actual_mode, exception = by_ja[ja_name]
+    assert actual_en == en_name
+    assert actual_mode == mode
+    assert exception is None
+    assert (ROOT / ja_name).is_file()
+    assert (ROOT / en_name).is_file()
+
+
 def test_the_thirteen_earlier_pairs_are_intact() -> None:
     """T-2: the control -- no existing row was displaced by the seven new ones."""
     pairs = _pairs()
     ja_names = [pair[0] for pair in pairs]
     missing = [name for name in EXISTING_PAIRS if name not in ja_names]
     assert not missing, f"pairs that check_docs.py used to compare are gone: {missing}"
-    assert len(pairs) == 20, (
-        f"PAIRS holds {len(pairs)} pairs, not the 13 earlier ones plus the 7 manual ones"
+    assert len(pairs) == 31, (
+        f"PAIRS holds {len(pairs)} pairs, not the 13 earlier, 7 manual, and 11 architecture pairs"
     )
 
 

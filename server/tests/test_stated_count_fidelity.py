@@ -134,9 +134,18 @@ def test_a_stated_count_in_the_literal_band_reaches_the_score(
 # T-2 -- at `literal_count_threshold` and above, SPEC asks for the group to be
 # shown rather than counted, and this branch has no business overruling that.
 # Which of density and the total budget wins up there has not been ruled on.
+#
+# 240 is the case that isolates the band, and it is here because a perturbation
+# found that the others cannot. Widening the band past the threshold leaves 300
+# and 500 where they are anyway -- not because the band refused them, but because
+# they exceed `max_expanded_per_instruction` and the guard below declines them.
+# 240 is the one value no other rule catches: it is exactly the per-instruction
+# budget, so only the band's own edge can turn it away.
 @pytest.mark.parametrize(
     ("ddl", "primitive", "stage_two_said"),
     [
+        ("黒いペンの円を二百四十個散らす。", "circle", 2),
+        ("黒いペンの円を二百四十個散らす。", "circle", 40),
         ("黒いペンの円を三百個散らす。", "circle", 2),
         ("黒いペンの円を三百個散らす。", "circle", 40),
         ("黒いペンの線を五百本引く。", "line", 2),

@@ -29,7 +29,10 @@ PUBLIC = {  # every entry needs a reason
 
 # The count is part of the contract: a split that loses an endpoint is a
 # regression that no per-route assertion would notice.
-EXPECTED_ROUTE_COUNT = 82
+#   82 before the ACL work; +2 for GET/PUT /api/history/{item_id}/acl (stage D),
+#   +2 for GET/PUT /api/settings/single-user (stage H), and +1 for
+#   GET /api/auth/me/group-peers, which lets sharing offer names.
+EXPECTED_ROUTE_COUNT = 87
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

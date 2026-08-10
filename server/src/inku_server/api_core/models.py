@@ -74,6 +74,11 @@ class HistoryPostBody(BaseModel):
 class HistoryItem(HistoryPostBody):
     id: str
     output_path: str | None = None
+    # True when this work is somebody else's, reached through a group scope or an
+    # explicit grant. Absent (not false) for one's own, so the ordinary listing
+    # is unchanged on the wire; a client that never learned the field sees what
+    # it always saw.
+    shared: bool | None = None
     # The staffage level a work was drawn at. The axis was folded away in
     # v2.11.0 and nothing writes this any more, so it is declared on the
     # RESPONSE model and not on the post body: a work saved before the removal

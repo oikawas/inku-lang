@@ -6,6 +6,10 @@ export type HistoryManagerTab = 'thumbs' | 'list';
 export type Score = { instructions: unknown[]; canvas?: string | null };
 
 export type HistoryItem = {
+	// Set only when the work is somebody else's, reached through a group scope
+	// or an explicit grant. Absent for one's own, so nothing changes for a
+	// listing of works the caller made.
+	shared?: boolean;
 	id?: string;
 	input: string;
 	source_text?: string | null;

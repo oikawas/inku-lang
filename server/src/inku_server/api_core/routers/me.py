@@ -67,6 +67,26 @@ class DemoSettingsBody(BaseModel):
     timeout_seconds: int = Field(default=3600, ge=60, le=86400)
 
 
+class GroupPeer(BaseModel):
+    """A person the caller may name when sharing a work."""
+
+    id: str
+    username: str
+
+
+@router.get("/api/auth/me/group-peers", response_model=list[GroupPeer])
+def api_me_group_peers(actor: dict = Depends(_current_user)) -> list[GroupPeer]:
+    """The caller's own organisation group, so sharing can offer names.
+
+    Under `/api/auth/me/` rather than `/api/users/`, and behind `_current_user`
+    rather than `_user_manager`, because that is what it is: a fact about the
+    caller, not the member directory. The directory stays where it was -- one
+    server's whole membership is a manager's to read, and this feature only
+    needs the names inside one organisation.
+    """
+    return [GroupPeer(**peer) for peer in _db.list_group_peers(actor["id"])]
+
+
 @router.get("/api/auth/me", response_model=UserAccountItem)
 def api_auth_me(actor: dict = Depends(_current_user)) -> UserAccountItem:
     return UserAccountItem(**actor)

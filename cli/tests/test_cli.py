@@ -2765,3 +2765,248 @@ def test_a_server_that_does_want_credentials_still_gets_the_old_advice(monkeypat
     with pytest.raises(cli.CliError, match="not logged in"):
         client.request("GET", "/api/auth/me")
     assert len(captured.seen) == 1
+
+
+# --- sharing one work, and a lineage that crosses owners ---------------------
+
+
+class _AclClient:
+    """Records every call and answers the ACL routes from an in-memory list."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    calls: list = []
+    stored: list = []
+
+    def request(self, method, path, *, data=None, **kwargs):
+        type(self).calls.append((method, path, data))
+        if path.endswith("/acl") and method == "GET":
+            return list(type(self).stored), None
+        if path.endswith("/acl") and method == "PUT":
+            type(self).stored = [
+                {**entry, "id": f"row-{i}", "history_id": "work-1", "at": 0}
+                for i, entry in enumerate(data["entries"])
+            ]
+            return list(type(self).stored), None
+        return {}, None
+
+
+def _acl_client(monkeypatch, stored=()):
+    _AclClient.calls = []
+    _AclClient.stored = [dict(entry) for entry in stored]
+    monkeypatch.setattr(cli, "ApiClient", _AclClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    return _AclClient
+
+
+def test_history_share_sends_the_subject_it_was_given(monkeypatch):
+    """P-14's target: a client that drops --to-user shares with nobody and says
+    nothing, because PUT with an empty list is a valid request."""
+    client = _acl_client(monkeypatch)
+    args = cli.build_parser().parse_args(
+        ["history", "share", "work-1", "--to-user", "bob-id", "--permission", "write"]
+    )
+    assert cli.command_history_share(args) == 0
+    put = [data for method, _path, data in client.calls if method == "PUT"]
+    assert put == [{"entries": [
+        {"subject_type": "user", "subject_id": "bob-id", "permission": "write"}
+    ]}]
+
+
+def test_history_share_keeps_the_guests_already_on_the_list(monkeypatch):
+    """PUT replaces the whole list, so sharing has to read it first. Sending
+    only the new entry would silently revoke everyone else."""
+    client = _acl_client(monkeypatch, stored=[
+        {"subject_type": "user", "subject_id": "carol-id", "permission": "read"}
+    ])
+    args = cli.build_parser().parse_args(
+        ["history", "share", "work-1", "--to-group", "circle-b", "--permission", "read"]
+    )
+    assert cli.command_history_share(args) == 0
+    put = [data for method, _path, data in client.calls if method == "PUT"][0]
+    subjects = {(e["subject_type"], e["subject_id"]) for e in put["entries"]}
+    assert subjects == {("user", "carol-id"), ("org_group", "circle-b")}
+
+
+def test_history_unshare_removes_only_the_named_subject(monkeypatch):
+    client = _acl_client(monkeypatch, stored=[
+        {"subject_type": "user", "subject_id": "bob-id", "permission": "read"},
+        {"subject_type": "user", "subject_id": "carol-id", "permission": "read"},
+    ])
+    args = cli.build_parser().parse_args(["history", "unshare", "work-1", "--to-user", "bob-id"])
+    assert cli.command_history_share(args) == 0
+    put = [data for method, _path, data in client.calls if method == "PUT"][0]
+    assert [e["subject_id"] for e in put["entries"]] == ["carol-id"]
+
+
+def test_history_still_lists_without_a_subcommand(monkeypatch):
+    """`history` was a flat listing command before it had subcommands, and
+    `inku-cli history --limit 20` has to keep meaning what it did."""
+    args = cli.build_parser().parse_args(["history", "--limit", "20"])
+    assert args.history_action is None
+    assert args.func is cli.command_history
+
+
+def test_refine_save_translates_the_kind_the_flag_offers(monkeypatch, tmp_path):
+    """The four --kind choices are not the four names the server accepts.
+
+    `save` sent the flag value straight through, so every invocation came back
+    422 "invalid lineage derivation kind" -- no value worked, and the subcommand
+    had never once succeeded. `perform` had the translation all along.
+    """
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            return {"id": "child-1"}, None
+
+    score = tmp_path / "score.json"
+    score.write_text('{"canvas":"square","instructions":[]}', encoding="utf-8")
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+
+    for flag_kind, server_kind in cli._DERIVATION_KIND_BY_REFINE_KIND.items():
+        calls.clear()
+        args = cli.build_parser().parse_args([
+            "refine", "save", "node-1", "--kind", flag_kind,
+            "--file", str(score), "--input-text", "t",
+        ])
+        assert cli.command_refine(args) == 0
+        posted = [data for method, path, data in calls if path == "/api/history"][0]
+        assert posted["derivation_kind"] == server_kind
+        assert posted["lineage_parent_node_id"] == "node-1"
+
+
+def test_refine_perform_resolves_a_parent_the_listing_cannot_reach(monkeypatch):
+    """A work shared BY someone else is not in the caller's own listing.
+
+    Both lookups `perform` used -- the first page, then a text search -- go
+    through /api/history, which answers with what the caller owns or is given,
+    paged and matched on text. Neither is a way to name one id. Without the
+    lineage fallback a lineage could never cross owners from the command line.
+    """
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, query=None, **kwargs):
+            calls.append((method, path))
+            if path == "/api/history":
+                return {"items": []}, None       # not mine, and not findable by text
+            if path.endswith("/lineage"):
+                return {
+                    "focus_node_id": "their-node",
+                    "nodes": [{
+                        "id": "their-node",
+                        "redacted": None,
+                        "history": {
+                            "id": "their-work", "lineage_node_id": "their-node",
+                            "source_text": "a pine", "render_seed": 1,
+                            "composition_seed": 2, "interpretation_seed": "s",
+                            "render_color_catalog_id": "default",
+                        },
+                    }],
+                }, None
+            return {"svg": "<svg />", "render_hash_short": "ABCD"}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    args = cli.build_parser().parse_args(["refine", "perform", "their-work", "--kind", "touch"])
+    assert cli.command_refine(args) == 0
+    assert ("GET", "/api/history/their-work/lineage") in calls
+
+
+def test_single_user_set_sends_the_account_it_was_given(monkeypatch):
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            return {"enabled": True, "user_id": "successor", "eligible": []}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+
+    show = cli.build_parser().parse_args(["single-user", "show"])
+    assert cli.command_single_user(show) == 0
+    move = cli.build_parser().parse_args(["single-user", "set", "successor"])
+    assert cli.command_single_user(move) == 0
+
+    assert calls == [
+        ("GET", "/api/settings/single-user", None),
+        ("PUT", "/api/settings/single-user", {"user_id": "successor"}),
+    ]
+
+
+def test_lineage_show_labels_a_withheld_parent_apart_from_a_deleted_one(monkeypatch, capsys):
+    """T-27. The two states render identically -- an empty card -- so the label
+    is the only thing telling the reader whether asking would help."""
+    graph = {
+        "focus_node_id": "mine",
+        "nodes": [
+            {"id": "withheld", "state": "active", "at": 1, "redacted": "not_permitted"},
+            {"id": "gone", "state": "tombstone", "at": 2, "redacted": "deleted", "child_count": 1},
+            {"id": "mine", "state": "active", "at": 3, "redacted": None,
+             "history": {"source_text": "my own work"}},
+        ],
+        "edges": [
+            {"parent_node_id": "withheld", "child_node_id": "mine",
+             "derivation_kind": "touch_change", "at": 1},
+            {"parent_node_id": "gone", "child_node_id": "withheld",
+             "derivation_kind": "touch_change", "at": 2},
+        ],
+    }
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            return graph, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    args = cli.build_parser().parse_args(["lineage", "show", "mine"])
+    assert cli.command_lineage(args) == 0
+    printed = capsys.readouterr().out
+
+    assert "[Private]" in printed, "a withheld parent is not labelled"
+    assert "[Deleted]" in printed, "a deleted parent is not labelled"
+    # And they are on different lines: one label for both would be the defect.
+    private_line = next(line for line in printed.splitlines() if "[Private]" in line)
+    deleted_line = next(line for line in printed.splitlines() if "[Deleted]" in line)
+    assert "withheld"[:8] in private_line
+    assert "gone"[:8] in deleted_line
+    assert "my own work" in printed
+
+
+def test_history_peers_asks_for_the_callers_own_organisation(monkeypatch):
+    """Sharing takes an id, and the member directory is a manager's. This is the
+    one route that answers a plain member, and it stops at their organisation."""
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            calls.append((method, path))
+            return [{"id": "peer-1", "username": "carol"}], None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    args = cli.build_parser().parse_args(["history", "peers"])
+    assert cli.command_history_share(args) == 0
+    assert calls == [("GET", "/api/auth/me/group-peers")]
+    # Not the directory: /api/users answers 403 for a plain member anyway, and
+    # asking it here would make the subcommand useless to the people who need it.
+    assert all(path != "/api/users" for _method, path in calls)

@@ -16,7 +16,7 @@ from datetime import datetime, time as clock_time, timedelta
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, select, text, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -223,6 +223,30 @@ class OkugakiRow(Base):
     warnings_json = Column(Text, nullable=False, default="[]")
     fact_sheet_json = Column(Text, nullable=False, default="{}")
     idempotency_key = Column(String, nullable=True)
+
+
+class HistoryAclRow(Base):
+    """Who else may see or change one work. Empty by default.
+
+    A work carries its own guest list. The permission groups decide a default
+    scope -- what an admin or a leader may reach without anyone naming them --
+    and this table is the exception to it, one row per (work, subject) pair.
+    Kept apart from the group scope on purpose: if the two were one mechanism, a
+    change that broke either would be absorbed by the other and no test could
+    tell them apart.
+    """
+
+    __tablename__ = "history_acl"
+    __table_args__ = (
+        UniqueConstraint("history_id", "subject_type", "subject_id", name="uq_history_acl_subject"),
+    )
+
+    id = Column(String, primary_key=True)
+    history_id = Column(String, ForeignKey("history.id"), nullable=False, index=True)
+    subject_type = Column(String, nullable=False)   # "user" | "org_group"
+    subject_id = Column(String, nullable=False, index=True)
+    permission = Column(String, nullable=False)     # "read" | "write"
+    at = Column(BigInteger, nullable=False, index=True)
 
 
 class UnreadWordRow(Base):
@@ -924,6 +948,187 @@ def has_permission_group(actor: dict, name: str) -> bool:
     return name in (actor.get("permission_groups") or ())
 
 
+def _actor_of(user_id: str) -> dict:
+    """The actor a scope decision is made against: identity plus what it holds.
+
+    Read from the account rather than taken from the caller, because every public
+    function in this module is handed a bare `user_id` and a scope that trusted
+    what it was told would widen for anyone who could name an id.
+    """
+    with SessionLocal() as session:
+        row = session.query(UserAccountRow).filter(UserAccountRow.id == user_id).first()
+        if row is None:
+            # No account, no groups: falls through to the owner-only branch of
+            # every predicate. An unknown id must never widen anything.
+            return {"id": user_id, "permission_groups": [], "group_id": None}
+        return {
+            "id": user_id,
+            "permission_groups": _permission_groups_of(session, user_id),
+            "group_id": row.group_id,
+        }
+
+
+def _owner_actor(user_id: str) -> dict:
+    """Identity only, for paths that go through _owned_by and never widen.
+
+    Cascades and idempotency-replay lookups do not read permissions, so resolving
+    the account for them would be two queries spent on a decision nothing makes.
+    Handing this to _readable_by by mistake narrows rather than widens.
+    """
+    return {"id": user_id, "permission_groups": [], "group_id": None}
+
+
+ACL_SUBJECT_TYPES = ("user", "org_group")
+
+# Two rights, not three. `delete` lives inside `write`: a third would multiply
+# the acceptance surface for a need nobody has measured yet, and it can be added
+# later without moving what is already here.
+ACL_PERMISSIONS = ("read", "write")
+
+
+def _acl_grants(actor: dict, permissions: tuple[str, ...]):
+    """Works explicitly granted to this actor at one of `permissions`.
+
+    The actor is reached as themselves and as a member of their organisation
+    group. Permission groups are deliberately not subjects: a grant to `users`
+    would mean "everyone", which is publication and needs a different design.
+    """
+    subjects = [and_(HistoryAclRow.subject_type == "user", HistoryAclRow.subject_id == actor["id"])]
+    if actor.get("group_id"):
+        subjects.append(
+            and_(HistoryAclRow.subject_type == "org_group", HistoryAclRow.subject_id == actor["group_id"])
+        )
+    return select(HistoryAclRow.history_id).where(
+        HistoryAclRow.permission.in_(permissions),
+        or_(*subjects),
+    )
+
+
+def _same_org_group(actor: dict):
+    """Accounts sharing the actor's organisation group, as a subquery.
+
+    A subquery rather than a resolved list of ids: the membership is read at the
+    moment the outer query runs, so a member added between the actor being built
+    and the query being issued is not briefly invisible.
+    """
+    return select(UserAccountRow.id).where(UserAccountRow.group_id == actor["group_id"])
+
+
+def _readable_by(actor: dict, owner_column, acl_history_id=None):
+    """Rows the actor may see: owner, or group scope, or an explicit grant.
+
+    admins see everything, orphan rows included: `history.user_id` is nullable
+    and a database restored from before the column was backfilled holds works
+    owned by nobody. Showing them to no one reads as "the backup lost my work".
+
+    leaders see their own organisation group. The range is the ORGANISATION
+    group, not the permission group -- circle_a's leader sees circle_a, not every
+    work on the server -- and a leader with no group_id sees only their own,
+    which is the same defence delete_user and update_user already apply.
+
+    `acl_history_id` is the column holding the work's id, where the caller has
+    one. Rows that are not a work and carry no id to grant against (lineage
+    edges, for now) pass nothing and are decided by scope alone. A `write` grant
+    satisfies a read: someone trusted to change a work can obviously see it.
+    """
+    if has_permission_group(actor, "admins"):
+        return true()
+    if has_permission_group(actor, "leaders") and actor.get("group_id"):
+        scope = or_(owner_column == actor["id"], owner_column.in_(_same_org_group(actor)))
+    else:
+        scope = owner_column == actor["id"]
+    if acl_history_id is None:
+        return scope
+    return or_(scope, acl_history_id.in_(_acl_grants(actor, ACL_PERMISSIONS)))
+
+
+def _writable_by(actor: dict, owner_column, acl_history_id=None):
+    """Rows the actor may change: owner, or admin, or an explicit `write` grant.
+
+    Deliberately narrower than _readable_by, in both halves. A leader reads their
+    organisation's works but cannot star, trash, revise or delete them, and a
+    `read` grant does not become a `write` one. Collapsing either would make
+    every reader an editor.
+    """
+    if has_permission_group(actor, "admins"):
+        return true()
+    scope = owner_column == actor["id"]
+    if acl_history_id is None:
+        return scope
+    return or_(scope, acl_history_id.in_(_acl_grants(actor, ("write",))))
+
+
+def _owned_by(actor: dict, owner_column):
+    """Rows the actor owns outright. Unlike the two above, this never widens.
+
+    Cascades and bulk operations (deleting an account, emptying one's own
+    history or trash) and idempotency-replay lookups select by ownership, not by
+    permission. Routed through _writable_by they would reach every row an admin
+    may change, and deleting one account would empty the server.
+    """
+    return owner_column == actor["id"]
+
+
+def _readable_node(actor: dict):
+    """A lineage node is visible exactly when the work behind it is."""
+    return _readable_by(actor, LineageNodeRow.user_id, LineageNodeRow.history_id)
+
+
+def _readable_edge(actor: dict):
+    """An edge is visible exactly when its CHILD is -- never its parent.
+
+    An edge belongs to the derivation, and `lineage_edges.user_id` holds the
+    CHILD's owner, so the owner test alone almost says this already. It stops
+    being enough once a work can be shared: the child may be visible through a
+    grant while its owner column names someone else.
+
+    Following the parent instead would leak the one thing a lineage must not
+    disclose. If A's work has children by B and by C, an edge visible to whoever
+    can see the PARENT puts C's edge in B's view -- B learns that somebody else
+    derived from the same work, and how many did. Following the child, B sees
+    A->B and nothing more.
+    """
+    return LineageEdgeRow.child_node_id.in_(
+        select(LineageNodeRow.id).where(_readable_node(actor))
+    )
+
+
+def _readable_node_sql(actor: dict, alias: str = "n") -> tuple[str, dict]:
+    """`_readable_node` for the recursive CTEs, which take no ORM expression."""
+    return _readable_sql(actor, f"{alias}.user_id", f"{alias}.history_id")
+
+
+def _readable_sql(actor: dict, owner_column: str, acl_history_id: str | None = None) -> tuple[str, dict]:
+    """The _readable_by test as a SQL fragment and its bind parameters.
+
+    The recursive lineage CTEs and the full-text history search are raw SQL and
+    cannot take a SQLAlchemy expression, so they take this instead. The two forms
+    have to say the same thing and move together; T-1 counts every filter that
+    bypasses either, and the search-path test reads a shared work through this
+    one specifically -- the failure it guards against is not a leak but a
+    disagreement, where the listing shows a work and searching for it does not.
+    """
+    if has_permission_group(actor, "admins"):
+        return "1 = 1", {}
+    params = {"acl_owner_id": actor["id"]}
+    clauses = [f"{owner_column} = :acl_owner_id"]
+    if has_permission_group(actor, "leaders") and actor.get("group_id"):
+        params["acl_group_id"] = actor["group_id"]
+        clauses.append(f"{owner_column} IN (SELECT id FROM user_accounts WHERE group_id = :acl_group_id)")
+    if acl_history_id is not None:
+        subjects = ["(subject_type = 'user' AND subject_id = :acl_owner_id)"]
+        if actor.get("group_id"):
+            params["acl_group_id"] = actor["group_id"]
+            subjects.append("(subject_type = 'org_group' AND subject_id = :acl_group_id)")
+        clauses.append(
+            f"{acl_history_id} IN (SELECT history_id FROM history_acl"
+            f" WHERE permission IN ('read', 'write') AND ({' OR '.join(subjects)}))"
+        )
+    if len(clauses) == 1:
+        return clauses[0], params
+    return "(" + " OR ".join(clauses) + ")", params
+
+
 def _derived_role(names) -> str:
     """The legacy role column's value, derived from the groups a member holds."""
     for group, role in _ROLE_MIRROR_BY_GROUP.items():
@@ -1176,52 +1381,58 @@ def _lineage_edge_to_dict(row: LineageEdgeRow) -> dict:
     }
 
 
-def _ancestor_edge_ids(session, user_id: str, focus_node_id: str, limit: int) -> list[str]:
+def _ancestor_edge_ids(session, actor: dict, focus_node_id: str, limit: int) -> list[str]:
     if limit <= 0:
         return []
+    node_visible, params = _readable_node_sql(actor)
+    visible = f"child_node_id IN (SELECT n.id FROM lineage_nodes n WHERE {node_visible})"
+    step_visible = f"edge.{visible}"
     return list(session.execute(
         text(
-            """
+            f"""
             WITH RECURSIVE ancestor_edges(id, parent_node_id, child_node_id) AS (
                 SELECT id, parent_node_id, child_node_id
                 FROM lineage_edges
-                WHERE user_id = :user_id AND child_node_id = :focus_node_id
+                WHERE {visible} AND child_node_id = :focus_node_id
                 UNION
                 SELECT edge.id, edge.parent_node_id, edge.child_node_id
                 FROM lineage_edges edge
                 JOIN ancestor_edges ancestor
                   ON edge.child_node_id = ancestor.parent_node_id
-                WHERE edge.user_id = :user_id
+                WHERE {step_visible}
             )
             SELECT id FROM ancestor_edges LIMIT :limit
             """
         ),
-        {"user_id": user_id, "focus_node_id": focus_node_id, "limit": limit},
+        {**params, "focus_node_id": focus_node_id, "limit": limit},
     ).scalars())
 
 
 def _descendant_edge_ids(
     session,
-    user_id: str,
+    actor: dict,
     focus_node_id: str,
     depth: int,
     limit: int,
 ) -> list[str]:
     if depth <= 0 or limit <= 0:
         return []
+    node_visible, params = _readable_node_sql(actor)
+    seed_visible = f"child_node_id IN (SELECT n.id FROM lineage_nodes n WHERE {node_visible})"
+    step_visible = f"edge.{seed_visible}"
     return list(session.execute(
         text(
-            """
+            f"""
             WITH RECURSIVE descendant_edges(id, parent_node_id, child_node_id, depth) AS (
                 SELECT id, parent_node_id, child_node_id, 1
                 FROM lineage_edges
-                WHERE user_id = :user_id AND parent_node_id = :focus_node_id
+                WHERE {seed_visible} AND parent_node_id = :focus_node_id
                 UNION ALL
                 SELECT edge.id, edge.parent_node_id, edge.child_node_id, descendant.depth + 1
                 FROM lineage_edges edge
                 JOIN descendant_edges descendant
                   ON edge.parent_node_id = descendant.child_node_id
-                WHERE edge.user_id = :user_id AND descendant.depth < :depth
+                WHERE {step_visible} AND descendant.depth < :depth
             )
             SELECT id
             FROM descendant_edges
@@ -1230,7 +1441,7 @@ def _descendant_edge_ids(
             """
         ),
         {
-            "user_id": user_id,
+            **params,
             "focus_node_id": focus_node_id,
             "depth": depth,
             "limit": limit,
@@ -1238,7 +1449,50 @@ def _descendant_edge_ids(
     ).scalars())
 
 
-def _lineage_generations(session, user_id: str, node_ids: list[str]) -> dict[str, int]:
+def _lineage_node_payload(
+    node: LineageNodeRow,
+    readable: bool,
+    child_counts: dict,
+    history_by_id: dict,
+    generations: dict,
+) -> dict:
+    """One node as the lineage answer carries it.
+
+    Three states, told apart by `redacted`, because "gone" and "not yours" mean
+    different things to whoever is looking: a deleted parent is never coming
+    back, an unreadable one comes back the moment its owner says so. Rendered
+    the same way -- dashed card, dashed arrow -- but labelled differently, so
+    nobody stops asking.
+
+    A redacted node withholds one thing a tombstone does not: `child_count`. How
+    many times somebody else's work has been derived from is itself information
+    about that work, and a tombstone has no owner left to keep it from.
+    """
+    payload = {
+        "id": node.id,
+        "state": node.state,
+        "at": node.at,
+        "deleted_at": node.deleted_at,
+    }
+    if node.state == "tombstone":
+        payload["redacted"] = "deleted"
+        payload["child_count"] = int(child_counts.get(node.id, 0))
+        return payload
+    if not readable:
+        payload["redacted"] = "not_permitted"
+        return payload
+    payload["redacted"] = None
+    payload["child_count"] = int(child_counts.get(node.id, 0))
+    payload["description_hash"] = node.description_hash
+    payload["render_hash"] = node.render_hash
+    history = history_by_id.get(node.history_id or "")
+    if history is not None:
+        payload["history"] = _row_to_dict(history)
+        payload["history"]["lineage_generation"] = generations.get(node.id)
+    return payload
+
+
+def _lineage_generations(session, actor: dict, node_ids: list[str]) -> dict[str, int]:
     """世代 (root=1, 主親エッジを辿って +1) をノード集合分まとめて計算する。
 
     履歴リスト側 (_rows_to_dicts_with_lineage) と同じ意味論。lineage_generation は
@@ -1258,7 +1512,7 @@ def _lineage_generations(session, user_id: str, node_ids: list[str]) -> dict[str
             seen.add(current)
             chain.append(current)
             edge = session.query(LineageEdgeRow).filter(
-                LineageEdgeRow.user_id == user_id,
+                _readable_edge(actor),
                 LineageEdgeRow.child_node_id == current,
             ).first()
             if edge is None:
@@ -1277,19 +1531,20 @@ def _lineage_generations(session, user_id: str, node_ids: list[str]) -> dict[str
 def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200) -> dict | None:
     descendant_depth = max(0, min(descendant_depth, 200))
     node_limit = max(1, min(node_limit, 200))
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         focus = session.query(LineageNodeRow).filter(
             LineageNodeRow.id == focus_node_id,
-            LineageNodeRow.user_id == user_id,
+            _readable_node(actor),
         ).first()
         if focus is None:
             return None
 
-        ancestor_ids = _ancestor_edge_ids(session, user_id, focus.id, node_limit - 1)
+        ancestor_ids = _ancestor_edge_ids(session, actor, focus.id, node_limit - 1)
         remaining = max(0, node_limit - 1 - len(ancestor_ids))
         descendant_ids = _descendant_edge_ids(
             session,
-            user_id,
+            actor,
             focus.id,
             descendant_depth,
             remaining,
@@ -1298,7 +1553,7 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
         selected_edges = (
             session.query(LineageEdgeRow)
             .filter(
-                LineageEdgeRow.user_id == user_id,
+                _readable_edge(actor),
                 LineageEdgeRow.id.in_(selected_edge_ids),
             )
             .all()
@@ -1311,45 +1566,39 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
             node_ids.add(edge.parent_node_id)
             node_ids.add(edge.child_node_id)
 
-        nodes = session.query(LineageNodeRow).filter(
-            LineageNodeRow.user_id == user_id,
-            LineageNodeRow.id.in_(node_ids),
-        ).all()
-        history_ids = [node.history_id for node in nodes if node.history_id]
+        # Every node an edge reaches, readable or not. A lineage may now cross
+        # owners, so dropping the ones the caller cannot read would cut the chain
+        # and the child would appear to have no parent at all. They come back
+        # redacted instead -- present, connected, empty.
+        nodes = session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(node_ids)).all()
+        readable_ids = {
+            node_id for node_id, in
+            session.query(LineageNodeRow.id).filter(
+                _readable_node(actor), LineageNodeRow.id.in_(node_ids)
+            )
+        }
+        history_ids = [node.history_id for node in nodes if node.history_id and node.id in readable_ids]
         history_by_id = {
             row.id: row
             for row in session.query(HistoryRow).filter(
-                HistoryRow.user_id == user_id,
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(history_ids),
             ).all()
         }
         child_counts = dict(
             session.query(LineageEdgeRow.parent_node_id, func.count(LineageEdgeRow.id))
             .filter(
-                LineageEdgeRow.user_id == user_id,
+                _readable_edge(actor),
                 LineageEdgeRow.parent_node_id.in_(node_ids),
             )
             .group_by(LineageEdgeRow.parent_node_id)
             .all()
         )
-        generations = _lineage_generations(session, user_id, [node.id for node in nodes])
-        node_payloads = []
-        for node in nodes:
-            payload = {
-                "id": node.id,
-                "state": node.state,
-                "at": node.at,
-                "deleted_at": node.deleted_at,
-                "child_count": int(child_counts.get(node.id, 0)),
-            }
-            if node.state != "tombstone":
-                payload["description_hash"] = node.description_hash
-                payload["render_hash"] = node.render_hash
-                history = history_by_id.get(node.history_id or "")
-                if history is not None:
-                    payload["history"] = _row_to_dict(history)
-                    payload["history"]["lineage_generation"] = generations.get(node.id)
-            node_payloads.append(payload)
+        generations = _lineage_generations(session, actor, sorted(readable_ids))
+        node_payloads = [
+            _lineage_node_payload(node, node.id in readable_ids, child_counts, history_by_id, generations)
+            for node in nodes
+        ]
         return {
             "focus_node_id": focus.id,
             "nodes": sorted(node_payloads, key=lambda item: (item["at"], item["id"])),
@@ -1358,17 +1607,18 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
 
 
 def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         node = session.query(LineageNodeRow).filter(
             LineageNodeRow.id == node_id,
-            LineageNodeRow.user_id == user_id,
+            _writable_by(actor, LineageNodeRow.user_id, LineageNodeRow.history_id),
             LineageNodeRow.state == "lineage_only",
         ).first()
         if node is None or not node.history_id:
             return None
         row = session.query(HistoryRow).filter(
             HistoryRow.id == node.history_id,
-            HistoryRow.user_id == user_id,
+            _writable_by(actor, HistoryRow.user_id, HistoryRow.id),
         ).first()
         if row is None:
             return None
@@ -1381,10 +1631,11 @@ def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
 
 def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
     """Return the single primary-parent path from root through target."""
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         target = session.query(LineageNodeRow).filter(
             LineageNodeRow.id == target_node_id,
-            LineageNodeRow.user_id == user_id,
+            _readable_node(actor),
         ).first()
         if target is None:
             return None
@@ -1394,15 +1645,15 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
         current = target
         while True:
             edge = session.query(LineageEdgeRow).filter(
-                LineageEdgeRow.user_id == user_id,
+                _readable_edge(actor),
                 LineageEdgeRow.child_node_id == current.id,
             ).first()
             if edge is None or edge.parent_node_id in seen:
                 break
-            parent = session.query(LineageNodeRow).filter(
-                LineageNodeRow.user_id == user_id,
-                LineageNodeRow.id == edge.parent_node_id,
-            ).first()
+            # Walk into the parent whether or not it can be read: the branch is
+            # the path from the root, and stopping at the first unreadable
+            # ancestor would silently shorten it.
+            parent = session.get(LineageNodeRow, edge.parent_node_id)
             if parent is None:
                 break
             reversed_edges.append(edge)
@@ -1411,38 +1662,35 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
             current = parent
         nodes = list(reversed(reversed_nodes))
         edges = list(reversed(reversed_edges))
-        history_ids = [node.history_id for node in nodes if node.history_id]
+        node_ids = [node.id for node in nodes]
+        readable_ids = {
+            node_id for node_id, in
+            session.query(LineageNodeRow.id).filter(
+                _readable_node(actor), LineageNodeRow.id.in_(node_ids)
+            )
+        }
+        history_ids = [node.history_id for node in nodes if node.history_id and node.id in readable_ids]
         histories = {
             row.id: row
             for row in session.query(HistoryRow).filter(
-                HistoryRow.user_id == user_id,
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(history_ids),
             ).all()
         } if history_ids else {}
         child_counts = dict(
             session.query(LineageEdgeRow.parent_node_id, func.count(LineageEdgeRow.id))
             .filter(
-                LineageEdgeRow.user_id == user_id,
-                LineageEdgeRow.parent_node_id.in_([node.id for node in nodes]),
+                _readable_edge(actor),
+                LineageEdgeRow.parent_node_id.in_(node_ids),
             )
             .group_by(LineageEdgeRow.parent_node_id)
             .all()
         )
-        generations = _lineage_generations(session, user_id, [node.id for node in nodes])
-        payload_nodes = []
-        for node in nodes:
-            payload = {
-                "id": node.id,
-                "state": node.state,
-                "at": node.at,
-                "deleted_at": node.deleted_at,
-                "child_count": int(child_counts.get(node.id, 0)),
-            }
-            history = histories.get(node.history_id or "")
-            if node.state != "tombstone" and history is not None:
-                payload["history"] = _row_to_dict(history)
-                payload["history"]["lineage_generation"] = generations.get(node.id)
-            payload_nodes.append(payload)
+        generations = _lineage_generations(session, actor, sorted(readable_ids))
+        payload_nodes = [
+            _lineage_node_payload(node, node.id in readable_ids, child_counts, histories, generations)
+            for node in nodes
+        ]
         return {
             "target_node_id": target.id,
             "nodes": payload_nodes,
@@ -1471,10 +1719,11 @@ def _okugaki_to_dict(row: OkugakiRow) -> dict:
 
 
 def add_okugaki(user_id: str, item: dict, *, idempotency_key: str | None = None) -> dict:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         if idempotency_key:
             existing = session.query(OkugakiRow).filter(
-                OkugakiRow.user_id == user_id,
+                _owned_by(actor, OkugakiRow.user_id),
                 OkugakiRow.idempotency_key == idempotency_key,
             ).first()
             if existing is not None:
@@ -1482,7 +1731,7 @@ def add_okugaki(user_id: str, item: dict, *, idempotency_key: str | None = None)
                 result["_idempotent_replay"] = True
                 return result
         target = session.query(LineageNodeRow).filter(
-            LineageNodeRow.user_id == user_id,
+            _readable_node(actor),
             LineageNodeRow.id == item["target_node_id"],
         ).first()
         if target is None:
@@ -1508,7 +1757,7 @@ def add_okugaki(user_id: str, item: dict, *, idempotency_key: str | None = None)
             if not idempotency_key:
                 raise
             existing = session.query(OkugakiRow).filter(
-                OkugakiRow.user_id == user_id,
+                _owned_by(actor, OkugakiRow.user_id),
                 OkugakiRow.idempotency_key == idempotency_key,
             ).first()
             if existing is None:
@@ -1521,28 +1770,31 @@ def add_okugaki(user_id: str, item: dict, *, idempotency_key: str | None = None)
 
 
 def list_okugaki(user_id: str, target_node_id: str) -> list[dict]:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         rows = session.query(OkugakiRow).filter(
-            OkugakiRow.user_id == user_id,
+            _readable_by(actor, OkugakiRow.user_id),
             OkugakiRow.target_node_id == target_node_id,
         ).order_by(OkugakiRow.at.asc(), OkugakiRow.id.asc()).all()
         return [_okugaki_to_dict(row) for row in rows]
 
 
 def get_okugaki_by_idempotency(user_id: str, idempotency_key: str) -> dict | None:
+    owner = _owner_actor(user_id)
     with SessionLocal() as session:
         row = session.query(OkugakiRow).filter(
-            OkugakiRow.user_id == user_id,
+            _owned_by(owner, OkugakiRow.user_id),
             OkugakiRow.idempotency_key == idempotency_key,
         ).first()
         return _okugaki_to_dict(row) if row is not None else None
 
 
 def delete_okugaki(user_id: str, okugaki_id: str) -> bool:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         row = session.query(OkugakiRow).filter(
             OkugakiRow.id == okugaki_id,
-            OkugakiRow.user_id == user_id,
+            _writable_by(actor, OkugakiRow.user_id),
         ).first()
         if row is None:
             return False
@@ -1689,6 +1941,51 @@ def single_user_account() -> dict | None:
 def single_user_pinned_id() -> str | None:
     """The pinned account id, without resolving or writing one."""
     return (_read_app_setting(_SINGLE_USER_SETTING_KEY) or {}).get("user_id")
+
+
+def set_single_user_pin(user_id: str) -> dict:
+    """Move the pin to another account. Raises ValueError when it may not move.
+
+    Only an account holding `admins` may receive it. Anyone else would open the
+    app to a settings screen they cannot reach, unable to change the LLM
+    connection -- which is the whole point of a server that belongs to one
+    person.
+
+    Sessions already open are left alone deliberately. The pin decides who the
+    NEXT automatic login becomes; revoking the current one would drop whoever is
+    working right now, and the person moving the pin is usually that person.
+    """
+    if not single_user_mode_enabled():
+        # Nothing reads the pin when the mode is off, so writing it would look
+        # like it had taken effect and change nothing.
+        raise ValueError("single-user mode is not enabled")
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if row is None:
+            raise ValueError("user not found")
+        if "admins" not in _permission_groups_of(session, user_id):
+            raise ValueError("the single user must hold the admins permission group")
+    stored = _read_app_setting(_SINGLE_USER_SETTING_KEY) or {}
+    _write_app_setting(_SINGLE_USER_SETTING_KEY, {**stored, "user_id": user_id})
+    return single_user_pin_status()
+
+
+def single_user_pin_status() -> dict:
+    """Who the app opens as, and who it could open as instead."""
+    pinned_id = single_user_pinned_id()
+    pinned = get_user(pinned_id) if pinned_id else None
+    with SessionLocal() as session:
+        eligible = [
+            {"id": row.id, "username": row.username}
+            for row in session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).all()
+            if "admins" in _permission_groups_of(session, row.id)
+        ]
+    return {
+        "enabled": single_user_mode_enabled(),
+        "user_id": pinned_id,
+        "username": pinned["username"] if pinned else None,
+        "eligible": eligible,
+    }
 
 
 def database_info() -> dict:
@@ -2281,9 +2578,23 @@ def _row_to_dict(row: HistoryRow) -> dict:
     return item
 
 
-def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow]) -> list[dict]:
-    """Attach edge provenance while keeping lineage_edges as the source of truth."""
+def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow], actor: dict | None = None) -> list[dict]:
+    """Attach edge provenance while keeping lineage_edges as the source of truth.
+
+    `actor` marks the works that reached this listing through someone else's
+    permission -- a group scope or a grant -- rather than by being the caller's
+    own. Without the mark, another person's work sits in the listing looking
+    exactly like one of yours, and the first thing anyone does with a listing is
+    select and delete from it.
+
+    Set only when true, so `response_model_exclude_none` keeps it off the wire
+    for the ordinary case of a person looking at their own works.
+    """
     items = [_row_to_dict(row) for row in rows]
+    if actor is not None:
+        for item, row in zip(items, rows):
+            if row.user_id != actor["id"]:
+                item["shared"] = True
     node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
     if not node_ids:
         return items
@@ -2458,11 +2769,12 @@ def add_item(item: dict) -> dict:
         description_hash=desc_hash, render_hash=render_hash, at=item["at"],
         root_node_id=node_id,
     )
+    actor = _actor_of(item["user_id"])
     with SessionLocal() as session:
         idempotency_key = item.get("idempotency_key")
         if idempotency_key:
             existing = session.query(HistoryRow).filter(
-                HistoryRow.user_id == item["user_id"],
+                _owned_by(actor, HistoryRow.user_id),
                 HistoryRow.idempotency_key == idempotency_key,
             ).first()
             if existing is not None:
@@ -2472,7 +2784,7 @@ def add_item(item: dict) -> dict:
         if parent_node_id:
             parent = session.query(LineageNodeRow).filter(
                 LineageNodeRow.id == parent_node_id,
-                LineageNodeRow.user_id == item["user_id"],
+                _readable_node(actor),
                 LineageNodeRow.state != "tombstone",
             ).first()
             if parent is None:
@@ -2490,7 +2802,7 @@ def add_item(item: dict) -> dict:
             if not idempotency_key:
                 raise
             existing = session.query(HistoryRow).filter(
-                HistoryRow.user_id == item["user_id"],
+                _owned_by(actor, HistoryRow.user_id),
                 HistoryRow.idempotency_key == idempotency_key,
             ).first()
             if existing is None:
@@ -2607,6 +2919,11 @@ def delete_user_group(group_id: str) -> bool:
         row = session.get(UserGroupRow, group_id)
         if not row:
             return False
+        # Grants naming this organisation outlive it otherwise, and a later group
+        # created with the same id would inherit them.
+        session.query(HistoryAclRow).filter(
+            HistoryAclRow.subject_type == "org_group", HistoryAclRow.subject_id == group_id
+        ).delete(synchronize_session=False)
         session.delete(row)
         session.commit()
         return True
@@ -2766,6 +3083,34 @@ def list_users_for_actor(actor: dict) -> list[dict]:
             )
             return [_user_to_dict(row, group_name) for row, group_name in rows]
     return []
+
+
+def list_group_peers(user_id: str) -> list[dict]:
+    """The caller's own organisation group, as names to share a work with.
+
+    Id and display name only, and only the caller's own group. Sharing needs a
+    way to name a person, and the account listing is a member manager's -- the
+    owner of a work usually is not one, so before this they had to be told a raw
+    id and paste it. Opening the whole listing instead would put every name on
+    the server in front of everyone, to solve a problem that stops at the
+    organisation boundary.
+
+    An account with no organisation group gets an empty list, not everyone.
+    """
+    with SessionLocal() as session:
+        row = session.get(UserAccountRow, user_id)
+        if row is None or not row.group_id:
+            return []
+        peers = (
+            session.query(UserAccountRow)
+            .filter(
+                UserAccountRow.group_id == row.group_id,
+                UserAccountRow.id != user_id,   # sharing with oneself is not a thing
+            )
+            .order_by(UserAccountRow.username.asc())
+            .all()
+        )
+        return [{"id": peer.id, "username": peer.username} for peer in peers]
 
 
 def add_user(username: str, email: str, password: str, permission_groups: list[str], group_id: str | None) -> dict:
@@ -3229,6 +3574,140 @@ def update_user_plugin_value(user_id: str, plugin_id: str, value: dict) -> dict 
     return update_user_plugin_storage(user_id, current)
 
 
+def _acl_to_dict(row: HistoryAclRow) -> dict:
+    return {
+        "id": row.id,
+        "history_id": row.history_id,
+        "subject_type": row.subject_type,
+        "subject_id": row.subject_id,
+        "permission": row.permission,
+        "at": row.at,
+    }
+
+
+def _may_share(actor: dict, session, item_id: str) -> bool:
+    """Only the owner and an admin may hand a work to someone else.
+
+    Not everyone who can READ it: a leader reads their organisation's works, and
+    if reading were enough to grant, the leader could pass any of them outside
+    the organisation and the scope would stop meaning anything.
+    """
+    if has_permission_group(actor, "admins"):
+        return session.query(HistoryRow).filter(HistoryRow.id == item_id).first() is not None
+    return (
+        session.query(HistoryRow)
+        .filter(HistoryRow.id == item_id, _owned_by(actor, HistoryRow.user_id))
+        .first()
+        is not None
+    )
+
+
+def list_history_acl(user_id: str, item_id: str) -> list[dict] | None:
+    """The guest list of one work, or None when the caller may not see it."""
+    actor = _actor_of(user_id)
+    with SessionLocal() as session:
+        if not _may_share(actor, session, item_id):
+            return None
+        rows = (
+            session.query(HistoryAclRow)
+            .filter(HistoryAclRow.history_id == item_id)
+            .order_by(HistoryAclRow.at.asc(), HistoryAclRow.id.asc())
+            .all()
+        )
+        return [_acl_to_dict(row) for row in rows]
+
+
+def _validated_acl_entries(entries: list[dict]) -> list[tuple[str, str, str]]:
+    clean: dict[tuple[str, str], tuple[str, str, str]] = {}
+    for entry in entries:
+        subject_type = str(entry.get("subject_type") or "")
+        subject_id = str(entry.get("subject_id") or "")
+        permission = str(entry.get("permission") or "")
+        if subject_type not in ACL_SUBJECT_TYPES:
+            raise ValueError(f"invalid subject_type: {subject_type}")
+        if permission not in ACL_PERMISSIONS:
+            raise ValueError(f"invalid permission: {permission}")
+        if not subject_id:
+            raise ValueError("subject_id is required")
+        # Last entry wins rather than raising: a caller that names the same
+        # subject twice is stating one intention clumsily, not two.
+        clean[(subject_type, subject_id)] = (subject_type, subject_id, permission)
+    return list(clean.values())
+
+
+def replace_history_acl(user_id: str, item_id: str, entries: list[dict]) -> list[dict] | None:
+    """Set the whole guest list at once. Absent subjects lose their access.
+
+    A whole-list write rather than a patch: the caller sends what the list should
+    be, so revoking is expressible. A patch API would need a separate delete verb
+    and a client that forgot it would silently never revoke anything.
+    """
+    wanted = _validated_acl_entries(entries)
+    actor = _actor_of(user_id)
+    now = _now_ms()
+    with SessionLocal() as session:
+        if not _may_share(actor, session, item_id):
+            return None
+        existing = {
+            (row.subject_type, row.subject_id): row
+            for row in session.query(HistoryAclRow).filter(HistoryAclRow.history_id == item_id).all()
+        }
+        for subject_type, subject_id, permission in wanted:
+            row = existing.pop((subject_type, subject_id), None)
+            if row is None:
+                session.add(HistoryAclRow(
+                    id=str(uuid.uuid4()), history_id=item_id, subject_type=subject_type,
+                    subject_id=subject_id, permission=permission, at=now,
+                ))
+            elif row.permission != permission:
+                row.permission = permission
+                row.at = now
+        for row in existing.values():
+            session.delete(row)
+        session.commit()
+    return list_history_acl(user_id, item_id)
+
+
+def grant_history_acl(user_id: str, item_id: str, subject_type: str, subject_id: str, permission: str) -> list[dict] | None:
+    """Add or raise one entry, leaving the rest of the list alone."""
+    current = list_history_acl(user_id, item_id)
+    if current is None:
+        return None
+    entries = [
+        entry for entry in current
+        if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
+    ]
+    entries.append({"subject_type": subject_type, "subject_id": subject_id, "permission": permission})
+    return replace_history_acl(user_id, item_id, entries)
+
+
+def revoke_history_acl(user_id: str, item_id: str, subject_type: str, subject_id: str) -> list[dict] | None:
+    """Drop one entry, leaving the rest of the list alone."""
+    current = list_history_acl(user_id, item_id)
+    if current is None:
+        return None
+    entries = [
+        entry for entry in current
+        if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
+    ]
+    return replace_history_acl(user_id, item_id, entries)
+
+
+def _delete_acl_for_histories(session, history_ids: list[str]) -> None:
+    """Drop the guest lists of works that are going away.
+
+    An orphaned row is not merely untidy. Ids are handed out by uuid4 here, but
+    an import or a restore can reintroduce one, and a stale grant would then
+    attach to whatever took the id -- someone else's work, shared with someone
+    who was never told.
+    """
+    if not history_ids:
+        return
+    session.query(HistoryAclRow).filter(HistoryAclRow.history_id.in_(history_ids)).delete(
+        synchronize_session=False
+    )
+
+
 def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = None) -> bool:
     with SessionLocal() as session:
         query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
@@ -3242,17 +3721,31 @@ def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = Non
         row = query.first()
         if not row:
             return False
+        # The account being deleted, not the one doing the deleting: the cascade
+        # selects by ownership so that widening what an admin may write never
+        # widens what one deletion removes.
+        target_owner = _owner_actor(user_id)
         if not cascade:
-            if session.query(HistoryRow).filter(HistoryRow.user_id == user_id).first():
+            if session.query(HistoryRow).filter(_owned_by(target_owner, HistoryRow.user_id)).first():
                 raise ValueError("user has history")
         else:
-            session.query(HistoryRow).filter(HistoryRow.user_id == user_id).delete()
-        session.query(OkugakiRow).filter(OkugakiRow.user_id == user_id).delete()
+            _delete_acl_for_histories(session, [
+                item_id for item_id, in
+                session.query(HistoryRow.id).filter(_owned_by(target_owner, HistoryRow.user_id))
+            ])
+            session.query(HistoryRow).filter(_owned_by(target_owner, HistoryRow.user_id)).delete()
+        # Both directions: the works this account owned, above, and the grants
+        # that named this account as a guest, here. Only the first is a cascade;
+        # the second would otherwise survive on other people's works.
+        session.query(HistoryAclRow).filter(
+            HistoryAclRow.subject_type == "user", HistoryAclRow.subject_id == user_id
+        ).delete(synchronize_session=False)
+        session.query(OkugakiRow).filter(_owned_by(target_owner, OkugakiRow.user_id)).delete()
         session.query(UserSessionRow).filter(UserSessionRow.user_id == user_id).delete()
         session.query(ExternalIdentityRow).filter(ExternalIdentityRow.user_id == user_id).delete()
         session.query(UnreadWordRow).filter(UnreadWordRow.user_id == user_id).delete()
-        session.query(LineageEdgeRow).filter(LineageEdgeRow.user_id == user_id).delete()
-        session.query(LineageNodeRow).filter(LineageNodeRow.user_id == user_id).delete()
+        session.query(LineageEdgeRow).filter(_owned_by(target_owner, LineageEdgeRow.user_id)).delete()
+        session.query(LineageNodeRow).filter(_owned_by(target_owner, LineageNodeRow.user_id)).delete()
         session.query(UserPermissionGroupRow).filter(UserPermissionGroupRow.user_id == user_id).delete()
         session.delete(row)
         session.commit()
@@ -3292,7 +3785,7 @@ def _use_history_fts(search: str) -> bool:
 
 def _list_items_with_fts(
     session,
-    user_id: str,
+    actor: dict,
     offset: int,
     limit: int,
     trashed: bool,
@@ -3300,8 +3793,9 @@ def _list_items_with_fts(
     starred: bool,
     for_revision: bool = False,
 ) -> tuple[list[dict], int]:
+    visible, visible_params = _readable_sql(actor, "h.user_id", "h.id")
     params = {
-        "user_id": user_id,
+        **visible_params,
         "trashed": 1 if trashed else 0,
         "match": _fts_match_query(search),
         "limit": limit,
@@ -3317,7 +3811,7 @@ def _list_items_with_fts(
             SELECT count(h.id)
             FROM history h
             JOIN history_fts ON history_fts.rowid = h.rowid
-            WHERE h.user_id = :user_id
+            WHERE {visible}
               AND h.trashed = :trashed
               AND h.history_visibility = 'normal'
               {starred_clause}
@@ -3335,7 +3829,7 @@ def _list_items_with_fts(
                 SELECT h.id
                 FROM history h
                 JOIN history_fts ON history_fts.rowid = h.rowid
-                WHERE h.user_id = :user_id
+                WHERE {visible}
                   AND h.trashed = :trashed
                   AND h.history_visibility = 'normal'
                   {starred_clause}
@@ -3352,7 +3846,7 @@ def _list_items_with_fts(
         return [], int(total)
     order = {item_id: index for index, item_id in enumerate(ids)}
     rows = session.query(HistoryRow).filter(HistoryRow.id.in_(ids)).all()
-    items = _rows_to_dicts_with_lineage(session, rows)
+    items = _rows_to_dicts_with_lineage(session, rows, actor)
     return sorted(items, key=lambda item: order[item["id"]]), int(total)
 
 
@@ -3365,9 +3859,10 @@ def list_items(
     starred: bool = False,
     for_revision: bool = False,
 ) -> tuple[list[dict], int]:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         query = session.query(HistoryRow).filter(
-            HistoryRow.user_id == user_id,
+            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.trashed == (1 if trashed else 0),
             HistoryRow.history_visibility == "normal",
         )
@@ -3378,7 +3873,7 @@ def list_items(
         search = query_text.strip()
         if search and _use_history_fts(search):
             return _list_items_with_fts(
-                session, user_id, offset, limit, trashed, search, starred, for_revision
+                session, actor, offset, limit, trashed, search, starred, for_revision
             )
         if search:
             query = query.filter(_history_search_clause(search))
@@ -3390,7 +3885,7 @@ def list_items(
             .limit(limit)
             .all()
         )
-        return _rows_to_dicts_with_lineage(session, rows), total
+        return _rows_to_dicts_with_lineage(session, rows, actor), total
 
 
 def list_lineage_groups(
@@ -3410,13 +3905,14 @@ def list_lineage_groups(
     one-work groups after the fact would show fewer than `limit` cards per page
     and would disagree with `total`.
     """
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         query = (
             session.query(HistoryRow)
             .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
             .filter(
-                HistoryRow.user_id == user_id,
-                LineageNodeRow.user_id == user_id,
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                _readable_node(actor),
                 HistoryRow.trashed == (1 if trashed else 0),
                 HistoryRow.history_visibility == "normal",
             )
@@ -3473,7 +3969,7 @@ def list_lineage_groups(
         representative_rows = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids)).all()
         representative_by_id = {
             item["id"]: item
-            for item in _rows_to_dicts_with_lineage(session, representative_rows)
+            for item in _rows_to_dicts_with_lineage(session, representative_rows, actor)
         }
         groups = []
         for row in page_rows:
@@ -3502,19 +3998,23 @@ def list_lineage_group_items(
     starred: bool = False,
     for_revision: bool = False,
 ) -> tuple[list[dict], int]:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
-        root = session.query(LineageNodeRow).filter(
-            LineageNodeRow.id == root_node_id,
-            LineageNodeRow.user_id == user_id,
-        ).first()
+        # The root is looked up without a readability test, and the members
+        # below are filtered with one. A lineage started by someone else and
+        # continued here has THEIR work as its root: requiring the root to be
+        # readable would close the group on its own later members, who would see
+        # a card in the listing that opens onto nothing. Nothing about the root
+        # is returned from this lookup -- only the fact that the id names a root.
+        root = session.get(LineageNodeRow, root_node_id)
         if root is None or (root.root_node_id or root.id) != root_node_id:
             return [], 0
         query = (
             session.query(HistoryRow)
             .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
             .filter(
-                HistoryRow.user_id == user_id,
-                LineageNodeRow.user_id == user_id,
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                _readable_node(actor),
                 # coalesce, not a bare ==, and the same expression list_lineage_groups
                 # groups by: the root_node_id column was added by migration without a
                 # backfill, so a root node created before it holds NULL and would not
@@ -3534,7 +4034,7 @@ def list_lineage_group_items(
             query = query.filter(_history_search_clause(search))
         total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
         rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit).all()
-        return _rows_to_dicts_with_lineage(session, rows), total
+        return _rows_to_dicts_with_lineage(session, rows, actor), total
 
 
 def item_position(
@@ -3544,9 +4044,10 @@ def item_position(
     starred: bool = False,
     for_revision: bool = False,
 ) -> int | None:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         target = session.query(HistoryRow).filter(
-            HistoryRow.user_id == user_id,
+            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.id == item_id,
             HistoryRow.trashed == (1 if trashed else 0),
             HistoryRow.history_visibility == "normal",
@@ -3556,7 +4057,7 @@ def item_position(
         if for_revision and not target.for_revision:
             return None
         query = session.query(func.count(HistoryRow.id)).filter(
-            HistoryRow.user_id == user_id,
+            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.trashed == (1 if trashed else 0),
             HistoryRow.history_visibility == "normal",
             or_(
@@ -3572,10 +4073,11 @@ def item_position(
 
 
 def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None = None) -> dict | None:
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         row = (
             session.query(HistoryRow)
-            .filter(HistoryRow.user_id == user_id, HistoryRow.id == item_id)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
             .first()
         )
         if not row:
@@ -3591,10 +4093,11 @@ def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None
 
 def set_item_for_revision(user_id: str, item_id: str, for_revision: bool) -> dict | None:
     """Raise or drop the revision mark. Independent of starred: neither reads the other."""
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         row = (
             session.query(HistoryRow)
-            .filter(HistoryRow.user_id == user_id, HistoryRow.id == item_id)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
             .first()
         )
         if not row:
@@ -3618,17 +4121,18 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
     if not ids:
         return []
     order = {item_id: index for index, item_id in enumerate(ids)}
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         rows = (
             session.query(HistoryRow)
             .filter(
-                HistoryRow.user_id == user_id,
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(ids),
                 HistoryRow.trashed == 0,
             )
             .all()
         )
-        items = _rows_to_dicts_with_lineage(session, rows)
+        items = _rows_to_dicts_with_lineage(session, rows, actor)
         return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
 
@@ -3642,11 +4146,12 @@ def _neighbor_score(raw: str | None) -> dict:
 
 def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000) -> list[dict]:
     """Load only fields used by similarity ranking, avoiding SVG and lineage hydration."""
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         rows = (
             session.query(HistoryRow.id, HistoryRow.at, HistoryRow.score)
             .filter(
-                HistoryRow.user_id == user_id,
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id != item_id,
                 HistoryRow.trashed == 0,
                 HistoryRow.history_visibility == "normal",
@@ -3659,21 +4164,29 @@ def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000)
 
 
 def delete_all(user_id: str) -> None:
+    # Ownership, not write permission: "erase everything of mine" must keep
+    # meaning one account's works however wide writing becomes.
+    owner = _owner_actor(user_id)
     with SessionLocal() as session:
-        session.query(OkugakiRow).filter(OkugakiRow.user_id == user_id).delete()
-        session.query(LineageEdgeRow).filter(LineageEdgeRow.user_id == user_id).delete()
-        session.query(LineageNodeRow).filter(LineageNodeRow.user_id == user_id).delete()
-        session.query(HistoryRow).filter(HistoryRow.user_id == user_id).delete()
+        _delete_acl_for_histories(session, [
+            item_id for item_id, in
+            session.query(HistoryRow.id).filter(_owned_by(owner, HistoryRow.user_id))
+        ])
+        session.query(OkugakiRow).filter(_owned_by(owner, OkugakiRow.user_id)).delete()
+        session.query(LineageEdgeRow).filter(_owned_by(owner, LineageEdgeRow.user_id)).delete()
+        session.query(LineageNodeRow).filter(_owned_by(owner, LineageNodeRow.user_id)).delete()
+        session.query(HistoryRow).filter(_owned_by(owner, HistoryRow.user_id)).delete()
         session.commit()
 
 
 def trash_items(user_id: str, ids: list[str]) -> int:
     if not ids:
         return 0
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         count = (
             session.query(HistoryRow)
-            .filter(HistoryRow.user_id == user_id, HistoryRow.id.in_(ids), HistoryRow.trashed == 0)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id.in_(ids), HistoryRow.trashed == 0)
             .update({HistoryRow.trashed: 1}, synchronize_session=False)
         )
         session.commit()
@@ -3683,10 +4196,11 @@ def trash_items(user_id: str, ids: list[str]) -> int:
 def restore_items(user_id: str, ids: list[str]) -> int:
     if not ids:
         return 0
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         count = (
             session.query(HistoryRow)
-            .filter(HistoryRow.user_id == user_id, HistoryRow.id.in_(ids), HistoryRow.trashed == 1)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id.in_(ids), HistoryRow.trashed == 1)
             .update({HistoryRow.trashed: 0}, synchronize_session=False)
         )
         session.commit()
@@ -3696,9 +4210,10 @@ def restore_items(user_id: str, ids: list[str]) -> int:
 def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False) -> int:
     if not ids:
         return 0
+    actor = _actor_of(user_id)
     with SessionLocal() as session:
         query = session.query(HistoryRow).filter(
-            HistoryRow.user_id == user_id,
+            _writable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.id.in_(ids),
         )
         if require_trashed:
@@ -3707,8 +4222,13 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
         now = _now_ms()
         node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         if node_ids:
+            # No owner test on these two. They follow `rows`, which the filter
+            # above already authorised, and the nodes and edges belong to the
+            # WORK's owner -- who is not the actor once a write grant lets
+            # someone else delete it. Re-testing against the actor would match
+            # nothing and quietly leave the deleted work's node un-tombstoned,
+            # its child still pointing at a parent whose history is gone.
             nodes = session.query(LineageNodeRow).filter(
-                LineageNodeRow.user_id == user_id,
                 LineageNodeRow.id.in_(node_ids),
             ).all()
             for node in nodes:
@@ -3718,11 +4238,11 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
                 node.render_hash = None
                 node.deleted_at = now
             touching = session.query(LineageEdgeRow).filter(
-                LineageEdgeRow.user_id == user_id,
                 or_(LineageEdgeRow.parent_node_id.in_(node_ids), LineageEdgeRow.child_node_id.in_(node_ids)),
             ).all()
             for edge in touching:
                 edge.metadata_json = "{}"
+        _delete_acl_for_histories(session, [row.id for row in rows])
         for row in rows:
             session.delete(row)
         session.commit()
@@ -3730,11 +4250,13 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
 
 
 def delete_all_trashed_items(user_id: str) -> int:
+    # Same reason as delete_all: emptying the trash empties one's own trash.
+    owner = _owner_actor(user_id)
     with SessionLocal() as session:
         ids = [
             item_id
             for item_id, in session.query(HistoryRow.id).filter(
-                HistoryRow.user_id == user_id,
+                _owned_by(owner, HistoryRow.user_id),
                 HistoryRow.trashed == 1,
             )
         ]

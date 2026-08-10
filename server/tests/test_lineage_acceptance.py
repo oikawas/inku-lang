@@ -144,12 +144,16 @@ def test_lineage_only_trash_restore_tombstone_and_limits():
         graph = db.get_lineage(user["id"], child["lineage_node_id"], descendant_depth=5)
         assert graph is not None
         tombstone = next(node for node in graph["nodes"] if node["id"] == hidden["lineage_node_id"])
+        # `redacted` tells a deleted parent apart from one that is merely out of
+        # reach: both render as an empty dashed card, and without the label a
+        # viewer cannot tell "gone forever" from "ask its owner".
         assert tombstone == {
             "id": hidden["lineage_node_id"],
             "state": "tombstone",
             "at": 301,
             "deleted_at": tombstone["deleted_at"],
             "child_count": 1,
+            "redacted": "deleted",
         }
         assert len(graph["edges"]) == 2
         assert all(edge["metadata"] == {} for edge in graph["edges"])

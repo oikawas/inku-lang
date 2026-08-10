@@ -11,6 +11,9 @@
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
 
 	type HistoryItem = {
+		// Set only when the work is somebody else's, reached through a group
+		// scope or an explicit grant. Absent for one's own.
+		shared?: boolean;
 		id?: string;
 		input: string;
 		source_text?: string | null;
@@ -87,6 +90,9 @@
 		onToggleSelection: (id: string) => void;
 		onLoadItem: (item: HistoryItem) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
+		// Absent in single-user mode, where there is nobody to share with.
+		onShareItem?: ((item: HistoryItem) => void) | null;
+		isJapanese?: boolean;
 		historyModelSummary: (item: HistoryItem) => string;
 		formatHistoryDate: (at: number) => string;
 		formatElapsed: (ms: number | null | undefined) => string;
@@ -131,6 +137,8 @@
 		onToggleSelection,
 		onLoadItem,
 		onToggleStar,
+		onShareItem = null,
+		isJapanese = false,
 		historyModelSummary,
 		formatHistoryDate,
 		formatElapsed,
@@ -805,12 +813,18 @@
 									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 								>✎</button>
 							</td>
-							<td>{#if hashLabel(it)}<button class="hash-chip table-hash" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>#{hashLabel(it)}</button>{/if}</td>
+							<td>
+								{#if it.shared}<span class="shared-mark" title={isJapanese ? '他の利用者から共有された作品' : 'Shared with you by another member'}>{isJapanese ? '共有' : 'Shared'}</span>{/if}
+								{#if hashLabel(it)}<button class="hash-chip table-hash" onclick={(event) => copyHash(it, event)} title={t().historyHashCopyTitle}>#{hashLabel(it)}</button>{/if}
+							</td>
 							<td>{formatHistoryDate(it.at)}</td>
 							<td>{historyModelSummary(it)}</td>
 							<td>{formatElapsed(it.elapsed_ms)}</td>
 							<td>{catalogName(it.catalog_id)}</td>
 							<td>
+								{#if historyManagerView === 'active' && onShareItem && !it.shared}
+									<button class="ghost-btn" onclick={() => onShareItem?.(it)} title={isJapanese ? 'この作品を共有する' : 'Share this work'}>{isJapanese ? '共有' : 'Share'}</button>
+								{/if}
 								{#if historyManagerView === 'active'}
 									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().historyTrashItemTitle} aria-label={t().deleteButton}>
 										<svg viewBox="2 2 20 20" aria-hidden="true">
@@ -835,6 +849,19 @@
 </div>
 
 <style>
+	/* Not a decoration: this listing is what people select and delete from, so a
+	   work that belongs to someone else has to be legible as such at a glance. */
+	.shared-mark {
+		display: inline-block;
+		margin-right: 0.35rem;
+		padding: 0 0.35em;
+		border: 1px solid var(--accent);
+		border-radius: var(--btn-sm-radius);
+		color: var(--accent);
+		font-size: 0.75em;
+		vertical-align: middle;
+	}
+
 	.lineage-history-list { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 	.lineage-history-message { margin: auto; padding: 30px; color: var(--fg3); text-align: center; }
 	.lineage-history-group { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }

@@ -43,7 +43,9 @@
         "arrangement": {
           "center": null,
           "cluster_count": null,
-          "color_cycle": [],
+          "color_cycle": [
+            "purple"
+          ],
           "cols": null,
           "count": 2,
           "density": "none",
@@ -68,7 +70,7 @@
           0.5
         ],
         "mode": "additive",
-        "note": "purple restored in color_cycle from DDL color intent; purple promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names purple alone",
+        "note": "purple restored in color_cycle from DDL color intent; purple promoted to primary stroke from DDL color intent; color_cycle reduced to purple alone as the DDL names it alone",
         "position": null,
         "primitive": "line",
         "radius": null,

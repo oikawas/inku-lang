@@ -580,9 +580,9 @@ def test_coerce_score_reads_withered_grass_as_green_without_halving_the_group():
     # repair moved in front of the promotion. It stays green here.
     assert repaired.color == "green"
     assert repaired.arrangement is not None
-    assert repaired.arrangement.color_cycle == []
+    assert repaired.arrangement.color_cycle == ["green"]
     assert "withered grass kept as muted green-gray" in (repaired.note or "")
-    assert "color_cycle dropped because the DDL names green alone" in (repaired.note or "")
+    assert "color_cycle reduced to green alone as the DDL names it alone" in (repaired.note or "")
 
 
 def test_coerce_score_does_not_repair_green_from_words_false_positive():

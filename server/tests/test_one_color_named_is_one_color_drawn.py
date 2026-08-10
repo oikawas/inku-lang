@@ -75,7 +75,7 @@ def test_t1_one_named_color_empties_the_cycle_and_keeps_the_color() -> None:
         ddl="緑の小さな楕円を十二散らす。",
     )
 
-    assert _cycles(fixed) == [[]]
+    assert _cycles(fixed) == [["green"]]
     assert [ins.color for ins in fixed.instructions] == ["green"]
 
 
@@ -86,7 +86,7 @@ def test_t1_holds_when_a_background_clause_precedes_the_one_color() -> None:
         ddl="背景を黒で塗りつぶす。白い細い線を十二本引く。",
         )
 
-    assert _cycles(fixed) == [[]]
+    assert _cycles(fixed) == [["white"]]
     assert [ins.color for ins in fixed.instructions] == ["white"]
 
 
@@ -108,8 +108,18 @@ def test_t2_two_named_colors_leave_every_cycle_member_in_place() -> None:
 # T-3: a description that asks for many colors keeps its cycle.
 
 
-@pytest.mark.parametrize("ddl", ["色とりどりの楕円を十二散らす。", "a colorful scatter of twelve ellipses"])
+@pytest.mark.parametrize(
+    "ddl",
+    ["色とりどりの緑の楕円を十二散らす。", "a colorful scatter of twelve green ellipses"],
+)
 def test_t3_a_polychrome_phrase_leaves_the_cycle_in_place(ddl: str) -> None:
+    # The sample names exactly one color on purpose. `色とりどりの楕円を…` names
+    # none, so condition 1 stops the fold before the polychrome check is ever
+    # consulted -- removing the check outright left this test green. Naming one
+    # color makes condition 2 the only thing standing between this cycle and the
+    # fold, which is what the test is for.
+    assert len(_requested_colors_from_ddl(_marks_only_ddl(ddl))) == 1
+
     fixed = coerce_score(_score(_grouped("green", ["green", "gray"])), ddl=ddl)
 
     for cycle in _cycles(fixed):
@@ -137,20 +147,31 @@ def test_t4_a_ddl_with_no_named_color_leaves_the_cycle_unchanged(ddl: str) -> No
 
 
 @pytest.mark.parametrize(
-    ("ddl", "named", "carried"),
+    ("ddl", "named", "carried", "background"),
     [
-        ("紫の小さな楕円を十二散らす。", "purple", "black"),
-        ("橙の小さな楕円を十二散らす。", "orange", "gray"),
-        ("黄色い小さな楕円を十二散らす。", "yellow", "blue"),
+        ("紫の小さな楕円を十二散らす。", "purple", "black", "white"),
+        ("橙の小さな楕円を十二散らす。", "orange", "gray", "white"),
+        ("黄色い小さな楕円を十二散らす。", "yellow", "blue", "white"),
+        # White is the case that makes this test discriminating.
+        # `_with_primary_color_delivery` runs before the fold and skips white and
+        # the background color, so for every row above it has already moved the
+        # named color onto the primary stroke and the fold's own `color` write
+        # agrees with what is there. Only here is the fold the sole writer, and
+        # only here does dropping that write change the drawing.
+        ("背景を黒で塗りつぶす。白い小さな楕円を十二散らす。", "white", "gray", "black"),
     ],
 )
-def test_t5_the_folded_instruction_carries_the_named_color(ddl: str, named: str, carried: str) -> None:
+def test_t5_the_folded_instruction_carries_the_named_color(
+    ddl: str, named: str, carried: str, background: str
+) -> None:
     # The instruction arrives carrying a color the description did not name, so
     # emptying the cycle without setting `color` would draw the whole group in
     # `carried` and take the named color out of the picture entirely.
-    fixed = coerce_score(_score(_grouped(carried, [carried, named])), ddl=ddl)
+    fixed = coerce_score(
+        _score(_grouped(carried, [carried, named]), background=background), ddl=ddl
+    )
 
-    assert _cycles(fixed) == [[]]
+    assert _cycles(fixed) == [[named]]
     assert [ins.color for ins in fixed.instructions] == [named]
 
 
@@ -168,6 +189,23 @@ def test_t6_a_white_mark_on_black_is_one_named_color() -> None:
     assert _requested_colors_from_ddl(ddl) == {"black", "white"}
 
 
+def test_t6_a_white_mark_on_a_white_background_is_still_one_named_color() -> None:
+    # The case that separates the two implementations. Dropping the background
+    # clause leaves white named once. Subtracting `score.background` instead
+    # takes white away entirely, so a description that named one color reads as
+    # naming none and the cycle survives -- the mark colour is the background
+    # colour here, and only the clause structure says which mention was which.
+    ddl = "背景を白で塗りつぶす。白い細い線を十二本引く。"
+    assert _requested_colors_from_ddl(_marks_only_ddl(ddl)) == {"white"}
+
+    fixed = coerce_score(
+        _score(_grouped("gray", ["gray", "white"]), background="white"), ddl=ddl
+    )
+
+    assert _cycles(fixed) == [["white"]]
+    assert [ins.color for ins in fixed.instructions] == ["white"]
+
+
 def test_t6_a_black_mark_on_a_black_background_clause_is_still_one_color() -> None:
     ddl = "背景を白で塗りつぶす。黒い細い線を十二本引く。"
 
@@ -177,7 +215,7 @@ def test_t6_a_black_mark_on_a_black_background_clause_is_still_one_color() -> No
         _score(_grouped("black", ["black", "gray"]), background="white"), ddl=ddl
     )
 
-    assert _cycles(fixed) == [[]]
+    assert _cycles(fixed) == [["black"]]
     assert [ins.color for ins in fixed.instructions] == ["black"]
 
 
@@ -205,7 +243,7 @@ def test_t10_the_rule_holds_when_style_coercion_is_disabled(monkeypatch: pytest.
         ddl="緑の小さな楕円を十二散らす。",
     )
 
-    assert _cycles(fixed) == [[]]
+    assert _cycles(fixed) == [["green"]]
     assert [ins.color for ins in fixed.instructions] == ["green"]
 
 

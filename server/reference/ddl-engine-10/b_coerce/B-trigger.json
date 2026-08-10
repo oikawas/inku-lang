@@ -43,7 +43,9 @@
         "arrangement": {
           "center": null,
           "cluster_count": null,
-          "color_cycle": [],
+          "color_cycle": [
+            "red"
+          ],
           "cols": null,
           "count": 2,
           "density": "none",
@@ -68,7 +70,7 @@
           0.5
         ],
         "mode": "additive",
-        "note": "red restored in color_cycle from DDL color intent; red promoted to primary stroke from DDL color intent; motion energy restored through trajectory and rotation; color_cycle dropped because the DDL names red alone",
+        "note": "red restored in color_cycle from DDL color intent; red promoted to primary stroke from DDL color intent; motion energy restored through trajectory and rotation; color_cycle reduced to red alone as the DDL names it alone",
         "position": null,
         "primitive": "line",
         "radius": null,

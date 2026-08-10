@@ -1237,8 +1237,8 @@ def test_compose_fallback_clusters_large_counts_and_palette(monkeypatch, auth_co
     # ["red","green","white"], so 100 of the 300 ellipses were the red the
     # description actually named and 200 were colors it did not. The tone
     # palette still runs -- this is a one-color description, so the cycle it
-    # produced is folded at the exit and every member takes the named red.
-    assert arrangement["color_cycle"] == []
+    # produced is reduced at the exit to the named red and every member takes it.
+    assert arrangement["color_cycle"] == ["red"]
     assert r.json()["score"]["instructions"][0]["color"] == "red"
 
 

@@ -43,7 +43,9 @@
         "arrangement": {
           "center": null,
           "cluster_count": null,
-          "color_cycle": [],
+          "color_cycle": [
+            "orange"
+          ],
           "cols": null,
           "count": 2,
           "density": "none",
@@ -68,7 +70,7 @@
           0.5
         ],
         "mode": "additive",
-        "note": "orange restored in color_cycle from DDL color intent; orange promoted to primary stroke from DDL color intent; motion energy restored through trajectory and rotation; color_cycle dropped because the DDL names orange alone",
+        "note": "orange restored in color_cycle from DDL color intent; orange promoted to primary stroke from DDL color intent; motion energy restored through trajectory and rotation; color_cycle reduced to orange alone as the DDL names it alone",
         "position": null,
         "primitive": "line",
         "radius": null,

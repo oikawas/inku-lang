@@ -43,7 +43,9 @@
         "arrangement": {
           "center": null,
           "cluster_count": null,
-          "color_cycle": [],
+          "color_cycle": [
+            "blue"
+          ],
           "cols": null,
           "count": 2,
           "density": "none",
@@ -68,7 +70,7 @@
           0.5
         ],
         "mode": "additive",
-        "note": "blue restored in color_cycle from DDL color intent; blue promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names blue alone",
+        "note": "blue restored in color_cycle from DDL color intent; blue promoted to primary stroke from DDL color intent; color_cycle reduced to blue alone as the DDL names it alone",
         "position": null,
         "primitive": "line",
         "radius": null,

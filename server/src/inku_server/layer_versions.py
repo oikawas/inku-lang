@@ -8,9 +8,15 @@
 # The rule reads the DDL with its background clauses dropped, fires only when
 # exactly one color is named and no "colorful" phrase is present, and only on a
 # cycle that carries the named color alongside another -- a cycle without it is
-# a delivery failure, which is a different layer's work. Both exits run it,
-# including the `INKU_COERCE_DISABLE` one: that flag turns off style repair, not
-# the ban on inventing.
+# a delivery failure, which is a different layer's work. The cycle is reduced to
+# the one named color rather than emptied: `_apply_color_cycle` rebuilds
+# `color_hint` and returns early on an empty cycle, so emptying it also skips
+# that rebuild, and a stored Score whose `color_hint` still carries an old
+# machine note ("black restored in color_cycle...") then hands the renderer a
+# color the description never named -- measured, 58 of 100 cycled instructions
+# in the [I-173] sample carry such a note. Both exits run the branch, including
+# the `INKU_COERCE_DISABLE` one: that flag turns off style repair, not the ban
+# on inventing.
 # 9 (2026-08-09): coerce becomes a fixed point for a color it delivers. The
 # promotion to a primary stroke ran before the repair that puts a color in a
 # cycle, and it can only promote what a cycle already carries -- so a color the

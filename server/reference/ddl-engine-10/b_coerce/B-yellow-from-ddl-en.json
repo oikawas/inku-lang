@@ -43,7 +43,9 @@
         "arrangement": {
           "center": null,
           "cluster_count": null,
-          "color_cycle": [],
+          "color_cycle": [
+            "yellow"
+          ],
           "cols": null,
           "count": 2,
           "density": "none",
@@ -68,7 +70,7 @@
           0.5
         ],
         "mode": "additive",
-        "note": "yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names yellow alone",
+        "note": "yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; color_cycle reduced to yellow alone as the DDL names it alone",
         "position": null,
         "primitive": "line",
         "radius": null,

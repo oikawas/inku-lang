@@ -72,7 +72,7 @@
      "instructions": [
       {
        "primitive": "square",
-       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names yellow alone; hard ceiling 400 applied to the whole work",
+       "note": "material inferred from DDL: crayon; black restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; yellow restored in color_cycle from DDL color intent; yellow promoted to primary stroke from DDL color intent; color_cycle reduced to yellow alone as the DDL names it alone; hard ceiling 400 applied to the whole work",
        "from": null,
        "to": null,
        "center": null,
@@ -112,7 +112,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [],
+        "color_cycle": [
+         "yellow"
+        ],
         "margin": 0.08,
         "center": null,
         "radius": null,
@@ -767,7 +769,7 @@
       },
       {
        "primitive": "ellipse",
-       "note": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation; material inferred from DDL: pencil; color_cycle dropped because the DDL names green alone",
+       "note": "leaf/grain energy restored without density growth; motion energy restored through trajectory and rotation; material inferred from DDL: pencil; color_cycle reduced to green alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": [
@@ -807,7 +809,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [],
+        "color_cycle": [
+         "green"
+        ],
         "margin": 0.22,
         "center": null,
         "radius": null,
@@ -824,7 +828,7 @@
       },
       {
        "primitive": "line",
-       "note": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names green alone",
+       "note": "visual event restored as a compact off-center mark; visual event counterweight preserved through opposing placement; color_cycle reduced to green alone as the DDL names it alone",
        "from": [
         0.11149999999999999,
         0.385
@@ -863,7 +867,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [],
+        "color_cycle": [
+         "green"
+        ],
         "margin": 0.22,
         "center": [
          0.8230000000000001,
@@ -2349,7 +2355,7 @@
      "instructions": [
       {
        "primitive": "arc",
-       "note": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; green promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names green alone",
+       "note": "material inferred from DDL: pencil; green restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; green promoted to primary stroke from DDL color intent; color_cycle reduced to green alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": [
@@ -2386,7 +2392,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [],
+        "color_cycle": [
+         "green"
+        ],
         "margin": 0.16,
         "center": null,
         "radius": null,
@@ -4855,7 +4863,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent; color_cycle dropped because the DDL names white alone",
+       "note": "material inferred from DDL: brush_thin; black restored in color_cycle from DDL color intent; color_cycle reduced to white alone as the DDL names it alone",
        "from": [
         0.48,
         0.5
@@ -4887,7 +4895,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [],
+        "color_cycle": [
+         "white"
+        ],
         "margin": 0.1,
         "center": null,
         "radius": null,
@@ -5011,7 +5021,7 @@
      "instructions": [
       {
        "primitive": "arc",
-       "note": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; color_cycle dropped because the DDL names white alone",
+       "note": "material inferred from DDL: pencil; white foreground made visible; blue/white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; color_cycle reduced to white alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": [
@@ -5048,7 +5058,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [],
+        "color_cycle": [
+         "white"
+        ],
         "margin": 0.45,
         "center": null,
         "radius": null,
@@ -5279,7 +5291,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
+       "note": "material inferred from DDL: brush_thick; motion energy restored through trajectory and rotation; visual event preserved as pre-bell light hinge; visual event counterweight preserved through opposing placement; color_cycle reduced to gray alone as the DDL names it alone",
        "from": [
         0.1,
         0.1
@@ -5319,7 +5331,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [],
+        "color_cycle": [
+         "gray"
+        ],
         "margin": 0.22,
         "center": [
          0.726,
@@ -5430,7 +5444,7 @@
       },
       {
        "primitive": "square",
-       "note": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
+       "note": "visual event restored as a pre-bell light hinge; visual event counterweight preserved through opposing placement; color_cycle reduced to gray alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": null,
@@ -5470,7 +5484,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [],
+        "color_cycle": [
+         "gray"
+        ],
         "margin": 0.22,
         "center": [
          0.34,
@@ -5490,7 +5506,7 @@
       },
       {
        "primitive": "line",
-       "note": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
+       "note": "visual event adjacent reaction added to hold focal event; visual event counterweight preserved through opposing placement; color_cycle reduced to gray alone as the DDL names it alone",
        "from": [
         0.0575,
         0.16086
@@ -5530,7 +5546,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [],
+        "color_cycle": [
+         "gray"
+        ],
         "margin": 0.22,
         "center": [
          0.729,
@@ -7308,7 +7326,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190; color_cycle dropped because the DDL names red alone",
+       "note": "motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; expanded density clustered to preserve negative space; original count 190; color_cycle reduced to red alone as the DDL names it alone",
        "from": [
         0.5,
         0.5
@@ -7347,7 +7365,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "left_to_right",
-        "color_cycle": [],
+        "color_cycle": [
+         "red"
+        ],
         "margin": 0.22,
         "center": [
          0.193,
@@ -7367,7 +7387,7 @@
       },
       {
        "primitive": "ellipse",
-       "note": "blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space; single arrangement density clustered to preserve negative space; original count 321; color_cycle dropped because the DDL names red alone",
+       "note": "blue restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; expanded density capped to preserve negative space; single arrangement density clustered to preserve negative space; original count 321; color_cycle reduced to red alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": [
@@ -7407,7 +7427,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "wave",
-        "color_cycle": [],
+        "color_cycle": [
+         "red"
+        ],
         "margin": 0.22,
         "center": null,
         "radius": null,
@@ -7718,7 +7740,7 @@
       },
       {
        "primitive": "arc",
-       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names green alone",
+       "note": "motion floor restored as a small directional trace; visual event counterweight preserved through opposing placement; color_cycle reduced to green alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": [
@@ -7755,7 +7777,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [],
+        "color_cycle": [
+         "green"
+        ],
         "margin": 0.24,
         "center": [
          0.272,
@@ -8380,7 +8404,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; color_cycle dropped because the DDL names gray alone",
+       "note": "visual event restored as a compact off-center mark; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement; color_cycle reduced to gray alone as the DDL names it alone",
        "from": [
         0.4455,
         0.4372
@@ -8420,7 +8444,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [],
+        "color_cycle": [
+         "gray"
+        ],
         "margin": 0.22,
         "center": [
          0.253,
@@ -8693,7 +8719,7 @@
       },
       {
        "primitive": "arc",
-       "note": "coverage from DDL clause: 静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; color_cycle dropped because the DDL names white alone",
+       "note": "coverage from DDL clause: 静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space; color_cycle reduced to white alone as the DDL names it alone",
        "from": null,
        "to": null,
        "center": [
@@ -8730,7 +8756,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "diagonal",
-        "color_cycle": [],
+        "color_cycle": [
+         "white"
+        ],
         "margin": 0.22,
         "center": null,
         "radius": null,
@@ -8916,7 +8944,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names green alone",
+       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent; color_cycle reduced to green alone as the DDL names it alone",
        "from": [
         0.2,
         0.5
@@ -8948,7 +8976,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [],
+        "color_cycle": [
+         "green"
+        ],
         "margin": 0.16,
         "center": null,
         "radius": null,
@@ -9209,7 +9239,7 @@
      "instructions": [
       {
        "primitive": "line",
-       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names green alone",
+       "note": "green restored in color_cycle from DDL color intent; green promoted to primary stroke from DDL color intent; color_cycle reduced to green alone as the DDL names it alone",
        "from": [
         0.2,
         0.5
@@ -9241,7 +9271,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [],
+        "color_cycle": [
+         "green"
+        ],
         "margin": 0.16,
         "center": null,
         "radius": null,
@@ -10735,7 +10767,7 @@
      "instructions": [
       {
        "primitive": "circle",
-       "note": "blue restored in color_cycle from DDL color intent; color_cycle dropped because the DDL names blue alone",
+       "note": "blue restored in color_cycle from DDL color intent; color_cycle reduced to blue alone as the DDL names it alone",
        "from": [
         0.2,
         0.5
@@ -10770,7 +10802,9 @@
         "cols": null,
         "jitter": 0.12,
         "path": "none",
-        "color_cycle": [],
+        "color_cycle": [
+         "blue"
+        ],
         "margin": 0.1,
         "center": null,
         "radius": null,
@@ -11502,7 +11536,7 @@
    "targets": "with_visual_event_type_hints"
   }
  },
- "commit": "bf76331c5e3c6810593dbf7b0827e86f730307b1",
+ "commit": "061016a9804e79afae190f32204f994ff863d0c2",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

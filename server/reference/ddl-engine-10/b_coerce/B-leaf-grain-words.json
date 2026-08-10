@@ -43,7 +43,9 @@
         "arrangement": {
           "center": null,
           "cluster_count": null,
-          "color_cycle": [],
+          "color_cycle": [
+            "green"
+          ],
           "cols": null,
           "count": 2,
           "density": "none",
@@ -68,7 +70,7 @@
           0.5
         ],
         "mode": "additive",
-        "note": "green restored in color_cycle from DDL color intent; forest green kept as quiet residue behind warm leaves; green promoted to primary stroke from DDL color intent; color_cycle dropped because the DDL names green alone",
+        "note": "green restored in color_cycle from DDL color intent; forest green kept as quiet residue behind warm leaves; green promoted to primary stroke from DDL color intent; color_cycle reduced to green alone as the DDL names it alone",
         "position": null,
         "primitive": "line",
         "radius": null,

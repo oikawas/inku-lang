@@ -43,7 +43,9 @@
         "arrangement": {
           "center": null,
           "cluster_count": null,
-          "color_cycle": [],
+          "color_cycle": [
+            "white"
+          ],
           "cols": null,
           "count": 2,
           "density": "low",
@@ -68,7 +70,7 @@
           0.5
         ],
         "mode": "additive",
-        "note": "black restored in color_cycle from DDL color intent; ma pressure restored through spacing and preserved negative space; color_cycle dropped because the DDL names white alone",
+        "note": "black restored in color_cycle from DDL color intent; ma pressure restored through spacing and preserved negative space; color_cycle reduced to white alone as the DDL names it alone",
         "position": null,
         "primitive": "line",
         "radius": null,

@@ -128,11 +128,11 @@ def test_h01_promotes_the_delivered_color_on_the_first_pass() -> None:
     promotes at all, so the promotion is named here.
 
     The note carries the weight from ddl-engine 10 on. H-01 names one color, so
-    the exit branch empties the cycle and writes `color` itself -- which means
-    `color == "yellow"` no longer says the promotion ran, and the cycle is gone
-    to be inspected. Only `_with_primary_color_delivery` writes the promotion
-    note, and only when it moved a color, so that line is what still separates
-    "promoted on the first pass" from "not promoted at all".
+    the exit branch reduces the cycle to that color and writes `color` itself --
+    which means `color == "yellow"` no longer says the promotion ran. Only
+    `_with_primary_color_delivery` writes the promotion note, and only when it
+    moved a color, so that line is what still separates "promoted on the first
+    pass" from "not promoted at all".
     """
     case = _golden_cases()["H-01"]
 
@@ -143,8 +143,8 @@ def test_h01_promotes_the_delivered_color_on_the_first_pass() -> None:
     assert "yellow restored in color_cycle from DDL color intent" in data["note"]
     assert "yellow promoted to primary stroke from DDL color intent" in data["note"]
     # Both ran, and then the exit folded what they built: one named color.
-    assert data["arrangement"]["color_cycle"] == []
-    assert "color_cycle dropped because the DDL names yellow alone" in data["note"]
+    assert data["arrangement"]["color_cycle"] == ["yellow"]
+    assert "color_cycle reduced to yellow alone as the DDL names it alone" in data["note"]
 
 
 def test_ddl_coerce_outputs_keep_machine_diagnostics_out_of_color_hint() -> None:

@@ -1262,8 +1262,16 @@ def _without_unrequested_color_cycle(instructions: list[Instruction], *, ddl: st
     This is not about honouring a distribution the description states -- no
     description states one -- but about removing one nobody asked for.
 
-    The cycle is emptied rather than reduced to `[named]`: both draw the same,
-    and a Score with no cycle says plainly that no cycle was requested.
+    The cycle keeps one entry rather than being emptied. Emptying it does not
+    draw the same picture: `_apply_color_cycle` rebuilds `color_hint` from the
+    effect allowlist and returns early on an empty cycle, so emptying the cycle
+    also skips that rebuild -- and a stored Score whose `color_hint` carries an
+    old machine note ("black restored in color_cycle...") then hands the renderer
+    a color word the description never named. Measured on the [I-173] sample:
+    58 of the 100 instructions that carry a cycle have another color's name
+    sitting in `color_hint`, and four of them lost the named color entirely when
+    the cycle went to `[]`. One entry is still not a cycle -- `len(cycle) <= 1`
+    reads that off the Score -- and it keeps the rebuild on the path it was on.
     """
     marks_only = _marks_only_ddl(ddl)
     if not marks_only or _has_polychrome_phrase(ddl):
@@ -1285,14 +1293,14 @@ def _without_unrequested_color_cycle(instructions: list[Instruction], *, ddl: st
             continue
         data = ins.model_dump(by_alias=True)
         arr_data = dict(data.get("arrangement") or {})
-        arr_data["color_cycle"] = []
+        arr_data["color_cycle"] = [named]
         data["arrangement"] = arr_data
         data["color"] = named
         # One clause, no semicolon: `_append_note` dedupes by splitting the note
         # on ";", so a two-clause note never matches itself and gets appended
         # again on every pass -- which would cost coerce the fixed point engine 9
         # bought.
-        _append_note(data, f"color_cycle dropped because the DDL names {named} alone")
+        _append_note(data, f"color_cycle reduced to {named} alone as the DDL names it alone")
         folded[index] = Instruction.model_validate(data)
     return folded
 

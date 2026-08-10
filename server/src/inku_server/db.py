@@ -225,6 +225,30 @@ class OkugakiRow(Base):
     idempotency_key = Column(String, nullable=True)
 
 
+class HistoryAclRow(Base):
+    """Who else may see or change one work. Empty by default.
+
+    A work carries its own guest list. The permission groups decide a default
+    scope -- what an admin or a leader may reach without anyone naming them --
+    and this table is the exception to it, one row per (work, subject) pair.
+    Kept apart from the group scope on purpose: if the two were one mechanism, a
+    change that broke either would be absorbed by the other and no test could
+    tell them apart.
+    """
+
+    __tablename__ = "history_acl"
+    __table_args__ = (
+        UniqueConstraint("history_id", "subject_type", "subject_id", name="uq_history_acl_subject"),
+    )
+
+    id = Column(String, primary_key=True)
+    history_id = Column(String, ForeignKey("history.id"), nullable=False, index=True)
+    subject_type = Column(String, nullable=False)   # "user" | "org_group"
+    subject_id = Column(String, nullable=False, index=True)
+    permission = Column(String, nullable=False)     # "read" | "write"
+    at = Column(BigInteger, nullable=False, index=True)
+
+
 class UnreadWordRow(Base):
     __tablename__ = "unread_words"
     __table_args__ = (UniqueConstraint("user_id", "word", "context", name="uq_unread_word_context"),)
@@ -954,6 +978,32 @@ def _owner_actor(user_id: str) -> dict:
     return {"id": user_id, "permission_groups": [], "group_id": None}
 
 
+ACL_SUBJECT_TYPES = ("user", "org_group")
+
+# Two rights, not three. `delete` lives inside `write`: a third would multiply
+# the acceptance surface for a need nobody has measured yet, and it can be added
+# later without moving what is already here.
+ACL_PERMISSIONS = ("read", "write")
+
+
+def _acl_grants(actor: dict, permissions: tuple[str, ...]):
+    """Works explicitly granted to this actor at one of `permissions`.
+
+    The actor is reached as themselves and as a member of their organisation
+    group. Permission groups are deliberately not subjects: a grant to `users`
+    would mean "everyone", which is publication and needs a different design.
+    """
+    subjects = [and_(HistoryAclRow.subject_type == "user", HistoryAclRow.subject_id == actor["id"])]
+    if actor.get("group_id"):
+        subjects.append(
+            and_(HistoryAclRow.subject_type == "org_group", HistoryAclRow.subject_id == actor["group_id"])
+        )
+    return select(HistoryAclRow.history_id).where(
+        HistoryAclRow.permission.in_(permissions),
+        or_(*subjects),
+    )
+
+
 def _same_org_group(actor: dict):
     """Accounts sharing the actor's organisation group, as a subquery.
 
@@ -964,8 +1014,8 @@ def _same_org_group(actor: dict):
     return select(UserAccountRow.id).where(UserAccountRow.group_id == actor["group_id"])
 
 
-def _readable_by(actor: dict, owner_column):
-    """Rows the actor may see.
+def _readable_by(actor: dict, owner_column, acl_history_id=None):
+    """Rows the actor may see: owner, or group scope, or an explicit grant.
 
     admins see everything, orphan rows included: `history.user_id` is nullable
     and a database restored from before the column was backfilled holds works
@@ -975,25 +1025,37 @@ def _readable_by(actor: dict, owner_column):
     group, not the permission group -- circle_a's leader sees circle_a, not every
     work on the server -- and a leader with no group_id sees only their own,
     which is the same defence delete_user and update_user already apply.
+
+    `acl_history_id` is the column holding the work's id, where the caller has
+    one. Rows that are not a work and carry no id to grant against (lineage
+    edges, for now) pass nothing and are decided by scope alone. A `write` grant
+    satisfies a read: someone trusted to change a work can obviously see it.
     """
     if has_permission_group(actor, "admins"):
         return true()
     if has_permission_group(actor, "leaders") and actor.get("group_id"):
-        return or_(owner_column == actor["id"], owner_column.in_(_same_org_group(actor)))
-    return owner_column == actor["id"]
+        scope = or_(owner_column == actor["id"], owner_column.in_(_same_org_group(actor)))
+    else:
+        scope = owner_column == actor["id"]
+    if acl_history_id is None:
+        return scope
+    return or_(scope, acl_history_id.in_(_acl_grants(actor, ACL_PERMISSIONS)))
 
 
-def _writable_by(actor: dict, owner_column):
-    """Rows the actor may change.
+def _writable_by(actor: dict, owner_column, acl_history_id=None):
+    """Rows the actor may change: owner, or admin, or an explicit `write` grant.
 
-    Deliberately narrower than _readable_by: a leader reads their organisation's
-    works but cannot star, trash, revise or delete them. Reading and writing are
-    separate here so that Stage C's `read` and `write` grants have something to
-    attach to; collapsing them would make every reader an editor.
+    Deliberately narrower than _readable_by, in both halves. A leader reads their
+    organisation's works but cannot star, trash, revise or delete them, and a
+    `read` grant does not become a `write` one. Collapsing either would make
+    every reader an editor.
     """
     if has_permission_group(actor, "admins"):
         return true()
-    return owner_column == actor["id"]
+    scope = owner_column == actor["id"]
+    if acl_history_id is None:
+        return scope
+    return or_(scope, acl_history_id.in_(_acl_grants(actor, ("write",))))
 
 
 def _owned_by(actor: dict, owner_column):
@@ -1007,23 +1069,35 @@ def _owned_by(actor: dict, owner_column):
     return owner_column == actor["id"]
 
 
-def _readable_sql(actor: dict, owner_column: str) -> tuple[str, dict]:
+def _readable_sql(actor: dict, owner_column: str, acl_history_id: str | None = None) -> tuple[str, dict]:
     """The _readable_by test as a SQL fragment and its bind parameters.
 
     The recursive lineage CTEs and the full-text history search are raw SQL and
     cannot take a SQLAlchemy expression, so they take this instead. The two forms
     have to say the same thing and move together; T-1 counts every filter that
-    bypasses either, and T-3 reads a work through the search path specifically.
+    bypasses either, and the search-path test reads a shared work through this
+    one specifically -- the failure it guards against is not a leak but a
+    disagreement, where the listing shows a work and searching for it does not.
     """
     if has_permission_group(actor, "admins"):
         return "1 = 1", {}
+    params = {"acl_owner_id": actor["id"]}
+    clauses = [f"{owner_column} = :acl_owner_id"]
     if has_permission_group(actor, "leaders") and actor.get("group_id"):
-        return (
-            f"({owner_column} = :acl_owner_id"
-            f" OR {owner_column} IN (SELECT id FROM user_accounts WHERE group_id = :acl_group_id))",
-            {"acl_owner_id": actor["id"], "acl_group_id": actor["group_id"]},
+        params["acl_group_id"] = actor["group_id"]
+        clauses.append(f"{owner_column} IN (SELECT id FROM user_accounts WHERE group_id = :acl_group_id)")
+    if acl_history_id is not None:
+        subjects = ["(subject_type = 'user' AND subject_id = :acl_owner_id)"]
+        if actor.get("group_id"):
+            params["acl_group_id"] = actor["group_id"]
+            subjects.append("(subject_type = 'org_group' AND subject_id = :acl_group_id)")
+        clauses.append(
+            f"{acl_history_id} IN (SELECT history_id FROM history_acl"
+            f" WHERE permission IN ('read', 'write') AND ({' OR '.join(subjects)}))"
         )
-    return f"{owner_column} = :acl_owner_id", {"acl_owner_id": actor["id"]}
+    if len(clauses) == 1:
+        return clauses[0], params
+    return "(" + " OR ".join(clauses) + ")", params
 
 
 def _derived_role(names) -> str:
@@ -2721,6 +2795,11 @@ def delete_user_group(group_id: str) -> bool:
         row = session.get(UserGroupRow, group_id)
         if not row:
             return False
+        # Grants naming this organisation outlive it otherwise, and a later group
+        # created with the same id would inherit them.
+        session.query(HistoryAclRow).filter(
+            HistoryAclRow.subject_type == "org_group", HistoryAclRow.subject_id == group_id
+        ).delete(synchronize_session=False)
         session.delete(row)
         session.commit()
         return True
@@ -3343,6 +3422,140 @@ def update_user_plugin_value(user_id: str, plugin_id: str, value: dict) -> dict 
     return update_user_plugin_storage(user_id, current)
 
 
+def _acl_to_dict(row: HistoryAclRow) -> dict:
+    return {
+        "id": row.id,
+        "history_id": row.history_id,
+        "subject_type": row.subject_type,
+        "subject_id": row.subject_id,
+        "permission": row.permission,
+        "at": row.at,
+    }
+
+
+def _may_share(actor: dict, session, item_id: str) -> bool:
+    """Only the owner and an admin may hand a work to someone else.
+
+    Not everyone who can READ it: a leader reads their organisation's works, and
+    if reading were enough to grant, the leader could pass any of them outside
+    the organisation and the scope would stop meaning anything.
+    """
+    if has_permission_group(actor, "admins"):
+        return session.query(HistoryRow).filter(HistoryRow.id == item_id).first() is not None
+    return (
+        session.query(HistoryRow)
+        .filter(HistoryRow.id == item_id, _owned_by(actor, HistoryRow.user_id))
+        .first()
+        is not None
+    )
+
+
+def list_history_acl(user_id: str, item_id: str) -> list[dict] | None:
+    """The guest list of one work, or None when the caller may not see it."""
+    actor = _actor_of(user_id)
+    with SessionLocal() as session:
+        if not _may_share(actor, session, item_id):
+            return None
+        rows = (
+            session.query(HistoryAclRow)
+            .filter(HistoryAclRow.history_id == item_id)
+            .order_by(HistoryAclRow.at.asc(), HistoryAclRow.id.asc())
+            .all()
+        )
+        return [_acl_to_dict(row) for row in rows]
+
+
+def _validated_acl_entries(entries: list[dict]) -> list[tuple[str, str, str]]:
+    clean: dict[tuple[str, str], tuple[str, str, str]] = {}
+    for entry in entries:
+        subject_type = str(entry.get("subject_type") or "")
+        subject_id = str(entry.get("subject_id") or "")
+        permission = str(entry.get("permission") or "")
+        if subject_type not in ACL_SUBJECT_TYPES:
+            raise ValueError(f"invalid subject_type: {subject_type}")
+        if permission not in ACL_PERMISSIONS:
+            raise ValueError(f"invalid permission: {permission}")
+        if not subject_id:
+            raise ValueError("subject_id is required")
+        # Last entry wins rather than raising: a caller that names the same
+        # subject twice is stating one intention clumsily, not two.
+        clean[(subject_type, subject_id)] = (subject_type, subject_id, permission)
+    return list(clean.values())
+
+
+def replace_history_acl(user_id: str, item_id: str, entries: list[dict]) -> list[dict] | None:
+    """Set the whole guest list at once. Absent subjects lose their access.
+
+    A whole-list write rather than a patch: the caller sends what the list should
+    be, so revoking is expressible. A patch API would need a separate delete verb
+    and a client that forgot it would silently never revoke anything.
+    """
+    wanted = _validated_acl_entries(entries)
+    actor = _actor_of(user_id)
+    now = _now_ms()
+    with SessionLocal() as session:
+        if not _may_share(actor, session, item_id):
+            return None
+        existing = {
+            (row.subject_type, row.subject_id): row
+            for row in session.query(HistoryAclRow).filter(HistoryAclRow.history_id == item_id).all()
+        }
+        for subject_type, subject_id, permission in wanted:
+            row = existing.pop((subject_type, subject_id), None)
+            if row is None:
+                session.add(HistoryAclRow(
+                    id=str(uuid.uuid4()), history_id=item_id, subject_type=subject_type,
+                    subject_id=subject_id, permission=permission, at=now,
+                ))
+            elif row.permission != permission:
+                row.permission = permission
+                row.at = now
+        for row in existing.values():
+            session.delete(row)
+        session.commit()
+    return list_history_acl(user_id, item_id)
+
+
+def grant_history_acl(user_id: str, item_id: str, subject_type: str, subject_id: str, permission: str) -> list[dict] | None:
+    """Add or raise one entry, leaving the rest of the list alone."""
+    current = list_history_acl(user_id, item_id)
+    if current is None:
+        return None
+    entries = [
+        entry for entry in current
+        if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
+    ]
+    entries.append({"subject_type": subject_type, "subject_id": subject_id, "permission": permission})
+    return replace_history_acl(user_id, item_id, entries)
+
+
+def revoke_history_acl(user_id: str, item_id: str, subject_type: str, subject_id: str) -> list[dict] | None:
+    """Drop one entry, leaving the rest of the list alone."""
+    current = list_history_acl(user_id, item_id)
+    if current is None:
+        return None
+    entries = [
+        entry for entry in current
+        if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
+    ]
+    return replace_history_acl(user_id, item_id, entries)
+
+
+def _delete_acl_for_histories(session, history_ids: list[str]) -> None:
+    """Drop the guest lists of works that are going away.
+
+    An orphaned row is not merely untidy. Ids are handed out by uuid4 here, but
+    an import or a restore can reintroduce one, and a stale grant would then
+    attach to whatever took the id -- someone else's work, shared with someone
+    who was never told.
+    """
+    if not history_ids:
+        return
+    session.query(HistoryAclRow).filter(HistoryAclRow.history_id.in_(history_ids)).delete(
+        synchronize_session=False
+    )
+
+
 def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = None) -> bool:
     with SessionLocal() as session:
         query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
@@ -3364,7 +3577,17 @@ def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = Non
             if session.query(HistoryRow).filter(_owned_by(target_owner, HistoryRow.user_id)).first():
                 raise ValueError("user has history")
         else:
+            _delete_acl_for_histories(session, [
+                item_id for item_id, in
+                session.query(HistoryRow.id).filter(_owned_by(target_owner, HistoryRow.user_id))
+            ])
             session.query(HistoryRow).filter(_owned_by(target_owner, HistoryRow.user_id)).delete()
+        # Both directions: the works this account owned, above, and the grants
+        # that named this account as a guest, here. Only the first is a cascade;
+        # the second would otherwise survive on other people's works.
+        session.query(HistoryAclRow).filter(
+            HistoryAclRow.subject_type == "user", HistoryAclRow.subject_id == user_id
+        ).delete(synchronize_session=False)
         session.query(OkugakiRow).filter(_owned_by(target_owner, OkugakiRow.user_id)).delete()
         session.query(UserSessionRow).filter(UserSessionRow.user_id == user_id).delete()
         session.query(ExternalIdentityRow).filter(ExternalIdentityRow.user_id == user_id).delete()
@@ -3418,7 +3641,7 @@ def _list_items_with_fts(
     starred: bool,
     for_revision: bool = False,
 ) -> tuple[list[dict], int]:
-    visible, visible_params = _readable_sql(actor, "h.user_id")
+    visible, visible_params = _readable_sql(actor, "h.user_id", "h.id")
     params = {
         **visible_params,
         "trashed": 1 if trashed else 0,
@@ -3487,7 +3710,7 @@ def list_items(
     actor = _actor_of(user_id)
     with SessionLocal() as session:
         query = session.query(HistoryRow).filter(
-            _readable_by(actor, HistoryRow.user_id),
+            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.trashed == (1 if trashed else 0),
             HistoryRow.history_visibility == "normal",
         )
@@ -3669,7 +3892,7 @@ def item_position(
     actor = _actor_of(user_id)
     with SessionLocal() as session:
         target = session.query(HistoryRow).filter(
-            _readable_by(actor, HistoryRow.user_id),
+            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.id == item_id,
             HistoryRow.trashed == (1 if trashed else 0),
             HistoryRow.history_visibility == "normal",
@@ -3679,7 +3902,7 @@ def item_position(
         if for_revision and not target.for_revision:
             return None
         query = session.query(func.count(HistoryRow.id)).filter(
-            _readable_by(actor, HistoryRow.user_id),
+            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.trashed == (1 if trashed else 0),
             HistoryRow.history_visibility == "normal",
             or_(
@@ -3699,7 +3922,7 @@ def set_item_starred(user_id: str, item_id: str, starred: bool, note: str | None
     with SessionLocal() as session:
         row = (
             session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id), HistoryRow.id == item_id)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
             .first()
         )
         if not row:
@@ -3719,7 +3942,7 @@ def set_item_for_revision(user_id: str, item_id: str, for_revision: bool) -> dic
     with SessionLocal() as session:
         row = (
             session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id), HistoryRow.id == item_id)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id == item_id)
             .first()
         )
         if not row:
@@ -3748,7 +3971,7 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
         rows = (
             session.query(HistoryRow)
             .filter(
-                _readable_by(actor, HistoryRow.user_id),
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(ids),
                 HistoryRow.trashed == 0,
             )
@@ -3773,7 +3996,7 @@ def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000)
         rows = (
             session.query(HistoryRow.id, HistoryRow.at, HistoryRow.score)
             .filter(
-                _readable_by(actor, HistoryRow.user_id),
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id != item_id,
                 HistoryRow.trashed == 0,
                 HistoryRow.history_visibility == "normal",
@@ -3790,6 +4013,10 @@ def delete_all(user_id: str) -> None:
     # meaning one account's works however wide writing becomes.
     owner = _owner_actor(user_id)
     with SessionLocal() as session:
+        _delete_acl_for_histories(session, [
+            item_id for item_id, in
+            session.query(HistoryRow.id).filter(_owned_by(owner, HistoryRow.user_id))
+        ])
         session.query(OkugakiRow).filter(_owned_by(owner, OkugakiRow.user_id)).delete()
         session.query(LineageEdgeRow).filter(_owned_by(owner, LineageEdgeRow.user_id)).delete()
         session.query(LineageNodeRow).filter(_owned_by(owner, LineageNodeRow.user_id)).delete()
@@ -3804,7 +4031,7 @@ def trash_items(user_id: str, ids: list[str]) -> int:
     with SessionLocal() as session:
         count = (
             session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id), HistoryRow.id.in_(ids), HistoryRow.trashed == 0)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id.in_(ids), HistoryRow.trashed == 0)
             .update({HistoryRow.trashed: 1}, synchronize_session=False)
         )
         session.commit()
@@ -3818,7 +4045,7 @@ def restore_items(user_id: str, ids: list[str]) -> int:
     with SessionLocal() as session:
         count = (
             session.query(HistoryRow)
-            .filter(_writable_by(actor, HistoryRow.user_id), HistoryRow.id.in_(ids), HistoryRow.trashed == 1)
+            .filter(_writable_by(actor, HistoryRow.user_id, HistoryRow.id), HistoryRow.id.in_(ids), HistoryRow.trashed == 1)
             .update({HistoryRow.trashed: 0}, synchronize_session=False)
         )
         session.commit()
@@ -3831,7 +4058,7 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
     actor = _actor_of(user_id)
     with SessionLocal() as session:
         query = session.query(HistoryRow).filter(
-            _writable_by(actor, HistoryRow.user_id),
+            _writable_by(actor, HistoryRow.user_id, HistoryRow.id),
             HistoryRow.id.in_(ids),
         )
         if require_trashed:
@@ -3859,6 +4086,7 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
             ).all()
             for edge in touching:
                 edge.metadata_json = "{}"
+        _delete_acl_for_histories(session, [row.id for row in rows])
         for row in rows:
             session.delete(row)
         session.commit()

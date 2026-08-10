@@ -194,6 +194,40 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
         "B-leaf-grain-words": _coerce_input(
             _score([line]), ddl="森の落ち葉が湿った土に重なる。"
         ),
+        # Two cases for the literal band above what a reader counts on one hand.
+        # The corpus had none: every stated count in it sits at or below eleven,
+        # so widening the band to `literal_count_threshold - 1` moved none of the
+        # twenty-one frozen cases, and refreezing would have recorded a layer the
+        # change never traversed. Both are synthetic (2026-08-10 ruling), and
+        # they are a pair on purpose -- the first has the branch write the stated
+        # number, the second has it decline, so the record carries the guard as
+        # well as the repair.
+        "B-stated-count-in-the-wide-band": _coerce_input(
+            _score([_instruction(
+                primitive="circle", **{"from": None}, to=None, center=[0.5, 0.5], radius=0.06,
+                arrangement={**copy.deepcopy(BASE_ARRANGEMENT), "count": 7},
+            )]),
+            ddl="黒いペンの小さな円を三十個散らす。",
+        ),
+        # Two hundred squares leave room for five more marks, not for the two
+        # hundred thirty-three the clause asks for. The branch runs after both
+        # density budgets, so declining is the only way the count stays a number
+        # somebody chose: the hard ceiling at the exit would otherwise trim the
+        # forced value to whatever its division returned.
+        "B-stated-count-over-the-work-budget": _coerce_input(
+            _score([
+                _instruction(
+                    primitive="square", **{"from": None}, to=None,
+                    position=[0.15, 0.5], size=[0.10, 0.10],
+                    arrangement={**copy.deepcopy(BASE_ARRANGEMENT), "count": 200},
+                ),
+                _instruction(
+                    primitive="circle", **{"from": None}, to=None, center=[0.7, 0.5], radius=0.06,
+                    arrangement={**copy.deepcopy(BASE_ARRANGEMENT), "count": 5},
+                ),
+            ]),
+            ddl="黒いペンの円を二百三十三個散らす。",
+        ),
         "B-production-multiline": _coerce_input(
             _score([_instruction(color="white")], background="black"),
             ddl=(

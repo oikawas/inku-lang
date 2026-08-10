@@ -1,5 +1,22 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 12 (2026-08-10): the stated number holds past what the eye can count. Engine 11
+# stopped the repair at eleven, on the reading that a larger number is density
+# rather than a promise. Measured on 1,346 production works that is not what the
+# band above it holds: of the counts stated in 12..239 that never reached the
+# Score, lifting the band makes 203 of 341 true, and the works whose branch fires
+# go from 30 to 198. Thirty circles drawn as two is not a matter of density; it
+# is the description not being read. The band is no longer a number of its own --
+# it is `literal_count_threshold - 1`, the literal side of the line SPEC already
+# draws between drawing a number and showing a group, so the boundary cannot move
+# in one place and stay in the other. Above that line nothing changed. What did
+# change is that the branch now declines a number it cannot deliver whole: it
+# runs after both density budgets and before the hard ceiling at the exit, and
+# that ceiling trims, so a forced 233 in a work with room for five came out as
+# 200 -- neither the stated number, nor Stage 2's, nor a representative count.
+# Two synthetic cases join the coerce corpus, which had no stated count above
+# eleven in it and would otherwise have frozen a record of a layer this change
+# never traversed.
 # 11 (2026-08-10): the number the description states in plain words is the number
 # that gets drawn. One branch made a stated count true and it answered only to
 # "だけ / のみ / only / just"; a plain 「三つ」 was protected from thinning and
@@ -72,7 +89,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "11"
+DDL_ENGINE_VERSION = "12"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

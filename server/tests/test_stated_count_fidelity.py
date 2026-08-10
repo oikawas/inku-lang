@@ -19,11 +19,12 @@ import pytest
 from inku_server.coerce import coerce_score
 from inku_server.coerce.compose import (
     EXPLICIT_COUNT_NOTE,
-    MAX_STATED_COUNT_FIDELITY,
     STATED_COUNT_FIDELITY_NOTE,
     _primitive_from_clause,
     _fallback_instruction_from_clause,
+    _stated_count_fidelity_band,
 )
+from inku_server.limits import DEFAULT_LIMITS, Limits
 from inku_server.schema import Score
 
 BRANCH = "with_stated_count_fidelity"
@@ -58,9 +59,11 @@ def _score(*groups: dict, background: str = "white") -> Score:
     )
 
 
-def _replay(score: Score, ddl: str) -> tuple[list[int], list[str], dict[str, int]]:
+def _replay(
+    score: Score, ddl: str, limits: Limits = DEFAULT_LIMITS
+) -> tuple[list[int], list[str], dict[str, int]]:
     report: dict[str, int] = {}
-    out = coerce_score(score, ddl=ddl, branch_report=report)
+    out = coerce_score(score, ddl=ddl, branch_report=report, limits=limits)
     counts = [(ins.arrangement.count if ins.arrangement else 1) for ins in out.instructions]
     notes = [ins.note or "" for ins in out.instructions]
     return counts, notes, report
@@ -105,29 +108,66 @@ def test_the_strict_road_is_unchanged(ddl: str, stage_two_said: int) -> None:
     assert report[BRANCH] == 0, "the strict road decided this one; the plain-word branch must stay out"
 
 
-# T-3 -- above the band a number is density, not a promise, and which of density
-# and the total budget wins up there has not been ruled on.
+# T-1 (the widened band) -- a number a reader cannot count on one hand is still a
+# number the description states. Thirty circles drawn as two is not a matter of
+# density; it is the description not being read.
+@pytest.mark.parametrize(
+    ("stated", "ja", "en"),
+    [
+        (12, "十二個", "twelve"),
+        (30, "三十個", "thirty"),
+        (120, "百二十個", "one hundred twenty"),
+        (233, "二百三十三個", "two hundred thirty-three"),
+    ],
+)
+@pytest.mark.parametrize("lang", ["ja", "en"])
+@pytest.mark.parametrize("stage_two_said", [2, 40])
+def test_a_stated_count_in_the_literal_band_reaches_the_score(
+    stated: int, ja: str, en: str, lang: str, stage_two_said: int
+) -> None:
+    ddl = f"黒いペンの円を{ja}散らす。" if lang == "ja" else f"Scatter {en} black pen circles."
+    counts, _, report = _replay(_score(_group(count=stage_two_said)), ddl)
+    assert counts == [stated], f"{ddl!r} with {stage_two_said} drawn returned {counts}"
+    assert report[BRANCH] > 0
+
+
+# T-2 -- at `literal_count_threshold` and above, SPEC asks for the group to be
+# shown rather than counted, and this branch has no business overruling that.
+# Which of density and the total budget wins up there has not been ruled on.
 @pytest.mark.parametrize(
     ("ddl", "primitive", "stage_two_said"),
     [
-        ("黒いペンの線を十二本並べる。", "line", 2),
-        ("黒いペンの線を十二本並べる。", "line", 40),
-        ("Line up one hundred thirty black pen lines.", "line", 2),
-        ("Line up one hundred thirty black pen lines.", "line", 40),
+        ("黒いペンの円を三百個散らす。", "circle", 2),
+        ("黒いペンの円を三百個散らす。", "circle", 40),
+        ("黒いペンの線を五百本引く。", "line", 2),
+        ("Scatter three hundred black pen circles.", "circle", 40),
     ],
 )
-def test_a_count_above_the_band_is_left_where_it_is(ddl: str, primitive: str, stage_two_said: int) -> None:
+def test_a_count_above_the_literal_band_is_left_where_it_is(
+    ddl: str, primitive: str, stage_two_said: int
+) -> None:
     counts, _, report = _replay(_score(_group(primitive, count=stage_two_said)), ddl)
     assert counts == [stage_two_said], f"{ddl!r} moved the count to {counts}"
     assert report[BRANCH] == 0
 
 
-def test_the_band_stops_at_eleven() -> None:
-    assert MAX_STATED_COUNT_FIDELITY == 11
-    counts, _, _ = _replay(_score(_group(count=2)), "黒いペンの円を十一個並べる。")
-    assert counts == [11]
-    counts, _, _ = _replay(_score(_group(count=2)), "黒いペンの円を十二個並べる。")
-    assert counts == [2]
+# T-3 -- the top of the band is not a number of its own. It is the literal side
+# of the line `literal_count_threshold` already draws, so moving that line moves
+# the band with it -- in both directions, because a hard-coded 239 would still
+# honour 99 when the threshold is lowered and would still refuse 240 when it is
+# raised.
+def test_the_band_is_the_literal_side_of_the_threshold() -> None:
+    lowered = Limits(literal_count_threshold=100)
+    assert _stated_count_fidelity_band(lowered) == 99
+    counts, _, _ = _replay(_score(_group(count=2)), "黒いペンの円を九十九個散らす。", lowered)
+    assert counts == [99], "the band did not follow the threshold down"
+    counts, _, _ = _replay(_score(_group(count=2)), "黒いペンの円を百個散らす。", lowered)
+    assert counts == [2], "a count the lowered threshold represents was drawn literally"
+
+    raised = Limits(literal_count_threshold=480)
+    assert _stated_count_fidelity_band(raised) == 479
+    counts, _, _ = _replay(_score(_group(count=2)), "黒いペンの円を二百四十個散らす。", raised)
+    assert counts == [240], "the band did not follow the threshold up"
 
 
 # T-4 -- a number pushed onto a guess changes the count of a group the clause
@@ -248,6 +288,66 @@ def test_one_group_answers_one_clause() -> None:
     ddl = "黒いペンの円を三つ並べる。黒いペンの円を五つ並べる。"
     counts, _, _ = _replay(_score(_group(count=2)), ddl)
     assert counts == [3], f"the later clause overwrote the earlier one: {counts}"
+
+
+# T-5 -- a number this branch cannot deliver whole is one it declines to write.
+#
+# Both cases are about the same thing seen from two budgets. The branch runs
+# after both density governors, so nothing above it will make room; what runs
+# after it is the hard ceiling at the exit of coerce, and that ceiling TRIMS.
+# Without these guards the 233 below leaves as 200 -- neither the number the
+# description stated, nor the number Stage 2 chose, nor a representative count,
+# but whatever the ceiling's division returned. The assertions therefore check
+# that Stage 2's own count survives untouched, which is what separates declining
+# from trimming; asserting only "not 233" would pass for both.
+def test_a_count_that_would_break_the_work_budget_is_not_written() -> None:
+    over = _score(
+        _group("square", count=200, x=0.15),
+        _group("circle", count=5, x=0.7),
+    )
+    counts, notes, report = _replay(over, "黒いペンの円を二百三十三個散らす。")
+    assert counts == [200, 5], f"the branch wrote a count the work cannot carry: {counts}"
+    assert report[BRANCH] == 0
+    assert not any(STATED_COUNT_FIDELITY_NOTE in note for note in notes)
+    assert not any("hard ceiling" in note for note in notes), "declined, so the ceiling has nothing to trim"
+
+
+def test_the_same_count_is_written_when_the_work_has_room_for_it() -> None:
+    """The other half of the guard: it must decline for want of room, not always.
+
+    Same clause, same target group, same stated number -- only the neighbouring
+    group is smaller. Without this, a guard that simply never fires would pass
+    the test above.
+    """
+    within = _score(
+        _group("square", count=100, x=0.15),
+        _group("circle", count=5, x=0.7),
+    )
+    counts, _, report = _replay(within, "黒いペンの円を二百三十三個散らす。")
+    assert counts == [100, 233], f"the branch declined a count that fits: {counts}"
+    assert report[BRANCH] > 0
+
+
+def test_a_count_no_single_group_may_hold_is_not_written() -> None:
+    """The per-instruction budget, which the shipping limits cannot reach.
+
+    The band tops out one below `literal_count_threshold`, and that equals
+    `max_expanded_per_instruction` at the defaults, so 239 can never exceed 240.
+    The two are separate settings with no rounding between them, so an install
+    that lowers the per-instruction budget -- or raises the threshold -- reaches
+    this. Measured at the defaults it would be a test of nothing.
+    """
+    narrow = Limits(max_expanded_per_instruction=20)
+    counts, notes, report = _replay(_score(_group(count=5)), "黒いペンの円を三十個散らす。", narrow)
+    assert counts == [5], f"a count above the per-instruction budget was written: {counts}"
+    assert report[BRANCH] == 0
+    assert not any(STATED_COUNT_FIDELITY_NOTE in note for note in notes)
+
+    # And the same limits honour a number that fits, so the guard is bounded by
+    # the budget rather than by the presence of a non-default setting.
+    counts, _, report = _replay(_score(_group(count=5)), "黒いペンの円を八個散らす。", narrow)
+    assert counts == [8]
+    assert report[BRANCH] > 0
 
 
 # T-10 -- INKU_COERCE_DISABLE switches off the style layer. This branch is part

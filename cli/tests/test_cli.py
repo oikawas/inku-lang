@@ -2946,3 +2946,44 @@ def test_single_user_set_sends_the_account_it_was_given(monkeypatch):
         ("GET", "/api/settings/single-user", None),
         ("PUT", "/api/settings/single-user", {"user_id": "successor"}),
     ]
+
+
+def test_lineage_show_labels_a_withheld_parent_apart_from_a_deleted_one(monkeypatch, capsys):
+    """T-27. The two states render identically -- an empty card -- so the label
+    is the only thing telling the reader whether asking would help."""
+    graph = {
+        "focus_node_id": "mine",
+        "nodes": [
+            {"id": "withheld", "state": "active", "at": 1, "redacted": "not_permitted"},
+            {"id": "gone", "state": "tombstone", "at": 2, "redacted": "deleted", "child_count": 1},
+            {"id": "mine", "state": "active", "at": 3, "redacted": None,
+             "history": {"source_text": "my own work"}},
+        ],
+        "edges": [
+            {"parent_node_id": "withheld", "child_node_id": "mine",
+             "derivation_kind": "touch_change", "at": 1},
+            {"parent_node_id": "gone", "child_node_id": "withheld",
+             "derivation_kind": "touch_change", "at": 2},
+        ],
+    }
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            return graph, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    args = cli.build_parser().parse_args(["lineage", "show", "mine"])
+    assert cli.command_lineage(args) == 0
+    printed = capsys.readouterr().out
+
+    assert "[Private]" in printed, "a withheld parent is not labelled"
+    assert "[Deleted]" in printed, "a deleted parent is not labelled"
+    # And they are on different lines: one label for both would be the defect.
+    private_line = next(line for line in printed.splitlines() if "[Private]" in line)
+    deleted_line = next(line for line in printed.splitlines() if "[Deleted]" in line)
+    assert "withheld"[:8] in private_line
+    assert "gone"[:8] in deleted_line
+    assert "my own work" in printed

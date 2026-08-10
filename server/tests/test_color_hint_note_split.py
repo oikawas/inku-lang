@@ -204,10 +204,14 @@ def test_the_57_write_sites_remain_split_by_role() -> None:
     # three fallback sites still write descriptive markers to color_hint, the
     # rest write machine notes, and the carry site preserves both fields.
     assert len(re.findall(r'\["note"\]\s*=', compose_source)) == 4
+    # 22 since ddl-engine 11: `_with_stated_count_fidelity` signs its repair with
+    # a machine note of its own, deliberately not the one the strict count road
+    # writes -- two branches now make a stated count true, and a shared note
+    # would leave a stored Score unable to say which of them did it.
     # 21 since ddl-engine 10: `_without_unrequested_color_cycle` writes a machine
     # note like the rest, in one clause -- `_append_note` dedupes by splitting on
     # ";", so a note carrying its own semicolon is appended again on every pass.
-    assert len(re.findall(r"_append_note\(", compose_source)) - 1 == 21
+    assert len(re.findall(r"_append_note\(", compose_source)) - 1 == 22
     assert len(re.findall(r'"note"\s*:', compose_source)) == 11
     assert len(re.findall(r'\["color_hint"\]\s*=', compose_source)) == 3
     assert len(re.findall(r'"color_hint"\s*:', compose_source)) == 5

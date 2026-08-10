@@ -1,5 +1,25 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 11 (2026-08-10): the number the description states in plain words is the number
+# that gets drawn. One branch made a stated count true and it answered only to
+# "だけ / のみ / only / just"; a plain 「三つ」 was protected from thinning and
+# nothing more, so a count Stage 2 had already missed stayed missed -- measured
+# on 1,346 production works, a fifth of the counts in the band a reader can
+# count by eye never reached the Score, and in 88.8% of those the group was
+# there with the wrong number on it. `with_stated_count_fidelity` pairs a clause
+# with the single group carrying its (primitive, color, weight) -- read through
+# the same DDL hints the instructions themselves went through, or the material
+# word in a neighbouring clause makes a matching group look like a stranger --
+# and failing that with the single group carrying its figure. A clause matching
+# two groups or none is left alone: a number pushed onto a guess changes the
+# count of a group the clause never named. It sits after both budgets and after
+# the strict road, so a repaired count is not thinned again and 「だけ」 keeps the
+# last word, and it stops at 11, because above the band a number is read as
+# density and which of density and the total budget wins there is not ruled on.
+# It signs a note of its own so a stored Score still says which branch honoured
+# the count. `_primitive_from_clause` also gained the 雲形 / cloudform branch it
+# never had -- the one shape word no other test caught, which fell through to
+# the `line` default and would have handed a cloud's count to a line.
 # 10 (2026-08-10): a description that names one color is drawn in one color. The
 # cycle hands `cycle[i % len(cycle)]` to each member, so a two-color cycle gave
 # the named color half the group and an unnamed color the other half. Engine 8
@@ -52,7 +72,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "10"
+DDL_ENGINE_VERSION = "11"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

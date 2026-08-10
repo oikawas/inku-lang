@@ -65,6 +65,23 @@ MAX_NEON_BLUR_VERTICAL_COUNT = 18
 MAX_QUIET_LARGE_SHAPE_COUNT = 16
 
 
+# The band a reader counts by eye, and the band this repair stops at. A small
+# number is a promise -- three bells drawn as two is a broken one, and anybody
+# can see it. A large number is density: nobody counts a hundred and thirty
+# lines, they see how full the picture is. Which of density and the total budget
+# should win above this band has not been ruled on, so the repair stays below it.
+MAX_STATED_COUNT_FIDELITY = 11
+
+
+# Deliberately not the note `_with_explicit_constraint_enforcement` writes. Two
+# branches now make a stated count true, and a shared note would make it
+# impossible to read from a Score which of them did it.
+STATED_COUNT_FIDELITY_NOTE = "stated count from the clause honoured"
+
+
+EXPLICIT_COUNT_NOTE = "explicit count constraint enforced"
+
+
 MAX_QUIET_SYMBOLIC_SHAPE_COUNT = 8
 
 
@@ -1654,6 +1671,12 @@ def _weight_from_clause(clause: str) -> str:
 
 def _primitive_from_clause(clause: str) -> str:
     lower = clause.lower()
+    # Read first, because it is the only shape word here that no other branch
+    # would catch: a clause naming 雲形 falls through every test below to the
+    # `line` default, and a repair that pairs clauses with groups then pushes
+    # the clause's count onto whatever line the Score happens to carry.
+    if ("雲形" in clause) or ("cloudform" in lower):
+        return "cloudform"
     if ("多角形" in clause) or ("五角" in clause) or ("六角" in clause) or ("polygon" in lower):
         return "polygon"
     if ("四角" in clause) or ("square" in lower) or ("rectangle" in lower):
@@ -1774,6 +1797,12 @@ def _fallback_instruction_from_clause(
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "radius": radius})
     elif primitive == "ellipse":
         size = [0.06, 0.032] if _is_small_mark_clause(clause) else [0.16, 0.09]
+        common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": size, "rotation": -18 + index * 9})
+    elif primitive == "cloudform":
+        # center + size, not the position + size the `else` branch below writes:
+        # the renderer draws a cloudform only when both `center` and `size` are
+        # present, so a cloudform laid out like a square is an invisible mark.
+        size = [0.10, 0.06] if _is_small_mark_clause(clause) else [0.26, 0.15]
         common.update({"center": [0.68 - offset / 2, 0.30 + offset], "size": size, "rotation": -18 + index * 9})
     else:
         common.update({"position": [0.58 - offset / 2, 0.24 + offset], "size": [0.14, 0.10], "rotation": -12 + index * 8})
@@ -2469,9 +2498,174 @@ def _with_explicit_constraint_enforcement(
             arr_data["count"] = strict_count
             arr_data["layout"] = arr_data.get("layout") or "scatter"
             first["arrangement"] = arr_data
-        _append_note(first, "explicit count constraint enforced")
+        _append_note(first, EXPLICIT_COUNT_NOTE)
         repaired = [Instruction.model_validate(first)]
 
+    return repaired
+
+
+def _arrangement_count(ins: Instruction) -> int:
+    """How many marks this instruction draws: no arrangement is one mark."""
+    return ins.arrangement.count if ins.arrangement is not None else 1
+
+
+def _is_the_only_answer_to_another_count(
+    instructions: list[Instruction],
+    position: int,
+    spoken_for: frozenset[int],
+    limits: Limits,
+) -> bool:
+    """Would renumbering this group leave another stated number with no group?
+
+    Not "does it answer another number" -- two groups of two both answer a
+    stated two, and renumbering either leaves the other standing. Only the last
+    group answering a number is protected, because that is the case where the
+    repair would trade one broken promise for another.
+    """
+    count = _arrangement_count(instructions[position])
+    for value in spoken_for:
+        if not _count_follows_ddl_request(count, frozenset({value}), limits):
+            continue
+        others = sum(
+            1
+            for other, ins in enumerate(instructions)
+            if other != position
+            and _count_follows_ddl_request(_arrangement_count(ins), frozenset({value}), limits)
+        )
+        if others == 0:
+            return True
+    return False
+
+
+def _group_the_clause_names(
+    instructions: list[Instruction],
+    clause: str,
+    *,
+    ddl: str | None,
+    index: int,
+    background: str,
+    limits: Limits,
+    spoken_for: frozenset[int],
+) -> int | None:
+    """Which group this clause is about, when exactly one answer is available.
+
+    The clause is read into an instruction the same way `_with_ddl_coverage`
+    reads it, so the pairing uses the product's own reading of the clause rather
+    than a second one written here. The reading then goes through the same DDL
+    hints every instruction went through on the way in: a clause that names no
+    material reads as `pen`, while the instruction it names was moved to
+    `pencil` by a material word elsewhere in the description, and comparing the
+    two unhinted makes a group that matches look like a group that does not.
+
+    Two kinds of group are not candidates. One already repaired by the strict
+    path: that path speaks for "だけ / のみ / only / just", and this one must not
+    overwrite what it decided. And one already answering a different number the
+    description states: `_primitive_from_clause` reads a shape word anywhere in
+    the clause, so 焦点 makes a clause about lines read as a clause about
+    circles, and without this the three lines it asks for would be taken out of
+    the hundred and fifty-five circles standing next to them.
+    """
+    fallback = _with_ddl_instruction_hints(
+        _fallback_instruction_from_clause(clause, index=index, background=background, limits=limits),
+        ddl=ddl,
+    )
+    candidates = [
+        position
+        for position, ins in enumerate(instructions)
+        if EXPLICIT_COUNT_NOTE not in (ins.note or "")
+        and not _is_the_only_answer_to_another_count(instructions, position, spoken_for, limits)
+    ]
+    triple = [
+        position
+        for position in candidates
+        if (instructions[position].primitive, instructions[position].color, instructions[position].weight)
+        == (fallback.primitive, fallback.color, fallback.weight)
+    ]
+    if triple:
+        return triple[0] if len(triple) == 1 else None
+    figure = [position for position in candidates if instructions[position].primitive == fallback.primitive]
+    return figure[0] if len(figure) == 1 else None
+
+
+def _with_stated_count(ins: Instruction, count: int) -> Instruction:
+    data = ins.model_dump(by_alias=True)
+    arrangement = dict(data.get("arrangement") or {})
+    if not arrangement and count == 1:
+        return ins
+    arrangement["count"] = count
+    arrangement["layout"] = arrangement.get("layout") or "scatter"
+    data["arrangement"] = arrangement
+    _append_note(data, STATED_COUNT_FIDELITY_NOTE)
+    return Instruction.model_validate(data)
+
+
+def _with_stated_count_fidelity(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    background: str,
+    limits: Limits = DEFAULT_LIMITS,
+) -> list[Instruction]:
+    """Make a count stated in plain words true of the group the clause names.
+
+    Until now one branch made a stated number true, and it answered only to
+    "だけ / のみ / only / just". A plain "三つ" was protected from thinning and
+    nothing more: a number Stage 2 had already missed stayed missed, and the
+    miss cost the group its protection too, so a group written as 74 and drawn
+    as 73 was thinned to 64 by a governor that no longer recognized it.
+
+    It repairs only what pairs unambiguously -- one clause, one group. A clause
+    matching two groups or none is left alone: a number pushed onto a guess
+    changes the count of a group the clause never named, which is a worse defect
+    than the one being repaired. It also stops at the band a reader can count,
+    because above it a number is read as density rather than as a promise.
+    """
+    if not ddl or not instructions:
+        return instructions
+    every_stated_count = _explicit_counts_from_ddl(ddl)
+    stated = {
+        value
+        for value in every_stated_count
+        if 1 <= value <= MAX_STATED_COUNT_FIDELITY
+    }
+    if not stated:
+        return instructions
+
+    repaired = list(instructions)
+    for index, clause in enumerate(_ddl_clauses(ddl)):
+        # The same reader that answered "which counts were asked for at all",
+        # narrowed to this clause. `_single_mark_count_from_clause` is the other
+        # candidate and cannot be used here: it reaches English through
+        # `_english_count_hint`, whose noun list holds lines and squares but not
+        # circles, so "three black pen circles" reads as no count at all.
+        values = {
+            value
+            for value in _explicit_counts_from_ddl(clause)
+            if value in stated
+        }
+        if len(values) != 1:
+            continue
+        value = values.pop()
+        # A number the Score already carries somewhere is a number this branch
+        # has nothing to add to. Moving a second group onto it would answer a
+        # request that was answered, and take a count nobody asked to change.
+        if any(
+            _count_follows_ddl_request(_arrangement_count(ins), frozenset({value}), limits)
+            for ins in repaired
+        ):
+            continue
+        target = _group_the_clause_names(
+            repaired,
+            clause,
+            ddl=ddl,
+            index=index,
+            background=background,
+            limits=limits,
+            spoken_for=frozenset(every_stated_count - {value}),
+        )
+        if target is None:
+            continue
+        repaired[target] = _with_stated_count(repaired[target], value)
     return repaired
 
 

@@ -26,6 +26,7 @@ from .compose import (
     _with_rhythm_variation,
     _with_semantic_visual_event_hints,
     _with_shape_delivery_repair,
+    _with_stated_count_fidelity,
     _with_unintentional_filled_shape_tempering,
     _with_visual_event_type_hints,
     _without_explicit_region_support,
@@ -204,6 +205,22 @@ def coerce_score(
     _branch_before = instructions
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
     _record_branch_fire(branch_report, "with_explicit_constraint_enforcement", _branch_before, instructions)
+    _branch_before = instructions
+    # After the strict path, so that "だけ / のみ / only / just" keeps the last
+    # word on the clauses it speaks for. That half is measured: moving this call
+    # above `_with_explicit_constraint_enforcement` turns the strict-road test
+    # red.
+    #
+    # It also sits after both budgets, which reads like the same kind of claim
+    # and is not. Moving it above `_with_total_density_budget` was measured on a
+    # Score whose other group was over the cap, and the repaired count came out
+    # identical either way: the budgets scale a count DOWN, and a count in the
+    # 1..11 band this branch repairs is never the one they take. So the position
+    # is right but nothing distinguishes it, and no test here pretends to.
+    instructions = _with_stated_count_fidelity(
+        instructions, ddl=ddl, background=background, limits=limits
+    )
+    _record_branch_fire(branch_report, "with_stated_count_fidelity", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)

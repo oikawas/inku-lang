@@ -1,0 +1,95 @@
+{
+  "branch_report": {
+    "coerce_and_repair_instruction": 0,
+    "dedupe_instructions": 0,
+    "drop_invalid_relations": 0,
+    "presence_from_ddl": 0,
+    "with_background_dominance_governor": 0,
+    "with_color_delivery_repair": 1,
+    "with_complex_motif_repair": 0,
+    "with_context_density_governor": 0,
+    "with_crescent_sensory_suppression": 0,
+    "with_ddl_coverage": 0,
+    "with_existing_event_counterweight": 0,
+    "with_explicit_constraint_enforcement": 0,
+    "with_literal_grid_fidelity": 0,
+    "with_ma_pressure": 0,
+    "with_motion_energy": 0,
+    "with_per_instruction_density_budget": 0,
+    "with_presence_auxiliary_shape_repair": 0,
+    "with_primary_color_delivery": 1,
+    "with_repetition_event_variation": 0,
+    "with_rhythm_variation": 0,
+    "with_semantic_visual_event_hints": 0,
+    "with_shape_delivery_repair": 0,
+    "with_structural_duplicate_repair": 0,
+    "with_total_density_budget": 0,
+    "with_unintentional_filled_shape_tempering": 0,
+    "with_visual_event_type_hints": 0,
+    "without_explicit_region_support": 0,
+    "without_spontaneous_grid": 0,
+    "without_unrequested_color_cycle": 1
+  },
+  "score": {
+    "background": "white",
+    "canvas": {
+      "aspect": "square",
+      "ground": null
+    },
+    "instructions": [
+      {
+        "angle_end": null,
+        "angle_start": null,
+        "arrangement": {
+          "center": null,
+          "cluster_count": null,
+          "color_cycle": [
+            "purple"
+          ],
+          "cols": null,
+          "count": 2,
+          "density": "none",
+          "fade": "none",
+          "jitter": 0.12,
+          "layout": "scatter",
+          "margin": 0.16,
+          "path": "none",
+          "preserve_space": false,
+          "radius": null,
+          "rhythm_spacing": "none",
+          "rows": null
+        },
+        "at": null,
+        "carve_depth": null,
+        "center": null,
+        "color": "purple",
+        "color_hint": null,
+        "filled": false,
+        "from": [
+          0.18,
+          0.5
+        ],
+        "mode": "additive",
+        "note": "purple restored in color_cycle from DDL color intent; purple promoted to primary stroke from DDL color intent; color_cycle reduced to purple alone as the DDL names it alone",
+        "position": null,
+        "primitive": "line",
+        "radius": null,
+        "relation": null,
+        "rotation": null,
+        "sides": null,
+        "size": null,
+        "style": "solid",
+        "surface": null,
+        "thinness": null,
+        "to": [
+          0.82,
+          0.5
+        ],
+        "variation": null,
+        "weight": "pen"
+      }
+    ],
+    "presence": null,
+    "version": "0.1.0"
+  }
+}

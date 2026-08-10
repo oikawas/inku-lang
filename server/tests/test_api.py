@@ -154,7 +154,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "29"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "9"
+    assert data["ddl_engine_version"] == "10"
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     enabled = client.get("/api/info")
@@ -1233,7 +1233,13 @@ def test_compose_fallback_clusters_large_counts_and_palette(monkeypatch, auth_co
     assert arrangement["density"] == "high"
     assert arrangement["cluster_count"] == 9
     assert arrangement["preserve_space"] is True
-    assert arrangement["color_cycle"] == ["red", "green", "white"]
+    # Until ddl-engine 10 the fallback read `春` as a tone and built
+    # ["red","green","white"], so 100 of the 300 ellipses were the red the
+    # description actually named and 200 were colors it did not. The tone
+    # palette still runs -- this is a one-color description, so the cycle it
+    # produced is reduced at the exit to the named red and every member takes it.
+    assert arrangement["color_cycle"] == ["red"]
+    assert r.json()["score"]["instructions"][0]["color"] == "red"
 
 
 def test_compose_fallback_uses_triangle_for_mountain(monkeypatch, auth_context):
@@ -1483,7 +1489,7 @@ def test_compose_hands_coerce_the_ddl_alone_over_http(monkeypatch, auth_context)
     assert r.json()["render_engine_id"] == "default"
     assert r.json()["render_engine_version"] == "29"
     assert r.json()["ddl_version"] == "3"
-    assert r.json()["ddl_engine_version"] == "9"
+    assert r.json()["ddl_engine_version"] == "10"
     assert r.json()["render_canvas_aspect"] == "square"
     assert r.json()["render_canvas_aspect_id"] == "square"
     assert r.json()["render_canvas_aspect_ratio"] == 1.0
@@ -1520,7 +1526,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "29"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "9"
+    assert data["ddl_engine_version"] == "10"
     assert data["render_canvas_aspect"] == "square"
     assert data["render_canvas_aspect_id"] == "square"
     assert data["render_canvas_aspect_ratio"] == 1.0
@@ -2214,7 +2220,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_engine_id"] == "default"
     assert item["render_engine_version"] == "29"
     assert item["ddl_version"] == "3"
-    assert item["ddl_engine_version"] == "9"
+    assert item["ddl_engine_version"] == "10"
     assert item["render_canvas_aspect"] == "wide"
     assert item["render_canvas_aspect_id"] == "wide"
     assert item["render_canvas_aspect_ratio"] == 2.35

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..limits import DEFAULT_LIMITS, Limits
-from ..schema import Score
+from ..schema import Instruction, Score
 from .compose import (
     _presence_from_ddl,
     _record_branch_fire,
@@ -30,6 +30,7 @@ from .compose import (
     _with_visual_event_type_hints,
     _without_explicit_region_support,
     _without_spontaneous_grid,
+    _without_unrequested_color_cycle,
     count_hint_from_ddl,
 )
 from .normalize import (
@@ -46,6 +47,24 @@ from .normalize import (
 )
 
 __all__ = ["coerce_score", "count_hint_from_ddl", "ensure_renderable_score"]
+
+
+def _folded_of_unrequested_color_cycle(
+    instructions: list[Instruction],
+    *,
+    ddl: str | None,
+    branch_report: dict[str, int] | None,
+) -> list[Instruction]:
+    """Run on both exits, which is why it is a function and not two call sites.
+
+    Taking back a color the description never asked for is not a style choice,
+    so it is not something INKU_COERCE_DISABLE switches off -- the same reason
+    the hard ceiling holds on that exit too.
+    """
+    before = instructions
+    folded = _without_unrequested_color_cycle(instructions, ddl=ddl)
+    _record_branch_fire(branch_report, "without_unrequested_color_cycle", before, folded)
+    return folded
 
 
 def coerce_score(
@@ -81,6 +100,9 @@ def coerce_score(
         _branch_before = instructions
         instructions = _without_explicit_region_support(instructions, ddl=ddl)
         _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
+        instructions = _folded_of_unrequested_color_cycle(
+            instructions, ddl=ddl, branch_report=branch_report
+        )
         data = score.model_dump(by_alias=True)
         data["instructions"] = [ins.model_dump(by_alias=True) for ins in instructions]
         # The ceiling holds on this exit too. It is a guard on drawing cost, so it
@@ -191,6 +213,9 @@ def coerce_score(
     _branch_before = instructions
     instructions = _without_explicit_region_support(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
+    instructions = _folded_of_unrequested_color_cycle(
+        instructions, ddl=ddl, branch_report=branch_report
+    )
     data = score.model_dump(by_alias=True)
     data["background"] = background
     if score.presence is None and effective_presence is not None:

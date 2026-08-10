@@ -1,0 +1,2827 @@
+{
+  "cases": {
+    "A-base-en": {
+      "bytes": 86,
+      "digest": "695dfc5052a003860fa8791db44c2103",
+      "input": {
+        "composition_seed": null,
+        "context_text": "Place one black square near the center. Draw three white horizontal lines.",
+        "ddl": "Place one black square near the center. Draw three white horizontal lines.",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "en",
+        "plugin_instructions_present": false,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output_path": "a_expand/A-base-en.ddl",
+      "part": "a_expand"
+    },
+    "A-base-ja": {
+      "bytes": 73,
+      "digest": "a11d3f13c797008ee42d28623ae97ec9",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output_path": "a_expand/A-base-ja.ddl",
+      "part": "a_expand"
+    },
+    "A-plugin-disabled": {
+      "bytes": 47,
+      "digest": "5cbc565ec82eeee57482332c14657f64",
+      "input": {
+        "composition_seed": null,
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "enable_plugins": false,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output_path": "a_expand/A-plugin-disabled.ddl",
+      "part": "a_expand"
+    },
+    "A-plugin-enabled": {
+      "bytes": 121,
+      "digest": "6699b9b6022baf30b4c2a53a27b81aad",
+      "input": {
+        "composition_seed": null,
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output_path": "a_expand/A-plugin-enabled.ddl",
+      "part": "a_expand"
+    },
+    "A-scatter": {
+      "bytes": 70,
+      "digest": "7d97e7ae8a53ec78fd6438db1cd732ae",
+      "input": {
+        "composition_seed": null,
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output_path": "a_expand/A-scatter.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-amplitude-only": {
+      "bytes": 73,
+      "digest": "a11d3f13c797008ee42d28623ae97ec9",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": "large",
+        "variation_seed": null
+      },
+      "output_path": "a_expand/A-variation-amplitude-only.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-large-1": {
+      "bytes": 76,
+      "digest": "50ad1db49cecdd2da3e5d484a4cee28c",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": "large",
+        "variation_seed": 1
+      },
+      "output_path": "a_expand/A-variation-large-1.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-large-12345": {
+      "bytes": 73,
+      "digest": "21252469c5346d43426e5eaaae379da1",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": "large",
+        "variation_seed": 12345
+      },
+      "output_path": "a_expand/A-variation-large-12345.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-medium-1": {
+      "bytes": 79,
+      "digest": "39e5a9eece9267f58b78b27349c5835d",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": "medium",
+        "variation_seed": 1
+      },
+      "output_path": "a_expand/A-variation-medium-1.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-medium-12345": {
+      "bytes": 73,
+      "digest": "c4d9ba9465a8bc54d670cc65d5d5fb0b",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output_path": "a_expand/A-variation-medium-12345.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-seed-only": {
+      "bytes": 73,
+      "digest": "a11d3f13c797008ee42d28623ae97ec9",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": null,
+        "variation_seed": 12345
+      },
+      "output_path": "a_expand/A-variation-seed-only.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-small-1": {
+      "bytes": 73,
+      "digest": "c4d9ba9465a8bc54d670cc65d5d5fb0b",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": "small",
+        "variation_seed": 1
+      },
+      "output_path": "a_expand/A-variation-small-1.ddl",
+      "part": "a_expand"
+    },
+    "A-variation-small-12345": {
+      "bytes": 73,
+      "digest": "55412e6dc33e3e4e5d26e7c6be6d4019",
+      "input": {
+        "composition_seed": null,
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "enable_plugins": true,
+        "focus": null,
+        "lang": "ja",
+        "plugin_instructions_present": false,
+        "variation_amplitude": "small",
+        "variation_seed": 12345
+      },
+      "output_path": "a_expand/A-variation-small-12345.ddl",
+      "part": "a_expand"
+    },
+    "B-baseline-no-ddl": {
+      "bytes": 2059,
+      "digest": "d5356edf8ff730e380767d0d6b1e74dc",
+      "fired_branches": {},
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-baseline-no-ddl.json",
+      "part": "b_coerce"
+    },
+    "B-cloudform": {
+      "bytes": 2062,
+      "digest": "e97d0893a8d611714c4e107e320ce227",
+      "fired_branches": {},
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": null,
+              "mode": "additive",
+              "position": null,
+              "primitive": "cloudform",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": [
+                0.4,
+                0.3
+              ],
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": null,
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-cloudform.json",
+      "part": "b_coerce"
+    },
+    "B-dedupe-three": {
+      "bytes": 2059,
+      "digest": "15ee5ee83b05c972311ce0b81e3fad4b",
+      "fired_branches": {
+        "dedupe_instructions": 2
+      },
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-dedupe-three.json",
+      "part": "b_coerce"
+    },
+    "B-dense-forty": {
+      "bytes": 30579,
+      "digest": "1e7e98bec494639b68ea328aba2e2050",
+      "fired_branches": {},
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.02
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.02
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.04
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.04
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.06
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.06
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.08
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.08
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.1
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.1
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.12000000000000001
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.12000000000000001
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.13999999999999999
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.13999999999999999
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.16
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.16
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.18
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.18
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.19999999999999998
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.19999999999999998
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.22
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.22
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.24
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.24
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.26
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.26
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.28
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.28
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.30000000000000004
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.30000000000000004
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.32
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.32
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.34
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.34
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.36000000000000004
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.36000000000000004
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.38
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.38
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.4
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.4
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.42000000000000004
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.42000000000000004
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.44
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.44
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.46
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.46
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.48000000000000004
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.48000000000000004
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.52
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.52
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.54
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.54
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.56
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.56
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.5800000000000001
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.5800000000000001
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.6
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.6
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.62
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.62
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.64
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.64
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.66
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.66
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.68
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.68
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.7000000000000001
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.7000000000000001
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.7200000000000001
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.7200000000000001
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.74
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.74
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.76
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.76
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.78
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.78
+              ],
+              "variation": null,
+              "weight": "pen"
+            },
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.1,
+                0.8
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.9,
+                0.8
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 40,
+      "output_path": "b_coerce/B-dense-forty.json",
+      "part": "b_coerce"
+    },
+    "B-grid": {
+      "bytes": 2476,
+      "digest": "f5c53639c3ccf98c0a9e3e8f3131f2cc",
+      "fired_branches": {
+        "with_literal_grid_fidelity": 1
+      },
+      "input": {
+        "ddl": "黒い線を三行四列の格子に並べる。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": {
+                "center": null,
+                "cluster_count": null,
+                "color_cycle": [],
+                "cols": 4,
+                "count": 12,
+                "density": "none",
+                "fade": "none",
+                "jitter": 0.12,
+                "layout": "grid",
+                "margin": 0.1,
+                "path": "none",
+                "preserve_space": false,
+                "radius": null,
+                "rhythm_spacing": "none",
+                "rows": 3
+              },
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-grid.json",
+      "part": "b_coerce"
+    },
+    "B-invalid-touching": {
+      "bytes": 2059,
+      "digest": "3ba96e966778ce0009a86b4d1353ba14",
+      "fired_branches": {
+        "drop_invalid_relations": 1
+      },
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": {
+                "gap": "medium",
+                "type": "touching"
+              },
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-invalid-touching.json",
+      "part": "b_coerce"
+    },
+    "B-leaf-grain-words": {
+      "bytes": 4246,
+      "digest": "3d3bb5b868b3f1973d05ee4a24940566",
+      "fired_branches": {
+        "with_color_delivery_repair": 1,
+        "with_complex_motif_repair": 2,
+        "with_primary_color_delivery": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "森の落ち葉が湿った土に重なる。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 3,
+      "output_path": "b_coerce/B-leaf-grain-words.json",
+      "part": "b_coerce"
+    },
+    "B-orange-from-ddl": {
+      "bytes": 2933,
+      "digest": "1cb3ac8477ab582676f7c76eb6e4b881",
+      "fired_branches": {
+        "with_color_delivery_repair": 1,
+        "with_motion_energy": 1,
+        "with_primary_color_delivery": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "橙の灯火が揺れる。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-orange-from-ddl.json",
+      "part": "b_coerce"
+    },
+    "B-presence-from-ddl": {
+      "bytes": 2896,
+      "digest": "451a086138ee4fc55e8bf79ea26ffe6a",
+      "fired_branches": {
+        "presence_from_ddl": 1,
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1
+      },
+      "input": {
+        "ddl": "金色の三日月が右上に浮かび、水面が細かく震え、岸辺に草が群れる。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-presence-from-ddl.json",
+      "part": "b_coerce"
+    },
+    "B-presence-no-ddl": {
+      "bytes": 2264,
+      "digest": "b74558ccae0662bc10f07d3e01d0f865",
+      "fired_branches": {},
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": {
+            "center": [
+              0.5,
+              0.5
+            ],
+            "contour_density": "low",
+            "gaze_pressure": "low",
+            "intensity": "medium",
+            "kind": "figure_like",
+            "symmetry": "bilateral"
+          },
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-presence-no-ddl.json",
+      "part": "b_coerce"
+    },
+    "B-production-fill-clause": {
+      "bytes": 7206,
+      "digest": "92fbeadd87f5f5c21c27900218916018",
+      "fired_branches": {
+        "coerce_and_repair_instruction": 1,
+        "with_color_delivery_repair": 1,
+        "with_ddl_coverage": 3,
+        "with_existing_event_counterweight": 2,
+        "with_ma_pressure": 1,
+        "with_motion_energy": 4,
+        "with_repetition_event_variation": 1
+      },
+      "input": {
+        "ddl": "背景を青で塗りつぶす。画面全体に白い細筆の細い縦線を三百本、上から下へ散らす。黒い細い余白線を存在の重心として右上の焦点へ二本引く。透明な膜を重ねる。境界が滲む。",
+        "score": {
+          "background": "blue",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": {
+                "center": null,
+                "cluster_count": null,
+                "color_cycle": [],
+                "cols": null,
+                "count": 110,
+                "density": "none",
+                "fade": "none",
+                "jitter": 0.12,
+                "layout": "vertical",
+                "margin": 0.1,
+                "path": "none",
+                "preserve_space": false,
+                "radius": null,
+                "rhythm_spacing": "none",
+                "rows": null
+              },
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "white",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 4,
+      "output_path": "b_coerce/B-production-fill-clause.json",
+      "part": "b_coerce"
+    },
+    "B-production-multiline": {
+      "bytes": 2694,
+      "digest": "d7f4405b5977be5b78aaa1f17961bda3",
+      "fired_branches": {
+        "with_color_delivery_repair": 1,
+        "with_ma_pressure": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "地: 生成りの紙、細かい紙目。\n背景を黒で塗りつぶす。白い右下がりの小さな楕円を百三十七個を散らす。",
+        "score": {
+          "background": "black",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "white",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-production-multiline.json",
+      "part": "b_coerce"
+    },
+    "B-production-no-fill-clause": {
+      "bytes": 8794,
+      "digest": "b4508d578d27d5eb2bfaa0500409b444",
+      "fired_branches": {
+        "coerce_and_repair_instruction": 1,
+        "with_background_dominance_governor": 1,
+        "with_color_delivery_repair": 1,
+        "with_ddl_coverage": 4,
+        "with_existing_event_counterweight": 2,
+        "with_ma_pressure": 2,
+        "with_motion_energy": 5,
+        "with_repetition_event_variation": 1
+      },
+      "input": {
+        "ddl": "静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす。黒い細い余白線を存在の重心として右上の焦点へ二本引く。透明な膜を重ねる。境界が滲む。",
+        "score": {
+          "background": "blue",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": {
+                "center": null,
+                "cluster_count": null,
+                "color_cycle": [],
+                "cols": null,
+                "count": 110,
+                "density": "none",
+                "fade": "none",
+                "jitter": 0.12,
+                "layout": "vertical",
+                "margin": 0.1,
+                "path": "none",
+                "preserve_space": false,
+                "radius": null,
+                "rhythm_spacing": "none",
+                "rows": null
+              },
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "white",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 5,
+      "output_path": "b_coerce/B-production-no-fill-clause.json",
+      "part": "b_coerce"
+    },
+    "B-purple-from-ddl": {
+      "bytes": 2687,
+      "digest": "58866a42ec8d758ed80b7be6c6fa4c6b",
+      "fired_branches": {
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "紫の菫が咲く。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-purple-from-ddl.json",
+      "part": "b_coerce"
+    },
+    "B-quiet-water": {
+      "bytes": 2677,
+      "digest": "d079faa7331ef2f2f7978736001493d3",
+      "fired_branches": {
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "静かな水面。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-quiet-water.json",
+      "part": "b_coerce"
+    },
+    "B-surface-tension-words": {
+      "bytes": 2059,
+      "digest": "d5356edf8ff730e380767d0d6b1e74dc",
+      "fired_branches": {},
+      "input": {
+        "ddl": "布の影が机に落ちて沈む。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-surface-tension-words.json",
+      "part": "b_coerce"
+    },
+    "B-trigger": {
+      "bytes": 2918,
+      "digest": "f47e80da3c916128a1f1f9a93e781190",
+      "fired_branches": {
+        "coerce_and_repair_instruction": 1,
+        "with_color_delivery_repair": 1,
+        "with_motion_energy": 1,
+        "with_primary_color_delivery": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "赤い円を三つ散らす。ゆっくり波打つ。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-trigger.json",
+      "part": "b_coerce"
+    },
+    "B-white-filled-circle": {
+      "bytes": 2048,
+      "digest": "848ae9b89ed902332c39d5bff49ab56b",
+      "fired_branches": {
+        "coerce_and_repair_instruction": 1
+      },
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": [
+                0.5,
+                0.5
+              ],
+              "color": "white",
+              "color_hint": null,
+              "filled": true,
+              "from": null,
+              "mode": "additive",
+              "position": null,
+              "primitive": "circle",
+              "radius": 0.2,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": null,
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-white-filled-circle.json",
+      "part": "b_coerce"
+    },
+    "B-white-line": {
+      "bytes": 2086,
+      "digest": "d0ab0db6201f7472e88850c5d7930f00",
+      "fired_branches": {
+        "coerce_and_repair_instruction": 1
+      },
+      "input": {
+        "ddl": null,
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "white",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-white-line.json",
+      "part": "b_coerce"
+    },
+    "B-yellow-from-ddl": {
+      "bytes": 2687,
+      "digest": "59090527626b5db8eb893b0e53445d9f",
+      "fired_branches": {
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "黄色い円を三つ散らす。",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-yellow-from-ddl.json",
+      "part": "b_coerce"
+    },
+    "B-yellow-from-ddl-en": {
+      "bytes": 2687,
+      "digest": "59090527626b5db8eb893b0e53445d9f",
+      "fired_branches": {
+        "with_color_delivery_repair": 1,
+        "with_primary_color_delivery": 1,
+        "without_unrequested_color_cycle": 1
+      },
+      "input": {
+        "ddl": "Scatter three yellow circles.",
+        "score": {
+          "background": "white",
+          "canvas": {
+            "aspect": "square",
+            "ground": null
+          },
+          "instructions": [
+            {
+              "angle_end": null,
+              "angle_start": null,
+              "arrangement": null,
+              "at": null,
+              "carve_depth": null,
+              "center": null,
+              "color": "black",
+              "color_hint": null,
+              "filled": false,
+              "from": [
+                0.18,
+                0.5
+              ],
+              "mode": "additive",
+              "position": null,
+              "primitive": "line",
+              "radius": null,
+              "relation": null,
+              "rotation": null,
+              "sides": null,
+              "size": null,
+              "style": "solid",
+              "surface": null,
+              "thinness": null,
+              "to": [
+                0.82,
+                0.5
+              ],
+              "variation": null,
+              "weight": "pen"
+            }
+          ],
+          "presence": null,
+          "version": "0.1.0"
+        }
+      },
+      "instruction_count": 1,
+      "output_path": "b_coerce/B-yellow-from-ddl-en.json",
+      "part": "b_coerce"
+    }
+  },
+  "changed_from_previous": [
+    "B-baseline-no-ddl",
+    "B-cloudform",
+    "B-dedupe-three",
+    "B-dense-forty",
+    "B-grid",
+    "B-invalid-touching",
+    "B-leaf-grain-words",
+    "B-orange-from-ddl",
+    "B-presence-from-ddl",
+    "B-presence-no-ddl",
+    "B-production-fill-clause",
+    "B-production-multiline",
+    "B-production-no-fill-clause",
+    "B-purple-from-ddl",
+    "B-quiet-water",
+    "B-surface-tension-words",
+    "B-trigger",
+    "B-white-filled-circle",
+    "B-white-line",
+    "B-yellow-from-ddl",
+    "B-yellow-from-ddl-en"
+  ],
+  "commit": "bf76331c5e3c6810593dbf7b0827e86f730307b1",
+  "corpus_format_version": "1",
+  "ddl_version": "3",
+  "engine_version": "10",
+  "frozen_at": "2026-08-10",
+  "layer": "ddl-engine",
+  "reason": "a description that names one color is drawn in one color. The cycle hands `cycle[i % len(cycle)]` to each member of a group, so a two-color cycle gave the color the description named half the members and a color nobody named the other half. Engine 8 removed the order coerce wrote into the cycle; the cycle carrying an unrequested color at all survived it. coerce now empties such a cycle and sets `color` to the named color, reading the DDL with its background clauses dropped and firing only when exactly one color is named, no polychrome phrase is present, and the cycle carries the named color alongside another -- a cycle without it is a delivery failure, which is a different layer's work. None of the 13 expand cases moved, the change being entirely inside coerce, and 8 of the 21 coerce cases did.",
+  "schema_version": "0.1.0"
+}

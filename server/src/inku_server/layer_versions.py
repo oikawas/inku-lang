@@ -1,5 +1,22 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 10 (2026-08-10): a description that names one color is drawn in one color. The
+# cycle hands `cycle[i % len(cycle)]` to each member, so a two-color cycle gave
+# the named color half the group and an unnamed color the other half. Engine 8
+# removed the order coerce was writing into the cycle; the cycle itself carrying
+# a color the description never named survived that, and is what this removes.
+# The rule reads the DDL with its background clauses dropped, fires only when
+# exactly one color is named and no "colorful" phrase is present, and only on a
+# cycle that carries the named color alongside another -- a cycle without it is
+# a delivery failure, which is a different layer's work. The cycle is reduced to
+# the one named color rather than emptied: `_apply_color_cycle` rebuilds
+# `color_hint` and returns early on an empty cycle, so emptying it also skips
+# that rebuild, and a stored Score whose `color_hint` still carries an old
+# machine note ("black restored in color_cycle...") then hands the renderer a
+# color the description never named -- measured, 58 of 100 cycled instructions
+# in the [I-173] sample carry such a note. Both exits run the branch, including
+# the `INKU_COERCE_DISABLE` one: that flag turns off style repair, not the ban
+# on inventing.
 # 9 (2026-08-09): coerce becomes a fixed point for a color it delivers. The
 # promotion to a primary stroke ran before the repair that puts a color in a
 # cycle, and it can only promote what a cycle already carries -- so a color the
@@ -35,7 +52,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "9"
+DDL_ENGINE_VERSION = "10"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

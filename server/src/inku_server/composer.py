@@ -202,7 +202,8 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 - **灰色の主題は foreground の color="gray" としても background="gray" としても扱える。灰の濃淡だけで構成せず、黒・白・青・赤・緑の可視色を併用する**
 - **具体的な色ニュアンス (桜色・朱に近い赤・冷たい青緑など) → color は最も近い抽象色、color_hint に原文の色表現を短く保持**
 - **色とりどり・多色配色 → arrangement の color_cycle に使う色を列挙。例: ["red","blue","green","black","gray"]**
-- **明示色が少ない場合は場のトーンで抽象色を選ぶ。春・花・温かい光は red/green/white、水・夜・冷気は blue/white/gray、森・葉・香りは green/white/gray、陽光・実り・金属・灯りは yellow/orange、夕暮れ・薄明・花の陰は purple。抽象色に収まらないニュアンスは color_hint に保持する**
+- **記述が色をひとつしか述べていない場合は color_cycle を作らない。color にその色を書く。color_cycle は成員へ順に色を配るので、2 色入れればその色は半分の成員にしか付かない。記述が求めていない配分になる**
+- **明示色が少ない場合は場のトーンで抽象色を選ぶ。春・花・温かい光は red/green/white、水・夜・冷気は blue/white/gray、森・葉・香りは green/white/gray、陽光・実り・金属・灯りは yellow/orange、夕暮れ・薄明・花の陰は purple。抽象色に収まらないニュアンスは color_hint に保持する。ここで選ぶのは color ひとつであって、並べた候補を color_cycle にしてはいけない**
 - **黄・橙・紫は他の抽象色と同格である。該当する場面では遠慮なく選ぶこと。**
 - **強い単色背景 (black/gray/red/orange/yellow/green/blue/purple) は DDL が明示する、または夜・炎・標識・海など主題に必要な場合だけ使う。迷ったら white を使う**
 
@@ -590,7 +591,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **A gray subject may be a foreground color="gray" or a background="gray". Do not build gray value-only drawings; combine gray with visible black, white, blue, red, or green foreground**
 - **Specific color nuance (cherry-blossom pink, cinnabar red, cool blue-green, etc.) → keep color as nearest abstract color, and preserve the original short nuance in color_hint**
 - **colorful/multi-color → arrangement color_cycle. e.g. ["red","blue","green","black","gray"]**
-- **When explicit colors are sparse, choose the abstract colors by scene tone. Spring/flowers/warm light → red/green/white; water/night/cold air → blue/white/gray; forest/leaves/fragrance → green/white/gray; sunlight/harvest/metal/lamplight → yellow/orange; dusk/twilight/shadowed flowers → purple. Preserve unavailable nuance in color_hint**
+- **When the description names only one color, do not write a color_cycle. Put that color in color. The cycle hands one color to each member in turn, so a second color in it takes half the members -- a share the description did not ask for**
+- **When explicit colors are sparse, choose the abstract colors by scene tone. Spring/flowers/warm light → red/green/white; water/night/cold air → blue/white/gray; forest/leaves/fragrance → green/white/gray; sunlight/harvest/metal/lamplight → yellow/orange; dusk/twilight/shadowed flowers → purple. Preserve unavailable nuance in color_hint. What you choose here is one color, not a cycle: never turn the listed candidates into a color_cycle**
 - **Yellow, orange, and purple are peers of the other abstract colors. Choose them freely when the scene calls for them.**
 - **Strong solid backgrounds (black/gray/red/orange/yellow/green/blue/purple) are allowed only when explicit or required by context such as night, flame, sign, or sea. If unsure, use white**
 

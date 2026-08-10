@@ -1048,6 +1048,41 @@ def _with_context_density_governor(
     return adjusted
 
 
+DDL_CLAUSE_SPLIT = re.compile(r"[。\n;；]+|(?<!\d)\.\s+")
+# Words that ask for many colors at once. A description carrying one of these
+# has asked for a cycle, so the rule that folds unrequested cycles away must
+# not touch it.
+POLYCHROME_MARKERS = ("色とりどり", "多色", "カラフル", "虹", "colorful", "multi-color")
+
+
+def _split_ddl_clauses(ddl: str) -> list[str]:
+    return [part.strip() for part in DDL_CLAUSE_SPLIT.split(ddl) if part.strip()]
+
+
+def _marks_only_ddl(ddl: str | None) -> str:
+    """Drop the background clauses, keep everything else.
+
+    `_ddl_clauses` also drops clauses without a shape word, which is right for
+    counting the marks a description asks for and wrong here: it would throw
+    away `落ち葉が散る` and `静かな水面` whole, and those are exactly the
+    descriptions whose one color this layer is about.
+    """
+    if not ddl:
+        return ""
+    kept = [
+        clause
+        for clause in _split_ddl_clauses(ddl)
+        if not (clause.startswith("背景") or clause.lower().startswith("background"))
+    ]
+    return "。".join(kept)
+
+
+def _has_polychrome_phrase(ddl: str | None) -> bool:
+    if not ddl:
+        return False
+    return _any_marker_in_text(POLYCHROME_MARKERS, ddl, ddl.lower())
+
+
 def _requested_colors_from_ddl(ddl: str | None) -> set[str]:
     if not ddl:
         return set()
@@ -1216,6 +1251,58 @@ def _with_primary_color_delivery(instructions: list[Instruction], *, ddl: str | 
         _append_note(data, f"{color} promoted to primary stroke from DDL color intent")
         repaired[candidate_index] = Instruction.model_validate(data)
     return repaired
+
+
+def _without_unrequested_color_cycle(instructions: list[Instruction], *, ddl: str | None) -> list[Instruction]:
+    """Fold a cycle away when the description named exactly one color.
+
+    The renderer hands `cycle[i % len(cycle)]` to each member in turn, so a
+    two-color cycle gives the named color to half the members and an unnamed
+    color to the other half. Nothing in the description asked for that split.
+    This is not about honouring a distribution the description states -- no
+    description states one -- but about removing one nobody asked for.
+
+    The cycle keeps one entry rather than being emptied. Emptying it does not
+    draw the same picture: `_apply_color_cycle` rebuilds `color_hint` from the
+    effect allowlist and returns early on an empty cycle, so emptying the cycle
+    also skips that rebuild -- and a stored Score whose `color_hint` carries an
+    old machine note ("black restored in color_cycle...") then hands the renderer
+    a color word the description never named. Measured on the [I-173] sample:
+    58 of the 100 instructions that carry a cycle have another color's name
+    sitting in `color_hint`, and four of them lost the named color entirely when
+    the cycle went to `[]`. One entry is still not a cycle -- `len(cycle) <= 1`
+    reads that off the Score -- and it keeps the rebuild on the path it was on.
+    """
+    marks_only = _marks_only_ddl(ddl)
+    if not marks_only or _has_polychrome_phrase(ddl):
+        return instructions
+    requested = _requested_colors_from_ddl(marks_only)
+    if len(requested) != 1:
+        return instructions
+    named = next(iter(requested))
+
+    folded = list(instructions)
+    for index, ins in enumerate(folded):
+        arr = ins.arrangement
+        if arr is None:
+            continue
+        cycle = list(arr.color_cycle or [])
+        # A cycle that never carries the named color is not dilution but a
+        # failure to deliver, and delivery is another layer's work.
+        if len(cycle) < 2 or named not in cycle or not any(color != named for color in cycle):
+            continue
+        data = ins.model_dump(by_alias=True)
+        arr_data = dict(data.get("arrangement") or {})
+        arr_data["color_cycle"] = [named]
+        data["arrangement"] = arr_data
+        data["color"] = named
+        # One clause, no semicolon: `_append_note` dedupes by splitting the note
+        # on ";", so a two-clause note never matches itself and gets appended
+        # again on every pass -- which would cost coerce the fixed point engine 9
+        # bought.
+        _append_note(data, f"color_cycle reduced to {named} alone as the DDL names it alone")
+        folded[index] = Instruction.model_validate(data)
+    return folded
 
 
 def _requested_shapes_from_ddl(ddl: str | None) -> set[str]:
@@ -1510,7 +1597,7 @@ def _presence_from_ddl(ddl: str | None) -> dict | None:
 def _ddl_clauses(ddl: str | None) -> list[str]:
     if not ddl:
         return []
-    clauses = [part.strip() for part in re.split(r"[。\n;；]+|(?<!\d)\.\s+", ddl) if part.strip()]
+    clauses = _split_ddl_clauses(ddl)
     markers = (
         "線", "点", "円", "楕円", "四角", "三角", "多角形", "五角", "六角", "弧", "塗りつぶす", "散らす", "並べる",
         "膜", "霞", "霧", "靄", "気配", "余韻", "反射", "映り", "消え", "滲",

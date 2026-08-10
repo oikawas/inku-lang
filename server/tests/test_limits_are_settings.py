@@ -301,11 +301,11 @@ def test_t4_digests_hold_at_the_defaults_and_move_under_a_setting():
     assert "1〜1500 の振れ幅" in base_alt
 
     # Stage 2 the same way: identical at the defaults, moved by the setting.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "5dc728550e37fac9"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "c5f553c03edb2879"
     raised = Limits(**{**limits_as_dict(DEFAULT_LIMITS), **RAISED})
     assert (
         composer._stage2_prompt_digest(composer.build_system_prompt("ja", raised))
-        != "5dc728550e37fac9"
+        != "c5f553c03edb2879"
     )
 
 

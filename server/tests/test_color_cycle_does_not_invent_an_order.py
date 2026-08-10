@@ -122,7 +122,11 @@ def test_t1_delivery_does_not_add_a_color_the_cycle_already_carries() -> None:
 def test_t1_repaired_score_carries_no_duplicated_color_in_a_cycle() -> None:
     score = Score.model_validate({"instructions": [_grouped("red", ["red", "black"]).model_dump(by_alias=True)]})
 
-    fixed = coerce_score(score, ddl="黄色い小さな四角を点々と散らす。")
+    # Two named colors, so ddl-engine 10 leaves the cycle standing. A one-color
+    # DDL is folded at the exit now, and this test cannot see a cycle that is
+    # not there -- the property held here is about the cycle coerce writes, and
+    # a description naming two colors is where that cycle survives to be read.
+    fixed = coerce_score(score, ddl="黄色と黒の小さな四角を点々と散らす。")
 
     cycles = _cycles(fixed)
     assert cycles, "the repair must have written a cycle for this to measure anything"
@@ -132,7 +136,14 @@ def test_t1_repaired_score_carries_no_duplicated_color_in_a_cycle() -> None:
 
 def test_t1_frozen_coerce_corpus_holds_no_duplicated_cycle() -> None:
     cycles = _corpus_cycles()
-    assert len(cycles) >= 10, f"only {len(cycles)} cycles in the corpus; the census stopped seeing them"
+    # Six since ddl-engine 10, down from fourteen. The eight that went were all
+    # one-color descriptions, which is where the new exit branch folds -- so the
+    # cycles left in the corpus are exactly the ones a description asked for, in
+    # `B-presence-from-ddl`, `B-production-fill-clause` and
+    # `B-production-no-fill-clause`. The floor is here so that a corpus which
+    # quietly stopped carrying cycles at all cannot make the duplicate check
+    # below pass by having nothing to check.
+    assert len(cycles) >= 6, f"only {len(cycles)} cycles in the corpus; the census stopped seeing them"
     duplicated = [(name, cycle) for name, cycle in cycles if len(cycle) != len(set(cycle))]
     assert duplicated == []
 
@@ -161,7 +172,8 @@ def test_t2_primary_color_survives_when_it_is_already_in_the_cycle() -> None:
 def test_t2_every_repaired_instruction_keeps_its_own_color_in_its_cycle() -> None:
     score = Score.model_validate({"instructions": [_grouped("red", ["red", "black"]).model_dump(by_alias=True)]})
 
-    fixed = coerce_score(score, ddl="黄色い小さな四角を点々と散らす。")
+    # Two named colors, for the reason given on T-1 above.
+    fixed = coerce_score(score, ddl="黄色と黒の小さな四角を点々と散らす。")
 
     grouped = [ins for ins in fixed.instructions if ins.arrangement is not None and ins.arrangement.color_cycle]
     assert grouped, "the repair must have written a cycle for this to measure anything"
@@ -258,7 +270,16 @@ def _delivered_yellow() -> Score:
             ],
         }
     )
-    return coerce_score(score, ddl="黄色い小さな四角を点々と散らす。")
+    # Two named colors since ddl-engine 10. With one, the exit branch empties the
+    # cycle and sets `color` to the named color itself -- which would leave the
+    # assertion below true whether or not the promotion ran at all. The pair of
+    # colors keeps the cycle standing, so the promotion is still the only thing
+    # that can put yellow on the primary stroke.
+    #
+    # The second color is white on purpose: `_with_primary_color_delivery` skips
+    # white, so the promotion still has exactly one candidate colour to place and
+    # this stays a test about when it runs, not about which color it picks.
+    return coerce_score(score, ddl="黄色と白の小さな四角を点々と散らす。")
 
 
 def test_t9_a_delivered_color_is_promoted_on_the_same_pass() -> None:
@@ -278,7 +299,7 @@ def test_t9_coerce_is_a_fixed_point_for_a_color_it_delivers() -> None:
     # The negative half. T-9's first test alone would pass an implementation
     # that promotes twice or keeps moving; this says one pass is the whole of it.
     first = _delivered_yellow()
-    second = coerce_score(first, ddl="黄色い小さな四角を点々と散らす。")
+    second = coerce_score(first, ddl="黄色と白の小さな四角を点々と散らす。")
 
     assert second.model_dump(mode="json", by_alias=True) == first.model_dump(mode="json", by_alias=True)
 

@@ -10,12 +10,12 @@
       "sha256": "b056eb26fc3748efedef88bd3d59ba66d10c72b9d7fbf3e9fc61505a233a8137"
     },
     "STAGE2_SYSTEM_PROMPT_JA": {
-      "bytes": 44193,
-      "sha256": "8b0c2559310f85e22d9f049c4c2939c1c4b089a15ed3e5a73a4530afd263d0ea"
+      "bytes": 44589,
+      "sha256": "1612296fc2102f90931753cd88fb7517a36b2b16ed846390cdcf3cbea15f57c3"
     },
     "STAGE2_SYSTEM_PROMPT_EN": {
-      "bytes": 42242,
-      "sha256": "4fbf91abd7c32e84f8d15f4f9aff020128f078383672921b9eb6e797dd5b8e82"
+      "bytes": 42585,
+      "sha256": "ffee4a72b70fbdee322ce91ebab8087789d23f063fd4388914dd597e35ef9d92"
     }
   }
 }

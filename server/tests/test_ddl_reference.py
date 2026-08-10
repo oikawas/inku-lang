@@ -52,7 +52,7 @@ def test_ddl_reference_versions_and_parts() -> None:
     # input the corpus already held. **That is the point of listing only three** --
     # the corpus could not have caught the behaviour this version changed, because
     # no case here ever had the shape production was passing.
-    assert DDL_ENGINE_VERSION == "9"
+    assert DDL_ENGINE_VERSION == "10"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -85,11 +85,28 @@ def test_ddl_reference_versions_and_parts() -> None:
     # instruction's own `color` was left at the black it started with. Engine 8 is
     # why five of them are new -- until the six-word table stopped dropping yellow,
     # orange, and purple, those cases could not reach either stage.
+    # Engine 10 (2026-08-10): a description that names one color is drawn in one
+    # color. The cycle hands `cycle[i % len(cycle)]` to each member, so a
+    # two-color cycle gave the named color half the group. **`changed_from_previous`
+    # lists all 21 coerce cases and the Score moved in 8**: every case carries the
+    # new branch's key in its branch report whether or not the branch fired, so
+    # the digest moves everywhere and the transform moves in eight. No expand case
+    # moves; the change lives entirely inside coerce, like engines 8 and 9.
     assert len(manifest["cases"]) == 34
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
     assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 21
-    assert manifest["changed_from_previous"] == [
-        "B-leaf-grain-words", "B-orange-from-ddl", "B-presence-from-ddl", "B-purple-from-ddl",
+    # All 21, for the reason above: the branch report is part of the frozen body,
+    # so a new branch moves every digest. The eight whose Score moved are listed
+    # separately below, and they are the ones this version is about.
+    assert manifest["changed_from_previous"] == sorted(
+        case_id for case_id, case in manifest["cases"].items() if case["part"] == "b_coerce"
+    )
+    assert sorted(
+        case_id
+        for case_id, case in manifest["cases"].items()
+        if "without_unrequested_color_cycle" in case.get("fired_branches", {})
+    ) == [
+        "B-leaf-grain-words", "B-orange-from-ddl", "B-production-multiline", "B-purple-from-ddl",
         "B-quiet-water", "B-trigger", "B-yellow-from-ddl", "B-yellow-from-ddl-en",
     ]
     assert not any(
@@ -174,11 +191,20 @@ def test_ddl_reference_coerce_discriminators() -> None:
         # them; it ran before the repair that puts the color in a cycle, and it
         # can only promote what a cycle already carries, so it found nothing and
         # the work waited for a second pass that production never made.
+        # `without_unrequested_color_cycle` joins them at ddl-engine 10, and it is
+        # the same set again: a DDL that names one color, delivered into a cycle
+        # that also carries another. Delivery puts the color there, the promotion
+        # moves it to the primary stroke, and this branch takes the cycle away so
+        # the color the description named reaches every member and not half.
         "B-trigger": {
             "coerce_and_repair_instruction", "with_color_delivery_repair",
             "with_primary_color_delivery", "with_motion_energy",
+            "without_unrequested_color_cycle",
         },
-        "B-quiet-water": {"with_color_delivery_repair", "with_primary_color_delivery"},
+        "B-quiet-water": {
+            "with_color_delivery_repair", "with_primary_color_delivery",
+            "without_unrequested_color_cycle",
+        },
         "B-presence-from-ddl": {
             "presence_from_ddl", "with_color_delivery_repair", "with_primary_color_delivery",
         },
@@ -194,13 +220,24 @@ def test_ddl_reference_coerce_discriminators() -> None:
         # for, so `with_complex_motif_repair` still delivers it.
         "B-leaf-grain-words": {
             "with_color_delivery_repair", "with_primary_color_delivery", "with_complex_motif_repair",
+            "without_unrequested_color_cycle",
         },
-        "B-yellow-from-ddl": {"with_color_delivery_repair", "with_primary_color_delivery"},
+        "B-yellow-from-ddl": {
+            "with_color_delivery_repair", "with_primary_color_delivery",
+            "without_unrequested_color_cycle",
+        },
         "B-orange-from-ddl": {
             "with_color_delivery_repair", "with_primary_color_delivery", "with_motion_energy",
+            "without_unrequested_color_cycle",
         },
-        "B-purple-from-ddl": {"with_color_delivery_repair", "with_primary_color_delivery"},
-        "B-yellow-from-ddl-en": {"with_color_delivery_repair", "with_primary_color_delivery"},
+        "B-purple-from-ddl": {
+            "with_color_delivery_repair", "with_primary_color_delivery",
+            "without_unrequested_color_cycle",
+        },
+        "B-yellow-from-ddl-en": {
+            "with_color_delivery_repair", "with_primary_color_delivery",
+            "without_unrequested_color_cycle",
+        },
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired, case_id

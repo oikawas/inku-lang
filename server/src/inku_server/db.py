@@ -1370,17 +1370,129 @@ def delete_okugaki(user_id: str, okugaki_id: str) -> bool:
 
 
 
+def _oldest_admin_id(session) -> str | None:
+    """The administrator who has been here longest.
+
+    Shared by the history-owner fallback and by single-user mode so the two
+    can never drift into naming different people.
+    """
+    admin = session.query(UserAccountRow).filter(UserAccountRow.role == "admin").order_by(UserAccountRow.at.asc()).first()
+    return admin.id if admin else None
+
+
 def _history_owner_user_id() -> str | None:
     with SessionLocal() as session:
-        admin = session.query(UserAccountRow).filter(UserAccountRow.role == "admin").order_by(UserAccountRow.at.asc()).first()
-        if admin:
-            return admin.id
+        admin_id = _oldest_admin_id(session)
+        if admin_id:
+            return admin_id
         user = session.query(UserAccountRow).order_by(UserAccountRow.at.asc()).first()
         return user.id if user else None
 
 
 def admin_history_owner_id() -> str | None:
     return _history_owner_user_id()
+
+
+# ---------------------------------------------------------------------------
+# Single-user mode
+#
+# A server that belongs to one person still runs the whole multi-user
+# machinery: nothing is removed, and turning the flag off puts the login
+# screen back with every account and every work where it was.  What the flag
+# changes is only who an unauthenticated request is taken to be.
+# ---------------------------------------------------------------------------
+
+_SINGLE_USER_SETTING_KEY = "single_user"
+
+
+def single_user_mode_enabled() -> bool:
+    """Whether this server runs as one person's own.
+
+    Off unless explicitly asked for: a deployment that merely upgrades must
+    not quietly lose its login screen.  The distribution turns it on in its
+    own compose file, not here.
+
+    An empty value reads as unset, matching how _bootstrap_admin_password
+    treats a blank field handed over by compose interpolation.
+
+    This is the only reader of the variable.  deps.py and the /api/info
+    banner both come through here, so the guard and what the banner claims
+    cannot disagree.
+    """
+    value = os.getenv("INKU_SINGLE_USER")
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _create_single_user_account() -> str | None:
+    """Make the one account an empty database is missing.
+
+    Only ever reached when there is no account at all: with no bootstrap
+    password set, _ensure_bootstrap_admin leaves the database empty and the
+    first request would have nobody to be.
+    """
+    _ensure_default_user_group()
+    with SessionLocal() as session:
+        if session.query(UserAccountRow).first():
+            return None
+        group = session.query(UserGroupRow).order_by(UserGroupRow.name.asc()).first()
+        # No bootstrap password means nobody chose one.  The account still
+        # needs a hash, so it gets an unusable random one; the UI tells the
+        # owner to set a password before they ever turn single-user mode off,
+        # because that password is the only way back in.
+        password = _bootstrap_admin_password() or secrets.token_urlsafe(32)
+        row = UserAccountRow(
+            id=str(uuid.uuid4()),
+            username=os.getenv("INKU_BOOTSTRAP_ADMIN_USERNAME", "admin"),
+            email=os.getenv("INKU_BOOTSTRAP_ADMIN_EMAIL", "admin@local"),
+            password_hash=_hash_password(password),
+            role="admin",
+            group_id=group.id if group else None,
+            at=_now_ms(),
+        )
+        session.add(row)
+        session.commit()
+        return row.id
+
+
+def single_user_account() -> dict | None:
+    """The account this server belongs to, or None when it has none.
+
+    Resolution is pinned rather than derived on every call.  A derived answer
+    moves the moment the oldest administrator is deleted, which would read as
+    "my works disappeared"; a pinned one is a row in the same database, so a
+    restored backup brings the same person back with it.
+
+    The pin holds the account id, not its name, because the name can be
+    changed from the settings screen.
+    """
+    stored = _read_app_setting(_SINGLE_USER_SETTING_KEY) or {}
+    pinned = stored.get("user_id")
+    if pinned:
+        user = get_user(pinned)
+        if user:
+            return user
+    with SessionLocal() as session:
+        user_id = _oldest_admin_id(session)
+        if user_id is None and session.query(UserAccountRow).first():
+            # Accounts exist but none of them administers.  Single-user mode
+            # has nobody to hand the server to, so the login screen stays.
+            return None
+    if user_id is None:
+        user_id = _create_single_user_account()
+    if user_id is None:
+        return None
+    user = get_user(user_id)
+    if user is None:
+        return None
+    _write_app_setting(_SINGLE_USER_SETTING_KEY, {**stored, "user_id": user_id})
+    return user
+
+
+def single_user_pinned_id() -> str | None:
+    """The pinned account id, without resolving or writing one."""
+    return (_read_app_setting(_SINGLE_USER_SETTING_KEY) or {}).get("user_id")
 
 
 def database_info() -> dict:

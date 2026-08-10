@@ -689,6 +689,7 @@ export const ja: LangPack = {
 	userValidationUpdate: 'ユーザー名とメールアドレスを入力してください。',
 	userPasswordTooShort: 'パスワードは8文字以上で入力してください。',
 	bootstrapAdminNote: '初期管理者は INKU_BOOTSTRAP_ADMIN_PASSWORD を設定した新規DBでのみ作成されます。',
+	singleUserPasswordNote: 'このサーバーは単独利用モードで、あなたとして自動的にログインします。単独利用モードを解除する前に、下でパスワードを設定してください。設定しないと再びログインできなくなります。',
 	userNamePlaceholder: 'ユーザー名',
 	userEmailPlaceholder: 'メールアドレス',
 	userPasswordPlaceholder: 'パスワード',

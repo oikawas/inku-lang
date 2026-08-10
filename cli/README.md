@@ -2,6 +2,15 @@
 
 Command line client for controlling an inku API server.
 
+## Signing in, and when it is not needed
+
+Most commands need a session: run `inku-cli login` once and it is stored.
+
+A server in single-user mode (`INKU_SINGLE_USER=1`) belongs to one person and
+answers an unauthenticated request as them, so every command works there
+without logging in at all. Against any other server the commands still ask you
+to log in first, and say so.
+
 ## Save generated drawings to normal history
 
 Use `--save-history` with `paint` or `batch` when benchmark outputs should be

@@ -7,6 +7,8 @@ import json
 import os
 import re
 import subprocess
+import urllib.error
+import urllib.request
 import sys
 from pathlib import Path
 
@@ -2709,3 +2711,57 @@ def test_from_work_does_not_resolve_colors_in_the_cli(monkeypatch, capsys):
     _run_render_score_from_work(monkeypatch, capsys, client, "--from-work", "history-77")
 
     assert calls == []
+
+
+# --- Single-user mode: the server decides who a request is, not the client ---
+
+
+class _CapturedRequest:
+    """Stands in for urlopen so the header the client would have sent is visible."""
+
+    def __init__(self, status: int, body: bytes = b"{}"):
+        self.status = status
+        self.body = body
+        self.seen: list[dict[str, str]] = []
+
+    def __call__(self, req, timeout=None):
+        self.seen.append(dict(req.headers))
+        if self.status >= 400:
+            raise urllib.error.HTTPError(req.full_url, self.status, "denied", {}, io.BytesIO(b'{"detail":"x"}'))
+
+        class _Response:
+            def __init__(self, body):
+                self._body = body
+
+            def read(self):
+                return self._body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        return _Response(self.body)
+
+
+def test_a_request_without_a_stored_session_still_reaches_the_server(monkeypatch):
+    """A server in single-user mode answers it; refusing here would decide that
+    on the client, which does not know the mode."""
+    captured = _CapturedRequest(200, b'{"username":"admin"}')
+    monkeypatch.setattr(cli.urllib.request, "urlopen", captured)
+    client = cli.ApiClient("http://127.0.0.1:8199", None)
+    payload, _ = client.request("GET", "/api/auth/me")
+    assert payload == {"username": "admin"}
+    assert len(captured.seen) == 1
+    assert not any(key.lower() == "authorization" for key in captured.seen[0])
+
+
+def test_a_server_that_does_want_credentials_still_gets_the_old_advice(monkeypatch):
+    """The control: the message is now given after asking, not instead of asking."""
+    captured = _CapturedRequest(401)
+    monkeypatch.setattr(cli.urllib.request, "urlopen", captured)
+    client = cli.ApiClient("http://127.0.0.1:8199", None)
+    with pytest.raises(cli.CliError, match="not logged in"):
+        client.request("GET", "/api/auth/me")
+    assert len(captured.seen) == 1

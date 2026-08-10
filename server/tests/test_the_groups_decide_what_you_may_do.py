@@ -104,6 +104,15 @@ def test_t2_the_migration_is_idempotent() -> None:
     # group, which the set-valued reader above would hide.
     assert _membership_row_count(user_id) == 1
 
+    # The half the unique constraint cannot catch.  A migration that re-derived
+    # every account from the role mirror on each run would delete-and-rewrite
+    # rather than duplicate, so the database would raise nothing -- and an
+    # account deliberately given both groups would silently lose one, because
+    # the mirror can only name the stronger.
+    widened, _headers = _member("widened", ["admins", "leaders"])
+    db._migrate_roles_to_permission_groups()
+    assert _memberships(widened["id"]) == ["admins", "leaders"]
+
 
 # --- T-3: the role mirror is not read by any decision -----------------------
 

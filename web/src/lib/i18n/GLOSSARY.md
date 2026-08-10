@@ -93,6 +93,11 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 起点（新規作成） | **origin**（動作は **New**） | 名詞 | — |
 | 記録なし | **not recorded** | 状態表示。値を推測しない契約の表示 | ~~unknown~~（別状態。`historyVersionUnknown` は「不明」の訳として別に存在する） |
 | UIモード | **UI mode**（**Simple UI / Full UI / Custom UI**） | 表示構成の固定プリセットとユーザー別設定 | ~~Beginner / Expert~~（習熟度の評価にしない） |
+| 権限グループ | **Permission groups** | 名詞・**常に複数形**。何ができるかを決める所属で、1 人が複数を持てる（v2.12.0） | ~~Role~~・~~ロール~~（**判定から消えた語。列としてしか残っていない**）、~~Permission group~~（単数）、~~Access level~~（段位に読める） |
+| 管理者（グループ名） | **Administrators** | 権限グループ `admins` の表示形。**複数形で、グループを指す** | ~~Admin~~（旧 role の表示語）、~~Administrator~~（単数） |
+| リーダー（グループ名） | **Leaders** | 権限グループ `leaders` の表示形 | ~~Group lead~~（旧 role の表示語）、~~Manager~~ |
+| ユーザー（グループ名） | **Users** | 権限グループ `users` の表示形。**組織のまとまりを指す user group とは別物** | ~~User~~（単数）、~~Member~~ |
+| ユーザーグループ | **user group** | 名詞。組織のまとまりで、1 人 1 つ。**権限とは独立に動く** | ~~permission group~~（別の実体） |
 
 ### 2-1. 道具（てざわり）の名
 

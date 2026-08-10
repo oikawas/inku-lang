@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.11.20 (Web Build 876). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.12.0 (Web Build 877). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -61,7 +61,7 @@ The account is created only when a password is set and the DB contains no users.
 
 A blank value counts as unset. Neither an empty field in an environment file nor the empty value that Compose's `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` interpolation supplies will fail startup. When clearing the secret after initial creation, deleting the line and blanking it have the same effect.
 
-inku has no self-service registration. Accounts are created only through `POST /api/users` by an authenticated administrator or group lead. **Starting an empty database without a bootstrap administrator, with single-user mode off, therefore leaves a server nobody can sign in to.** With single-user mode on, the server creates one account and signs it in by itself. Recovery is simply to set the password and restart. The bootstrap administrator is attempted only while the DB has no users, so an existing account's password is never overwritten.
+inku has no self-service registration. Accounts are created only through `POST /api/users`, by an authenticated member of the `admins` or `leaders` group. **Starting an empty database without a bootstrap administrator, with single-user mode off, therefore leaves a server nobody can sign in to.** With single-user mode on, the server creates one account and signs it in by itself. Recovery is simply to set the password and restart. The bootstrap administrator is attempted only while the DB has no users, so an existing account's password is never overwritten.
 
 ### 2.3 Artifacts and Concurrency
 
@@ -161,13 +161,15 @@ The canonical payload of `rh3` is the score, `render_seed`, `render_wild`, the r
 
 Lineage connects only explicit creation operations. It is never inferred from similarity, identical descriptions, or timestamps. Permanent removal of a regular-history work may leave a content-free tombstone so the lineage path remains recorded.
 
-## 4. Authentication, Roles, and Scope
+## 4. Authentication, Permission Groups, and Scope
 
-| Role | Permissions |
+| Permission group | Permissions |
 |---|---|
-| `admin` | Providers, server, DB, logs, users, and groups |
-| `group_lead` | User administration within assigned scope |
-| `user` | Generation and management of own history and settings |
+| `admins` | Providers, server, DB, logs, users, and groups |
+| `leaders` | User administration within assigned scope |
+| `users` | Generation and management of own history and settings |
+
+One member may hold several permission groups; where they overlap the stronger one decides (a member holding `admins` and `leaders` passes as `admins`). A user group — the organisational unit — is a separate thing: one per member, and independent of permission.
 
 Generation, history, lineage, and settings APIs enforce authentication and user scope. Acceptance testing must verify that roots, works, and counts never cross user boundaries.
 

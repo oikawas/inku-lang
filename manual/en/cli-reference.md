@@ -1,8 +1,8 @@
 # inku-cli Reference
 
-inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions of regular users, group leads, and administrators.
+inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.11.20 (Web Build 876).
+It covers inku v2.12.0 (Web Build 877).
 
 ## Basics
 
@@ -154,7 +154,7 @@ The colophon is neither an evaluation nor a selection command. It must not be co
 | `config show` | Show the server's system settings |
 | `config update` | Update the server's system settings |
 
-`user` and `group` require an administrator or group lead session; `config` requires an administrator. Limits, painting concurrency, the log retention policy, and DB backup settings are all `config` subjects. See `Server Configuration` for what the values mean.
+`user` and `group` require a session in `admins` or `leaders`; `config` requires one in `admins`. `user create` takes the permission groups as `--permission-group {users,leaders,admins}`, which may be repeated. Limits, painting concurrency, the log retention policy, and DB backup settings are all `config` subjects. See `Server Configuration` for what the values mean.
 
 ## Calling any public API
 
@@ -169,7 +169,7 @@ APIs without a dedicated command are reached through api. It accepts only relati
 
 --data and --file are mutually exclusive. Non-JSON responses can be written with --output. Endpoints that need no authentication accept --no-auth.
 
-Permissions match the GUI. A regular user reaches only their own works and settings; a group lead manages regular users in the same group; an administrator reaches server settings, all users, and the aggregate unread-word ledger. Calls outside a role return 403, and calls without a session return 401.
+Permissions match the GUI. A member holding only `users` reaches their own works and settings; `leaders` manages the members of the same group; `admins` reaches server settings, all users, and the aggregate unread-word ledger. Calls outside the permission groups return 403, and calls without a session return 401.
 
 When retrying a write API, passing the same Idempotency-Key prevents a work and its lineage from being saved twice.
 

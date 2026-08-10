@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade of the unreleased inku v2.11.20 (Web Build 876) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
+This guide describes a standard new installation or upgrade of the unreleased inku v2.12.0 (Web Build 877) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
 
 ## 1. Components
 
@@ -115,7 +115,7 @@ NVIDIA_API_KEY=
 
 **In single-user mode (`INKU_SINGLE_USER=1`, the distribution default) this first setting is not needed.** The server creates one account and signs it in by itself.
 
-**If you turn single-user mode off, this first setting cannot be skipped.** inku has no self-service registration, and only an authenticated administrator or group lead can create accounts. A server started against an empty DB without a bootstrap admin offers no way to sign in. If it was missed, set the password and restart: the account is created then, and because creation is attempted only while the DB has no users, existing accounts are unaffected.
+**If you turn single-user mode off, this first setting cannot be skipped.** inku has no self-service registration, and only an authenticated member of the `admins` or `leaders` group can create accounts. A server started against an empty DB without a bootstrap admin offers no way to sign in. If it was missed, set the password and restart: the account is created then, and because creation is attempted only while the DB has no users, existing accounts are unaffected.
 
 ## 8. Verify with Manual Startup
 

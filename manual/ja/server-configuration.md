@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v2.11.20（Web Build 876）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v2.12.0（Web Build 877）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -61,7 +61,7 @@ passwordが設定され、DBにユーザーがいない場合だけ作成しま�
 
 空文字は未設定と同じ扱いです。env fileの空欄も、composeの `${INKU_BOOTSTRAP_ADMIN_PASSWORD:-}` 補間が渡す空値も、起動を失敗させません。初回作成後に環境から除去する際は、行を削除しても空欄にしても同じ結果になります。
 
-inkuにはセルフサインアップがありません。アカウントを作れるのは認証済みのadminまたはgroup leadによる `POST /api/users` だけです。したがって**単独利用モードを off にしたうえで空のDBをbootstrap adminなしで起動すると、誰もログインできないサーバーになります**（単独利用モードが on なら、サーバーが利用者を1人作って自動的にログイン済みにします）。復旧はpasswordを設定して再起動するだけです。bootstrap adminはユーザーが0件のときだけ作成を試みるため、既存アカウントのpasswordが上書きされることはありません。
+inkuにはセルフサインアップがありません。アカウントを作れるのは、`admins`または`leaders`グループに属する認証済み利用者による `POST /api/users` だけです。したがって**単独利用モードを off にしたうえで空のDBをbootstrap adminなしで起動すると、誰もログインできないサーバーになります**（単独利用モードが on なら、サーバーが利用者を1人作って自動的にログイン済みにします）。復旧はpasswordを設定して再起動するだけです。bootstrap adminはユーザーが0件のときだけ作成を試みるため、既存アカウントのpasswordが上書きされることはありません。
 
 ### 2.3 artifactと同時実行
 
@@ -161,13 +161,15 @@ DBは次を分離して保存します。
 
 系譜は明示的な制作操作だけで接続します。類似、同一記述、時刻からedgeを推測しません。通常履歴を完全削除しても、系譜の経路を保つためcontent-free tombstoneが残る場合があります。
 
-## 4. 認証、role、scope
+## 4. 認証、権限グループ、scope
 
-| role | 権限 |
+| 権限グループ | 権限 |
 |---|---|
-| `admin` | provider、server、DB、log、ユーザー／group管理 |
-| `group_lead` | 所属scope内のユーザー管理 |
-| `user` | 生成と自分の履歴・設定管理 |
+| `admins` | provider、server、DB、log、ユーザー／group管理 |
+| `leaders` | 所属scope内のユーザー管理 |
+| `users` | 生成と自分の履歴・設定管理 |
+
+1人の利用者は複数の権限グループに属せます。両方を持つ場合は強い側が効きます（`admins`と`leaders`を持つ利用者は`admins`として通ります）。ユーザーgroup（組織のまとまり）は権限グループとは別で、1人1つのまま権限とは独立に動きます。
 
 生成、履歴、系譜、設定APIは認証とuser scopeを確認します。他userのroot、作品、件数を返さないことを受け入れ試験へ含めてください。
 

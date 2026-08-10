@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.11.20 / Build 876**
+**Target version: v2.12.0 / Build 877**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -222,6 +222,10 @@ lines.
 **Dependencies run one way — `api.py` → routers → shared** — and no router imports `api.py`.
 - Authorization is enforced both by per-route guards and by router-level default dependencies.
 Every endpoint except the six on the public allowlist sits behind a guard.
+What a guard asks is membership in a permission group (`admins`, `leaders`, `users`), and one member
+may hold several. The test lives in a single predicate; the `role` column that remains on the user row
+is a mirror derived from those memberships and is read by no decision. Memberships are assigned through
+the existing user APIs. The organisation group is a separate thing, one per member, independent of permission.
 - The LLM layer reaches both Anthropic and OpenAI-compatible local or cloud backends, and the product
 can be started without a single API key.
 Model reference resolution follows three rules — explicit qualification, sole ownership, then the

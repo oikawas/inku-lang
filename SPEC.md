@@ -3126,9 +3126,26 @@ different emoji sets that match their roles.
 
 ## 22. Security and Operations
 
-The web app includes authentication, user roles, sessions, per-user settings,
+The web app includes authentication, permission groups, sessions, per-user settings,
 user profile editing, and user management.  Passwords are stored as salted
 PBKDF2-SHA256 hashes.
+
+**Permission groups (v2.12.0).**  What a member may do is decided by the permission
+groups they hold.  The groups are **fixed at three — `admins`, `leaders`, and `users`** —
+and members cannot create more: the demand for more is really per-work sharing, which
+the visibility side carries.  **One member may hold several groups** (many-to-many).
+**The test lives in a single predicate**; scattering the branch would leave gaps when
+visibility is written on top of it.  **The `role` column stays on the user row and is read
+by no decision.**  It stays for backup and restore — dropping it would mean a database
+taken after this version fails to open on a build from before it.  **The column is written
+as a mirror the machine derives from the memberships, never by a person** (a copy written
+by hand and frozen in a test keeps guarding a stale value from the day the source of truth
+moves).  **The startup migration is one-to-one and idempotent**, mapping the old `admin` to
+`admins`, `group_lead` to `leaders`, and `user` to `users`.  **It does not read `admin` as
+"an administrator is also a leader"** — reading it that way would make a membership the
+migration widened indistinguishable from one a person widened on purpose.  **The
+organisation group is a separate thing, one per member**, judged independently of
+permission.
 
 **Single-user mode (v2.11.19).**  For one person on their own machine, the entry
 ceremony a shared server needs is too much.  A server started with
@@ -3154,10 +3171,10 @@ dialog can update the user's email address and password through
 `PATCH /api/auth/me/profile`.  Password changes require the current password,
 and the endpoint is separate from admin user-management APIs.
 
-Settings visibility is role-aware.  DB settings and user management are visible
-only to the `admin` role.  The plugins tab is visible to all signed-in users,
-but plugin setting changes and plugin-storage update APIs are restricted to
-`admin`.
+Settings visibility follows the permission groups.  DB settings and user management
+are visible only to members of the `admins` group.  The plugins tab is visible to all
+signed-in users, but plugin setting changes and plugin-storage update APIs are
+restricted to `admins`.
 
 The DB settings tab also shows the current DB file size when the backend is a
 SQLite file database.  Admin users can configure DB replica backups with an

@@ -5,7 +5,7 @@
 - When local authentication is enabled, login passes a sliding-window rate limit keyed by client identifier and username.
 - Passwords use salted PBKDF2-SHA256. A missing user still runs a dummy hash to reduce a simple timing distinction.
 - The DB stores a session-token hash. Clients present a Bearer token or `HttpOnly`, `SameSite=Lax` cookie; the secure flag is configured by environment.
-- Roles include `admin` and `group_lead`. `_current_user`, `_user_manager`, and `_admin_user` guard routes.
+- The permission groups are `admins`, `leaders`, and `users`, and one user may hold several. `_current_user`, `_user_manager`, and `_admin_user` guard routes, and each guard asks a single predicate about membership. The `role` column remains as a mirror derived from the memberships and is read by no decision.
 - Of 82 endpoints, only the reasoned six-path allowlist has no guard; a live-route test enumerates it.
 - Request-body, process-wide request, and render concurrency limits are independent.
 

@@ -5132,3 +5132,61 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
 - **⚠ One fact remains:** `_primitive_from_clause` reads a figure word from anywhere in the clause, so
   the "point" inside "focal point" reads as a figure. **This change works around it with a guard; the
   misreading itself is untouched.**
+
+### v2.12.0 — What a member may do is decided by the group (Build 877, 2026-08-10, permission groups)
+
+- **The three-valued `user_accounts.role` flag is gone from every decision.** What a member may do
+  is decided by membership in **three permission groups: `admins`, `leaders`, and `users`**.
+  **One member may hold several of them** (many-to-many). **There is a single entry point for the
+  test, `has_permission_group`**, called from `deps.py`, `users.py`, and `feedback.py` alike.
+  **The branch is not scattered.**
+- **The `role` column was not dropped.** After the migration it is written as a **mirror the machine
+  derives from the memberships** (`admin` if `admins` is held, `group_lead` if `leaders` is,
+  otherwise `user`). **The reason is backup and restore** — dropping the column would mean a database
+  taken after this version fails to open on a build from before it. **Nowhere does a person write the
+  mirror; the same hand that writes the memberships updates it.**
+  **That no decision reads the mirror is measured by behaviour rather than by reading the source** —
+  an account whose column claims `admin` while it holds only `users` gets 403 on the admin routes
+  and 403 on the user-management routes.
+- **The startup migration is one-to-one and idempotent.** `admin`→`admins`, `group_lead`→`leaders`,
+  `user`→`users`. **`admin` is not read as "an administrator is also a leader"** — reading it that way
+  would leave nothing able to tell an account the migration widened from one an administrator widened
+  on purpose.
+- **The organisation group (`user_accounts.group_id`) stays as a separate thing**, one per member.
+  **Permission groups and organisation groups are judged independently** — two members of the same
+  `circle_a` are treated differently: the one holding `leaders` reaches user management, the one
+  holding only `users` does not. Moving between organisation groups moves no permission.
+- **Which accounts a leader may touch is now decided by memberships rather than by the mirror.**
+  The old code narrowed on `role == "user"`, so **an account whose mirror still said `user` could be
+  mistaken for one**. It now narrows on "holds neither `admins` nor `leaders`".
+- **Three API schemas changed their keys** — `role` and `role_label` left `UserAccountItem`,
+  `UserAccountCreateBody`, and `UserAccountUpdateBody`, and `permission_groups` and
+  `permission_group_labels` arrived. **Not one route was added** (82 total, 6 public, unchanged).
+  **The API-surface counts stay at 82 endpoints / 82 operations / 82 schemas; only the digest moved**
+  (`fc1378ba…` → `cd4148a7…`). **A count that does not move is no evidence that nothing was lost**, so
+  a gate names the field-level set difference across the three schemas and asserts that the hash of
+  the other 79 is unchanged.
+- **The CLI flag changed** — `user create --role {user,group_lead,admin}` became
+  **`--permission-group {users,leaders,admins}` (repeatable)**, and **`--role` is no longer accepted.**
+  `me` and `user list` print the response whole, so the printing followed with no added code.
+- **The web UI moved the permission-group choice from one `<select>` to three checkboxes** (memberships
+  are plural; an empty selection cannot be made). Tab visibility was collected into
+  `$lib/permissionGroups.ts` so **the gate can execute the rule rather than match it with a regex**.
+- **Checks:** **server 2,747 passed / 31 skipped** (17 new on the branch), **cli 201 passed** (2 new),
+  **web `test:unit` 127** (2 new), **ruff clean** (server and cli), **`npm run check` 0 errors /
+  2 warnings** (the two pre-existing a11y ones), **`lint:i18n` 0 warnings / 0 errors**,
+  **frozen corpora byte-identical on darwin**, **`check_docs.py` consistent**.
+- **Twelve perturbations turned 18 tests red; the contract predicted 21.** **The three missing are not
+  a hole but a concentration of discriminating power** — the reachability tests (where `admins`,
+  `leaders`, and `users` each get through) build their subjects with `add_user`, the path that grants
+  a permission during operation, not through the migration. Breaking the migration's mapping therefore
+  leaves reachability untouched, and only the test that reads the mapping one-to-one goes red.
+- **⚠ The idempotence test as first written went red for none of the failures it named** — inserting a
+  duplicate membership is refused by the `UniqueConstraint`, so **the run died in collection before the
+  test executed**. It was extended to measure **the half the constraint cannot catch**: a migration that
+  re-derives every account from the mirror, which loses one membership from any account holding both
+  `admins` and `leaders`, because the mirror can only name the stronger.
+- **⚠ The completion report's list of documents made false by this change missed two places** — it was
+  drawn by searching for the value `group_lead`, and **two specification passages (one ja/en pair) that
+  speak only of the `admin` role** were not in that net. **A net woven from a word does not catch a
+  falsehood that avoids the word.**

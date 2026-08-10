@@ -5,7 +5,7 @@
 - loginはlocal authが有効な場合に、client識別子とusernameをkeyにしたsliding-window rate limitを通る。
 - passwordはsalt付きPBKDF2-SHA256。存在しないuserにもdummy hashを計算し、単純なtiming差を減らす。
 - session tokenはDBへhash保存され、clientはBearerまたは`HttpOnly` cookieで提示する。cookieは`SameSite=Lax`、secure属性は環境設定。
-- roleは`admin`、`group_lead`等。`_current_user`、`_user_manager`、`_admin_user`でrouteを保護する。
+- 権限グループは`admins`、`leaders`、`users`の3つで、1 userが複数に属せる。`_current_user`、`_user_manager`、`_admin_user`でrouteを保護し、guardは所属を1本の述語へ尋ねる。`role`列は所属から導出した写しとして残るが、どの判定も読まない。
 - 82 endpointのうちguardなしは理由付きallowlist 6 pathだけで、live routeをtestが列挙する。
 - request body上限、process-wide request concurrency、render concurrencyを別々に持つ。
 

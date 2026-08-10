@@ -2,7 +2,7 @@
 
 This document serves as a guideline for AI agents to operate the `inku-server` via command line and paint works autonomously, evaluate them visually, and refine them while tracking lineage nodes.
 
-It covers inku v2.11.20 (Web Build 876). The full flag list lives in the `inku-cli Reference`.
+It covers inku v2.12.0 (Web Build 877). The full flag list lives in the `inku-cli Reference`.
 
 ---
 
@@ -11,12 +11,12 @@ It covers inku v2.11.20 (Web Build 876). The full flag list lives in the `inku-c
 The standard operational procedure for an AI agent to refine a work step by step.
 
 ### Step 1: Establish Connection and Verify Session
-Verify that the API server is reachable and inspect the current user's session role.
+Verify that the API server is reachable and inspect the permission groups of the current session.
 
 ```sh
 uv run inku-cli me
 ```
-* **Expected Output (JSON)**: A JSON object containing the user profile, e.g., role `admin` or `user`.
+* **Expected Output (JSON)**: A JSON object containing the user profile, with `permission_groups` as a list of names such as `["admins"]` or `["users"]`.
 * **AI Decision Logic**: Connection is successful if the response contains `id` and `username`.
 
 ### Step 2: Paint the Initial Work (Root Node)

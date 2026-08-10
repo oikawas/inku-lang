@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-10 — Unreleased v2.12.0 Baseline (Web Build 877)
+
+Updated the 13 places that name a version to v2.12.0 / Build 877, and **revised `Server Configuration` §2.2 and §4, the `inku-cli Reference`, and `Application Installation` §7 for the new way permission is decided**.
+
+- **What a member may do is now decided by the permission groups they hold, not by a role.** There are three groups — `admins`, `leaders`, and `users` — and no more can be created.
+- **One member may hold several groups.** Someone holding both `admins` and `leaders` is treated as the stronger of the two, `admins`.
+- **Existing roles move one-to-one at startup.** `admin` becomes `admins`, `group_lead` becomes `leaders`, and `user` becomes `users`. **Nothing has to be set up again.**
+- **An `inku-cli` flag changed.** `user create --role` is no longer accepted; pass **`--permission-group {users,leaders,admins}`**, repeating it if you need more than one.
+- **User groups — the organisational unit — are unchanged.** They are a separate thing from permission groups: one per member, and independent of permission.
+- **Restoring from a backup works as before.** The `role` column stays on the user row, written by the machine from the memberships. **Nowhere is it read to decide what somebody may do.**
+
 ## 2026-08-10 — Unreleased v2.11.20 Baseline (Web Build 876)
 
 Updated the 13 places that name a version to v2.11.20 / Build 876, and **added how a written count is treated to `Creating Images` §3**.

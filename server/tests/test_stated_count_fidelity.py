@@ -174,6 +174,28 @@ def test_a_cloudform_clause_becomes_a_drawable_cloudform() -> None:
     assert fallback.size is not None
 
 
+def test_the_clause_is_read_through_the_same_hints_the_instructions_went_through() -> None:
+    """A material word in a neighbouring clause must not hide the matching group.
+
+    Every instruction passes through `_with_ddl_instruction_hints` on the way in,
+    which reads the whole description: a group whose own clause names no material
+    still leaves that step as `pencil` when 鉛筆 appears anywhere. The clause read
+    on its own says `pen`, so comparing the two unhinted finds no match on the
+    triple at all and falls through to the figure, where two circles are
+    ambiguous and nothing is repaired. Measured on the 214 frozen cases, reading
+    the clause through the same hints is worth 8 of them.
+    """
+    ddl = "黒い円を三つ並べる。赤い円を置く。やわらかい鉛筆で描く。"
+    score = _score(
+        _group(count=6, color="black", x=0.3),
+        _group(count=4, color="red", x=0.7),
+    )
+    counts, notes, report = _replay(score, ddl)
+    assert counts == [3, 4], f"the black group was not found through the material hint: {counts}"
+    assert report[BRANCH] > 0
+    assert STATED_COUNT_FIDELITY_NOTE in notes[0]
+
+
 # The guard that keeps this branch from paying for one promise with another.
 def test_a_group_that_is_the_only_answer_to_another_stated_count_is_not_renumbered() -> None:
     """`_primitive_from_clause` reads a shape word anywhere in the clause, and

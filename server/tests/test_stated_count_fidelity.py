@@ -209,10 +209,41 @@ def test_a_group_that_is_the_only_answer_to_another_stated_count_is_not_renumber
     assert report[BRANCH] == 0
 
 
+def test_a_count_the_score_already_carries_is_not_answered_a_second_time() -> None:
+    """The request is answered work-wide, not group by group, and that is a choice.
+
+    Here the three the description asks for is already on the squares, and the
+    circles the clause names are five. The branch declines: a work that carries
+    the number somewhere is not one it has anything to add to, and renumbering a
+    second group takes a count nobody asked to change.
+
+    Measured on the 214 frozen production cases, this reading is worth 12 of
+    them -- 144 against 132 with no such check, and 140 with the narrower reading
+    that excludes only the group already holding the number. The reason removing
+    it costs cases is not this shape but the neighbouring clauses: without it the
+    branch renumbers groups that were already answering, and consumes the group
+    a later clause needed.
+    """
+    score = _score(
+        _group("square", count=3, x=0.15),
+        _group("circle", count=5, x=0.7),
+    )
+    counts, _, report = _replay(score, "黒いペンの円を三つ並べる。")
+    assert counts == [3, 5], f"a second group was made to answer the same request: {counts}"
+    assert report[BRANCH] == 0
+
+
 def test_one_group_answers_one_clause() -> None:
-    """Two clauses can name the same single group. Neither number is more right
-    than the other, so the group keeps the answer it gave first -- otherwise
-    which number survives is decided by the order the clauses were written in.
+    """Two clauses can name the same single group, and the later one must not win.
+
+    Otherwise which number survives is decided by the order the clauses happen to
+    be written in. Nothing here enforces this directly: an explicit "already
+    answered by an earlier clause" guard was written, measured, and removed as
+    unreachable. Once the first clause sets the group to three, that group is the
+    only thing in the Score answering the three the description also states, and
+    `_is_the_only_answer_to_another_count` refuses it to the second clause. The
+    property is real and is what this asserts; the guard was a second lock on a
+    door already shut.
     """
     ddl = "黒いペンの円を三つ並べる。黒いペンの円を五つ並べる。"
     counts, _, _ = _replay(_score(_group(count=2)), ddl)

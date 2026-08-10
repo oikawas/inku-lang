@@ -2632,7 +2632,6 @@ def _with_stated_count_fidelity(
         return instructions
 
     repaired = list(instructions)
-    answered: set[int] = set()
     for index, clause in enumerate(_ddl_clauses(ddl)):
         # The same reader that answered "which counts were asked for at all",
         # narrowed to this clause. `_single_mark_count_from_clause` is the other
@@ -2664,16 +2663,9 @@ def _with_stated_count_fidelity(
             limits=limits,
             spoken_for=frozenset(every_stated_count - {value}),
         )
-        # One group answers one clause. Two clauses can pair to the same single
-        # group -- "three circles" and "one circle" with a single circle group in
-        # the Score -- and without this the later clause overwrites the earlier,
-        # so which number survives is decided by the order the clauses happen to
-        # be written in. Neither is more right than the other, so the group keeps
-        # the answer it already gave.
-        if target is None or target in answered:
+        if target is None:
             continue
         repaired[target] = _with_stated_count(repaired[target], value)
-        answered.add(target)
     return repaired
 
 

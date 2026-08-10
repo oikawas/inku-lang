@@ -7,6 +7,14 @@ stayed missed. Production bore this out -- of the counts stated in the band a
 reader can count by eye, one in five never reached the Score, and in 88.8% of
 those the group was there with the wrong number on it.
 
+At ddl-engine 12 the repair covers the whole literal band rather than stopping
+at eleven, on the reading that thirty circles drawn as two is not a matter of
+density but the description not being read; measured on the same works, 203 of
+the 341 missed counts in 12..239 become true. The band is no longer a number of
+its own -- it is `literal_count_threshold - 1` -- and the branch now declines a
+number the work has no room for, because the hard ceiling below it trims rather
+than refuses.
+
 Every case here is synthetic. The production works this repair was measured
 against stay in the private overlay (2026-08-10 ruling), so nothing in this file
 is copied from one.

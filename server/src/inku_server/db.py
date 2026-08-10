@@ -16,7 +16,7 @@ from datetime import datetime, time as clock_time, timedelta
 from hashlib import pbkdf2_hmac, sha256
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Column, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_, case, create_engine, event, func, inspect, or_, select, text, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -925,23 +925,74 @@ def has_permission_group(actor: dict, name: str) -> bool:
 
 
 def _actor_of(user_id: str) -> dict:
-    """Actor for a caller that carries nothing but an owner id.
+    """The actor a scope decision is made against: identity plus what it holds.
 
-    Stage A keeps this minimal on purpose: the predicates below read only the
-    id, so resolving the account here would cost a query per call and change no
-    decision. Stage B fills in the permission groups and the organisation group,
-    and every predicate reads them from here rather than querying on its own.
+    Read from the account rather than taken from the caller, because every public
+    function in this module is handed a bare `user_id` and a scope that trusted
+    what it was told would widen for anyone who could name an id.
     """
-    return {"id": user_id}
+    with SessionLocal() as session:
+        row = session.query(UserAccountRow).filter(UserAccountRow.id == user_id).first()
+        if row is None:
+            # No account, no groups: falls through to the owner-only branch of
+            # every predicate. An unknown id must never widen anything.
+            return {"id": user_id, "permission_groups": [], "group_id": None}
+        return {
+            "id": user_id,
+            "permission_groups": _permission_groups_of(session, user_id),
+            "group_id": row.group_id,
+        }
+
+
+def _owner_actor(user_id: str) -> dict:
+    """Identity only, for paths that go through _owned_by and never widen.
+
+    Cascades and idempotency-replay lookups do not read permissions, so resolving
+    the account for them would be two queries spent on a decision nothing makes.
+    Handing this to _readable_by by mistake narrows rather than widens.
+    """
+    return {"id": user_id, "permission_groups": [], "group_id": None}
+
+
+def _same_org_group(actor: dict):
+    """Accounts sharing the actor's organisation group, as a subquery.
+
+    A subquery rather than a resolved list of ids: the membership is read at the
+    moment the outer query runs, so a member added between the actor being built
+    and the query being issued is not briefly invisible.
+    """
+    return select(UserAccountRow.id).where(UserAccountRow.group_id == actor["group_id"])
 
 
 def _readable_by(actor: dict, owner_column):
-    """Rows the actor may see. Stage A returns the owner test unchanged."""
+    """Rows the actor may see.
+
+    admins see everything, orphan rows included: `history.user_id` is nullable
+    and a database restored from before the column was backfilled holds works
+    owned by nobody. Showing them to no one reads as "the backup lost my work".
+
+    leaders see their own organisation group. The range is the ORGANISATION
+    group, not the permission group -- circle_a's leader sees circle_a, not every
+    work on the server -- and a leader with no group_id sees only their own,
+    which is the same defence delete_user and update_user already apply.
+    """
+    if has_permission_group(actor, "admins"):
+        return true()
+    if has_permission_group(actor, "leaders") and actor.get("group_id"):
+        return or_(owner_column == actor["id"], owner_column.in_(_same_org_group(actor)))
     return owner_column == actor["id"]
 
 
 def _writable_by(actor: dict, owner_column):
-    """Rows the actor may change. Stage A returns the owner test unchanged."""
+    """Rows the actor may change.
+
+    Deliberately narrower than _readable_by: a leader reads their organisation's
+    works but cannot star, trash, revise or delete them. Reading and writing are
+    separate here so that Stage C's `read` and `write` grants have something to
+    attach to; collapsing them would make every reader an editor.
+    """
+    if has_permission_group(actor, "admins"):
+        return true()
     return owner_column == actor["id"]
 
 
@@ -950,9 +1001,8 @@ def _owned_by(actor: dict, owner_column):
 
     Cascades and bulk operations (deleting an account, emptying one's own
     history or trash) and idempotency-replay lookups select by ownership, not by
-    permission. Routing them through _writable_by would make them reach every
-    row an admin may change once Stage B lands: deleting one account would empty
-    the server, and a replayed idempotency key would return someone else's work.
+    permission. Routed through _writable_by they would reach every row an admin
+    may change, and deleting one account would empty the server.
     """
     return owner_column == actor["id"]
 
@@ -961,9 +1011,18 @@ def _readable_sql(actor: dict, owner_column: str) -> tuple[str, dict]:
     """The _readable_by test as a SQL fragment and its bind parameters.
 
     The recursive lineage CTEs and the full-text history search are raw SQL and
-    cannot take a SQLAlchemy expression, so they take this instead. The two
-    forms have to move together; T-1 counts every filter that bypasses either.
+    cannot take a SQLAlchemy expression, so they take this instead. The two forms
+    have to say the same thing and move together; T-1 counts every filter that
+    bypasses either, and T-3 reads a work through the search path specifically.
     """
+    if has_permission_group(actor, "admins"):
+        return "1 = 1", {}
+    if has_permission_group(actor, "leaders") and actor.get("group_id"):
+        return (
+            f"({owner_column} = :acl_owner_id"
+            f" OR {owner_column} IN (SELECT id FROM user_accounts WHERE group_id = :acl_group_id))",
+            {"acl_owner_id": actor["id"], "acl_group_id": actor["group_id"]},
+        )
     return f"{owner_column} = :acl_owner_id", {"acl_owner_id": actor["id"]}
 
 
@@ -1582,10 +1641,10 @@ def list_okugaki(user_id: str, target_node_id: str) -> list[dict]:
 
 
 def get_okugaki_by_idempotency(user_id: str, idempotency_key: str) -> dict | None:
-    actor = _actor_of(user_id)
+    owner = _owner_actor(user_id)
     with SessionLocal() as session:
         row = session.query(OkugakiRow).filter(
-            _owned_by(actor, OkugakiRow.user_id),
+            _owned_by(owner, OkugakiRow.user_id),
             OkugakiRow.idempotency_key == idempotency_key,
         ).first()
         return _okugaki_to_dict(row) if row is not None else None
@@ -3300,7 +3359,7 @@ def delete_user(user_id: str, *, cascade: bool = False, actor: dict | None = Non
         # The account being deleted, not the one doing the deleting: the cascade
         # selects by ownership so that widening what an admin may write never
         # widens what one deletion removes.
-        target_owner = _actor_of(user_id)
+        target_owner = _owner_actor(user_id)
         if not cascade:
             if session.query(HistoryRow).filter(_owned_by(target_owner, HistoryRow.user_id)).first():
                 raise ValueError("user has history")
@@ -3729,7 +3788,7 @@ def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000)
 def delete_all(user_id: str) -> None:
     # Ownership, not write permission: "erase everything of mine" must keep
     # meaning one account's works however wide writing becomes.
-    owner = _actor_of(user_id)
+    owner = _owner_actor(user_id)
     with SessionLocal() as session:
         session.query(OkugakiRow).filter(_owned_by(owner, OkugakiRow.user_id)).delete()
         session.query(LineageEdgeRow).filter(_owned_by(owner, LineageEdgeRow.user_id)).delete()
@@ -3808,7 +3867,7 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
 
 def delete_all_trashed_items(user_id: str) -> int:
     # Same reason as delete_all: emptying the trash empties one's own trash.
-    owner = _actor_of(user_id)
+    owner = _owner_actor(user_id)
     with SessionLocal() as session:
         ids = [
             item_id

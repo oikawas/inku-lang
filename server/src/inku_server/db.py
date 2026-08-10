@@ -1069,6 +1069,35 @@ def _owned_by(actor: dict, owner_column):
     return owner_column == actor["id"]
 
 
+def _readable_node(actor: dict):
+    """A lineage node is visible exactly when the work behind it is."""
+    return _readable_by(actor, LineageNodeRow.user_id, LineageNodeRow.history_id)
+
+
+def _readable_edge(actor: dict):
+    """An edge is visible exactly when its CHILD is -- never its parent.
+
+    An edge belongs to the derivation, and `lineage_edges.user_id` holds the
+    CHILD's owner, so the owner test alone almost says this already. It stops
+    being enough once a work can be shared: the child may be visible through a
+    grant while its owner column names someone else.
+
+    Following the parent instead would leak the one thing a lineage must not
+    disclose. If A's work has children by B and by C, an edge visible to whoever
+    can see the PARENT puts C's edge in B's view -- B learns that somebody else
+    derived from the same work, and how many did. Following the child, B sees
+    A->B and nothing more.
+    """
+    return LineageEdgeRow.child_node_id.in_(
+        select(LineageNodeRow.id).where(_readable_node(actor))
+    )
+
+
+def _readable_node_sql(actor: dict, alias: str = "n") -> tuple[str, dict]:
+    """`_readable_node` for the recursive CTEs, which take no ORM expression."""
+    return _readable_sql(actor, f"{alias}.user_id", f"{alias}.history_id")
+
+
 def _readable_sql(actor: dict, owner_column: str, acl_history_id: str | None = None) -> tuple[str, dict]:
     """The _readable_by test as a SQL fragment and its bind parameters.
 
@@ -1355,15 +1384,16 @@ def _lineage_edge_to_dict(row: LineageEdgeRow) -> dict:
 def _ancestor_edge_ids(session, actor: dict, focus_node_id: str, limit: int) -> list[str]:
     if limit <= 0:
         return []
-    seed_visible, params = _readable_sql(actor, "user_id")
-    step_visible, _ = _readable_sql(actor, "edge.user_id")
+    node_visible, params = _readable_node_sql(actor)
+    visible = f"child_node_id IN (SELECT n.id FROM lineage_nodes n WHERE {node_visible})"
+    step_visible = f"edge.{visible}"
     return list(session.execute(
         text(
             f"""
             WITH RECURSIVE ancestor_edges(id, parent_node_id, child_node_id) AS (
                 SELECT id, parent_node_id, child_node_id
                 FROM lineage_edges
-                WHERE {seed_visible} AND child_node_id = :focus_node_id
+                WHERE {visible} AND child_node_id = :focus_node_id
                 UNION
                 SELECT edge.id, edge.parent_node_id, edge.child_node_id
                 FROM lineage_edges edge
@@ -1387,8 +1417,9 @@ def _descendant_edge_ids(
 ) -> list[str]:
     if depth <= 0 or limit <= 0:
         return []
-    seed_visible, params = _readable_sql(actor, "user_id")
-    step_visible, _ = _readable_sql(actor, "edge.user_id")
+    node_visible, params = _readable_node_sql(actor)
+    seed_visible = f"child_node_id IN (SELECT n.id FROM lineage_nodes n WHERE {node_visible})"
+    step_visible = f"edge.{seed_visible}"
     return list(session.execute(
         text(
             f"""
@@ -1418,6 +1449,49 @@ def _descendant_edge_ids(
     ).scalars())
 
 
+def _lineage_node_payload(
+    node: LineageNodeRow,
+    readable: bool,
+    child_counts: dict,
+    history_by_id: dict,
+    generations: dict,
+) -> dict:
+    """One node as the lineage answer carries it.
+
+    Three states, told apart by `redacted`, because "gone" and "not yours" mean
+    different things to whoever is looking: a deleted parent is never coming
+    back, an unreadable one comes back the moment its owner says so. Rendered
+    the same way -- dashed card, dashed arrow -- but labelled differently, so
+    nobody stops asking.
+
+    A redacted node withholds one thing a tombstone does not: `child_count`. How
+    many times somebody else's work has been derived from is itself information
+    about that work, and a tombstone has no owner left to keep it from.
+    """
+    payload = {
+        "id": node.id,
+        "state": node.state,
+        "at": node.at,
+        "deleted_at": node.deleted_at,
+    }
+    if node.state == "tombstone":
+        payload["redacted"] = "deleted"
+        payload["child_count"] = int(child_counts.get(node.id, 0))
+        return payload
+    if not readable:
+        payload["redacted"] = "not_permitted"
+        return payload
+    payload["redacted"] = None
+    payload["child_count"] = int(child_counts.get(node.id, 0))
+    payload["description_hash"] = node.description_hash
+    payload["render_hash"] = node.render_hash
+    history = history_by_id.get(node.history_id or "")
+    if history is not None:
+        payload["history"] = _row_to_dict(history)
+        payload["history"]["lineage_generation"] = generations.get(node.id)
+    return payload
+
+
 def _lineage_generations(session, actor: dict, node_ids: list[str]) -> dict[str, int]:
     """世代 (root=1, 主親エッジを辿って +1) をノード集合分まとめて計算する。
 
@@ -1438,7 +1512,7 @@ def _lineage_generations(session, actor: dict, node_ids: list[str]) -> dict[str,
             seen.add(current)
             chain.append(current)
             edge = session.query(LineageEdgeRow).filter(
-                _readable_by(actor, LineageEdgeRow.user_id),
+                _readable_edge(actor),
                 LineageEdgeRow.child_node_id == current,
             ).first()
             if edge is None:
@@ -1461,7 +1535,7 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
     with SessionLocal() as session:
         focus = session.query(LineageNodeRow).filter(
             LineageNodeRow.id == focus_node_id,
-            _readable_by(actor, LineageNodeRow.user_id),
+            _readable_node(actor),
         ).first()
         if focus is None:
             return None
@@ -1479,7 +1553,7 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
         selected_edges = (
             session.query(LineageEdgeRow)
             .filter(
-                _readable_by(actor, LineageEdgeRow.user_id),
+                _readable_edge(actor),
                 LineageEdgeRow.id.in_(selected_edge_ids),
             )
             .all()
@@ -1492,45 +1566,39 @@ def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, nod
             node_ids.add(edge.parent_node_id)
             node_ids.add(edge.child_node_id)
 
-        nodes = session.query(LineageNodeRow).filter(
-            _readable_by(actor, LineageNodeRow.user_id),
-            LineageNodeRow.id.in_(node_ids),
-        ).all()
-        history_ids = [node.history_id for node in nodes if node.history_id]
+        # Every node an edge reaches, readable or not. A lineage may now cross
+        # owners, so dropping the ones the caller cannot read would cut the chain
+        # and the child would appear to have no parent at all. They come back
+        # redacted instead -- present, connected, empty.
+        nodes = session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(node_ids)).all()
+        readable_ids = {
+            node_id for node_id, in
+            session.query(LineageNodeRow.id).filter(
+                _readable_node(actor), LineageNodeRow.id.in_(node_ids)
+            )
+        }
+        history_ids = [node.history_id for node in nodes if node.history_id and node.id in readable_ids]
         history_by_id = {
             row.id: row
             for row in session.query(HistoryRow).filter(
-                _readable_by(actor, HistoryRow.user_id),
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(history_ids),
             ).all()
         }
         child_counts = dict(
             session.query(LineageEdgeRow.parent_node_id, func.count(LineageEdgeRow.id))
             .filter(
-                _readable_by(actor, LineageEdgeRow.user_id),
+                _readable_edge(actor),
                 LineageEdgeRow.parent_node_id.in_(node_ids),
             )
             .group_by(LineageEdgeRow.parent_node_id)
             .all()
         )
-        generations = _lineage_generations(session, actor, [node.id for node in nodes])
-        node_payloads = []
-        for node in nodes:
-            payload = {
-                "id": node.id,
-                "state": node.state,
-                "at": node.at,
-                "deleted_at": node.deleted_at,
-                "child_count": int(child_counts.get(node.id, 0)),
-            }
-            if node.state != "tombstone":
-                payload["description_hash"] = node.description_hash
-                payload["render_hash"] = node.render_hash
-                history = history_by_id.get(node.history_id or "")
-                if history is not None:
-                    payload["history"] = _row_to_dict(history)
-                    payload["history"]["lineage_generation"] = generations.get(node.id)
-            node_payloads.append(payload)
+        generations = _lineage_generations(session, actor, sorted(readable_ids))
+        node_payloads = [
+            _lineage_node_payload(node, node.id in readable_ids, child_counts, history_by_id, generations)
+            for node in nodes
+        ]
         return {
             "focus_node_id": focus.id,
             "nodes": sorted(node_payloads, key=lambda item: (item["at"], item["id"])),
@@ -1543,14 +1611,14 @@ def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
     with SessionLocal() as session:
         node = session.query(LineageNodeRow).filter(
             LineageNodeRow.id == node_id,
-            _writable_by(actor, LineageNodeRow.user_id),
+            _writable_by(actor, LineageNodeRow.user_id, LineageNodeRow.history_id),
             LineageNodeRow.state == "lineage_only",
         ).first()
         if node is None or not node.history_id:
             return None
         row = session.query(HistoryRow).filter(
             HistoryRow.id == node.history_id,
-            _writable_by(actor, HistoryRow.user_id),
+            _writable_by(actor, HistoryRow.user_id, HistoryRow.id),
         ).first()
         if row is None:
             return None
@@ -1567,7 +1635,7 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
     with SessionLocal() as session:
         target = session.query(LineageNodeRow).filter(
             LineageNodeRow.id == target_node_id,
-            _readable_by(actor, LineageNodeRow.user_id),
+            _readable_node(actor),
         ).first()
         if target is None:
             return None
@@ -1577,15 +1645,15 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
         current = target
         while True:
             edge = session.query(LineageEdgeRow).filter(
-                _readable_by(actor, LineageEdgeRow.user_id),
+                _readable_edge(actor),
                 LineageEdgeRow.child_node_id == current.id,
             ).first()
             if edge is None or edge.parent_node_id in seen:
                 break
-            parent = session.query(LineageNodeRow).filter(
-                _readable_by(actor, LineageNodeRow.user_id),
-                LineageNodeRow.id == edge.parent_node_id,
-            ).first()
+            # Walk into the parent whether or not it can be read: the branch is
+            # the path from the root, and stopping at the first unreadable
+            # ancestor would silently shorten it.
+            parent = session.get(LineageNodeRow, edge.parent_node_id)
             if parent is None:
                 break
             reversed_edges.append(edge)
@@ -1594,38 +1662,35 @@ def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
             current = parent
         nodes = list(reversed(reversed_nodes))
         edges = list(reversed(reversed_edges))
-        history_ids = [node.history_id for node in nodes if node.history_id]
+        node_ids = [node.id for node in nodes]
+        readable_ids = {
+            node_id for node_id, in
+            session.query(LineageNodeRow.id).filter(
+                _readable_node(actor), LineageNodeRow.id.in_(node_ids)
+            )
+        }
+        history_ids = [node.history_id for node in nodes if node.history_id and node.id in readable_ids]
         histories = {
             row.id: row
             for row in session.query(HistoryRow).filter(
-                _readable_by(actor, HistoryRow.user_id),
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.id.in_(history_ids),
             ).all()
         } if history_ids else {}
         child_counts = dict(
             session.query(LineageEdgeRow.parent_node_id, func.count(LineageEdgeRow.id))
             .filter(
-                _readable_by(actor, LineageEdgeRow.user_id),
-                LineageEdgeRow.parent_node_id.in_([node.id for node in nodes]),
+                _readable_edge(actor),
+                LineageEdgeRow.parent_node_id.in_(node_ids),
             )
             .group_by(LineageEdgeRow.parent_node_id)
             .all()
         )
-        generations = _lineage_generations(session, actor, [node.id for node in nodes])
-        payload_nodes = []
-        for node in nodes:
-            payload = {
-                "id": node.id,
-                "state": node.state,
-                "at": node.at,
-                "deleted_at": node.deleted_at,
-                "child_count": int(child_counts.get(node.id, 0)),
-            }
-            history = histories.get(node.history_id or "")
-            if node.state != "tombstone" and history is not None:
-                payload["history"] = _row_to_dict(history)
-                payload["history"]["lineage_generation"] = generations.get(node.id)
-            payload_nodes.append(payload)
+        generations = _lineage_generations(session, actor, sorted(readable_ids))
+        payload_nodes = [
+            _lineage_node_payload(node, node.id in readable_ids, child_counts, histories, generations)
+            for node in nodes
+        ]
         return {
             "target_node_id": target.id,
             "nodes": payload_nodes,
@@ -1666,7 +1731,7 @@ def add_okugaki(user_id: str, item: dict, *, idempotency_key: str | None = None)
                 result["_idempotent_replay"] = True
                 return result
         target = session.query(LineageNodeRow).filter(
-            _readable_by(actor, LineageNodeRow.user_id),
+            _readable_node(actor),
             LineageNodeRow.id == item["target_node_id"],
         ).first()
         if target is None:
@@ -2660,7 +2725,7 @@ def add_item(item: dict) -> dict:
         if parent_node_id:
             parent = session.query(LineageNodeRow).filter(
                 LineageNodeRow.id == parent_node_id,
-                _readable_by(actor, LineageNodeRow.user_id),
+                _readable_node(actor),
                 LineageNodeRow.state != "tombstone",
             ).first()
             if parent is None:
@@ -3759,8 +3824,8 @@ def list_lineage_groups(
             session.query(HistoryRow)
             .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
             .filter(
-                _readable_by(actor, HistoryRow.user_id),
-                _readable_by(actor, LineageNodeRow.user_id),
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                _readable_node(actor),
                 HistoryRow.trashed == (1 if trashed else 0),
                 HistoryRow.history_visibility == "normal",
             )
@@ -3848,18 +3913,21 @@ def list_lineage_group_items(
 ) -> tuple[list[dict], int]:
     actor = _actor_of(user_id)
     with SessionLocal() as session:
-        root = session.query(LineageNodeRow).filter(
-            LineageNodeRow.id == root_node_id,
-            _readable_by(actor, LineageNodeRow.user_id),
-        ).first()
+        # The root is looked up without a readability test, and the members
+        # below are filtered with one. A lineage started by someone else and
+        # continued here has THEIR work as its root: requiring the root to be
+        # readable would close the group on its own later members, who would see
+        # a card in the listing that opens onto nothing. Nothing about the root
+        # is returned from this lookup -- only the fact that the id names a root.
+        root = session.get(LineageNodeRow, root_node_id)
         if root is None or (root.root_node_id or root.id) != root_node_id:
             return [], 0
         query = (
             session.query(HistoryRow)
             .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
             .filter(
-                _readable_by(actor, HistoryRow.user_id),
-                _readable_by(actor, LineageNodeRow.user_id),
+                _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                _readable_node(actor),
                 # coalesce, not a bare ==, and the same expression list_lineage_groups
                 # groups by: the root_node_id column was added by migration without a
                 # backfill, so a root node created before it holds NULL and would not
@@ -4067,11 +4135,13 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
         now = _now_ms()
         node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         if node_ids:
-            # Stage C revisits these two: the rows follow the works already
-            # selected above, so once someone else's work can be deleted through
-            # an ACL these have to key off the works' owners, not the actor's.
+            # No owner test on these two. They follow `rows`, which the filter
+            # above already authorised, and the nodes and edges belong to the
+            # WORK's owner -- who is not the actor once a write grant lets
+            # someone else delete it. Re-testing against the actor would match
+            # nothing and quietly leave the deleted work's node un-tombstoned,
+            # its child still pointing at a parent whose history is gone.
             nodes = session.query(LineageNodeRow).filter(
-                _writable_by(actor, LineageNodeRow.user_id),
                 LineageNodeRow.id.in_(node_ids),
             ).all()
             for node in nodes:
@@ -4081,7 +4151,6 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
                 node.render_hash = None
                 node.deleted_at = now
             touching = session.query(LineageEdgeRow).filter(
-                _writable_by(actor, LineageEdgeRow.user_id),
                 or_(LineageEdgeRow.parent_node_id.in_(node_ids), LineageEdgeRow.child_node_id.in_(node_ids)),
             ).all()
             for edge in touching:

@@ -3074,7 +3074,13 @@ def command_lineage(args: argparse.Namespace) -> int:
                 text = ""
                 if node.get("history"):
                     text = node["history"].get("source_text") or node["history"].get("input") or ""
-                elif node.get("state") == "tombstone":
+                elif node.get("redacted") == "not_permitted":
+                    # Checked before the tombstone branch and labelled apart from
+                    # it: a withheld node is not deleted, and printing both as
+                    # [Deleted] would tell the reader to stop asking for one they
+                    # could still be given.
+                    text = "[Private]"
+                elif node.get("state") == "tombstone" or node.get("redacted") == "deleted":
                     text = "[Deleted]"
                 elif node.get("state") == "lineage_only":
                     text = "[Intermediate]"
@@ -3128,6 +3134,18 @@ def command_colophon(args: argparse.Namespace) -> int:
     return 0
 
 
+# What `refine --kind` is called on the command line, and what the server calls
+# it. The flag's four choices are short verbs; `LINEAGE_DERIVATION_KINDS` names
+# the same four differently, and sending a flag value straight through is
+# refused.
+_DERIVATION_KIND_BY_REFINE_KIND = {
+    "touch": "touch_change",
+    "layout": "layout_change",
+    "reading": "reinterpretation",
+    "color": "catalog_change",
+}
+
+
 def command_refine(args: argparse.Namespace) -> int:
     import uuid
     config = load_config()
@@ -3143,22 +3161,30 @@ def command_refine(args: argparse.Namespace) -> int:
         if not target:
             target_list = client.request("GET", "/api/history", query={"q": args.item_id})[0].get("items", [])
             target = next((item for item in target_list if item["id"] == args.item_id), None)
+        if not target:
+            # Both lookups above go through the caller's own listing, which is
+            # where a work shared BY someone else does not appear -- the listing
+            # is paged and the search matches text, and neither is a way to name
+            # one id. Ask the lineage route instead, which resolves exactly one
+            # work and answers for anything the caller may read. Without this a
+            # lineage could never cross owners from the command line, and the
+            # server-side rule would have no way to be exercised.
+            lineage, _ = client.request(
+                "GET", f"/api/history/{args.item_id}/lineage", query={"descendant_depth": 0}
+            )
+            focus = str(lineage.get("focus_node_id") or "")
+            target = next(
+                (node.get("history") for node in lineage.get("nodes", []) if node["id"] == focus),
+                None,
+            )
             if not target:
                 raise CliError(f"history item {args.item_id} not found")
-        
+
         parent_node_id = target.get("lineage_node_id")
         if not parent_node_id:
             raise CliError(f"lineage node ID is missing on item {args.item_id}")
         
-        derivation_kind = "touch_change"
-        if args.kind == "touch":
-            derivation_kind = "touch_change"
-        elif args.kind == "layout":
-            derivation_kind = "layout_change"
-        elif args.kind == "reading":
-            derivation_kind = "reinterpretation"
-        elif args.kind == "color":
-            derivation_kind = "catalog_change"
+        derivation_kind = _DERIVATION_KIND_BY_REFINE_KIND[args.kind]
 
         params = {
             "description": args.description or target.get("source_text") or target.get("input") or "",
@@ -3227,7 +3253,12 @@ def command_refine(args: argparse.Namespace) -> int:
             "score": score,
             "svg": svg,
             "lineage_parent_node_id": args.parent_node_id,
-            "derivation_kind": args.kind,
+            # Through the same map `perform` uses. This sent `args.kind`
+            # unchanged, so every `refine save` was refused with "invalid
+            # lineage derivation kind" -- the four choices the flag offers are
+            # none of the names the server accepts, so no value worked and the
+            # subcommand had never once succeeded.
+            "derivation_kind": _DERIVATION_KIND_BY_REFINE_KIND[args.kind],
             "history_visibility": args.visibility,
         }
         data, _ = client.request("POST", "/api/history", data=params)
@@ -3394,6 +3425,62 @@ def command_user(args: argparse.Namespace) -> int:
         query = {"cascade": "true" if args.cascade else "false"}
         data, _ = client.request("DELETE", f"/api/users/{args.user_id}", query=query)
         _print_json(data)
+    return 0
+
+
+def command_history_share(args: argparse.Namespace) -> int:
+    """Read and change one work's guest list.
+
+    `share` and `unshare` read the list first and send it back whole, because
+    PUT replaces it. Sending only the entry being added would silently revoke
+    everyone else.
+    """
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    path = f"/api/history/{args.item_id}/acl"
+    if args.history_action == "acl":
+        data, _ = client.request("GET", path)
+        _print_json(data)
+        return 0
+
+    subject_type, subject_id = ("user", args.to_user) if args.to_user else ("org_group", args.to_group)
+    current, _ = client.request("GET", path)
+    entries = [
+        {
+            "subject_type": entry["subject_type"],
+            "subject_id": entry["subject_id"],
+            "permission": entry["permission"],
+        }
+        for entry in current
+        if not (entry["subject_type"] == subject_type and entry["subject_id"] == subject_id)
+    ]
+    if args.history_action == "share":
+        entries.append(
+            {"subject_type": subject_type, "subject_id": subject_id, "permission": args.permission}
+        )
+    data, _ = client.request("PUT", path, data={"entries": entries})
+    _print_json(data)
+    return 0
+
+
+def command_single_user(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    if args.single_user_action == "show":
+        data, _ = client.request("GET", "/api/settings/single-user")
+    else:
+        data, _ = client.request(
+            "PUT", "/api/settings/single-user", data={"user_id": args.user_id}
+        )
+    _print_json(data)
     return 0
 
 
@@ -3829,7 +3916,43 @@ def build_parser() -> argparse.ArgumentParser:
     history.add_argument("--query", "-q")
     history.add_argument("--starred", action="store_true")
     history.add_argument("--for-revision", action="store_true")
-    history.set_defaults(func=command_history)
+    history.set_defaults(func=command_history, history_action=None)
+
+    # Optional on purpose (no `required=True`): `history` was a flat listing
+    # command long before it had subcommands, and `inku-cli history --limit 20`
+    # has to keep working exactly as it did.
+    history_sub = history.add_subparsers(dest="history_action")
+
+    history_share = history_sub.add_parser(
+        "share", help="let another member see or change one work"
+    )
+    history_share.add_argument("item_id", help="the work to share")
+    share_target = history_share.add_mutually_exclusive_group(required=True)
+    share_target.add_argument("--to-user", help="user ID to share it with")
+    share_target.add_argument("--to-group", help="organisation group ID to share it with")
+    history_share.add_argument(
+        "--permission",
+        choices=("read", "write"),
+        default="read",
+        help="read lets them open it; write also lets them star, trash and delete it",
+    )
+
+    history_unshare = history_sub.add_parser(
+        "unshare", help="take one member's access to a work away again"
+    )
+    history_unshare.add_argument("item_id", help="the work to stop sharing")
+    unshare_target = history_unshare.add_mutually_exclusive_group(required=True)
+    unshare_target.add_argument("--to-user", help="user ID to remove")
+    unshare_target.add_argument("--to-group", help="organisation group ID to remove")
+
+    history_acl = history_sub.add_parser("acl", help="show who else may see or change one work")
+    history_acl.add_argument("item_id", help="the work to inspect")
+
+    # No _add_common_server_args here: `history` itself already carries them,
+    # so the server flags go before the subcommand, as they do for `user`,
+    # `group` and `lineage`.
+    for parser_ in (history_share, history_unshare, history_acl):
+        parser_.set_defaults(func=command_history_share)
 
     unread_words = subparsers.add_parser("unread-words", help="report words the interpreter could not confidently read")
     _add_common_server_args(unread_words)
@@ -4020,6 +4143,25 @@ def build_parser() -> argparse.ArgumentParser:
     user_create.set_defaults(func=command_user)
     user_update.set_defaults(func=command_user)
     user_delete.set_defaults(func=command_user)
+
+    # single-user
+    single_user_cmd = subparsers.add_parser(
+        "single-user", help="show or move the account this server opens as"
+    )
+    _add_common_server_args(single_user_cmd)
+    single_user_sub = single_user_cmd.add_subparsers(dest="single_user_action", required=True)
+
+    single_user_show = single_user_sub.add_parser(
+        "show", help="show which account the app opens as, and who else could"
+    )
+    single_user_set = single_user_sub.add_parser(
+        "set", help="hand the server to another account from the next automatic login on"
+    )
+    single_user_set.add_argument(
+        "user_id", help="the account to open as; it must hold the admins permission group"
+    )
+    single_user_show.set_defaults(func=command_single_user)
+    single_user_set.set_defaults(func=command_single_user)
 
     # group
     group_cmd = subparsers.add_parser("group", help="manage user groups")

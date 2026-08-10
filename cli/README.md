@@ -27,6 +27,40 @@ through Stage 2/rendering:
 inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --save-history
 ```
 
+## Share one work with someone else
+
+By default a work is visible to whoever made it. What an admin or a group leader
+can reach beyond that is decided by their permission group; anything else has to
+be given away one work at a time:
+
+```sh
+inku-cli history share <item_id> --to-user <user_id> --permission read
+inku-cli history share <item_id> --to-group <group_id> --permission write
+inku-cli history unshare <item_id> --to-user <user_id>
+inku-cli history acl <item_id>
+```
+
+`read` lets them open the work; `write` also lets them star, trash and delete it.
+Only the owner and an admin may share — being able to read a work is not
+permission to hand it on.
+
+A work you can read can be varied, and the variation keeps the connection rather
+than copying anything: `inku-cli refine perform <their_item_id> …` records their
+work as your work's parent. In `inku-cli lineage show`, a parent you cannot read
+prints as `[Private]` rather than `[Deleted]` — it still exists, and its owner
+can still give it to you.
+
+## Hand a single-user server to a different account
+
+On a server in single-user mode, one account is the one it opens as. It can be
+moved, and the move takes effect at the next automatic login rather than
+throwing out the session doing the moving:
+
+```sh
+inku-cli single-user show          # who it opens as, and who else could
+inku-cli single-user set <user_id> # move it; the account must hold `admins`
+```
+
 ## Export saved history by render hash
 
 `history-export` selects drawings stored in the server history DB by render hash suffix and writes a review bundle:
@@ -92,13 +126,13 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
@@ -130,6 +164,7 @@ positional arguments:
     inspect             parallel model inspection comparison
     review              evaluate drawings and submit feedback
     user                manage user accounts
+    single-user         show or move the account this server opens as
     group               manage user groups
     config              manage system settings
 
@@ -640,6 +675,13 @@ usage: inku-cli history [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--offset OFFSET]
                         [--limit LIMIT] [--query QUERY] [--starred]
                         [--for-revision]
+                        {share,unshare,acl} ...
+
+positional arguments:
+  {share,unshare,acl}
+    share               let another member see or change one work
+    unshare             take one member's access to a work away again
+    acl                 show who else may see or change one work
 
 options:
   -h, --help            show this help message and exit
@@ -651,6 +693,55 @@ options:
   --query QUERY, -q QUERY
   --starred
   --for-revision
+
+```
+
+### `inku-cli history share`
+
+```
+usage: inku-cli history share [-h] (--to-user TO_USER | --to-group TO_GROUP)
+                              [--permission {read,write}]
+                              item_id
+
+positional arguments:
+  item_id               the work to share
+
+options:
+  -h, --help            show this help message and exit
+  --to-user TO_USER     user ID to share it with
+  --to-group TO_GROUP   organisation group ID to share it with
+  --permission {read,write}
+                        read lets them open it; write also lets them star,
+                        trash and delete it
+
+```
+
+### `inku-cli history unshare`
+
+```
+usage: inku-cli history unshare [-h] (--to-user TO_USER | --to-group TO_GROUP)
+                                item_id
+
+positional arguments:
+  item_id              the work to stop sharing
+
+options:
+  -h, --help           show this help message and exit
+  --to-user TO_USER    user ID to remove
+  --to-group TO_GROUP  organisation group ID to remove
+
+```
+
+### `inku-cli history acl`
+
+```
+usage: inku-cli history acl [-h] item_id
+
+positional arguments:
+  item_id     the work to inspect
+
+options:
+  -h, --help  show this help message and exit
 
 ```
 
@@ -1162,6 +1253,51 @@ positional arguments:
 options:
   -h, --help  show this help message and exit
   --cascade   cascade delete user's generation history
+
+```
+
+### `inku-cli single-user`
+
+```
+usage: inku-cli single-user [-h] [--base-url BASE_URL]
+                            [--timeout-seconds TIMEOUT_SECONDS]
+                            {show,set} ...
+
+positional arguments:
+  {show,set}
+    show                show which account the app opens as, and who else
+                        could
+    set                 hand the server to another account from the next
+                        automatic login on
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+
+```
+
+### `inku-cli single-user show`
+
+```
+usage: inku-cli single-user show [-h]
+
+options:
+  -h, --help  show this help message and exit
+
+```
+
+### `inku-cli single-user set`
+
+```
+usage: inku-cli single-user set [-h] user_id
+
+positional arguments:
+  user_id     the account to open as; it must hold the admins permission group
+
+options:
+  -h, --help  show this help message and exit
 
 ```
 

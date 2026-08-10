@@ -5190,3 +5190,50 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   drawn by searching for the value `group_lead`, and **two specification passages (one ja/en pair) that
   speak only of the `admin` role** were not in that net. **A net woven from a word does not catch a
   falsehood that avoids the word.**
+
+### v2.12.1 — The stated number holds beyond what the eye can count (Build 878, 2026-08-11, ddl-engine 12)
+
+- **The band in which a count written in plain words takes effect was widened from 1–11 to the literal
+  threshold** (239 by default). **The boundary was not given a second name** — the band comes from
+  `limits.literal_count_threshold - 1`. **Written as a separate constant, 239 could move on one side
+  and nobody would notice.** **At or above the threshold, crowd representation governs and this branch
+  touches nothing.**
+- **When the forced count would exceed the per-instruction budget (240) or the whole-work budget (400),
+  it is not forced rather than trimmed.** **This branch runs after both budgets, so nothing would
+  remove the excess**, and a trimmed count puts **neither the number stated nor the represented one**
+  on the sheet. **Where the number cannot be reached, leaving it alone is the honest answer.**
+- **Measured over 1,346 works frozen from production**: of the **309 works and 341 counts** that state
+  a number in 12–239 and miss it, **203 became true** (4 before this change). **Works the branch fired
+  in went from 30 to 197**; marks per work moved from p50 **15 to 36** and p90 **131 to 230**; **works
+  over the 400-mark ceiling stayed at 0**.
+- **⚠ The budget guard fires once in production; the contract's estimate of "none" was an artefact of
+  where it measured.** The estimate counted the total **after the exit ceiling had already cut it**,
+  and a cut total is always at or below 400. **Before the cut it was 419.** In that work **the branch
+  fired, no stated number came true, and other groups were cut as collateral by the ceiling.** The
+  guard stops that wasted firing along with the overflow.
+- **The counts still out of reach fail on pairing, not on the band** (ambiguous, already answered by an
+  earlier clause, or the clause cannot name a group). **That is the previous contract's ruling and it
+  was not touched.**
+- **Two cases through which this change actually passes were added to the reference corpus** (synthetic;
+  no production description is copied) — one stating a count in 12–239 that Stage 2 missed, and one
+  where forcing it would cross 400 marks. **None of the 21 existing cases move when the band is lifted,
+  so rebaking alone would have recorded nothing about this change.** `ddl-engine-12/` holds **36 cases
+  (A 13 / B 23)** and `changed_from_previous` names **only the two that were added**.
+- **Five of the 41 golden cases moved** (`H-01`, `H-07`, `H-10`, `H-13`, `H-18`) and **`branch_report`
+  still has 30 keys** (no branch was added) — **exactly what the contract predicted.**
+- **Checks:** **server 2,769 passed / 31 skipped** (22 new on the branch), **cli 201 passed**,
+  **`npm run check` 0 errors / 2 warnings** (the two pre-existing a11y ones), **`test:unit` 127**,
+  **ruff clean** (server and cli), **frozen corpora byte-identical on darwin**, **`check_docs.py`
+  consistent**, **Android JVM 263 / 0 failed** (`composer.py` was untouched, so the prompt-fingerprint
+  test is green too). **The band's own tests went from 25 to 46** (14 to 19 by `def`). **All eight
+  perturbations landed; none missed.**
+- **⚠ One perturbation did miss at first, and it exposed a defect in a gate** — widening the band past
+  the threshold failed to redden the test that watches "240 and above does not move". That test used
+  300 and 500, **both of which exceed the per-instruction budget, so the guard above refused them
+  regardless of the band** — **the test was not measuring the band at all.** **240 was added.** It sits
+  exactly at the per-instruction budget, so the guard does not refuse it and **only the band's edge can.**
+- **⚠ Raising the layer version turned seven tests red that the contract never named** (four asserting
+  `ddl_engine_version` literally, two Android reference fixtures, one counting corpus cases). **None
+  were defects in this change; all were version follow-through.** Rebaking the Android fixture moved
+  **only the two files in the new version's directory** — no earlier version, and none of the five
+  files the engine does not govern, moved a byte.

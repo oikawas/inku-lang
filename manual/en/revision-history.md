@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.12.1 Baseline (Web Build 878)
+
+Updated the 13 places that name a version to v2.12.1 / Build 878, and **revised `Creating Images` §3 for the wider reach of a written number**.
+
+- **A written number now reaches up to 239, where it used to stop at eleven.** Numbers written as "thirty" or "two hundred and thirty-three" are drawn as written.
+- **The boundary is the same value as `Stated counts` in `Server Configuration` (240 by default).** No new setting was added; moving that boundary moves the reach of a written number with it.
+- **The condition is unchanged.** It applies only when the sentence points to a single group; where the sentence does not settle on one, the count is left alone.
+- **When the number asked for would cross the limit for one work or for one group, it is not drawn part of the way.** It is left as it is, because **a partial count is neither the number written nor the number of a crowd.**
+- **Treatment of 240 and above is unchanged** (the work is shown as a crowd).
+
 ## 2026-08-10 — Unreleased v2.12.0 Baseline (Web Build 877)
 
 Updated the 13 places that name a version to v2.12.0 / Build 877, and **revised `Server Configuration` §2.2 and §4, the `inku-cli Reference`, and `Application Installation` §7 for the new way permission is decided**.

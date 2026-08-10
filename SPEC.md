@@ -2263,17 +2263,25 @@ that is drawn as stated moves with it. Which values a work was drawn under is
 recorded on the work** (`history.render_limits`), so the configuration carries
 reproducibility on the same footing as the version.
 
-**A count of 1 to 11 is drawn as stated even when the wording is not "only" or
-"alone" (v2.11.20, ddl-engine 11).** Before that, only the emphatic form held a
-number; a count written the ordinary way — "three circles in a row" — was
-overwritten by downstream guesswork. **It reaches a group only when exactly one
-group answers to the clause**: the group carrying the (figure, colour, weight)
-triple built from the clause, or failing that the single group with the same
-figure. **With several candidates, or none, nothing happens — forcing an
-ambiguous pairing would break the number some other clause stated.** The band
-stops at 11 because **only what can be counted by eye is in scope**; how this
-relates to crowd representation and the total budget above that band belongs to a
-separate ruling.
+**A stated count is drawn as stated even when the wording is not "only" or
+"alone" (v2.11.20, ddl-engine 11; the band was widened in v2.12.1, ddl-engine
+12).** Before that, only the emphatic form held a number; a count written the
+ordinary way — "three circles in a row" — was overwritten by downstream
+guesswork. **It reaches a group only when exactly one group answers to the
+clause**: the group carrying the (figure, colour, weight) triple built from the
+clause, or failing that the single group with the same figure. **With several
+candidates, or none, nothing happens — forcing an ambiguous pairing would break
+the number some other clause stated.** **The band comes from the literal
+threshold itself** (239 by default; normalization keeps the threshold aligned
+with `max_expanded_per_instruction`, so moving the setting moves the band).
+**The same boundary is not given a second name** — written as a separate
+constant, one of the two could move without anyone noticing. **At or above the
+threshold, crowd representation governs and this branch touches nothing.**
+**When the forced count would exceed the per-instruction or whole-work budget, it
+is not forced rather than trimmed** — the branch runs after those budgets, so
+nothing would remove the excess, and a trimmed count is **neither the number
+stated nor the represented one**. **Where the number cannot be reached, leaving
+it alone is the honest answer to the description.**
 
 **The treatments that reduce density in quiet, membrane, or memory contexts are
 not applied to a group whose count was stated.** Quietness is a reading of the

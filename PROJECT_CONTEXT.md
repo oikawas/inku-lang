@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.12.0 / Build 877**
+**Target version: v2.12.1 / Build 878**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -103,7 +103,7 @@ To learn why something took its current shape, search the changelog by term, ver
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 29 | `server/src/inku_server/render_engines/default.py` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 11 | `server/src/inku_server/layer_versions.py` |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 12 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.22` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
@@ -154,9 +154,14 @@ Invalid values prefer drop-only handling, and no house style is injected.
 (background clauses do not count, and a polychrome phrase or a cycle without the named color is left
 alone).
 **An even split is a distribution the description never stated, so it is taken back rather than delivered.**
-**A count of 1 to 11 stated in plain words reaches the group its clause describes, but only when
+**A count stated in plain words reaches the group its clause describes, but only when
 exactly one group answers to that clause** (an ambiguous pairing is left alone). It is a branch of its
 own, separate from the "only" path and carrying its own note wording, so attribution stays countable.
+**The band it covers comes from the limits threshold** — it reaches the counts the configuration calls
+literal (up to 239 by default) and leaves everything at or above the threshold to representation.
+**The boundary is not given a second name.**
+**When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
+than trimmed** — a trimmed count is neither the number stated nor the represented one.
 - **Render Engine 29** — the SVG performance.
 It carries closed-shape outlines and fills, arcs, the material layer, ground resistance, and master
 grid quantization of coordinates.
@@ -260,7 +265,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-29` (549 cases) and `ddl-engine-11` (34 cases) are current, and CI enforces
+`render-engine-29` (549 cases) and `ddl-engine-12` (36 cases) are current, and CI enforces
 byte-identical regeneration.
 - **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
 same way. The port reads the directory for the version it declares, so **raising the server engine

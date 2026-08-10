@@ -134,7 +134,7 @@ def actor():
         username=f"work-colors-{suffix}",
         email=f"work-colors-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     token = db.create_session(user["id"])
@@ -417,7 +417,7 @@ def test_another_users_work_is_not_readable_through_the_colors(actor):
         username=f"work-colors-other-{stranger_suffix}",
         email=f"work-colors-other-{stranger_suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=stranger_group["id"],
     )
     try:
@@ -598,7 +598,7 @@ user = db.add_user(
     username="legacy",
     email="legacy@example.test",
     password="password-123",
-    role="user",
+    permission_groups=["users"],
     group_id=group["id"],
 )
 db.add_item({

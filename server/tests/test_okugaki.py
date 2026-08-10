@@ -52,7 +52,7 @@ def _user(prefix: str = "okugaki") -> dict:
         f"{prefix}-{suffix}",
         f"{prefix}-{suffix}@example.test",
         "okugaki-test-password",
-        "user",
+        ["users"],
         groups[0]["id"] if groups else None,
     )
 

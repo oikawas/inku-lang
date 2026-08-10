@@ -3368,7 +3368,9 @@ def command_user(args: argparse.Namespace) -> int:
             "username": args.username,
             "email": args.email,
             "password": args.password,
-            "role": args.role,
+            # argparse's append action cannot carry a list default without
+            # appending to it, so the default is resolved here instead.
+            "permission_groups": args.permission_group or ["users"],
         }
         if args.group_id:
             body["group_id"] = args.group_id
@@ -3382,8 +3384,8 @@ def command_user(args: argparse.Namespace) -> int:
             body["email"] = args.email
         if args.password:
             body["password"] = args.password
-        if args.role:
-            body["role"] = args.role
+        if args.permission_group:
+            body["permission_groups"] = args.permission_group
         if args.group_id:
             body["group_id"] = args.group_id
         data, _ = client.request("PATCH", f"/api/users/{args.user_id}", data=body)
@@ -3989,7 +3991,12 @@ def build_parser() -> argparse.ArgumentParser:
     user_create.add_argument("username", help="new username")
     user_create.add_argument("email", help="email address")
     user_create.add_argument("password", help="password (min 8 chars)")
-    user_create.add_argument("--role", choices=("user", "group_lead", "admin"), default="user", help="user role")
+    user_create.add_argument(
+        "--permission-group",
+        action="append",
+        choices=("users", "leaders", "admins"),
+        help="what the new member may do; repeat to grant several (default: users)",
+    )
     user_create.add_argument("--group-id", help="assign to a group ID")
 
     user_update = user_sub.add_parser("update", help="update a user account")
@@ -3997,7 +4004,12 @@ def build_parser() -> argparse.ArgumentParser:
     user_update.add_argument("--username", help="update username")
     user_update.add_argument("--email", help="update email")
     user_update.add_argument("--password", help="update password")
-    user_update.add_argument("--role", choices=("user", "group_lead", "admin"), help="update role")
+    user_update.add_argument(
+        "--permission-group",
+        action="append",
+        choices=("users", "leaders", "admins"),
+        help="replace what the member may do; repeat to grant several",
+    )
     user_update.add_argument("--group-id", help="update group ID")
 
     user_delete = user_sub.add_parser("delete", help="delete a user account")

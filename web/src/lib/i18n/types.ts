@@ -651,13 +651,13 @@ export interface LangPack {
 	colorCatalogTitle: string;
 	colorCatalogDetail: string;
 	colorCatalogConfirm: string;
-	userRoleAdmin: string;
-	userRoleGroupLead: string;
-	userRoleUser: string;
+	permissionGroupAdmins: string;
+	permissionGroupLeaders: string;
+	permissionGroupUsers: string;
 	settingsUserSessionLabel: string;
 	userCountLabel: (n: number) => string;
-	userRoleLabel: string;
-	userRoleSelectLabel: string;
+	permissionGroupLabel: string;
+	permissionGroupSelectLabel: string;
 	userGroupSelectLabel: string;
 	userGenerationCountLabel: string;
 	profileGenerationCountLabel: string;

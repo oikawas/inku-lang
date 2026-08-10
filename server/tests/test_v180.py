@@ -44,7 +44,7 @@ def test_seed_text_is_explicit_deterministic_and_empty_matches_none():
 def test_unread_word_ledger_is_user_scoped():
     suffix = "v180-ledger"
     group = db.add_user_group(suffix)
-    user = db.add_user(f"{suffix}-user", f"{suffix}@example.com", "password-123", "user", group["id"])
+    user = db.add_user(f"{suffix}-user", f"{suffix}@example.com", "password-123", ["users"], group["id"])
     try:
         db.record_unread_words(user["id"], ["未読語", "未読語"], "文脈", at=100)
         db.record_unread_words(user["id"], ["未読語"], "文脈", at=200)

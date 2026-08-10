@@ -1,0 +1,271 @@
+"""What a member may do is decided by the permission groups they hold.
+
+The `user_accounts.role` flag is gone from every decision.  The column itself
+stays, written as a machine-derived mirror, so a database taken after this
+change still opens on a build from before it -- and the tests below measure
+that nothing reads it, by behaviour rather than by reading the source.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import pathlib
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+
+from inku_server import db
+from inku_server.api import app
+
+
+client = TestClient(app)
+
+
+# One route from each guard's set, used as the reachability probe.  Both are
+# reads, so a 200 says the guard let the caller through and nothing else.
+ADMIN_ROUTE = "/api/settings/status"
+ADMIN_ROUTE_2 = "/api/settings/models"
+MANAGER_ROUTE = "/api/users"
+
+
+def _member(prefix: str, groups: list[str], group_id: str | None = None) -> tuple[dict, dict[str, str]]:
+    suffix = uuid.uuid4().hex[:8]
+    user = db.add_user(
+        f"{prefix}-{suffix}",
+        f"{prefix}-{suffix}@example.test",
+        "password-123",
+        groups,
+        group_id,
+    )
+    token = db.create_session(user["id"])
+    return user, {"Authorization": f"Bearer {token}"}
+
+
+def _memberships(user_id: str) -> list[str]:
+    with db.SessionLocal() as session:
+        return db._permission_groups_of(session, user_id)
+
+
+def _membership_row_count(user_id: str) -> int:
+    with db.SessionLocal() as session:
+        return (
+            session.query(db.UserPermissionGroupRow)
+            .filter(db.UserPermissionGroupRow.user_id == user_id)
+            .count()
+        )
+
+
+def _make_legacy_account(role: str) -> str:
+    """An account as a pre-migration database holds it: a role, no memberships."""
+    user, _headers = _member("legacy", ["users"])
+    with db.SessionLocal() as session:
+        session.query(db.UserPermissionGroupRow).filter(
+            db.UserPermissionGroupRow.user_id == user["id"]
+        ).delete(synchronize_session=False)
+        session.get(db.UserAccountRow, user["id"]).role = role
+        session.commit()
+    assert _memberships(user["id"]) == []
+    return user["id"]
+
+
+# --- T-1: the migration maps one legacy role to exactly one group ------------
+
+
+@pytest.mark.parametrize(
+    ("legacy_role", "expected"),
+    [("admin", ["admins"]), ("group_lead", ["leaders"]), ("user", ["users"])],
+)
+def test_t1_the_migration_maps_each_legacy_role_to_one_group(legacy_role: str, expected: list[str]) -> None:
+    """One-to-one on purpose.
+
+    Reading `admin` as "an admin is also a leader" would be a helpful guess that
+    makes the original role unrecoverable: nothing afterwards could tell an
+    account the migration widened from one an administrator widened on purpose.
+    """
+    user_id = _make_legacy_account(legacy_role)
+    db._migrate_roles_to_permission_groups()
+    assert _memberships(user_id) == expected
+
+
+# --- T-2: running it twice changes nothing ----------------------------------
+
+
+def test_t2_the_migration_is_idempotent() -> None:
+    user_id = _make_legacy_account("group_lead")
+    db._migrate_roles_to_permission_groups()
+    first = _memberships(user_id)
+    db._migrate_roles_to_permission_groups()
+
+    assert _memberships(user_id) == first == ["leaders"]
+    # Not just the names: a second insert would leave two rows naming the same
+    # group, which the set-valued reader above would hide.
+    assert _membership_row_count(user_id) == 1
+
+    # The half the unique constraint cannot catch.  A migration that re-derived
+    # every account from the role mirror on each run would delete-and-rewrite
+    # rather than duplicate, so the database would raise nothing -- and an
+    # account deliberately given both groups would silently lose one, because
+    # the mirror can only name the stronger.
+    widened, _headers = _member("widened", ["admins", "leaders"])
+    db._migrate_roles_to_permission_groups()
+    assert _memberships(widened["id"]) == ["admins", "leaders"]
+
+
+# --- T-3: the role mirror is not read by any decision -----------------------
+
+
+def _member_whose_mirror_lies() -> dict[str, str]:
+    """Holds only `users`, while the legacy column claims `admin`."""
+    user, headers = _member("mirror-lies", ["users"])
+    with db.SessionLocal() as session:
+        session.get(db.UserAccountRow, user["id"]).role = "admin"
+        session.commit()
+    with db.SessionLocal() as session:
+        assert session.get(db.UserAccountRow, user["id"]).role == "admin"
+    assert _memberships(user["id"]) == ["users"]
+    return headers
+
+
+def test_t3_an_admin_role_mirror_does_not_open_the_admin_routes() -> None:
+    headers = _member_whose_mirror_lies()
+    assert client.get(ADMIN_ROUTE, headers=headers).status_code == 403
+
+
+def test_t3_an_admin_role_mirror_does_not_open_the_user_manager_routes() -> None:
+    headers = _member_whose_mirror_lies()
+    assert client.get(MANAGER_ROUTE, headers=headers).status_code == 403
+
+
+# --- T-4/T-5/T-6: what each group reaches -----------------------------------
+
+
+def test_t4_admins_reach_the_admin_routes() -> None:
+    _user, headers = _member("reach-admin", ["admins"])
+    assert client.get(ADMIN_ROUTE, headers=headers).status_code == 200
+
+
+def test_t4_admins_reach_a_second_admin_route() -> None:
+    _user, headers = _member("reach-admin2", ["admins"])
+    assert client.get(ADMIN_ROUTE_2, headers=headers).status_code == 200
+
+
+def test_t5_leaders_reach_the_user_manager_routes() -> None:
+    _user, headers = _member("reach-lead", ["leaders"])
+    assert client.get(MANAGER_ROUTE, headers=headers).status_code == 200
+
+
+def test_t5_leaders_do_not_reach_the_admin_routes() -> None:
+    _user, headers = _member("reach-lead-stop", ["leaders"])
+    assert client.get(ADMIN_ROUTE, headers=headers).status_code == 403
+
+
+def test_t6_plain_users_do_not_reach_the_user_manager_routes() -> None:
+    _user, headers = _member("reach-user", ["users"])
+    assert client.get(MANAGER_ROUTE, headers=headers).status_code == 403
+
+
+def test_t6_plain_users_do_not_reach_the_admin_routes() -> None:
+    _user, headers = _member("reach-user-admin", ["users"])
+    assert client.get(ADMIN_ROUTE, headers=headers).status_code == 403
+
+
+# --- T-8: the API surface moved exactly where it was meant to ---------------
+
+
+_BEFORE = pathlib.Path(__file__).parent / "data" / "api-surface-before-permission-groups.json"
+_CHANGED_SCHEMAS = ("UserAccountItem", "UserAccountCreateBody", "UserAccountUpdateBody")
+
+
+def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
+    """A count that does not move is not evidence that nothing was lost.
+
+    endpoint/operation/schema counts all stay at 82 through this change, so the
+    gate has to name the fields: what left the three user schemas, what arrived,
+    and that the other 79 did not move a byte.
+    """
+    # Load the sibling by path rather than by name: the surface is computed in
+    # exactly one place, and a copy here would drift from it silently.
+    spec = importlib.util.spec_from_file_location(
+        "_api_surface_for_delta", pathlib.Path(__file__).parent / "test_api_surface.py"
+    )
+    surface_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(surface_module)
+    _stable, current_surface = surface_module._stable, surface_module.current_surface
+
+    before = json.loads(_BEFORE.read_text(encoding="utf-8"))
+    after = current_surface()
+
+    others = {k: v for k, v in after["schemas"].items() if k not in _CHANGED_SCHEMAS}
+    assert len(others) == before["unchanged_schema_count"]
+    assert (
+        hashlib.sha256(_stable(others).encode()).hexdigest()
+        == before["unchanged_schema_digest"]
+    )
+
+    for name in _CHANGED_SCHEMAS:
+        old_props = set(json.loads(before["changed_schemas"][name])["properties"])
+        new_props = set(json.loads(after["schemas"][name])["properties"])
+        assert old_props - new_props == {"role"} | ({"role_label"} if name == "UserAccountItem" else set()), name
+        assert new_props - old_props == {"permission_groups"} | (
+            {"permission_group_labels"} if name == "UserAccountItem" else set()
+        ), name
+
+
+# --- T-9: permission groups and organisation groups are separate ------------
+
+
+def test_t9_two_members_of_one_organisation_group_are_judged_separately() -> None:
+    """The organisation group they share says nothing about what they may do."""
+    circle = db.add_user_group(f"circle-a-{uuid.uuid4().hex[:8]}")
+    _lead, lead_headers = _member("circle-lead", ["leaders"], circle["id"])
+    _plain, plain_headers = _member("circle-plain", ["users"], circle["id"])
+
+    assert client.get(MANAGER_ROUTE, headers=lead_headers).status_code == 200
+    assert client.get(MANAGER_ROUTE, headers=plain_headers).status_code == 403
+
+
+def test_t9_moving_between_organisation_groups_does_not_move_permission() -> None:
+    first = db.add_user_group(f"circle-b-{uuid.uuid4().hex[:8]}")
+    second = db.add_user_group(f"circle-c-{uuid.uuid4().hex[:8]}")
+    user, headers = _member("circle-move", ["users"], first["id"])
+    assert client.get(MANAGER_ROUTE, headers=headers).status_code == 403
+
+    moved = db.update_user(user["id"], group_id=second["id"])
+    assert moved["group_id"] == second["id"]
+    assert moved["permission_groups"] == ["users"]
+    assert client.get(MANAGER_ROUTE, headers=headers).status_code == 403
+
+
+# --- T-10: holding two groups works, and the stronger one decides -----------
+
+
+def test_t10_a_member_holding_admins_and_leaders_gets_both() -> None:
+    user, headers = _member("both", ["admins", "leaders"])
+    assert _memberships(user["id"]) == ["admins", "leaders"]
+    # The user-manager routes come with `leaders`, the admin ones with `admins`:
+    # a implementation that kept only the first membership would lose one of these.
+    assert client.get(MANAGER_ROUTE, headers=headers).status_code == 200
+    assert client.get(ADMIN_ROUTE, headers=headers).status_code == 200
+
+
+# --- T-13: single-user mode's pin is untouched by any of this ---------------
+
+
+def test_t13_the_single_user_pin_does_not_follow_the_permission_groups() -> None:
+    """The pin holds an account id and reads neither role nor group.
+
+    Single-user mode resolves the owner once and writes the id down, so a
+    restored backup names the same person.  Swapping that person's permission
+    groups must not move the pin -- if it did, the owner's works would appear
+    to belong to somebody else.
+    """
+    user, _headers = _member("pinned", ["admins"])
+    db._write_app_setting(db._SINGLE_USER_SETTING_KEY, {"user_id": user["id"]})
+    assert db.single_user_pinned_id() == user["id"]
+
+    db.update_user(user["id"], permission_groups=["users"])
+    assert _memberships(user["id"]) == ["users"]
+    assert db.single_user_pinned_id() == user["id"]

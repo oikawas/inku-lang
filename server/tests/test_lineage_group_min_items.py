@@ -42,7 +42,7 @@ def _user(prefix: str) -> tuple[dict, dict[str, str], str, str]:
         username=f"{prefix}-{suffix}",
         email=f"{prefix}-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     token = db.create_session(user["id"])

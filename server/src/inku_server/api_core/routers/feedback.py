@@ -30,6 +30,6 @@ def api_my_unread_words(limit: int = Query(default=100, ge=1, le=500), actor: di
 
 @router.get("/api/admin/unread-words")
 def api_admin_unread_words(limit: int = Query(default=500, ge=1, le=2000), actor: dict = Depends(_current_user)) -> list[dict]:
-    if actor.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="admin role required")
+    if not _db.has_permission_group(actor, "admins"):
+        raise HTTPException(status_code=403, detail="admins permission group required")
     return _db.list_unread_words(None, limit=limit)

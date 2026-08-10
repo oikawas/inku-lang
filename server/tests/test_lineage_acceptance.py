@@ -19,7 +19,7 @@ def _user(prefix: str = "lineage-accept") -> dict:
         f"{prefix}-{suffix}",
         f"{prefix}-{suffix}@example.test",
         "lineage-test-password",
-        "user",
+        ["users"],
         group["id"],
     )
 

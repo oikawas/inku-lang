@@ -60,14 +60,14 @@ me = client.get('/api/auth/me')
 print(json.dumps({
     'me_status': me.status_code,
     'username': me.json().get('username'),
-    'role': me.json().get('role'),
+    'permission_groups': me.json().get('permission_groups'),
 }))
 """,
         tmp_path / "on.db",
         single_user="1",
     )
     assert payload["me_status"] == 200
-    assert payload["role"] == "admin"
+    assert payload["permission_groups"] == ["admins"]
     assert payload["username"] == "admin"
 
 
@@ -187,7 +187,7 @@ me = client.get('/api/auth/me').json()
 print(json.dumps({
     'before': before,
     'after': len(db.list_users()),
-    'role': me['role'],
+    'permission_groups': me['permission_groups'],
     'pinned': db.single_user_pinned_id() == me['id'],
 }))
 """,
@@ -196,15 +196,15 @@ print(json.dumps({
     )
     assert payload["before"] == 0
     assert payload["after"] == 1
-    assert payload["role"] == "admin"
+    assert payload["permission_groups"] == ["admins"]
     assert payload["pinned"] is True
 
 
 def test_a_populated_database_picks_the_oldest_administrator(tmp_path: Path):
     payload = _run(
         _CLIENT_PREAMBLE + """
-first = db.add_user('elder', 'elder@example.test', 'password-1', 'admin', None)
-second = db.add_user('younger', 'younger@example.test', 'password-2', 'admin', None)
+first = db.add_user('elder', 'elder@example.test', 'password-1', ["admins"], None)
+second = db.add_user('younger', 'younger@example.test', 'password-2', ["admins"], None)
 with db.SessionLocal() as session:
     row = session.get(db.UserAccountRow, second['id'])
     row.at = first['at'] + 1000
@@ -229,7 +229,7 @@ def test_an_account_created_earlier_does_not_steal_the_pin(tmp_path: Path):
     payload = _run(
         _CLIENT_PREAMBLE + """
 first = client.get('/api/auth/me').json()
-older = db.add_user('older', 'older@example.test', 'password-1', 'admin', None)
+older = db.add_user('older', 'older@example.test', 'password-1', ["admins"], None)
 with db.SessionLocal() as session:
     row = session.get(db.UserAccountRow, older['id'])
     row.at = 1

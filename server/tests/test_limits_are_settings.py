@@ -109,7 +109,7 @@ def admin_context():
         username=f"limits-{suffix}",
         email=f"limits-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     headers, token = _auth_headers(user)

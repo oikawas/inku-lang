@@ -109,7 +109,7 @@ def auth_headers():
         username=f"composition-seed-{suffix}",
         email=f"composition-seed-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     token = db.create_session(user["id"])

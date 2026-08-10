@@ -20,7 +20,7 @@ def _user(prefix: str) -> tuple[dict, dict[str, str], str, str]:
         f"{prefix}-{suffix}",
         f"{prefix}-{suffix}@example.test",
         "password-123",
-        "user",
+        ["users"],
         group["id"],
     )
     token = db.create_session(user["id"])
@@ -139,9 +139,10 @@ def test_group_lead_scope_is_enforced_inside_update_and_delete_transactions() ->
     target, _target_headers, target_token, target_group = _user("outside")
     try:
         with db.SessionLocal() as session:
-            session.get(db.UserAccountRow, lead["id"]).role = "group_lead"
+            row = session.get(db.UserAccountRow, lead["id"])
+            db._set_permission_groups(session, row, ["leaders"])
             session.commit()
-        actor = {**lead, "role": "group_lead", "group_id": lead_group}
+        actor = {**lead, "permission_groups": ["leaders"], "group_id": lead_group}
         assert db.update_user(target["id"], actor=actor, email="stolen@example.test") is None
         assert db.delete_user(target["id"], actor=actor) is False
         assert db.get_user(target["id"])["email"] == target["email"]

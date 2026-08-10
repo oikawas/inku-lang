@@ -121,7 +121,7 @@ def auth_context():
         username=f"api-auth-{suffix}",
         email=f"api-auth-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     headers, token = _auth_headers(user)
@@ -198,7 +198,7 @@ def test_login_uses_httponly_session_cookie():
         username=f"cookie-auth-{suffix}",
         email=f"cookie-auth-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     local_client = TestClient(app)
@@ -234,7 +234,7 @@ def test_expired_session_is_rejected_and_deleted(monkeypatch):
         username=f"expired-session-{suffix}",
         email=f"expired-session-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     monkeypatch.setattr(db, "_SESSION_MAX_AGE_SECONDS", 1)
@@ -260,7 +260,7 @@ def test_create_session_prunes_expired_sessions(monkeypatch):
         username=f"session-prune-{suffix}",
         email=f"session-prune-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     monkeypatch.setattr(db, "_SESSION_MAX_AGE_SECONDS", 1)
@@ -627,7 +627,7 @@ def test_current_user_batch_prompt_history_is_persisted(auth_context):
         username=f"api-batch-history-{uuid.uuid4().hex[:8]}",
         email=f"api-batch-history-{uuid.uuid4().hex[:8]}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     other_headers, other_token = _auth_headers(other_user)
@@ -727,7 +727,7 @@ def test_current_user_plugin_storage_is_persisted(auth_context):
         username=f"api-plugin-admin-{uuid.uuid4().hex[:8]}",
         email=f"api-plugin-admin-{uuid.uuid4().hex[:8]}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     admin_headers, admin_token = _auth_headers(admin)
@@ -735,7 +735,7 @@ def test_current_user_plugin_storage_is_persisted(auth_context):
         username=f"api-plugin-storage-{uuid.uuid4().hex[:8]}",
         email=f"api-plugin-storage-{uuid.uuid4().hex[:8]}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     other_headers, other_token = _auth_headers(other_user)
@@ -1981,7 +1981,7 @@ def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
         username=f"fetch-models-admin-{suffix}",
         email=f"fetch-models-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     admin_headers, admin_token = _auth_headers(admin)
@@ -2028,7 +2028,7 @@ def test_generation_count_increment_is_atomic_under_concurrency():
         username=f"counter-{suffix}",
         email=f"counter-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=None,
     )
     try:
@@ -2582,7 +2582,7 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
         username=f"artifact-{suffix}",
         email=f"artifact-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     headers, token = _auth_headers(user)
@@ -2695,14 +2695,14 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
         username=f"settings-admin-{suffix}",
         email=f"settings-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     user = db.add_user(
         username=f"settings-user-{suffix}",
         email=f"settings-user-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
 
@@ -2768,14 +2768,14 @@ def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch)
         username=f"db-backup-user-{suffix}",
         email=f"db-backup-user-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     admin = db.add_user(
         username=f"db-backup-admin-{suffix}",
         email=f"db-backup-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     user_headers, user_token = _auth_headers(user)
@@ -2829,7 +2829,7 @@ def test_reading_the_settings_panel_does_not_write_a_backup(tmp_path, monkeypatc
         username=f"db-readonly-admin-{suffix}",
         email=f"db-readonly-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     admin_headers, admin_token = _auth_headers(admin)
@@ -2926,7 +2926,7 @@ def test_db_backup_schedule_time_round_trips_and_moves_the_due_moment(tmp_path, 
         username=f"db-schedule-admin-{suffix}",
         email=f"db-schedule-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     admin_headers, admin_token = _auth_headers(admin)
@@ -3020,7 +3020,7 @@ def test_user_management_crud():
         username=f"admin-{suffix}",
         email=f"admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=admin_group["id"],
     )
     headers, token = _auth_headers(admin)
@@ -3043,7 +3043,7 @@ def test_user_management_crud():
             "username": f"student-{suffix}",
             "email": f"student-{suffix}@example.test",
             "password": "password-123",
-            "role": "user",
+            "permission_groups": ["users"],
             "group_id": group["id"],
         },
         headers=headers,
@@ -3051,7 +3051,7 @@ def test_user_management_crud():
     assert user_r.status_code == 200
     user = user_r.json()
     assert user["group_id"] == group["id"]
-    assert user["role"] == "user"
+    assert user["permission_groups"] == ["users"]
     assert "password" not in user
     assert "password_hash" not in user
 
@@ -3060,11 +3060,11 @@ def test_user_management_crud():
 
     patch_r = client.patch(
         f"/api/users/{user['id']}",
-        json={"role": "group_lead", "password": "password-456"},
+        json={"permission_groups": ["leaders"], "password": "password-456"},
         headers=headers,
     )
     assert patch_r.status_code == 200
-    assert patch_r.json()["role"] == "group_lead"
+    assert patch_r.json()["permission_groups"] == ["leaders"]
     settings_r = client.patch("/api/auth/me/settings", json={"settings_tab": "users"}, headers=headers)
     assert settings_r.status_code == 200
     assert settings_r.json()["settings_tab"] == "users"
@@ -3085,7 +3085,7 @@ def test_user_management_crud():
             "username": f"blocked-admin-{suffix}",
             "email": f"blocked-admin-{suffix}@example.test",
             "password": "password-123",
-            "role": "admin",
+            "permission_groups": ["admins"],
             "group_id": group["id"],
         },
         headers=lead_headers,
@@ -3098,7 +3098,7 @@ def test_user_management_crud():
             "username": f"lead-student-{suffix}",
             "email": f"lead-student-{suffix}@example.test",
             "password": "password-123",
-            "role": "user",
+            "permission_groups": ["users"],
             "group_id": group["id"],
         },
         headers=lead_headers,
@@ -3121,14 +3121,14 @@ def test_history_is_scoped_to_authenticated_user():
         username=f"history-a-{suffix}",
         email=f"history-a-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     user_b = db.add_user(
         username=f"history-b-{suffix}",
         email=f"history-b-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
 
@@ -3288,7 +3288,7 @@ def test_history_neighbors_returns_ranked_items():
         username=f"neighbors-{suffix}",
         email=f"neighbors-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     headers, token = _auth_headers(user)
@@ -3408,14 +3408,14 @@ def test_output_save_settings_are_admin_only(tmp_path):
         username=f"output-save-user-{suffix}",
         email=f"output-save-user-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     admin = db.add_user(
         username=f"output-save-admin-{suffix}",
         email=f"output-save-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     user_headers, user_token = _auth_headers(user)
@@ -3472,14 +3472,14 @@ def test_render_concurrency_settings_are_admin_only():
         username=f"render-concurrency-user-{suffix}",
         email=f"render-concurrency-user-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     admin = db.add_user(
         username=f"render-concurrency-admin-{suffix}",
         email=f"render-concurrency-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     user_headers, user_token = _auth_headers(user)
@@ -3544,14 +3544,14 @@ def test_log_retention_settings_are_admin_only():
         username=f"log-retention-user-{suffix}",
         email=f"log-retention-user-{suffix}@example.test",
         password="password-123",
-        role="user",
+        permission_groups=["users"],
         group_id=group["id"],
     )
     admin = db.add_user(
         username=f"log-retention-admin-{suffix}",
         email=f"log-retention-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     user_headers, user_token = _auth_headers(user)
@@ -3696,7 +3696,7 @@ def test_model_settings_store_keys_server_side(monkeypatch):
         username=f"model-settings-admin-{suffix}",
         email=f"model-settings-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     headers, token = _auth_headers(admin)
@@ -3806,7 +3806,7 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
         username=f"model-fetch-admin-{suffix}",
         email=f"model-fetch-admin-{suffix}@example.test",
         password="password-123",
-        role="admin",
+        permission_groups=["admins"],
         group_id=group["id"],
     )
     headers, token = _auth_headers(admin)

@@ -26,6 +26,7 @@ from .compose import (
     _with_rhythm_variation,
     _with_semantic_visual_event_hints,
     _with_shape_delivery_repair,
+    _with_stated_count_fidelity,
     _with_unintentional_filled_shape_tempering,
     _with_visual_event_type_hints,
     _without_explicit_region_support,
@@ -204,6 +205,16 @@ def coerce_score(
     _branch_before = instructions
     instructions = _with_explicit_constraint_enforcement(instructions, ddl=ddl, background=background)
     _record_branch_fire(branch_report, "with_explicit_constraint_enforcement", _branch_before, instructions)
+    _branch_before = instructions
+    # After both budgets, not beside the governors: a count repaired before them
+    # is a count they are free to thin again, and the repair would be undone by
+    # the same governors that lost the number in the first place. After the
+    # strict path too, so that "だけ / のみ / only / just" keeps the last word on
+    # the clauses it speaks for.
+    instructions = _with_stated_count_fidelity(
+        instructions, ddl=ddl, background=background, limits=limits
+    )
+    _record_branch_fire(branch_report, "with_stated_count_fidelity", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)

@@ -45,6 +45,10 @@ EXPECTED_BRANCH_ORDER = [
     "with_per_instruction_density_budget",
     "with_total_density_budget",
     "with_explicit_constraint_enforcement",
+    # After both budgets and after the strict road (ddl-engine 11). Before the
+    # budgets a repaired count is one they are free to thin again, and before the
+    # strict road it would overwrite what "だけ / のみ / only / just" decided.
+    "with_stated_count_fidelity",
     "with_literal_grid_fidelity",
     "drop_invalid_relations",
     "without_explicit_region_support",

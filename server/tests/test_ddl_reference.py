@@ -52,7 +52,14 @@ def test_ddl_reference_versions_and_parts() -> None:
     # input the corpus already held. **That is the point of listing only three** --
     # the corpus could not have caught the behaviour this version changed, because
     # no case here ever had the shape production was passing.
-    assert DDL_ENGINE_VERSION == "10"
+    # Engine 11 (2026-08-10): a count stated in plain words is repaired to the
+    # group its clause names. All 21 coerce entries are listed as changed and NOT
+    # ONE of their Scores moved: the branch report gained a 30th key, which every
+    # case carries whether or not the branch fired, and no case in this corpus
+    # states a count in the 1..11 band beside a group a clause pairs with. The
+    # witness for the new branch is in the coerce golden set, which is where
+    # `test_every_branch_coerce_reaches_has_a_witness` demands one.
+    assert DDL_ENGINE_VERSION == "11"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"

@@ -1518,20 +1518,23 @@ def count_preservation_fixtures() -> None:
             pathlib.Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "count_preservation_cases.json"
         ).read_text(encoding="utf-8")
     )
-    cases = []
-    for case in source["cases"]:
-        score = Score.model_validate(case["score"])
+    def _counts_after_passes(score_data: dict, ddl: str) -> list[int]:
+        score = Score.model_validate(score_data)
         instructions = _with_context_density_governor(
             list(score.instructions),
-            ddl=case["ddl"],
+            ddl=ddl,
             background=score.background,
         )
         instructions = _with_per_instruction_density_budget(instructions)
         instructions = _with_total_density_budget(instructions)
-        counts = [
+        return [
             (ins.arrangement.count if ins.arrangement is not None else 1)
             for ins in instructions
         ]
+
+    cases = []
+    for case in source["cases"]:
+        counts = _counts_after_passes(case["score"], case["ddl"])
         cases.append(
             {
                 "id": case["id"],
@@ -1544,6 +1547,42 @@ def count_preservation_fixtures() -> None:
                 "requested_survives": case["requested"] in counts,
             }
         )
+
+    # [I-204] ruling B: the English path reads numerals, and asks nothing of the noun
+    # that follows. The 50 cases above come from benchmark runs whose lines all state
+    # their counts in words, so every one of them passes against a mirror that never
+    # adopted the ruling. This case is the discriminating one: unread, the quiet
+    # governor thins 99 to 64, and only a reader that takes `99` for a count exempts
+    # it. Synthetic on purpose -- no production description is quoted here.
+    numeral_ddl = "Scatter 99 small gray squares in a quiet field."
+    numeral_score = {
+        "version": "0.1.0",
+        "canvas": {"aspect": "square"},
+        "background": "white",
+        "instructions": [
+            {
+                "primitive": "square",
+                "position": [0.3, 0.4],
+                "size": [0.05, 0.05],
+                "color": "gray",
+                "weight": "pen",
+                "arrangement": {"count": 99, "layout": "scatter"},
+            }
+        ],
+    }
+    numeral_counts = _counts_after_passes(numeral_score, numeral_ddl)
+    cases.append(
+        {
+            "id": "en-numeral-99",
+            "lang": "en",
+            "kind": "literal",
+            "ddl": numeral_ddl,
+            "requested": 99,
+            "score": numeral_score,
+            "expected_counts": numeral_counts,
+            "requested_survives": 99 in numeral_counts,
+        }
+    )
     literal = [case for case in cases if case["kind"] == "literal"]
     represented = [case for case in cases if case["kind"] == "represented"]
     out = {

@@ -10,12 +10,18 @@ import org.junit.Test
 /**
  * A count the description stated outright is not a governor's to thin.
  *
- * `count_preservation.json` holds 50 cases run through the server's three count-touching
- * passes in the order the port runs them. Two kinds are in it and both are needed: 38
- * literal cases whose requested count must survive verbatim, and 12 represented cases
+ * `count_preservation.json` holds the cases run through the server's three count-touching
+ * passes in the order the port runs them. Two kinds are in it and both are needed: the
+ * literal cases whose requested count must survive verbatim, and the represented ones
  * asking for 240 or more, which Stage 2 already stood in for at 110 and which must be
  * left at 110. Waving everything through breaks the represented side; representing
  * everything breaks the literal side. A check that reads only one kind passes either way.
+ * The counts of each kind are read from the corpus rather than written here, because a
+ * number in a comment goes stale the day a case is added.
+ *
+ * One case (`en-numeral-99`) states its count as an English numeral. Every other case
+ * states its count in words, so before ruling B ([I-204]) the whole corpus passed against
+ * a reader that could not read a numeral at all.
  */
 class CountPreservationTest {
 
@@ -152,6 +158,47 @@ class CountPreservationTest {
         assertEquals("the small group stays literal", 120, counts[1])
     }
 
+    /**
+     * Ruling B ([I-204]): a numeral is a count, and the noun that follows is not asked
+     * about. Condition for condition against `_explicit_counts_from_ddl` in `counts.py`.
+     */
+    @Test
+    fun testTheEnglishPathReadsANumeral() {
+        assertEquals(setOf(12), ServerScoreCounts.explicitCountsFromDdl("Draw 12 circles."))
+        assertEquals(setOf(233), ServerScoreCounts.explicitCountsFromDdl("Draw 233 marks."))
+        assertEquals(
+            setOf(40),
+            ServerScoreCounts.explicitCountsFromDdl("Line up 40 short horizontal red strokes."),
+        )
+    }
+
+    @Test
+    fun testTheEnglishPathDoesNotRequireANounItKnows() {
+        // `petals` was never in the 32-word table the reader used to require.
+        assertEquals(setOf(12), ServerScoreCounts.explicitCountsFromDdl("Draw twelve petals."))
+    }
+
+    @Test
+    fun testTheJapanesePathDidNotMove() {
+        // No counter, so still unread: a bare numeral in Japanese is an angle or a
+        // fraction as often as it is a count, and that needs its own ruling.
+        assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("十二の円を描く。"))
+        assertEquals(setOf(12), ServerScoreCounts.explicitCountsFromDdl("円を12個描く。"))
+        assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("立方体の向き: 30度回転。"))
+        assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("画面下1/3に灰色の線を引く。"))
+        assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("下草を50散らす。"))
+    }
+
+    @Test
+    fun testADigitInsideAnotherNumberIsNotACount() {
+        assertEquals(
+            emptySet<Int>(),
+            ServerScoreCounts.explicitCountsFromDdl("Place a circle of radius 0.11 in the lower-right focus."),
+        )
+        assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("Cover 1/3 of the field in gray."))
+        assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("Leave 40% of the field empty."))
+    }
+
     @Test
     fun testExplicitCountsAreReadFromBothLanguages() {
         // Kanji and English number words; a bare digit grep finds neither.
@@ -160,7 +207,8 @@ class CountPreservationTest {
         assertTrue(
             120 in ServerScoreCounts.explicitCountsFromDdl("Scatter one hundred twenty small black pen circles."),
         )
-        // The number word must belong to a counted object, not to anything nearby.
+        // A description that states no number states no count. (Until ruling B the reader
+        // also asked what was being counted; it no longer does, on either side.)
         assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("Fill background with white."))
     }
 

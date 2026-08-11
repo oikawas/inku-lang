@@ -18,8 +18,10 @@ SERVER_SRC = pathlib.Path(__file__).resolve().parents[1] / "src"
 # Each pattern is the *definition* of a name the readers are built from, not a
 # use of it.  A second definition anywhere in the tree is the accident this
 # guards against: an extraction that leaves the original standing.
+# `COUNTED_OBJECT_WORDS` was in this list until ruling B ([I-204]) dropped the
+# noun-table requirement from the English path.  The table had no other reader, so
+# the constant is gone rather than left standing unused.
 DEFINITION_PATTERNS = {
-    "COUNTED_OBJECT_WORDS": r"^COUNTED_OBJECT_WORDS: frozenset",
     "JAPANESE_COUNT_PATTERN": r"^JAPANESE_COUNT_PATTERN = re\.compile",
     "ENGLISH_COUNT_UNITS": r"^ENGLISH_COUNT_UNITS: dict",
     "ENGLISH_SMALL_NUMBERS": r"^ENGLISH_SMALL_NUMBERS: dict",

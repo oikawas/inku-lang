@@ -180,16 +180,48 @@ def _parse_count_token(token: str) -> int | None:
     return _parse_small_japanese_number(token)
 
 
-COUNTED_OBJECT_WORDS: frozenset[str] = frozenset(
-    {
-        "line", "lines", "stroke", "strokes", "square", "squares", "circle", "circles",
-        "ellipse", "ellipses", "oval", "ovals", "triangle", "triangles", "arc", "arcs",
-        "polygon", "polygons", "cloudform", "cloudforms", "dot", "dots", "mark", "marks",
-        "point", "points", "tile", "tiles", "brick", "bricks", "shape", "shapes",
-    }
-)
-
 JAPANESE_COUNT_PATTERN = re.compile(r"(\d{1,4}|[一二三四五六七八九十百千]{1,8})(?:本|個|つ(?!の方向)|点|枚)")
+
+# Ruling B ([I-204], 2026-08-11): the English path reads numerals as well as number
+# words, and asks nothing of the noun that follows.  The Japanese path never asked
+# for a noun; a table of 32 counted objects on one side only is why `Draw 12
+# circles.` and `Draw twelve petals.` both went unread.  The table is gone -- it had
+# no other reader.
+_COUNT_TOKEN_PATTERN = re.compile(r"[a-z]+|\d+")
+_CJK_PATTERN = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿]")
+_CJK_WINDOW = 12
+_NUMBER_EXPRESSION_PUNCTUATION = ".,/:"
+
+
+def _numeral_is_a_bare_count(text: str, start: int, end: int) -> bool:
+    """Is this digit run a count, or a piece of some other number?
+
+    Two exclusions, both measured on the stored works (2026-08-11):
+
+    - CJK within twelve characters.  Japanese writes angles, fractions and
+      percentages as bare numerals, and reading those moved nineteen works with
+      true and false readings in equal number.  Whether Japanese should read a
+      numeral with no counter needs its own ruling; this is not it.
+    - a digit that belongs to a decimal, fraction or ratio (`radius 0.11`,
+      `1/3 of the screen`), or carries a percent sign.  Ruling B calls those false
+      on the Japanese side, and the digits inside them are no more a count in
+      English.  Measured: without this, one work in the fifty-case count corpus
+      reads a radius as the counts 0 and 11.
+    """
+    if _CJK_PATTERN.search(text[max(0, start - _CJK_WINDOW) : end + _CJK_WINDOW]):
+        return False
+    if start >= 2 and text[start - 1] in _NUMBER_EXPRESSION_PUNCTUATION and text[start - 2].isdigit():
+        return False
+    if end < len(text):
+        if text[end] == "%":
+            return False
+        if (
+            text[end] in _NUMBER_EXPRESSION_PUNCTUATION
+            and end + 1 < len(text)
+            and text[end + 1].isdigit()
+        ):
+            return False
+    return True
 
 # LITERAL_COUNT_THRESHOLD and REPRESENTED_COUNT_RANGE used to be defined here, a
 # second name for the band `..limits` already holds. Both readers now go through
@@ -210,33 +242,40 @@ def _explicit_counts_from_ddl(ddl: str | None) -> frozenset[int]:
         value = _parse_small_japanese_number(token)
         if value:
             counts.add(value)
-    words = re.findall(r"[a-z]+", ddl.lower().replace("-", " "))
+    text = ddl.lower().replace("-", " ")
+    tokens = [(match.group(0), match.start(), match.end()) for match in _COUNT_TOKEN_PATTERN.finditer(text)]
     number_words = set(ENGLISH_COUNT_UNITS) | {"hundred", "thousand", "and"}
     index = 0
-    while index < len(words):
-        if words[index] not in number_words or words[index] == "and":
+    while index < len(tokens):
+        token, start, stop = tokens[index]
+        if token.isdigit():
+            value = int(token)
+            if value and _numeral_is_a_bare_count(text, start, stop):
+                counts.add(value)
+            index += 1
+            continue
+        if token not in number_words or token == "and":
             index += 1
             continue
         end = index
         phrase: list[str] = []
-        while end < len(words) and words[end] in number_words:
-            phrase.append(words[end])
+        while end < len(tokens) and tokens[end][0] in number_words:
+            phrase.append(tokens[end][0])
             end += 1
-        if any(word in COUNTED_OBJECT_WORDS for word in words[end : end + 9]):
-            total = 0
-            current = 0
-            for token in phrase:
-                if token == "and":
-                    continue
-                if token == "hundred":
-                    current = max(current, 1) * 100
-                elif token == "thousand":
-                    total += max(current, 1) * 1000
-                    current = 0
-                else:
-                    current += ENGLISH_COUNT_UNITS[token]
-            if total + current:
-                counts.add(total + current)
+        total = 0
+        current = 0
+        for word in phrase:
+            if word == "and":
+                continue
+            if word == "hundred":
+                current = max(current, 1) * 100
+            elif word == "thousand":
+                total += max(current, 1) * 1000
+                current = 0
+            else:
+                current += ENGLISH_COUNT_UNITS[word]
+        if total + current:
+            counts.add(total + current)
         index = end
     return frozenset(counts)
 

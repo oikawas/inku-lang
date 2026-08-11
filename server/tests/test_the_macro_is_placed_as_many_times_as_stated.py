@@ -128,11 +128,8 @@ def test_t12_the_body_does_not_reach_inside_the_unit() -> None:
     assert 12 <= per_unit <= 16, per_unit
 
 
-def test_t13_the_english_reader_has_not_been_widened_yet() -> None:
-    """Stage 3 ([I-204], ruling B) is a separate commit; this pins that it is not here.
-
-    Replaced by the T-15/T-16/T-17 gates when the reader is widened.
-    """
-    from inku_server.counts import _explicit_counts_from_ddl
-
-    assert _explicit_counts_from_ddl("Draw 12 circles.") == frozenset()
+# T-13 stood here through the stage 2 commit: `Draw 12 circles.` had to stay
+# unread, so that widening the reader could not ride in on ruling A.  Ruling B
+# widened it in the next commit, which turns that assertion false by design; the
+# reader's behaviour is now gated by T-15 to T-17 in
+# `test_the_english_reader_reads_a_numeral.py`.

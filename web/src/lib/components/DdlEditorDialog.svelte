@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { highlightDDL } from '$lib/highlight';
+	import { buildPluginNameIndex, unknownPluginNames } from '$lib/plugin-names';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
@@ -35,7 +36,9 @@
 		runTokensOut: number | null;
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
-		pluginEntries?: { qualified_name: string; note_ja: string; note_en: string }[];
+		// `fires_on_*` is what lets the editor say which plain word a wrong
+		// qualified name would have fired (GET /api/saijiki carries them).
+		pluginEntries?: { qualified_name: string; note_ja: string; note_en: string; fires_on_ja?: string[]; fires_on_en?: string[] }[];
 		showSettings?: boolean;
 		wildValue?: boolean;
 		wildInherited?: boolean;
@@ -67,7 +70,13 @@
 	});
 
 	const lineNumbers = $derived(value.split('\n'));
-	const highlighted = $derived(highlightDDL(value, focused && selection.start === selection.end ? selection.start : null));
+	// This editor is the one surface that knows which qualified names exist, so
+	// it is the only caller that hands the index to the highlighter.
+	const pluginNameIndex = $derived(buildPluginNameIndex(pluginEntries));
+	const highlighted = $derived(highlightDDL(value, focused && selection.start === selection.end ? selection.start : null, pluginNameIndex));
+	// Named while it is being typed: the expansion layer drops such a reference
+	// together with the sentence around it, and nothing says so afterwards.
+	const unknownNames = $derived(unknownPluginNames(value, pluginNameIndex));
 
 	$effect(() => {
 		if (open && !lastOpen) {
@@ -190,6 +199,21 @@
 					</div>
 				</div>
 				<div class="ddl-editor-foot">
+					{#if unknownNames.length > 0}
+						<div class="ddl-unknown-names">
+							<span class="ddl-unknown-title">{t().ddlUnknownNameTitle}</span>
+							{#each unknownNames as unknown (unknown.text)}
+								<span class="ddl-unknown-row">
+									<code class="ddl-unknown-name">{unknown.text}</code>
+									<span class="ddl-unknown-hint">
+										{unknown.firesAs
+											? t().ddlUnknownNameFires(unknown.namespace, unknown.firesAs)
+											: t().ddlUnknownNameUnregistered}
+									</span>
+								</span>
+							{/each}
+						</div>
+					{/if}
 					<p class="ddl-syntax-guide">{t().ddlSyntaxGuide}</p>
 				</div>
 			</div>
@@ -324,6 +348,37 @@
 		flex-direction: column;
 		align-items: stretch;
 		justify-content: flex-end;
+		gap: 8px;
+	}
+	/* Same amber as the token in the text above it: the strip and the mark are
+	   one statement, and neither is red -- the name may exist tomorrow. */
+	.ddl-unknown-names {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 8px 10px;
+		border: 1px solid var(--ddl-token-unknown-border);
+		border-radius: var(--r);
+		background: var(--ddl-token-unknown-bg);
+		font-size: 11px;
+		line-height: 1.5;
+	}
+	.ddl-unknown-title {
+		color: var(--ddl-token-unknown-fg);
+		font-weight: 500;
+	}
+	.ddl-unknown-row {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.ddl-unknown-name {
+		color: var(--ddl-token-unknown-fg);
+		font-family: inherit;
+	}
+	.ddl-unknown-hint {
+		color: var(--fg2);
 	}
 	.ddl-syntax-guide {
 		margin: 0;

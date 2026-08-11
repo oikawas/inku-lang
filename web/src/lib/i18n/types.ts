@@ -156,6 +156,13 @@ export interface LangPack {
 	ddlEditDialogSubtitle: string;
 	ddlSyntaxGuide: string;
 	ddlDialogDrawingModel: string;
+	// A namespaced name the server does not hold. Not an error: plugins can be
+	// installed later, so the wording says "not on this server", not "wrong".
+	ddlUnknownNameTitle: string;
+	ddlUnknownNameFires: (namespace: string, word: string) => string;
+	ddlUnknownNameUnregistered: string;
+	// The same loss, seen after the drawing: the warnings the server recorded.
+	ddlPluginWarningsTitle: string;
 
 	// Output tabs
 	tabCanvas: string;

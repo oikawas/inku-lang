@@ -1,10 +1,16 @@
 import { SAIJIKI, SAIJIKI_EN, type SaijikiCategory } from './saijiki';
+import { scanPluginReferences, type PluginNameIndex } from './plugin-names';
 
 export type Part = {
 	text: string;
-	kind: 'saijiki' | 'emotion' | 'plain';
+	// 'plugin-name' is a namespaced reference (`Nature.下草`) and only appears
+	// when the caller hands over the list of names the server holds; without
+	// it the reference is scanned as ordinary text, exactly as before.
+	kind: 'saijiki' | 'emotion' | 'plain' | 'plugin-name';
 	category?: string;
 	categoryKey?: string;
+	/** For 'plugin-name': whether the server holds this qualified name. */
+	known?: boolean;
 };
 
 // SAIJIKI / SAIJIKI_EN are hydratable stores (reassigned on GET /api/saijiki).
@@ -76,9 +82,15 @@ const EMOTION_WORDS = [
 /**
  * 文字列を Saijiki / 感情語 / 地 の 3 種に分割。
  * 貪欲な最長一致で走査する。
+ *
+ * With a plugin name index, namespaced references are cut out first: they are
+ * one word to the server, and letting the greedy saijiki match run inside them
+ * splits `Nature.青葉` into a color word and two loose characters.
  */
-export function annotate(text: string): Part[] {
+export function annotate(text: string, pluginNames: PluginNameIndex | null = null): Part[] {
 	const parts: Part[] = [];
+	const references = pluginNames ? scanPluginReferences(text, pluginNames) : [];
+	const referenceAt = new Map(references.map((reference) => [reference.start, reference]));
 	let i = 0;
 
 	const pushPlain = (ch: string) => {
@@ -92,6 +104,13 @@ export function annotate(text: string): Part[] {
 
 	while (i < text.length) {
 		let matched = false;
+
+		const reference = referenceAt.get(i);
+		if (reference) {
+			parts.push({ text: reference.text, kind: 'plugin-name', known: reference.known });
+			i = reference.end;
+			continue;
+		}
 
 		for (const entry of saijikiEntries()) {
 			if (matchesAt(text, i, entry)) {
@@ -171,10 +190,18 @@ function ddlCaretMarkup(): string {
 	return '<span class="ddl-custom-caret"></span>';
 }
 
-function renderDDLPart(text: string, kind: string, category: string | undefined, categoryKey: string | undefined, caretOffset: number | null): string {
+function renderDDLPart(part: Part, caretOffset: number | null): string {
+	const { text, kind, category, categoryKey } = part;
 	const before = caretOffset === null ? text : text.slice(0, caretOffset);
 	const after = caretOffset === null ? '' : text.slice(caretOffset);
 	const content = caretOffset === null ? escapeHtml(text) : `${escapeHtml(before)}${ddlCaretMarkup()}${escapeHtml(after)}`;
+	if (kind === 'plugin-name') {
+		// A name the server does not hold is not an error -- plugins can be
+		// installed later, and today's unknown name is tomorrow's word. The
+		// class says "not on this server", and the palette says it in amber.
+		const cls = part.known ? 'plugin' : 'unknown';
+		return `<span class="ddl-token ddl-token-${cls}">${content}</span>`;
+	}
 	if (kind === 'saijiki') {
 		const cls = categoryKey ? saijikiCategoryClassByKey(categoryKey) : saijikiCategoryClass(category);
 		return `<span class="ddl-token ddl-token-${cls}">${content}</span>`;
@@ -188,18 +215,21 @@ function renderDDLPart(text: string, kind: string, category: string | undefined,
 /**
  * DDL テキストを Saijiki / 感情語 で色分けした HTML を返す。
  * caretIndex を渡すとその位置にカスタムキャレット span を差し込む。
+ *
+ * `pluginNames` is optional on purpose: the viewers and the batch/demo
+ * observers call this without one and must keep the output they had.
  */
-export function highlightDDL(text: string, caretIndex: number | null = null): string {
+export function highlightDDL(text: string, caretIndex: number | null = null, pluginNames: PluginNameIndex | null = null): string {
 	const clampedCaret = caretIndex === null ? null : Math.max(0, Math.min(text.length, caretIndex));
 	let offset = 0;
-	const html = annotate(text).map((part) => {
+	const html = annotate(text, pluginNames).map((part) => {
 		const nextOffset = offset + part.text.length;
 		const localCaret = clampedCaret !== null
 			&& clampedCaret >= offset
 			&& (clampedCaret < nextOffset || (clampedCaret === text.length && clampedCaret === nextOffset))
 			? clampedCaret - offset
 			: null;
-		const rendered = renderDDLPart(part.text, part.kind, part.category, part.categoryKey, localCaret);
+		const rendered = renderDDLPart(part, localCaret);
 		offset = nextOffset;
 		return rendered;
 	}).join('');

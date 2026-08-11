@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 from ...languages import stage_prompts_for_lang
-from ...plugins import DOCUMENT_PLUGIN_MANAGER
+from ...plugins import DOCUMENT_PLUGIN_MANAGER, entries_with_fires_on
 from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
@@ -127,7 +127,10 @@ def _enabled_plugin_entries() -> list[dict[str, object]]:
     for item in DOCUMENT_PLUGIN_MANAGER.items():
         if item.status != "enabled":
             continue
-        entries.extend(dict(entry) for entry in item.entries)
+        # This is the list the DDL editor holds, so it carries `fires_on_*`:
+        # without it the editor can only say a qualified name is unknown, not
+        # which plain word it would have fired.
+        entries.extend(entries_with_fires_on(item.entries))
     return entries
 
 

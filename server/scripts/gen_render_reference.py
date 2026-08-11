@@ -31,17 +31,22 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-09"
+FROZEN_AT = "2026-08-11"
 REASON = (
-    "Paper-contact sampling no longer reads the last bit of a libm arc length. "
-    "Engine 28 counted samples with raw hypot sums; macOS and Linux therefore "
-    "split on six pencil cases, three in fragment structure and three in "
-    "crossing coordinates. Engine 29 puts every segment, total, sampling step "
-    "and fragment cutoff on the same six-decimal pixel lattice the SVG writes. "
-    "A one-ULP difference can no longer add a sample, move the sample-derived "
-    "quantile, shift its crossing, or flip the 0.6px fragment cutoff. The "
-    "contact field, material-outline geometry, arrangement quantum and contour "
-    "stroke are unchanged."
+    "A mark keeps the proportion its description gave it on any canvas. "
+    "Engine 29 turned `size` into pixels through `canvas.width` and "
+    "`canvas.height` separately, so the same description drew a different shape "
+    "on every aspect: a square written `size [0.3, 0.3]` came out 1.61:1 on the "
+    "golden canvas and 0.20:1 on the pillar, and an ellipse written "
+    "`size [0.4, 0.2]` -- wide, 2:1 -- came out 0.40 on the pillar, upright, the "
+    "reverse of what the description said. Engine 30 puts both extents on the "
+    "short edge, through one helper all twelve sites go through. Placement is "
+    "unchanged: coordinates still scale with width and height, so the aspect "
+    "still decides where a mark sits and no longer what shape it is. On a "
+    "square canvas the two rules are the same arithmetic, so only the "
+    "non-square cases drawn from `size` move. `D-canvas-*-ellipse-pen` is new: "
+    "the corpus had no wide mark on a narrow canvas, and so could not tell a "
+    "widened mark from a preserved one."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -292,6 +297,10 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         "circle-crayon": _instruction("circle", weight="crayon"),
         "arc-brush-thick": _instruction("arc", weight="brush_thick"),
         "filled-square-rotring": _instruction("square", weight="rotring", filled=True),
+        # A 1.6:1 ellipse is the case the corpus never had: on a non-square
+        # canvas the old rule turned it upright, so the record could not tell a
+        # widened mark from a preserved one.
+        "ellipse-pen": _instruction("ellipse", weight="pen"),
     }
     for aspect in ("square", "wide", "pillar", "vertical"):
         for name, instruction in representatives.items():
@@ -541,9 +550,13 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # G gained 4 in engine 25: the three size rules a circle cannot reach.
     # G gained 4 in engine 26: the two shapes the angle rule turns that the
     # corpus had never carried, and the two groups that state their own angle.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 50}
+    # D gained 4 in engine 30: one representative, drawn on all four aspects.
+    # Until then no case put a mark wider than it is tall on a canvas taller
+    # than it is wide, so nothing in the record could tell a mark that kept its
+    # proportion from one the canvas had stretched.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 32, "E": 119, "F": 128, "G": 50}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 549:
+    if actual != expected or len(cases) != 553:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

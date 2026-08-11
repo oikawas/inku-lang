@@ -65,6 +65,7 @@
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
+	import { downloadCard } from '$lib/cardExport';
 	import { createExportActions } from '$lib/features/export/download';
 	import { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
@@ -5547,6 +5548,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		effectiveCanvasAspectId,
 	});
 
+	// The canvas toolbar builds the card from the work it is showing, which is
+	// the listed item when one is selected and the fresh drawing otherwise. The
+	// page shape and the seal come from the same settings the history modal uses.
+	async function downloadCurrentCard(): Promise<void> {
+		const id = displayedHistoryItem?.id ?? result?.history_id ?? null;
+		if (!id) return;
+		await downloadCard(apiFetch, id, exportSettings.card);
+	}
+
 	// ── Prompts ─────────────────────────────────────────────
 	async function fetchPrompts(): Promise<void> {
 		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
@@ -6378,6 +6388,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				replayDisabled={!replayableStatusHistoryItem || reloading}
 				onDownloadSVG={downloadSVG}
 				onDownloadPNG={downloadPNG}
+				currentHistoryId={displayedHistoryItem?.id ?? result?.history_id ?? null}
+				onDownloadCard={downloadCurrentCard}
 				onVaryPerformance={varyPerformance}
 				onVaryComposition={varyComposition}
 				onVaryInterpretation={varyInterpretation}

@@ -91,6 +91,16 @@ test('the second page starts where the first one ended -- no overlap, no gap', a
 
 // ── T-18 ────────────────────────────────────────────────────────────────────
 test('one press is still one request', async () => {
-	const { calls } = await openTheManager();
+	const { manager, calls } = await openTheManager();
+	assert.equal(calls.length, 1);
+
+	// The modal does not always report while the page is still on its way: it
+	// mounts about 888 ms after the click, by which time the answer can already
+	// have landed. Reporting then finds nothing in flight to ride on, so an
+	// implementation that fixed stage 7 by re-fetching would send a second page
+	// here and nowhere else. Measured before the fix: with the guessed page in
+	// hand, this is exactly the moment the manager decided it was short.
+	manager.setPageSize(MEASURED_PAGE_SIZE);
+	await settle();
 	assert.equal(calls.length, 1);
 });

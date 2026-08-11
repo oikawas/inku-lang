@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.2 (Web Build 886). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.3 (Web Build 887). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -147,6 +147,16 @@ There are two entrances to the instructions.
 | Edit instructions | Edit the instructions of the displayed work and repaint it as that work's child |
 
 `Draw from instructions` sends the displayed instructions to Stage 2 unchanged. Stage 1 does not run, so the interpretation does not change.
+
+### A plugin name that does not exist shows up while you type
+
+A `namespace.word` such as `Nature.青葉` is marked in the plugin color only when that qualified name is registered on this server. **A name that is not registered takes a different color, and the reason is listed under the editor.**
+
+- **If the word is a firing word, the editor says how to drop the prefix.** `Nature.菖蒲` reads `Remove "Nature." and it fires as "下草"`, because `菖蒲` is one of the words that fire `Nature.下草` while the qualified name itself does not exist.
+- **If it is not a firing word either**, the editor says `This name is not registered`.
+- **The color means caution, not error.** Plugins can be added later, so a name missing today may be valid tomorrow.
+- **⚠ A qualified name that does not exist costs the whole sentence.** When the expansion layer strips `namespace.`, it removes that sentence with a warning. **The same warning stays under the work after it is painted.**
+- **A word without a dot is unchanged.** Written as plain `菖蒲` it stays an ordinary word and keeps its color.
 
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 

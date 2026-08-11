@@ -5503,3 +5503,41 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   **All fifteen perturbations landed** -- **two of them only after the acceptance gates they aimed
   at were found to have no discriminating power and were repaired.**
 - **No deterministic layer was touched**, so no frozen corpus was regenerated.
+
+### v2.13.3 — The editor says which plugin name does not exist (Build 887, 2026-08-11, ledger I-207 ruling C)
+
+- **Writing a qualified name that does not exist, such as `Nature.菖蒲`, silently cost the whole
+  sentence.** When the expansion layer strips `Nature.` it removes that sentence with a warning.
+  **The warning was recorded and never reached the author** -- `plugin_warnings` was read in
+  **zero places** across web and cli.
+- **The editor now says so while you type.** An unregistered qualified name takes a different color
+  and the reason is listed under the editor. **Red is not used**: plugins can be added later, so the
+  truth is "not on this server yet", not "wrong".
+- **When the word is a firing word, the editor says how to drop the prefix.** `Nature.菖蒲` reads
+  `Remove "Nature." and it fires as "下草"`: `菖蒲` fires `Nature.下草`, and **it is the qualified
+  name that is invalid**. Otherwise it reads `This name is not registered`.
+- **It also stays after the work is painted.** `plugin_warnings` appears under the interpretation.
+  **That cannot replace the editor**, because it only tells you once the sentence is already gone;
+  ruling C asks for both.
+- **The listing API now returns `fires_on_ja` / `fires_on_en`.** ⚠ The editor actually reads
+  **`GET /api/saijiki`**, not `GET /api/plugins`, so both carry it.
+  **No existing key was removed or renamed.**
+- **⚠ A valid qualified name looks different now too.** `Nature.青葉` used to have only `青` painted
+  in the catalog color; the qualified name is now **taken as one word**, so it shows as a single
+  plugin token.
+- **A word without a dot is unchanged**: plain `菖蒲` stays an ordinary word.
+- **The API surface did not move.** The route total stays at **93** and the diff against
+  `api-surface-baseline.json` is **zero lines** -- the 200 response of `/api/plugins` is a generic
+  object with `additionalProperties`, so entry keys were never on the surface. **Gating this
+  addition on the baseline would therefore be vacuous**, and the acceptance counts keys on a real
+  response instead.
+- **The web tests can now call application modules.** A hook that resolves extensionless relative
+  imports was added and `test:unit` runs through it. **It fires only after Node's own resolution
+  fails** -- on acceptance, importing a module that does not exist was confirmed to go red.
+- **Checks:** **server 2,903 passed / 31 skipped** (5 new on the branch, none lost), **web 188 passed**
+  (15 new), **cli 219 passed**, **ruff clean**, `npm run check` **0 errors / 2 warnings** (the two
+  pre-existing a11y ones), **i18n 0 errors**, published documents consistent. **Ten of eleven
+  perturbations landed**, and **the seam the missing one exposed got a roll-call gate**: the key
+  names the web reads are checked against a real server response.
+- **No deterministic layer was touched** (`document_format.py` did not move by a byte), so no frozen
+  corpus was regenerated. **This change tells the author; it does not change what the layer does.**

@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.3 Baseline (Web Build 887)
+
+The 13 version markers were moved to v2.13.3 / Build 887, and **a subsection was added to §6 of `Creating Works`** now that an unregistered plugin name is shown on screen.
+
+- **A plugin name that does not exist shows up while you type.** A `namespace.word` such as `Nature.青葉` is marked in the plugin color only when that qualified name is registered on this server. An unregistered name takes a different color and the reason is listed under the editor.
+- **When the word is a firing word, the editor says how to drop the prefix.** `Nature.菖蒲` reads `Remove "Nature." and it fires as "下草"`. Otherwise it reads `This name is not registered`.
+- **⚠ A qualified name that does not exist costs the whole sentence.** That was already true; what changed is that **the author is now told**. **The same warning stays under the work after it is painted.**
+- **⚠ A valid qualified name looks different too.** `Nature.青葉` used to colour only `青`; the qualified name is now taken as one word, so the whole of it shows as a single plugin token.
+- **A word without a dot is unchanged.**
+
 ## 2026-08-11 — Unreleased v2.13.2 Baseline (Web Build 886)
 
 The 13 version markers were moved to v2.13.2 / Build 886, and **a row was added to the subcommand table in `CLI Reference` for the new `history state` in `inku-cli`**.

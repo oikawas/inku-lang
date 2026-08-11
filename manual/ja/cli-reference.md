@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.13.2（Web Build 886）です。
+対象はinku v2.13.3（Web Build 887）です。
 
 ## 基本操作
 

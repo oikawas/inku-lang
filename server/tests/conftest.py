@@ -1,7 +1,9 @@
 import os
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -37,3 +39,32 @@ def pytest_sessionfinish(session, exitstatus):
             path.unlink()
         except FileNotFoundError:
             pass
+
+
+@pytest.fixture
+def rebuild_in_process(monkeypatch):
+    """Make the thumbnail rebuild bake in this process for the length of a test.
+
+    The rebuild rasterizes in child processes -- resvg_py holds the GIL, so a
+    pool of six threads finished twelve bakes in 11.49 s against one thread's
+    10.08 s -- and monkeypatch cannot reach a child. A test that needs to
+    arrange what one bake does, raise or block, asks for this fixture and then
+    patches `inku_analysis.rasterizer.svg_to_png` as usual.
+
+    This weakens nothing the tests rely on: a future re-raises on `.result()`
+    whichever pool produced it. That the pool is a process pool at all is
+    measured on its own, by watching which class the rebuild constructs.
+    """
+    from inku_server.api_core import thumbnails
+
+    class InProcessPool(ThreadPoolExecutor):
+        def __init__(self, *args, mp_context=None, **kwargs):
+            super().__init__(*args, **kwargs)
+
+    class NoContext:
+        @staticmethod
+        def get_context(_name):
+            return None
+
+    monkeypatch.setattr(thumbnails, "ProcessPoolExecutor", InProcessPool)
+    monkeypatch.setattr(thumbnails, "multiprocessing", NoContext())

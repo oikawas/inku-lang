@@ -18,6 +18,7 @@ from .color_catalogs import render_color_map_for_catalog
 from .render_engines import current_render_engine
 from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware
 from . import db as _db
+from . import thumbs_db as _thumbs_db
 from .api_core.common import _APP_VERSION, _build_number, _env_flag
 from .api_core.deps import _logger
 from .api_core.state import _render_slots
@@ -65,6 +66,10 @@ app = FastAPI(title="inku-server", version=_APP_VERSION, lifespan=_lifespan)
 
 
 _db.init_db()
+# The derived thumbnail store. Separate from the canonical schema on purpose:
+# deleting its file is the supported way to clear every thumbnail, and the next
+# start makes an empty one again.
+_thumbs_db.init_thumbs_db()
 
 
 def _apply_stored_render_concurrency() -> None:

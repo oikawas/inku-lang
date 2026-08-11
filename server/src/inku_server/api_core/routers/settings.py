@@ -13,11 +13,13 @@ from ...plugins import plugin_status_items
 from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
 from ... import db as _db
 from ... import logging_setup as _logging_setup
+from ... import thumbs_db as _thumbs_db
+from .. import thumbnails as _thumbnails
 from ..common import _env_flag
-from ..deps import _admin_user
+from ..deps import _admin_user, _logger
 from ..models import ModelSettingsResponse
 from ..rendering import _output_save_settings
-from ..state import _SAVE_QUEUE_LIMIT, _SAVE_WORKERS, _STAGE_QUEUE_LIMIT, _STAGE_WORKERS, _artifact_save_stats, _render_slots, _stage_execution_stats
+from ..state import _SAVE_QUEUE_LIMIT, _SAVE_WORKERS, _STAGE_QUEUE_LIMIT, _STAGE_WORKERS, _artifact_save_stats, _render_slots, _stage_execution_stats, _thumbnail_stats
 
 
 router = APIRouter(dependencies=[Depends(_admin_user)])
@@ -93,6 +95,17 @@ class OutputSaveSettingsBody(BaseModel):
     png_size: int = Field(default=2160)
 
 
+class ThumbnailSettingsBody(BaseModel):
+    hidpi: bool = False
+
+
+class ThumbnailRebuildBody(BaseModel):
+    # Rasterizing is CPU-bound and one work measured about half a second, so the
+    # useful range is the machine's cores. Bounded because this runs while the
+    # server is answering.
+    workers: int = Field(default=4, ge=1, le=16)
+
+
 class LogRetentionSettingsBody(BaseModel):
     enabled: bool = True
     retention_days: int = Field(default=90, ge=1, le=3650)
@@ -111,6 +124,33 @@ class PluginSettingsStatus(BaseModel):
     enabled: bool = False
     loaded: list[dict[str, object]] = Field(default_factory=list)
     runtime_editable: bool = False
+    note: str
+
+
+class ThumbnailRebuildStatus(BaseModel):
+    running: bool
+    total: int
+    done: int
+    remaining: int
+    built: int
+    failed: int
+    started_at: int | None = None
+    finished_at: int | None = None
+    workers: int
+
+
+class ThumbnailStatus(BaseModel):
+    hidpi: bool
+    store_path: str | None
+    stored_bytes: int
+    count_scale_1: int
+    count_scale_2: int
+    rebuild: ThumbnailRebuildStatus
+    submitted: int
+    completed: int
+    failed: int
+    skipped: int
+    unavailable: int
     note: str
 
 
@@ -454,6 +494,70 @@ def api_settings_update_output_save(
         **_artifact_save_stats(),
         note="History DB is the source of truth. Output files are background artifacts and may be rebuilt from DB.",
     )
+
+
+def _thumbnail_status() -> "ThumbnailStatus":
+    """One builder for every route that reports thumbnails, so none can drift."""
+    settings = _db.get_thumbnail_settings()
+    counts = _thumbs_db.counts_by_scale()
+    return ThumbnailStatus(
+        hidpi=bool(settings["hidpi"]),
+        store_path=_thumbs_db.thumbs_db_path(),
+        stored_bytes=_thumbs_db.stored_bytes(),
+        count_scale_1=counts.get(1, 0),
+        count_scale_2=counts.get(2, 0),
+        rebuild=ThumbnailRebuildStatus(**_thumbnails.rebuild_progress()),
+        **_thumbnail_stats(),
+        note=(
+            "Thumbnails are rasterized from each work's stored SVG; the engine is not run "
+            "and the picture does not change. The store is a separate file and may be "
+            "deleted at any time -- the listing falls back to the SVG until it is rebuilt."
+        ),
+    )
+
+
+@router.get("/api/settings/thumbnails", response_model=ThumbnailStatus)
+def api_settings_thumbnails(actor: dict = Depends(_admin_user)) -> "ThumbnailStatus":
+    return _thumbnail_status()
+
+
+@router.put("/api/settings/thumbnails", response_model=ThumbnailStatus)
+def api_settings_update_thumbnails(
+    body: ThumbnailSettingsBody,
+    actor: dict = Depends(_admin_user),
+) -> "ThumbnailStatus":
+    """Turn the second size on or off.
+
+    Turning it off deletes the scale-2 rows and nothing else: scale 1 is what
+    the listing draws from, and losing it would blank every thumbnail. The
+    confirmation for the deletion belongs to the client, which is where the
+    person is.
+    """
+    was_hidpi = bool(_db.get_thumbnail_settings()["hidpi"])
+    settings = _db.update_thumbnail_settings(body.hidpi)
+    if was_hidpi and not settings["hidpi"]:
+        removed = _thumbnails.drop_hidpi()
+        _logger.info("HiDPI thumbnails turned off; removed %d scale-2 thumbnails", removed)
+    return _thumbnail_status()
+
+
+@router.get("/api/settings/thumbnails/rebuild", response_model=ThumbnailStatus)
+def api_settings_thumbnail_rebuild_status(actor: dict = Depends(_admin_user)) -> "ThumbnailStatus":
+    return _thumbnail_status()
+
+
+@router.post("/api/settings/thumbnails/rebuild", response_model=ThumbnailStatus)
+def api_settings_thumbnail_rebuild(
+    body: ThumbnailRebuildBody,
+    actor: dict = Depends(_admin_user),
+) -> "ThumbnailStatus":
+    """Bake what is missing or stale, in the background, while serving.
+
+    Works that already have a thumbnail keep serving the one they have until
+    their new one is written, so running this does not blank the listing.
+    """
+    _thumbnails.start_rebuild(body.workers)
+    return _thumbnail_status()
 
 
 def _render_concurrency_status() -> RenderConcurrencyStatus:

@@ -38,9 +38,16 @@
 		onNewerPage: () => void | Promise<void>;
 		onOlderPage: () => void | Promise<void>;
 		onLatestPage: () => void | Promise<void>;
-		onLoadIteration: (index: number) => void;
+		onLoadItem: (item: HistoryItem) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		interactionLocked: boolean;
+		// Counted in works, so this button and the canvas's "Latest" are never in
+		// disagreement about whether the newest work is already on screen.
+		navLatestDisabled: boolean;
+		navNewerPageDisabled: boolean;
+		navOlderPageDisabled: boolean;
+		/** Said when the filter was cleared for the user rather than by them. */
+		starredFilterClearedNotice: string | null;
 		historyStarredOnly: boolean;
 		onSetStarredOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
@@ -64,9 +71,13 @@
 		onNewerPage,
 		onOlderPage,
 		onLatestPage,
-		onLoadIteration,
+		onLoadItem,
 		onToggleStar,
 		interactionLocked,
+		navLatestDisabled,
+		navNewerPageDisabled,
+		navOlderPageDisabled,
+		starredFilterClearedNotice,
 		historyStarredOnly,
 		onSetStarredOnly,
 		historyIndexLabel,
@@ -92,11 +103,14 @@
 		return item.lineage_generation ? (isJapanese ? '通常作品' : 'Active') : (isJapanese ? '系譜なし' : 'No lineage');
 	}
 
-	function handleThumbKeydown(event: KeyboardEvent, index: number) {
+	// The work, not where it was sitting. A position is only the work that was
+	// pressed for as long as the listing stands still, and it does not: a save in
+	// another window is taken in at the front every twelve seconds.
+	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
 		if (interactionLocked) return;
-		onLoadIteration(index);
+		onLoadItem(item);
 	}
 </script>
 
@@ -120,10 +134,10 @@
 							class:ghost-active={historyStarredOnly}
 							onclick={() => onSetStarredOnly(!historyStarredOnly)}
 						>{t().historyStarredOnly}</button>
-						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || historyPage <= 0}>{t().historyLatest}</button>
-						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || historyPage <= 0}>{t().historyNewerPage(historyNavSpan)}</button>
+						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
+						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || navNewerPageDisabled}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
-						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={interactionLocked || historyPage >= historyTotalPages - 1}>{t().historyOlderPage(historyNavSpan)}</button>
+						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={interactionLocked || navOlderPageDisabled}>{t().historyOlderPage(historyNavSpan)}</button>
 					</div>
 				{/if}
 				<button
@@ -136,14 +150,17 @@
 				</button>
 			</div>
 		</div>
+		{#if starredFilterClearedNotice}
+			<div class="history-filter-notice" role="status" aria-live="polite">{starredFilterClearedNotice}</div>
+		{/if}
 		{#if !historyCollapsed}
 			<div class="thumb-strip">
 				{#each historyItems as it, i (it.id ?? it.at)}
 					<div
 						class="thumb"
 						class:current={i === historyCursor}
-						onclick={() => !interactionLocked && onLoadIteration(i)}
-						onkeydown={(event) => handleThumbKeydown(event, i)}
+						onclick={() => !interactionLocked && onLoadItem(it)}
+						onkeydown={(event) => handleThumbKeydown(event, it)}
 						role="button"
 						tabindex={interactionLocked ? -1 : 0}
 					>
@@ -254,6 +271,15 @@
 		font-variant-numeric: tabular-nums;
 		min-width: 30px;
 		text-align: center;
+	}
+	.history-filter-notice {
+		font-size: var(--btn-sm-font-size);
+		color: var(--fg2);
+		border: 1px solid var(--border2);
+		border-radius: var(--btn-sm-radius);
+		background: var(--panel);
+		padding: var(--btn-sm-padding);
+		margin-bottom: 7px;
 	}
 	.history-nav-btn { min-width: 92px; }
 	.history-latest-btn { min-width: 54px; }

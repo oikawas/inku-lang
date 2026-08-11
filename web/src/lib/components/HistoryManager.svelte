@@ -583,29 +583,29 @@
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
 						<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(0)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyLatest}</button>
 					</Tooltip>
-					<Tooltip placement="bottom-left" text={t().tooltipHistoryPrevPage}>
-						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyPrev}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyNewer}</button>
 					</Tooltip>
 					<span>{lineageGroupLoading ? t().historyLoading : (lineageGroupPage + 1) + ' / ' + lineageGroupTotalPages}</span>
-					<Tooltip placement="bottom-left" text={t().tooltipHistoryNextPage}>
-						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage + 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyNext}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage + 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyOlder}</button>
 					</Tooltip>
-					<Tooltip placement="bottom-left" text={t().tooltipHistoryFirstPage}>
-						<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(lineageGroupTotalPages - 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyFirst}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryOldestPage}>
+						<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(lineageGroupTotalPages - 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyOldest}</button>
 					</Tooltip>
 				{:else}
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
 						<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyLatest}</button>
 					</Tooltip>
-					<Tooltip placement="bottom-left" text={t().tooltipHistoryPrevPage}>
-						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyPrev}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyNewer}</button>
 					</Tooltip>
 					<span>{historyManagerLoading ? t().historyLoading : (historyManagerPage + 1) + ' / ' + historyManagerTotalPages}</span>
-					<Tooltip placement="bottom-left" text={t().tooltipHistoryNextPage}>
-						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyNext}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>
+						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyOlder}</button>
 					</Tooltip>
-					<Tooltip placement="bottom-left" text={t().tooltipHistoryFirstPage}>
-						<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyFirst}</button>
+					<Tooltip placement="bottom-left" text={t().tooltipHistoryOldestPage}>
+						<button class="ghost-btn history-latest-btn" onclick={onSetFirstPage} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyOldest}</button>
 					</Tooltip>
 				{/if}
 			</div>

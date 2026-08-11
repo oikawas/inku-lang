@@ -87,6 +87,14 @@
 	} from '$lib/historyManagerState.svelte';
 	import { historyListLimit } from '$lib/historyListLimit';
 	import { historyRefreshBlockedBy, historyStripIsCurrent, type HistoryState } from '$lib/historyRefreshDecision';
+	import {
+		alignHistoryOffset,
+		historyNavDisabled,
+		historyNavTarget,
+		historyPageTarget,
+		resolveStripSelection,
+		type HistoryNavTarget
+	} from '$lib/historyNavigation';
 	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
@@ -481,6 +489,8 @@
 	let variationCandidates = $state<VariationCandidate[]>([]);
 	let lineageIntermediateNotice = $state<string | null>(null);
 	let lineageIntermediateNoticeTimer: number | null = null;
+	let historyStarredFilterNotice = $state<string | null>(null);
+	let historyStarredFilterNoticeTimer: number | null = null;
 	let nearbyHistory = $state<Iteration[]>([]);
 	let variationGridBusy = $state(false);
 	let variationGridCanAbort = $state(false);
@@ -2309,7 +2319,7 @@
 			authToken = 'cookie';
 			loginStatus = null;
 			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
-			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
+			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch {
 			authToken = null;
@@ -2359,7 +2369,7 @@
 			historyManager.clear();
 			loginPassword = '';
 			await Promise.all([loadAvailableModels(), loadUserSettings(), loadSettingsStatus(), loadBatchPromptHistory(), loadDemoSettings(), loadPluginStorage(), loadPluginVocabulary(), loadExportTemplates(), loadClientConfig()]);
-			await Promise.all([fetchHistoryPage(0), fetchTrashPage()]);
+			await Promise.all([fetchHistoryOffset(0), fetchTrashPage()]);
 			if (historyItems.length > 0) loadIteration(0);
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e);
@@ -2674,6 +2684,15 @@
 		void loadNearbyHistory(historyId);
 	});
 	let historySelectionSyncRequest = 0;
+	// Which listing request is the current one. Every other async route on this
+	// page already carries one of these; the strip's did not, so an answer that
+	// came back late overwrote a newer one without anything noticing.
+	let historyFetchRequest = 0;
+	let trashFetchRequest = 0;
+	// How many listing requests are out. The nav buttons read it: pressing while
+	// one is on its way asks for the same offset again, because the offset has
+	// not moved yet, and both presses then land on the same work.
+	let historyFetchInFlight = $state(0);
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const historyWindowSize = $derived(visibleThumbCount);
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
@@ -3706,6 +3725,14 @@ if (unreadWords.length > 0) {
 			return false;
 		}
 		const safeOffset = Math.max(0, offset);
+		// Taken before anything is asked for, so an answer can tell whether it is
+		// still the answer to the current question. This function writes the four
+		// quantities the whole strip is read from, and had nothing stopping a slow
+		// answer from putting its page back over a newer one -- four of its
+		// callers do not even await it, one of them the resize effect, which fires
+		// on every 89-pixel boundary the window edge is dragged across.
+		const requestId = ++historyFetchRequest;
+		historyFetchInFlight += 1;
 		const selectedHistoryId = options.anchorId ?? (options.preserveSelection
 			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? result?.history_id ?? null
 			: null);
@@ -3727,6 +3754,7 @@ if (unreadWords.length > 0) {
 			if (historyStarredOnly) params.set('starred', 'true');
 			if (options.anchorId) params.set('anchor_id', options.anchorId);
 			const r = await apiFetch(`/api/history?${params.toString()}`);
+			if (requestId !== historyFetchRequest) return false;
 			if (!r.ok) return false;
 			const data = await r.json();
 			const resolvedOffset = Number.isFinite(data.offset) ? Number(data.offset) : safeOffset;
@@ -3737,6 +3765,9 @@ if (unreadWords.length > 0) {
 			const stripItems = resolvedOffset === 0 && !historyStarredOnly
 				? data.items.slice(0, historyWindowSize)
 				: data.items;
+			// Immediately before the four quantities are written, so no await added
+			// later can slip between the check and what it is protecting.
+			if (requestId !== historyFetchRequest) return false;
 			historyItems = stripItems; historyTotal = data.total; historyOffset = resolvedOffset;
 			if (selectedHistoryId) {
 				const selectedIndex = stripItems.findIndex((item: Iteration) => item.id === selectedHistoryId);
@@ -3760,6 +3791,8 @@ if (unreadWords.length > 0) {
 			return options.anchorId ? historyCursor >= 0 && historyItems[historyCursor]?.id === options.anchorId : true;
 		} catch {
 			return false;
+		} finally {
+			historyFetchInFlight = Math.max(0, historyFetchInFlight - 1);
 		}
 	}
 
@@ -3769,7 +3802,7 @@ if (unreadWords.length > 0) {
 			historyCursor = -1;
 			return;
 		}
-		const localIndex = historyItems.findIndex((candidate) => candidate.id === item.id);
+		const localIndex = resolveStripSelection(historyItems, item);
 		if (localIndex >= 0) {
 			historyCursor = localIndex;
 			return;
@@ -3782,6 +3815,7 @@ if (unreadWords.length > 0) {
 		}
 		if (!found && historyStarredOnly) {
 			historyStarredOnly = false;
+			showHistoryStarredFilterClearedNotice();
 			found = await fetchHistoryOffset(0, { anchorId: item.id });
 		}
 		if (requestId !== historySelectionSyncRequest) {
@@ -3847,23 +3881,33 @@ if (unreadWords.length > 0) {
 		}
 	}
 
-	async function fetchHistoryPage(page: number): Promise<void> {
-		await fetchHistoryOffset(page * historyWindowSize);
-	}
-
+	/**
+	 * One page newer.
+	 *
+	 * Lands on the oldest work of that page, which is the work immediately newer
+	 * than the one that was on screen. Landing on its newest instead -- what this
+	 * did before -- stepped over everything in between, and was the only one of
+	 * the four steps that did not read continuously.
+	 */
 	async function gotoHistoryNewerPage(): Promise<void> {
-		await fetchHistoryPage(historyPage - 1);
-		loadIteration(0);
+		const target = historyPageTarget(historyNavState, 'newer');
+		if (!target) return;
+		if (!(await fetchHistoryOffset(target.offset))) return;
+		loadIteration(historyNavIndex(target));
 	}
 
 	async function gotoHistoryLatestPage(): Promise<void> {
-		await fetchHistoryPage(0);
-		loadIteration(0);
+		const target = historyPageTarget(historyNavState, 'latest');
+		if (!target) return;
+		if (!(await fetchHistoryOffset(target.offset))) return;
+		loadIteration(historyNavIndex(target));
 	}
 
 	async function gotoHistoryOlderPage(): Promise<void> {
-		await fetchHistoryPage(historyPage + 1);
-		loadIteration(0);
+		const target = historyPageTarget(historyNavState, 'older');
+		if (!target) return;
+		if (!(await fetchHistoryOffset(target.offset))) return;
+		loadIteration(historyNavIndex(target));
 	}
 
 	async function fetchTrashPage(): Promise<void> {
@@ -3872,10 +3916,15 @@ if (unreadWords.length > 0) {
 			trashTotal = 0;
 			return;
 		}
+		// Same reason as the listing above: this one also writes state a late
+		// answer could put back over a newer one.
+		const requestId = ++trashFetchRequest;
 		try {
 			const r = await apiFetch(`/api/history?offset=0&limit=100&trashed=true`);
+			if (requestId !== trashFetchRequest) return;
 			if (!r.ok) return;
 			const data = await r.json();
+			if (requestId !== trashFetchRequest) return;
 			trashItems = data.items; trashTotal = data.total;
 		} catch { /* ignore */ }
 	}
@@ -4793,29 +4842,67 @@ $effect(() => {
 	});
 
 
+	/** One work older. */
 	async function gotoPrev() {
+		const target = historyNavTarget(historyNavState, 'older');
+		if (!target) return;
+		if (target.offset !== historyOffset && !(await fetchHistoryOffset(target.offset))) return;
+		// Read after the await, not before it. Read before, a tab the user chose
+		// while the page was arriving was quietly put back to the one they left.
 		const preservedTab = outputTab;
-		if (historyCursor < historyItems.length - 1) { loadIteration(historyCursor + 1); }
-		else if (historyOffset + historyWindowSize < historyTotal) { await fetchHistoryOffset(historyOffset + historyWindowSize); loadIteration(0); }
+		loadIteration(historyNavIndex(target));
 		outputTab = preservedTab;
 	}
 
+	/** One work newer. */
 	async function gotoNext() {
+		const target = historyNavTarget(historyNavState, 'newer');
+		if (!target) return;
+		if (target.offset !== historyOffset && !(await fetchHistoryOffset(target.offset))) return;
 		const preservedTab = outputTab;
-		if (historyCursor > 0) { loadIteration(historyCursor - 1); }
-		else if (historyOffset > 0) { await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize)); loadIteration(historyItems.length - 1); }
+		loadIteration(historyNavIndex(target));
 		outputTab = preservedTab;
 	}
 
 	async function gotoLatest() {
-		if (historyTotal <= 0) return;
-		await fetchHistoryOffset(0);
-		loadIteration(0);
+		const target = historyNavTarget(historyNavState, 'latest');
+		if (!target) return;
+		if (target.offset !== historyOffset && !(await fetchHistoryOffset(target.offset))) return;
+		loadIteration(historyNavIndex(target));
 	}
 
-	const prevDisabled = $derived(historyCursor < 0 || historyOffset + historyCursor >= historyTotal - 1);
-	const nextDisabled = $derived(historyCursor <= 0 && historyOffset <= 0);
+	// Where the strip is standing, as historyNavigation.ts reads it. The canvas's
+	// six buttons and the strip's three all decide from this one value.
+	const historyNavState = $derived({
+		cursor: historyCursor,
+		offset: historyOffset,
+		total: historyTotal,
+		windowSize: historyWindowSize,
+		busy: historyFetchInFlight > 0,
+		locked: demoRunning
+	});
+	const historyNavButtonsDisabled = $derived(historyNavDisabled(historyNavState));
+	// The strip's pager. "Latest" is counted in works so it agrees with the
+	// canvas's; the other two step a page and are disabled when there is no page
+	// that way to step to.
+	const historyPageNavDisabled = $derived({
+		latest: historyNavButtonsDisabled.latest,
+		newer: historyPageTarget(historyNavState, 'newer') === null,
+		older: historyPageTarget(historyNavState, 'older') === null
+	});
+	// Left as it was: 0 / N is how "nothing is selected" is shown, and is not a
+	// claim about which work is current.
 	const navPos       = $derived(historyOffset + historyCursor + 1);
+
+	/**
+	 * The index a target names, once the page it names is in hand.
+	 *
+	 * 'oldest-on-page' cannot be a number in the module: how many works the page
+	 * actually holds is only known after the answer arrives.
+	 */
+	function historyNavIndex(target: HistoryNavTarget): number {
+		return target.select === 'oldest-on-page' ? historyItems.length - 1 : target.select;
+	}
 
 	// ── Saijiki ─────────────────────────────────────────────
 	function handleKeydown(e: KeyboardEvent) {
@@ -4934,6 +5021,25 @@ $effect(() => {
 		lineageIntermediateNoticeTimer = window.setTimeout(() => {
 			lineageIntermediateNotice = null;
 			lineageIntermediateNoticeTimer = null;
+		}, 5000);
+	}
+
+	/**
+	 * Say that the starred filter was cleared, because nothing else says it.
+	 *
+	 * Clearing it is a rescue and stays: a work reached from somewhere else --
+	 * a lineage, a shared link, the manager -- can be unstarred, and leaving the
+	 * filter on would put the user in front of a strip their work is not in. But
+	 * the filter button goes back to off on its own, which reads as the press
+	 * having failed. Same mechanism as the lineage notice above: a string and a
+	 * five second timer.
+	 */
+	function showHistoryStarredFilterClearedNotice(): void {
+		historyStarredFilterNotice = t().historyStarredFilterClearedNotice;
+		if (historyStarredFilterNoticeTimer !== null) window.clearTimeout(historyStarredFilterNoticeTimer);
+		historyStarredFilterNoticeTimer = window.setTimeout(() => {
+			historyStarredFilterNotice = null;
+			historyStarredFilterNoticeTimer = null;
 		}, 5000);
 	}
 
@@ -5964,6 +6070,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (size === lastHistoryWindowSize) return;
 		lastHistoryWindowSize = size;
 		if (!authToken || historyTotal <= 0) return;
+		// Seated on the new grid before the request goes out. Fetching the old
+		// offset under the new page size is what made the pager show works twice
+		// going older and step over them going newer.
+		historyOffset = alignHistoryOffset(historyOffset, size, historyTotal);
 		void fetchHistoryOffset(historyOffset);
 	});
 
@@ -6337,8 +6447,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{lineageIntermediateNotice}
 				allowEmptyOutputTabs={inputMode === 'demo' || activeRunMode === 'demo'}
 				{currentRenderedAt}
-				{nextDisabled}
-				{prevDisabled}
+				navLatestDisabled={historyNavButtonsDisabled.latest}
+				navNewerDisabled={historyNavButtonsDisabled.newer}
+				navOlderDisabled={historyNavButtonsDisabled.older}
+				interactionLocked={demoRunning}
 				{historyTotal}
 				{navPos}
 				canvasAspectWidth={displayCanvasAspect.ratioW}
@@ -6468,9 +6580,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onNewerPage={gotoHistoryNewerPage}
 			onOlderPage={gotoHistoryOlderPage}
 			onLatestPage={gotoHistoryLatestPage}
-			onLoadIteration={loadIteration}
+			onLoadItem={loadIterationItem}
 			onToggleStar={toggleHistoryStar}
 			interactionLocked={demoRunning}
+			navLatestDisabled={historyPageNavDisabled.latest}
+			navNewerPageDisabled={historyPageNavDisabled.newer}
+			navOlderPageDisabled={historyPageNavDisabled.older}
+			starredFilterClearedNotice={historyStarredFilterNotice}
 			{historyStarredOnly}
 			onSetStarredOnly={setHistoryStarredOnly}
 			{historyIndexLabel}

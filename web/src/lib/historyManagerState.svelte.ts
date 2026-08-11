@@ -90,6 +90,14 @@ type Request = {
 	view: HistoryManagerView;
 	page: number;
 	pageSize: number;
+	/**
+	 * Where in the listing the request starts, which is `page * pageSize`.
+	 *
+	 * Carried rather than recomputed because this is what two requests have to
+	 * agree on to be the same question. `page` alone is not that: the same page
+	 * number names a different place the moment the page size changes.
+	 */
+	offset: number;
 	search: string;
 	starredOnly: boolean;
 	forRevisionOnly: boolean;
@@ -127,6 +135,17 @@ export class HistoryManagerState {
 	// tens of megabytes here, so asking again for something already on its way is
 	// not a harmless duplicate.
 	private inFlight: Request[] = [];
+	/**
+	 * The offset the works in hand were fetched at. -1 before anything lands.
+	 *
+	 * What the works are is not enough to know whether they are the right ones:
+	 * counting them says how many arrived, not where they came from. The modal
+	 * measures its grid after it is on screen and reports a smaller page size,
+	 * which moves `offset` without changing how many works are held -- so a
+	 * check on the count alone keeps a full page that is now labelled with
+	 * somebody else's numbers.
+	 */
+	private fetchedOffset = -1;
 
 	// One page shows what fits and no more. The works in hand can outnumber it:
 	// the page guesses the manager's page size before the modal exists and fetches
@@ -183,6 +202,7 @@ export class HistoryManagerState {
 		this.requestId += 1;
 		this.pendingRequests = 0;
 		this.preloadKey = "";
+		this.fetchedOffset = -1;
 	}
 
 	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number) {
@@ -223,7 +243,8 @@ export class HistoryManagerState {
 		// every earlier request as superseded, so a question dropped after taking
 		// one would throw away the answer it was riding on: the works arrive, all
 		// of them, and are discarded on the doorstep.
-		const request: Request = { view, page, pageSize, search, starredOnly, forRevisionOnly };
+		const offset = page * pageSize;
+		const request: Request = { view, page, pageSize, offset, search, starredOnly, forRevisionOnly };
 		if (this.requestInFlight(request, pageSize)) return;
 		const requestId = ++this.requestId;
 		this.inFlight.push(request);
@@ -231,7 +252,6 @@ export class HistoryManagerState {
 		if (!silent) this.loading = true;
 		try {
 			const trashed = view === 'trash';
-			const offset = page * pageSize;
 			const params = new URLSearchParams({
 				offset: String(offset),
 				limit: String(pageSize),
@@ -257,6 +277,8 @@ export class HistoryManagerState {
 				this.activeItems = data.items;
 				this.activeTotal = data.total;
 			}
+			// Written where the works are taken in, so the two can never disagree.
+			this.fetchedOffset = offset;
 			this.preloadKey = this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, data.total);
 			if (data.items.length === 0 && data.total > 0 && page > 0) {
 				const fallbackPage = page - 1;
@@ -336,13 +358,21 @@ export class HistoryManagerState {
 	setPageSize = (pageSize: number) => {
 		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
 		this.pageSize = nextPageSize;
-		this.page = Math.max(0, Math.min(this.page, this.totalPages - 1));
-		// The modal measures itself once it is on screen and reports the real page
-		// size, which arrives while the page opened with is still being fetched.
-		// Nothing is asked for here: fetch() sees that the answer on its way holds
-		// at least this many works and drops the question.
-		const expectedItems = Math.min(nextPageSize, this.total);
-		if (this.items.length < expectedItems) void this.fetch({ page: this.page });
+		// Both quantities are computed here rather than read off the derived
+		// fields: those are recomputed after this method returns, so reading them
+		// now would clamp the page against the size that is being replaced.
+		const nextTotalPages = Math.max(1, Math.ceil(this.total / nextPageSize));
+		this.page = Math.max(0, Math.min(this.page, nextTotalPages - 1));
+		const nextOffset = this.page * nextPageSize;
+		// Asked by where the works came from, not by how many there are. A page
+		// size that shrinks moves `offset` while leaving the works untouched, so
+		// counting them finds nothing wrong and the modal goes on showing works
+		// from one place under the numbers of another.
+		//
+		// The modal also measures itself while the page opened with is still on
+		// its way. Nothing extra is asked for then: fetch() sees a request out for
+		// this same offset holding at least this many works and drops the question.
+		if (nextOffset !== this.fetchedOffset) void this.fetch({ page: this.page });
 	};
 
 	searchChanged = (search: string) => {
@@ -390,16 +420,24 @@ export class HistoryManagerState {
 	/**
 	 * Whether a request already on its way will answer this one.
 	 *
-	 * `atLeast` is how many works the caller needs. A request for the same page
+	 * `atLeast` is how many works the caller needs. A request for the same offset
 	 * that asked for more of them answers a smaller need as well, which is the
 	 * ordinary case on opening: the page guesses the manager's page size before
 	 * the modal exists, then the modal measures its own grid and says a smaller
 	 * number. Guessing 65 and measuring 52 must not cost two pages of history.
+	 *
+	 * Matched on `offset`, which is the place in the listing being asked for.
+	 * `page` is not that place -- it is a place divided by a page size, and both
+	 * halves move: the same page number with a different size names a different
+	 * offset, and different page numbers with different sizes can name the same
+	 * one. Matching on the number alone made a resize ride on a request for
+	 * somewhere else, so the works that arrived were 36 short of the ones the
+	 * modal then said it was showing.
 	 */
 	private requestInFlight(request: Request, atLeast: number): boolean {
 		return this.inFlight.some((sent) =>
 			sent.view === request.view &&
-			sent.page === request.page &&
+			sent.offset === request.offset &&
 			sent.search === request.search &&
 			sent.starredOnly === request.starredOnly &&
 			sent.forRevisionOnly === request.forRevisionOnly &&

@@ -263,8 +263,8 @@ export interface LangPack {
 	tooltipCanvasVaryInterpretation: string;
 	tooltipCanvasVaryColor: string;
 	tooltipVariation: string;
-	tooltipCanvasNavPrev: string;
-	tooltipCanvasNavNext: string;
+	tooltipCanvasNavNewer: string;
+	tooltipCanvasNavOlder: string;
 	tooltipCanvasNavLatest: string;
 	tooltipCanvasDownloadSvg: string;
 	tooltipCanvasDownloadPng: string;
@@ -430,6 +430,7 @@ export interface LangPack {
 	// Settings / catalog
 	unsavedRefinementPreviewLabel: string;
 	lineageIntermediateSavedNotice: string;
+	historyStarredFilterClearedNotice: string;
 	lineageIntermediateSaveFailed: string;
 
 	settingsTitle: string;
@@ -750,9 +751,9 @@ export interface LangPack {
 	historyRestoreSelected: string;
 	historyPermanentDelete: string;
 	historySearchLabel: string;
-	historyPrev: string;
-	historyNext: string;
-	historyFirst: string;
+	historyNewer: string;
+	historyOlder: string;
+	historyOldest: string;
 	historyLoading: string;
 	historyRestore: string;
 	historyImageHeader: string;
@@ -762,9 +763,9 @@ export interface LangPack {
 	tooltipHistoryChronological: string;
 	tooltipHistoryLineageGrouped: string;
 	tooltipHistoryLatestPage: string;
-	tooltipHistoryPrevPage: string;
-	tooltipHistoryNextPage: string;
-	tooltipHistoryFirstPage: string;
+	tooltipHistoryNewerPage: string;
+	tooltipHistoryOlderPage: string;
+	tooltipHistoryOldestPage: string;
 	tooltipHistoryClose: string;
 	tooltipHistorySelectAll: string;
 	tooltipHistoryStarredOnly: string;

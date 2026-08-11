@@ -323,6 +323,21 @@
 
 	// Selection can span pages. The current page and expanded lineage members are
 	// checked first; off-page items are fetched on demand by export actions.
+	/**
+	 * The work, with its drawing.
+	 *
+	 * The listing asks for thumbnails rather than pictures, so the copy on the
+	 * page carries an empty `svg`. Contact sheets and exports need the drawing
+	 * itself, and an item without one is skipped in silence -- an empty sheet
+	 * with no error. Falling through to the single-work fetch keeps that from
+	 * being how it fails.
+	 */
+	async function resolveWorkWithSvg(id: string): Promise<HistoryItem | null> {
+		const onPage = findSelectedItem(id);
+		if (onPage?.svg) return onPage;
+		return (await fetchHistoryItem(id)) ?? onPage;
+	}
+
 	function findSelectedItem(id: string): HistoryItem | null {
 		const onPage = managedHistoryItems.find((it) => it.id === id);
 		if (onPage) return onPage;
@@ -352,7 +367,7 @@
 		try {
 			const items: HistoryItem[] = [];
 			for (const id of selectedHistoryIds) {
-				const item = findSelectedItem(id) ?? await fetchHistoryItem(id);
+				const item = await resolveWorkWithSvg(id);
 				if (item?.id) items.push(item);
 			}
 			if (items.length < 2) throw new Error("At least two saved works are required.");
@@ -384,7 +399,7 @@
 		try {
 			await runContactSheet(variant, {
 				ids: () => selectedHistoryIds,
-				resolveWork: async (id) => findSelectedItem(id) ?? await fetchHistoryItem(id),
+				resolveWork: (id) => resolveWorkWithSvg(id),
 				catalogName,
 				formatDate: formatHistoryDate,
 				previewText: historyPreviewText,

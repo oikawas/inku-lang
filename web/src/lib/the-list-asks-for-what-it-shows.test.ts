@@ -13,68 +13,17 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { historyListLimit } from './historyListLimit.ts';
-import type { HistoryItem } from './historyManagerState.svelte.ts';
-
-// Runes are a compile-time transform, so plain node has no $state or $derived.
-// The tests read values rather than react to them, so an identity shim is
-// enough -- but it has to be installed before the module is evaluated, which is
-// why the import below is dynamic.
-const identity = <T>(value: T): T => value;
-const stateShim = identity as (<T>(value: T) => T) & { raw: <T>(value: T) => T };
-stateShim.raw = identity;
-const runeHost = globalThis as unknown as Record<string, unknown>;
-runeHost.$state = stateShim;
-runeHost.$derived = identity;
-
-const { HistoryManagerState } = await import('./historyManagerState.svelte.ts');
-
-/** Works enough for the manager to count; nothing here reads their contents. */
-function works(count: number, prefix = 'w'): HistoryItem[] {
-	return Array.from({ length: count }, (_, i) => ({
-		id: `${prefix}-${i}`,
-		input: '',
-		ddl: null,
-		score: { instructions: [] },
-		svg: '',
-		at: 0
-	}));
-}
-
-/** The manager, plus the list of paths it asked the server for. */
-function makeManager(pageItems: HistoryItem[], total: number) {
-	const calls: string[] = [];
-	const apiFetch = async (path: string) => {
-		calls.push(path);
-		return {
-			ok: true,
-			json: async () => ({ items: pageItems, total })
-		} as unknown as Response;
-	};
-	const manager = new HistoryManagerState(apiFetch, () => {});
-	return { manager, calls };
-}
-
-/**
- * Let the frozen derived values catch up with the state they are derived from.
- *
- * Needed only because the shim above turns $derived into a plain value taken at
- * construction time. In the browser this happens by itself; here it does not,
- * and the code under test reads both -- preloadMatches reads this.items.length,
- * setPageSize reads this.total. Leaving `total` frozen at 0 makes setPageSize
- * think no works are expected, so it asks for nothing and a gate on asking
- * passes without the code ever having decided anything.
- */
-function refreshDerived(manager: InstanceType<typeof HistoryManagerState>) {
-	manager.items = manager.activeItems;
-	manager.total = manager.activeTotal;
-}
-
-const STRIP_SIZE = 21;
-/** What the page guesses a manager page holds, before the modal exists. */
-const MANAGER_PAGE_SIZE = 65;
-/** What the modal reports once it is on screen and has measured its grid. */
-const MEASURED_PAGE_SIZE = 52;
-const TOTAL = 2917;
+// The rune shim, the fake manager and the stand-in for $derived live in the
+// harness so that contract 2's gates next door drive the same ones.
+import {
+	MANAGER_PAGE_SIZE,
+	MEASURED_PAGE_SIZE,
+	STRIP_SIZE,
+	TOTAL,
+	makeManager,
+	refreshDerived,
+	works
+} from './history-manager-harness.ts';
 
 // ── T-1 ─────────────────────────────────────────────────────────────────────
 test('the first load asks for what the strip shows, not for a manager page', () => {

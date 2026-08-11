@@ -472,6 +472,13 @@ _OUTPUT_SAVE_DEFAULT_SETTINGS = {
     "output_dir": str(Path(os.getenv("INKU_OUTPUT_DIR", str(Path.home() / ".local" / "share" / "inku" / "outputs")))),
     "png_size": int(os.getenv("INKU_OUTPUT_PNG_SIZE", "2160")),
 }
+_THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
+# Off by default: the second size doubles the rebuild and roughly quadruples the
+# stored bytes, and is worth neither until someone is looking at the listing on
+# a HiDPI screen.
+_THUMBNAIL_DEFAULT_SETTINGS = {
+    "hidpi": False,
+}
 _RENDER_CONCURRENCY_SETTINGS_KEY = "render_concurrency_settings"
 # INKU_RENDER_CONCURRENCY / INKU_CLIENT_FANOUT_LIMIT seed the first value only;
 # once stored, the DB row is the source of truth (admin settings screen).
@@ -2179,6 +2186,24 @@ def get_output_save_settings() -> dict:
 def update_output_save_settings(enabled: bool, output_dir: str, png_size: int) -> dict:
     clean = _normalize_output_save_settings({"enabled": enabled, "output_dir": output_dir, "png_size": png_size})
     return _write_app_setting(_OUTPUT_SAVE_SETTINGS_KEY, clean)
+
+
+def _normalize_thumbnail_settings(settings: dict | None) -> dict:
+    clean = dict(_THUMBNAIL_DEFAULT_SETTINGS)
+    if not isinstance(settings, dict):
+        return clean
+    if "hidpi" in settings:
+        clean["hidpi"] = bool(settings["hidpi"])
+    return clean
+
+
+def get_thumbnail_settings() -> dict:
+    return _normalize_thumbnail_settings(_read_app_setting(_THUMBNAIL_SETTINGS_KEY))
+
+
+def update_thumbnail_settings(hidpi: bool) -> dict:
+    clean = _normalize_thumbnail_settings({"hidpi": hidpi})
+    return _write_app_setting(_THUMBNAIL_SETTINGS_KEY, clean)
 
 
 def _normalize_log_retention_settings(settings: dict | None) -> dict:
@@ -4106,6 +4131,34 @@ def set_item_for_revision(user_id: str, item_id: str, for_revision: bool) -> dic
         session.commit()
         session.refresh(row)
         return _row_to_dict(row)
+
+
+def history_render_hashes() -> list[tuple[str, str | None]]:
+    """Every stored work and the render hash of the SVG it holds.
+
+    Unscoped, unlike get_items(): the only caller is the thumbnail rebuild,
+    which the settings screen runs for the whole installation and which returns
+    no work to anybody -- it writes pictures into the derived store, and every
+    read of that store goes back through the ordinary visibility rules.
+    """
+    with SessionLocal() as session:
+        rows = session.execute(select(HistoryRow.id, HistoryRow.render_hash)).all()
+    return [(str(item_id), render_hash) for item_id, render_hash in rows]
+
+
+def history_svgs(ids: list[str]) -> dict[str, str]:
+    """The stored SVG of each id, for the thumbnail rebuild. Unscoped, as above.
+
+    Taken in batches by the caller: one work's SVG averages about a megabyte,
+    so the whole table at once is the very cost this exists to remove.
+    """
+    if not ids:
+        return {}
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(HistoryRow.id, HistoryRow.svg).where(HistoryRow.id.in_(ids))
+        ).all()
+    return {str(item_id): (svg or "") for item_id, svg in rows}
 
 
 def get_items(user_id: str, ids: list[str]) -> list[dict]:

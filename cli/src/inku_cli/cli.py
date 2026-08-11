@@ -2984,6 +2984,10 @@ def command_history(args: argparse.Namespace) -> int:
             "q": args.query,
             "starred": args.starred,
             "for_revision": args.for_revision,
+            # Sent either way rather than only when it is false: a sender that
+            # writes nothing is a sender nothing tests, and what it receives is
+            # then decided by the server's default alone.
+            "include_svg": not args.no_svg,
         },
     )
     _print_json(data)
@@ -3923,6 +3927,11 @@ def build_parser() -> argparse.ArgumentParser:
     history.add_argument("--query", "-q")
     history.add_argument("--starred", action="store_true")
     history.add_argument("--for-revision", action="store_true")
+    history.add_argument(
+        "--no-svg",
+        action="store_true",
+        help="leave each work's drawing out of the listing; the items come back with svg empty",
+    )
     history.set_defaults(func=command_history, history_action=None)
 
     # Optional on purpose (no `required=True`): `history` was a flat listing

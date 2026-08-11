@@ -32,7 +32,9 @@ PUBLIC = {  # every entry needs a reason
 #   82 before the ACL work; +2 for GET/PUT /api/history/{item_id}/acl (stage D),
 #   +2 for GET/PUT /api/settings/single-user (stage H), and +1 for
 #   GET /api/auth/me/group-peers, which lets sharing offer names.
-EXPECTED_ROUTE_COUNT = 87
+#   +5 for contract 2's thumbnails: GET /api/history/{item_id}/thumb, and
+#   GET/PUT /api/settings/thumbnails with GET/POST of its rebuild.
+EXPECTED_ROUTE_COUNT = 92
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

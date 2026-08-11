@@ -27,6 +27,21 @@ through Stage 2/rendering:
 inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --save-history
 ```
 
+## List history, with or without the drawings
+
+`history` returns each work's whole SVG by default, which is what makes it
+usable for anything that needs the picture. A listing of 21 works is about
+23.5 MB that way, and about 1.0 MB without them, so pass `--no-svg` when the
+listing is being read for its metadata:
+
+```sh
+inku-cli history --limit 21                 # every work carries its drawing
+inku-cli history --limit 21 --no-svg        # svg comes back as an empty string
+```
+
+The `svg` key is present either way. `--no-svg` empties it rather than removing
+it, so a reader that expects the field still finds it.
+
 ## Share one work with someone else
 
 By default a work is visible to whoever made it. What an admin or a group leader

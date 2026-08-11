@@ -128,7 +128,14 @@ export class HistoryManagerState {
 	// not a harmless duplicate.
 	private inFlight: Request[] = [];
 
-	items = $derived(this.view === 'trash' ? this.trashItems : this.activeItems);
+	// One page shows what fits and no more. The works in hand can outnumber it:
+	// the page guesses the manager's page size before the modal exists and fetches
+	// with the guess, then the modal measures its own grid and says a smaller
+	// number. Drawing the surplus does not show it -- the grid's box clips what
+	// overflows -- while `offset` advances by pageSize, so the next page would
+	// hand back works already counted as shown. Capping here keeps the quantity
+	// that is drawn and the quantity that `offset` steps by the same one.
+	items = $derived(this.pageOf(this.view === 'trash' ? this.trashItems : this.activeItems));
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
 	totalPages = $derived(Math.max(1, Math.ceil(this.total / this.pageSize)));
 	offset = $derived(this.page * this.pageSize);
@@ -143,6 +150,19 @@ export class HistoryManagerState {
 	constructor(apiFetch: ApiFetch, syncTrashPage: TrashPageSync) {
 		this.apiFetch = apiFetch;
 		this.syncTrashPage = syncTrashPage;
+	}
+
+	/**
+	 * One page's worth of the works in hand.
+	 *
+	 * Public, and a method rather than part of the $derived above, because this
+	 * is where the quantity that is shown is decided, and it has to be the same
+	 * quantity `offset` advances by. A rune is a compile-time transform, so a
+	 * test outside the browser cannot evaluate it; leaving the decision inside
+	 * one would leave the gates reading their own stand-in for it instead.
+	 */
+	pageOf(held: HistoryItem[]): HistoryItem[] {
+		return held.slice(0, this.pageSize);
 	}
 
 	clear() {
@@ -216,6 +236,9 @@ export class HistoryManagerState {
 				offset: String(offset),
 				limit: String(pageSize),
 				q: search,
+				// The manager draws thumbnails, so it does not need the drawings.
+				// They were nearly all of the cost: one page of them, 23.5 MB.
+				include_svg: 'false',
 			});
 			if (trashed) params.set('trashed', 'true');
 			if (starredOnly) params.set('starred', 'true');

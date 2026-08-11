@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Literal
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from ...animation_export import build_animation
 from ...feature_analysis import composition_distance
@@ -14,6 +14,7 @@ from ...limits import limits_as_dict, using_limits
 from ...schema import Score
 from ...sketch import SketchDetail, normalize_sketch_grain, sketch_state_of
 from ... import db as _db
+from ... import thumbs_db as _thumbs_db
 from ..common import _unexpected_http_error
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
@@ -79,6 +80,10 @@ def api_history_get(
     for_revision: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     anchor_id: str | None = Query(default=None, max_length=100),
+    include_svg: bool = Query(
+        default=True,
+        description="Send each work's whole SVG. Clients that draw from thumbnails send false.",
+    ),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
     if anchor_id:
@@ -96,6 +101,13 @@ def api_history_get(
         starred=starred,
         for_revision=for_revision,
     )
+    if not include_svg:
+        # Emptied, not removed. A client that has never heard of this flag still
+        # finds the key where it has always been, holding a string; taking the
+        # key away would make "no picture asked for" and "old server" the same
+        # shape on the wire. Twenty-one works cost 23.5 MB with the pictures and
+        # about 1.0 MB without them.
+        items = [{**item, "svg": ""} for item in items]
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
@@ -149,6 +161,52 @@ def api_history_neighbors(item_id: str, actor: dict = Depends(_current_user)) ->
         key=lambda item: (composition_distance(focus[0].get("score") or {}, item.get("score") or {}), -int(item.get("at") or 0)),
     )[:3]
     return [HistoryItem(**item) for item in _db.get_items(actor["id"], [item["id"] for item in ranked])]
+
+
+# A year, and immutable: a saved work's SVG never changes, so neither does the
+# picture baked from it. `v` exists for the case that is not covered by that --
+# a rebuild bakes a work again, and a browser told `immutable` would never ask.
+# Clients pass the work's render_hash there, so a rebuilt thumbnail arrives
+# under a URL the cache has not seen. The server ignores its value; answering
+# 404 for a mismatch would blank the listing for the length of a rebuild.
+_THUMB_CACHE_CONTROL = "private, max-age=31536000, immutable"
+
+
+def _thumb_etag(row: dict) -> str:
+    # The source hash identifies the picture; the scale distinguishes the two
+    # sizes baked from it. built_at only stands in for works saved before the
+    # render hash existed.
+    source = row.get("source_render_hash") or f"built-{row.get('built_at')}"
+    return f'"{source}-{row.get("scale")}"'
+
+
+@router.get("/api/history/{item_id}/thumb")
+def api_history_thumb(
+    item_id: str,
+    request: Request,
+    scale: int = Query(default=1, ge=1, le=2),
+    v: str = Query(default="", max_length=100, description="Cache key; the work's render hash. Not read."),
+    actor: dict = Depends(_current_user),
+) -> Response:
+    """The listing's picture of one work, as a PNG.
+
+    Nothing is drawn here. The bytes were baked from the SVG this work has been
+    holding since it was saved; if none were, the answer is 404 and the client
+    draws the SVG itself.
+    """
+    # The listing's own rule, not a second one: get_items() applies the same
+    # visibility and sharing checks, and answers with nothing -- so, 404 -- for
+    # a work this caller may not see.
+    if not _db.get_items(actor["id"], [item_id]):
+        raise HTTPException(status_code=404, detail="history item not found")
+    row = _thumbs_db.get_thumb(item_id, scale)
+    if row is None:
+        raise HTTPException(status_code=404, detail="thumbnail not found")
+    etag = _thumb_etag(row)
+    headers = {"ETag": etag, "Cache-Control": _THUMB_CACHE_CONTROL}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=row["png"], media_type="image/png", headers=headers)
 
 
 @router.get("/api/history/{item_id}/svg")

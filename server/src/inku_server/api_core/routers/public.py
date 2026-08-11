@@ -42,6 +42,10 @@ class AppInfoResponse(BaseModel):
     # Whether this server belongs to one person.  The client reads it to drop
     # the doors that lead nowhere when there is nobody else to be.
     single_user_mode: bool = False
+    # Whether this server keeps the second thumbnail size. The client asks for
+    # it only where both this is on and the screen is dense enough to use it;
+    # asking otherwise would be a 404 per thumbnail.
+    thumbnail_hidpi: bool = False
     render_engine_id: str
     render_engine_version: str
     ddl_version: str
@@ -83,6 +87,7 @@ def api_info() -> AppInfoResponse:
         build_number=_build_number(),
         developer_mode=_env_flag("INKU_DEVELOPER_MODE"),
         single_user_mode=_db.single_user_mode_enabled(),
+        thumbnail_hidpi=bool(_db.get_thumbnail_settings()["hidpi"]),
         render_engine_id=engine.id,
         render_engine_version=engine.version,
         ddl_version=DDL_VERSION,

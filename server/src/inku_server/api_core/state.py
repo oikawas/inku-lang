@@ -32,6 +32,34 @@ _save_stats = {
 }
 
 
+# Baking a thumbnail is its own queue, not a share of the artifact save one.
+# That one is gated by output_save_settings, which is off; a thumbnail is how
+# the listing draws itself, so it must not ride on a switch that means
+# something else.
+_THUMB_WORKERS = max(1, int(os.getenv("INKU_THUMBNAIL_WORKERS", "2")))
+
+
+_THUMB_QUEUE_LIMIT = max(_THUMB_WORKERS, int(os.getenv("INKU_THUMBNAIL_QUEUE_LIMIT", "64")))
+
+
+_thumb_executor = ThreadPoolExecutor(max_workers=_THUMB_WORKERS, thread_name_prefix="inku-thumb")
+
+
+_thumb_slots = BoundedSemaphore(_THUMB_QUEUE_LIMIT)
+
+
+_thumb_stats_lock = Lock()
+
+
+_thumb_stats = {
+    "submitted": 0,
+    "completed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "unavailable": 0,
+}
+
+
 _STAGE_WORKERS = max(1, int(os.getenv("INKU_STAGE_WORKERS", "4")))
 
 
@@ -108,6 +136,16 @@ def _increment_save_stat(name: str) -> None:
 def _artifact_save_stats() -> dict[str, int]:
     with _save_stats_lock:
         return dict(_save_stats)
+
+
+def _increment_thumb_stat(name: str) -> None:
+    with _thumb_stats_lock:
+        _thumb_stats[name] = _thumb_stats.get(name, 0) + 1
+
+
+def _thumbnail_stats() -> dict[str, int]:
+    with _thumb_stats_lock:
+        return dict(_thumb_stats)
 
 
 def _increment_stage_stat(name: str) -> None:

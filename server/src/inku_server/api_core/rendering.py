@@ -22,6 +22,7 @@ from .. import db as _db
 from .common import _build_number, _model_metadata
 from .deps import _logger
 from .state import _SAVE_QUEUE_LIMIT, _increment_save_stat, _render_capacity, _save_executor, _save_slots
+from .thumbnails import submit_thumbnail_build as _submit_thumbnail_build
 
 
 _SRGB_COLOR_PROFILE = {
@@ -553,4 +554,7 @@ def _add_history_item(
         _submit_history_artifact_save(item_dict)
     else:
         item_dict.update(metadata)
+    # Unconditional, unlike the artifact save above: the listing draws from
+    # thumbnails whether or not this installation also keeps files on disk.
+    _submit_thumbnail_build(item_dict)
     return item_dict

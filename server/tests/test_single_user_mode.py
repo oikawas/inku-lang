@@ -172,7 +172,9 @@ def test_app_info_gained_exactly_one_field():
         "ddl_version",
         "ddl_engine_version",
     }
-    assert current - before == {"single_user_mode"}
+    # thumbnail_hidpi joined it with contract 2: the client asks for the second
+    # thumbnail size only where the server keeps it, and this is how it learns.
+    assert current - before == {"single_user_mode", "thumbnail_hidpi"}
     assert before - current == set()
 
 

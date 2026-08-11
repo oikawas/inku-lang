@@ -16,6 +16,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Iterable
 
+from ..counts import _explicit_counts_from_ddl
+from ..limits import DEFAULT_LIMITS
 from ..saijiki import (
     RELATIONS,
     core_grammar_markers as saijiki_core_grammar_markers,
@@ -904,12 +906,50 @@ def _is_metaphorical_at(source_folded: str, index: int, length: int, *, lang: st
     return any(marker in window for marker in markers)
 
 
-def _strip_qualified_sentence(ddl: str, qualified: str, *, lang: str) -> str:
+def _sentences_of(text: str, *, lang: str) -> list[str]:
     if lang == "ja":
-        sentences = [part.strip() for part in re.split(r"(?<=。)", ddl) if part.strip()]
-    else:
-        sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", ddl) if part.strip()]
+        return [part.strip() for part in re.split(r"(?<=。)", text) if part.strip()]
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+
+
+def _strip_qualified_sentence(ddl: str, qualified: str, *, lang: str) -> str:
+    sentences = _sentences_of(ddl, lang=lang)
     return ("" if lang == "ja" else " ").join(part for part in sentences if qualified.casefold() not in part.casefold())
+
+
+def _clause_that_names(text: str, marker: str, *, lang: str) -> str | None:
+    """The sentence the plugin is named in -- where the body states how many."""
+    if not text or not marker:
+        return None
+    folded = marker.casefold()
+    for sentence in _sentences_of(text, lang=lang):
+        if folded in sentence.casefold():
+            return sentence
+    return None
+
+
+def _stated_unit_count(clause: str | None) -> int | None:
+    """How many whole units the body asked for, or None if it did not say.
+
+    Ruling A (2026-08-11): what a plugin offers is one unit, and a count in the
+    body means "that whole, N times".  The reader is the shared one in `..counts`,
+    so this layer and the coerce layer answer "how many did the description say"
+    the same way and a hole in the reader cannot be fixed on one side only.
+
+    A clause stating more than one count is left at one unit: which of them is the
+    unit count is not decidable here, and choosing would place a number nobody
+    wrote.
+    """
+    stated = _explicit_counts_from_ddl(clause)
+    if len(stated) != 1:
+        return None
+    value = next(iter(stated))
+    return value if value > 1 else None
+
+
+def _expansion_cost(text: str, instructions: list[dict], *, lang: str) -> int:
+    """What one unit costs the work: transcribed instructions plus expanded lines."""
+    return len(instructions) + len(_sentences_of(text, lang=lang))
 
 
 def expand_plugin_ddl(
@@ -968,17 +1008,17 @@ def expand_plugin_ddl(
             else:
                 continue
             base = _strip_qualified_sentence(result, qualified, lang=lang) if explicit else result
+            # `source` is not a fallback seed.  It is the sketch prose, which
+            # Stage 0.5 rewrites on every run, so falling back to it would quietly
+            # cost "the same description draws the same counts" -- and nothing
+            # would turn red.  A caller that passes no seed lands on the DDL being
+            # expanded, which is the fallback render.py already writes by hand.
+            unit_seed = seed_text or result or qualified
             try:
                 expansion, entry_instructions = _expand_entry(
                     entry,
                     lang=lang,
-                    # `source` is not a fallback seed.  It is the sketch prose,
-                    # which Stage 0.5 rewrites on every run, so falling back to
-                    # it would quietly cost "the same description draws the same
-                    # counts" -- and nothing would turn red.  A caller that
-                    # passes no seed lands on the DDL being expanded, which is
-                    # the fallback render.py already writes by hand.
-                    seed_text=seed_text or result or qualified,
+                    seed_text=unit_seed,
                     warnings=warnings,
                 )
             except (KeyError, PluginFormatError) as exc:
@@ -989,8 +1029,57 @@ def expand_plugin_ddl(
                     else "Place a small black pencil arc in the middle region."
                 )
                 continue
+
+            # Ruling A: the body says how many of the whole unit to place.  An
+            # explicit reference states its count in the DDL clause that names the
+            # plugin; a firing word states it in the description, which is the only
+            # place that word appears at all.
+            if explicit:
+                clause = _clause_that_names(result, trigger, lang=lang) or _clause_that_names(
+                    source, trigger, lang=lang
+                )
+            else:
+                clause = _clause_that_names(source, trigger, lang=lang)
+            requested = _stated_unit_count(clause)
+            unit_cost = _expansion_cost(expansion, entry_instructions, lang=lang)
+            expansions = [expansion]
+            units = 1
+            if requested is not None:
+                budget = DEFAULT_LIMITS.max_expanded_primitives
+                if unit_cost * requested > budget:
+                    # A count that cannot be delivered whole is declined, never
+                    # trimmed: a trimmed count is neither the one the description
+                    # asked for nor one anybody else chose, and no reader of the
+                    # Score could say what it means.
+                    warnings.append(
+                        f"{qualified}: {requested} units of {unit_cost} marks exceeds the "
+                        f"{budget}-mark work budget; expansion kept at one unit"
+                    )
+                else:
+                    for index in range(1, requested):
+                        # Each unit resolves the plugin document's own range on its
+                        # own seed.  Repeating one unit verbatim would hand the
+                        # score N copies of one figure, which the duplicate repair
+                        # would then collapse back to one.
+                        try:
+                            more_text, more_instructions = _expand_entry(
+                                entry,
+                                lang=lang,
+                                seed_text=f"{unit_seed}#unit-{index}",
+                                warnings=warnings,
+                            )
+                        except (KeyError, PluginFormatError) as exc:
+                            warnings.append(
+                                f"{qualified}: unit {index + 1} of {requested} dropped: {exc}"
+                            )
+                            break
+                        expansions.append(more_text)
+                        entry_instructions.extend(more_instructions)
+                        units += 1
             joiner = "" if lang == "ja" else " "
-            result = joiner.join(part for part in (base.strip(), expansion.strip()) if part)
+            result = joiner.join(
+                part for part in (base.strip(), *(text.strip() for text in expansions)) if part
+            )
             instructions.extend(entry_instructions)
             provenance.append(
                 {
@@ -998,6 +1087,10 @@ def expand_plugin_ddl(
                     "plugin_term": qualified,
                     "plugin_name": document.manifest.name,
                     "plugin_version": document.manifest.version,
+                    # How many whole units the body asked for and got.  Declining an
+                    # oversized count leaves this at 1, which is what tells a decline
+                    # apart from a description that never stated a count.
+                    "units": str(units),
                 }
             )
     if _PLUGIN_REFERENCE_RE.search(result):

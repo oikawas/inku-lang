@@ -14,7 +14,11 @@ DDL editor actually holds -- `+page.svelte` hydrates `pluginEntries` from it).
 
 from __future__ import annotations
 
+import re
 import uuid
+from pathlib import Path
+
+import pytest
 
 from fastapi.testclient import TestClient
 
@@ -94,6 +98,29 @@ def test_no_existing_key_was_dropped_or_renamed():
             assert isinstance(entry["surface_en"], list)
             assert isinstance(entry["note_ja"], str)
             assert isinstance(entry["note_en"], str)
+
+
+_WEB_PLUGIN_NAMES = (
+    Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "plugin-names.ts"
+)
+
+
+@pytest.mark.skipif(
+    not _WEB_PLUGIN_NAMES.exists(),
+    reason="web sources are not deployed beside the server",
+)
+def test_the_editor_reads_the_keys_this_server_writes():
+    """The reader and the writer are in different languages and repositories
+    halves; only the key names hold them together. A rename on either side
+    would leave the editor silently unable to name the word."""
+    source = _WEB_PLUGIN_NAMES.read_text(encoding="utf-8")
+    keys = sorted(set(re.findall(r"fires_on_[a-z]{2}", source)))
+    assert keys == ["fires_on_en", "fires_on_ja"], keys
+    headers = _auth()
+    for entries in (_plugins_entries(headers), _saijiki_entries(headers)):
+        for entry in entries:
+            for key in keys:
+                assert key in entry, f"{key} missing from {sorted(entry)}"
 
 
 def test_both_transports_agree_on_the_firing_phrases():

@@ -692,7 +692,7 @@ options:
 usage: inku-cli history [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--offset OFFSET]
                         [--limit LIMIT] [--query QUERY] [--starred]
-                        [--for-revision]
+                        [--for-revision] [--no-svg]
                         {share,unshare,acl,peers} ...
 
 positional arguments:
@@ -713,6 +713,8 @@ options:
   --query QUERY, -q QUERY
   --starred
   --for-revision
+  --no-svg              leave each work's drawing out of the listing; the
+                        items come back with svg empty
 
 ```
 

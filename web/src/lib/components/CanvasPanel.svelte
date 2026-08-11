@@ -103,6 +103,10 @@
 		replayDisabled: boolean;
 		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
 		onDownloadPNG: (size: number) => void | Promise<void>;
+		// The card is built from a saved work, so the toolbar needs its id, not
+		// just the drawing on screen.
+		currentHistoryId: string | null;
+		onDownloadCard: () => void | Promise<void>;
 		onVaryPerformance: () => void | Promise<void>;
 		onVaryComposition: () => void | Promise<void>;
 		onVaryInterpretation: () => void | Promise<void>;
@@ -238,6 +242,8 @@
 		replayDisabled,
 		onDownloadSVG,
 		onDownloadPNG,
+		currentHistoryId,
+		onDownloadCard,
 		onVaryPerformance,
 		onVaryComposition,
 		onVaryInterpretation,
@@ -302,6 +308,18 @@
 
 	let canvasContentEl: HTMLDivElement | null = null;
 	let svgMenuOpen = $state(false);
+	// The card leaves in one press, so the only state it needs is "in flight".
+	let cardExportBusy = $state(false);
+
+	async function downloadCardFromCanvas(): Promise<void> {
+		if (cardExportBusy) return;
+		cardExportBusy = true;
+		try {
+			await onDownloadCard();
+		} finally {
+			cardExportBusy = false;
+		}
+	}
 	let svgHelpOpen = $state(false);
 	let presentationMode = $state(false);
 	let generationInfoOpen = $state(false);
@@ -1274,6 +1292,19 @@
 				</div>
 			{/if}
 		</div>
+		<Tooltip placement="left" text={t().tooltipCanvasDownloadCard}>
+			<button
+				class="ghost-btn export-btn"
+				type="button"
+				onclick={downloadCardFromCanvas}
+				disabled={!result || !currentHistoryId || cardExportBusy}
+			>
+				<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+				</svg>
+				<span>{cardExportBusy ? t().cardExportBusy : t().historyCardExport}</span>
+			</button>
+		</Tooltip>
 	</div>
 </div>
 

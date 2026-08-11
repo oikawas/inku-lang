@@ -128,13 +128,13 @@ but never asserts "the output will change"**.
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
 | `render_engine_version` | the drawing engine | `29` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `12` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `13` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.0 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.1 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 884 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 885 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -210,12 +210,16 @@ There are two instances as of v2.4.7.
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
 | Drawing | `server/reference/render-engine-29/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 549 (454 SVG) |
-| Deterministic DDL layers | `server/reference/ddl-engine-12/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` | 36 (A 13 / B 23) |
+| Deterministic DDL layers | `server/reference/ddl-engine-13/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` / **C** = expanded DDL, unit counts and declines from `expand_plugin_ddl` | 40 (A 13 / B 23 / C 4) |
 
-**The DDL side splits into A and B because the deterministic layers are not
+**The DDL side splits into A, B and C because the deterministic layers are not
 adjacent** ("Deterministic and non-deterministic layers" in this document). Stage 2's LLM sits between Stage 1.5 (DDL→DDL) and coercion
 (Score→Score), so "DDL through to Score" cannot be a single baseline. **A's output is
 never used as B's input** — that is the "corpora are never chained" rule above.
+**C (plugin expansion) was added in v2.13.1**: the layer had carried a version number
+from the start and never a frozen output, because A's plugin work is the `Nature.`
+macro regex in `ddl_expander` and the document plugin manager is called from the
+render route alone.
 
 The operating procedure lives next to the artifacts (`server/reference/README.md`), and
 CI (`.github/workflows/reference-corpus.yml`) enforces byte-identical regeneration with

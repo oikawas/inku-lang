@@ -5431,3 +5431,40 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   `workers`.
 - **⚠ Baking straight after a save is unchanged.** That path is still threads, and
   `INKU_THUMBNAIL_WORKERS` still makes no difference to how long it takes.
+
+### v2.13.1 — the count is read in one place and the macro honours it (Build 885, 2026-08-11, drawing)
+
+- **Write "three" beside a plugin and three are placed.** The expansion layer read no number at
+  all, so `Nature.青葉を三つ置く。` came back as one group. **What a plugin hands over is one unit,
+  and a count stated in the phrase says how many of those units to place** (**what one unit becomes
+  is settled by the plugin document's declaration and the seed; the body does not reach inside it**).
+- **One reader for the count.** The twelve definitions coerce carried moved to
+  `server/src/inku_server/counts.py`, and the expansion layer reads the same words. **A hole in the
+  reader can no longer be fixed on one side only.**
+- **The count belongs to the phrase, not the sentence.** Of seven production works stating a count
+  beside a reference, **five carry another number in the same sentence** (`一つ` / `一本`), and
+  reading by sentence left all of them at one unit. The boundary is the comma.
+- **A count the work has no room for is declined, not trimmed.** When the stated number times one
+  unit exceeds the budget, the single unit stands and a line goes into `plugin_warnings`. **Knowing
+  a number was not drawn beats drawing a number nobody chose.**
+- **The English path reads Arabic numerals.** It used to require a noun from a 32-word table, which
+  is why `Draw 12 circles.` was invisible to it. **The table is gone.** Numerals that are part of
+  another number — decimals, fractions, ratios, percentages — are not counts (measured: without
+  that exclusion a radius of `0.11` was read as `0` and `11`).
+- **The Japanese path is untouched.** A bare numeral with no counter is still not read; the true and
+  false cases are eight against eight, so it needs a ruling.
+- **`ddl_engine_version` 12 → 13, and the reference corpus gained part C (plugin expansion).** That
+  layer had carried a version number from the start and **never a frozen output**: part A's plugin
+  work is the `Nature.` macro regex in `ddl_expander`, and the document plugin manager is called
+  from the render route alone. **The corpus goes 36 → 40 cases (A 13 / B 23 / C 4), and the four new
+  ones are the whole of what moved.**
+- **⚠ Where the two rulings do not meet is recorded rather than fixed** (**undecided**): in an
+  English description, a plugin whose name contains CJK is not counted by an Arabic numeral
+  (`Place 12 Nature.青葉 marks.` places one unit, `twelve` places twelve). The rule that leaves a
+  numeral with CJK within twelve characters to the Japanese path lands on the reference name itself.
+  **The fourth C case freezes this**, so a ruling either way moves a case.
+- **Checks:** **server 2,890 passed / 31 skipped** (39 new on the branch, one discriminator added for part C on acceptance, none lost), **cli 218 passed**, **ruff clean**,
+  **frozen corpora byte-identical**, **Android JVM 0 failures**, **no change under `web/`**.
+  **Fourteen of fifteen perturbations landed**; the one that missed (P-15) missed on where it was
+  aimed — applying stage 3's own change did redden T-13.
+

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.0 / Build 884**
+**Target version: v2.13.1 / Build 885**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -103,8 +103,8 @@ To learn why something took its current shape, search the changelog by term, ver
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 29 | `server/src/inku_server/render_engines/default.py` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 12 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.22` | `android/VERSION` (a namespace separate from web and server) |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 13 | `server/src/inku_server/layer_versions.py` |
+| Android | `2.1.4-android.23` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -142,6 +142,11 @@ The prompt is assembled from the saijiki table and holds no fixed vocabulary str
 immediately after Stage 1.
 Only a `fires_on` term that is namespace-qualified or named as an explicit subject fires; it never
 widens to metaphor or unknown subjects.
+**What a plugin hands over is one unit, and a count stated in the phrase naming it says how many of
+those units to place** (what one unit becomes is settled by the plugin document's declaration and the
+seed; the body does not reach inside it). The count is read by `counts.py`, shared with coerce.
+**When the stated number times one unit exceeds a budget, the single unit stands and the decline is
+recorded rather than trimmed to fit.**
 - **Stage 1.5** — deterministic expansion and relation assignment.
 It carries variation (three strengths), stored per work. **One axis moves — the focus — and this
 layer adds no sentence the description did not ask for.**
@@ -286,7 +291,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-29` (549 cases) and `ddl-engine-12` (36 cases) are current, and CI enforces
+`render-engine-29` (549 cases) and `ddl-engine-13` (40 cases) are current, and CI enforces
 byte-identical regeneration.
 - **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
 same way. The port reads the directory for the version it declares, so **raising the server engine

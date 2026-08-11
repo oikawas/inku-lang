@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.1 Baseline (Web Build 885)
+
+The 13 version markers were moved to v2.13.1 / Build 885. **How a plugin reference is counted changed; the manual does not document plugin-reference syntax, so nothing was added to explain it.**
+
+- **Write "three" beside a plugin and three are placed.** Any number used to give one. What a plugin hands over is one whole unit, and a count stated in the same phrase says how many of those units to place (**what one unit becomes is settled by the plugin document's own declaration and the seed**).
+- **⚠ The count is read inside the phrase that names the macro.** A number written in another phrase of the same sentence does not reach it (`、` or `,` ends a phrase).
+- **A count the work has no room for is declined, not trimmed.** If the stated number times one unit exceeds the work-wide budget, the single unit stands and the work records that it was declined. **Knowing a number was not drawn beats drawing a number nobody chose.**
+- **⚠ In an English description, a plugin whose name contains CJK is not counted by an Arabic numeral** (`Place 12 Nature.青葉 marks.` places one, `Place twelve Nature.青葉 marks.` places twelve). A numeral with CJK beside it is left to the Japanese path, and **that case is undecided**.
+
 ## 2026-08-11 — Unreleased v2.13.0 Baseline (Web Build 884)
 
 The 13 version markers were moved to v2.13.0 / Build 884, and **`Server Configuration` §2.1 and §3.1 were revised now that the thumbnail parallelism is an administration setting**.

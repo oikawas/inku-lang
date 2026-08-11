@@ -8,10 +8,9 @@
 //     and still make the setting do nothing. This drives the layer that builds
 //     the body, so a constant cannot hide behind a correct-looking picture.
 //
-// (2) the card did not become a fourth essential of the simple UI. The
-//     essentials are the description input, the drawing and the canvas; every
-//     optional group is a key in SIMPLE_UI_VISIBILITY, all of them off. The
-//     card lives in the history group, which is one of those.
+// (2) the card has two doors and neither is closed by a UI mode. One is on the
+//     canvas status bar, the other in the history manager; a work can be taken
+//     out as one sheet from whichever surface the user is looking at.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -27,6 +26,25 @@ import { SIMPLE_UI_VISIBILITY, UI_VISIBILITY_KEYS } from './uiMode.ts';
 const HISTORY_MANAGER = fileURLToPath(
 	new URL('./components/HistoryManager.svelte', import.meta.url)
 );
+const CANVAS_PANEL = fileURLToPath(
+	new URL('./components/CanvasPanel.svelte', import.meta.url)
+);
+const PAGE = fileURLToPath(new URL('../routes/+page.svelte', import.meta.url));
+
+/** The selectors of the one rule that hides groups per UI mode, on their own.
+ *
+ *  Read as a rule rather than as a file: a `.status-bar` written anywhere else
+ *  in the page must not be able to answer for this one. */
+function hideRuleSelectors(source: string): string {
+	// The dot is what separates the rule from `class:ui-hide-input-modes` in the
+	// markup, which carries no dot.
+	const start = source.indexOf('.ui-hide-input-modes');
+	assert.ok(start >= 0, 'the ui-hide rule was not found in the page');
+	const brace = source.indexOf('{', start);
+	const end = source.indexOf('}', brace);
+	assert.match(source.slice(brace, end), /display:\s*none;/);
+	return source.slice(start, brace);
+}
 
 // ── T-10 (1): the choices reach the wire ────────────────────────────────────
 
@@ -55,11 +73,11 @@ test('every combination of page shape and seal is carried, not a constant', () =
 	assert.equal(normalizeCardExportSettings({ layout: 'portrait', seal: false }).seal, false);
 });
 
-// ── T-10 (2): the simple UI gained nothing ──────────────────────────────────
+// ── T-10 (2): the card has two doors, and no UI mode closes them ────────────
 
-test('the card did not become an essential of the simple UI', () => {
-	// The optional groups, and their state in simple mode. A new key here, or
-	// any of them turned on, would mean the simple UI grew.
+test('the card has two doors and neither is hidden by a UI mode', () => {
+	// The optional groups. A new key here would mean the UI grew a group the
+	// modes do not know about.
 	assert.deepEqual([...UI_VISIBILITY_KEYS], [
 		'input_modes',
 		'drawing_settings',
@@ -69,11 +87,19 @@ test('the card did not become an essential of the simple UI', () => {
 		'history',
 		'auxiliary'
 	]);
-	assert.deepEqual(Object.values(SIMPLE_UI_VISIBILITY), Array(7).fill(false));
 
-	// And the card export itself sits in the history group rather than beside
-	// the description input: it is in the component the history group renders.
+	// Door one lives in the history manager, which the simple UI now shows: the
+	// group is on, so the door is reachable from every mode.
 	const source = readFileSync(HISTORY_MANAGER, 'utf8');
 	assert.match(source, /downloadSelectedCard/);
 	assert.match(source, /historyCardExport\b/);
+	assert.equal(SIMPLE_UI_VISIBILITY.history, true);
+
+	// Door two is on the canvas status bar. It is a direct child of .status-bar
+	// rather than of a group that the modes hide, and no rule hides the bar
+	// itself -- so it survives with the rest of the bar's contents gone.
+	const canvas = readFileSync(CANVAS_PANEL, 'utf8');
+	assert.match(canvas, /onclick=\{downloadCardFromCanvas\}/);
+	const page = readFileSync(PAGE, 'utf8');
+	assert.doesNotMatch(hideRuleSelectors(page), /:global\(\.status-bar\)/);
 });

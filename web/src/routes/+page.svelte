@@ -3692,29 +3692,24 @@ if (unreadWords.length > 0) {
 	}
 
 	// ── History ─────────────────────────────────────────────
+	// A prediction, used only for the first fetch made before the manager opens.
+	// The canonical page size is what the manager measures on its own grid
+	// (calculatePageSize() in HistoryManager.svelte); this estimate never
+	// overrides it. minCardWidth mirrors the minmax() in that component's
+	// .history-thumb-grid rule and must move whenever the CSS does.
 	function estimatedHistoryManagerPageSize(): number {
 		const modalWidth = Math.max(320, windowWidth * 0.8);
 		const modalHeight = Math.max(280, windowHeight * 0.8);
 		const gridWidth = Math.max(1, modalWidth - 20);
 		const gridHeight = Math.max(1, modalHeight - 94);
 		const gap = 8;
-		const minCardWidth = 104;
+		const minCardWidth = 142;
 		const columns = Math.max(1, Math.floor((gridWidth + gap) / (minCardWidth + gap)));
 		const cardWidth = Math.max(minCardWidth, (gridWidth - gap * (columns - 1)) / columns);
 		const imageWidth = Math.max(1, cardWidth - 12);
 		const cardHeight = imageWidth * 58 / 82 + 75;
 		const rows = Math.max(1, Math.floor((gridHeight + gap) / (cardHeight + gap)));
 		return Math.max(historyWindowSize, Math.min(100, columns * rows));
-	}
-
-	function preloadHistoryManagerFirstPage() {
-		if (!authToken || historyManager.open || historyStarredOnly || historyOffset !== 0) return;
-		historyManager.preloadFirstPage(
-			historyItems,
-			historyTotal,
-			trashTotal,
-			estimatedHistoryManagerPageSize()
-		);
 	}
 
 	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean; anchorId?: string } = {}): Promise<boolean> {
@@ -3778,15 +3773,11 @@ if (unreadWords.length > 0) {
 				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
 			}
-			if (!historyManager.open) {
-				if (resolvedOffset === 0 && !historyStarredOnly) {
-					// The strip's items are what we have; the manager's page size is a
-					// different quantity, so it is passed separately. The manager is
-					// seeded, not filled: it fetches its own page when it opens.
-					historyManager.seedFromStrip(data.items, data.total, trashTotal, estimatedHistoryManagerPageSize());
-				} else {
-					preloadHistoryManagerFirstPage();
-				}
+			if (!historyManager.open && resolvedOffset === 0 && !historyStarredOnly) {
+				// The strip's items are what we have; the manager's page size is a
+				// different quantity, so it is passed separately. The manager is
+				// seeded, not filled: it fetches its own page when it opens.
+				historyManager.seedFromStrip(data.items, data.total, trashTotal, estimatedHistoryManagerPageSize());
 			}
 			return options.anchorId ? historyCursor >= 0 && historyItems[historyCursor]?.id === options.anchorId : true;
 		} catch {
@@ -6870,7 +6861,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			historyManagerShownTo={historyManager.shownTo}
 			managedHistoryItems={historyManager.items}
 			managedHistoryTotal={historyManager.total}
-			managerTrashTotal={historyManager.trashTotal}
 			{trashTotal}
 			selectedHistoryIds={historyManager.selectedIds}
 			animationExportSettings={exportSettings.animation}
@@ -7081,8 +7071,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-work-tools :global(.png-wrap),
 	.ui-hide-history :global(.nav-left),
 	.ui-hide-history :global(.nav-right),
-	.ui-hide-history :global(.nearby-mirror),
-	.ui-hide-detail-status.ui-hide-work-tools :global(.status-bar) {
+	.ui-hide-history :global(.nearby-mirror) {
 		display: none;
 	}
 	.tooltips-disabled :global(.tooltip-bubble) {

@@ -68,7 +68,8 @@
 		historyManagerShownTo: number;
 		managedHistoryItems: HistoryItem[];
 		managedHistoryTotal: number;
-		managerTrashTotal: number;
+		// One source for how many works are in the trash. The page holds it and
+		// both routes that learn a new count write it there.
 		trashTotal: number;
 		selectedHistoryIds: string[];
 		animationExportSettings: AnimationExportSettings;
@@ -116,7 +117,6 @@
 		historyManagerShownTo,
 		managedHistoryItems,
 		managedHistoryTotal,
-		managerTrashTotal,
 		trashTotal,
 		selectedHistoryIds,
 		animationExportSettings,
@@ -489,6 +489,11 @@
 		void onToggleStar(item, event);
 	}
 
+	// The canonical page size: measured from the real grid, so this is the number
+	// one page of the manager holds. The page's estimatedHistoryManagerPageSize()
+	// is only a prediction for the first fetch made before the manager opens.
+	// minCardWidth mirrors the minmax() in the .history-thumb-grid rule below and
+	// must move whenever the CSS does.
 	function calculatePageSize(element: HTMLElement): number {
 		const grid = element.querySelector('.history-thumb-grid');
 		const elementStyle = getComputedStyle(element);
@@ -500,7 +505,7 @@
 		if (width <= 0 || height <= 0) return 1;
 		const computed = grid ? getComputedStyle(grid) : null;
 		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
-		const minCardWidth = 104;
+		const minCardWidth = 142;
 		const columns = Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
 		// Derive the card height from the fixed CSS contract instead of measuring
 		// rendered cards. Measuring content-visibility placeholders caused the
@@ -517,7 +522,7 @@
 		if (historyDisplayMode !== 'lineage') return;
 		// historyManagerTab is a dependency because the thumbnail tab asks the
 		// server for a different set (min_items=2) than the list tab does.
-		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; lineageGroupPage; managedHistoryTotal; managerTrashTotal; historyManagerTab;
+		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; lineageGroupPage; managedHistoryTotal; trashTotal; historyManagerTab;
 		void fetchLineageGroups();
 	});
 
@@ -638,7 +643,7 @@
 					class="ghost-btn"
 					class:ghost-active={historyManagerView === 'trash'}
 					onclick={() => onSetView(historyManagerView === 'trash' ? 'active' : 'trash')}
-				>{t().historyTrashButton(managerTrashTotal || trashTotal)}</button>
+				>{t().historyTrashButton(trashTotal)}</button>
 			</Tooltip>
 			{#if historyManagerView === 'active'}
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryMoveToTrash}>

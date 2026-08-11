@@ -47,7 +47,7 @@ const EN: Record<string, string> = {
 };
 
 export function derivationKindLabel(kind: string | null | undefined, isJapanese: boolean): string {
-	return (isJapanese ? JA : EN)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Root'));
+	return (isJapanese ? JA : EN)[kind ?? ''] ?? (kind || (isJapanese ? '起点' : 'Origin'));
 }
 
 /** Which edge a redraw from the describe tab writes.

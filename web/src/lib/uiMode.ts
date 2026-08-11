@@ -19,7 +19,9 @@ export const SIMPLE_UI_VISIBILITY: Record<UiVisibilityKey, boolean> = {
 	ddl_tools: false,
 	detail_status: false,
 	work_tools: false,
-	history: false,
+	// The simple UI keeps its history: without it the work is drawn, looked at
+	// and lost, and the card export has no reachable door.
+	history: true,
 	auxiliary: false,
 };
 

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.12.4 / Build 882**
+**Target version: v2.12.5 / Build 883**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -202,7 +202,10 @@ nodes and edges.
 The two marks are independent: filtering on both shows only the works that carry both.
 A listing shows **images baked from the stored SVGs**, kept in a derived `thumbs.db` beside the
 canonical database. Baking happens after saving and never runs the engine, so the picture stays
-the one the work was drawn with; works not baked yet are drawn from their SVG
+the one the work was drawn with; works not baked yet are drawn from their SVG.
+The rasterizing runs in child processes -- the rasterizer holds the GIL, so threads would sit
+on one core -- while the writing stays in the parent, and one work that cannot be baked does
+not stop the rest
 - Per-work sharing.
 A recipient and a permission (`read` or `write`) are chosen one work at a time, and a shared work
 carries a mark in the list.

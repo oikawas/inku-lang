@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.12.5 Baseline (Web Build 883)
+
+The 13 version markers were moved to v2.12.5 / Build 883. **Only the way thumbnails are baked changed; nothing an operator does is different.**
+
+- **Rebuilding thumbnails now uses every core.** The previous version could only use one, so `INKU_THUMBNAIL_WORKERS` and the rebuild's `workers` made no difference to how long a rebuild took. **Now as many bake at once as are asked for.**
+- **One work that cannot be baked no longer stops the rest.** The previous version abandoned the remaining works on the first failure and still reported itself finished with no failures. **The number that could not be baked is now shown.**
+- **A run that stopped short says so.** The rebuild status gained a "left unfinished" flag.
+
 ## 2026-08-11 — Unreleased v2.12.4 Baseline (Web Build 882)
 
 The 13 version markers were moved to v2.12.4 / Build 882, and **`Server Configuration` §2.1, §2.3, §3.1 and §7 and the history section of the `inku-cli Reference` were revised now that a listing shows baked images rather than the drawings themselves**.

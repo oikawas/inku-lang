@@ -5385,3 +5385,27 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
 - **Production-scale figures were not measured.** The local database holds 83 works totalling
   350 KB of SVG — **a different population from production's roughly 1 MB per work**. Response
   size, backfill duration and the real size of `thumbs.db` **will be measured after deployment.**
+
+### v2.12.5 — thumbnails bake on every core, and one bad work no longer stops the run (Build 883, 2026-08-11, first load)
+
+- **Baking moved into child processes.** v2.12.4 called `resvg` in this process inside a thread pool,
+  and **`resvg` holds the GIL for the whole rasterization**, so **the `workers` setting changed the
+  shape of the queue and nothing else.** Measured: the same twelve bakes took **10.08 / 10.36 /
+  11.49 s** at 1 / 2 / 6 threads — six threads was slower. In production **one of eight cores ran at
+  99.4% while the other seven sat between 0 and 1.2%.** The project's own "six ways, about eight
+  times" is a figure from a different path, one that runs a child process per file, and it had been
+  carried over to this one. **⚠ Only the rasterizing crosses to a child; the write into `thumbs.db`
+  happens in the parent**, so SQLite keeps one writer. **⚠ Spawn is named explicitly** — a threaded
+  server must not be forked.
+- **A work that cannot be baked no longer takes the rest with it.** In v2.12.4 one raised work meant
+  **the remaining works were never attempted**, and the run **reported itself finished with no
+  failures.** Measured in production: **it stopped at 481 of 2,917**, and nothing in the status said
+  so. **⚠ A listing holds no drawing for an unbaked work, so nothing is drawn there.**
+- **A run that stopped short now says so.** The rebuild status gained `ended_short`. **"Not running,
+  no failures" is also what a completed run looks like**, so the two could not be told apart.
+- **Checks:** **server 2,844 → 2,847 passed / 31 skipped** (three new), **cli 218 passed**, **ruff
+  clean** (server and cli), **frozen corpora byte-identical**, **no change under `web/`**. **Three
+  perturbations were applied and each reddened exactly one gate** (drop the guard → T-R1, stop
+  recording the short run → T-R2, go back to threads → T-R3).
+- **⚠ Neither defect appeared until v2.12.4 was deployed and the real 2,917 works were baked.** The
+  83 works on the development machine never stopped, and never showed the load sitting on one core.

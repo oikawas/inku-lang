@@ -84,6 +84,7 @@
 		type Score
 	} from '$lib/historyManagerState.svelte';
 	import { historyListLimit } from '$lib/historyListLimit';
+	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
@@ -2185,9 +2186,10 @@
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; render_engine_version?: string };
+			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string };
 			developerMode = data.developer_mode === true;
 			singleUserMode = data.single_user_mode === true;
+			setThumbnailHidpi(data.thumbnail_hidpi === true);
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
 				? data.render_engine_version
 				: null;

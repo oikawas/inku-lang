@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import { thumbnailConditions, thumbnailSrc } from '$lib/thumbnailSource';
 	type HistoryItem = {
 		id?: string;
 		svg: string;
 		at: number;
+		render_hash?: string | null;
 		// v1.98: Stage 1 フォールバックで描かれた作品の理由。null = 通常の解釈。
 		interpret_fallback?: string | null;
 	};
@@ -17,6 +19,12 @@
 	};
 
 	let { item, scope, size = 'strip' }: Props = $props();
+
+	// A work has no thumbnail until one has been baked for it, and the one on
+	// screen the moment it is drawn never does. Missing is answered with 404, so
+	// the picture that is already in hand is what gets drawn instead.
+	let thumbMissing = $state(false);
+	const pngSrc = $derived(thumbMissing ? null : thumbnailSrc(item, thumbnailConditions()));
 
 	const clipId = $derived(`thumb-clip-${scope}-${String(item.id ?? item.at).replace(/[^a-zA-Z0-9_-]/g, '-')}`);
 	const clippedSvg = $derived.by(() => {
@@ -44,7 +52,11 @@
 	{#if item.interpret_fallback}
 		<span class="thumb-fallback-mark" title={t().interpretFallbackBadge} aria-label={t().interpretFallbackBadge}></span>
 	{/if}
-	{@html clippedSvg}
+	{#if pngSrc}
+		<img src={pngSrc} alt="" loading="lazy" decoding="async" onerror={() => (thumbMissing = true)} />
+	{:else}
+		{@html clippedSvg}
+	{/if}
 </div>
 
 <style>
@@ -80,6 +92,15 @@
 		width: 48px;
 		height: 36px;
 		border: 1px solid var(--border);
+	}
+	/* `contain` keeps the letterboxing the SVG path already produced: an <svg>
+	   sized to the box with the default preserveAspectRatio fits inside it and
+	   leaves the remainder showing. A work does not change shape by being a PNG. */
+	.history-thumbnail img {
+		width: 100%;
+		height: 100%;
+		display: block;
+		object-fit: contain;
 	}
 	.history-thumbnail :global(svg) {
 		width: 100%;

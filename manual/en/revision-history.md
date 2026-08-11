@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.4 Baseline (Web Build 888)
+
+The 13 version markers were moved to v2.13.4 / Build 888, and **a subsection was added to §15 of `Creating Works`** now that a work can leave as a single card (§15.2 Shareable Card; the former §15.2 Animation is now §15.3).
+
+- **A work can be exported as a single card.** The drawing, the headnote, the last four digits of the render seed, and the seal are composed into one sheet, in a square layout (1080×1080) or a portrait one (1080×1350). It is exported from history management, and layout and seal live under `Export` in the settings.
+- **A work with no headnote becomes a card of the drawing alone**, and a work with no render seed shows no seed line. A long headnote shrinks the frame around the drawing, and anything past six lines is cut with `…`.
+- **The server composes the card and bakes it with a bundled font**, so the characters are the same whatever fonts the viewing machine happens to have.
+- **The same card comes out of the CLI** with `inku-cli export-card` (`--out`, `--layout`, `--no-seal`).
+- **The `Export` row of the settings table now names the card's layout and seal** (both languages).
+
 ## 2026-08-11 — Unreleased v2.13.3 Baseline (Web Build 887)
 
 The 13 version markers were moved to v2.13.3 / Build 887, and **a subsection was added to §6 of `Creating Works`** now that an unregistered plugin name is shown on screen.

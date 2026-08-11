@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.3 (Web Build 887). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.4 (Web Build 888). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -330,7 +330,20 @@ Works selected in history management are laid out on a single PNG.
 | Contact sheet for people | 7×4 works per sheet. The remainder goes to further files |
 | Contact sheet for AI | 3×4 works per sheet, 1568px on the long edge, captions numbered only. A companion md holding the numbers, descriptions, DDL, and provenance is saved alongside |
 
-### 15.2 Animation
+### 15.2 Shareable Card
+
+History management exports a work as a single card. The drawing, the headnote, the last four digits of the render seed, and the seal are composed into one sheet. A work with no headnote becomes a card of the drawing alone, and a work with no render seed shows no seed line.
+
+| Setting | Choices |
+|---|---|
+| Layout | Square (1080×1080), portrait (1080×1350) |
+| Seal | On (default) or off |
+
+The server composes the card and bakes it with a bundled font, so the characters are the same whatever fonts the viewing machine happens to have. The drawing is nested as SVG rather than pasted as pixels, so the sheet stays vector until the single rasterization at the end. A long headnote shrinks the frame around the drawing, and anything past six lines is cut with `…`.
+
+The same card comes out of the CLI with `inku-cli export-card`.
+
+### 15.3 Animation
 
 Works checked in history management, or the works from a selected work back to its origin in the lineage, are exported as one moving image.
 
@@ -371,7 +384,7 @@ Open the settings from the application rail. Which tabs are visible depends on t
 | DB settings | The current server DB; DB backup interval, generations, time, and manual run |
 | Plugins | The state of the system plugin, canvas ratio, and of user plugins |
 | User management | Adding, changing, and deleting users and groups |
-| Export | PNG export templates, animation across several works |
+| Export | PNG export templates, animation across several works, the shareable card's layout and seal |
 | Limits | The ceilings, such as how many marks one work may hold |
 | Log retention | Log retention and rotation policy |
 | Unread-word ledger | Words interpretation could not map directly |

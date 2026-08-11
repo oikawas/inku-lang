@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.3 / Build 887**
+**Target version: v2.13.4 / Build 888**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -222,7 +222,9 @@ A lineage may cross owners, so a node you cannot read appears as a card with its
 and deleted is told apart from private in words
 - Model, language, and drawing-element comparison; generation-info, prompt, and JSON inspectors; the
 colophon
-- SVG, PNG, and animation export.
+- SVG, PNG, and animation export, plus a shareable one-sheet card (drawing, headnote, seed, and seal
+composed into one image, in a square and a portrait layout; the server bakes it with a bundled font,
+so the same characters appear on any machine).
 One code path drops every file, and it can write to a folder the user picked (browsers with the File
 System Access API; the rest fall back to the browser default)
 - A Japanese and English UI.

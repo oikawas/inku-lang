@@ -5541,3 +5541,52 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   names the web reads are checked against a real server response.
 - **No deterministic layer was touched** (`document_format.py` did not move by a byte), so no frozen
   corpus was regenerated. **This change tells the author; it does not change what the layer does.**
+
+### v2.13.4 — The work leaves as one sheet (shareable card) (Build 888, 2026-08-11)
+
+- **A work can now leave as a single card.** The drawing, the headnote, the last four digits of the
+  render seed, and the seal are composed into one sheet, in **a square layout (1080×1080) and a
+  portrait one (1080×1350)**. It is exported from history management; layout and seal live in the
+  settings. **A work with no headnote becomes a card of the drawing alone**, and a work with no render
+  seed shows no seed line.
+- **⚠ Until now the repository carried no font at all.** The rasterizer used whatever the baking
+  machine happened to have, so **the same work came out with different letterforms on different
+  machines**. If the server is to do the typesetting, the letters have to travel with it.
+  **Noto Serif JP (variable, 12.95 MB, SIL OFL 1.1) now sits in `server/src/inku_server/fonts/`** —
+  it covers all 1,233 characters of demand taken from the frozen DDL corpus and the repository's
+  Japanese prose, with a cmap of 16,726. **⚠ The headnote is free text, so 1,233 is a floor, not a
+  ceiling.**
+- **⚠ resvg draws nothing at all — and raises nothing — when the family name does not match.** For
+  this variable font, name ID 1 is `Noto Serif JP ExtraLight` and **name ID 16 is `Noto Serif JP`**;
+  write the former and the card comes out blank. **A test of its own measures that the name written
+  into the SVG is the name the bundled file answers to**, because that mistake appears only as an
+  empty card.
+- **`svg_to_png()` gained `skip_system_fonts` and `font_files`, and its defaults are unchanged**, so
+  **the six existing callers** (animation ×2, colophon, autonomous refinement, the API's rendering,
+  and thumbnails) produce the same pixels as before.
+- **The drawing is nested as SVG rather than pasted as pixels**, so the card stays vector until the
+  single rasterization at the end. **A long headnote shrinks the frame around the drawing, and
+  anything past six lines is cut with `…`** — without the cut, the drawing is pushed off the sheet.
+- **From the CLI: `inku-cli export-card`** (`--out`, `--layout`, `--no-seal`). **⚠ Passing a
+  directory that does not exist, in the form `cards/`, produced a PNG named `cards`, and the second
+  card overwrote the first** — found and fixed by the implementing session, which now reads the
+  trailing separator too.
+- **The API is one route, `POST /api/history/export-card`.** It goes through identity, and **another
+  person's work id returns 404**. **The public list is still six.**
+- **⚠⚠ Two branches wrote the same number into the same guard in one cycle.** Contract 3 (the twelve
+  second poll) and the card both wrote **93** — "the branch point's 92 plus my own one" — and
+  **either one taken on its own is wrong**. **The right value is 94, and the merge added both**:
+  `EXPECTED_ROUTE_COUNT`, the three api-surface counts, and the allow-lists of the two guards that
+  hold a frozen file (**one of which goes red without conflicting at all**, because its frozen file
+  is the 92 of the branch point and one of the two additions then reads as undeclared).
+- **The set difference was measured before anything was regenerated**: the merge added **two
+  operations (`POST /api/history/export-card` and `GET /api/history/state`) and two schemas**, and
+  **the preceding 92 operations and 92 schemas did not move by a byte** (none removed, none changed).
+- **Checks:** **server 2,923 passed / 31 skipped** (**20 new from this branch** = 19 functions, one of which splits into two layout cases; **none lost**); **web 191 passed** (3 of them from this branch, the rest already on
+  main from the two contracts that landed first); **cli 220 passed** (**the +1 is this branch's** —
+  adding `export-card` gave the parser-help test one more case); **ruff clean** (server and cli);
+  `npm run check` **0 errors / 2 warnings** (the two pre-existing a11y ones); **i18n 0 errors** (1,046
+  English strings). **The implementing session applied 11 perturbations, and 23 tests went red
+  against a contract that predicted 15** (the three that differed are explained with measurements).
+- **No deterministic layer was touched** (`renderer.py` did not move by a byte), so no frozen corpus
+  was regenerated.

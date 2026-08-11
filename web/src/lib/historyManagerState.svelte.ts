@@ -113,6 +113,10 @@ export class HistoryManagerState {
 	private requestId = 0;
 	private pendingRequests = 0;
 	private preloadKey = "";
+	// Requests that have been sent and not yet come back, by what they ask for.
+	// One page of history is tens of megabytes here, so asking for the same page
+	// twice at once is not a harmless duplicate.
+	private inFlight = new Set<string>();
 
 	items = $derived(this.view === 'trash' ? this.trashItems : this.activeItems);
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
@@ -180,6 +184,14 @@ export class HistoryManagerState {
 		const forRevisionOnly = options.forRevisionOnly ?? this.forRevisionOnly;
 		const pageSize = options.pageSize ?? this.pageSize;
 		const silent = options.silent ?? false;
+		// Two callers can decide at the same moment that the manager needs its
+		// page -- opening it is one, the page's search effect another. Asking
+		// twice costs a second copy of the same tens of megabytes and shows the
+		// user nothing extra, so the later caller rides on the request already
+		// out. Answers still arrive; only the duplicate question is dropped.
+		const flightKey = [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0].join('|');
+		if (this.inFlight.has(flightKey)) return;
+		this.inFlight.add(flightKey);
 		this.pendingRequests += 1;
 		if (!silent) this.loading = true;
 		try {
@@ -222,6 +234,7 @@ export class HistoryManagerState {
 			}
 		} catch { /* ignore */ }
 		finally {
+			this.inFlight.delete(flightKey);
 			this.pendingRequests = Math.max(0, this.pendingRequests - 1);
 			if (!silent && (requestId === this.requestId || this.pendingRequests === 0)) this.loading = false;
 		}

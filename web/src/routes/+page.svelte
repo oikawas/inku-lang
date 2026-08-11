@@ -5671,11 +5671,22 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		void fetchHistoryOffset(0);
 	}
 
+	// What the manager was last sent away to search for. Opening the modal is not
+	// a search: this effect re-runs when `open` flips, and used to ask for a whole
+	// page on that alone. Now that opening fetches its own page, that made two
+	// identical requests for the same works -- 106 MB for one click. A view change
+	// is not a search either; setView() does its own fetch.
+	let historyManagerQuerySent = '';
+
 	$effect(() => {
 		const q = historyManager.search.trim();
-		if (!historyManager.open) return;
-		historyManager.view;
+		if (!historyManager.open) {
+			historyManagerQuerySent = '';
+			return;
+		}
+		if (q === historyManagerQuerySent) return;
 		const handle = setTimeout(() => {
+			historyManagerQuerySent = q;
 			untrack(() => { historyManager.searchChanged(q); });
 		}, q ? 250 : 0);
 		return () => clearTimeout(handle);

@@ -195,6 +195,39 @@ test('opening the manager without a page in hand fetches one', async () => {
 	assert.equal(stale.calls.length, 2);
 });
 
+// ── One click, one request ──────────────────────────────────────────────────
+// Beyond the contract's gates, from the author's ruling of 2026-08-11: pressing
+// the history button fetches once. Measured in the browser first -- opening the
+// manager sent two identical requests a millisecond apart, 105.9 MB for one
+// click, because the page's search effect re-runs on open and asked for the
+// same page that openWith had just asked for.
+test('two callers wanting the same page at once cost one request', async () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
+	manager.pageSize = MANAGER_PAGE_SIZE;
+
+	const both = Promise.all([
+		manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE }),
+		manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE })
+	]);
+	assert.equal(calls.length, 1);
+	await both;
+
+	// And once it is back, asking again is a real question, not a duplicate.
+	await manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
+	assert.equal(calls.length, 2);
+});
+
+test('a different page is not swallowed as a duplicate', async () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
+	manager.pageSize = MANAGER_PAGE_SIZE;
+	await Promise.all([
+		manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE }),
+		manager.fetch({ view: 'active', page: 1, pageSize: MANAGER_PAGE_SIZE }),
+		manager.fetch({ view: 'trash', page: 0, pageSize: MANAGER_PAGE_SIZE })
+	]);
+	assert.equal(calls.length, 3);
+});
+
 // ── T-6 ─────────────────────────────────────────────────────────────────────
 test('opening it again with the page already in hand fetches nothing', async () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);

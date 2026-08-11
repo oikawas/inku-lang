@@ -135,7 +135,7 @@ export class HistoryManagerState {
 	// overflows -- while `offset` advances by pageSize, so the next page would
 	// hand back works already counted as shown. Capping here keeps the quantity
 	// that is drawn and the quantity that `offset` steps by the same one.
-	items = $derived((this.view === 'trash' ? this.trashItems : this.activeItems).slice(0, this.pageSize));
+	items = $derived(this.pageOf(this.view === 'trash' ? this.trashItems : this.activeItems));
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
 	totalPages = $derived(Math.max(1, Math.ceil(this.total / this.pageSize)));
 	offset = $derived(this.page * this.pageSize);
@@ -150,6 +150,19 @@ export class HistoryManagerState {
 	constructor(apiFetch: ApiFetch, syncTrashPage: TrashPageSync) {
 		this.apiFetch = apiFetch;
 		this.syncTrashPage = syncTrashPage;
+	}
+
+	/**
+	 * One page's worth of the works in hand.
+	 *
+	 * Public, and a method rather than part of the $derived above, because this
+	 * is where the quantity that is shown is decided, and it has to be the same
+	 * quantity `offset` advances by. A rune is a compile-time transform, so a
+	 * test outside the browser cannot evaluate it; leaving the decision inside
+	 * one would leave the gates reading their own stand-in for it instead.
+	 */
+	pageOf(held: HistoryItem[]): HistoryItem[] {
+		return held.slice(0, this.pageSize);
 	}
 
 	clear() {

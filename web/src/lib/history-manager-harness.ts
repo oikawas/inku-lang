@@ -58,9 +58,10 @@ export function makeManager(pageItems: HistoryItem[], total: number) {
  * think no works are expected, so it asks for nothing and a gate on asking
  * passes without the code ever having decided anything.
  *
- * `items` must be sliced exactly the way the class slices it. It is one page's
- * worth, not everything in hand: the two differ whenever the page guessed a
- * larger size than the modal went on to measure, which is the ordinary case.
+ * `items` is not copied but delegated: manager.pageOf() is the product's own
+ * decision about what one page shows. Re-implementing the slice here would make
+ * the gates read this file instead of the class, and a perturbation of the
+ * class would leave them green.
  *
  * All five derived fields are caught up, not just the two the code reads most.
  * `totalPages` is frozen at 1 on a fresh manager, and setPage() clamps against
@@ -73,7 +74,7 @@ export function refreshDerived(manager: Manager) {
 	manager.total = trash ? manager.trashTotal : manager.activeTotal;
 	manager.totalPages = Math.max(1, Math.ceil(manager.total / manager.pageSize));
 	manager.offset = manager.page * manager.pageSize;
-	manager.items = held.slice(0, manager.pageSize);
+	manager.items = manager.pageOf(held);
 	manager.shownTo = Math.min(manager.offset + manager.items.length, manager.total);
 }
 

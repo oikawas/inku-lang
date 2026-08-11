@@ -244,6 +244,26 @@ test('the modal measuring itself smaller does not cost a second page', () => {
 	assert.equal(manager.pageSize, MEASURED_PAGE_SIZE);
 });
 
+// Measured in the browser after the two requests became one: the request went
+// out, 52,945,665 bytes came back, and the manager still showed the 21 seeded
+// works. Dropping the duplicate after taking a request number had marked the
+// real request as superseded, so its answer was discarded on arrival. One
+// request is only worth having if the works in it are the ones on screen.
+test('the works that arrive are the works that are shown', async () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE, 'page'), TOTAL);
+	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
+	refreshDerived(manager);
+
+	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
+	refreshDerived(manager);
+	manager.setPageSize(MEASURED_PAGE_SIZE);
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	assert.equal(calls.length, 1);
+	assert.equal(manager.activeItems.length, MANAGER_PAGE_SIZE);
+	assert.equal(manager.activeItems[0].id, 'page-0');
+});
+
 test('measuring itself larger than what is on its way does ask again', () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);

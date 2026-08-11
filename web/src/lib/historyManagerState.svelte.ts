@@ -186,7 +186,6 @@ export class HistoryManagerState {
 	}
 
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
-		const requestId = ++this.requestId;
 		const view = options.view ?? this.view;
 		const page = options.page ?? this.page;
 		const search = options.search ?? this.search.trim();
@@ -199,8 +198,14 @@ export class HistoryManagerState {
 		// twice costs a second copy of the same tens of megabytes and shows the
 		// user nothing extra, so the later caller rides on the request already
 		// out. Answers still arrive; only the duplicate question is dropped.
+		//
+		// This has to be decided before taking a request number. A number marks
+		// every earlier request as superseded, so a question dropped after taking
+		// one would throw away the answer it was riding on: the works arrive, all
+		// of them, and are discarded on the doorstep.
 		const request: Request = { view, page, pageSize, search, starredOnly, forRevisionOnly };
 		if (this.requestInFlight(request, pageSize)) return;
+		const requestId = ++this.requestId;
 		this.inFlight.push(request);
 		this.pendingRequests += 1;
 		if (!silent) this.loading = true;

@@ -2899,7 +2899,10 @@ files, PNG files, and other artifacts are derived outputs.
 ## 19. Canvas Model
 
 Coordinates remain normalized from `0.0` to `1.0`. Canvas aspect changes do not
-change DDL coordinates. Changing the aspect clears the rendered display and shows
+change DDL coordinates. **A mark's extents (`size`) become pixels through the short edge on both axes, so the shape the description
+stated is kept on any aspect** (the same rule the circle and arc radius already used; widened to every form
+with a `size` in v2.13.6 / render engine 30). **Placement still scales with width and height** -- the aspect
+decides where a mark sits, not what shape it is. Changing the aspect clears the rendered display and shows
 a placeholder for the new aspect, but retains the displayed work as lineage context.
 The next saved work is recorded as its child with `canvas_aspect_change`.
 

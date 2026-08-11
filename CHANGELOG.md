@@ -5610,3 +5610,28 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   restore the label, move the button to the left of PNG, drop `currentHistoryId` from `disabled`, remove only the
   prop wiring while keeping the function, and drop the key from the type. **The fourth is the one that catches a
   button placed with no path behind it.**
+
+### v2.13.6 — A mark keeps the shape its description gave it on any canvas (Build 891, 2026-08-11, ledger I-135 ruling A, render engine 30)
+
+- **A mark's extents now become pixels through the canvas's short edge.** Engine 29 stretched `size` through
+  `canvas.width` and `canvas.height` **separately**, so **the same description drew a different shape on every
+  aspect**: a square written `size [0.3, 0.3]` came out 1.61:1 on the golden canvas and 0.20:1 on the pillar,
+  and **an ellipse written `size [0.4, 0.2]` -- wide, 2:1 -- came out 0.40 on the pillar: upright, the reverse
+  of what the description said**.
+- **All twelve sites in `renderer.py` now go through one helper, `_size_px`.** **Placement (`_px`) was not
+  touched by a byte** -- coordinates still scale with width and height, so **the aspect still decides where a
+  mark sits, and no longer what shape it is**.
+- **The square canvas does not move by a byte** (`unit == width == height` makes the two rules the same
+  arithmetic). **The rebake moved exactly three cases**
+  (`D-canvas-{pillar,vertical,wide}-filled-square-rotring`).
+- **Four cases were added, taking the corpus to 553**: it held **no wide mark on a narrow canvas** and so could
+  not tell a widened mark from a preserved one. The added `D-canvas-pillar-ellipse-pen` is **0.32 (upright)
+  under the branch-point implementation and 1.59 (wide) under engine 30**; `D-canvas-square-ellipse-pen` is
+  **1.59 under both** (the control).
+- **Checks:** **server 2,941 passed / 31 skipped**, **web 196 passed**, **cli 220 passed**, **ruff clean**,
+  `check_docs.py` consistent. **The implementing session applied five perturbations; P-1 turned red at all
+  twelve sites** (the contract predicted four). **⚠ The contract's P-2 prediction did not hold**: a long-edge
+  basis preserves orientation too, so T-2 does not catch it -- **what catches it is the mark staying on the
+  paper**, and the implementation added a test for that.
+- **The Android reference fixtures (64 files under `render-engine-30/`) were baked by the accepting session.**
+  **The Kotlin renderer still carries the same wiring** (ledger I-217, a separate contract).

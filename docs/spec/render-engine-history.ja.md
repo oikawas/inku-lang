@@ -115,14 +115,14 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 
 | 名前 | 何の版か | 現在 | 上げる条件 |
 |---|---|---|---|
-| `render_engine_version` | 描画エンジン | `29` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
+| `render_engine_version` | 描画エンジン | `30` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
 | `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `13` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `3` | **語彙の追加・変更・廃止、または文法の追加・変更・廃止**（2026-07-30 作者裁定で明文化。v2 は太さの語で、v3 は黄・橙・紫で上げた） |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
 | `MODEL_CONFIG_VERSION` | モデルカタログの中身 | `2.5.0` | **計測値・推奨度・選択可否が変わったとき**。上げると保存済みカタログの同じ id へ組み込みのメタを貼り直す（保存済みのモデル一覧と有効/無効の選択は残る） |
-| `APP_VERSION` | アプリの版 | v2.13.5 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
+| `APP_VERSION` | アプリの版 | v2.13.6 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
 | `server/pyproject.toml` | 配布物の版 | 2.7.2 | **リリースのタグを打つときだけ**。`/api/info` の `release_version` が返す。リリース保留中はアプリの版から遅れる |
-| `web/BUILD_NUMBER` | ビルド通し番号 | 890 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
+| `web/BUILD_NUMBER` | ビルド通し番号 | 891 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
 
 **「現在」の列は書いた時点の値である。** 版を上げたら、この列も同じ commit で直す。
 
@@ -177,7 +177,7 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 
 | コーパス | 置き場 | 何を凍結するか | ケース数 |
 |---|---|---|---|
-| 描画 | `server/reference/render-engine-29/` | `renderer.py` / `stroke_engine.py` の演奏結果（SVG） | 549（SVG 454） |
+| 描画 | `server/reference/render-engine-30/` | `renderer.py` / `stroke_engine.py` の演奏結果（SVG） | 553（SVG 7） |
 | 決定的 DDL 層 | `server/reference/ddl-engine-13/` | **A** = `expand_intermediate_ddl` の展開後 DDL / **B** = `coerce_score` の補正後 Score + `branch_report` / **C** = `expand_plugin_ddl` の展開後 DDL + 単位数 + 断りの記録 | 40（A 13 / B 23 / C 4） |
 
 **DDL 側が A・B・C の 3 部に分かれるのは、決定的な層が隣り合っていないからである**（本書の「決定的な層と非決定的な層」）。
@@ -320,6 +320,35 @@ Android 比較ハーネスのいずれもここを通す。番人は 3 つで、
 `/api/info` は版を 2 つ返す（v2.9.25 で分けた）。`version` は**アプリの版**で、`web/APP_VERSION` の 1 ファイルを読む — UI が画面に出す値と必ず一致する。`release_version` は**配布物の版**で、`server/pyproject.toml` を `importlib.metadata` から読む。**両者は別の概念で、リリースを保留している間は一致しない**（2026-08-01 実測でアプリ v2.9.24 に対し配布物 2.7.2）。分ける前は `version` が配布物の版だけを返しており、同じ画面に 2 つの版数が出ていた。
 
 **デベロッパーモード（v2.4.3）**: 環境変数 `INKU_DEVELOPER_MODE` は、開発者向けの選択肢を画面に出すかどうかだけを決める。無効時は NVIDIA NIM が表示用モデルカタログ（`GET /api/models`、管理者のモデル設定、モデル一覧再取得）から外れ、Build 番号の常時表示（左下レール・ログイン画面・アプリ情報）も消える。**隠すのは表示だけで、実行経路・保存済みモデル設定・履歴のモデル情報・作品ごとの `render_build_number` は無効時も変わらない**（保存済み設定が非公開プロバイダーを指す場合、画面内の選択だけが公開カタログの先頭へ補正される）。配布 compose は既定で無効、開発・ベンチ用 compose は既定で有効。`/api/info` が `developer_mode` を返し、web はログイン前にこれを読む。
+
+## engine 30 — 痕は、どのキャンバスでも記述が述べた形を保つ（v2.13.6）
+
+**engine 29 は `size` を `canvas.width` と `canvas.height` で別々に画素へ直していたので、同じ記述が縦横比ごとに違う形を描いていた。**
+`size [0.3, 0.3]` と書いた正方形は、黄金比で 1.61:1・柱絵で 0.20:1 になった。
+**`size [0.4, 0.2]`（横長 2:1）と書いた楕円は、柱絵では 0.40 —— 縦長で、記述の逆だった。**
+
+### 直したのは寸法だけで、置き場所は動かしていない
+
+**寸法は両軸ともキャンバスの短辺（`canvas.unit`）で画素へ直す。**`renderer.py` の 12 箇所が
+`_size_px` という 1 つの口を通る。**座標は従来どおり幅と高さに比例する**ので、
+**縦横比は「痕がどこに座るか」を決め続け、「痕がどんな形か」は決めなくなった。**
+
+**正方形では `unit == width == height` なので、2 つの規則は同じ算術である。**
+動くのは `size` から描かれる非正方形の case だけで、**焼き直しで実際に動いたのは 3 件**
+（`D-canvas-{pillar,vertical,wide}-filled-square-rotring`）である。
+
+### コーパスは 4 件増えて 553 件になった
+
+**`D-canvas-*-ellipse-pen` の 4 件を足した** —— コーパスには**狭いキャンバスに横長の痕を描く case が 1 件も無く**、
+**広げられた痕と保たれた痕を見分けられなかった**。
+足した case は判別力を持つ: `D-canvas-pillar-ellipse-pen` は engine 29 の実装では 0.32（縦長）、
+engine 30 では 1.59（横長）になる。`D-canvas-square-ellipse-pen` は両方で 1.59 で、
+**正方形が動かないことの対照**である。
+
+### 同じ配線が Android にもある
+
+**Kotlin の renderer も `size` を縦横別に伸ばしている**（[I-217]）。**本改修は server 側だけで、
+Android の追随は別契約である。**参照 fixture（`render-engine-30/` の 64 ファイル）は受け入れ側が焼いた。
 
 ## engine 29 — 同じ紙の目を、どの機械でも同じだけ数える（v2.11.17）
 

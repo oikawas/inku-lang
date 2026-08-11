@@ -127,14 +127,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `29` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `30` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `13` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.5 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.6 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 890 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 891 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -209,7 +209,7 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-29/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 549 (454 SVG) |
+| Drawing | `server/reference/render-engine-30/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 553 (7 SVG) |
 | Deterministic DDL layers | `server/reference/ddl-engine-13/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` / **C** = expanded DDL, unit counts and declines from `expand_plugin_ddl` | 40 (A 13 / B 23 / C 4) |
 
 **The DDL side splits into A, B and C because the deterministic layers are not
@@ -410,6 +410,37 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 30 — a mark keeps the shape its description gave it on any canvas (v2.13.6)
+
+**Engine 29 turned `size` into pixels through `canvas.width` and `canvas.height` separately, so the same
+description drew a different shape on every aspect.** A square written `size [0.3, 0.3]` came out 1.61:1 on the
+golden canvas and 0.20:1 on the pillar. **An ellipse written `size [0.4, 0.2]` -- wide, 2:1 -- came out 0.40 on
+the pillar: upright, the reverse of what the description said.**
+
+### Only the extents changed; placement did not
+
+**Both extents become pixels through the canvas's short edge (`canvas.unit`).** All twelve sites in
+`renderer.py` go through one helper, `_size_px`. **Coordinates still scale with width and height**, so
+**the aspect still decides where a mark sits, and no longer what shape it is.**
+
+**On a square canvas `unit == width == height`, so the two rules are the same arithmetic.** Only non-square
+cases drawn from `size` move, and **the rebake moved exactly three**
+(`D-canvas-{pillar,vertical,wide}-filled-square-rotring`).
+
+### The corpus grew by four cases, to 553
+
+**Four `D-canvas-*-ellipse-pen` cases were added**: the corpus held **no wide mark on a narrow canvas**, and so
+**could not tell a widened mark from a preserved one**. The added cases discriminate:
+`D-canvas-pillar-ellipse-pen` is 0.32 (upright) under the engine 29 implementation and 1.59 (wide) under
+engine 30, while `D-canvas-square-ellipse-pen` is 1.59 under both -- the control that shows the square canvas
+does not move.
+
+### The same wiring exists on Android
+
+**The Kotlin renderer also stretches `size` per axis** (ledger I-217). **This change is server-side only;
+the Android catch-up is a separate contract.** The reference fixtures (64 files under `render-engine-30/`)
+were baked by the accepting session.
 
 ## engine 29 — the same grain is counted on every machine (v2.11.17)
 

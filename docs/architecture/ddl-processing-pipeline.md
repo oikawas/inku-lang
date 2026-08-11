@@ -29,7 +29,7 @@ flowchart TD
     S2["Stage 2 score writing"]
     SCORE["JSON Score"]
     COERCE["Coerce / validation"]
-    RENDER["Render Engine 29"]
+    RENDER["Render Engine 30"]
     SVG["SVG + performance metadata"]
     HISTORY[("History DB + lineage")]
     FILES[("Optional work files")]

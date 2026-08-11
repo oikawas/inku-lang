@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.6 Baseline (Web Build 891)
+
+Updated the 13 places that name a version to v2.13.6 / Build 891, and added a sentence to §7 of `Creating Images` now that a mark's size no longer depends on the canvas ratio.
+
+- **A mark's size is measured against the canvas's short edge.** The same description draws the same shape on any ratio, and an ellipse written wide stays wide on the pillar canvas (render engine 30).
+- **Placement still spreads with the ratio.** The aspect decides where a mark sits, not what shape it is.
+- **Nothing changes on the square canvas** (the short and long edges are the same length, so the old and new rules are the same arithmetic).
+
 ## 2026-08-11 — Unreleased v2.13.5 Baseline (Web Build 890)
 
 Updated the 13 places that name a version to v2.13.5 / Build 890, and rewrote §15.2 of `Creating Images` now that the share card has two doors.

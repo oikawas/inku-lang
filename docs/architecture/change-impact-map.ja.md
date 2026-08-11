@@ -10,7 +10,7 @@
 | plugin文書 | Stage 1直後のcore writing-down | `plugins/document_format.py`, router | plugin format/v2 tests | DDL corpus `A-plugin-*` | plugin CRUD/auth、reference dump |
 | Stage 1.5 | 意味非上書き、焦点、明示変奏 | `ddl_expander.py`, language support | expander、variation、staffage fold tests | DDL engine corpus | `check_frozen_corpora.py` |
 | coerce | drop/repair、要求配達、hard ceiling、単一の名指し抽象色 | `coerce/normalize.py`, `coerce/compose.py`, `coerce/__init__.py` | composer/coerce/limits/relation tests | DDL engine corpus | `check_frozen_corpora.py` |
-| renderer/stroke | 同一Score+seed、engine前進 | `renderer.py`, `stroke_engine.py`, `render_engines/default.py` | renderer各契約、platform stability | Render Engine corpus 549件 | version bump、再生成2回、Linux CI |
+| renderer/stroke | 同一Score+seed、engine前進 | `renderer.py`, `stroke_engine.py`, `render_engines/default.py` | renderer各契約、platform stability | Render Engine corpus 553件 | version bump、再生成2回、Linux CI |
 | identity/history | `dh1`, `rh3`, legacy `rh2`, DB正本 | `identity.py`, `db.py`, rendering/history router | hash、integrity、lineage acceptance | Android parity fixtures | migrationと既存row互換 |
 | API route/model | 82 route、公開6、response shape | `api.py`, `api_core/*` | route auth、module split、API surface baseline | なし | Web/CLI/Android sender census |
 | Web設定feature | 3 registry、local/user/payload境界 | `web/src/lib/features/*`, `+page.svelte` | registry unit tests、route source contracts | なし | `npm run check`, `test:unit`, relevant lint |

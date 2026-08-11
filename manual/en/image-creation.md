@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.5 (Web Build 890). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.6 (Web Build 891). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -192,7 +192,7 @@ There are nine canvases.
 | Byobu | 2.2:1 | The Japanese folding screen, based on one half of a six-panel pair |
 | Vertical | 9:16 | The contemporary full-screen mobile format |
 
-Coordinates stay normalized to 0.0–1.0 whatever the canvas. The canvas ratio is a system plugin, so if an administrator disables it only the square remains.
+Coordinates stay normalized to 0.0–1.0 whatever the canvas. **A mark's size is measured against the canvas's short edge, so the same description draws the same shape on any ratio** (an ellipse written wide stays wide on the pillar canvas). Placement still spreads with the ratio. The canvas ratio is a system plugin, so if an administrator disables it only the square remains.
 
 The settings of the displayed work and the settings for the next painting are separate. Distinguish the `Displayed` strip at the top of the work tab from the button row on the describe tab.
 

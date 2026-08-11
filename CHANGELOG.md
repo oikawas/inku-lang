@@ -5661,3 +5661,17 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   The four that differed from the contract's table all turned **more** red than predicted, and the implementing
   session reported the discrepancy rather than adjusting the tests.
 - **⚠ The implementing session pressed all 17 buttons on a real screen** (pentala, 2,924 works in history).
+
+### 2026-08-12 — Design principle 4 now names what it denies (**no version bump**, documents only)
+
+**The Japanese title of principle 4, "has no canvas", read as a denial of the vessel itself.** What it denies is a
+**fixed size** — not the vessel, and not the range of aspect ratios (author's ruling, 2026-08-11). **The title now
+reads "has no fixed size", and the number `0.0–1.0` was taken out of the sentence**: the principle states that
+coordinates carry no absolute dimensions, and the granularity of the ratio is not what the principle requires.
+**On aspect ratio the text says only that it is not fixed, and names no concrete ratio** — the phrasing "it does
+have a ratio" was rejected by the author in the same ruling, because it implies that 1:1 is the fixed one. One
+sentence says that the aspect ratio is a constraint shaping the world of the work, not a dimension the description
+carries. **Four places changed**: the design principle in `SPEC.md` / `SPEC.ja.md` and the list of principles in
+`README.md` / `README.ja.md`. **The English `SPEC.md` was already right in intent** ("not fixed pixels") **and was
+brought to the same two sentences as the Japanese; `README.md`'s "No fixed canvas" was a literal translation of the
+old Japanese title and was changed with it.** **No code changed.** `check_docs.py` is consistent.

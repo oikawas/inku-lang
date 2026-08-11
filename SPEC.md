@@ -106,7 +106,7 @@ It stands at the intersection of three traditions:
 2. Sway is part of the specification, not a bug. It exists at two scales: micro sway in line wobble, blur, grain, and texture; and macro sway in composition and placement resolved by the renderer.
 3. Emotional adjectives are excluded from core vocabulary.
 4. Physical, spatial, material, and motion words are preferred.
-5. Coordinates are normalized ratios, not fixed pixels.
+5. Coordinates carry no absolute dimensions such as pixels, so one description applies to a wall as readily as to a screen. The aspect ratio is not fixed either: it is a constraint that shapes the world of the work, not a dimension the description carries.
 6. Output is still image SVG; the viewer moves, not the image.
 7. The input language is constrained enough to support iteration.
 8. Optional concrete worlds belong in plugins, not the core language.

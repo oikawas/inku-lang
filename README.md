@@ -254,7 +254,7 @@ Only physical, observable words belong to the core. Emotional evaluation — "be
 1. Descriptions are human-readable, between natural language and code
 2. Sway is a feature, not a bug
 3. Emotional vocabulary is excluded; physical and motion vocabulary is embraced
-4. No fixed canvas — coordinates are ratios from 0.0 to 1.0, scalable to any medium
+4. No fixed size — coordinates carry no absolute dimensions and scale to any medium; the aspect ratio is not fixed either
 5. Output is still — the viewer moves, not the image
 6. Input is a constrained DSL, not free-form natural language
 7. The engine does not go backwards — like a woodblock being carved, the drawing engine only moves in one direction

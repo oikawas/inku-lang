@@ -66,11 +66,16 @@ def test_render_reference_case_counts() -> None:
     # groups, and `cloudform`), and two groups that state their own angle, `0`
     # and `30` -- the only sight the corpus has of `is not None` against a
     # truthy test.
-    assert len(cases) == 549
+    # Engine 30 added four to D: one representative, `ellipse-pen`, drawn on all
+    # four aspects. Every `size` in D until then stated its two extents the same,
+    # so no case in the corpus could tell a mark that kept the proportion its
+    # description gave it from one the canvas had stretched -- and on the pillar
+    # engine 29 drew a mark written 1.6:1 wide as 0.32, upright.
+    assert len(cases) == 553
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 64, "D": 28, "E": 119, "F": 128, "G": 50}
+    } == {"A": 88, "B": 72, "C": 64, "D": 32, "E": 119, "F": 128, "G": 50}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:

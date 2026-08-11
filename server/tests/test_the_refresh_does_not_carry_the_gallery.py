@@ -134,9 +134,23 @@ def test_t3_a_second_save_in_the_same_millisecond_is_noticed(world) -> None:
 
 def test_t4_the_answer_stays_under_a_kilobyte(world) -> None:
     for index in range(25):
-        db.add_item(
-            _item(world.owner["id"], SAME_MILLISECOND + index, f"work {index}", str(uuid.uuid4()))
+        item = _item(
+            world.owner["id"], SAME_MILLISECOND + index, f"work {index}", str(uuid.uuid4())
         )
+        # A drawing the size of a real one. Measured on the development database
+        # on 2026-08-11: 83 saved works, the average `svg` 4,219 bytes and the
+        # largest 47,480. A fixture with a sixty-byte picture would keep this
+        # under a kilobyte even if the route sent the whole drawing, and the
+        # check would prove nothing about the size of anything.
+        item["svg"] = (
+            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1618 1618'>"
+            + "".join(
+                f"<path d='M{i} {i}c40 {i} 80 {i % 97} 120 {i % 53}' stroke='#1a1a1a'/>"
+                for i in range(60)
+            )
+            + "</svg>"
+        )
+        db.add_item(item)
     state, response = _state(world.owner_h)
     assert state["total"] >= 25
     # Bytes on the wire, not "it felt quick". The whole point of the route is

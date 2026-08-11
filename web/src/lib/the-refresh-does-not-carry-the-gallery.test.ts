@@ -43,7 +43,10 @@ function functionBody(source: string, signature: string): string {
 
 // Sliced rather than searched whole: a structural claim about this function is
 // satisfied by any other occurrence in a 7,000-line file if it is not fenced in.
-const REFRESH = functionBody(PAGE_SOURCE, 'async function refreshHistoryForExternalSave()');
+// Matched without the closing paren so that restoring the parameter still
+// slices the function rather than aborting the file. What the parameter list
+// holds is T-7's business, and it says so by name.
+const REFRESH = functionBody(PAGE_SOURCE, 'async function refreshHistoryForExternalSave(');
 const MOUNT = functionBody(PAGE_SOURCE, 'onMount(() =>');
 
 const NOTHING_IN_THE_WAY: HistoryRefreshConditions = {

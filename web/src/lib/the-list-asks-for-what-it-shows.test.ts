@@ -55,18 +55,25 @@ function makeManager(pageItems: HistoryItem[], total: number) {
 }
 
 /**
- * Let the frozen `items` catch up with `activeItems`.
+ * Let the frozen derived values catch up with the state they are derived from.
  *
  * Needed only because the shim above turns $derived into a plain value taken at
  * construction time. In the browser this happens by itself; here it does not,
- * and preloadMatches reads this.items.length.
+ * and the code under test reads both -- preloadMatches reads this.items.length,
+ * setPageSize reads this.total. Leaving `total` frozen at 0 makes setPageSize
+ * think no works are expected, so it asks for nothing and a gate on asking
+ * passes without the code ever having decided anything.
  */
-function refreshDerivedItems(manager: InstanceType<typeof HistoryManagerState>) {
+function refreshDerived(manager: InstanceType<typeof HistoryManagerState>) {
 	manager.items = manager.activeItems;
+	manager.total = manager.activeTotal;
 }
 
 const STRIP_SIZE = 21;
+/** What the page guesses a manager page holds, before the modal exists. */
 const MANAGER_PAGE_SIZE = 65;
+/** What the modal reports once it is on screen and has measured its grid. */
+const MEASURED_PAGE_SIZE = 52;
 const TOTAL = 2917;
 
 // ── T-1 ─────────────────────────────────────────────────────────────────────
@@ -138,7 +145,7 @@ test("the manager's page does not shrink to the strip's handful", () => {
 test('holding the strip is not claimed to be holding a page', async () => {
 	const { manager } = makeManager([], TOTAL);
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
-	refreshDerivedItems(manager);
+	refreshDerived(manager);
 	assert.equal(
 		manager.preloadMatches('active', 0, manager.pageSize, '', false, false, TOTAL),
 		false
@@ -153,9 +160,9 @@ test('holding the strip is not claimed to be holding a page', async () => {
 	const stale = makeManager(works(MANAGER_PAGE_SIZE, 'page'), TOTAL);
 	stale.manager.pageSize = MANAGER_PAGE_SIZE;
 	await stale.manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
-	refreshDerivedItems(stale.manager);
+	refreshDerived(stale.manager);
 	stale.manager.seedFromStrip(works(STRIP_SIZE, 'fresh'), TOTAL + 1, 6, MANAGER_PAGE_SIZE);
-	refreshDerivedItems(stale.manager);
+	refreshDerived(stale.manager);
 	assert.equal(stale.manager.items.length, MANAGER_PAGE_SIZE);
 	assert.equal(
 		stale.manager.preloadMatches('active', 0, MANAGER_PAGE_SIZE, '', false, false, TOTAL + 1),
@@ -167,7 +174,7 @@ test('holding the strip is not claimed to be holding a page', async () => {
 test('opening the manager without a page in hand fetches one', async () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
-	refreshDerivedItems(manager);
+	refreshDerived(manager);
 	assert.equal(calls.length, 0);
 
 	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
@@ -185,9 +192,9 @@ test('opening the manager without a page in hand fetches one', async () => {
 	const stale = makeManager(works(MANAGER_PAGE_SIZE, 'page'), TOTAL);
 	stale.manager.pageSize = MANAGER_PAGE_SIZE;
 	await stale.manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
-	refreshDerivedItems(stale.manager);
+	refreshDerived(stale.manager);
 	stale.manager.seedFromStrip(works(STRIP_SIZE, 'fresh'), TOTAL + 1, 6, MANAGER_PAGE_SIZE);
-	refreshDerivedItems(stale.manager);
+	refreshDerived(stale.manager);
 	assert.equal(stale.calls.length, 1);
 
 	stale.manager.openWith(works(STRIP_SIZE, 'fresh'), TOTAL + 1, 6);
@@ -217,6 +224,40 @@ test('two callers wanting the same page at once cost one request', async () => {
 	assert.equal(calls.length, 2);
 });
 
+// The sequence one press actually produces, measured in the browser: the page
+// opens the manager with a guessed page size, then the modal appears, measures
+// its own grid and reports a smaller one. Asking again for the smaller page
+// cost a second 46 MB for works that were already on their way.
+test('the modal measuring itself smaller does not cost a second page', () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
+	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
+	refreshDerived(manager);
+
+	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
+	refreshDerived(manager);
+	assert.equal(calls.length, 1);
+	assert.equal(new URL(calls[0], 'http://x').searchParams.get('limit'), String(MANAGER_PAGE_SIZE));
+
+	manager.setPageSize(MEASURED_PAGE_SIZE);
+
+	assert.equal(calls.length, 1);
+	assert.equal(manager.pageSize, MEASURED_PAGE_SIZE);
+});
+
+test('measuring itself larger than what is on its way does ask again', () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
+	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
+	refreshDerived(manager);
+	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
+	refreshDerived(manager);
+	assert.equal(calls.length, 1);
+
+	manager.setPageSize(MANAGER_PAGE_SIZE + 20);
+
+	assert.equal(calls.length, 2);
+	assert.equal(new URL(calls[1], 'http://x').searchParams.get('limit'), String(MANAGER_PAGE_SIZE + 20));
+});
+
 test('a different page is not swallowed as a duplicate', async () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.pageSize = MANAGER_PAGE_SIZE;
@@ -233,7 +274,7 @@ test('opening it again with the page already in hand fetches nothing', async () 
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.pageSize = MANAGER_PAGE_SIZE;
 	await manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
-	refreshDerivedItems(manager);
+	refreshDerived(manager);
 	assert.equal(calls.length, 1);
 	assert.equal(
 		manager.preloadMatches('active', 0, MANAGER_PAGE_SIZE, '', false, false, TOTAL),

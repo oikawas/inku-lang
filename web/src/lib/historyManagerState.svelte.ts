@@ -85,6 +85,16 @@ export type HistoryItem = {
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 type TrashPageSync = (items: HistoryItem[], total: number) => void;
 
+/** What a request asks the server for. */
+type Request = {
+	view: HistoryManagerView;
+	page: number;
+	pageSize: number;
+	search: string;
+	starredOnly: boolean;
+	forRevisionOnly: boolean;
+};
+
 type FetchOptions = {
 	view?: HistoryManagerView;
 	page?: number;
@@ -113,10 +123,10 @@ export class HistoryManagerState {
 	private requestId = 0;
 	private pendingRequests = 0;
 	private preloadKey = "";
-	// Requests that have been sent and not yet come back, by what they ask for.
-	// One page of history is tens of megabytes here, so asking for the same page
-	// twice at once is not a harmless duplicate.
-	private inFlight = new Set<string>();
+	// Requests that have been sent and not yet come back. One page of history is
+	// tens of megabytes here, so asking again for something already on its way is
+	// not a harmless duplicate.
+	private inFlight: Request[] = [];
 
 	items = $derived(this.view === 'trash' ? this.trashItems : this.activeItems);
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
@@ -189,9 +199,9 @@ export class HistoryManagerState {
 		// twice costs a second copy of the same tens of megabytes and shows the
 		// user nothing extra, so the later caller rides on the request already
 		// out. Answers still arrive; only the duplicate question is dropped.
-		const flightKey = [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0].join('|');
-		if (this.inFlight.has(flightKey)) return;
-		this.inFlight.add(flightKey);
+		const request: Request = { view, page, pageSize, search, starredOnly, forRevisionOnly };
+		if (this.requestInFlight(request, pageSize)) return;
+		this.inFlight.push(request);
 		this.pendingRequests += 1;
 		if (!silent) this.loading = true;
 		try {
@@ -234,7 +244,7 @@ export class HistoryManagerState {
 			}
 		} catch { /* ignore */ }
 		finally {
-			this.inFlight.delete(flightKey);
+			this.inFlight = this.inFlight.filter((sent) => sent !== request);
 			this.pendingRequests = Math.max(0, this.pendingRequests - 1);
 			if (!silent && (requestId === this.requestId || this.pendingRequests === 0)) this.loading = false;
 		}
@@ -297,14 +307,22 @@ export class HistoryManagerState {
 
 	setPageSize = (pageSize: number) => {
 		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
-		if (nextPageSize === this.pageSize) {
-			const expectedItems = Math.min(nextPageSize, this.total);
-			if (this.items.length < expectedItems) void this.fetch({ page: this.page });
-			return;
-		}
 		this.pageSize = nextPageSize;
 		this.page = Math.max(0, Math.min(this.page, this.totalPages - 1));
-		void this.fetch({ page: this.page });
+		const request: Request = {
+			view: this.view,
+			page: this.page,
+			pageSize: nextPageSize,
+			search: this.search.trim(),
+			starredOnly: this.starredOnly,
+			forRevisionOnly: this.forRevisionOnly
+		};
+		// The modal measures itself once it is on screen and reports the real page
+		// size, which arrives while the page opened with is still being fetched.
+		// That answer will hold this many works, so there is nothing to ask for.
+		if (this.requestInFlight(request, nextPageSize)) return;
+		const expectedItems = Math.min(nextPageSize, this.total);
+		if (this.items.length < expectedItems) void this.fetch({ page: this.page });
 	};
 
 	searchChanged = (search: string) => {
@@ -341,6 +359,26 @@ export class HistoryManagerState {
 		this.activeItems = this.activeItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
 		this.trashItems = this.trashItems.map((it) => it.id === item.id ? { ...it, starred: item.starred, note: hasNote ? item.note : it.note } : it);
 		this.preloadKey = "";
+	}
+
+	/**
+	 * Whether a request already on its way will answer this one.
+	 *
+	 * `atLeast` is how many works the caller needs. A request for the same page
+	 * that asked for more of them answers a smaller need as well, which is the
+	 * ordinary case on opening: the page guesses the manager's page size before
+	 * the modal exists, then the modal measures its own grid and says a smaller
+	 * number. Guessing 65 and measuring 52 must not cost two pages of history.
+	 */
+	private requestInFlight(request: Request, atLeast: number): boolean {
+		return this.inFlight.some((sent) =>
+			sent.view === request.view &&
+			sent.page === request.page &&
+			sent.search === request.search &&
+			sent.starredOnly === request.starredOnly &&
+			sent.forRevisionOnly === request.forRevisionOnly &&
+			sent.pageSize >= atLeast
+		);
 	}
 
 	private cacheKey(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): string {

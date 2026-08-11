@@ -345,6 +345,11 @@ def test_hidpi_adds_the_second_size_and_turning_it_off_removes_only_that(owner, 
     bake_for(item, 1)
     bake_for(item, 2)
     assert thumbs_db.get_thumb(item["id"], 2) is not None
+    # The second size has to actually be larger, or HiDPI is a switch that
+    # doubles the stored bytes and changes nothing on screen.
+    one = png_size(thumbs_db.get_thumb(item["id"], 1)["png"])
+    two = png_size(thumbs_db.get_thumb(item["id"], 2)["png"])
+    assert two[0] == one[0] * 2 and two[1] == one[1] * 2
 
     off = client.put("/api/settings/thumbnails", headers=admin_headers, json={"hidpi": False})
     assert off.status_code == 200

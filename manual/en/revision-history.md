@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.0 Baseline (Web Build 884)
+
+The 13 version markers were moved to v2.13.0 / Build 884, and **`Server Configuration` §2.1 and §3.1 were revised now that the thumbnail parallelism is an administration setting**.
+
+- **How many thumbnails a rebuild bakes at once is entered by an administrator**, as `workers` on `PUT /api/settings/thumbnails` (1..16, default 4). **⚠ The rebuild request no longer takes a body** — there is one place to decide this now, so an older request carrying `{"workers": N}` has its body ignored.
+- **⚠ The machine is not asked for its core count.** In a container the host's count is the wrong answer, so **whoever enters the number has to know what this machine or container actually has**.
+- **A child process that is killed no longer stops the rest.** That is the first thing that happens when memory is capped, and the number that could not be baked is now shown.
+
 ## 2026-08-11 — Unreleased v2.12.5 Baseline (Web Build 883)
 
 The 13 version markers were moved to v2.12.5 / Build 883. **Only the way thumbnails are baked changed; nothing an operator does is different.**

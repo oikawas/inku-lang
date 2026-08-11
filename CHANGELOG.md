@@ -5409,3 +5409,25 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   recording the short run → T-R2, go back to threads → T-R3).
 - **⚠ Neither defect appeared until v2.12.4 was deployed and the real 2,917 works were baked.** The
   83 works on the development machine never stopped, and never showed the load sitting on one core.
+
+### v2.13.0 — the administrator enters the parallelism (Build 884, 2026-08-11, first load)
+
+- **⚠ Compatibility breaks.** `POST /api/settings/thumbnails/rebuild` **no longer takes a body.**
+  **The parallelism is a stored setting rather than something each request carries** — an
+  administrator enters it as `workers` (1..16, default 4) on `PUT /api/settings/thumbnails`, and the
+  rebuild reads it. **One place decides it.**
+- **The machine is not asked for its core count.** Nothing in `server`, `shared` or `cli` read it
+  before, and nothing does now. **In a container the host's count is the wrong answer**, so the
+  number comes from the person who knows, not from the machine.
+- **A killed child no longer ends the run.** When the pool breaks, **handing work over** raises just
+  as taking a result back does, and only the taking side was guarded. **This is the first thing that
+  happens when a container's memory is capped.** What could not be handed over is now counted, and
+  the run reaches the end of its list.
+- **Checks:** **server 2,847 → 2,850 passed / 31 skipped** (three new), **cli 218 passed**, **ruff
+  clean**, **frozen corpora byte-identical**, **no change under `web/`**. **Three perturbations, one
+  gate each.**
+- **The API surface moved in four named places** — the rebuild POST lost its body,
+  `ThumbnailRebuildBody` is gone, and `ThumbnailSettingsBody` and `ThumbnailStatus` each gained
+  `workers`.
+- **⚠ Baking straight after a save is unchanged.** That path is still threads, and
+  `INKU_THUMBNAIL_WORKERS` still makes no difference to how long it takes.

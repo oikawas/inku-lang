@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.12.5 / Build 883**
+**Target version: v2.13.0 / Build 884**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -203,6 +203,8 @@ The two marks are independent: filtering on both shows only the works that carry
 A listing shows **images baked from the stored SVGs**, kept in a derived `thumbs.db` beside the
 canonical database. Baking happens after saving and never runs the engine, so the picture stays
 the one the work was drawn with; works not baked yet are drawn from their SVG.
+How many run at once is entered by an administrator, since the machine is not asked for its core
+count -- in a container the host's is the wrong answer.
 The rasterizing runs in child processes -- the rasterizer holds the GIL, so threads would sit
 on one core -- while the writing stays in the parent, and one work that cannot be baked does
 not stop the rest

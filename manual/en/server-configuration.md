@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.12.5 (Web Build 883). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.13.0 (Web Build 884). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -77,7 +77,7 @@ inku has no self-service registration. Accounts are created only through `POST /
 | `INKU_RENDER_CONCURRENCY` | Initial value for the concurrent renderer limit | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | Initial value for the browser's concurrent painting requests | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | Set to `0` to leave the periodic backup scheduler unstarted | `1` |
-| `INKU_THUMBNAIL_WORKERS` | Workers that bake after a save (**separate from the rebuild**, whose parallelism comes from the `workers` in its request) | `2` |
+| `INKU_THUMBNAIL_WORKERS` | Workers that bake after a save (**separate from the rebuild**, whose parallelism comes from the stored `workers` setting) | `2` |
 | `INKU_THUMBNAIL_QUEUE_LIMIT` | Thumbnail baking queue ceiling | `64` |
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
@@ -138,6 +138,8 @@ Base URLs, keys, and published models can also be managed from the admin UI. Key
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 ```
+
+How many thumbnails the rebuild bakes at once comes from the stored `workers` setting (1..16, default 4). **It is not an environment variable** — the machine is never asked for its core count, so whoever enters it has to know what this machine or container actually has.
 
 Thumbnails do not go into the canonical database; they go into `thumbs.db` beside it. Deleting that file leaves the canonical data whole, and the listing draws from each work's SVG again.
 

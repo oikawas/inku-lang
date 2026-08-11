@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v2.12.5（Web Build 883）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v2.13.0（Web Build 884）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -77,7 +77,7 @@ inkuにはセルフサインアップがありません。アカウントを作�
 | `INKU_RENDER_CONCURRENCY` | 同時Renderer実行上限の初期値 | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | ブラウザが同時に投げる描画要求の上限の初期値 | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | `0` にすると定期backupのschedulerを起動しない | `1` |
-| `INKU_THUMBNAIL_WORKERS` | 保存後の焼き付けを受け持つworker数（**再作成の並列度とは別**。再作成は要求ごとの`workers`で決まる） | `2` |
+| `INKU_THUMBNAIL_WORKERS` | 保存後の焼き付けを受け持つworker数（**再作成の並列度とは別**。再作成は管理設定の`workers`で決まる） | `2` |
 | `INKU_THUMBNAIL_QUEUE_LIMIT` | サムネイル生成queue上限 | `64` |
 
 queue上限時も履歴DB保存を優先し、artifact保存だけをskipします。providerの無料queueによる遅延と、server worker不足を区別してください。
@@ -138,6 +138,8 @@ providerのBase URL、key、公開モデルは管理UIからも設定できま�
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 ```
+
+サムネイルの再作成が同時に焼く数は、管理設定の`workers`（1〜16、既定4）で入れます。**環境変数ではありません**——コア数は機械に訊かないので、入れる人が機械の実際の割り当てを知っている必要があります（コンテナでは母機のコア数が答えになりません）。
 
 サムネイルは正本DBには入らず、隣の`thumbs.db`へ入ります。捨てても正本は壊れず、一覧は作品のSVGから描き直します。
 

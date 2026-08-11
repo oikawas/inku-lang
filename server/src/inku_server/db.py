@@ -476,9 +476,14 @@ _THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
 # Off by default: the second size doubles the rebuild and roughly quadruples the
 # stored bytes, and is worth neither until someone is looking at the listing on
 # a HiDPI screen.
+# The parallelism is the administrator's to enter: nothing here reads the core
+# count, and in a container the host's count is the wrong answer anyway.
 _THUMBNAIL_DEFAULT_SETTINGS = {
     "hidpi": False,
+    "workers": 4,
 }
+THUMBNAIL_WORKERS_MIN = 1
+THUMBNAIL_WORKERS_MAX = 16
 _RENDER_CONCURRENCY_SETTINGS_KEY = "render_concurrency_settings"
 # INKU_RENDER_CONCURRENCY / INKU_CLIENT_FANOUT_LIMIT seed the first value only;
 # once stored, the DB row is the source of truth (admin settings screen).
@@ -2194,6 +2199,12 @@ def _normalize_thumbnail_settings(settings: dict | None) -> dict:
         return clean
     if "hidpi" in settings:
         clean["hidpi"] = bool(settings["hidpi"])
+    if "workers" in settings:
+        try:
+            workers = int(settings["workers"])
+        except (TypeError, ValueError):
+            workers = clean["workers"]
+        clean["workers"] = max(THUMBNAIL_WORKERS_MIN, min(THUMBNAIL_WORKERS_MAX, workers))
     return clean
 
 
@@ -2201,8 +2212,8 @@ def get_thumbnail_settings() -> dict:
     return _normalize_thumbnail_settings(_read_app_setting(_THUMBNAIL_SETTINGS_KEY))
 
 
-def update_thumbnail_settings(hidpi: bool) -> dict:
-    clean = _normalize_thumbnail_settings({"hidpi": hidpi})
+def update_thumbnail_settings(hidpi: bool, workers: int) -> dict:
+    clean = _normalize_thumbnail_settings({"hidpi": hidpi, "workers": workers})
     return _write_app_setting(_THUMBNAIL_SETTINGS_KEY, clean)
 
 

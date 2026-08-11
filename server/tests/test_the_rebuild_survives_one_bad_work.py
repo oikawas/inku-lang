@@ -20,6 +20,7 @@ from __future__ import annotations
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 
 import pytest
 
@@ -184,4 +185,89 @@ def test_the_rasterizing_leaves_this_process_and_the_writing_does_not(works, mon
     )
     assert sorted(stores) == sorted(work["id"] for work in works), (
         "every thumbnail must be written from this process"
+    )
+
+
+# ── T-R4 ────────────────────────────────────────────────────────────────────
+def test_a_broken_pool_does_not_end_the_run(works, monkeypatch, rebuild_in_process):
+    """The other side of the same pool.
+
+    A killed child -- the first thing a memory-capped container does -- breaks
+    the pool, and then handing over the next work raises just as taking a result
+    back does. The guard on the taking side was I-210; this is the offering one.
+    """
+    targets = _targets_for(works)
+    assert len(targets) == 4
+
+    from inku_analysis import rasterizer
+
+    original = rasterizer.svg_to_png
+    state = {"handed": 0}
+
+    class BreaksAfterOne(thumbnails.ProcessPoolExecutor):
+        def submit(self, fn, /, *args, **kwargs):
+            state["handed"] += 1
+            if state["handed"] > 1:
+                raise BrokenProcessPool("a child was killed")
+            return super().submit(fn, *args, **kwargs)
+
+    monkeypatch.setattr(rasterizer, "svg_to_png", original)
+    monkeypatch.setattr(thumbnails, "ProcessPoolExecutor", BreaksAfterOne)
+
+    thumbnails._rebuild.begin(len(targets), 2)
+    thumbnails._rebuild_worker(targets, 2)
+    progress = thumbnails.rebuild_progress()
+
+    assert progress["done"] == 4, "a broken pool must not leave works unattempted"
+    assert progress["built"] == 1, "only the work handed over before the break is baked"
+    assert progress["failed"] == 3, "the three that could not be handed over are counted"
+    assert progress["ended_short"] is False, "the run reached the end of its list"
+
+
+# ── T-S1 ────────────────────────────────────────────────────────────────────
+def test_the_parallelism_comes_from_the_stored_setting(works, monkeypatch, rebuild_in_process):
+    asked: list[int] = []
+    real_pool = thumbnails.ProcessPoolExecutor
+
+    class Recording(real_pool):
+        def __init__(self, *args, max_workers=None, **kwargs):
+            asked.append(max_workers)
+            super().__init__(*args, max_workers=max_workers, **kwargs)
+
+    monkeypatch.setattr(thumbnails, "ProcessPoolExecutor", Recording)
+    before = db.get_thumbnail_settings()
+    try:
+        db.update_thumbnail_settings(before["hidpi"], 7)
+        thumbnails.start_rebuild()
+        for _ in range(200):
+            if not thumbnails.rebuild_progress()["running"]:
+                break
+            time.sleep(0.05)
+    finally:
+        db.update_thumbnail_settings(before["hidpi"], before["workers"])
+
+    assert asked == [7], f"the pool was built with {asked}, not the stored 7"
+    assert thumbnails.rebuild_progress()["workers"] == 7
+
+
+# ── T-S2 ────────────────────────────────────────────────────────────────────
+def test_the_rebuild_request_carries_no_parallelism():
+    """One place decides it. The request is not a second one."""
+    from fastapi.testclient import TestClient
+
+    from inku_server.api import app
+    from inku_server.api_core.routers import settings as settings_router
+
+    assert not hasattr(settings_router, "ThumbnailRebuildBody"), (
+        "the request body is gone; a second place to set the parallelism is not"
+    )
+    spec = TestClient(app).app.openapi()
+    operation = spec["paths"]["/api/settings/thumbnails/rebuild"]["post"]
+    assert "requestBody" not in operation, (
+        "the rebuild endpoint must take no body, so no caller can name a worker count"
+    )
+    put = spec["paths"]["/api/settings/thumbnails"]["put"]
+    schema = put["requestBody"]["content"]["application/json"]["schema"]["$ref"].rsplit("/", 1)[-1]
+    assert "workers" in spec["components"]["schemas"][schema]["properties"], (
+        "the setting is where it is entered"
     )

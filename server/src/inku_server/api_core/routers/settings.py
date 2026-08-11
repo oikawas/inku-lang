@@ -97,13 +97,11 @@ class OutputSaveSettingsBody(BaseModel):
 
 class ThumbnailSettingsBody(BaseModel):
     hidpi: bool = False
-
-
-class ThumbnailRebuildBody(BaseModel):
-    # Rasterizing is CPU-bound and one work measured about half a second, so the
-    # useful range is the machine's cores. Bounded because this runs while the
-    # server is answering.
-    workers: int = Field(default=4, ge=1, le=16)
+    # Rasterizing is CPU-bound, so the useful range is the machine's cores --
+    # and the machine is not asked, because in a container the host's count is
+    # the wrong answer. The administrator enters it, once, and the rebuild reads
+    # it: one place decides the parallelism.
+    workers: int = Field(default=4, ge=_db.THUMBNAIL_WORKERS_MIN, le=_db.THUMBNAIL_WORKERS_MAX)
 
 
 class LogRetentionSettingsBody(BaseModel):
@@ -145,6 +143,8 @@ class ThumbnailRebuildStatus(BaseModel):
 
 class ThumbnailStatus(BaseModel):
     hidpi: bool
+    #: How many bakes run at once, as the administrator entered it.
+    workers: int = 4
     store_path: str | None
     stored_bytes: int
     count_scale_1: int
@@ -506,6 +506,7 @@ def _thumbnail_status() -> "ThumbnailStatus":
     counts = _thumbs_db.counts_by_scale()
     return ThumbnailStatus(
         hidpi=bool(settings["hidpi"]),
+        workers=int(settings["workers"]),
         store_path=_thumbs_db.thumbs_db_path(),
         stored_bytes=_thumbs_db.stored_bytes(),
         count_scale_1=counts.get(1, 0),
@@ -538,7 +539,7 @@ def api_settings_update_thumbnails(
     person is.
     """
     was_hidpi = bool(_db.get_thumbnail_settings()["hidpi"])
-    settings = _db.update_thumbnail_settings(body.hidpi)
+    settings = _db.update_thumbnail_settings(body.hidpi, body.workers)
     if was_hidpi and not settings["hidpi"]:
         removed = _thumbnails.drop_hidpi()
         _logger.info("HiDPI thumbnails turned off; removed %d scale-2 thumbnails", removed)
@@ -552,7 +553,6 @@ def api_settings_thumbnail_rebuild_status(actor: dict = Depends(_admin_user)) ->
 
 @router.post("/api/settings/thumbnails/rebuild", response_model=ThumbnailStatus)
 def api_settings_thumbnail_rebuild(
-    body: ThumbnailRebuildBody,
     actor: dict = Depends(_admin_user),
 ) -> "ThumbnailStatus":
     """Bake what is missing or stale, in the background, while serving.
@@ -560,7 +560,7 @@ def api_settings_thumbnail_rebuild(
     Works that already have a thumbnail keep serving the one they have until
     their new one is written, so running this does not blank the listing.
     """
-    _thumbnails.start_rebuild(body.workers)
+    _thumbnails.start_rebuild()
     return _thumbnail_status()
 
 

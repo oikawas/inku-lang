@@ -323,7 +323,9 @@ def test_the_old_thumbnail_is_served_while_it_is_being_rebuilt(owner, monkeypatc
     monkeypatch.setattr(
         thumbnails._db, "history_render_hashes", lambda: [(item["id"], item["render_hash"])]
     )
-    thumbnails.start_rebuild(workers=1)
+    # The parallelism is the stored setting's now, not the caller's.
+    db.update_thumbnail_settings(db.get_thumbnail_settings()['hidpi'], 1)
+    thumbnails.start_rebuild()
     assert holding.wait(timeout=10), "the rebuild never started baking"
 
     try:
@@ -348,7 +350,7 @@ def test_hidpi_adds_the_second_size_and_turning_it_off_removes_only_that(owner, 
     item = save_work(user)
 
     assert thumbnails.active_scales() == (1,)
-    db.update_thumbnail_settings(True)
+    db.update_thumbnail_settings(True, db.get_thumbnail_settings()['workers'])
     assert thumbnails.active_scales() == (1, 2)
 
     bake_for(item, 1)

@@ -69,15 +69,8 @@ def _band_ink(png: bytes, band: tuple[int, int]) -> tuple[int, int]:
 
 
 def test_t1_bundled_font_puts_ink_in_the_headnote_band():
-    document = compose_card_svg(WORK, headnote=HEADNOTE, seed=4821)
-    width, height = LAYOUT_SIZES["square"]
-    png = svg_to_png(
-        document,
-        width=width,
-        height=height,
-        font_files=[str(FONT_PATH)],
-        skip_system_fonts=True,
-    )
+    """Through `build_card`, so it is the product's own font wiring being measured."""
+    png = build_card(WORK, headnote=HEADNOTE, seed=4821)
     ink, _ = _band_ink(png, _headnote_band("square", 1))
     assert ink > 0
 
@@ -93,16 +86,9 @@ def test_t1_control_without_the_font_the_same_band_is_empty():
 
 def test_t1_a_longer_headnote_is_drawn_wider():
     """Rules out an implementation that draws a constant regardless of the text."""
-    width, height = LAYOUT_SIZES["square"]
     widths = []
     for text in ("石", "石の匂いだけが残っている"):
-        png = svg_to_png(
-            compose_card_svg(WORK, headnote=text, seed=4821),
-            width=width,
-            height=height,
-            font_files=[str(FONT_PATH)],
-            skip_system_fonts=True,
-        )
+        png = build_card(WORK, headnote=text, seed=4821)
         _, drawn = _band_ink(png, _headnote_band("square", 1))
         widths.append(drawn)
     assert widths[0] > 0

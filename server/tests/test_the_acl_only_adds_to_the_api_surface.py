@@ -59,6 +59,8 @@ ADDED_OPERATIONS = {
     "PUT /api/settings/thumbnails",
     "GET /api/settings/thumbnails/rebuild",
     "POST /api/settings/thumbnails/rebuild",
+    # Contract 3 (the refresh does not carry the gallery). Same rule again.
+    "GET /api/history/state",
 }
 
 ADDED_SCHEMAS = {
@@ -73,6 +75,8 @@ ADDED_SCHEMAS = {
     "ThumbnailStatus",
     "ThumbnailRebuildStatus",
     "ThumbnailSettingsBody",
+    # Contract 3.
+    "HistoryStateResponse",
 }
 
 # One schema that predates this branch is changed rather than added, and it is

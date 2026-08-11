@@ -3924,6 +3924,44 @@ def list_items(
         return _rows_to_dicts_with_lineage(session, rows, actor), total
 
 
+def list_state(user_id: str, trashed: bool = False) -> tuple[int, int | None, str | None]:
+    """How many works the caller may see, and which one is newest.
+
+    This is what a client polls when it only wants to know whether the listing
+    it already holds is still current. It reads no drawing: the count comes from
+    the database and the newest work is fetched as two columns, so a caller
+    asking every twelve seconds costs a few hundred bytes rather than the whole
+    gallery.
+
+    The three filters are `list_items`' three, in its order. Sharing decides who
+    may see a work, so a state that judged visibility its own way would let
+    somebody else's private work move the count and pull the whole listing back
+    across the wire.
+
+    The newest work is the listing's first row, not `max(id)`: the listing is
+    ordered by `at DESC, id ASC`, so when two works share a millisecond the one
+    the listing shows first is the one reported here. Reporting `max(at)` alone
+    would miss a second save inside the same millisecond entirely.
+    """
+    actor = _actor_of(user_id)
+    with SessionLocal() as session:
+        query = session.query(HistoryRow).filter(
+            _readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+            HistoryRow.trashed == (1 if trashed else 0),
+            HistoryRow.history_visibility == "normal",
+        )
+        total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
+        newest = (
+            query
+            .with_entities(HistoryRow.id, HistoryRow.at)
+            .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
+            .first()
+        )
+        if newest is None:
+            return int(total), None, None
+        return int(total), int(newest.at), str(newest.id)
+
+
 def list_lineage_groups(
     user_id: str,
     offset: int = 0,

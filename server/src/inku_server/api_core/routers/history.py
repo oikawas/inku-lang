@@ -37,6 +37,19 @@ class AnimationExportBody(BaseModel):
     height_px: int | None = Field(default=None, ge=64, le=12000)
 
 
+class HistoryStateResponse(BaseModel):
+    """The listing's shape, without the listing.
+
+    Three scalars, and every one of them earns its place: `total` catches a work
+    appearing or being trashed, `newest_at` catches a new save, and `newest_id`
+    separates two saves that landed in the same millisecond.
+    """
+
+    total: int
+    newest_at: int | None = None
+    newest_id: str | None = None
+
+
 class HistoryStarBody(BaseModel):
     starred: bool = False
     note: str | None = None
@@ -106,9 +119,27 @@ def api_history_get(
         # finds the key where it has always been, holding a string; taking the
         # key away would make "no picture asked for" and "old server" the same
         # shape on the wire. Twenty-one works cost 23.5 MB with the pictures and
-        # about 1.0 MB without them.
+        # 163 KB without them, measured on the production database.
         items = [{**item, "svg": ""} for item in items]
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
+
+
+@router.get("/api/history/state", response_model=HistoryStateResponse)
+def api_history_state(actor: dict = Depends(_current_user)) -> HistoryStateResponse:
+    """What a poller needs to decide whether to ask for the listing at all.
+
+    The client that draws the strip refetches every twelve seconds so a work
+    saved in another window appears. Nearly every one of those rounds finds
+    nothing changed and rebuilds no part of the page, so asking the question
+    here -- a few hundred bytes -- and fetching the listing only when the answer
+    moves is the whole point of this route.
+
+    `newest_id` is not redundant beside `newest_at`: two works saved inside one
+    millisecond share an `at`, and without the id the second one would never be
+    noticed.
+    """
+    total, newest_at, newest_id = _db.list_state(actor["id"])
+    return HistoryStateResponse(total=total, newest_at=newest_at, newest_id=newest_id)
 
 
 @router.post("/api/history/export-animation")

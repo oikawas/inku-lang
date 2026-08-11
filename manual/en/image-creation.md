@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.4 (Web Build 888). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.5 (Web Build 890). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -332,7 +332,16 @@ Works selected in history management are laid out on a single PNG.
 
 ### 15.2 Shareable Card
 
-History management exports a work as a single card. The drawing, the headnote, the last four digits of the render seed, and the seal are composed into one sheet. A work with no headnote becomes a card of the drawing alone, and a work with no render seed shows no seed line.
+A work is exported as a single card. The drawing, the headnote, the last four digits of the render seed, and the seal are composed into one sheet. A work with no headnote becomes a card of the drawing alone, and a work with no render seed shows no seed line.
+
+There are two doors.
+
+| Door | What it cards | What one press does |
+|---|---|---|
+| `Share card` in the toolbar under the canvas | the work on the canvas | exports one sheet immediately |
+| `Share card` in history management | the one checked work | enabled only when exactly one work is checked |
+
+Both follow the same layout and seal settings. A work that has not been saved yet has no card, so the button under the canvas cannot be pressed.
 
 | Setting | Choices |
 |---|---|

@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.5 Baseline (Web Build 890)
+
+Updated the 13 places that name a version to v2.13.5 / Build 890, and rewrote §15.2 of `Creating Images` now that the share card has two doors.
+
+- **Added `Share card` to the toolbar under the canvas.** It sits to the right of PNG, and one press exports a card of the work on the canvas. Nothing has to be checked or selected first.
+- **`Share card` in history management is unchanged** (enabled only when exactly one work is checked). Both doors follow the same layout and seal settings.
+- **A work that has not been saved yet has no card, so the button under the canvas cannot be pressed.**
+- **Renamed the button from `Card` to `Share card`** (both languages).
+
 ## 2026-08-11 — Unreleased v2.13.4 Baseline (Web Build 888)
 
 The 13 version markers were moved to v2.13.4 / Build 888, and **a subsection was added to §15 of `Creating Works`** now that a work can leave as a single card (§15.2 Shareable Card; the former §15.2 Animation is now §15.3).

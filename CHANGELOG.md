@@ -5590,3 +5590,23 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   against a contract that predicted 15** (the three that differed are explained with measurements).
 - **No deterministic layer was touched** (`renderer.py` did not move by a byte), so no frozen corpus
   was regenerated.
+
+### v2.13.5 — The share card leaves from the canvas too (Build 890, 2026-08-11)
+
+- **Added `Share card` to the toolbar under the canvas.** It sits to the right of PNG, and **one press exports a
+  card of the work on the canvas**. Nothing has to be checked or selected. The layout and the seal follow the
+  same settings the history modal uses.
+- **Renamed the button from `Card` to `Share card`** (both languages). **It is one key** (`historyCardExport`),
+  so the button in history management changed with it.
+- **A work that has not been saved yet has no card.** `history_id` is optional and `displayedHistoryItem` can be
+  null, so **the canvas button is disabled on `currentHistoryId` as well as on `!result`** — a press can never go
+  out with no id.
+- **The canvas toolbar (`status-bar`) is not wrapped in any of the seven visibility groups, so this button
+  appears in the simple UI too.** (The card in history management stays inside the `history` group.)
+- **Checks:** **web 196 passed / 0 failed** (**5 new**, none of the existing 191 lost), **`npm run check`
+  0 errors / 2 warnings** (the two existing a11y ones), **i18n 0 warnings / 0 errors** (**1,047** English strings,
+  47 exceptions; 1,046 at the branch point), **server 2,923 passed / 31 skipped**, **cli 220 passed**, **ruff clean**.
+- **Five perturbations were applied, and all five turned exactly one test red as predicted** (no misses):
+  restore the label, move the button to the left of PNG, drop `currentHistoryId` from `disabled`, remove only the
+  prop wiring while keeping the function, and drop the key from the type. **The fourth is the one that catches a
+  button placed with no path behind it.**

@@ -77,7 +77,7 @@ inkuにはセルフサインアップがありません。アカウントを作�
 | `INKU_RENDER_CONCURRENCY` | 同時Renderer実行上限の初期値 | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | ブラウザが同時に投げる描画要求の上限の初期値 | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | `0` にすると定期backupのschedulerを起動しない | `1` |
-| `INKU_THUMBNAIL_WORKERS` | サムネイル生成worker数 | `2` |
+| `INKU_THUMBNAIL_WORKERS` | 保存後の焼き付けを受け持つworker数（**再作成の並列度とは別**。再作成は要求ごとの`workers`で決まる） | `2` |
 | `INKU_THUMBNAIL_QUEUE_LIMIT` | サムネイル生成queue上限 | `64` |
 
 queue上限時も履歴DB保存を優先し、artifact保存だけをskipします。providerの無料queueによる遅延と、server worker不足を区別してください。

@@ -6,7 +6,7 @@ This file records revisions to user and operations documents under `manual/`. Se
 
 The 13 version markers were moved to v2.12.5 / Build 883. **Only the way thumbnails are baked changed; nothing an operator does is different.**
 
-- **Rebuilding thumbnails now uses every core.** The previous version could only use one, so `INKU_THUMBNAIL_WORKERS` and the rebuild's `workers` made no difference to how long a rebuild took. **Now as many bake at once as are asked for.**
+- **Rebuilding thumbnails now uses more than one core.** The previous version could only use one, so the rebuild's `workers` made no difference to how long a rebuild took. **Now it starts as many child processes as are asked for.** (**⚠ Baking straight after a save is unchanged, and `INKU_THUMBNAIL_WORKERS` still makes no difference to how long that takes.**)
 - **One work that cannot be baked no longer stops the rest.** The previous version abandoned the remaining works on the first failure and still reported itself finished with no failures. **The number that could not be baked is now shown.**
 - **A run that stopped short says so.** The rebuild status gained a "left unfinished" flag.
 

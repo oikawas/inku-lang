@@ -77,7 +77,7 @@ inku has no self-service registration. Accounts are created only through `POST /
 | `INKU_RENDER_CONCURRENCY` | Initial value for the concurrent renderer limit | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | Initial value for the browser's concurrent painting requests | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | Set to `0` to leave the periodic backup scheduler unstarted | `1` |
-| `INKU_THUMBNAIL_WORKERS` | Thumbnail baking workers | `2` |
+| `INKU_THUMBNAIL_WORKERS` | Workers that bake after a save (**separate from the rebuild**, whose parallelism comes from the `workers` in its request) | `2` |
 | `INKU_THUMBNAIL_QUEUE_LIMIT` | Thumbnail baking queue ceiling | `64` |
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.

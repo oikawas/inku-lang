@@ -413,11 +413,16 @@ function makeCorpusManager() {
 	};
 }
 
-/** A manager standing on the given page, with that page's works in hand. */
+/**
+ * A manager standing on the given page, with that page's works in hand.
+ *
+ * The page size is seeded rather than set: setPageSize is what four of the
+ * gates below are measuring, and a setup that went through it would report
+ * every fault in it as a broken setup instead of as the fault it is.
+ */
 async function managerAt(pageSize: number, page: number) {
 	const made = makeCorpusManager();
-	made.manager.setPageSize(pageSize);
-	await settle();
+	made.manager.seedFromStrip([], CORPUS_TOTAL, 0, pageSize);
 	refreshDerived(made.manager);
 	made.manager.setPage(page);
 	await settle();
@@ -467,14 +472,13 @@ test('T-20  a request still out does not answer for a different place in the lis
 	// same number names somewhere else -- so the request for 120 was dropped as
 	// already-asked and the answer for 156 arrived in its place.
 	const made = makeCorpusManager();
-	made.manager.setPageSize(52);
-	await settle();
+	made.manager.seedFromStrip([], CORPUS_TOTAL, 0, 52);
 	refreshDerived(made.manager);
 
 	made.hold(156);
 	made.manager.setPage(3);
 	await settle();
-	assert.deepEqual(made.offsets, [0, 156], 'setup: the page-3 request did not go out and hang');
+	assert.deepEqual(made.offsets, [156], 'setup: the page-3 request did not go out and hang');
 
 	made.manager.setPageSize(40);
 	await settle();

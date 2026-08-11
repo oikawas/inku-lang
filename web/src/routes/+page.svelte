@@ -6572,6 +6572,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			bind:autoRepairEnabled={ddlAutoRepairEnabled}
 			bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
 			bind:animationExportSettings={exportSettings.animation}
+			bind:cardExportSettings={exportSettings.card}
 			{exportTemplates}
 			{exportTemplateStatus}
 			{canvasAspectEnabled}
@@ -6745,6 +6746,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{trashTotal}
 			selectedHistoryIds={historyManager.selectedIds}
 			animationExportSettings={exportSettings.animation}
+			cardExportSettings={exportSettings.card}
 			historyManagerStarredOnly={historyManager.starredOnly}
 			historyManagerForRevisionOnly={historyManager.forRevisionOnly}
 			onClose={() => (historyManager.open = false)}

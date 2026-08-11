@@ -61,6 +61,11 @@ ADDED_OPERATIONS = {
     "POST /api/settings/thumbnails/rebuild",
     # Contract 3 (the refresh does not carry the gallery). Same rule again.
     "GET /api/history/state",
+    # The shareable card. Same rule again: this file measures everything added
+    # since `3450548c`, so a later branch declares its routes here or the check
+    # reads them as damage. What the card added and nothing else is measured
+    # against its own starting point in test_the_card_only_adds_one_route.py.
+    "POST /api/history/export-card",
 }
 
 ADDED_SCHEMAS = {
@@ -77,6 +82,8 @@ ADDED_SCHEMAS = {
     "ThumbnailSettingsBody",
     # Contract 3.
     "HistoryStateResponse",
+    # The shareable card.
+    "CardExportBody",
 }
 
 # One schema that predates this branch is changed rather than added, and it is

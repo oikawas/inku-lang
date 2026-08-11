@@ -34,12 +34,22 @@ def _resvg_renderer() -> Callable[..., bytes] | None:
     except ImportError:
         return None
 
-    def render(svg: str, width: int | None, height: int | None) -> bytes:
-        kwargs: dict[str, int] = {}
+    def render(
+        svg: str,
+        width: int | None,
+        height: int | None,
+        font_files: list[str] | None,
+        skip_system_fonts: bool,
+    ) -> bytes:
+        kwargs: dict[str, object] = {}
         if width is not None:
             kwargs["width"] = width
         if height is not None:
             kwargs["height"] = height
+        if font_files:
+            kwargs["font_files"] = list(font_files)
+        if skip_system_fonts:
+            kwargs["skip_system_fonts"] = True
         return bytes(resvg_py.svg_to_bytes(svg_string=svg, **kwargs))
 
     return render
@@ -71,12 +81,28 @@ def rasterizer_info() -> dict[str, str]:
         return {"backend": BACKEND_RESVG}
 
 
-def svg_to_png(svg: str, *, width: int | None = None, height: int | None = None) -> bytes:
+def svg_to_png(
+    svg: str,
+    *,
+    width: int | None = None,
+    height: int | None = None,
+    font_files: list[str] | None = None,
+    skip_system_fonts: bool = False,
+) -> bytes:
     """Rasterize ``svg`` to PNG bytes.
 
     Omitting both width and height renders at the SVG's intrinsic size; giving only
     one scales the other to preserve the aspect ratio. The background stays
     transparent unless the SVG paints one.
+
+    ``font_files`` loads specific font files rather than relying on whatever the
+    host machine happens to have installed, and ``skip_system_fonts`` shuts the
+    host's own fonts out entirely. Text is only reproducible across machines when
+    both are given: the drawings themselves carry no text, but anything typeset
+    around them does, and an installed-font lookup makes the output a property of
+    the machine. A ``font-family`` in the SVG has to match the loaded font's
+    typographic family name (name ID 16, falling back to ID 1) exactly -- an
+    unmatched family draws nothing at all rather than substituting.
 
     Raises RasterizerUnavailable when resvg is not installed. There is no second
     backend to fall back to; see the module docstring for why.
@@ -86,4 +112,4 @@ def svg_to_png(svg: str, *, width: int | None = None, height: int | None = None)
         raise RasterizerUnavailable(
             "resvg-py is not installed, and it is the only supported SVG rasterizer"
         )
-    return render(svg, width, height)
+    return render(svg, width, height, font_files, skip_system_fonts)

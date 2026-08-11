@@ -3054,6 +3054,46 @@ def command_history_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_export_card(args: argparse.Namespace) -> int:
+    """Ask the server to typeset one work as a shareable sheet and save the PNG.
+
+    The card is composed server-side, so what comes back here is the same sheet
+    the web export produces; the CLI adds nothing to it but the destination.
+    """
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    items = _fetch_all_history(client)
+    item = _resolve_history_hash(items, args.hash)
+    payload = {"id": item["id"], "layout": args.layout, "seal": not args.no_seal}
+    raw, _ = client.request_raw(
+        "POST", "/api/history/export-card", data=payload, headers={"Accept": "image/png"}
+    )
+    out = Path(args.out)
+    # A trailing separator means a directory even when it does not exist yet.
+    # Testing `is_dir()` alone silently writes a FILE named `cards` for
+    # `--out cards/`, and a second card then overwrites the first.
+    if args.out.endswith(("/", os.sep)) or out.is_dir():
+        out.mkdir(parents=True, exist_ok=True)
+        out = out / f"inku-card-{_history_hash_label(item)}-{args.layout}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(raw)
+    _print_json(
+        {
+            "id": item["id"],
+            "hash": _history_hash_label(item),
+            "layout": args.layout,
+            "seal": not args.no_seal,
+            "path": str(out),
+            "bytes": len(raw),
+        }
+    )
+    return 0
+
+
 def command_lineage(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -4026,6 +4066,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="filter history to items marked for revision before resolving hashes",
     )
     history_export.set_defaults(func=command_history_export)
+
+    export_card = subparsers.add_parser(
+        "export-card",
+        help="write one work as a shareable card: picture, headnote, seed and seal on one sheet",
+    )
+    _add_common_server_args(export_card)
+    export_card.add_argument("hash", help="4+ character history hash suffix of the work")
+    export_card.add_argument(
+        "--out",
+        "-o",
+        required=True,
+        help="destination PNG path, or a directory to name the file inside",
+    )
+    export_card.add_argument(
+        "--layout",
+        choices=["square", "portrait"],
+        default="square",
+        help="square gives a 1080x1080 sheet, portrait a taller 1080x1350 one",
+    )
+    export_card.add_argument(
+        "--no-seal",
+        action="store_true",
+        help="leave the small `inku` mark off the sheet; it is printed by default",
+    )
+    export_card.set_defaults(func=command_export_card)
 
     api_command = subparsers.add_parser(
         "api",

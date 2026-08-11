@@ -36,7 +36,10 @@ PUBLIC = {  # every entry needs a reason
 #   GET/PUT /api/settings/thumbnails with GET/POST of its rebuild.
 #   +1 for contract 3's GET /api/history/state, which lets the strip ask
 #   whether the listing changed without fetching the listing.
-EXPECTED_ROUTE_COUNT = 93
+#   +1 for POST /api/history/export-card, the shareable one-sheet card.
+#   The last two landed in the same cycle from two branches, and each had
+#   written 93 on its own: the merged count is the base plus both, not either.
+EXPECTED_ROUTE_COUNT = 94
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

@@ -3822,6 +3822,7 @@ if (unreadWords.length > 0) {
 				total: historyTotal,
 				newestId: historyItems[0]?.id ?? null,
 				newestAt: historyItems[0]?.at ?? null,
+				showsTheNewestFirst: historyOffset === 0 && !historyStarredOnly,
 			})) return;
 			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
 			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });

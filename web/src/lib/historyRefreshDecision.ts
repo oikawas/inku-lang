@@ -25,6 +25,17 @@ export type HistoryStripHead = {
 	total: number;
 	newestAt: number | null;
 	newestId: string | null;
+	/**
+	 * Is the strip on its first page with no filter?
+	 *
+	 * Only then is its first item the newest work and its count the same count
+	 * the server reports. The guards above already stop a round in any other
+	 * case, so this is carried rather than assumed: a guard removed later --
+	 * deliberately, to let the strip refresh on page two -- would otherwise
+	 * leave the comparison reading some middle page's first work as "newest"
+	 * and reporting no change forever.
+	 */
+	showsTheNewestFirst: boolean;
 };
 
 export type HistoryRefreshConditions = {
@@ -81,8 +92,15 @@ export function historyRefreshBlockedBy(c: HistoryRefreshConditions): string | n
  *
  * `newestId` is compared as well as `newestAt` because two works saved inside
  * one millisecond share an `at`; on `at` alone the second one is invisible.
+ *
+ * A strip that is not showing the newest work first cannot answer the question,
+ * and says so by reporting itself stale. That costs a listing fetch, which is
+ * exactly what this round did before any of this existed -- the failure the
+ * comparison must never have is the quiet one, where it reads the wrong work as
+ * newest and reports no change while the user waits for a save to appear.
  */
 export function historyStripIsCurrent(state: HistoryState, strip: HistoryStripHead): boolean {
+	if (!strip.showsTheNewestFirst) return false;
 	return state.total === strip.total
 		&& state.newest_id === strip.newestId
 		&& state.newest_at === strip.newestAt;

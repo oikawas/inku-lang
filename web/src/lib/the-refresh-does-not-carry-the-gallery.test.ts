@@ -62,7 +62,12 @@ const NOTHING_IN_THE_WAY: HistoryRefreshConditions = {
 	minGapMs: 5000
 };
 
-const HELD = { total: 21, newestAt: 1_700_000_000_000, newestId: 'work-a' };
+const HELD = {
+	total: 21,
+	newestAt: 1_700_000_000_000,
+	newestId: 'work-a',
+	showsTheNewestFirst: true
+};
 const SAME = { total: 21, newest_at: 1_700_000_000_000, newest_id: 'work-a' };
 
 // ── T-1: nothing changed, so the gallery stays where it is ──────────────────
@@ -118,7 +123,7 @@ test('T-2 each of the three quantities on its own means the listing is stale', (
 });
 
 test('T-2 an empty gallery and a first save are both handled', () => {
-	const empty = { total: 0, newestAt: null, newestId: null };
+	const empty = { total: 0, newestAt: null, newestId: null, showsTheNewestFirst: true };
 	assert.equal(historyStripIsCurrent({ total: 0, newest_at: null, newest_id: null }, empty), true);
 	assert.equal(
 		historyStripIsCurrent({ total: 1, newest_at: 5, newest_id: 'first' }, empty),
@@ -171,6 +176,34 @@ test('T-6 the four conditions each stop the round before it asks anything', () =
 	// And with nothing in the way it does run, or the check above is satisfied
 	// by a function that blocks everything.
 	assert.equal(historyRefreshBlockedBy(NOTHING_IN_THE_WAY), null);
+});
+
+// ── T-11: the comparison says so when it cannot answer ──────────────────────
+// Added on the author's ruling of 2026-08-11, which kept the comparison against
+// the strip rather than against a remembered answer. That choice binds the
+// comparison to two of the guards: only on the first page, unfiltered, is the
+// strip's first item the newest work. The binding is carried explicitly so that
+// a guard removed later -- deliberately, to let page two refresh -- degrades to
+// fetching the listing rather than to reporting "nothing changed" forever.
+
+test('T-11 a strip that cannot show the newest work first is never current', () => {
+	// Same three numbers, agreeing exactly. It is still not an answer.
+	assert.equal(
+		historyStripIsCurrent(SAME, { ...HELD, showsTheNewestFirst: false }),
+		false,
+		'a strip on another page or under a filter reported itself up to date'
+	);
+	// It fails towards fetching, which is what this round did before the state
+	// route existed -- never towards silence.
+	assert.equal(historyStripIsCurrent(SAME, { ...HELD, showsTheNewestFirst: true }), true);
+});
+
+test('T-11 the page derives that from the same state the guards read', () => {
+	assert.match(
+		REFRESH,
+		/showsTheNewestFirst: historyOffset === 0 && !historyStarredOnly/,
+		'the page no longer tells the comparison whether the strip can answer'
+	);
 });
 
 test('T-6 the page hands the guards its live values', () => {

@@ -42,8 +42,15 @@
 		lineageIntermediateNotice: string | null;
 		allowEmptyOutputTabs: boolean;
 		currentRenderedAt: string | null;
-		nextDisabled: boolean;
-		prevDisabled: boolean;
+		// The three nav buttons, each with its own answer. They come decided by
+		// historyNavigation.ts so this panel and the strip read one judgement.
+		navLatestDisabled: boolean;
+		navNewerDisabled: boolean;
+		navOlderDisabled: boolean;
+		// A demo is running, so nothing may move. ORed into every nav button
+		// below as well: the flags above already carry it, and this is the guard
+		// that stays if a caller ever forgets to pass it through them.
+		interactionLocked: boolean;
 		historyTotal: number;
 		navPos: number;
 		canvasAspectWidth: number;
@@ -179,8 +186,10 @@
 		lineageIntermediateNotice = null,
 		allowEmptyOutputTabs,
 		currentRenderedAt,
-		nextDisabled,
-		prevDisabled,
+		navLatestDisabled,
+		navNewerDisabled,
+		navOlderDisabled,
+		interactionLocked,
 		historyTotal,
 		navPos,
 		canvasAspectWidth = 1,
@@ -553,10 +562,10 @@
 	<div class="canvas-area">
 		<div class="nav-left">
 			<Tooltip placement="right" text={t().tooltipCanvasNavLatest}>
-				<button class="nav-latest" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+				<button class="nav-latest" onclick={onGotoLatest} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
 			</Tooltip>
-			<Tooltip placement="right" text={t().tooltipCanvasNavPrev}>
-				<button class="nav-circle" onclick={onGotoNext} disabled={nextDisabled}>‹</button>
+			<Tooltip placement="right" text={t().tooltipCanvasNavNewer}>
+				<button class="nav-circle" onclick={onGotoNext} disabled={interactionLocked || navNewerDisabled}>‹</button>
 			</Tooltip>
 		</div>
 
@@ -1022,8 +1031,8 @@
 
 
 		<div class="nav-right">
-			<Tooltip placement="left" text={t().tooltipCanvasNavNext}>
-				<button class="nav-circle" onclick={onGotoPrev} disabled={prevDisabled}>›</button>
+			<Tooltip placement="left" text={t().tooltipCanvasNavOlder}>
+				<button class="nav-circle" onclick={onGotoPrev} disabled={interactionLocked || navOlderDisabled}>›</button>
 			</Tooltip>
 			{#if historyTotal > 0}
 				<span class="nav-counter">{navPos} / {historyTotal}</span>
@@ -1288,16 +1297,16 @@
 			{/if}
 		</div>
 		<div class="presentation-controls" aria-label={t().canvasPresentationControls}>
-			<Tooltip text={t().tooltipCanvasNavPrev}>
-				<button type="button" class="presentation-icon-btn" onclick={onGotoNext} disabled={nextDisabled} aria-label={t().historyOlderPage(1)}>
+			<Tooltip text={t().tooltipCanvasNavNewer}>
+				<button type="button" class="presentation-icon-btn" onclick={onGotoNext} disabled={interactionLocked || navNewerDisabled} aria-label={t().tooltipCanvasNavNewer}>
 					‹
 				</button>
 			</Tooltip>
 			<Tooltip text={t().tooltipCanvasNavLatest}>
-				<button type="button" class="presentation-text-btn" onclick={onGotoLatest} disabled={nextDisabled}>{t().historyLatest}</button>
+				<button type="button" class="presentation-text-btn" onclick={onGotoLatest} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
 			</Tooltip>
-			<Tooltip text={t().tooltipCanvasNavNext}>
-				<button type="button" class="presentation-icon-btn" onclick={onGotoPrev} disabled={prevDisabled} aria-label={t().historyNewerPage(1)}>
+			<Tooltip text={t().tooltipCanvasNavOlder}>
+				<button type="button" class="presentation-icon-btn" onclick={onGotoPrev} disabled={interactionLocked || navOlderDisabled} aria-label={t().tooltipCanvasNavOlder}>
 					›
 				</button>
 			</Tooltip>

@@ -120,10 +120,16 @@ export class HistoryManagerState {
 	offset = $derived(this.page * this.pageSize);
 	shownTo = $derived(Math.min(this.offset + this.items.length, this.total));
 
-	constructor(
-		private readonly apiFetch: ApiFetch,
-		private readonly syncTrashPage: TrashPageSync
-	) {}
+	// Written out rather than declared as constructor parameter properties: node's
+	// strip-only TypeScript loader cannot parse that form, and the unit tests
+	// construct this class for real.
+	private readonly apiFetch: ApiFetch;
+	private readonly syncTrashPage: TrashPageSync;
+
+	constructor(apiFetch: ApiFetch, syncTrashPage: TrashPageSync) {
+		this.apiFetch = apiFetch;
+		this.syncTrashPage = syncTrashPage;
+	}
 
 	clear() {
 		this.open = false;
@@ -152,12 +158,17 @@ export class HistoryManagerState {
 		this.page = 0;
 		this.search = '';
 		this.selectedIds = [];
-		if (!this.preloadMatches('active', 0, this.pageSize, '', false, false, activeTotal)) {
+		const preloaded = this.preloadMatches('active', 0, this.pageSize, '', false, false, activeTotal);
+		if (!preloaded) {
 			this.activeItems = activeItems;
 		}
 		this.activeTotal = activeTotal;
 		this.trashItems = [];
 		this.trashTotal = trashTotal;
+		// The first load carries the strip's works only, so a full page has to be
+		// fetched by whoever opens the manager. Seeded items stay on screen while
+		// it arrives. When a page is already in hand, opening costs nothing.
+		if (!preloaded) void this.fetch({ view: 'active', page: 0, pageSize: this.pageSize });
 	}
 
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
@@ -226,13 +237,21 @@ export class HistoryManagerState {
 		void this.fetch({ view: 'active', page: 0, search: '', starredOnly: false, forRevisionOnly: false, pageSize: nextPageSize, silent: true });
 	}
 
-	primeFirstPage(activeItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
-		const nextPageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
-		this.pageSize = nextPageSize;
-		this.activeItems = activeItems;
+	/**
+	 * Hand the manager what the history strip is holding.
+	 *
+	 * Two different quantities meet here and must not be confused. `pageSize` is
+	 * how many works one page of the manager holds; `stripItems` is what the
+	 * strip happens to have in hand, which is fewer -- the strip asks only for
+	 * what it shows. The items are kept so the modal does not open blank, but
+	 * they are not a page, so no preload key is written and openWith() will go
+	 * and fetch one. Items already in hand are not replaced by a shorter list.
+	 */
+	seedFromStrip(stripItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
+		this.pageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
 		this.activeTotal = activeTotal;
 		this.trashTotal = trashTotal;
-		this.preloadKey = this.cacheKey('active', 0, nextPageSize, '', false, false, activeTotal);
+		if (stripItems.length > this.activeItems.length) this.activeItems = stripItems;
 	}
 
 	setView = (view: HistoryManagerView) => {
@@ -315,7 +334,13 @@ export class HistoryManagerState {
 		return [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0, total].join('|');
 	}
 
-	private preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): boolean {
+	/**
+	 * Whether a whole page of what is being asked for is already in hand.
+	 *
+	 * Public because it is what decides whether opening the manager costs a
+	 * fetch, which is a fact about this class rather than an internal detail.
+	 */
+	preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): boolean {
 		const expectedItems = Math.min(pageSize, total);
 		return (
 			this.preloadKey === this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, total) &&

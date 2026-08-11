@@ -83,6 +83,7 @@
 		type HistoryItem,
 		type Score
 	} from '$lib/historyManagerState.svelte';
+	import { historyListLimit } from '$lib/historyListLimit';
 
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
@@ -3666,11 +3667,13 @@ if (unreadWords.length > 0) {
 			? historyItems[historyCursor]?.id ?? displayedHistoryItem?.id ?? result?.history_id ?? null
 			: null);
 		try {
-			const listLimit = options.anchorId
-				? historyWindowSize
-				: safeOffset === 0 && !historyStarredOnly
-					? estimatedHistoryManagerPageSize()
-					: historyWindowSize;
+			const listLimit = historyListLimit({
+				anchorId: options.anchorId ?? null,
+				offset: safeOffset,
+				starredOnly: historyStarredOnly,
+				windowSize: historyWindowSize,
+				managerPageSize: estimatedHistoryManagerPageSize()
+			});
 			const params = new URLSearchParams({
 				offset: String(safeOffset),
 				limit: String(listLimit),
@@ -3700,7 +3703,10 @@ if (unreadWords.length > 0) {
 			}
 			if (!historyManager.open) {
 				if (resolvedOffset === 0 && !historyStarredOnly) {
-					historyManager.primeFirstPage(data.items, data.total, trashTotal, listLimit);
+					// The strip's items are what we have; the manager's page size is a
+					// different quantity, so it is passed separately. The manager is
+					// seeded, not filled: it fetches its own page when it opens.
+					historyManager.seedFromStrip(data.items, data.total, trashTotal, estimatedHistoryManagerPageSize());
 				} else {
 					preloadHistoryManagerFirstPage();
 				}

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from ...plugins import DOCUMENT_PLUGIN_MANAGER, PluginFormatError, validate_plugin_document
+from ...plugins import (
+    DOCUMENT_PLUGIN_MANAGER,
+    PluginFormatError,
+    plugin_item_with_fires_on,
+    validate_plugin_document,
+)
 from ..deps import _admin_user, _current_user
 
 
@@ -30,7 +35,14 @@ class PluginEnabledBody(BaseModel):
 
 @router.get("/api/plugins")
 def api_plugins(actor: dict = Depends(_current_user)) -> dict[str, object]:
-    return {"items": [item.as_dict() for item in DOCUMENT_PLUGIN_MANAGER.items()]}
+    # Entries carry `fires_on_*` so an editor can say which plain word a wrong
+    # qualified name would have fired ("Nature.菖蒲" -> 下草).
+    return {
+        "items": [
+            plugin_item_with_fires_on(item.as_dict())
+            for item in DOCUMENT_PLUGIN_MANAGER.items()
+        ]
+    }
 
 
 @router.post("/api/plugins/validate")

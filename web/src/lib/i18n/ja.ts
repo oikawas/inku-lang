@@ -176,6 +176,10 @@ export const ja: LangPack = {
 	ddlEditDialogSubtitle: '描画すると、選択した作品の子として系譜へ保存します。',
 	ddlSyntaxGuide: '指示書（DDL）簡易ガイド\n指示書は、絵そのものではなく、絵を生成するための短い視覚指示です。自然文を、色・かたち・場所・動き・てざわりに分解した「演奏用の記述」として扱います。これらの文法を、DDL (Drawing Description Language)として定義しています。\n1行に1つの視覚指示を書くと安定します。\n基本形: 色 + 大きさ + かたち + 数 + 場所 + 動き。\n例: 背景を白で埋める。\n例: 赤い小さな円を右上に三個置く。\n例: 青い細い線を左下から右上へ引く。\n場所は「上端」「右半分」「左下から右上へ」のように具体化します。\n動きや質感は「波打つ」「細かく揺れる」「クレヨン」「鉛筆」のように短く添えます。',
 	ddlDialogDrawingModel: '描画モデル',
+	ddlUnknownNameTitle: 'このサーバーにない名前',
+	ddlUnknownNameFires: (namespace, word) => `「${namespace}.」を外すと「${word}」として効きます`,
+	ddlUnknownNameUnregistered: 'この名前は登録されていません',
+	ddlPluginWarningsTitle: 'プラグインからの警告',
 
 	tabCanvas: '作品',
 	tabRefine: '推敲',

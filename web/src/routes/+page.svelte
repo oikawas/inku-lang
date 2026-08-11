@@ -14,6 +14,7 @@
 		type PermissionGroup
 	} from '$lib/permissionGroups';
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
+	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
@@ -150,6 +151,10 @@
 		elapsed_stage2_ms: number;
 		elapsed_total_ms: number;
 		source_ddl?: string | null;
+		// What the expansion layer removed and why. It reaches the record on
+		// every path; until now nothing showed it to the person who wrote the
+		// sentence that went missing.
+		plugin_warnings?: string[] | null;
 		focus?: string | null;
 		variation_amplitude?: string | null;
 		variation_seed?: number | null;
@@ -184,6 +189,10 @@
 		surface_en: string[];
 		note_ja: string;
 		note_en: string;
+		// Carried by GET /api/saijiki so the DDL editor can tell a wrong
+		// qualified name from a name that does not exist at all.
+		fires_on_ja?: string[];
+		fires_on_en?: string[];
 	};
 	type PluginItem = {
 		name: string;
@@ -400,6 +409,8 @@
 	let ddlAutoRepairEnabled = $state(true);
 	let thinking = $state<string | null>(null);
 	let result   = $state<PaintResult | null>(null);
+	// One read point for every draw path: whatever sets `result` shows them.
+	const pluginWarningsShown = $derived(pluginWarningsToShow(result));
 	// 写生 (Stage 0.5). Chosen per draw, so it is plain state -- not persisted the
 	// way a user setting like the color catalog is (contract section 0.3.1).
 	let sketchMode = $state<SketchMode>(DEFAULT_SKETCH_MODE);
@@ -6183,6 +6194,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
+					<!-- 展開層が落としたもの。編集中の指摘 (DDL エディタ) と対で、
+					     消えた後にしか分からない側をここが受け持つ。 -->
+					{#if pluginWarningsShown.length > 0 && inputMode === 'single'}
+						<section class="panel-section plugin-warnings">
+							<div class="plugin-warnings-title">{t().ddlPluginWarningsTitle}</div>
+							{#each pluginWarningsShown as warning}
+								<p class="plugin-warning-line">{warning}</p>
+							{/each}
+						</section>
+					{/if}
+
 					{#if interpretationDiffParts.length > 0 && inputMode === "single"}
 						<section class="panel-section interpretation-diff">
 							{#each interpretationDiffParts as part}
@@ -6808,6 +6830,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--ddl-btn-border-hover: #bd8f34;
 		--ddl-btn-fg-hover:     #4f360b;
 		--ddl-btn-shadow:       0 1px 3px rgba(108,74,16,0.12);
+		/* 名前空間付きの参照のうち、このサーバーが持っていない名前の色。
+		   赤 (--danger) は使わない: プラグインは後から足せるので、いま無い名前が
+		   明日は有効になる。琥珀は「間違い」ではなく「まだ無い」を言う。 */
+		--ddl-token-unknown-fg:     #8a5a12;
+		--ddl-token-unknown-bg:     rgba(191, 136, 32, 0.12);
+		--ddl-token-unknown-border: rgba(191, 136, 32, 0.42);
 		/* 系譜で、起点からスター付き作品までの経路を引く色 */
 		--star-path:    #d97a1f;
 		/* 星を付けた状態のボタン。5 コンポーネントが同じリテラルを複製し、
@@ -6853,6 +6881,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--border:       #38342f;
 		--border2:      #514b43;
 		--danger:       #ff9a86;
+		--ddl-token-unknown-fg:     #f0c368;
+		--ddl-token-unknown-bg:     rgba(191, 136, 32, 0.26);
+		--ddl-token-unknown-border: rgba(240, 195, 104, 0.48);
 		--star-path:    #f0a44f;
 		--star-fg:      #ffd166;
 		--star-bg:      rgba(213,155,33,0.18);
@@ -6904,6 +6935,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	:global(.ddl-token-angle) { color: #3d6f2c; background: rgba(61, 111, 44, 0.10); }
 	:global(.ddl-token-ratio) { color: #9a3d3d; background: rgba(154, 61, 61, 0.09); }
 	:global(.ddl-token-plugin) { color: #9f4b3b; background: rgba(185, 88, 69, 0.10); }
+	/* A namespaced name this server does not hold. It takes its colour from the
+	   :root pair so the editor's strip below the text can say the same thing in
+	   the same amber, in both themes. */
+	:global(.ddl-token-unknown) {
+		color: var(--ddl-token-unknown-fg);
+		background: var(--ddl-token-unknown-bg);
+		text-decoration: underline wavy var(--ddl-token-unknown-border);
+		text-underline-offset: 3px;
+	}
 	:global(.ddl-token-word) { color: #2c3e91; background: rgba(44, 62, 145, 0.08); }
 	:global(.ddl-token-emotion) { color: #9b7a66; font-style: inherit; }
 	:global(html[data-theme='dark'] .ddl-token-shape) { color: #9cc4ff; background: rgba(92, 143, 220, 0.26); }
@@ -7261,6 +7301,23 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.sketch-editor { font-family: inherit; width: 100%; resize: vertical; }
 	.sketch-note { margin: 0; font-size: 11px; color: var(--fg3); }
 
+	/* The same amber as the editor's mark: one meaning, one colour. */
+	.plugin-warnings {
+		border: 1px solid var(--ddl-token-unknown-border);
+		background: var(--ddl-token-unknown-bg);
+	}
+	.plugin-warnings-title {
+		color: var(--ddl-token-unknown-fg);
+		font-size: 11px;
+		font-weight: 500;
+		margin-bottom: 4px;
+	}
+	.plugin-warning-line {
+		color: var(--fg2);
+		font-size: 11px;
+		line-height: 1.5;
+		word-break: break-word;
+	}
 	.interpretation-diff {
 		gap: 2px;
 		padding: 8px 10px;

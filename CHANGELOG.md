@@ -5302,3 +5302,40 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   of an unreadable node is stopped both by an early return and by a hydration step that admits only
   readable rows, so **removing either one leaves the other holding.** Removing both turns the tests
   red, so they do discriminate.
+
+
+### v2.12.3 — The list asks for what it shows (Build 880, 2026-08-11, first load)
+
+- **The first load stopped pre-fetching 50 MB.** `/api/history` asked for **one page of the history
+  manager (65) rather than what the strip below the canvas shows (21)** — for a modal nobody had
+  opened. The request now asks for what is shown. **Measured 52,945,665 → 23,524,802 bytes** (same
+  machine, same 1909×1056 dpr 1 window). **The response total went 2,675 → 1,997 ms, and time to
+  interactive 5,769 → 4,808 ms.**
+- **The history manager fetches its own page when it opens.** The pre-fetch **was paid on every
+  visit, including the ones where nobody opened it** (of 1,751 requests in 24 hours of production
+  logs, only 6 show the manager being opened). **The cost now falls on whoever opens it.**
+- **⚠ Three defects found along the way were fixed.** ① The search `$effect` reads whether the modal
+  is open, so **opening it sent two requests** (105.9 MB). ② The modal measures its own grid once on
+  screen and reports **65 → 52, which sent a third** (99.4 MB); a request already in flight for 65
+  answers a need for 52, and that judgement now drops the duplicate. ③ That duplicate was dropped
+  **after taking a request number**, so **the dropped question demoted the real request in flight to
+  "superseded" and the 52 MB that arrived was discarded** — the judgement moved ahead of the
+  numbering. **⚠ The third one is invisible to a test that counts requests** (the count was a
+  correct 1), so the test was moved onto **the works actually reaching the screen.**
+- **⚠ The contract's estimate for the long task that follows (1,055 → about 470 ms) was wrong.**
+  Measured: **1,497 → 1,349 ms (−10%)**. The reason is measured too — **the DOM node count (74,721)
+  and `<path>` count (6,845) did not move at all.** The strip draws 21 thumbnails before and after;
+  what disappeared was only the work of parsing 44 items that were then thrown away. **The
+  improvement comes from the wait (−678 ms) and time to interactive (−961 ms), not from drawing.**
+- **Two places decide how many works one page holds** (the page estimates 65, the modal measures 52).
+  **This version's judgement absorbs the difference, so no extra request results**, but the fact
+  stands and was filed in the ledger.
+- **Checks:** **web `test:unit` 132 → 146** (nothing deleted or renamed), **`npm run check` 0 errors /
+  2 warnings** (the two pre-existing a11y ones), **`lint:i18n` 0 errors**, **server 2,826 passed / 31
+  skipped**, **cli 217 passed**, **ruff clean** (server and cli). **No byte of `server/` changed, so
+  the reference corpora did not move.** **Eleven perturbations were applied and all eleven landed**
+  (the contract's six, plus five for the mid-flight ruling and the gates added along the way).
+- **⚠ Three perturbations missed first, and each time either a test or the implementation was fixed.**
+  One of them measured a case where **`preloadMatches` is an AND of "the cached key matches" and
+  "enough items are in hand", and the item count alone made it false** — so writing the key changed
+  nothing. Replacing it with **a case where only the declaration decides** turned both tests red.

@@ -25,7 +25,6 @@ from inku_server import db
 from inku_server import thumbs_db
 from inku_server.api import app
 from inku_server.api_core import thumbnails
-from inku_server.api_core.routers import history as history_routes
 
 client = TestClient(app)
 

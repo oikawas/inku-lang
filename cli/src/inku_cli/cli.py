@@ -2993,6 +2993,25 @@ def command_history(args: argparse.Namespace) -> int:
     _print_json(data)
     return 0
 
+def command_history_state(args: argparse.Namespace) -> int:
+    """Ask whether the listing changed, without fetching the listing.
+
+    The web client polls this every twelve seconds and fetches the works only
+    when one of the three numbers moves. `--bytes` wraps the answer in its own
+    measured size, because "is it small" is a claim about the wire and cannot be
+    read off a formatted body.
+    """
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    raw, _ = client.request_raw("GET", "/api/history/state")
+    state = json.loads(raw.decode("utf-8")) if raw else {}
+    _print_json({"bytes": len(raw), "state": state} if args.bytes else state)
+    return 0
+
 def command_unread_words(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -3967,6 +3986,17 @@ def build_parser() -> argparse.ArgumentParser:
     history_peers = history_sub.add_parser(
         "peers", help="list the members of your own organisation, to share a work with"
     )
+
+    history_state = history_sub.add_parser(
+        "state",
+        help="how many works there are and which is newest, without sending any of them",
+    )
+    history_state.add_argument(
+        "--bytes",
+        action="store_true",
+        help="wrap the answer in the size of the response it arrived in, to check it stays small",
+    )
+    history_state.set_defaults(func=command_history_state)
 
     # No _add_common_server_args here: `history` itself already carries them,
     # so the server flags go before the subcommand, as they do for `user`,

@@ -31,7 +31,7 @@ inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --s
 
 `history` returns each work's whole SVG by default, which is what makes it
 usable for anything that needs the picture. A listing of 21 works is about
-23.5 MB that way, and about 1.0 MB without them, so pass `--no-svg` when the
+23.5 MB that way, and 163 KB without them, so pass `--no-svg` when the
 listing is being read for its metadata:
 
 ```sh
@@ -41,6 +41,19 @@ inku-cli history --limit 21 --no-svg        # svg comes back as an empty string
 
 The `svg` key is present either way. `--no-svg` empties it rather than removing
 it, so a reader that expects the field still finds it.
+
+When the question is only whether the listing changed at all, `history state`
+answers it in a few hundred bytes: how many works there are, and the `at` and
+`id` of the newest one. It reads no drawing, so it costs the same whether the
+gallery holds twenty works or two thousand:
+
+```sh
+inku-cli history state
+inku-cli history state --bytes             # the answer, wrapped in its own wire size
+```
+
+Both `at` and `id` are reported because two works saved inside the same
+millisecond share an `at`; without the id the second one would go unnoticed.
 
 ## Share one work with someone else
 
@@ -693,15 +706,17 @@ usage: inku-cli history [-h] [--base-url BASE_URL]
                         [--timeout-seconds TIMEOUT_SECONDS] [--offset OFFSET]
                         [--limit LIMIT] [--query QUERY] [--starred]
                         [--for-revision] [--no-svg]
-                        {share,unshare,acl,peers} ...
+                        {share,unshare,acl,peers,state} ...
 
 positional arguments:
-  {share,unshare,acl,peers}
+  {share,unshare,acl,peers,state}
     share               let another member see or change one work
     unshare             take one member's access to a work away again
     acl                 show who else may see or change one work
     peers               list the members of your own organisation, to share a
                         work with
+    state               how many works there are and which is newest, without
+                        sending any of them
 
 options:
   -h, --help            show this help message and exit
@@ -774,6 +789,18 @@ usage: inku-cli history peers [-h]
 
 options:
   -h, --help  show this help message and exit
+
+```
+
+### `inku-cli history state`
+
+```
+usage: inku-cli history state [-h] [--bytes]
+
+options:
+  -h, --help  show this help message and exit
+  --bytes     wrap the answer in the size of the response it arrived in, to
+              check it stays small
 
 ```
 

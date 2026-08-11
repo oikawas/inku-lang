@@ -84,6 +84,7 @@
 		type Score
 	} from '$lib/historyManagerState.svelte';
 	import { historyListLimit } from '$lib/historyListLimit';
+	import { historyRefreshBlockedBy, historyStripIsCurrent, type HistoryState } from '$lib/historyRefreshDecision';
 	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
@@ -3778,15 +3779,51 @@ if (unreadWords.length > 0) {
 		if (!found) historyCursor = -1;
 	}
 
-	async function refreshHistoryForExternalSave(force = false): Promise<void> {
-		if (!authToken || historyManager.open || historyStarredOnly || historyOffset !== 0 || loading) return;
-		if (document.visibilityState !== 'visible') return;
+	async function fetchHistoryState(): Promise<HistoryState | null> {
+		try {
+			const r = await apiFetch('/api/history/state');
+			if (!r.ok) return null;
+			const data = await r.json();
+			if (!Number.isFinite(data?.total)) return null;
+			return {
+				total: Number(data.total),
+				newest_at: data.newest_at ?? null,
+				newest_id: data.newest_id ?? null,
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	async function refreshHistoryForExternalSave(): Promise<void> {
 		const now = Date.now();
-		if (!force && now - lastExternalHistoryRefreshAt < EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS) return;
-		if (externalHistoryRefreshInFlight) return;
+		if (historyRefreshBlockedBy({
+			signedIn: !!authToken,
+			managerOpen: historyManager.open,
+			starredOnly: historyStarredOnly,
+			offset: historyOffset,
+			loading,
+			visible: document.visibilityState === 'visible',
+			inFlight: externalHistoryRefreshInFlight,
+			now,
+			lastRefreshAt: lastExternalHistoryRefreshAt,
+			minGapMs: EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS,
+		})) return;
 		externalHistoryRefreshInFlight = true;
 		lastExternalHistoryRefreshAt = now;
 		try {
+			// Ask what changed before carrying the gallery. Most rounds find
+			// nothing and stop here; a failed answer falls through and fetches,
+			// so a server that cannot answer degrades to the old behaviour.
+			// The guards above mean the strip is at offset 0 and unstarred, so
+			// its first item is the newest work and its total is the same count.
+			const state = await fetchHistoryState();
+			if (state && historyStripIsCurrent(state, {
+				total: historyTotal,
+				newestId: historyItems[0]?.id ?? null,
+				newestAt: historyItems[0]?.at ?? null,
+				showsTheNewestFirst: historyOffset === 0 && !historyStarredOnly,
+			})) return;
 			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
 			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
 			else await fetchHistoryOffset(0, { preserveSelection: true });
@@ -5922,11 +5959,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const externalHistoryRefreshTimer = window.setInterval(() => {
 			void refreshHistoryForExternalSave();
 		}, EXTERNAL_HISTORY_REFRESH_MS);
+		// Coming back to the tab still refreshes at once; what it no longer does
+		// is jump the floor. Both of these fire on a single alt-tab.
 		function onHistoryVisibilityChange() {
-			if (document.visibilityState === 'visible') void refreshHistoryForExternalSave(true);
+			if (document.visibilityState === 'visible') void refreshHistoryForExternalSave();
 		}
 		function onHistoryWindowFocus() {
-			void refreshHistoryForExternalSave(true);
+			void refreshHistoryForExternalSave();
 		}
 		document.addEventListener('visibilitychange', onHistoryVisibilityChange);
 		window.addEventListener('focus', onHistoryWindowFocus);

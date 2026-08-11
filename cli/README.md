@@ -97,6 +97,28 @@ The output directory contains:
 
 Hash suffixes are matched against `render_hash_short` or the trailing characters of `render_hash`. If a suffix is ambiguous, use more characters.
 
+## Write one work as a shareable card
+
+`export-card` asks the server to typeset one work as a single sheet — the picture,
+the headnote, the last four digits of its seed, and a small `inku` mark — and saves
+the PNG:
+
+```sh
+inku-cli export-card F3DE --out cli/out/cards/
+inku-cli export-card F3DE --out one-sheet.png --layout portrait --no-seal
+```
+
+`--layout square` (the default) writes 1080×1080; `--layout portrait` writes
+1080×1350. `--no-seal` leaves the `inku` mark off — the sheet is otherwise
+unchanged, so the picture and the headnote sit where they always do.
+
+The typesetting happens on the server, with a font that ships beside it, so the
+same work becomes the same sheet from the CLI, the web export, and any other
+machine. A work whose headnote is empty still produces a card; the picture simply
+takes the room the text would have used.
+
+Hash suffixes resolve the same way as `history-export`.
+
 ## Adjust the render limits
 
 Nine numbers decide how many marks a work may carry. They are not performance
@@ -144,13 +166,13 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,rasterize,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
@@ -169,6 +191,8 @@ positional arguments:
     unread-words        report words the interpreter could not confidently
                         read
     history-export      export history items by hash for benchmark review
+    export-card         write one work as a shareable card: picture, headnote,
+                        seed and seal on one sheet
     api                 call any public inku HTTP API endpoint with the stored
                         session
     plugin              inspect and reload declarative DDL plugins
@@ -825,6 +849,32 @@ options:
                         hashes
   --for-revision        filter history to items marked for revision before
                         resolving hashes
+
+```
+
+### `inku-cli export-card`
+
+```
+usage: inku-cli export-card [-h] [--base-url BASE_URL]
+                            [--timeout-seconds TIMEOUT_SECONDS] --out OUT
+                            [--layout {square,portrait}] [--no-seal]
+                            hash
+
+positional arguments:
+  hash                  4+ character history hash suffix of the work
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+  --out OUT, -o OUT     destination PNG path, or a directory to name the file
+                        inside
+  --layout {square,portrait}
+                        square gives a 1080x1080 sheet, portrait a taller
+                        1080x1350 one
+  --no-seal             leave the small `inku` mark off the sheet; it is
+                        printed by default
 
 ```
 

@@ -645,6 +645,16 @@ export interface LangPack {
 	lineageAnimationExportHint: string;
 	animationExportBusy: string;
 	animationExportFailed: (reason: string) => string;
+	historyCardExport: string;
+	historyCardExportHint: string;
+	cardExportBusy: string;
+	cardExportFailed: (reason: string) => string;
+	settingsCardExportTitle: string;
+	settingsCardExportDescription: string;
+	settingsCardLayout: string;
+	cardLayoutSquare: string;
+	cardLayoutPortrait: string;
+	settingsCardSeal: string;
 	settingsMascotIncu: string;
 	settingsMascotYuragi: string;
 	settingsPngAlpha: string;

@@ -34,7 +34,8 @@ PUBLIC = {  # every entry needs a reason
 #   GET /api/auth/me/group-peers, which lets sharing offer names.
 #   +5 for contract 2's thumbnails: GET /api/history/{item_id}/thumb, and
 #   GET/PUT /api/settings/thumbnails with GET/POST of its rebuild.
-EXPECTED_ROUTE_COUNT = 92
+#   +1 for POST /api/history/export-card, the shareable one-sheet card.
+EXPECTED_ROUTE_COUNT = 93
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

@@ -10,6 +10,7 @@
 	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
+	import type { CardExportSettings } from '$lib/cardExport';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 
@@ -200,6 +201,7 @@
 		exportTemplates: ExportTemplate[];
 		exportTemplateStatus: string | null;
 		animationExportSettings: AnimationExportSettings;
+		cardExportSettings: CardExportSettings;
 		canvasAspectEnabled: boolean;
 		onChooseDownloadFolder: () => void | Promise<void>;
 		onClearDownloadFolder: () => void | Promise<void>;
@@ -313,6 +315,7 @@
 		exportTemplates,
 		exportTemplateStatus,
 		animationExportSettings = $bindable(),
+		cardExportSettings = $bindable(),
 		canvasAspectEnabled,
 		onChooseDownloadFolder,
 		onClearDownloadFolder,
@@ -1655,6 +1658,23 @@
 							/>
 							<small>{t().animationCustomHeight}</small>
 						{/if}
+					</label>
+				</div>
+			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().settingsCardExportTitle}</div>
+				<div class="db-test-result">{t().settingsCardExportDescription}</div>
+				<div class="animation-settings-grid">
+					<label>
+						<span>{t().settingsCardLayout}</span>
+						<select value={cardExportSettings.layout} onchange={(event) => (cardExportSettings = { ...cardExportSettings, layout: event.currentTarget.value as CardExportSettings["layout"] })}>
+							<option value="square">{t().cardLayoutSquare}</option>
+							<option value="portrait">{t().cardLayoutPortrait}</option>
+						</select>
+					</label>
+					<label class="setting-toggle">
+						<input type="checkbox" checked={cardExportSettings.seal} onchange={(event) => (cardExportSettings = { ...cardExportSettings, seal: event.currentTarget.checked })} />
+						<span>{t().settingsCardSeal}</span>
 					</label>
 				</div>
 			</div>

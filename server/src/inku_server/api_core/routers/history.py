@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from ...animation_export import build_animation
+from ...card_export import build_card
 from ...feature_analysis import composition_distance
 from ...coerce import coerce_score
 from ...ddl_expander import FOCUS_IDS
@@ -35,6 +36,14 @@ class AnimationExportBody(BaseModel):
     hold_seconds: float = Field(default=1.0, ge=0.1, le=30.0)
     resolution: Literal["1k", "4k", "8k"] = "1k"
     height_px: int | None = Field(default=None, ge=64, le=12000)
+
+
+class CardExportBody(BaseModel):
+    id: str
+    layout: Literal["square", "portrait"] = "square"
+    # On by default. A card that carries no mark of where it came from is the
+    # honest option to offer, not the one to make people opt into.
+    seal: bool = True
 
 
 class HistoryStarBody(BaseModel):
@@ -143,6 +152,44 @@ def api_history_export_animation(
     return Response(
         content=payload,
         media_type=media_type,
+        headers={
+            "Content-Disposition": "attachment; filename=\"" + filename + "\"",
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.post("/api/history/export-card")
+def api_history_export_card(
+    body: CardExportBody,
+    actor: dict = Depends(_current_user),
+) -> Response:
+    items = _db.get_items(actor["id"], [body.id])
+    if not items:
+        raise HTTPException(status_code=404, detail="history item not found")
+    item = items[0]
+    svg = str(item.get("svg") or "")
+    if not svg:
+        raise HTTPException(status_code=409, detail="this work has no saved SVG")
+    try:
+        payload = build_card(
+            svg,
+            # The headnote is the description the author typed; ja.ts calls the
+            # canvas overlay of this same text 詞書.
+            headnote=str(item.get("input") or ""),
+            # The seed that fixes the performance, so the tail identifies this
+            # picture rather than the variation it was drawn under.
+            seed=item.get("render_seed"),
+            layout=body.layout,
+            seal=body.seal,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    filename = f"inku-card-{timestamp}.png"
+    return Response(
+        content=payload,
+        media_type="image/png",
         headers={
             "Content-Disposition": "attachment; filename=\"" + filename + "\"",
             "Cache-Control": "no-store",

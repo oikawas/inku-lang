@@ -9,6 +9,7 @@
 	import { runContactSheet } from '$lib/features/contact-sheet/run';
 	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
 	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
+	import { downloadCard, type CardExportSettings } from '$lib/cardExport';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -71,6 +72,7 @@
 		trashTotal: number;
 		selectedHistoryIds: string[];
 		animationExportSettings: AnimationExportSettings;
+		cardExportSettings: CardExportSettings;
 		historySearch: string;
 		historyManagerStarredOnly: boolean;
 		historyManagerForRevisionOnly: boolean;
@@ -118,6 +120,7 @@
 		trashTotal,
 		selectedHistoryIds,
 		animationExportSettings,
+		cardExportSettings,
 		historySearch = $bindable(''),
 		historyManagerStarredOnly,
 		historyManagerForRevisionOnly,
@@ -320,6 +323,8 @@
 	let contactSheetError = $state<string | null>(null);
 	let animationExportBusy = $state(false);
 	let animationExportError = $state<string | null>(null);
+	let cardExportBusy = $state(false);
+	let cardExportError = $state<string | null>(null);
 
 	// Selection can span pages. The current page and expanded lineage members are
 	// checked first; off-page items are fetched on demand by export actions.
@@ -378,6 +383,20 @@
 			animationExportError = t().animationExportFailed(reason);
 		} finally {
 			animationExportBusy = false;
+		}
+	}
+
+	async function downloadSelectedCard(): Promise<void> {
+		if (cardExportBusy || selectedHistoryIds.length !== 1) return;
+		cardExportBusy = true;
+		cardExportError = null;
+		try {
+			await downloadCard(apiFetch, selectedHistoryIds[0], cardExportSettings);
+		} catch (cause) {
+			const reason = cause instanceof Error ? cause.message : String(cause);
+			cardExportError = t().cardExportFailed(reason);
+		} finally {
+			cardExportBusy = false;
 		}
 	}
 
@@ -678,7 +697,18 @@
 					{#if !animationExportBusy && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
 				</button>
 			</Tooltip>
+			<Tooltip placement="bottom-left" wide text={t().historyCardExportHint}>
+				<button
+					class="ghost-btn"
+					type="button"
+					onclick={downloadSelectedCard}
+					disabled={selectedHistoryIds.length !== 1 || cardExportBusy}
+				>
+					{cardExportBusy ? t().cardExportBusy : t().historyCardExport}
+				</button>
+			</Tooltip>
 			{#if animationExportError}<span class="tool-error">{animationExportError}</span>{/if}
+			{#if cardExportError}<span class="tool-error">{cardExportError}</span>{/if}
 			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
 			{/if}
 		</div>

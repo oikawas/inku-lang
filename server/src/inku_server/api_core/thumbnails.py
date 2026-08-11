@@ -193,6 +193,26 @@ def rebuild_progress() -> dict:
     return _rebuild.snapshot()
 
 
+def _offer(pool: ProcessPoolExecutor, svg: str, scale: int) -> "Future[bytes] | None":
+    """Hand one bake to the pool. Never raises; None means it was not accepted.
+
+    Handing work over can fail as readily as doing it: once a child has been
+    killed -- the first thing that happens when a container's memory is capped
+    -- the pool is broken and every later submit raises. Outside this guard that
+    ended the run, which is the shape I-210 was about, only reached through the
+    other side of the same pool.
+    """
+    from inku_analysis.rasterizer import svg_to_png
+
+    if not svg:
+        return None
+    try:
+        return pool.submit(svg_to_png, svg, width=_thumbs.width_for_scale(scale))
+    except Exception:
+        _logger.exception("could not hand a thumbnail to the pool: scale=%s", scale)
+        return None
+
+
 def _store_result(history_id: str, render_hash: str | None, scale: int, future: "Future[bytes]") -> bool:
     """Take one bake back from a child and write it here. Never raises.
 
@@ -236,8 +256,6 @@ def _rebuild_worker(targets: list[tuple[str, str | None, int]], workers: int) ->
     the SQLite writes stay in this process, where there is one connection and
     one writer.
     """
-    from inku_analysis.rasterizer import svg_to_png
-
     try:
         by_id: dict[str, list[tuple[str | None, int]]] = {}
         for history_id, render_hash, scale in targets:
@@ -256,12 +274,9 @@ def _rebuild_worker(targets: list[tuple[str, str | None, int]], workers: int) ->
                 for history_id in batch:
                     svg = svgs.get(history_id, "")
                     for render_hash, scale in by_id[history_id]:
-                        future = (
-                            pool.submit(svg_to_png, svg, width=_thumbs.width_for_scale(scale))
-                            if svg
-                            else None
+                        pending.append(
+                            (history_id, render_hash, scale, _offer(pool, svg, scale))
                         )
-                        pending.append((history_id, render_hash, scale, future))
                 for history_id, render_hash, scale, future in pending:
                     built = (
                         _store_result(history_id, render_hash, scale, future)
@@ -275,9 +290,17 @@ def _rebuild_worker(targets: list[tuple[str, str | None, int]], workers: int) ->
         _rebuild.end()
 
 
-def start_rebuild(workers: int) -> dict:
-    """Begin a rebuild in the background. Returns the progress to report back."""
+def start_rebuild() -> dict:
+    """Begin a rebuild in the background. Returns the progress to report back.
+
+    The parallelism comes from the stored setting rather than from the caller:
+    nothing here reads the core count -- in a container the host's count is the
+    wrong answer -- so the administrator enters it once and every rebuild uses
+    the same number.
+    """
     _thumbs.init_thumbs_db()
+    settings = _db.get_thumbnail_settings()
+    workers = int(settings["workers"])
     scales = active_scales()
     targets = stale_targets(scales)
     if not _rebuild.begin(len(targets), workers):

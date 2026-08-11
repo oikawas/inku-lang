@@ -73,7 +73,6 @@ ADDED_SCHEMAS = {
     "ThumbnailStatus",
     "ThumbnailRebuildStatus",
     "ThumbnailSettingsBody",
-    "ThumbnailRebuildBody",
 }
 
 # One schema that predates this branch is changed rather than added, and it is

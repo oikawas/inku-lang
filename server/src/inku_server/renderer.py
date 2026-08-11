@@ -13,6 +13,7 @@ import math
 import secrets
 import re
 import struct
+from collections.abc import Sequence
 from typing import Any
 from xml.sax.saxutils import escape
 
@@ -760,12 +761,11 @@ def _representative_size_px(ins: Instruction, canvas: CanvasSize) -> float:
     if p in ("circle", "polygon", "arc") and ins.radius is not None:
         return ins.radius * canvas.unit
     if p == "ellipse" and ins.size is not None:
-        rx = ins.size[0] * canvas.width / 2
-        ry = ins.size[1] * canvas.height / 2
+        w, h = _size_px(ins.size, canvas)
+        rx, ry = w / 2, h / 2
         return math.sqrt(max(0.0, rx * ry))
     if p in ("square", "triangle", "cloudform") and ins.size is not None:
-        w = ins.size[0] * canvas.width
-        h = ins.size[1] * canvas.height
+        w, h = _size_px(ins.size, canvas)
         return min(w, h) / 2
     if p == "line":
         start = _px(ins.from_ if ins.from_ is not None else (0.5, 0.0), canvas)
@@ -2629,13 +2629,11 @@ def _shape_bbox(
         return cx - r, cy - r, r * 2, r * 2
     if ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
         cx, cy = _px(ins.center, canvas)
-        w = ins.size[0] * canvas.width
-        h = ins.size[1] * canvas.height
+        w, h = _size_px(ins.size, canvas)
         return cx - w / 2, cy - h / 2, w, h
     if ins.primitive == "cloudform" and ins.center is not None and ins.size is not None:
         cx, cy = _px(ins.center, canvas)
-        w = ins.size[0] * canvas.width
-        h = ins.size[1] * canvas.height
+        w, h = _size_px(ins.size, canvas)
         return cx - w * 0.56, cy - h * 0.56, w * 1.12, h * 1.12
     if (
         ins.primitive in ("square", "triangle")
@@ -2643,7 +2641,8 @@ def _shape_bbox(
         and ins.size is not None
     ):
         x, y = _px(ins.position, canvas)
-        return x, y, ins.size[0] * canvas.width, ins.size[1] * canvas.height
+        w, h = _size_px(ins.size, canvas)
+        return x, y, w, h
     if ins.primitive == "polygon" and ins.center is not None and ins.radius is not None:
         cx, cy = _px(ins.center, canvas)
         r = ins.radius * canvas.unit
@@ -2675,8 +2674,8 @@ def _surface_contour(
         )
     if ins.primitive == "ellipse" and ins.center is not None and ins.size is not None:
         cx, cy = _px(ins.center, canvas)
-        rx = ins.size[0] * canvas.width / 2
-        ry = ins.size[1] * canvas.height / 2
+        w, h = _size_px(ins.size, canvas)
+        rx, ry = w / 2, h / 2
         return _circle_points(
             cx, cy, rx, ry, _stroke_sample_count(_ellipse_perimeter(rx, ry), canvas)
         )
@@ -2686,8 +2685,7 @@ def _surface_contour(
         and ins.size is not None
     ):
         x, y = _px(ins.position, canvas)
-        w = ins.size[0] * canvas.width
-        h = ins.size[1] * canvas.height
+        w, h = _size_px(ins.size, canvas)
         if ins.primitive == "square":
             return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
         return [(x + w / 2, y), (x + w, y + h), (x, y + h)]
@@ -2700,7 +2698,7 @@ def _surface_contour(
         cx, cy = _px(ins.center, canvas)
         contour = generate_cloudform_contour(
             (cx, cy),
-            (ins.size[0] * canvas.width, ins.size[1] * canvas.height),
+            _size_px(ins.size, canvas),
             performance_seed=_seed_for_instruction(ins, render_seed),
             instruction_index=ins_idx,
             mark_index=mark_idx,
@@ -5114,6 +5112,15 @@ def _px(coord: tuple[float, float], canvas: CanvasSize) -> tuple[float, float]:
     return x * canvas.width, y * canvas.height
 
 
+def _size_px(size: Sequence[float], canvas: CanvasSize) -> tuple[float, float]:
+    """Both extents follow the short edge, so a mark keeps the proportion the
+    description gave it: a square stays square, and a 2:1 ellipse stays 2:1 on
+    any canvas. The aspect decides where a mark sits, not what shape it is --
+    placement still goes through _px, which keeps using width and height.
+    """
+    return size[0] * canvas.unit, size[1] * canvas.unit
+
+
 def _apply_rotation(element, ins: Instruction, canvas: CanvasSize):
     if ins.rotation is None or abs(ins.rotation) < 1e-9:
         return element
@@ -6783,8 +6790,8 @@ def _render_instruction(
         if ins.center is None or ins.size is None:
             raise ValueError("ellipse requires 'center' and 'size'")
         cx, cy = _px(ins.center, canvas)
-        rx = ins.size[0] * canvas.width / 2
-        ry = ins.size[1] * canvas.height / 2
+        size_w, size_h = _size_px(ins.size, canvas)
+        rx, ry = size_w / 2, size_h / 2
         hand = _uses_hand_stroke(ins.weight)
         varied = _needs_contour_variation(ins.variation)
         if varied:
@@ -6874,7 +6881,7 @@ def _render_instruction(
         cx, cy = _px(ins.center, canvas)
         contour = generate_cloudform_contour(
             (cx, cy),
-            (ins.size[0] * canvas.width, ins.size[1] * canvas.height),
+            _size_px(ins.size, canvas),
             performance_seed=_seed_for_instruction(ins, render_seed),
             instruction_index=ins_idx,
             mark_index=mark_idx,
@@ -6951,8 +6958,7 @@ def _render_instruction(
         if ins.position is None or ins.size is None:
             raise ValueError("square requires 'position' and 'size'")
         x, y = _px(ins.position, canvas)
-        w = ins.size[0] * canvas.width
-        h = ins.size[1] * canvas.height
+        w, h = _size_px(ins.size, canvas)
         corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
         hand = _uses_hand_stroke(ins.weight)
         varied = _needs_contour_variation(ins.variation)
@@ -7026,8 +7032,7 @@ def _render_instruction(
         if ins.position is None or ins.size is None:
             raise ValueError("triangle requires 'position' and 'size'")
         x, y = _px(ins.position, canvas)
-        w = ins.size[0] * canvas.width
-        h = ins.size[1] * canvas.height
+        w, h = _size_px(ins.size, canvas)
         corners = [
             (x + w / 2, y),
             (x, y + h),

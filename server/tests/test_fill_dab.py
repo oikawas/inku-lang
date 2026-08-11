@@ -232,6 +232,16 @@ def test_f2_the_one_tiny_case_in_the_corpus_did_move() -> None:
 
 # --- F-3 陰性: rotring は領域 fill のまま ---------------------------------- #
 
+# The three cases render engine 30 was authorised to move: every frozen case on
+# a canvas that is not square and whose instruction states `size`. The corpus
+# has no other -- the remaining non-square cases are drawn from `radius` or from
+# two endpoints, neither of which engine 30 touches.
+ENGINE_30_ASPECT_CASES = frozenset({
+    "D-canvas-pillar-filled-square-rotring",
+    "D-canvas-vertical-filled-square-rotring",
+    "D-canvas-wide-filled-square-rotring",
+})
+
 
 def test_f3_the_drafting_pen_keeps_its_region_fill() -> None:
     """機械の極。engine 8 で輪郭を筆致から外したのと同じ理由で塗りも幾何のまま。"""
@@ -240,13 +250,29 @@ def test_f3_the_drafting_pen_keeps_its_region_fill() -> None:
 
 
 def test_f3_the_machine_pole_cases_are_byte_identical_to_engine_15() -> None:
+    """Three of the four are non-square canvases, and engine 30 moved them.
+
+    `size` used to become pixels through `width` and `height` separately, so a
+    square written 0.44 x 0.44 came out a rectangle on any canvas that was not
+    square; engine 30 puts both extents on the short edge. That is a geometry
+    ruling and not a fill one, so what this test guards -- that the drafting pen
+    still fills a region rather than a dab -- is asked of all four, and byte
+    identity is asked of the one canvas the ruling cannot reach. The three are
+    named rather than matched by shape so that a fourth case moving for some
+    other reason still fails here.
+    """
     cases = json.loads(ENGINE_15_MANIFEST.read_text())["cases"]
     machine = sorted(
         case_id for case_id in cases if case_id.endswith("-filled-square-rotring")
     )
     assert len(machine) == 4, machine
+    assert ENGINE_30_ASPECT_CASES < set(machine)
     for case_id in machine:
-        assert _normalized_digest(_replay(cases[case_id])) == cases[case_id]["digest"]
+        svg = _replay(cases[case_id])
+        assert _mechanism(svg) == "region", case_id
+        if case_id in ENGINE_30_ASPECT_CASES:
+            continue
+        assert _normalized_digest(svg) == cases[case_id]["digest"], case_id
 
 
 # --- F-4 境界: 直下と直上で機構が切り替わる -------------------------------- #

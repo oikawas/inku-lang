@@ -85,6 +85,16 @@ export type HistoryItem = {
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 type TrashPageSync = (items: HistoryItem[], total: number) => void;
 
+/** What a request asks the server for. */
+type Request = {
+	view: HistoryManagerView;
+	page: number;
+	pageSize: number;
+	search: string;
+	starredOnly: boolean;
+	forRevisionOnly: boolean;
+};
+
 type FetchOptions = {
 	view?: HistoryManagerView;
 	page?: number;
@@ -113,6 +123,10 @@ export class HistoryManagerState {
 	private requestId = 0;
 	private pendingRequests = 0;
 	private preloadKey = "";
+	// Requests that have been sent and not yet come back. One page of history is
+	// tens of megabytes here, so asking again for something already on its way is
+	// not a harmless duplicate.
+	private inFlight: Request[] = [];
 
 	items = $derived(this.view === 'trash' ? this.trashItems : this.activeItems);
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
@@ -120,10 +134,16 @@ export class HistoryManagerState {
 	offset = $derived(this.page * this.pageSize);
 	shownTo = $derived(Math.min(this.offset + this.items.length, this.total));
 
-	constructor(
-		private readonly apiFetch: ApiFetch,
-		private readonly syncTrashPage: TrashPageSync
-	) {}
+	// Written out rather than declared as constructor parameter properties: node's
+	// strip-only TypeScript loader cannot parse that form, and the unit tests
+	// construct this class for real.
+	private readonly apiFetch: ApiFetch;
+	private readonly syncTrashPage: TrashPageSync;
+
+	constructor(apiFetch: ApiFetch, syncTrashPage: TrashPageSync) {
+		this.apiFetch = apiFetch;
+		this.syncTrashPage = syncTrashPage;
+	}
 
 	clear() {
 		this.open = false;
@@ -152,16 +172,20 @@ export class HistoryManagerState {
 		this.page = 0;
 		this.search = '';
 		this.selectedIds = [];
-		if (!this.preloadMatches('active', 0, this.pageSize, '', false, false, activeTotal)) {
+		const preloaded = this.preloadMatches('active', 0, this.pageSize, '', false, false, activeTotal);
+		if (!preloaded) {
 			this.activeItems = activeItems;
 		}
 		this.activeTotal = activeTotal;
 		this.trashItems = [];
 		this.trashTotal = trashTotal;
+		// The first load carries the strip's works only, so a full page has to be
+		// fetched by whoever opens the manager. Seeded items stay on screen while
+		// it arrives. When a page is already in hand, opening costs nothing.
+		if (!preloaded) void this.fetch({ view: 'active', page: 0, pageSize: this.pageSize });
 	}
 
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
-		const requestId = ++this.requestId;
 		const view = options.view ?? this.view;
 		const page = options.page ?? this.page;
 		const search = options.search ?? this.search.trim();
@@ -169,6 +193,20 @@ export class HistoryManagerState {
 		const forRevisionOnly = options.forRevisionOnly ?? this.forRevisionOnly;
 		const pageSize = options.pageSize ?? this.pageSize;
 		const silent = options.silent ?? false;
+		// Two callers can decide at the same moment that the manager needs its
+		// page -- opening it is one, the page's search effect another. Asking
+		// twice costs a second copy of the same tens of megabytes and shows the
+		// user nothing extra, so the later caller rides on the request already
+		// out. Answers still arrive; only the duplicate question is dropped.
+		//
+		// This has to be decided before taking a request number. A number marks
+		// every earlier request as superseded, so a question dropped after taking
+		// one would throw away the answer it was riding on: the works arrive, all
+		// of them, and are discarded on the doorstep.
+		const request: Request = { view, page, pageSize, search, starredOnly, forRevisionOnly };
+		if (this.requestInFlight(request, pageSize)) return;
+		const requestId = ++this.requestId;
+		this.inFlight.push(request);
 		this.pendingRequests += 1;
 		if (!silent) this.loading = true;
 		try {
@@ -211,6 +249,7 @@ export class HistoryManagerState {
 			}
 		} catch { /* ignore */ }
 		finally {
+			this.inFlight = this.inFlight.filter((sent) => sent !== request);
 			this.pendingRequests = Math.max(0, this.pendingRequests - 1);
 			if (!silent && (requestId === this.requestId || this.pendingRequests === 0)) this.loading = false;
 		}
@@ -226,13 +265,21 @@ export class HistoryManagerState {
 		void this.fetch({ view: 'active', page: 0, search: '', starredOnly: false, forRevisionOnly: false, pageSize: nextPageSize, silent: true });
 	}
 
-	primeFirstPage(activeItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
-		const nextPageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
-		this.pageSize = nextPageSize;
-		this.activeItems = activeItems;
+	/**
+	 * Hand the manager what the history strip is holding.
+	 *
+	 * Two different quantities meet here and must not be confused. `pageSize` is
+	 * how many works one page of the manager holds; `stripItems` is what the
+	 * strip happens to have in hand, which is fewer -- the strip asks only for
+	 * what it shows. The items are kept so the modal does not open blank, but
+	 * they are not a page, so no preload key is written and openWith() will go
+	 * and fetch one. Items already in hand are not replaced by a shorter list.
+	 */
+	seedFromStrip(stripItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
+		this.pageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
 		this.activeTotal = activeTotal;
 		this.trashTotal = trashTotal;
-		this.preloadKey = this.cacheKey('active', 0, nextPageSize, '', false, false, activeTotal);
+		if (stripItems.length > this.activeItems.length) this.activeItems = stripItems;
 	}
 
 	setView = (view: HistoryManagerView) => {
@@ -265,17 +312,23 @@ export class HistoryManagerState {
 
 	setPageSize = (pageSize: number) => {
 		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
-		if (nextPageSize === this.pageSize) {
-			const expectedItems = Math.min(nextPageSize, this.total);
-			if (this.items.length < expectedItems) void this.fetch({ page: this.page });
-			return;
-		}
 		this.pageSize = nextPageSize;
 		this.page = Math.max(0, Math.min(this.page, this.totalPages - 1));
-		void this.fetch({ page: this.page });
+		// The modal measures itself once it is on screen and reports the real page
+		// size, which arrives while the page opened with is still being fetched.
+		// Nothing is asked for here: fetch() sees that the answer on its way holds
+		// at least this many works and drops the question.
+		const expectedItems = Math.min(nextPageSize, this.total);
+		if (this.items.length < expectedItems) void this.fetch({ page: this.page });
 	};
 
 	searchChanged = (search: string) => {
+		// The page re-runs its search effect whenever the manager opens, so this
+		// arrives once per opening with the query the manager already has. That is
+		// not a search, and answering it would cost a whole page of history for
+		// works already in hand -- which is what reopening the manager used to do.
+		const next = search.trim();
+		if (this.preloadMatches(this.view, 0, this.pageSize, next, this.starredOnly, this.forRevisionOnly, this.total)) return;
 		this.page = 0;
 		this.selectedIds = [];
 		void this.fetch({ page: 0, search });
@@ -311,11 +364,37 @@ export class HistoryManagerState {
 		this.preloadKey = "";
 	}
 
+	/**
+	 * Whether a request already on its way will answer this one.
+	 *
+	 * `atLeast` is how many works the caller needs. A request for the same page
+	 * that asked for more of them answers a smaller need as well, which is the
+	 * ordinary case on opening: the page guesses the manager's page size before
+	 * the modal exists, then the modal measures its own grid and says a smaller
+	 * number. Guessing 65 and measuring 52 must not cost two pages of history.
+	 */
+	private requestInFlight(request: Request, atLeast: number): boolean {
+		return this.inFlight.some((sent) =>
+			sent.view === request.view &&
+			sent.page === request.page &&
+			sent.search === request.search &&
+			sent.starredOnly === request.starredOnly &&
+			sent.forRevisionOnly === request.forRevisionOnly &&
+			sent.pageSize >= atLeast
+		);
+	}
+
 	private cacheKey(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): string {
 		return [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0, total].join('|');
 	}
 
-	private preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): boolean {
+	/**
+	 * Whether a whole page of what is being asked for is already in hand.
+	 *
+	 * Public because it is what decides whether opening the manager costs a
+	 * fetch, which is a fact about this class rather than an internal detail.
+	 */
+	preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, total: number): boolean {
 		const expectedItems = Math.min(pageSize, total);
 		return (
 			this.preloadKey === this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, total) &&

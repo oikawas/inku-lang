@@ -917,14 +917,27 @@ def _strip_qualified_sentence(ddl: str, qualified: str, *, lang: str) -> str:
     return ("" if lang == "ja" else " ").join(part for part in sentences if qualified.casefold() not in part.casefold())
 
 
-def _clause_that_names(text: str, marker: str, *, lang: str) -> str | None:
-    """The sentence the plugin is named in -- where the body states how many."""
+# The count belongs to the phrase the plugin is named in, not to the whole
+# sentence.  Measured on the seven upstream misses (2026-08-11): read at sentence
+# granularity, five of the seven sentences hold a second count -- a `一つ` or `一本`
+# belonging to some other object -- and the ambiguity rule then leaves every one of
+# them at one unit.  At phrase granularity the count beside the reference is alone
+# in its phrase, and the three that fit the work budget come true.
+_PHRASE_BOUNDARY = re.compile(r"(?<=[。、；;])|(?<=[.!?,])\s+")
+
+
+def _phrases_of(text: str, *, lang: str) -> list[str]:
+    return [part.strip() for part in _PHRASE_BOUNDARY.split(text) if part and part.strip()]
+
+
+def _phrase_that_names(text: str, marker: str, *, lang: str) -> str | None:
+    """The phrase the plugin is named in -- where the body states how many."""
     if not text or not marker:
         return None
     folded = marker.casefold()
-    for sentence in _sentences_of(text, lang=lang):
-        if folded in sentence.casefold():
-            return sentence
+    for phrase in _phrases_of(text, lang=lang):
+        if folded in phrase.casefold():
+            return phrase
     return None
 
 
@@ -936,7 +949,7 @@ def _stated_unit_count(clause: str | None) -> int | None:
     so this layer and the coerce layer answer "how many did the description say"
     the same way and a hole in the reader cannot be fixed on one side only.
 
-    A clause stating more than one count is left at one unit: which of them is the
+    A phrase stating more than one count is left at one unit: which of them is the
     unit count is not decidable here, and choosing would place a number nobody
     wrote.
     """
@@ -1035,12 +1048,12 @@ def expand_plugin_ddl(
             # plugin; a firing word states it in the description, which is the only
             # place that word appears at all.
             if explicit:
-                clause = _clause_that_names(result, trigger, lang=lang) or _clause_that_names(
+                phrase = _phrase_that_names(result, trigger, lang=lang) or _phrase_that_names(
                     source, trigger, lang=lang
                 )
             else:
-                clause = _clause_that_names(source, trigger, lang=lang)
-            requested = _stated_unit_count(clause)
+                phrase = _phrase_that_names(source, trigger, lang=lang)
+            requested = _stated_unit_count(phrase)
             unit_cost = _expansion_cost(expansion, entry_instructions, lang=lang)
             expansions = [expansion]
             units = 1

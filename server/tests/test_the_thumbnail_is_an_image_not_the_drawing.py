@@ -292,7 +292,7 @@ def test_a_thumbnail_baked_from_a_different_svg_is_stale(owner):
 
 
 # ── T-9 ─────────────────────────────────────────────────────────────────────
-def test_the_old_thumbnail_is_served_while_it_is_being_rebuilt(owner, monkeypatch):
+def test_the_old_thumbnail_is_served_while_it_is_being_rebuilt(owner, monkeypatch, rebuild_in_process):
     user, headers = owner
     item = save_work(user)
     bake_for(item)
@@ -303,12 +303,20 @@ def test_the_old_thumbnail_is_served_while_it_is_being_rebuilt(owner, monkeypatc
     holding = threading.Event()
     released = threading.Event()
 
-    def blocking_bake(svg, scale):
+    # The rebuild rasterizes in child processes now, which monkeypatch cannot
+    # reach; the rebuild_in_process fixture runs it here so this bake can be
+    # held open. Bind the real one first -- `rasterize` below looks the name up
+    # at call time, so calling it after the patch would call this back.
+    from inku_analysis import rasterizer
+
+    real_svg_to_png = rasterizer.svg_to_png
+
+    def blocking_bake(svg, *, width=None, height=None):
         holding.set()
         released.wait(timeout=10)
-        return rasterize(svg, thumbs_db.width_for_scale(scale))
+        return real_svg_to_png(svg, width=width, height=height)
 
-    monkeypatch.setattr(thumbnails, "bake", blocking_bake)
+    monkeypatch.setattr(rasterizer, "svg_to_png", blocking_bake)
     # Only this work. What is being watched is that a rebuild replaces rather
     # than clears, which one work shows; enumerating every work in the test
     # database would bake all of them behind a blocking rasterizer.

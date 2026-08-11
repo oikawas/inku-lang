@@ -11,8 +11,9 @@ draw, so a save submits the job and returns.
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
 from threading import Lock
 
 from .. import db as _db
@@ -134,6 +135,11 @@ class RebuildProgress:
         self.started_at: int | None = None
         self.finished_at: int | None = None
         self.workers = 0
+        #: True when a run stopped with work left. Reported rather than inferred:
+        #: `done < total` is only readable while the numbers of one run are still
+        #: on show, and a reader who sees `running: False, failed: 0` otherwise
+        #: has no way to tell a finished run from an abandoned one.
+        self.ended_short = False
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -144,6 +150,7 @@ class RebuildProgress:
                 "remaining": max(0, self.total - self.done),
                 "built": self.built,
                 "failed": self.failed,
+                "ended_short": self.ended_short,
                 "started_at": self.started_at,
                 "finished_at": self.finished_at,
                 "workers": self.workers,
@@ -161,6 +168,7 @@ class RebuildProgress:
             self.started_at = int(time.time() * 1000)
             self.finished_at = None
             self.workers = workers
+            self.ended_short = False
             return True
 
     def record(self, built: bool) -> None:
@@ -175,6 +183,7 @@ class RebuildProgress:
         with self._lock:
             self.running = False
             self.finished_at = int(time.time() * 1000)
+            self.ended_short = self.done < self.total
 
 
 _rebuild = RebuildProgress()
@@ -184,6 +193,33 @@ def rebuild_progress() -> dict:
     return _rebuild.snapshot()
 
 
+def _store_result(history_id: str, render_hash: str | None, scale: int, future: "Future[bytes]") -> bool:
+    """Take one bake back from a child and write it here. Never raises.
+
+    A work that cannot be baked is one work: the rebuild has 2,917 of them and
+    the run has to survive the bad one. Before this guard existed, a single
+    raised work ended the whole run -- and because the caller marked the run
+    finished either way, the status said `failed: 0` with 2,436 works never
+    attempted.
+    """
+    from inku_analysis.rasterizer import RasterizerUnavailable
+
+    try:
+        png = future.result()
+    except RasterizerUnavailable:
+        # Not an error: a thumbnail is an optimization, and the listing falls
+        # back to the SVG it already has when one is missing.
+        _logger.warning("no SVG rasterizer is installed; skipped thumbnail")
+        return False
+    except Exception:
+        _logger.exception("failed to bake thumbnail: history_id=%s scale=%s", history_id, scale)
+        return False
+    if not png:
+        return False
+    _thumbs.put_thumb(history_id, scale, png, render_hash)
+    return True
+
+
 def _rebuild_worker(targets: list[tuple[str, str | None, int]], workers: int) -> None:
     """Bake every target, keeping the old thumbnail readable until each is done.
 
@@ -191,23 +227,48 @@ def _rebuild_worker(targets: list[tuple[str, str | None, int]], workers: int) ->
     that already has a thumbnail keeps serving it for the whole rebuild and
     swaps to the new one the moment it exists -- and because the ETag is made
     from the source hash, the swap is visible to a client that had cached it.
+
+    The rasterizing happens in child processes and the storing happens here.
+    Threads cannot do this work in parallel: resvg_py holds the GIL for the
+    whole rasterization, so a pool of six threads finished twelve bakes in
+    11.49 s against one thread's 10.08 s -- and on the eight-core server one
+    core sat at 99.4% while seven were idle. Only the CPU crosses to a child;
+    the SQLite writes stay in this process, where there is one connection and
+    one writer.
     """
+    from inku_analysis.rasterizer import svg_to_png
+
     try:
         by_id: dict[str, list[tuple[str | None, int]]] = {}
         for history_id, render_hash, scale in targets:
             by_id.setdefault(history_id, []).append((render_hash, scale))
         ids = list(by_id)
-        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="inku-rebuild") as pool:
+        # spawn, not fork: this runs inside a threaded uvicorn process, and a
+        # forked child inherits its locks. The child imports the rasterizer and
+        # nothing of the server -- which is why svg_to_png is what crosses, with
+        # the scale already resolved to a width on this side.
+        context = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=max(1, workers), mp_context=context) as pool:
             for start in range(0, len(ids), _REBUILD_BATCH):
                 batch = ids[start:start + _REBUILD_BATCH]
                 svgs = _db.history_svgs(batch)
-                jobs = [
-                    (history_id, svgs.get(history_id, ""), render_hash, scale)
-                    for history_id in batch
-                    for render_hash, scale in by_id[history_id]
-                ]
-                for built in pool.map(lambda job: build_one(*job), jobs):
-                    _rebuild.record(bool(built))
+                pending: list[tuple[str, str | None, int, "Future[bytes] | None"]] = []
+                for history_id in batch:
+                    svg = svgs.get(history_id, "")
+                    for render_hash, scale in by_id[history_id]:
+                        future = (
+                            pool.submit(svg_to_png, svg, width=_thumbs.width_for_scale(scale))
+                            if svg
+                            else None
+                        )
+                        pending.append((history_id, render_hash, scale, future))
+                for history_id, render_hash, scale, future in pending:
+                    built = (
+                        _store_result(history_id, render_hash, scale, future)
+                        if future is not None
+                        else False
+                    )
+                    _rebuild.record(built)
     except Exception:
         _logger.exception("thumbnail rebuild failed")
     finally:

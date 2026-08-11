@@ -134,6 +134,10 @@ class ThumbnailRebuildStatus(BaseModel):
     remaining: int
     built: int
     failed: int
+    #: A run that stopped with work left. Without it, an abandoned run and a
+    #: complete one both read as `running: False` with nothing else to separate
+    #: them once a later run has replaced the counts.
+    ended_short: bool = False
     started_at: int | None = None
     finished_at: int | None = None
     workers: int

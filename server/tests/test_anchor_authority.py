@@ -346,6 +346,21 @@ ENGINE_22_CHALK_CASES = frozenset({
 })
 
 
+# The 3 that render engine 30 was authorised to move, listed for the same reason
+# the two sets above are: a case moving for any OTHER reason must still fail.
+# Engine 30 stopped turning `size` into pixels through `width` and `height`
+# separately, so a mark keeps the proportion its description gave it on every
+# canvas. On a square canvas the two rules are the same arithmetic, which is why
+# only the non-square members of `D-canvas-*` are here -- and only the ones
+# drawn from `size`: the corpus's other non-square cases state `radius` or two
+# endpoints, and engine 30 does not reach either.
+ENGINE_30_ASPECT_CASES = frozenset({
+    "D-canvas-pillar-filled-square-rotring",
+    "D-canvas-vertical-filled-square-rotring",
+    "D-canvas-wide-filled-square-rotring",
+})
+
+
 def test_a_score_without_an_arrangement_is_engine_19():
     """The cases of A-F state no arrangement and must be byte-identical.
 
@@ -364,27 +379,43 @@ def test_a_score_without_an_arrangement_is_engine_19():
     the change cannot reach: `burin`, `drypoint`, `silverpoint`, `rotring` and
     `computer` have no material layer at all, and no case here has a variation.
 
+    Engine 30 is a third exception, of three cases: it stopped scaling `size`
+    by `width` and `height` separately, so the three non-square canvases in the
+    corpus that draw a mark from `size` moved. All three are drafting-pen fills,
+    which is why they survived the engine 22 and 28 exceptions to be caught here.
+
     **The claim is thinner than it was**: 447 cases carried "a score with no
-    arrangement is untouched by everything the layout work added", and 92 carry
-    it now. The layout work is still what is being tested -- none of engine 20's
-    expander runs on these -- but the byte-identity evidence for it is a fifth of
-    what it was. That is worth a ledger entry, not a silent edit.
+    arrangement is untouched by everything the layout work added", 92 carried it
+    after engine 28, and 89 carry it now. The layout work is still what is being
+    tested -- none of engine 20's expander runs on these -- but the byte-identity
+    evidence for it is a fifth of what it was. That is worth a ledger entry, not
+    a silent edit.
     """
     generator = _generator()
     frozen = json.loads(ENGINE_19_MANIFEST.read_text(encoding="utf-8"))["cases"]
     assert len(frozen) == 493
     assert ENGINE_22_FILL_CASES <= set(frozen)
     assert ENGINE_22_CHALK_CASES <= set(frozen)
+    assert ENGINE_30_ASPECT_CASES <= set(frozen)
     assert not (ENGINE_22_FILL_CASES & ENGINE_22_CHALK_CASES)
+    assert not (ENGINE_30_ASPECT_CASES & ENGINE_22_CHALK_CASES)
     # 除外の理由が名前と一致していること。塗りでない case が塗りの札で
     # 抜けたり、chalk でない case が chalk の札で抜けたりしない。
     assert all("fill" in case_id for case_id in ENGINE_22_FILL_CASES)
     assert all("chalk" in case_id for case_id in ENGINE_22_CHALK_CASES)
+    # 比の札で抜けるのは、正方形でないキャンバスの case だけ。比は case 名の
+    # 3 番目の区切りにある ("D-canvas-pillar-filled-square-rotring" の pillar)。
+    assert all(case_id.startswith("D-canvas-") for case_id in ENGINE_30_ASPECT_CASES)
+    assert all(
+        case_id.split("-")[2] != "square" for case_id in ENGINE_30_ASPECT_CASES
+    )
     checked = 0
     for case_id, case in frozen.items():
         render_input = case["input"]
         assert render_input["score"]["instructions"][0]["arrangement"] is None
         if case_id in ENGINE_22_FILL_CASES or case_id in ENGINE_22_CHALK_CASES:
+            continue
+        if case_id in ENGINE_30_ASPECT_CASES:
             continue
         if _uses_material_outline(render_input["score"]["instructions"][0]["weight"]):
             continue
@@ -398,7 +429,7 @@ def test_a_score_without_an_arrangement_is_engine_19():
         )
         assert generator._normalized_digest(svg) == case["digest"], case_id
         checked += 1
-    assert checked == 92
+    assert checked == 89
 
 
 # T-6 --------------------------------------------------------------------

@@ -259,14 +259,24 @@ def test_t2_the_underlay_survives_the_non_display_profiles():
 
 
 def test_t3_a_rotring_fill_is_still_a_region_fill_and_byte_identical():
-    """T-3 T-1 の対照。製図ペンの塗りは領域 fill のままで engine 21 と一致する。"""
+    """T-3 T-1 の対照。製図ペンの塗りは領域 fill のままで engine 21 と一致する。
+
+    Engine 30 moved the wide case: it draws a square written `size [0.44, 0.44]`,
+    and until engine 30 a square on a 2.35:1 canvas came out a 2.35:1 rectangle.
+    The proportion of a mark is not a fill ruling, so the fill claim -- no
+    `fill-` class at all -- is still asked of both cases, and the bytes are asked
+    of the one this test's own subject can be read from.
+    """
     frozen = json.loads(ENGINE_21_MANIFEST.read_text())["cases"]
     generator_digest = _digest
+    moved_by_engine_30 = {"D-canvas-wide-filled-square-rotring"}
     for case_id in ("C-tinyfill-circle-rotring", "D-canvas-wide-filled-square-rotring"):
         case = frozen[case_id]
         svg = _replay(case)
         classes = _classes(svg)
         assert not any(name.startswith("fill-") for name in classes), (case_id, classes)
+        if case_id in moved_by_engine_30:
+            continue
         assert generator_digest(svg) == case["digest"], case_id
 
 

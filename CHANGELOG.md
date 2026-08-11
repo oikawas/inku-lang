@@ -5468,3 +5468,33 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   **Fourteen of fifteen perturbations landed**; the one that missed (P-15) missed on where it was
   aimed — applying stage 3's own change did redden T-13.
 
+
+### v2.13.2 — The refresh does not carry the gallery (Build 886, 2026-08-11, first load)
+
+- **The twelve-second refresh no longer re-fetches the whole list.** It used to carry every work
+  each time, whether or not anything had changed. **Now it asks what changed first, and does
+  nothing when the answer is nothing.**
+- **`GET /api/history/state` is new.** It returns three values -- the total, the newest work's
+  timestamp and its id -- and **reads no picture bytes at all** (89 bytes of body against a local
+  83-work database). Visibility runs the same three filters as the listing, in the same order.
+- **The decision compares against what the strip on screen is showing**, not against a remembered
+  answer: remembering forces one fetch immediately after start-up.
+- **A strip that cannot answer declares itself stale.** Its first work is the newest one only on
+  page one with no filter. **Anywhere else it fetches rather than going quiet**, so removing that
+  condition later cannot turn into a permanent "nothing changed".
+- **Returning to the tab now goes through the five-second floor too.** Only the `force` path
+  skipped it, so moving between tabs carried the whole list each time.
+- **Measured (83 local works, a window of about 90 seconds)**: list fetches **8 → 0**, API traffic
+  **468,880 → 2,723 bytes** (**176× less**). **Main-thread blocking was zero at the starting point
+  as well** at this size, so it shows no difference here.
+- **`inku-cli history state` is new.** With `--bytes` it wraps the response in the byte count it
+  actually arrived in.
+- **The API surface goes 92 → 93 routes.** Exactly **one operation and one schema** were added and
+  **the existing 92 of each did not move by a byte** -- the diff was measured before the baseline
+  was regenerated.
+- **Checks:** **server 2,898 passed / 31 skipped** (8 new from the branch, 40 from main, none lost),
+  **web 173 passed**, **cli 219 passed**, **ruff clean**, `npm run check` **0 errors / 2 warnings**
+  (the two pre-existing a11y ones), **i18n 0 errors**, published documents consistent.
+  **All fifteen perturbations landed** -- **two of them only after the acceptance gates they aimed
+  at were found to have no discriminating power and were repaired.**
+- **No deterministic layer was touched**, so no frozen corpus was regenerated.

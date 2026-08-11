@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.2 Baseline (Web Build 886)
+
+The 13 version markers were moved to v2.13.2 / Build 886, and **a row was added to the subcommand table in `CLI Reference` for the new `history state` in `inku-cli`**.
+
+- **`inku-cli history state` is new.** It returns only the number of works and the newest work's timestamp and ID. **It reads no picture bytes at all**, so you can ask whether anything changed before re-fetching the listing. With `--bytes` it adds the byte count the response actually arrived in.
+- **The strip of works no longer re-fetches everything every twelve seconds.** It asks what changed first and does nothing when the answer is nothing. **What you see and how you work are unchanged.**
+- **Returning to the tab now goes through the five-second floor too.** Only that path skipped it, so moving between tabs carried the listing each time.
+
 ## 2026-08-11 — Unreleased v2.13.1 Baseline (Web Build 885)
 
 The 13 version markers were moved to v2.13.1 / Build 885. **How a plugin reference is counted changed; the manual does not document plugin-reference syntax, so nothing was added to explain it.**

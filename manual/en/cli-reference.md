@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.13.1 (Web Build 885).
+It covers inku v2.13.2 (Web Build 886).
 
 ## Basics
 
@@ -127,6 +127,7 @@ batch additionally takes `--continue-on-error`.
 | `history unshare` | `--to-user` / `--to-group` (one or the other) |
 | `history acl` | (the work ID only) shows who else may see or change that work |
 | `history peers` | (no flags) lists the members of your own organisation group with their IDs |
+| `history state` | `--bytes` (adds the byte count the response actually arrived in). Returns only the number of works and the newest work's timestamp and ID. **It reads no picture bytes at all**, so you can ask whether anything changed before re-fetching the listing |
 
 `--for-revision` narrows to works carrying the revision mark. That mark is independent of the star.
 

@@ -66,7 +66,15 @@ def test_ddl_reference_versions_and_parts() -> None:
     # cases states a count above eleven** -- which is exactly why the two were
     # written. Freezing the 21 alone would have recorded a version of a layer this
     # change never traversed.
-    assert DDL_ENGINE_VERSION == "12"
+    # Engine 13 (2026-08-11): a plugin hands over one unit and the count stated in
+    # the phrase naming it says how many of those to place. **Part C is new and is
+    # the whole of `changed_from_previous`**: parts A and B never reach the
+    # document plugin layer -- A's plugin work is the `Nature.` macro regex in
+    # `ddl_expander`, and the manager is called from the render route alone -- so
+    # this layer carried a version number from the start and never a frozen
+    # output. Freezing A and B alone would have recorded a version of a layer the
+    # change never traversed, which is what engine 12 wrote two cases to avoid.
+    assert DDL_ENGINE_VERSION == "13"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -106,14 +114,15 @@ def test_ddl_reference_versions_and_parts() -> None:
     # new branch's key in its branch report whether or not the branch fired, so
     # the digest moves everywhere and the transform moves in eight. No expand case
     # moves; the change lives entirely inside coerce, like engines 8 and 9.
-    assert len(manifest["cases"]) == 36
+    assert len(manifest["cases"]) == 40
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
     assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 23
-    # Two, and both new. Engine 11 listed all 21 because it added a branch and the
-    # report is part of the frozen body; this version added none, so a carried-over
-    # case moves only if the widened band actually reached it. None did.
+    assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 4
+    # Four, and all four are the new part. No carried-over case moves: the layer
+    # this version changed is reached by nothing in parts A and B.
     assert manifest["changed_from_previous"] == [
-        "B-stated-count-in-the-wide-band", "B-stated-count-over-the-work-budget",
+        "C-plugin-count-as-a-numeral-beside-cjk", "C-plugin-count-in-an-english-body",
+        "C-plugin-count-in-the-phrase", "C-plugin-count-over-the-ceiling",
     ]
     assert sorted(
         case_id
@@ -162,6 +171,15 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
         if score["presence"] is not None:
             assert set(score["presence"]) == set(Presence.model_fields)
 
+    # Part C hands its input straight to the document plugin manager, so the case
+    # record has to name every argument that manager takes -- a default left out
+    # of the record is a knob the corpus is not freezing.
+    plugin_fields = set(
+        inspect.signature(generator.PluginDocumentManager.expand).parameters
+    ) - {"self"}
+    for case in generator.build_plugin_expand_inputs().values():
+        assert set(case) == plugin_fields
+
     source = inspect.getsource(generator.build_coerce_inputs)
     assert "build_expand_inputs" not in source
     assert "expand_intermediate_ddl" not in source
@@ -187,6 +205,29 @@ def test_ddl_reference_expand_discriminators() -> None:
         seen[key] = case_id
     assert "A-scatter" in cases
     assert not [case_id for case_id in cases if case_id.startswith("A-tenkei-")]
+
+def test_ddl_reference_plugin_expand_discriminators() -> None:
+    """The four C cases measure two quantities, not one.
+
+    `units` is how many whole units the body asked for; `declined` is whether the
+    layer refused to deliver them.  A change that trims an over-budget count
+    instead of declining it keeps `units` at one and turns `declined` off, so the
+    pair has to be read together.
+    """
+    cases = _manifest()["cases"]
+    assert cases["C-plugin-count-in-the-phrase"]["units"] == [3]
+    assert cases["C-plugin-count-in-an-english-body"]["units"] == [12]
+    # The count is dropped, not misread: the numeral sits within twelve characters
+    # of the CJK in `Nature.青葉`, which the reader leaves to the Japanese path.
+    assert cases["C-plugin-count-as-a-numeral-beside-cjk"]["units"] == [1]
+    assert cases["C-plugin-count-over-the-ceiling"]["units"] == [1]
+    declined = sorted(cid for cid, case in cases.items()
+                      if case["part"] == "c_plugin_expand" and case["declined"])
+    assert declined == ["C-plugin-count-over-the-ceiling"]
+    # Two cases whose only difference is `twelve` against `12` must not share a
+    # body, or the case that records the gap records nothing.
+    assert (cases["C-plugin-count-in-an-english-body"]["digest"]
+            != cases["C-plugin-count-as-a-numeral-beside-cjk"]["digest"])
 
 def test_ddl_reference_coerce_discriminators() -> None:
     cases = _manifest()["cases"]

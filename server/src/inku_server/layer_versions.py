@@ -1,5 +1,26 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 13 (2026-08-11): a plugin hands over one whole unit, and the count stated in
+# the phrase that names it says how many of those units to place. The document
+# plugin layer placed the unit once and read nothing, so `Nature.青葉を三つ置く。`
+# came back as one leaf group -- the body could ask for a macro, but not for
+# three of it. The count is read by one reader now: the twelve definitions coerce
+# used moved to `counts.py`, and the expansion layer reads the same words rather
+# than a second table of its own. The count belongs to the phrase, not the
+# sentence: five of seven production works stating a count beside a reference
+# carry another number in the same sentence, and reading by sentence left them
+# all at one unit. A count the work has no room for is declined whole rather than
+# trimmed -- `N x unit` over the ceiling leaves the single unit standing and
+# writes a line into `plugin_warnings` -- because a trimmed number is neither
+# what the body asked for nor a number anybody chose. The English side of the
+# reader also stops requiring a noun from a 32-word table and reads Arabic
+# numerals, which is why `Draw 12 circles.` was invisible to it; numerals inside
+# another number (decimals, fractions, ratios, percentages) are not counts, and a
+# numeral with CJK beside it stays with the Japanese path. The Japanese path is
+# untouched: a bare numeral with no counter is still not read, and whether it
+# should be is undecided. Measured on the seven works: three now expand to the
+# stated number, where none did. Part C of the DDL reference corpus is new --
+# this layer carried a version number from the start and never a frozen output.
 # 12 (2026-08-10): the stated number holds past what the eye can count. Engine 11
 # stopped the repair at eleven, on the reading that a larger number is density
 # rather than a promise. Measured on 1,346 production works that is not what the
@@ -89,7 +110,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "12"
+DDL_ENGINE_VERSION = "13"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

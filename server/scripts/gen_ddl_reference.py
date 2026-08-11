@@ -1,7 +1,8 @@
 """Generate the frozen deterministic DDL-layer reference corpus.
 
-A expands literal DDL inputs. B coerces unrelated literal Score inputs; the two
-parts never feed one another. Run from ``server/``.
+A expands literal DDL inputs. B coerces unrelated literal Score inputs. C runs
+the document-plugin layer, which neither of the other two reaches. No part feeds
+another. Run from ``server/``.
 """
 from __future__ import annotations
 import copy
@@ -13,34 +14,39 @@ from typing import Any
 from inku_server.coerce import coerce_score
 from inku_server.ddl_expander import expand_intermediate_ddl
 from inku_server.layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
+from inku_server.plugins.document_format import PluginDocumentManager
 from inku_server.schema import Score
 
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
+# The plugin documents this corpus expands against, pinned to the repository copy.
+# The manager otherwise takes its directory from INKU_DOCUMENT_PLUGIN_DIR, and a
+# corpus that reads whatever a machine happens to have installed is not frozen.
+PLUGIN_DIR = REFERENCE_ROOT.parent / "plugins"
 OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-10"
+FROZEN_AT = "2026-08-11"
 REASON = (
-    "the number the description states in plain words is the number that gets "
-    "drawn. One branch made a stated count true and it answered only to "
-    "`だけ / のみ / only / just`; a plain `three` was protected from thinning and "
-    "nothing more, so a count Stage 2 had already missed stayed missed. "
-    "`with_stated_count_fidelity` pairs a clause with the single group carrying "
-    "its (primitive, color, weight) -- read through the same DDL hints the "
-    "instructions themselves went through -- or failing that with the single "
-    "group carrying its figure, and leaves alone a clause that matches two "
-    "groups or none. It sits after both budgets and after the strict road, and "
-    "stops at 11, the band a reader counts by eye. `_primitive_from_clause` "
-    "also gained the 雲形 / cloudform branch it never had, and the fallback "
-    "instruction lays a cloudform out with `center` + `size`, which is the only "
-    "form the renderer draws. None of the 13 expand cases moved and neither did "
-    "any of the 21 coerce scores: the corpus states no count in the band next "
-    "to a group a clause pairs with, so the new branch fires nowhere in it. "
-    "`changed_from_previous` lists all 21 because the branch report gained a "
-    "30th key, which every case carries whether or not the branch fired. The "
-    "witness for the branch lives in the coerce golden set, which is where "
-    "`test_every_branch_coerce_reaches_has_a_witness` requires one."
+    "a plugin hands over one whole unit, and a count stated in the phrase that "
+    "names it says how many of those units to place. The document plugin layer "
+    "placed the unit once and read nothing; a body saying `Nature.青葉を三つ置く。` "
+    "got one leaf group. The count is now read by the shared reader in "
+    "`counts.py` -- one definition, where coerce reads it too -- and a count the "
+    "work has no room for is declined whole rather than trimmed, so the number "
+    "that survives is one somebody chose. The English side of that reader reads "
+    "Arabic numerals and no longer requires a noun from a 32-word table, which "
+    "is why `Draw 12 circles.` was invisible to it. Part C is new: this layer "
+    "carried a version number from the start and never a frozen output, because "
+    "part A's plugin work is the `Nature.` macro regex in `ddl_expander` and the "
+    "document manager is called from the render route alone. Its four cases are "
+    "the whole of `changed_from_previous`; not one of the 13 expand cases or the "
+    "23 coerce scores moved, and nothing else in the corpus reaches the layer "
+    "this version changed. The fourth records where the two readings do not "
+    "meet: a numeral with CJK within twelve characters is left to the Japanese "
+    "path, and a plugin named `Nature.青葉` is CJK beside the number, so `Place "
+    "12 Nature.青葉 marks.` places one unit where `Place twelve Nature.青葉 "
+    "marks.` places twelve."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
@@ -119,6 +125,45 @@ def build_expand_inputs() -> dict[str, dict[str, Any]]:
     # freezes now is that a scatter-heavy DDL comes back reframed and no longer.
     cases["A-scatter"] = _expand_input(scatter_ddl, context_text=scatter_ddl)
     return cases
+
+def _plugin_expand_input(ddl: str, *, lang: str = "ja", source_text: str | None = None,
+                         seed_text: str | None = "reference") -> dict[str, Any]:
+    return {"ddl": ddl, "source_text": source_text, "lang": lang, "seed_text": seed_text}
+
+def build_plugin_expand_inputs() -> dict[str, dict[str, Any]]:
+    """Inputs for the document-plugin layer, which no other part reaches.
+
+    Part A runs `expand_intermediate_ddl`, whose plugin work is the `Nature.`
+    macro regex in `ddl_expander`; the document plugin manager is called from the
+    render route alone.  So this layer carried a version number from the start
+    and never a frozen output: engine 13 changes what it emits, and freezing A
+    and B alone would have recorded a version of a layer the change never
+    traversed.
+
+    Four cases.  Three are what the version decided: the count in the phrase
+    becomes the number of units, an English body counts the same way, and a count
+    the work has no room for is declined whole rather than trimmed -- the last
+    one is the only place a `plugin_warnings` line is frozen.  The seed is fixed
+    because the breakdown inside one unit is drawn from it.
+
+    The fourth freezes where the two rulings do not meet.  The English side of
+    the reader was widened to Arabic numerals, but a numeral with CJK within
+    twelve characters is left to the Japanese path -- and a plugin named
+    `Nature.青葉` is CJK sitting right beside the number.  So `Place 12
+    Nature.青葉 marks.` places one unit while `Place twelve Nature.青葉 marks.`
+    places twelve.  Recording it here means a later ruling either way moves a
+    case rather than passing unnoticed.
+    """
+    return {
+        "C-plugin-count-in-the-phrase": _plugin_expand_input("Nature.青葉を三つ置く。"),
+        "C-plugin-count-in-an-english-body": _plugin_expand_input(
+            "Place twelve Nature.青葉 marks.", lang="en"
+        ),
+        "C-plugin-count-as-a-numeral-beside-cjk": _plugin_expand_input(
+            "Place 12 Nature.青葉 marks.", lang="en"
+        ),
+        "C-plugin-count-over-the-ceiling": _plugin_expand_input("Nature.青葉を百二十個置く。"),
+    }
 
 def _coerce_input(score: dict[str, Any], *, ddl: str | None = None) -> dict[str, Any]:
     return {"score": copy.deepcopy(score), "ddl": ddl}
@@ -273,6 +318,28 @@ def _render_cases() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
             "instruction_count": len(score.instructions),
             "fired_branches": {key: value for key, value in sorted(report.items()) if value},
         }
+    manager = PluginDocumentManager(PLUGIN_DIR)
+    for case_id, input_data in sorted(build_plugin_expand_inputs().items()):
+        expansion = manager.expand(
+            input_data["ddl"], source_text=input_data["source_text"],
+            lang=input_data["lang"], seed_text=input_data["seed_text"],
+        )
+        text = _canonical_output({
+            "ddl": expansion.ddl,
+            "provenance": [dict(entry) for entry in expansion.provenance],
+            "warnings": list(expansion.warnings),
+            "instructions": [dict(entry) for entry in expansion.instructions],
+        })
+        path = f"c_plugin_expand/{case_id}.json"
+        outputs[path] = text
+        manifest_cases[case_id] = {
+            "part": "c_plugin_expand", "input": input_data, "output_path": path,
+            "digest": _digest(text), "bytes": len(text.encode("utf-8")),
+            # The two quantities the ruling separated: how many whole units the
+            # body asked for, and whether the layer declined to deliver them.
+            "units": [int(entry["units"]) for entry in expansion.provenance if "units" in entry],
+            "declined": bool(expansion.warnings),
+        }
     return manifest_cases, outputs
 
 def _previous_manifest() -> dict[str, Any] | None:
@@ -315,7 +382,8 @@ def generate() -> None:
     else:
         frozen = {key: existing[key] for key in ("frozen_at", "commit", "reason", "changed_from_previous")}
     manifest = {**identity, **frozen, "cases": cases}
-    for directory in (OUTPUT_DIR, OUTPUT_DIR / "a_expand", OUTPUT_DIR / "b_coerce"):
+    for directory in (OUTPUT_DIR, OUTPUT_DIR / "a_expand", OUTPUT_DIR / "b_coerce",
+                      OUTPUT_DIR / "c_plugin_expand"):
         directory.mkdir(parents=True, exist_ok=True)
     for path, text in outputs.items():
         (OUTPUT_DIR / path).write_text(text, encoding="utf-8")

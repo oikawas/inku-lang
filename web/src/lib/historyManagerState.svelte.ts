@@ -128,7 +128,14 @@ export class HistoryManagerState {
 	// not a harmless duplicate.
 	private inFlight: Request[] = [];
 
-	items = $derived(this.view === 'trash' ? this.trashItems : this.activeItems);
+	// One page shows what fits and no more. The works in hand can outnumber it:
+	// the page guesses the manager's page size before the modal exists and fetches
+	// with the guess, then the modal measures its own grid and says a smaller
+	// number. Drawing the surplus does not show it -- the grid's box clips what
+	// overflows -- while `offset` advances by pageSize, so the next page would
+	// hand back works already counted as shown. Capping here keeps the quantity
+	// that is drawn and the quantity that `offset` steps by the same one.
+	items = $derived((this.view === 'trash' ? this.trashItems : this.activeItems).slice(0, this.pageSize));
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
 	totalPages = $derived(Math.max(1, Math.ceil(this.total / this.pageSize)));
 	offset = $derived(this.page * this.pageSize);

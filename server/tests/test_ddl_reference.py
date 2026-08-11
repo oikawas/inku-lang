@@ -380,7 +380,7 @@ def test_the_corpus_holds_a_stated_count_above_the_band_engine_eleven_stopped_at
     held no stated count above eleven at all, which is the state this guards
     against returning to.
     """
-    from inku_server.coerce.compose import _explicit_counts_from_ddl
+    from inku_server.counts import _explicit_counts_from_ddl
     from inku_server.limits import DEFAULT_LIMITS
 
     cases = _generator().build_coerce_inputs()

@@ -8,9 +8,10 @@ package app.inku.mobile.pipeline
  * a group written to order apart from one a density governor is free to thin.
  *
  * Mirrors `_explicit_counts_from_ddl` and `_count_follows_ddl_request` in
- * `coerce/compose.py`. The English side matches on word tokens, never on substrings: on
- * the server a substring marker for "one " once fired inside "one hundred twenty" and
- * killed exactly the count it was supposed to protect.
+ * `inku_server/counts.py` (they moved out of `coerce/compose.py` when the expansion layer
+ * began reading counts through the same module). The English side matches on word tokens,
+ * never on substrings: on the server a substring marker for "one " once fired inside
+ * "one hundred twenty" and killed exactly the count it was supposed to protect.
  */
 internal object ServerScoreCounts {
 
@@ -39,17 +40,16 @@ internal object ServerScoreCounts {
 
     private val NUMBER_WORDS: Set<String> = ENGLISH_COUNT_UNITS.keys + setOf("hundred", "thousand", "and")
 
-    private val COUNTED_OBJECT_WORDS = setOf(
-        "line", "lines", "stroke", "strokes", "square", "squares", "circle", "circles",
-        "ellipse", "ellipses", "oval", "ovals", "triangle", "triangles", "arc", "arcs",
-        "polygon", "polygons", "cloudform", "cloudforms", "dot", "dots", "mark", "marks",
-        "point", "points", "tile", "tiles", "brick", "bricks", "shape", "shapes",
-    )
-
     private val JAPANESE_COUNT_PATTERN =
         Regex("""(\d{1,4}|[一二三四五六七八九十百千]{1,8})(?:本|個|つ(?!の方向)|点|枚)""")
 
-    private val LOWER_WORD_PATTERN = Regex("""[a-z]+""")
+    // Ruling B ([I-204], 2026-08-11): the English path reads numerals as well as number
+    // words, and asks nothing of the noun that follows. The 32-word COUNTED_OBJECT_WORDS
+    // table is gone on the server too; it had no other reader.
+    private val COUNT_TOKEN_PATTERN = Regex("""[a-z]+|\d+""")
+    private val CJK_PATTERN = Regex("""[぀-ヿ㐀-䶿一-鿿豈-﫿]""")
+    private const val CJK_WINDOW = 12
+    private const val NUMBER_EXPRESSION_PUNCTUATION = ".,/:"
 
     fun parseSmallJapaneseNumber(text: String): Int? {
         if (text.isEmpty()) return null
@@ -81,6 +81,30 @@ internal object ServerScoreCounts {
         return null
     }
 
+    /**
+     * Is this digit run a count, or a piece of some other number?
+     *
+     * Mirrors `_numeral_is_a_bare_count` in `counts.py`, condition for condition.
+     * CJK within twelve characters means the numeral sits in Japanese text, where a
+     * bare numeral is an angle or a fraction as often as it is a count; a digit
+     * beside a decimal point, a slash, a colon or a percent sign belongs to that
+     * number, not to a count.
+     */
+    private fun numeralIsABareCount(text: String, start: Int, end: Int): Boolean {
+        val window = text.substring(maxOf(0, start - CJK_WINDOW), minOf(text.length, end + CJK_WINDOW))
+        if (CJK_PATTERN.containsMatchIn(window)) return false
+        if (start >= 2 && text[start - 1] in NUMBER_EXPRESSION_PUNCTUATION && text[start - 2].isDigit()) {
+            return false
+        }
+        if (end < text.length) {
+            if (text[end] == '%') return false
+            if (text[end] in NUMBER_EXPRESSION_PUNCTUATION && end + 1 < text.length && text[end + 1].isDigit()) {
+                return false
+            }
+        }
+        return true
+    }
+
     fun explicitCountsFromDdl(ddl: String?): Set<Int> {
         if (ddl.isNullOrEmpty()) return emptySet()
         val counts = mutableSetOf<Int>()
@@ -89,37 +113,41 @@ internal object ServerScoreCounts {
             parseSmallJapaneseNumber(match.groupValues[1])?.takeIf { it != 0 }?.let { counts.add(it) }
         }
 
-        val words = LOWER_WORD_PATTERN.findAll(ddl.lowercase().replace("-", " ")).map { it.value }.toList()
+        val text = ddl.lowercase().replace("-", " ")
+        val tokens = COUNT_TOKEN_PATTERN.findAll(text).map { Triple(it.value, it.range.first, it.range.last + 1) }.toList()
         var index = 0
-        while (index < words.size) {
-            if (words[index] !in NUMBER_WORDS || words[index] == "and") {
+        while (index < tokens.size) {
+            val (token, start, stop) = tokens[index]
+            if (token.all { it.isDigit() }) {
+                val value = token.toIntOrNull()
+                if (value != null && value != 0 && numeralIsABareCount(text, start, stop)) counts.add(value)
+                index += 1
+                continue
+            }
+            if (token !in NUMBER_WORDS || token == "and") {
                 index += 1
                 continue
             }
             var end = index
             val phrase = mutableListOf<String>()
-            while (end < words.size && words[end] in NUMBER_WORDS) {
-                phrase.add(words[end])
+            while (end < tokens.size && tokens[end].first in NUMBER_WORDS) {
+                phrase.add(tokens[end].first)
                 end += 1
             }
-            // The counted noun has to follow soon after, or the number belongs to something else.
-            val lookahead = words.subList(end, minOf(words.size, end + 9))
-            if (lookahead.any { it in COUNTED_OBJECT_WORDS }) {
-                var total = 0
-                var current = 0
-                for (token in phrase) {
-                    when (token) {
-                        "and" -> {}
-                        "hundred" -> current = maxOf(current, 1) * 100
-                        "thousand" -> {
-                            total += maxOf(current, 1) * 1000
-                            current = 0
-                        }
-                        else -> current += ENGLISH_COUNT_UNITS.getValue(token)
+            var total = 0
+            var current = 0
+            for (word in phrase) {
+                when (word) {
+                    "and" -> {}
+                    "hundred" -> current = maxOf(current, 1) * 100
+                    "thousand" -> {
+                        total += maxOf(current, 1) * 1000
+                        current = 0
                     }
+                    else -> current += ENGLISH_COUNT_UNITS.getValue(word)
                 }
-                if (total + current != 0) counts.add(total + current)
             }
+            if (total + current != 0) counts.add(total + current)
             index = end
         }
         return counts

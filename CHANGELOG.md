@@ -5635,3 +5635,29 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   paper**, and the implementation added a test for that.
 - **The Android reference fixtures (64 files under `render-engine-30/`) were baked by the accepting session.**
   **The Kotlin renderer still carries the same wiring** (ledger I-217, a separate contract).
+
+### v2.13.7 — The navigation buttons agree on which way is newer (Build 892, 2026-08-11)
+
+- **The words for moving are now `newer` and `older` throughout.** The canvas read "next = newer" while the
+  modal read "prev = newer" -- **opposite words, inside the same `ja.ts`**. **`prev`, `next` and `first` are
+  gone from the screen**, replaced by `← newer`, `older →`, `Latest` and `Oldest` (both languages).
+- **Fixed the presentation-mode `aria-label`, which said the reverse of the tooltip.** `‹` (which moves to the
+  newer work) announced "older ×1". **Both now read the same key, so they cannot drift apart again.**
+- **Fixed the canvas navigation going fully dead when the selection was cleared.** Six paths -- switching the
+  Stage 1 model, re-choosing the colour catalog, detaching a lineage, and others -- cleared the selection while
+  leaving the work on screen. `-1` is now read as "one before the latest".
+- **`Latest` now means the latest work everywhere.** The strip and the modal judged it per page, so the canvas
+  `Latest` could be the only enabled one on the same screen.
+- **A one-work step and a one-page step now land consistently** (from the 22nd on page 2, `← newer` lands on the
+  21st; it used to jump to the first).
+- **Fixed duplicates and skips when the window is resized** (the offset is reseated onto the new grid).
+- **Closed the request overtaking**: `fetchHistoryOffset` and `fetchTrashPage` were the only two async paths with
+  neither a sequence number nor an `AbortController`. **The buttons are held while a fetch is in flight.**
+- **A demo run now holds the canvas navigation too** (only the strip was held before).
+- **The judgement moved into `web/src/lib/historyNavigation.ts`**, which the canvas, the strip and the modal all read.
+- **Checks:** **web 225 passed / 0 failed** (**29 new**, none of the existing 196 lost), **`npm run check`
+  0 errors / 2 warnings** (the two existing a11y ones), **i18n 0 warnings / 0 errors** (1,048 English strings),
+  **server 2,941 passed / 31 skipped**, **cli 220 passed**, **ruff clean**. **28 perturbations, no misses.**
+  The four that differed from the contract's table all turned **more** red than predicted, and the implementing
+  session reported the discrepancy rather than adjusting the tests.
+- **⚠ The implementing session pressed all 17 buttons on a real screen** (pentala, 2,924 works in history).

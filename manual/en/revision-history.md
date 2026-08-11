@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.13.7 Baseline (Web Build 892)
+
+Updated the 13 places that name a version to v2.13.7 / Build 892, and added a line to §14 of `Creating Images` now that the words for moving agree everywhere.
+
+- **The words for moving are now `newer` and `older` throughout.** On the canvas, the strip and history management alike, left is newer and right is older, and **`prev`, `next` and `first` are gone from the screen** (`← newer` / `older →` / `Latest` / `Oldest`).
+- **`First` became `Oldest`.** The button jumped to the oldest page, so its name now matches what it does.
+- **The canvas navigation works when no work is selected.** Changing a setting while a work was displayed used to disable all three.
+- **`Latest` now means the latest work everywhere.** Sitting at the top of a page no longer disables it.
+- **The canvas navigation is held during a demo run, too.**
+
 ## 2026-08-11 — Unreleased v2.13.6 Baseline (Web Build 891)
 
 Updated the 13 places that name a version to v2.13.6 / Build 891, and added a sentence to §7 of `Creating Images` now that a mark's size no longer depends on the canvas ratio.

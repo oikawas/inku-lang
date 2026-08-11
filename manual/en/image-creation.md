@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.6 (Web Build 891). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.7 (Web Build 892). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -300,7 +300,8 @@ The history strip at the bottom is for moving quickly back and forth in time. `H
 - Thumbnail view and list view. The list compares hash, timestamp, model, elapsed time, and color catalog
 - Move to trash, restore, and permanent delete, singly or by multiple selection
 - Expanding and selecting a whole lineage at once
-- Syncing to the displayed work and jumping to the first or latest page
+- Syncing to the displayed work and jumping to the oldest or latest page
+- **The words for moving agree everywhere.** On the canvas, the strip and history management alike, left is newer and right is older, and `prev`, `next` and `first` are not used (`← newer` / `older →` / `Latest` / `Oldest`)
 
 `By lineage` groups only on stored lineage nodes and edges. `lineage_only` intermediate works and tombstones are not counted in ordinary history.
 

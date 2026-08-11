@@ -89,3 +89,4 @@ server/plugins/.plugin-state.json
 
 # Local agent scratch (author's, not part of the project)
 .gemini/
+.work_backuup/

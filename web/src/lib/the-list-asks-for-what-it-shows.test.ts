@@ -258,6 +258,35 @@ test('measuring itself larger than what is on its way does ask again', () => {
 	assert.equal(new URL(calls[1], 'http://x').searchParams.get('limit'), String(MANAGER_PAGE_SIZE + 20));
 });
 
+// The page re-runs its search effect every time the manager opens, dispatching
+// the query the manager already has. On a reopen there is nothing in flight to
+// ride on, so without this the second press cost a whole page of history for
+// works already on screen.
+test('reopening does not re-search for the page already in hand', async () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
+	manager.pageSize = MANAGER_PAGE_SIZE;
+	await manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
+	refreshDerived(manager);
+	assert.equal(calls.length, 1);
+
+	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
+	manager.searchChanged('');
+
+	assert.equal(calls.length, 1);
+});
+
+test('a real search still asks, even with a page in hand', async () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
+	manager.pageSize = MANAGER_PAGE_SIZE;
+	await manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
+	refreshDerived(manager);
+
+	manager.searchChanged('mountain');
+
+	assert.equal(calls.length, 2);
+	assert.equal(new URL(calls[1], 'http://x').searchParams.get('q'), 'mountain');
+});
+
 test('a different page is not swallowed as a duplicate', async () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.pageSize = MANAGER_PAGE_SIZE;

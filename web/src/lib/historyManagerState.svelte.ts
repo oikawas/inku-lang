@@ -309,23 +309,21 @@ export class HistoryManagerState {
 		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
 		this.pageSize = nextPageSize;
 		this.page = Math.max(0, Math.min(this.page, this.totalPages - 1));
-		const request: Request = {
-			view: this.view,
-			page: this.page,
-			pageSize: nextPageSize,
-			search: this.search.trim(),
-			starredOnly: this.starredOnly,
-			forRevisionOnly: this.forRevisionOnly
-		};
 		// The modal measures itself once it is on screen and reports the real page
 		// size, which arrives while the page opened with is still being fetched.
-		// That answer will hold this many works, so there is nothing to ask for.
-		if (this.requestInFlight(request, nextPageSize)) return;
+		// Nothing is asked for here: fetch() sees that the answer on its way holds
+		// at least this many works and drops the question.
 		const expectedItems = Math.min(nextPageSize, this.total);
 		if (this.items.length < expectedItems) void this.fetch({ page: this.page });
 	};
 
 	searchChanged = (search: string) => {
+		// The page re-runs its search effect whenever the manager opens, so this
+		// arrives once per opening with the query the manager already has. That is
+		// not a search, and answering it would cost a whole page of history for
+		// works already in hand -- which is what reopening the manager used to do.
+		const next = search.trim();
+		if (this.preloadMatches(this.view, 0, this.pageSize, next, this.starredOnly, this.forRevisionOnly, this.total)) return;
 		this.page = 0;
 		this.selectedIds = [];
 		void this.fetch({ page: 0, search });

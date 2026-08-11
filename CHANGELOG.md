@@ -5492,6 +5492,11 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
 - **The API surface goes 92 → 93 routes.** Exactly **one operation and one schema** were added and
   **the existing 92 of each did not move by a byte** -- the diff was measured before the baseline
   was regenerated.
+- **Measured at production scale after deployment (2,897 works)**: the new question costs
+  **91 bytes at a median TTFB of 30.8 ms**; the listing it replaces costs **163,008 bytes at a
+  median TTFB of 1,201 ms**. That is **1,791× less data and 39× less waiting per poll** -- and when
+  nothing changed, even that one call does not happen. **The total, the newest timestamp and the
+  newest id all three agreed with the head of the listing.**
 - **Checks:** **server 2,898 passed / 31 skipped** (8 new from the branch, 40 from main, none lost),
   **web 173 passed**, **cli 219 passed**, **ruff clean**, `npm run check` **0 errors / 2 warnings**
   (the two pre-existing a11y ones), **i18n 0 errors**, published documents consistent.

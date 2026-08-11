@@ -80,6 +80,10 @@ def api_history_get(
     for_revision: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     anchor_id: str | None = Query(default=None, max_length=100),
+    include_svg: bool = Query(
+        default=True,
+        description="Send each work's whole SVG. Clients that draw from thumbnails send false.",
+    ),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
     if anchor_id:
@@ -97,6 +101,13 @@ def api_history_get(
         starred=starred,
         for_revision=for_revision,
     )
+    if not include_svg:
+        # Emptied, not removed. A client that has never heard of this flag still
+        # finds the key where it has always been, holding a string; taking the
+        # key away would make "no picture asked for" and "old server" the same
+        # shape on the wire. Twenty-one works cost 23.5 MB with the pictures and
+        # about 1.0 MB without them.
+        items = [{**item, "svg": ""} for item in items]
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 

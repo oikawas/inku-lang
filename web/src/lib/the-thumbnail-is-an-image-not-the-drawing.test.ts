@@ -105,3 +105,44 @@ test('the listings that show works side by side all use this component', () => {
 	}
 	assert.equal(total, 7);
 });
+
+// ── Stage 6: who asks the listing for what ──────────────────────────────────
+// A roll-call, not a style check. The flag defaults to true, so a sender that
+// writes nothing keeps receiving every drawing and nothing goes wrong loudly --
+// it is just slow, which is the defect this contract exists to remove. Counted
+// on 28ce4237: three GET senders in the web client.
+const SENDERS = [
+	{
+		file: '../routes/+page.svelte',
+		what: "the strip's listing",
+		pattern: /limit: String\(listLimit\),\s*(?:\/\/[^\n]*\n\s*)*include_svg: 'false'/,
+		sendsFalse: true
+	},
+	{
+		file: './historyManagerState.svelte.ts',
+		what: "the manager's listing",
+		pattern: /limit: String\(pageSize\),[\s\S]{0,200}?include_svg: 'false'/,
+		sendsFalse: true
+	}
+];
+
+test('the two listings that draw thumbnails ask for no drawings', () => {
+	for (const sender of SENDERS) {
+		const source = readFileSync(fileURLToPath(new URL(sender.file, import.meta.url)), 'utf-8');
+		assert.match(source, sender.pattern, `${sender.what} must ask for no drawings`);
+	}
+});
+
+test('every other listing sender is accounted for', () => {
+	// The trash page is the one GET that still asks for drawings, and it asks
+	// for a hundred works at a time. Contract 2 says to leave it alone, so it is
+	// named here rather than silently left out: a fourth sender appearing makes
+	// this fail and has to be decided about.
+	const page = readFileSync(fileURLToPath(new URL('../routes/+page.svelte', import.meta.url)), 'utf-8');
+	const manager = readFileSync(fileURLToPath(new URL('./historyManagerState.svelte.ts', import.meta.url)), 'utf-8');
+	const getters = [...page.matchAll(/apiFetch\(`\/api\/history\?/g)].length
+		+ [...manager.matchAll(/apiFetch\(`\/api\/history\?/g)].length;
+	assert.equal(getters, 3, 'three senders ask the listing for works');
+
+	assert.match(page, /\/api\/history\?offset=0&limit=100&trashed=true/, 'the trash page still asks for drawings');
+});

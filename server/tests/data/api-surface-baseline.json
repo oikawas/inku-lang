@@ -1,7 +1,7 @@
 {
-  "digest": "e779e460e50ab3c77f1dce34cf865e9a9064223e91ebc459385126c840815c85",
-  "endpoint_count": 87,
-  "operation_count": 87,
+  "digest": "809818f7e6bb109d6961a44e069d99bd27c2809f6eadb414e162d1539ba1c27e",
+  "endpoint_count": 92,
+  "operation_count": 92,
   "operations": [
     {
       "method": "GET",
@@ -369,6 +369,7 @@
         "header:authorization:opt",
         "query:anchor_id:opt",
         "query:for_revision:opt",
+        "query:include_svg:opt",
         "query:limit:opt",
         "query:offset:opt",
         "query:q:opt",
@@ -611,6 +612,23 @@
         "query:profile:opt"
       ],
       "path": "/api/history/{item_id}/svg",
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "operationId": "api_history_thumb_api_history__item_id__thumb_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:item_id:req",
+        "query:scale:opt",
+        "query:v:opt"
+      ],
+      "path": "/api/history/{item_id}/thumb",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -1120,6 +1138,62 @@
     },
     {
       "method": "GET",
+      "operationId": "api_settings_thumbnails_api_settings_thumbnails_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "path": "/api/settings/thumbnails",
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "PUT",
+      "operationId": "api_settings_update_thumbnails_api_settings_thumbnails_put",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "path": "/api/settings/thumbnails",
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailSettingsBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "operationId": "api_settings_thumbnail_rebuild_status_api_settings_thumbnails_rebuild_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "path": "/api/settings/thumbnails/rebuild",
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "POST",
+      "operationId": "api_settings_thumbnail_rebuild_api_settings_thumbnails_rebuild_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "path": "/api/settings/thumbnails/rebuild",
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailRebuildBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "method": "GET",
       "operationId": "api_user_groups_list_api_user_groups_get",
       "params": [
         "cookie:inku_session:opt",
@@ -1260,10 +1334,10 @@
       }
     }
   ],
-  "schema_count": 89,
+  "schema_count": 93,
   "schemas": {
     "AnimationExportBody": "{\"properties\":{\"format\":{\"default\":\"apng\",\"enum\":[\"apng\",\"gif\"],\"title\":\"Format\",\"type\":\"string\"},\"height_px\":{\"anyOf\":[{\"maximum\":12000.0,\"minimum\":64.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Height Px\"},\"hold_seconds\":{\"default\":1.0,\"maximum\":30.0,\"minimum\":0.1,\"title\":\"Hold Seconds\",\"type\":\"number\"},\"ids\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"minItems\":2,\"title\":\"Ids\",\"type\":\"array\"},\"pattern\":{\"default\":\"cut\",\"enum\":[\"cut\",\"crossfade\",\"fade_white\",\"slide\"],\"title\":\"Pattern\",\"type\":\"string\"},\"resolution\":{\"default\":\"1k\",\"enum\":[\"1k\",\"4k\",\"8k\"],\"title\":\"Resolution\",\"type\":\"string\"}},\"required\":[\"ids\"],\"title\":\"AnimationExportBody\",\"type\":\"object\"}",
-    "AppInfoResponse": "{\"properties\":{\"build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Build Number\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"developer_mode\":{\"default\":false,\"title\":\"Developer Mode\",\"type\":\"boolean\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"release_version\":{\"title\":\"Release Version\",\"type\":\"string\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"single_user_mode\":{\"default\":false,\"title\":\"Single User Mode\",\"type\":\"boolean\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"name\",\"version\",\"release_version\",\"render_engine_id\",\"render_engine_version\",\"ddl_version\",\"ddl_engine_version\"],\"title\":\"AppInfoResponse\",\"type\":\"object\"}",
+    "AppInfoResponse": "{\"properties\":{\"build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Build Number\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"developer_mode\":{\"default\":false,\"title\":\"Developer Mode\",\"type\":\"boolean\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"release_version\":{\"title\":\"Release Version\",\"type\":\"string\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"single_user_mode\":{\"default\":false,\"title\":\"Single User Mode\",\"type\":\"boolean\"},\"thumbnail_hidpi\":{\"default\":false,\"title\":\"Thumbnail Hidpi\",\"type\":\"boolean\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"name\",\"version\",\"release_version\",\"render_engine_id\",\"render_engine_version\",\"ddl_version\",\"ddl_engine_version\"],\"title\":\"AppInfoResponse\",\"type\":\"object\"}",
     "Arrangement": "{\"additionalProperties\":false,\"properties\":{\"center\":{\"anyOf\":[{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"radial の回転中心 [x,y] (省略=0.5,0.5)\",\"title\":\"Center\"},\"cluster_count\":{\"anyOf\":[{\"maximum\":12.0,\"minimum\":1.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"群を何個のまとまりに分けるか。大数量を全面均一に埋めず、3-9 個程度のクラスタで余白を残す時に使う\",\"title\":\"Cluster Count\"},\"color_cycle\":{\"description\":\"配色サイクル: 空=全要素同色。設定するとインデックス順に color_cycle を循環して各要素に適用する。色とりどり・ランダム配色の表現に使う\",\"items\":{\"enum\":[\"white\",\"black\",\"blue\",\"red\",\"green\",\"gray\",\"yellow\",\"orange\",\"purple\"],\"type\":\"string\"},\"title\":\"Color Cycle\",\"type\":\"array\"},\"cols\":{\"anyOf\":[{\"maximum\":64.0,\"minimum\":1.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"gridの列数 1-64。省略時はcountと領域比率から推定\",\"title\":\"Cols\"},\"count\":{\"description\":\"配置数。通常配置は1-1000、gridは1-2000。同一図形・同一配置の反復に使い、反復を N 件の instruction へ展開しない\",\"minimum\":1.0,\"title\":\"Count\",\"type\":\"integer\"},\"density\":{\"default\":\"none\",\"description\":\"群の視覚密度。none=通常配置 / low=粗い間隔 / medium=まとまりを感じる密度 / high=粒・雨・雪などの濃い群。count が大きい時の見え方を Renderer に伝える\",\"enum\":[\"none\",\"low\",\"medium\",\"high\"],\"title\":\"Density\",\"type\":\"string\"},\"fade\":{\"default\":\"none\",\"description\":\"群の薄れ方。outward=中心から端へ薄れる / directional=軌跡方向へ薄れる / none=薄れなし\",\"enum\":[\"none\",\"outward\",\"directional\"],\"title\":\"Fade\",\"type\":\"string\"},\"jitter\":{\"default\":0.12,\"description\":\"gridセル内の決定的な位置揺らぎ 0.0-1.0 (省略=0.12)\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Jitter\",\"type\":\"number\"},\"layout\":{\"default\":\"horizontal\",\"description\":\"horizontal=x軸等間隔 / vertical=y軸等間隔 / radial=指定中心周囲に円状 / scatter=決定的ランダム散布 / grid=等間隔の全面反復（敷き詰め）。scatter と違い偏り・薄れを持たない\",\"enum\":[\"horizontal\",\"vertical\",\"radial\",\"scatter\",\"grid\"],\"title\":\"Layout\",\"type\":\"string\"},\"margin\":{\"default\":0.1,\"description\":\"端余白 0.0-0.45 (省略=0.1)。grid全面敷き詰めでは0.02-0.08を使い、部分領域はat.regionで指定\",\"maximum\":0.45,\"minimum\":0.0,\"title\":\"Margin\",\"type\":\"number\"},\"path\":{\"default\":\"none\",\"description\":\"配置軌跡。none=layout通り / diagonal=斜めの帯 / wave=波打つ軌跡 / top_to_bottom=上から下 / left_to_right=左から右 / right_half=右半分\",\"enum\":[\"none\",\"diagonal\",\"wave\",\"top_to_bottom\",\"left_to_right\",\"right_half\"],\"title\":\"Path\",\"type\":\"string\"},\"preserve_space\":{\"default\":false,\"description\":\"true の場合、Renderer は margin と分布を広めに取り、余白を構図要素として残す\",\"title\":\"Preserve Space\",\"type\":\"boolean\"},\"radius\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"description\":\"radial の配置半径 (省略=0.3)\",\"title\":\"Radius\"},\"rhythm_spacing\":{\"default\":\"none\",\"description\":\"反復間隔の揺らし方。none=等間隔 / syncopated=詰まりと抜けを交互に作る / accelerando=後半へ向けて間隔を詰める / loose=ゆるい不均等間隔\",\"enum\":[\"none\",\"syncopated\",\"accelerando\",\"loose\"],\"title\":\"Rhythm Spacing\",\"type\":\"string\"},\"rows\":{\"anyOf\":[{\"maximum\":64.0,\"minimum\":1.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"gridの行数 1-64。rowsとcolsの両方を指定した場合はrows×colsを優先\",\"title\":\"Rows\"}},\"required\":[\"count\"],\"title\":\"Arrangement\",\"type\":\"object\"}",
     "AtRegion": "{\"additionalProperties\":false,\"properties\":{\"region\":{\"description\":\"[x0,y0,x1,y1] の正規化領域。Renderer が render_seed で実座標へ解決する\",\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Region\",\"type\":\"array\"}},\"required\":[\"region\"],\"title\":\"AtRegion\",\"type\":\"object\"}",
     "AuthSettingsBody": "{\"properties\":{\"google_enabled\":{\"title\":\"Google Enabled\",\"type\":\"boolean\"},\"local_enabled\":{\"title\":\"Local Enabled\",\"type\":\"boolean\"}},\"required\":[\"google_enabled\",\"local_enabled\"],\"title\":\"AuthSettingsBody\",\"type\":\"object\"}",
@@ -1336,6 +1410,10 @@
     "SingleUserStatus": "{\"properties\":{\"eligible\":{\"items\":{\"$ref\":\"#/components/schemas/SingleUserCandidate\"},\"title\":\"Eligible\",\"type\":\"array\"},\"enabled\":{\"title\":\"Enabled\",\"type\":\"boolean\"},\"user_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"User Id\"},\"username\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Username\"}},\"required\":[\"enabled\"],\"title\":\"SingleUserStatus\",\"type\":\"object\"}",
     "StageExecutionStatus": "{\"properties\":{\"completed\":{\"title\":\"Completed\",\"type\":\"integer\"},\"failed\":{\"title\":\"Failed\",\"type\":\"integer\"},\"note\":{\"title\":\"Note\",\"type\":\"string\"},\"queue_limit\":{\"title\":\"Queue Limit\",\"type\":\"integer\"},\"rejected\":{\"title\":\"Rejected\",\"type\":\"integer\"},\"submitted\":{\"title\":\"Submitted\",\"type\":\"integer\"},\"timed_out\":{\"title\":\"Timed Out\",\"type\":\"integer\"},\"workers\":{\"title\":\"Workers\",\"type\":\"integer\"}},\"required\":[\"workers\",\"queue_limit\",\"submitted\",\"completed\",\"failed\",\"timed_out\",\"rejected\",\"note\"],\"title\":\"StageExecutionStatus\",\"type\":\"object\"}",
     "SurfaceSpec": "{\"additionalProperties\":false,\"properties\":{\"bleed\":{\"default\":0.0,\"description\":\"滲み・広がり量 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Bleed\",\"type\":\"number\"},\"density\":{\"default\":0.35,\"description\":\"質感密度 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Density\",\"type\":\"number\"},\"direction\":{\"default\":\"none\",\"description\":\"線状質感の向き: none / horizontal / vertical / diagonal_rising / diagonal_falling\",\"enum\":[\"none\",\"horizontal\",\"vertical\",\"diagonal_rising\",\"diagonal_falling\"],\"title\":\"Direction\",\"type\":\"string\"},\"opacity\":{\"default\":0.28,\"description\":\"質感の不透明度 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Opacity\",\"type\":\"number\"},\"scale\":{\"default\":0.35,\"description\":\"質感粒度・間隔 0.0-1.0\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Scale\",\"type\":\"number\"},\"seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"任意の質感 seed。省略時は Renderer が演奏 seed から導出\",\"title\":\"Seed\"},\"spacing_gradient\":{\"default\":\"none\",\"description\":\"ハッチ間隔の勾配\",\"enum\":[\"none\",\"coarse_to_dense\",\"dense_to_coarse\"],\"title\":\"Spacing Gradient\",\"type\":\"string\"},\"texture\":{\"default\":\"none\",\"description\":\"面の質感: none=なし / stipple=点 / hatch=平行線 / crosshatch=交差線 / aquatint=段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / bleed=端が滲む / paper_grain=紙目\",\"enum\":[\"none\",\"stipple\",\"hatch\",\"crosshatch\",\"aquatint\",\"grain\",\"wash\",\"bleed\",\"paper_grain\"],\"title\":\"Texture\",\"type\":\"string\"},\"tone_steps\":{\"default\":3,\"description\":\"aquatint の離散調子段数 2-4\",\"maximum\":4.0,\"minimum\":2.0,\"title\":\"Tone Steps\",\"type\":\"integer\"}},\"title\":\"SurfaceSpec\",\"type\":\"object\"}",
+    "ThumbnailRebuildBody": "{\"properties\":{\"workers\":{\"default\":4,\"maximum\":16.0,\"minimum\":1.0,\"title\":\"Workers\",\"type\":\"integer\"}},\"title\":\"ThumbnailRebuildBody\",\"type\":\"object\"}",
+    "ThumbnailRebuildStatus": "{\"properties\":{\"built\":{\"title\":\"Built\",\"type\":\"integer\"},\"done\":{\"title\":\"Done\",\"type\":\"integer\"},\"failed\":{\"title\":\"Failed\",\"type\":\"integer\"},\"finished_at\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Finished At\"},\"remaining\":{\"title\":\"Remaining\",\"type\":\"integer\"},\"running\":{\"title\":\"Running\",\"type\":\"boolean\"},\"started_at\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Started At\"},\"total\":{\"title\":\"Total\",\"type\":\"integer\"},\"workers\":{\"title\":\"Workers\",\"type\":\"integer\"}},\"required\":[\"running\",\"total\",\"done\",\"remaining\",\"built\",\"failed\",\"workers\"],\"title\":\"ThumbnailRebuildStatus\",\"type\":\"object\"}",
+    "ThumbnailSettingsBody": "{\"properties\":{\"hidpi\":{\"default\":false,\"title\":\"Hidpi\",\"type\":\"boolean\"}},\"title\":\"ThumbnailSettingsBody\",\"type\":\"object\"}",
+    "ThumbnailStatus": "{\"properties\":{\"completed\":{\"title\":\"Completed\",\"type\":\"integer\"},\"count_scale_1\":{\"title\":\"Count Scale 1\",\"type\":\"integer\"},\"count_scale_2\":{\"title\":\"Count Scale 2\",\"type\":\"integer\"},\"failed\":{\"title\":\"Failed\",\"type\":\"integer\"},\"hidpi\":{\"title\":\"Hidpi\",\"type\":\"boolean\"},\"note\":{\"title\":\"Note\",\"type\":\"string\"},\"rebuild\":{\"$ref\":\"#/components/schemas/ThumbnailRebuildStatus\"},\"skipped\":{\"title\":\"Skipped\",\"type\":\"integer\"},\"store_path\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Store Path\"},\"stored_bytes\":{\"title\":\"Stored Bytes\",\"type\":\"integer\"},\"submitted\":{\"title\":\"Submitted\",\"type\":\"integer\"},\"unavailable\":{\"title\":\"Unavailable\",\"type\":\"integer\"}},\"required\":[\"hidpi\",\"store_path\",\"stored_bytes\",\"count_scale_1\",\"count_scale_2\",\"rebuild\",\"submitted\",\"completed\",\"failed\",\"skipped\",\"unavailable\",\"note\"],\"title\":\"ThumbnailStatus\",\"type\":\"object\"}",
     "UnreadWordsBody": "{\"properties\":{\"context\":{\"default\":\"\",\"maxLength\":1000,\"title\":\"Context\",\"type\":\"string\"},\"words\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"title\":\"Words\",\"type\":\"array\"}},\"title\":\"UnreadWordsBody\",\"type\":\"object\"}",
     "UserAccountCreateBody": "{\"properties\":{\"email\":{\"minLength\":1,\"title\":\"Email\",\"type\":\"string\"},\"group_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Group Id\"},\"password\":{\"minLength\":8,\"title\":\"Password\",\"type\":\"string\"},\"permission_groups\":{\"items\":{\"type\":\"string\"},\"title\":\"Permission Groups\",\"type\":\"array\"},\"username\":{\"minLength\":1,\"title\":\"Username\",\"type\":\"string\"}},\"required\":[\"username\",\"email\",\"password\"],\"title\":\"UserAccountCreateBody\",\"type\":\"object\"}",
     "UserAccountItem": "{\"properties\":{\"at\":{\"title\":\"At\",\"type\":\"integer\"},\"download_folder_enabled\":{\"default\":false,\"title\":\"Download Folder Enabled\",\"type\":\"boolean\"},\"download_folder_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Download Folder Name\"},\"email\":{\"title\":\"Email\",\"type\":\"string\"},\"group_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Group Id\"},\"group_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Group Name\"},\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"image_generation_count\":{\"default\":0,\"title\":\"Image Generation Count\",\"type\":\"integer\"},\"model_settings\":{\"additionalProperties\":true,\"title\":\"Model Settings\",\"type\":\"object\"},\"permission_group_labels\":{\"items\":{\"type\":\"string\"},\"title\":\"Permission Group Labels\",\"type\":\"array\"},\"permission_groups\":{\"items\":{\"type\":\"string\"},\"title\":\"Permission Groups\",\"type\":\"array\"},\"settings_tab\":{\"default\":\"db\",\"title\":\"Settings Tab\",\"type\":\"string\"},\"tooltips_enabled\":{\"default\":true,\"title\":\"Tooltips Enabled\",\"type\":\"boolean\"},\"ui_custom\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Ui Custom\",\"type\":\"object\"},\"ui_mode\":{\"default\":\"simple\",\"title\":\"Ui Mode\",\"type\":\"string\"},\"ui_theme\":{\"default\":\"dark\",\"title\":\"Ui Theme\",\"type\":\"string\"},\"username\":{\"title\":\"Username\",\"type\":\"string\"}},\"required\":[\"id\",\"username\",\"email\",\"permission_groups\",\"permission_group_labels\",\"at\"],\"title\":\"UserAccountItem\",\"type\":\"object\"}",

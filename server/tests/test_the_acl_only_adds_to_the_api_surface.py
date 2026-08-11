@@ -52,6 +52,13 @@ ADDED_OPERATIONS = {
     "GET /api/settings/single-user",
     "PUT /api/settings/single-user",
     "GET /api/auth/me/group-peers",
+    # Contract 2 (thumbnails). Same rule: named one by one, so an unlisted
+    # route appearing beside them still fails.
+    "GET /api/history/{item_id}/thumb",
+    "GET /api/settings/thumbnails",
+    "PUT /api/settings/thumbnails",
+    "GET /api/settings/thumbnails/rebuild",
+    "POST /api/settings/thumbnails/rebuild",
 }
 
 ADDED_SCHEMAS = {
@@ -62,6 +69,11 @@ ADDED_SCHEMAS = {
     "SingleUserCandidate",
     "SingleUserBody",
     "GroupPeer",
+    # Contract 2 (thumbnails).
+    "ThumbnailStatus",
+    "ThumbnailRebuildStatus",
+    "ThumbnailSettingsBody",
+    "ThumbnailRebuildBody",
 }
 
 # One schema that predates this branch is changed rather than added, and it is
@@ -71,7 +83,20 @@ ADDED_SCHEMAS = {
 # listing is the thing that has to say it. Declaring the change keeps the check
 # honest: any OTHER movement in HistoryItem, and any movement at all in the
 # remaining 81, still fails.
-CHANGED_SCHEMAS = {"HistoryItem": {"added": {"shared"}, "removed": set()}}
+CHANGED_SCHEMAS = {
+    "HistoryItem": {"added": {"shared"}, "removed": set()},
+    # Contract 2: the client asks for the second thumbnail size only where the
+    # server keeps it, and /api/info is where it learns that.
+    "AppInfoResponse": {"added": {"thumbnail_hidpi"}, "removed": set()},
+}
+
+# Operations that predate this branch and are declared to change, with exactly
+# what may move in them. Contract 2 gave the listing a way to be asked for the
+# metadata without the drawings; the parameter is optional and defaults to the
+# old behaviour, so nothing a caller already sent means anything different.
+CHANGED_OPERATIONS = {
+    "GET /api/history": {"added_params": {"query:include_svg:opt"}, "removed_params": set()},
+}
 
 
 def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> None:
@@ -90,15 +115,25 @@ def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> Non
     for name in ADDED_SCHEMAS:
         schemas.pop(name)
 
-    # The one declared change, checked field by field before being set aside.
+    # The declared changes, checked field by field before being set aside.
     baseline = json.loads(BASELINE_BEFORE_THE_BRANCH.read_text(encoding="utf-8"))
+    baseline_ops = {f"{op['method']} {op['path']}": op for op in baseline["operations"]}
+    for key, expected_delta in CHANGED_OPERATIONS.items():
+        before_params = set(baseline_ops[key]["params"])
+        after_op = next(op for op in surface["operations"] if f"{op['method']} {op['path']}" == key)
+        after_params = set(after_op["params"])
+        assert after_params - before_params == expected_delta["added_params"], key
+        assert before_params - after_params == expected_delta["removed_params"], key
+        # Everything else about the operation must still match byte for byte.
+        assert _stable({**after_op, "params": sorted(before_params)}) == _stable(baseline_ops[key]), key
+        operations.pop(key)
     for name, expected in CHANGED_SCHEMAS.items():
         before = set(json.loads(baseline["schemas"][name])["properties"])
         after = set(json.loads(schemas.pop(name))["properties"])
         assert after - before == expected["added"], f"{name} gained {sorted(after - before)}"
         assert before - after == expected["removed"], f"{name} lost {sorted(before - after)}"
 
-    assert len(operations) == PRE_ACL_OPERATION_COUNT
+    assert len(operations) == PRE_ACL_OPERATION_COUNT - len(CHANGED_OPERATIONS)
     assert len(schemas) == PRE_ACL_SCHEMA_COUNT - len(CHANGED_SCHEMAS)
 
     unchanged_before = {
@@ -108,7 +143,10 @@ def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> Non
         "a schema that predates this branch and was not declared as changing has moved: "
         f"{sorted(set(schemas) ^ set(unchanged_before)) or [n for n in schemas if schemas[n] != unchanged_before.get(n)]}"
     )
-    assert {f"{op['method']} {op['path']}": _stable(op) for op in baseline["operations"]} == operations, (
+    unchanged_ops_before = {
+        key: _stable(op) for key, op in baseline_ops.items() if key not in CHANGED_OPERATIONS
+    }
+    assert unchanged_ops_before == operations, (
         "an operation that predates this branch has changed. "
         "Adding a route is allowed; altering one that was already there is not."
     )

@@ -369,3 +369,49 @@ def test_losing_the_thumbnail_store_leaves_the_canonical_db_whole(owner):
     assert mine, "the work is still listed"
     assert mine[0]["svg"] == IMPOSTOR_SVG, "and the listing can still draw it itself"
     assert client.get(f"/api/history/{item['id']}/thumb", headers=headers).status_code == 404
+
+
+# ── T-13 ────────────────────────────────────────────────────────────────────
+def test_the_listing_still_carries_the_drawings_by_default(owner):
+    user, headers = owner
+    item = save_work(user, IMPOSTOR_SVG)
+
+    listing = client.get("/api/history?limit=10", headers=headers)
+    assert listing.status_code == 200
+    mine = [it for it in listing.json()["items"] if it["id"] == item["id"]]
+    assert mine and mine[0]["svg"] == IMPOSTOR_SVG, (
+        "a caller that writes nothing must get what it always got"
+    )
+
+
+# ── T-14 ────────────────────────────────────────────────────────────────────
+def test_asking_without_the_drawings_empties_the_key_but_keeps_it(owner):
+    user, headers = owner
+    item = save_work(user, IMPOSTOR_SVG)
+
+    listing = client.get("/api/history?limit=10&include_svg=false", headers=headers)
+    assert listing.status_code == 200
+    mine = [it for it in listing.json()["items"] if it["id"] == item["id"]]
+    assert mine
+    # The key stays. Removing it would make "no picture asked for" and "a server
+    # too old to have been asked" the same shape on the wire.
+    assert "svg" in mine[0]
+    assert mine[0]["svg"] == ""
+
+    # Nothing else about the work is withheld: the client still needs the
+    # metadata to draw the listing and to name the thumbnail's source.
+    assert mine[0]["id"] == item["id"]
+    assert "render_hash" in mine[0]
+
+
+def test_the_listing_shrinks_by_the_weight_of_the_drawings(owner):
+    user, headers = owner
+    for _ in range(3):
+        save_work(user, IMPOSTOR_SVG)
+
+    with_svg = client.get("/api/history?limit=100", headers=headers)
+    without = client.get("/api/history?limit=100&include_svg=false", headers=headers)
+    assert with_svg.status_code == 200 and without.status_code == 200
+    assert len(without.content) < len(with_svg.content), (
+        "the flag has to actually take the pictures off the wire"
+    )

@@ -212,7 +212,22 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     missing = [name for name in frozen_names if name not in after["schemas"]]
     assert not missing, f"schemas that existed before permission groups are gone: {missing}"
 
-    others = {name: after["schemas"][name] for name in frozen_names}
+    # Contract 2 added one field to a schema that predates permission groups.
+    # It is named here and taken back out before hashing, so the frozen digest
+    # still measures the other 77 byte for byte -- declaring the one change
+    # keeps the gate rather than regenerating past it.
+    declared_additions = {"AppInfoResponse": {"thumbnail_hidpi"}}
+    others = {}
+    for name in frozen_names:
+        body = after["schemas"][name]
+        added = declared_additions.get(name)
+        if added:
+            parsed = json.loads(body)
+            for field in added:
+                assert field in parsed["properties"], f"{name} was declared to gain {field}"
+                del parsed["properties"][field]
+            body = _stable(parsed)
+        others[name] = body
     assert (
         hashlib.sha256(_stable(others).encode()).hexdigest()
         == before["unchanged_schema_digest"]

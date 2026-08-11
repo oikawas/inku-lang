@@ -846,6 +846,34 @@
 		return new Error(describeApiError(d.detail, r.status));
 	}
 
+	/**
+	 * The drawing of a listed work, fetched only if the listing did not carry it.
+	 *
+	 * The listing asks for thumbnails instead of pictures, so an item that came
+	 * from it holds an empty `svg`. Anything that needs the drawing itself --
+	 * putting it on the canvas, comparing it with a replay, building a contact
+	 * sheet, saving it again -- asks for that one work rather than making the
+	 * listing carry every work's picture for the sake of the one that is used.
+	 *
+	 * The answer is kept on the item, so looking at the same work twice asks
+	 * once. Failure leaves the empty string the item already had: the caller
+	 * behaves as it did before any of this, which is the point of not removing
+	 * the field.
+	 */
+	async function ensureIterationSvg(it: { id?: string; svg?: string }): Promise<string> {
+		if (it.svg) return it.svg;
+		if (!it.id) return '';
+		try {
+			const r = await apiFetch(`/api/history/${encodeURIComponent(it.id)}/svg`, { cache: 'no-store' });
+			if (!r.ok) return '';
+			const svg = await r.text();
+			it.svg = svg;
+			return svg;
+		} catch {
+			return '';
+		}
+	}
+
 	async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
 		const headers = new Headers(init.headers);
 		for (let attempt = 0; ; attempt += 1) {
@@ -3679,6 +3707,9 @@ if (unreadWords.length > 0) {
 			const params = new URLSearchParams({
 				offset: String(safeOffset),
 				limit: String(listLimit),
+				// The strip draws thumbnails. A work that is opened, replayed, put
+				// on a sheet or saved again fetches its own drawing then.
+				include_svg: 'false',
 			});
 			if (historyStarredOnly) params.set('starred', 'true');
 			if (options.anchorId) params.set('anchor_id', options.anchorId);
@@ -3901,12 +3932,17 @@ if (unreadWords.length > 0) {
 
 	async function pushHistory(it: Iteration, options: { selectSaved?: boolean; countGeneration?: boolean; sourceText?: string; displayLabel?: string; batchLineNumber?: number; batchRunId?: string; historyVisibility?: 'normal' | 'lineage_only'; lineageParentNodeId?: string | null; derivationKind?: DerivationKind | null; derivationMetadata?: Record<string, unknown> } = {}): Promise<Iteration | null> {
 		if (!authToken) return null;
+		// Saving a work again stores the drawing it already has. An item that
+		// came from the listing does not carry one, and saving it as it stands
+		// would store a work with no picture -- a failure that shows up only when
+		// somebody opens the copy.
+		const svgToSave = await ensureIterationSvg(it);
 		let saved: Iteration | null = null;
 		try {
 			const r = await apiFetch('/api/history', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: it.svg ?? "", at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}) })
+				body: JSON.stringify({ input: it.input, ddl: it.ddl, expanded_ddl: it.expanded_ddl ?? null, focus: it.focus ?? null, score: it.score, svg: svgToSave, at: it.at, elapsed_ms: it.elapsed_ms ?? 0, stage1_model: it.stage1_model ?? null, stage2_model: it.stage2_model ?? null, tokens_in: it.tokens_in ?? null, tokens_out: it.tokens_out ?? null, catalog_id: it.catalog_id ?? colorCatalogSettings.effectiveId, render_build_number: it.render_build_number ?? null, render_color_profile: it.render_color_profile ?? null, render_engine_id: it.render_engine_id ?? null, render_engine_version: it.render_engine_version ?? null, render_color_catalog_id: it.render_color_catalog_id ?? null, render_color_catalog_name: it.render_color_catalog_name ?? null, render_color_catalog_sub: it.render_color_catalog_sub ?? null, render_color_map: it.render_color_map ?? null, render_canvas_aspect: it.render_canvas_aspect ?? it.render_canvas_aspect_id ?? effectiveCanvasAspectId(), render_canvas_aspect_id: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), render_canvas_aspect_ratio: it.render_canvas_aspect_ratio ?? null, render_seed: it.render_seed == null ? null : Number(it.render_seed), composition_seed: it.composition_seed == null ? null : Number(it.composition_seed), interpretation_seed: it.interpretation_seed ?? null, variation_amplitude: it.variation_amplitude ?? null, variation_seed: it.variation_seed == null ? null : Number(it.variation_seed), save_artifacts: true, count_generation: options.countGeneration ?? false, canvas_aspect: it.render_canvas_aspect_id ?? it.render_canvas_aspect ?? effectiveCanvasAspectId(), instruction_lang_requested: it.instruction_lang_requested ?? instructionLang, instruction_lang_resolved: it.instruction_lang_resolved ?? null, ui_lang: it.ui_lang ?? getLang(), source_text: options.sourceText ?? it.source_text ?? it.input, display_label: options.displayLabel ?? it.display_label ?? null, batch_line_number: options.batchLineNumber ?? it.batch_line_number ?? null, batch_run_id: options.batchRunId ?? it.batch_run_id ?? null, history_visibility: options.historyVisibility ?? 'normal', lineage_parent_node_id: options.lineageParentNodeId ?? null, derivation_kind: options.derivationKind ?? null, derivation_metadata: options.derivationMetadata ?? {}, sketch_text: it.sketch_text ?? null, sketch_grain: it.sketch_grain ?? null, ...(it.sketch_state ? { sketch_state: it.sketch_state } : {}) })
 			});
 			if (r.ok) saved = await r.json() as Iteration;
 		} catch { /* ignore */ }
@@ -4160,7 +4196,7 @@ if (unreadWords.length > 0) {
 				: null;
 			replayComparison = {
 				source,
-				originalSvg: it.svg,
+				originalSvg: await ensureIterationSvg(it),
 				replayedSvg: svg,
 				recordedVersion: it.render_engine_version ?? null,
 				currentVersion: currentRenderEngineVersion,
@@ -4681,6 +4717,19 @@ $effect(() => {
 		error = null;
 		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
 		if (preserveLineageTab && it.lineage_node_id) void fetchLineage(it.lineage_node_id, true);
+		fitCanvasZoom();
+		// The listing carries thumbnails, not drawings, so the work being put on
+		// the canvas fetches its own. One request for the one work being looked
+		// at, rather than a page of them for the one that gets opened.
+		if (!it.svg && it.id) void fillCanvasSvg(it);
+	}
+
+	/** Put the fetched drawing on the canvas, unless the reader has moved on. */
+	async function fillCanvasSvg(it: Iteration): Promise<void> {
+		const target = it.id;
+		const svg = await ensureIterationSvg(it);
+		if (!svg || displayedHistoryItem?.id !== target || !result) return;
+		result = { ...result, svg };
 		fitCanvasZoom();
 	}
 

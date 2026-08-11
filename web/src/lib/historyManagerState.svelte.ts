@@ -236,6 +236,9 @@ export class HistoryManagerState {
 				offset: String(offset),
 				limit: String(pageSize),
 				q: search,
+				// The manager draws thumbnails, so it does not need the drawings.
+				// They were nearly all of the cost: one page of them, 23.5 MB.
+				include_svg: 'false',
 			});
 			if (trashed) params.set('trashed', 'true');
 			if (starredOnly) params.set('starred', 'true');

@@ -13,6 +13,8 @@ picture and not of what engine 29 would draw from the same Score today.
 
 from __future__ import annotations
 
+import ast
+import pathlib
 import struct
 import threading
 import time
@@ -418,4 +420,77 @@ def test_the_listing_shrinks_by_the_weight_of_the_drawings(owner):
     assert with_svg.status_code == 200 and without.status_code == 200
     assert len(without.content) < len(with_svg.content), (
         "the flag has to actually take the pictures off the wire"
+    )
+
+
+# ── T-15 ────────────────────────────────────────────────────────────────────
+# The command line reads the listing's `svg` and writes it to a file, then
+# rasterizes that file (`cli.py`, the export path). An empty string is not an
+# error there: it writes a 0-byte drawing and a blank PNG and reports success.
+# So the senders that never name `include_svg` are the ones that would break in
+# silence, and what protects them is the server's default -- which is exactly
+# what this pair of assertions binds together.
+#
+# Keyed to the DIRECTORY, matching `test_cli_sender_census.py`: `cli/` is not on
+# the pentala sync path, so the whole tree is absent on the deployed server.
+CLI_TREE = pathlib.Path(__file__).resolve().parents[2] / "cli"
+CLI_SOURCE = CLI_TREE / "src/inku_cli/cli.py"
+
+cli_tree_only = pytest.mark.skipif(
+    not CLI_TREE.is_dir(),
+    reason="cli/ is not synced to the server; this gate runs where the tree exists",
+)
+
+
+def _history_senders() -> list[set[str]]:
+    """The literal query keys of every `GET /api/history` call in the CLI.
+
+    Read as text and parsed with `ast` rather than imported: the CLI lives in
+    its own virtualenv, and what is being checked is which literal keys each
+    sender names.
+    """
+    tree = ast.parse(CLI_SOURCE.read_text(encoding="utf-8"))
+    senders: list[set[str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Attribute) and func.attr == "request"):
+            continue
+        args = [a for a in node.args if isinstance(a, ast.Constant)]
+        if len(args) < 2 or args[0].value != "GET" or args[1].value != "/api/history":
+            continue
+        query = next(
+            (kw.value for kw in node.keywords if kw.arg == "query"),
+            None,
+        )
+        keys: set[str] = set()
+        if isinstance(query, ast.Dict):
+            keys = {k.value for k in query.keys if isinstance(k, ast.Constant)}
+        senders.append(keys)
+    return senders
+
+
+@cli_tree_only
+def test_the_command_line_still_receives_the_drawings_it_never_asks_for(owner):
+    user, headers = owner
+    item = save_work(user, IMPOSTOR_SVG)
+
+    senders = _history_senders()
+    assert senders, "found no GET /api/history sender in the CLI; the parse is wrong"
+    quiet = [keys for keys in senders if "include_svg" not in keys]
+    # If this ever becomes empty the gate has stopped measuring anything, and the
+    # census below is where the change has to be argued instead.
+    assert quiet, (
+        "every CLI sender now names include_svg; this gate is vacuous -- move it "
+        "or state which sender is relied upon to stay quiet"
+    )
+
+    # What a quiet sender puts on the wire, and what it must get back.
+    listing = client.get("/api/history?limit=100", headers=headers)
+    assert listing.status_code == 200
+    mine = [it for it in listing.json()["items"] if it["id"] == item["id"]]
+    assert mine and mine[0]["svg"] == IMPOSTOR_SVG, (
+        f"{len(quiet)} CLI sender(s) name no include_svg and would write an empty "
+        "drawing without saying so"
     )

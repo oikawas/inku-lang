@@ -3010,3 +3010,37 @@ def test_history_peers_asks_for_the_callers_own_organisation(monkeypatch):
     # Not the directory: /api/users answers 403 for a plain member anyway, and
     # asking it here would make the subcommand useless to the people who need it.
     assert all(path != "/api/users" for _method, path in calls)
+
+
+# ── T-15 ────────────────────────────────────────────────────────────────────
+# The `history` command is the one listing sender that names include_svg, and it
+# names it in both directions on purpose. A sender that only writes the flag when
+# it is false leaves the true case decided by the server alone, and nothing on
+# this side would notice the day that default moved.
+def test_the_history_listing_asks_for_the_drawings_unless_told_otherwise(monkeypatch):
+    sent = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            sent.append((method, path, kwargs.get("query") or {}))
+            return {"items": []}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    parser = cli.build_parser()
+
+    assert cli.command_history(parser.parse_args(["history"])) == 0
+    assert cli.command_history(parser.parse_args(["history", "--no-svg"])) == 0
+
+    assert [(m, p) for m, p, _q in sent] == [("GET", "/api/history")] * 2
+    default_query, no_svg_query = sent[0][2], sent[1][2]
+    # Written in both cases, not only when it is false.
+    assert "include_svg" in default_query and "include_svg" in no_svg_query
+    assert default_query["include_svg"] is True, (
+        "without the flag the CLI must ask for the drawings; its export path "
+        "writes whatever arrives straight to a file and rasterizes it"
+    )
+    assert no_svg_query["include_svg"] is False

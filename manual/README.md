@@ -1,6 +1,6 @@
 # inku Manuals
 
-This directory contains the Japanese and English manuals for the unreleased inku v2.12.2 baseline (Web Build 879).
+This directory contains the Japanese and English manuals for the unreleased inku v2.12.4 baseline (Web Build 882).
 
 ## 日本語
 

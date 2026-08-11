@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.12.2 (Web Build 879).
+It covers inku v2.12.4 (Web Build 882).
 
 ## Basics
 
@@ -120,7 +120,7 @@ batch additionally takes `--continue-on-error`.
 
 | Command | Main flags |
 |---|---|
-| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` |
+| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--no-svg` (leaves each work's drawing out of the listing; `svg` comes back empty) |
 | `history-export` | `--from` / `--to` (a range of hash suffixes) / `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` |
 | `unread-words` | `--all` (administrator-only aggregate) / `--limit` |
 | `history share` | `--to-user` / `--to-group` (one or the other) / `--permission {read,write}` |

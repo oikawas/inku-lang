@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は、未リリース版inku v2.12.2（Web Build 879）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
+この文書は、未リリース版inku v2.12.4（Web Build 882）を継続運用する管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。
 
 ## 1. 設定の優先境界
 
@@ -38,6 +38,7 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 | `INKU_ENV` | 動作モードの表示と開発時分岐 | `development` |
 | `INKU_TIMEZONE` | DB backupの時刻判定などに使うtimezone | `Asia/Tokyo` |
 | `INKU_REDIS_URL` | 設定するとrate limitなどの共有状態をRedisへ置く | 未設定（プロセス内） |
+| `INKU_THUMBS_DB_URL` | サムネイルを置く派生DBのURL | `INKU_DB_URL`の隣の`thumbs.db` |
 
 `INKU_SECRET_KEY`と`INKU_SECRET_KEY_FILE`を同時に設定した場合は直接鍵を優先します。本番では永続的な鍵ファイルを推奨します。
 
@@ -76,6 +77,8 @@ inkuにはセルフサインアップがありません。アカウントを作�
 | `INKU_RENDER_CONCURRENCY` | 同時Renderer実行上限の初期値 | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | ブラウザが同時に投げる描画要求の上限の初期値 | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | `0` にすると定期backupのschedulerを起動しない | `1` |
+| `INKU_THUMBNAIL_WORKERS` | サムネイル生成worker数 | `2` |
+| `INKU_THUMBNAIL_QUEUE_LIMIT` | サムネイル生成queue上限 | `64` |
 
 queue上限時も履歴DB保存を優先し、artifact保存だけをskipします。providerの無料queueによる遅延と、server worker不足を区別してください。
 
@@ -135,6 +138,8 @@ providerのBase URL、key、公開モデルは管理UIからも設定できま�
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 ```
+
+サムネイルは正本DBには入らず、隣の`thumbs.db`へ入ります。捨てても正本は壊れず、一覧は作品のSVGから描き直します。
 
 SQLiteは単一server向けの参照構成です。履歴検索はFTS5を使用し、利用できない環境では`LIKE`へfallbackします。
 
@@ -234,6 +239,8 @@ Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費
 ## 7. artifact保存
 
 履歴DBが正本です。artifactは再構築可能な副産物です。
+
+この設定はサムネイルとは無関係です。artifact保存を止めていても一覧のサムネイルは焼かれます。
 
 ```text
 <output_dir>/<user_id>/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>...

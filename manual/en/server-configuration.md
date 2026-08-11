@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.12.2 (Web Build 879). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline for the unreleased inku v2.12.4 (Web Build 882). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
 
 ## 1. Configuration Boundaries
 
@@ -38,6 +38,7 @@ Provider API key environment variables are initial values. A provider key saved 
 | `INKU_ENV` | Run mode, shown at start and branched on in development | `development` |
 | `INKU_TIMEZONE` | Timezone used for DB backup scheduling and similar | `Asia/Tokyo` |
 | `INKU_REDIS_URL` | When set, shared state such as rate limiting moves to Redis | unset, in-process |
+| `INKU_THUMBS_DB_URL` | URL of the derived database that holds the thumbnails | `thumbs.db` beside `INKU_DB_URL` |
 
 When both encryption variables are set, direct key material has priority. A persistent key file is recommended for production.
 
@@ -76,6 +77,8 @@ inku has no self-service registration. Accounts are created only through `POST /
 | `INKU_RENDER_CONCURRENCY` | Initial value for the concurrent renderer limit | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | Initial value for the browser's concurrent painting requests | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | Set to `0` to leave the periodic backup scheduler unstarted | `1` |
+| `INKU_THUMBNAIL_WORKERS` | Thumbnail baking workers | `2` |
+| `INKU_THUMBNAIL_QUEUE_LIMIT` | Thumbnail baking queue ceiling | `64` |
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
 
@@ -135,6 +138,8 @@ Base URLs, keys, and published models can also be managed from the admin UI. Key
 ```sh
 INKU_DB_URL=sqlite:////var/lib/inku/inku.db
 ```
+
+Thumbnails do not go into the canonical database; they go into `thumbs.db` beside it. Deleting that file leaves the canonical data whole, and the listing draws from each work's SVG again.
 
 SQLite is the reference single-server setup. History search uses FTS5 when available and falls back to `LIKE` otherwise.
 
@@ -234,6 +239,8 @@ History replay uses the saved Score, color catalog, canvas, seeds, and render-en
 ## 7. Artifact Saving
 
 The history DB is the source of truth. Artifacts are rebuildable outputs.
+
+This setting has nothing to do with thumbnails: listings keep baking them even when artifact saving is off.
 
 ```text
 <output_dir>/<user_id>/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>...

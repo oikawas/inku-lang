@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.12.2（Web Build 879）です。
+対象はinku v2.12.4（Web Build 882）です。
 
 ## 基本操作
 
@@ -120,7 +120,7 @@ batchはさらに `--continue-on-error` を持ちます。
 
 | コマンド | 主な旗 |
 |---|---|
-| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` |
+| `history` | `--limit` / `--offset` / `--query` / `--starred` / `--for-revision` / `--no-svg`（作品の絵を一覧に含めません。`svg`は空文字で返ります） |
 | `history-export` | `--from` / `--to`（hash下位桁の範囲）/ `--out-dir` / `--columns` / `--thumb-size` / `--starred` / `--for-revision` |
 | `unread-words` | `--all`（管理者のみの全体集計）/ `--limit` |
 | `history share` | `--to-user` / `--to-group`（どちらか一方）/ `--permission {read,write}` |

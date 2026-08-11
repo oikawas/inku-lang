@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-11 — Unreleased v2.12.4 Baseline (Web Build 882)
+
+The 13 version markers were moved to v2.12.4 / Build 882, and **`Server Configuration` §2.1, §2.3, §3.1 and §7 and the history section of the `inku-cli Reference` were revised now that a listing shows baked images rather than the drawings themselves**.
+
+- **A listing now shows images baked from the stored drawings.** They live in `thumbs.db` beside the canonical database, and **deleting that file loses no work** — the listing draws from each work's own drawing again.
+- **⚠ The picture does not change.** Baking turns a stored drawing into an image; it does not draw it again, so **a work made under an older version becomes an image of that version's picture**.
+- **Administrators can rebuild the thumbnails from the settings screen.** The remaining count is visible, and **the old image keeps being shown while a new one is built**. **High resolution (HiDPI) can be turned on and off**; turning it off asks for confirmation and removes only the 2x images.
+- **`inku-cli history` gained `--no-svg`.** With it, the listing carries no drawings and `svg` comes back empty. **Without it, the drawings arrive as they always did.**
+- Three environment variables were added (`INKU_THUMBS_DB_URL`, `INKU_THUMBNAIL_WORKERS`, `INKU_THUMBNAIL_QUEUE_LIMIT`).
+- **⚠ This has nothing to do with the artifact saving setting.** Thumbnails are baked even when artifact saving is off.
+
 ## 2026-08-11 — Unreleased v2.12.2 Baseline (Web Build 879)
 
 The 13 version markers were moved to v2.12.2 / Build 879, and **`Server Configuration` §4 and the history and administration sections of the `inku-cli Reference` were revised now that a work can be handed to another person**.

@@ -5339,3 +5339,49 @@ distribution (that is stage B); it removes **a distribution nobody asked for**.
   One of them measured a case where **`preloadMatches` is an AND of "the cached key matches" and
   "enough items are in hand", and the item count alone made it false** — so writing the key changed
   nothing. Replacing it with **a case where only the declaration decides** turned both tests red.
+
+### v2.12.4 — the thumbnail is an image, not the drawing (Build 882, 2026-08-11, first load)
+
+- **The listing stopped carrying each work's whole drawing and now carries a baked image.**
+  `GET /api/history` returned the full SVG of every listed work (**measured: 23,524,802 bytes,
+  median 1,816 ms, of which 1,184 ms was the server serializing**). The cost is set by
+  **characters, not by how many works there are** — it is the time to inspect and escape 22
+  million characters into one JSON document. **Works are now rasterized once, after saving,
+  into a derived `thumbs.db` beside the canonical database.**
+- **⚠ Not one pixel of the picture changes.** This is **rasterizing the stored SVG**, not
+  re-rendering it. **The engine is never run** — a work drawn by engine 2 becomes a PNG of the
+  engine 2 picture.
+- **The listing prefers the PNG and falls back to the SVG** for works not baked yet. Every
+  listing that puts works side by side goes through the same component — **all seven of them** —
+  so a page holding both kinds is fine.
+- **`GET /api/history` gained `include_svg` (default `true`).** Only the web listing sends
+  `false`. **Even then the `svg` key stays and comes back empty** — dropping the key would make
+  "no picture was asked for" and "a server too old to have been asked" the same shape on the
+  wire. **`inku-cli history` gained `--no-svg` as well.**
+- **Rebuilding thumbnails is a production feature.** An administrator can start it from the
+  settings screen and watch the remaining count. **The old image keeps being served while a new
+  one is being built** (never a blank). **HiDPI is a setting** (off by default); turning it off
+  asks for confirmation and removes only the 2× rows. **Deleting `thumbs.db` outright leaves the
+  canonical database whole.**
+- **The number of works one page shows and the step the pager takes now agree.** v2.12.3's
+  judgement reduced the fetch to one, but **65 works were shown while the pager advanced by 52,
+  so the 53rd to 65th appeared on two pages at once** (13 measured). **Overlap and gaps are now
+  zero, without discarding works already in hand.**
+- **Checks:** **server 2,826 → 2,844 passed / 31 skipped**, **cli 217 → 218 passed**, **web
+  `test:unit` 146 → 158** (nothing deleted or renamed), **`npm run check` 0 errors / 2 warnings**
+  (the two pre-existing a11y ones), **`lint:i18n` 0 errors**, **ruff clean** (server and cli),
+  **`check_docs.py` consistent**, **frozen corpora byte-identical** (no engine moved).
+  **Seventeen perturbations were applied and all seventeen landed.**
+- **⚠ Two perturbations could not be made to happen as written.** (1) `svg_to_png` ignores
+  `height` when `width` is given, so **passing both does not break the proportions** (re-aimed at
+  the direction that does). (2) Deleting `svg` from the dict does not remove the key, because
+  **`response_model` puts its default back** (re-aimed at the serialization layer).
+- **⚠ Acceptance found two gaps and closed them.** (1) **No test went through the command line.**
+  The path that reads a listing's drawing and writes it out will, given an empty string, **write
+  a 0-byte drawing and a blank PNG and report success.** A gate now measures, from both sides,
+  that the senders which name no flag are relied upon to receive the drawings. (2) **`--no-svg`
+  had not reached the generated help block**, which turned the manual gate red on the merged tree
+  (regenerated).
+- **Production-scale figures were not measured.** The local database holds 83 works totalling
+  350 KB of SVG — **a different population from production's roughly 1 MB per work**. Response
+  size, backfill duration and the real size of `thumbs.db` **will be measured after deployment.**

@@ -704,7 +704,9 @@ def _fallback_score_from_ddl(ddl: str, *, lang: str) -> Score:
         }
 
     arrangement: dict[str, object] | None = None
-    explicit_count = count_hint_from_ddl(ddl)
+    # This builder is handed the language; the reader is told it too, or the
+    # fallback for an English description reads counts by the Japanese rules.
+    explicit_count = count_hint_from_ddl(ddl, lang=lang)
     if ("散らす" in ddl) or ("点々" in ddl) or ("scatter" in lower) or ("dotted" in lower):
         arrangement = {"count": explicit_count or 11, "layout": "scatter", "margin": 0.18}
     elif ("並べる" in ddl) or ("line up" in lower):

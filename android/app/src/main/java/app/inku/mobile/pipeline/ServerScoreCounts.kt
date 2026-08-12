@@ -51,6 +51,76 @@ internal object ServerScoreCounts {
     private const val CJK_WINDOW = 12
     private const val NUMBER_EXPRESSION_PUNCTUATION = ".,/:"
 
+    /** What a reader falls back to when its caller does not name a language. */
+    const val DEFAULT_COUNT_LANG = "ja"
+
+    /** The band `Limits` holds on the server. Android has no settings seam for it. */
+    private const val DDL_COUNT_MAX = 1000
+    private const val DDL_COUNT_MAX_GRID = 2000
+
+    // Ruling (2026-08-12): a number is a count of marks only if what it counts is a
+    // thing that gets drawn. The old guard listed what MAY be counted, and the set of
+    // drawable things is open, so `circles` and `petals` leaked out of it; this lists
+    // what may NOT be. The counter pattern above already held the one case of it.
+    private val AXIS_WORDS_EN = setOf(
+        "direction", "directions", "degree", "degrees", "row", "rows",
+        "column", "columns", "kind", "kinds", "type", "types",
+        "layer", "layers", "percent", "time", "times",
+    )
+    private val AXIS_WORDS_JA =
+        listOf("方向", "向き", "種類", "層", "行", "列", "度", "回", "倍", "割")
+    private const val AXIS_LOOKAHEAD = 3
+
+    // An index says WHICH ONE, not HOW MANY. The DDL coerce reads is the one the
+    // plugin layer has already expanded, and that layer writes `Place member 2 in
+    // region [...]` into it.
+    private val INDEX_WORDS_EN = setOf("member", "no")
+    private val INDEX_WORDS_JA = listOf("第")
+
+    private val LITERAL_GRID_MARKERS_JA = listOf(
+        "敷き詰め", "格子状", "格子に",
+        "一面に並", "全面に並",
+    )
+    private val LITERAL_GRID_PATTERN_EN = Regex("""\b(?:tile|tiled|tiling)\b""")
+
+    /**
+     * Does a numeral with CJK beside it stay unread?
+     *
+     * Ruling B ([I-216], 2026-08-12): what decides this is the language the body is
+     * written in, not the characters that happen to sit next to the digit.
+     */
+    private fun cjkNeighbourhoodIsExcluded(lang: String?): Boolean =
+        (lang ?: DEFAULT_COUNT_LANG) != "en"
+
+    fun isLiteralGridRequest(ddl: String?): Boolean {
+        if (ddl.isNullOrEmpty()) return false
+        if (LITERAL_GRID_MARKERS_JA.any { ddl.contains(it) }) return true
+        return LITERAL_GRID_PATTERN_EN.containsMatchIn(ddl.lowercase())
+    }
+
+    /** Does an axis word follow this counter, the Japanese form of `four directions`? */
+    private fun namesAnAxisJa(text: String, end: Int): Boolean {
+        if (end > text.length) return false
+        var rest = text.substring(end)
+        if (rest.startsWith("の")) rest = rest.substring(1)
+        return AXIS_WORDS_JA.any { rest.startsWith(it) }
+    }
+
+    /** Does an axis word follow this number, as in `four directions`? */
+    private fun namesAnAxisEn(tokens: List<Triple<String, Int, Int>>, after: Int): Boolean {
+        val from = minOf(maxOf(after, 0), tokens.size)
+        val to = minOf(from + AXIS_LOOKAHEAD, tokens.size)
+        return tokens.subList(from, to).any { it.first in AXIS_WORDS_EN }
+    }
+
+    /** Is this number an index, as in `member 2`? */
+    private fun isAnIndexEn(tokens: List<Triple<String, Int, Int>>, at: Int): Boolean =
+        at > 0 && tokens[at - 1].first in INDEX_WORDS_EN
+
+    /** Is this number an index, the Japanese ordinal prefix before a digit? */
+    private fun isAnIndexJa(text: String, start: Int): Boolean =
+        INDEX_WORDS_JA.any { text.substring(0, start).endsWith(it) }
+
     fun parseSmallJapaneseNumber(text: String): Int? {
         if (text.isEmpty()) return null
         if (text.all { it.isDigit() }) return text.toIntOrNull()
@@ -90,9 +160,17 @@ internal object ServerScoreCounts {
      * beside a decimal point, a slash, a colon or a percent sign belongs to that
      * number, not to a count.
      */
-    private fun numeralIsABareCount(text: String, start: Int, end: Int): Boolean {
-        val window = text.substring(maxOf(0, start - CJK_WINDOW), minOf(text.length, end + CJK_WINDOW))
-        if (CJK_PATTERN.containsMatchIn(window)) return false
+    private fun numeralIsABareCount(
+        text: String,
+        start: Int,
+        end: Int,
+        lang: String?,
+        namesAPlugin: Boolean,
+    ): Boolean {
+        if (!namesAPlugin && cjkNeighbourhoodIsExcluded(lang)) {
+            val window = text.substring(maxOf(0, start - CJK_WINDOW), minOf(text.length, end + CJK_WINDOW))
+            if (CJK_PATTERN.containsMatchIn(window)) return false
+        }
         if (start >= 2 && text[start - 1] in NUMBER_EXPRESSION_PUNCTUATION && text[start - 2].isDigit()) {
             return false
         }
@@ -105,22 +183,47 @@ internal object ServerScoreCounts {
         return true
     }
 
-    fun explicitCountsFromDdl(ddl: String?): Set<Int> {
-        if (ddl.isNullOrEmpty()) return emptySet()
-        val counts = mutableSetOf<Int>()
+    /**
+     * Every count the description states, as (position, value), in reading order.
+     *
+     * Mirrors `_counts_in_reading_order` in `counts.py`. The one scan both readers
+     * stand on: `explicitCountsFromDdl` asks it which counts were stated at all,
+     * `countHintFromDdl` asks it which one comes first. Two readers over one scan
+     * cannot disagree about what a count is, and they did disagree -- on four of six
+     * descriptions -- for as long as the hint kept a walk of its own.
+     */
+    private fun countsInReadingOrder(
+        ddl: String?,
+        lang: String? = null,
+        namesAPlugin: Boolean = false,
+    ): List<Pair<Int, Int>> {
+        if (ddl.isNullOrEmpty()) return emptyList()
+        val text = ddl.lowercase().replace("-", " ")
+        val found = mutableListOf<Pair<Int, Int>>()
 
-        for (match in JAPANESE_COUNT_PATTERN.findAll(ddl)) {
-            parseSmallJapaneseNumber(match.groupValues[1])?.takeIf { it != 0 }?.let { counts.add(it) }
+        for (match in JAPANESE_COUNT_PATTERN.findAll(text)) {
+            val value = parseSmallJapaneseNumber(match.groupValues[1]) ?: continue
+            if (value == 0) continue
+            if (namesAnAxisJa(text, match.range.last + 1)) continue
+            found.add(match.range.first to value)
         }
 
-        val text = ddl.lowercase().replace("-", " ")
-        val tokens = COUNT_TOKEN_PATTERN.findAll(text).map { Triple(it.value, it.range.first, it.range.last + 1) }.toList()
+        val tokens = COUNT_TOKEN_PATTERN.findAll(text)
+            .map { Triple(it.value, it.range.first, it.range.last + 1) }.toList()
         var index = 0
         while (index < tokens.size) {
             val (token, start, stop) = tokens[index]
             if (token.all { it.isDigit() }) {
                 val value = token.toIntOrNull()
-                if (value != null && value != 0 && numeralIsABareCount(text, start, stop)) counts.add(value)
+                if (value != null && value != 0 &&
+                    numeralIsABareCount(text, start, stop, lang, namesAPlugin) &&
+                    !namesAnAxisEn(tokens, index + 1) &&
+                    !namesAnAxisJa(text, stop) &&
+                    !isAnIndexEn(tokens, index) &&
+                    !isAnIndexJa(text, start)
+                ) {
+                    found.add(start to value)
+                }
                 index += 1
                 continue
             }
@@ -147,10 +250,45 @@ internal object ServerScoreCounts {
                     else -> current += ENGLISH_COUNT_UNITS.getValue(word)
                 }
             }
-            if (total + current != 0) counts.add(total + current)
+            if (total + current != 0 && !namesAnAxisEn(tokens, end)) found.add(start to (total + current))
             index = end
         }
-        return counts
+        found.sortWith(compareBy({ it.first }, { it.second }))
+        return found
+    }
+
+    fun explicitCountsFromDdl(
+        ddl: String?,
+        lang: String? = null,
+        namesAPlugin: Boolean = false,
+    ): Set<Int> = countsInReadingOrder(ddl, lang, namesAPlugin).map { it.second }.toSet()
+
+    /**
+     * The count this description states first.
+     *
+     * Mirrors `count_hint_from_ddl`: the counter-marked pass runs first over the
+     * clauses that ask for tiling, then the shared scan answers with whichever count
+     * comes first in the text. The hand-written table of twenty-one kanji numbers this
+     * replaced read the first digit run anywhere in the description, with none of the
+     * exclusions -- it answered 0 for `radius 0.11` and 30 for a 30-degree rotation.
+     */
+    fun countHintFromDdl(ddl: String?, lang: String? = null): Int? {
+        if (ddl.isNullOrEmpty()) return null
+        val literalGrid = isLiteralGridRequest(ddl)
+        val clauses = ddl.split(Regex("""[。.!?]+"""))
+        val candidates = if (literalGrid) clauses.filter { isLiteralGridRequest(it) } else listOf(ddl)
+        val maximum = if (literalGrid) DDL_COUNT_MAX_GRID else DDL_COUNT_MAX
+        for (candidate in candidates) {
+            val match = JAPANESE_COUNT_PATTERN.find(candidate) ?: continue
+            if (namesAnAxisJa(candidate, match.range.last + 1)) continue
+            val value = parseSmallJapaneseNumber(match.groupValues[1]) ?: continue
+            return value.coerceAtLeast(1).coerceAtMost(maximum)
+        }
+        for (candidate in candidates) {
+            val first = countsInReadingOrder(candidate, lang).firstOrNull() ?: continue
+            return first.second.coerceAtLeast(1).coerceAtMost(maximum)
+        }
+        return null
     }
 
     /** Is this count the one the description asked for, literally or as its stand-in? */

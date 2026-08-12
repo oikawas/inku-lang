@@ -3292,5 +3292,56 @@
       ],
       "requested_survives": true
     }
+  ],
+  "count_hint_note": "[I-212]..[I-216] (2026-08-12). The port answers `how many did the description say` with the same rule the server does. Every value here is read off the server implementation, so a hand-written table on the port cannot go stale without this fixture going stale with it. Six descriptions, one per narrowness the rulings removed, plus the two exclusions that stay.",
+  "count_hint_cases": [
+    {
+      "ddl": "Draw 12 circles.",
+      "lang": null,
+      "separates": "a numeral, and a noun no table listed",
+      "count_hint": 12,
+      "explicit_counts": [
+        12
+      ]
+    },
+    {
+      "ddl": "Scatter twelve small ellipses.",
+      "lang": null,
+      "separates": "a number word, same missing noun",
+      "count_hint": 12,
+      "explicit_counts": [
+        12
+      ]
+    },
+    {
+      "ddl": "Place 12 Nature.青葉 marks.",
+      "lang": "en",
+      "separates": "an English body naming a Japanese plugin",
+      "count_hint": 12,
+      "explicit_counts": [
+        12
+      ]
+    },
+    {
+      "ddl": "立方体の向き: 30度回転",
+      "lang": "ja",
+      "separates": "a Japanese body keeps the bare-numeral exclusion",
+      "count_hint": null,
+      "explicit_counts": []
+    },
+    {
+      "ddl": "Tile thin black lines in four directions across the wall.",
+      "lang": "en",
+      "separates": "a number counting an axis, not marks",
+      "count_hint": null,
+      "explicit_counts": []
+    },
+    {
+      "ddl": "Place a circle of radius 0.11 near the center.",
+      "lang": "en",
+      "separates": "a digit inside another number",
+      "count_hint": null,
+      "explicit_counts": []
+    }
   ]
 }

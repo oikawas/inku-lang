@@ -186,6 +186,68 @@ def test_compose_payload_for_ddl_input_mode():
     assert "description" not in payload
 
 
+def test_compose_payload_carries_the_prose_a_plugin_fires_on():
+    """`--fires-on` is the only way a plugin expands in ddl input mode.
+
+    Whether a plugin fires is decided by the description (`source_text` on the
+    server); the DDL is only hashed for the seed. A DDL that spells a plugin
+    word therefore expands to nothing on its own, which reads as the plugin
+    being broken rather than as the description being absent.
+    """
+    parser = cli.build_parser()
+    args = parser.parse_args(
+        ["paint", "落葉", "--input-mode", "ddl", "--fires-on", "落葉"]
+    )
+
+    payload = cli._compose_payload(args, "落葉", stage2_model="s2", color_catalog="default")
+
+    assert payload["fires_on"] == "落葉"
+    # The DDL is unchanged: the flag adds prose, it does not rewrite the input.
+    assert payload["ddl"] == "落葉"
+
+
+def test_compose_payload_omits_an_empty_fires_on():
+    parser = cli.build_parser()
+    args = parser.parse_args(["paint", "落葉", "--input-mode", "ddl", "--fires-on", "   "])
+
+    payload = cli._compose_payload(args, "落葉", stage2_model="s2", color_catalog="default")
+
+    # Blank is not a description: sending "" would claim the work has one.
+    assert "fires_on" not in payload
+
+
+def test_compose_result_keeps_which_plugin_expanded():
+    """Without this the saved JSON says nothing fired even when one did.
+
+    `/api/compose` has always returned the provenance; this mapping did not
+    name it, so a run in ddl input mode could not be told apart from one where
+    no plugin was reached.
+    """
+    result = {
+        "ddl": "落葉 赤と灰を枚ごとに交互に。",
+        "plugin_provenance": [{"plugin_term": "Nature.落葉", "units": "18"}],
+        "plugin_warnings": ["one warning"],
+    }
+
+    mapped = cli._compose_response_as_paint_result(
+        result, ddl="落葉", input_text="落葉", stage2_model="s2"
+    )
+
+    assert mapped["plugin_provenance"] == [{"plugin_term": "Nature.落葉", "units": "18"}]
+    assert mapped["plugin_warnings"] == ["one warning"]
+
+
+def test_compose_result_reports_no_expansion_as_an_empty_list():
+    mapped = cli._compose_response_as_paint_result(
+        {"ddl": "円を置く。"}, ddl="円を置く。", input_text="円を置く。", stage2_model="s2"
+    )
+
+    # An empty list, not a missing key: a reader that counts entries must not
+    # have to tell "no plugins" from "this CLI does not report plugins".
+    assert mapped["plugin_provenance"] == []
+    assert mapped["plugin_warnings"] == []
+
+
 def test_compose_payload_includes_canvas_aspect():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--canvas-aspect", "wide"])

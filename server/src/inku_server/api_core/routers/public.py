@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.parse
 import urllib.request
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 from ...languages import stage_prompts_for_lang
 from ...plugins import DOCUMENT_PLUGIN_MANAGER, entries_with_fires_on
+from ...plugins.document_format import preview_path_for_qualified_name
 from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
@@ -122,6 +124,20 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     )
 
 
+PLUGIN_PREVIEW_ROUTE = "/api/saijiki/plugin-preview"
+
+
+def _preview_url(qualified_name: str, *, hidpi: bool) -> str:
+    """Where the browser fetches this word's artwork.
+
+    The name rides as a query parameter rather than in the path: a qualified
+    name is `Namespace.Word` with the word in the document's own language, and
+    a query value needs no decisions about what a path segment may hold.
+    """
+    query = urllib.parse.urlencode({"name": qualified_name, "scale": "2" if hidpi else "1"})
+    return f"{PLUGIN_PREVIEW_ROUTE}?{query}"
+
+
 def _enabled_plugin_entries() -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
     for item in DOCUMENT_PLUGIN_MANAGER.items():
@@ -131,6 +147,15 @@ def _enabled_plugin_entries() -> list[dict[str, object]]:
         # without it the editor can only say a qualified name is unknown, not
         # which plain word it would have fired.
         entries.extend(entries_with_fires_on(item.entries))
+    # v2.14: the loader says whether a picture exists at each scale; the URL is
+    # this layer's to write, since this layer owns the route. A word with no
+    # picture carries "" and the panel falls back to the shared mark.
+    for entry in entries:
+        name = str(entry.get("qualified_name", ""))
+        entry["preview_url"] = _preview_url(name, hidpi=False) if entry.get("has_preview") else ""
+        entry["preview_url_2x"] = (
+            _preview_url(name, hidpi=True) if entry.get("has_preview_hidpi") else ""
+        )
     return entries
 
 
@@ -145,6 +170,30 @@ def api_saijiki(
         "categories": display_categories(lang),
         "plugins": _enabled_plugin_entries(),
     }
+
+
+@router.get(PLUGIN_PREVIEW_ROUTE)
+def api_plugin_preview(
+    name: str = Query(min_length=1, max_length=200),
+    scale: str = Query(default="1", pattern="^[12]$"),
+    actor: dict = Depends(_current_user),
+) -> Response:
+    """The artwork behind a plugin word in the saijiki preview.
+
+    Served from its own route rather than inside the saijiki payload: the bake
+    that prompted this came to 188 KB across seven words at 720px, which the
+    browser fetches once and caches instead of carrying on every hydration.
+    The lookup goes through the loaded documents, so a name that matches no
+    word is a 404 whatever it spells.
+    """
+    path = preview_path_for_qualified_name(name, hidpi=(scale == "2"))
+    if path is None:
+        raise HTTPException(status_code=404, detail="no preview for that word")
+    # Immutable for a day: a picture changes only when its plugin document is
+    # replaced, and the panel asks for it on every hover.
+    return FileResponse(
+        path, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"}
+    )
 
 
 @router.get("/api/reference")

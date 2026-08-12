@@ -17,6 +17,7 @@ fires_on_ja: 若葉, 新芽, 芽吹き
 fires_on_en: young leaves, new leaves, budding leaves
 note_ja: 初夏。まだ小さく、光の方へ向く。
 note_en: Early summer. Still small, turning toward the light.
+preview: nature-leaves/wakaba.png
 
 ### 展開 (ja)
 
@@ -40,6 +41,7 @@ fires_on_ja: 下草, 草むら, 菖蒲, あやめ, 燕子花, かきつばた, �
 fires_on_en: undergrowth, grasses, iris leaves, kakitsubata, pampas grass
 note_ja: 初夏、菖蒲の剣。地面は描かない——根元が揃うとき、見る人の中に地が生まれる。
 note_en: Early summer, the sword of the iris. The ground is never drawn — when the roots align, the ground appears in the viewer's mind.
+preview: nature-leaves/shitakusa.png
 
 ### 展開 (ja)
 
@@ -65,6 +67,7 @@ fires_on_ja: 青葉, 茂み, 枝葉
 fires_on_en: summer leaves, green foliage, leafy branch
 note_ja: 盛夏。枝に重く、影を持つ。開いた弧の連なりは羊歯にも見える——将来の語彙候補として記す。
 note_en: High summer. Heavy on the branch, holding shade. Open arc chains resemble ferns — noted as a future word candidate.
+preview: nature-leaves/aoba.png
 
 ### 展開 (ja)
 
@@ -88,6 +91,7 @@ fires_on_ja: 紅葉, もみじ, カエデ
 fires_on_en: autumn leaves, maple, momiji
 note_ja: 晩秋。掌のかたちに並び、枝を離れる直前の赤。
 note_en: Late autumn. Ranged like a palm, red on the verge of leaving the branch.
+preview: nature-leaves/momiji.png
 
 ### 展開 (ja)
 
@@ -113,6 +117,7 @@ fires_on_ja: 落葉, 落ち葉, 散る葉
 fires_on_en: fallen leaves, falling leaves, scattering leaves
 note_ja: 晩秋から初冬。斜めに流れ、低いところに集まる。
 note_en: Late autumn into winter. Drifting diagonally, gathering where the ground is low.
+preview: nature-leaves/ochiba.png
 
 ### 展開 (ja)
 
@@ -138,6 +143,7 @@ fires_on_ja: 枯草, 枯れ草, 枯尾花, 枯れ薄
 fires_on_en: withered grass, dry grass, dead grasses, withered pampas
 note_ja: 冬。立っていたものの記憶。折れた葉(中折れ)はまだ書けない——「触れる(片端)」または「続きから」の再試験候補として記す。
 note_en: Winter. The memory of what stood. The folded blade cannot yet be written — noted as a retrial candidate for touching (one end) or continuing.
+preview: nature-leaves/karekusa.png
 
 ### 展開 (ja)
 
@@ -163,6 +169,7 @@ fires_on_ja: 枯葉, 枯れ葉, 朽ち葉
 fires_on_en: withered leaves, dry leaves, dead leaves
 note_ja: 冬。かたちの記憶だけが残る。ここでのみ雲形を用いる——不定形は乱用せず、輪郭が定義を失った葉にだけ。
 note_en: Winter. Only the memory of a form remains. Cloudform is used here alone — the amorphous reserved for leaves whose outline has lost its definition.
+preview: nature-leaves/kareha.png
 
 ### 展開 (ja)
 

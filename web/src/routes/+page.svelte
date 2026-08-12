@@ -205,6 +205,11 @@
 		// qualified name from a name that does not exist at all.
 		fires_on_ja?: string[];
 		fires_on_en?: string[];
+		// Where the drawing baked from this word's own expansion is served,
+		// shared by both languages the way the built-in previews share theirs.
+		// "" when the document ships none at that scale.
+		preview_url?: string;
+		preview_url_2x?: string;
 	};
 	type PluginItem = {
 		name: string;
@@ -612,6 +617,10 @@
 		effect: string;
 		example: string;
 		svg: string;
+		/** Raster artwork, served by its own route. Set for plugin words;
+		    built-in words carry their drawing in `svg` instead. */
+		image?: string;
+		image2x?: string;
 	};
 
 	// One entry per saijiki word. The copy exists in both UI languages; the
@@ -756,6 +765,46 @@
 			effect: isJa ? '記述の解釈に影響する語彙です。' : 'A vocabulary word that shapes how the description is read.',
 			example: isJa ? `${word}を使う` : `Use "${word}"`,
 			svg: lineSvg(),
+		};
+	}
+
+	// Shown when a plugin document declares no artwork, or declares one the
+	// server refused. The built-in table has the same shape of fallback: an
+	// unknown word gets a generic mark rather than an empty frame.
+	const PLUGIN_FALLBACK_SVG =
+		'<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M32 48 C52 28 74 68 94 48 S132 28 150 48" stroke="#2a4a72" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M34 62 C58 50 78 76 102 62 S134 50 150 62" stroke="#7d9cc4" stroke-width="3" fill="none" stroke-linecap="round"/></svg>';
+
+	/**
+	 * A plugin word's preview, in the same four parts a built-in word shows.
+	 *
+	 * The document supplies three of them already: the qualified name is the
+	 * title, the note is the effect, and the first firing phrase is the example
+	 * -- it is what a description would actually say to reach the word, which is
+	 * what the built-in examples are too. The fourth is the drawing baked from
+	 * the word's own expansion.
+	 */
+	function pluginPreview(entry: {
+		qualified_name: string;
+		note_ja: string;
+		note_en: string;
+		fires_on_ja?: string[];
+		fires_on_en?: string[];
+		preview_url?: string;
+		preview_url_2x?: string;
+	}): SaijikiPreview {
+		const isJa = getLang() === 'ja';
+		const firesOn = (isJa ? entry.fires_on_ja : entry.fires_on_en) ?? [];
+		return {
+			categoryKey: 'plugin',
+			word: entry.qualified_name,
+			canonicalWord: entry.qualified_name,
+			effect: (isJa ? entry.note_ja : entry.note_en) || '',
+			example: firesOn[0] ?? '',
+			// The fallback is the drawing, not an empty frame; it is only read
+			// when the word ships no artwork, since `image` wins where it is set.
+			svg: PLUGIN_FALLBACK_SVG,
+			image: entry.preview_url || undefined,
+			image2x: entry.preview_url_2x || undefined,
 		};
 	}
 
@@ -6779,6 +6828,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:activePreview={activeSaijikiPreview}
 		onClose={() => (saijikiOpen = false)}
 		previewForWord={saijikiPreview}
+		previewForPlugin={pluginPreview}
 	/>
 {/await}
 
@@ -6800,6 +6850,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			runTokensOut={activeRunTokensOut}
 			error={ddlDialogError}
 			previewForWord={saijikiPreview}
+		previewForPlugin={pluginPreview}
 			{pluginEntries}
 			showSettings={ddlDialogMode === 'edit'}
 			wildValue={ddlDialogWildOverride ?? (ddlDialogNode?.history?.render_wild === true)}

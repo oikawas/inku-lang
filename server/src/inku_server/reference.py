@@ -50,6 +50,7 @@ from .plugins.document_format import (
     SINGULAR_MEMBER,
     _CORE_MARKERS,
     _RANGE_RE,
+    entry_preview_path,
     _REGIONS,
     _SAIJIKI_MARKERS,
 )
@@ -182,6 +183,14 @@ def _plugin_words() -> list[dict[str, Any]]:
                     "fires_on_en": list(entry.fires_on.get("en", ())),
                     "note_ja": entry.notes.get("ja", ""),
                     "note_en": entry.notes.get("en", ""),
+                    # v2.14: the saijiki preview shows the same four things for
+                    # a plugin word as for a built-in one -- name, effect,
+                    # example, artwork. The first three are already here; this
+                    # names the fourth. The mirror records what the document
+                    # declared, not the bytes: it is a table of the tables, and
+                    # the picture itself has its own route.
+                    "preview": entry.preview,
+                    "preview_ready": entry_preview_path(document, entry) is not None,
                 }
             )
     return words

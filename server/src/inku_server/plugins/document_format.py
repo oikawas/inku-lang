@@ -28,6 +28,18 @@ from ..saijiki import (
 
 PLUGIN_SUFFIX = ".inku-plugin.md"
 MAX_ENTRY_INSTRUCTIONS = 48
+# v2.14: preview artwork is a raster, served by its own route rather than
+# carried inside the saijiki payload. PNG is the only accepted form, which is
+# also what keeps the picture inert: the browser shows it in an <img>, so a
+# document cannot put markup on screen no matter what it declares.
+PREVIEW_SUFFIX = ".png"
+# The HiDPI sibling of `name.png` is `name@2x.png`, found by name rather than
+# declared: a document names one picture, and the second is optional.
+PREVIEW_HIDPI_MARKER = "@2x"
+# A cap the served file must stay under. Measured against the bake that
+# prompted this: 7 words came to 188 KB at 720px and 559 KB at 1440px, the
+# largest single file being 160 KB.
+MAX_PREVIEW_BYTES = 512 * 1024
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 _ENTRY_RE = re.compile(r"^##\s+(?:語|Word)\s*:\s*(.+?)\s*$", re.IGNORECASE)
@@ -179,6 +191,12 @@ class PluginEntry:
     templates: dict[str, tuple[str, ...]]
     members: dict[str, dict[str, str]] = field(default_factory=dict)
     comments: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    # v2.14: `preview: <file>.svg` -- artwork for the saijiki preview, as a path
+    # relative to the plugin document. Held as the declared path, not as the
+    # file's contents: parsing stays free of I/O, and the reader below decides
+    # what a document is allowed to put on screen. One image per word, shared
+    # by both languages, the same way the built-in previews share theirs.
+    preview: str = ""
 
     def qualified_name(self, namespace: str) -> str:
         return f"{namespace}.{self.heading}"
@@ -189,6 +207,60 @@ class PluginDocument:
     manifest: PluginManifest
     entries: tuple[PluginEntry, ...]
     source_path: str | None = None
+
+
+def entry_preview_path(
+    document: PluginDocument, entry: PluginEntry, *, hidpi: bool = False
+) -> Path | None:
+    """The file behind the word's preview, or None when there is none to serve.
+
+    Every refusal returns None rather than raising: a preview is decoration,
+    and a document that draws its words correctly must not stop loading because
+    its picture is missing. The saijiki panel already has a shape for a word
+    with no artwork -- it shows the shared one.
+
+    Refused: a path that leaves the document's own directory, a name that is
+    not .png, and a file over the cap. `hidpi` asks for the `@2x` sibling and
+    returns None when the document ships only the one size, so the caller can
+    tell "no HiDPI" from "no preview at all".
+    """
+    declared = (entry.preview or "").strip()
+    if not declared or not document.source_path:
+        return None
+    if not declared.lower().endswith(PREVIEW_SUFFIX):
+        return None
+    if hidpi:
+        declared = declared[: -len(PREVIEW_SUFFIX)] + PREVIEW_HIDPI_MARKER + PREVIEW_SUFFIX
+    base = Path(document.source_path).resolve().parent
+    try:
+        target = (base / declared).resolve()
+        # `is_relative_to` is the check that matters: `../` and an absolute
+        # path both land outside, and both are refused here rather than at the
+        # open, which would already have followed the link.
+        if not target.is_relative_to(base):
+            return None
+        if not target.is_file():
+            return None
+        if target.stat().st_size > MAX_PREVIEW_BYTES:
+            return None
+    except (OSError, ValueError):
+        return None
+    return target
+
+
+def preview_path_for_qualified_name(qualified_name: str, *, hidpi: bool = False) -> Path | None:
+    """The preview file for a word named as `Namespace.Word`, or None.
+
+    The route hands over a name the browser sent, so the lookup goes through
+    the loaded documents rather than through the filesystem: a name that
+    matches no loaded word finds nothing, whatever it spells.
+    """
+    for document in DOCUMENT_PLUGIN_MANAGER.documents():
+        namespace = document.manifest.namespace
+        for entry in document.entries:
+            if entry.qualified_name(namespace) == qualified_name:
+                return entry_preview_path(document, entry, hidpi=hidpi)
+    return None
 
 
 @dataclass(frozen=True)
@@ -408,6 +480,7 @@ def parse_plugin_document(text: str, *, source_path: str | None = None) -> Plugi
                 for lang in ("ja", "en")
             },
             notes={lang: fields.get(f"note_{lang}", "") for lang in ("ja", "en")},
+            preview=fields.get("preview", "").strip(),
             templates={lang: tuple(lines) for lang, lines in templates.items()},
             members={lang: dict(defs) for lang, defs in members.items()},
             comments={lang: tuple(items) for lang, items in comments.items()},
@@ -1247,6 +1320,15 @@ class PluginDocumentManager:
                                     "surface_en": list(entry.surfaces.get("en", ())),
                                     "note_ja": entry.notes.get("ja", ""),
                                     "note_en": entry.notes.get("en", ""),
+                                    # v2.14: whether artwork for the saijiki
+                                    # preview exists, at each of the two
+                                    # scales. This is the list /api/saijiki
+                                    # serves; the route that serves the file
+                                    # turns these into URLs, so the loader
+                                    # stays free of the HTTP layer.
+                                    "has_preview": entry_preview_path(document, entry) is not None,
+                                    "has_preview_hidpi": entry_preview_path(document, entry, hidpi=True)
+                                    is not None,
                                 }
                                 for entry in document.entries
                             ),

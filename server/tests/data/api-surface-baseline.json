@@ -1,9 +1,10 @@
 {
-  "digest": "81e1bf333d03d5fcf856eb8b5a4cfe4eaf4d79240c369b269a515ff254d67894",
-  "endpoint_count": 94,
-  "operation_count": 94,
+  "endpoint_count": 95,
+  "operation_count": 95,
+  "schema_count": 94,
   "operations": [
     {
+      "path": "/api/admin/unread-words",
       "method": "GET",
       "operationId": "api_admin_unread_words_api_admin_unread_words_get",
       "params": [
@@ -11,7 +12,6 @@
         "header:authorization:opt",
         "query:limit:opt"
       ],
-      "path": "/api/admin/unread-words",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Response Api Admin Unread Words Api Admin Unread Words Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -19,23 +19,23 @@
       }
     },
     {
+      "path": "/api/auth/config",
       "method": "GET",
       "operationId": "api_auth_config_api_auth_config_get",
       "params": [],
-      "path": "/api/auth/config",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Auth Config Api Auth Config Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}"
       }
     },
     {
+      "path": "/api/auth/config",
       "method": "PUT",
       "operationId": "api_auth_config_update_api_auth_config_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/config",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AuthSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Auth Config Update Api Auth Config Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -43,10 +43,10 @@
       }
     },
     {
+      "path": "/api/auth/login",
       "method": "POST",
       "operationId": "api_auth_login_api_auth_login_post",
       "params": [],
-      "path": "/api/auth/login",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LoginBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LoginResponse\"}}},\"description\":\"Successful Response\"}",
@@ -54,13 +54,13 @@
       }
     },
     {
+      "path": "/api/auth/logout",
       "method": "POST",
       "operationId": "api_auth_logout_api_auth_logout_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/logout",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api Auth Logout Api Auth Logout Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -68,13 +68,13 @@
       }
     },
     {
+      "path": "/api/auth/me",
       "method": "GET",
       "operationId": "api_auth_me_api_auth_me_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -82,13 +82,13 @@
       }
     },
     {
+      "path": "/api/auth/me/batch-prompt-history",
       "method": "GET",
       "operationId": "api_auth_me_batch_prompt_history_api_auth_me_batch_prompt_history_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/batch-prompt-history",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/BatchPromptHistoryResponse\"}}},\"description\":\"Successful Response\"}",
@@ -96,13 +96,13 @@
       }
     },
     {
+      "path": "/api/auth/me/batch-prompt-history",
       "method": "PUT",
       "operationId": "api_auth_me_update_batch_prompt_history_api_auth_me_batch_prompt_history_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/batch-prompt-history",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/BatchPromptHistoryBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/BatchPromptHistoryResponse\"}}},\"description\":\"Successful Response\"}",
@@ -110,13 +110,13 @@
       }
     },
     {
+      "path": "/api/auth/me/demo-settings",
       "method": "GET",
       "operationId": "api_auth_me_demo_settings_api_auth_me_demo_settings_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/demo-settings",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"description\":\"Successful Response\"}",
@@ -124,13 +124,13 @@
       }
     },
     {
+      "path": "/api/auth/me/demo-settings",
       "method": "PUT",
       "operationId": "api_auth_me_update_demo_settings_api_auth_me_demo_settings_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/demo-settings",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoSettingsBody\"}}},\"description\":\"Successful Response\"}",
@@ -138,13 +138,13 @@
       }
     },
     {
+      "path": "/api/auth/me/export-templates",
       "method": "GET",
       "operationId": "api_auth_me_export_templates_api_auth_me_export_templates_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/export-templates",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"description\":\"Successful Response\"}",
@@ -152,13 +152,13 @@
       }
     },
     {
+      "path": "/api/auth/me/export-templates",
       "method": "PUT",
       "operationId": "api_auth_me_update_export_templates_api_auth_me_export_templates_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/export-templates",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ExportTemplatesBody\"}}},\"description\":\"Successful Response\"}",
@@ -166,13 +166,13 @@
       }
     },
     {
+      "path": "/api/auth/me/group-peers",
       "method": "GET",
       "operationId": "api_me_group_peers_api_auth_me_group_peers_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/group-peers",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/GroupPeer\"},\"title\":\"Response Api Me Group Peers Api Auth Me Group Peers Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -180,13 +180,13 @@
       }
     },
     {
+      "path": "/api/auth/me/plugin-storage",
       "method": "GET",
       "operationId": "api_auth_me_plugin_storage_api_auth_me_plugin_storage_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/plugin-storage",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"description\":\"Successful Response\"}",
@@ -194,13 +194,13 @@
       }
     },
     {
+      "path": "/api/auth/me/plugin-storage",
       "method": "PUT",
       "operationId": "api_auth_me_update_plugin_storage_api_auth_me_plugin_storage_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/plugin-storage",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"description\":\"Successful Response\"}",
@@ -208,6 +208,7 @@
       }
     },
     {
+      "path": "/api/auth/me/plugin-storage/{plugin_id}",
       "method": "PUT",
       "operationId": "api_auth_me_update_plugin_value_api_auth_me_plugin_storage__plugin_id__put",
       "params": [
@@ -215,7 +216,6 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
-      "path": "/api/auth/me/plugin-storage/{plugin_id}",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginValueBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginStorageBody\"}}},\"description\":\"Successful Response\"}",
@@ -223,13 +223,13 @@
       }
     },
     {
+      "path": "/api/auth/me/profile",
       "method": "PATCH",
       "operationId": "api_auth_me_profile_api_auth_me_profile_patch",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/profile",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserProfileUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -237,13 +237,13 @@
       }
     },
     {
+      "path": "/api/auth/me/settings",
       "method": "PATCH",
       "operationId": "api_auth_me_settings_api_auth_me_settings_patch",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/auth/me/settings",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -251,13 +251,13 @@
       }
     },
     {
+      "path": "/api/client-config",
       "method": "GET",
       "operationId": "api_client_config_api_client_config_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/client-config",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Client Config Api Client Config Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -265,6 +265,7 @@
       }
     },
     {
+      "path": "/api/colophon/{colophon_id}",
       "method": "DELETE",
       "operationId": "api_okugaki_delete_api_colophon__colophon_id__delete",
       "params": [
@@ -272,7 +273,6 @@
         "header:authorization:opt",
         "path:colophon_id:req"
       ],
-      "path": "/api/colophon/{colophon_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api Okugaki Delete Api Colophon  Colophon Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -280,23 +280,23 @@
       }
     },
     {
+      "path": "/api/color-catalogs",
       "method": "GET",
       "operationId": "api_color_catalogs_api_color_catalogs_get",
       "params": [],
-      "path": "/api/color-catalogs",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ColorCatalogsResponse\"}}},\"description\":\"Successful Response\"}"
       }
     },
     {
+      "path": "/api/compose",
       "method": "POST",
       "operationId": "api_compose_api_compose_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/compose",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ComposeRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ComposeResponse\"}}},\"description\":\"Successful Response\"}",
@@ -304,13 +304,13 @@
       }
     },
     {
+      "path": "/api/demo/instruction",
       "method": "POST",
       "operationId": "api_demo_instruction_api_demo_instruction_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/demo/instruction",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoInstructionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoInstructionResponse\"}}},\"description\":\"Successful Response\"}",
@@ -318,6 +318,7 @@
       }
     },
     {
+      "path": "/api/feedback/unread-words",
       "method": "GET",
       "operationId": "api_my_unread_words_api_feedback_unread_words_get",
       "params": [
@@ -325,7 +326,6 @@
         "header:authorization:opt",
         "query:limit:opt"
       ],
-      "path": "/api/feedback/unread-words",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Response Api My Unread Words Api Feedback Unread Words Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -333,13 +333,13 @@
       }
     },
     {
+      "path": "/api/feedback/unread-words",
       "method": "POST",
       "operationId": "api_record_unread_words_api_feedback_unread_words_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/feedback/unread-words",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UnreadWordsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Record Unread Words Api Feedback Unread Words Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -347,6 +347,7 @@
       }
     },
     {
+      "path": "/api/history",
       "method": "DELETE",
       "operationId": "api_history_delete_api_history_delete",
       "params": [
@@ -354,7 +355,6 @@
         "header:X-Inku-Confirm:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Delete Api History Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -362,6 +362,7 @@
       }
     },
     {
+      "path": "/api/history",
       "method": "GET",
       "operationId": "api_history_get_api_history_get",
       "params": [
@@ -376,7 +377,6 @@
         "query:starred:opt",
         "query:trashed:opt"
       ],
-      "path": "/api/history",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryListResponse\"}}},\"description\":\"Successful Response\"}",
@@ -384,6 +384,7 @@
       }
     },
     {
+      "path": "/api/history",
       "method": "POST",
       "operationId": "api_history_post_api_history_post",
       "params": [
@@ -391,7 +392,6 @@
         "header:Idempotency-Key:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryPostBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -399,13 +399,13 @@
       }
     },
     {
+      "path": "/api/history/export-animation",
       "method": "POST",
       "operationId": "api_history_export_animation_api_history_export_animation_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history/export-animation",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AnimationExportBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -413,13 +413,13 @@
       }
     },
     {
+      "path": "/api/history/export-card",
       "method": "POST",
       "operationId": "api_history_export_card_api_history_export_card_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history/export-card",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/CardExportBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -427,6 +427,7 @@
       }
     },
     {
+      "path": "/api/history/lineage-groups",
       "method": "GET",
       "operationId": "api_history_lineage_groups_api_history_lineage_groups_get",
       "params": [
@@ -440,7 +441,6 @@
         "query:starred:opt",
         "query:trashed:opt"
       ],
-      "path": "/api/history/lineage-groups",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryLineageGroupListResponse\"}}},\"description\":\"Successful Response\"}",
@@ -448,6 +448,7 @@
       }
     },
     {
+      "path": "/api/history/lineage-groups/{root_node_id}/items",
       "method": "GET",
       "operationId": "api_history_lineage_group_items_api_history_lineage_groups__root_node_id__items_get",
       "params": [
@@ -461,7 +462,6 @@
         "query:starred:opt",
         "query:trashed:opt"
       ],
-      "path": "/api/history/lineage-groups/{root_node_id}/items",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryListResponse\"}}},\"description\":\"Successful Response\"}",
@@ -469,13 +469,13 @@
       }
     },
     {
+      "path": "/api/history/permanent-delete",
       "method": "POST",
       "operationId": "api_history_permanent_delete_api_history_permanent_delete_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history/permanent-delete",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Permanent Delete Api History Permanent Delete Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -483,13 +483,13 @@
       }
     },
     {
+      "path": "/api/history/rebuild-output-files",
       "method": "POST",
       "operationId": "api_history_rebuild_output_files_api_history_rebuild_output_files_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history/rebuild-output-files",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Rebuild Output Files Api History Rebuild Output Files Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -497,13 +497,13 @@
       }
     },
     {
+      "path": "/api/history/restore",
       "method": "POST",
       "operationId": "api_history_restore_api_history_restore_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history/restore",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Restore Api History Restore Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -511,13 +511,13 @@
       }
     },
     {
+      "path": "/api/history/state",
       "method": "GET",
       "operationId": "api_history_state_api_history_state_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history/state",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryStateResponse\"}}},\"description\":\"Successful Response\"}",
@@ -525,13 +525,13 @@
       }
     },
     {
+      "path": "/api/history/trash",
       "method": "POST",
       "operationId": "api_history_trash_api_history_trash_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/history/trash",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryIdsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"boolean\"}]},\"title\":\"Response Api History Trash Api History Trash Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -539,6 +539,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/acl",
       "method": "GET",
       "operationId": "api_history_acl_get_api_history__item_id__acl_get",
       "params": [
@@ -546,7 +547,6 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
-      "path": "/api/history/{item_id}/acl",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/HistoryAclEntryOut\"},\"title\":\"Response Api History Acl Get Api History  Item Id  Acl Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -554,6 +554,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/acl",
       "method": "PUT",
       "operationId": "api_history_acl_put_api_history__item_id__acl_put",
       "params": [
@@ -561,7 +562,6 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
-      "path": "/api/history/{item_id}/acl",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryAclBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/HistoryAclEntryOut\"},\"title\":\"Response Api History Acl Put Api History  Item Id  Acl Put\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -569,6 +569,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/for-revision",
       "method": "PATCH",
       "operationId": "api_history_for_revision_api_history__item_id__for_revision_patch",
       "params": [
@@ -576,7 +577,6 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
-      "path": "/api/history/{item_id}/for-revision",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryForRevisionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -584,6 +584,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/lineage",
       "method": "GET",
       "operationId": "api_history_lineage_api_history__item_id__lineage_get",
       "params": [
@@ -593,7 +594,6 @@
         "query:descendant_depth:opt",
         "query:node_limit:opt"
       ],
-      "path": "/api/history/{item_id}/lineage",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api History Lineage Api History  Item Id  Lineage Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -601,6 +601,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/neighbors",
       "method": "GET",
       "operationId": "api_history_neighbors_api_history__item_id__neighbors_get",
       "params": [
@@ -608,7 +609,6 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
-      "path": "/api/history/{item_id}/neighbors",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/HistoryItem\"},\"title\":\"Response Api History Neighbors Api History  Item Id  Neighbors Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -616,6 +616,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/star",
       "method": "PATCH",
       "operationId": "api_history_star_api_history__item_id__star_patch",
       "params": [
@@ -623,7 +624,6 @@
         "header:authorization:opt",
         "path:item_id:req"
       ],
-      "path": "/api/history/{item_id}/star",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryStarBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -631,6 +631,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/svg",
       "method": "GET",
       "operationId": "api_history_svg_api_history__item_id__svg_get",
       "params": [
@@ -639,7 +640,6 @@
         "path:item_id:req",
         "query:profile:opt"
       ],
-      "path": "/api/history/{item_id}/svg",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -647,6 +647,7 @@
       }
     },
     {
+      "path": "/api/history/{item_id}/thumb",
       "method": "GET",
       "operationId": "api_history_thumb_api_history__item_id__thumb_get",
       "params": [
@@ -656,7 +657,6 @@
         "query:scale:opt",
         "query:v:opt"
       ],
-      "path": "/api/history/{item_id}/thumb",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -664,23 +664,23 @@
       }
     },
     {
+      "path": "/api/info",
       "method": "GET",
       "operationId": "api_info_api_info_get",
       "params": [],
-      "path": "/api/info",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AppInfoResponse\"}}},\"description\":\"Successful Response\"}"
       }
     },
     {
+      "path": "/api/interpret",
       "method": "POST",
       "operationId": "api_interpret_api_interpret_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/interpret",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/InterpretRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Interpret Api Interpret Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -688,6 +688,7 @@
       }
     },
     {
+      "path": "/api/lineage/{node_id}",
       "method": "GET",
       "operationId": "api_lineage_api_lineage__node_id__get",
       "params": [
@@ -697,7 +698,6 @@
         "query:descendant_depth:opt",
         "query:node_limit:opt"
       ],
-      "path": "/api/lineage/{node_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Lineage Api Lineage  Node Id  Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -705,6 +705,7 @@
       }
     },
     {
+      "path": "/api/lineage/{node_id}/colophon",
       "method": "GET",
       "operationId": "api_okugaki_list_api_lineage__node_id__colophon_get",
       "params": [
@@ -712,7 +713,6 @@
         "header:authorization:opt",
         "path:node_id:req"
       ],
-      "path": "/api/lineage/{node_id}/colophon",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/OkugakiItem\"},\"title\":\"Response Api Okugaki List Api Lineage  Node Id  Colophon Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -720,6 +720,7 @@
       }
     },
     {
+      "path": "/api/lineage/{node_id}/colophon",
       "method": "POST",
       "operationId": "api_okugaki_generate_api_lineage__node_id__colophon_post",
       "params": [
@@ -728,7 +729,6 @@
         "header:authorization:opt",
         "path:node_id:req"
       ],
-      "path": "/api/lineage/{node_id}/colophon",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OkugakiGenerateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OkugakiItem\"}}},\"description\":\"Successful Response\"}",
@@ -736,6 +736,7 @@
       }
     },
     {
+      "path": "/api/lineage/{node_id}/promote",
       "method": "POST",
       "operationId": "api_lineage_promote_api_lineage__node_id__promote_post",
       "params": [
@@ -743,7 +744,6 @@
         "header:authorization:opt",
         "path:node_id:req"
       ],
-      "path": "/api/lineage/{node_id}/promote",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
@@ -751,13 +751,13 @@
       }
     },
     {
+      "path": "/api/models",
       "method": "GET",
       "operationId": "api_models_api_models_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/models",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -765,6 +765,7 @@
       }
     },
     {
+      "path": "/api/paint",
       "method": "POST",
       "operationId": "api_paint_api_paint_post",
       "params": [
@@ -772,7 +773,6 @@
         "header:Idempotency-Key:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/paint",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PaintRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PaintResponse\"}}},\"description\":\"Successful Response\"}",
@@ -780,6 +780,7 @@
       }
     },
     {
+      "path": "/api/paint/stream",
       "method": "POST",
       "operationId": "api_paint_stream_api_paint_stream_post",
       "params": [
@@ -787,7 +788,6 @@
         "header:Idempotency-Key:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/paint/stream",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PaintRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -795,13 +795,13 @@
       }
     },
     {
+      "path": "/api/plugins",
       "method": "GET",
       "operationId": "api_plugins_api_plugins_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/plugins",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugins Api Plugins Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -809,13 +809,13 @@
       }
     },
     {
+      "path": "/api/plugins",
       "method": "POST",
       "operationId": "api_plugin_create_api_plugins_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/plugins",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginCreateBody\"}}},\"required\":true}",
       "responses": {
         "201": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Create Api Plugins Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -823,13 +823,13 @@
       }
     },
     {
+      "path": "/api/plugins/reload",
       "method": "POST",
       "operationId": "api_plugins_reload_api_plugins_reload_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/plugins/reload",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugins Reload Api Plugins Reload Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -837,13 +837,13 @@
       }
     },
     {
+      "path": "/api/plugins/validate",
       "method": "POST",
       "operationId": "api_plugins_validate_api_plugins_validate_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/plugins/validate",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginValidateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugins Validate Api Plugins Validate Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -851,6 +851,7 @@
       }
     },
     {
+      "path": "/api/plugins/{plugin_id}",
       "method": "DELETE",
       "operationId": "api_plugin_delete_api_plugins__plugin_id__delete",
       "params": [
@@ -858,7 +859,6 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
-      "path": "/api/plugins/{plugin_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Delete Api Plugins  Plugin Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -866,6 +866,7 @@
       }
     },
     {
+      "path": "/api/plugins/{plugin_id}",
       "method": "PUT",
       "operationId": "api_plugin_update_api_plugins__plugin_id__put",
       "params": [
@@ -873,7 +874,6 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
-      "path": "/api/plugins/{plugin_id}",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Update Api Plugins  Plugin Id  Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -881,6 +881,7 @@
       }
     },
     {
+      "path": "/api/plugins/{plugin_id}/content",
       "method": "GET",
       "operationId": "api_plugin_content_api_plugins__plugin_id__content_get",
       "params": [
@@ -888,7 +889,6 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
-      "path": "/api/plugins/{plugin_id}/content",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Content Api Plugins  Plugin Id  Content Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -896,6 +896,7 @@
       }
     },
     {
+      "path": "/api/plugins/{plugin_id}/enabled",
       "method": "PUT",
       "operationId": "api_plugin_set_enabled_api_plugins__plugin_id__enabled_put",
       "params": [
@@ -903,7 +904,6 @@
         "header:authorization:opt",
         "path:plugin_id:req"
       ],
-      "path": "/api/plugins/{plugin_id}/enabled",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginEnabledBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Set Enabled Api Plugins  Plugin Id  Enabled Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -911,12 +911,12 @@
       }
     },
     {
+      "path": "/api/prompts",
       "method": "GET",
       "operationId": "api_prompts_api_prompts_get",
       "params": [
         "query:lang:opt"
       ],
-      "path": "/api/prompts",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PromptsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -924,6 +924,7 @@
       }
     },
     {
+      "path": "/api/reference",
       "method": "GET",
       "operationId": "api_reference_api_reference_get",
       "params": [
@@ -931,7 +932,6 @@
         "header:authorization:opt",
         "query:format:opt"
       ],
-      "path": "/api/reference",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -939,13 +939,13 @@
       }
     },
     {
+      "path": "/api/refine/vision-advice",
       "method": "POST",
       "operationId": "api_vision_refine_advice_api_refine_vision_advice_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/refine/vision-advice",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/VisionRefineAdviceBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/VisionRefineAdviceResponse\"}}},\"description\":\"Successful Response\"}",
@@ -953,13 +953,13 @@
       }
     },
     {
+      "path": "/api/render-score",
       "method": "POST",
       "operationId": "api_render_score_api_render_score_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/render-score",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderScoreResponse\"}}},\"description\":\"Successful Response\"}",
@@ -967,13 +967,13 @@
       }
     },
     {
+      "path": "/api/render-svg",
       "method": "POST",
       "operationId": "api_render_svg_api_render_svg_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/render-svg",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderSvgRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
@@ -981,6 +981,7 @@
       }
     },
     {
+      "path": "/api/saijiki",
       "method": "GET",
       "operationId": "api_saijiki_api_saijiki_get",
       "params": [
@@ -988,7 +989,6 @@
         "header:authorization:opt",
         "query:lang:opt"
       ],
-      "path": "/api/saijiki",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Saijiki Api Saijiki Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -996,13 +996,29 @@
       }
     },
     {
+      "path": "/api/saijiki/plugin-preview",
+      "method": "GET",
+      "operationId": "api_plugin_preview_api_saijiki_plugin_preview_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "query:name:req",
+        "query:scale:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/settings/db-backup",
       "method": "PUT",
       "operationId": "api_settings_update_db_backup_api_settings_db_backup_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/db-backup",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1010,13 +1026,13 @@
       }
     },
     {
+      "path": "/api/settings/db-backup/run",
       "method": "POST",
       "operationId": "api_settings_run_db_backup_api_settings_db_backup_run_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/db-backup/run",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DbBackupResult\"}}},\"description\":\"Successful Response\"}",
@@ -1024,13 +1040,13 @@
       }
     },
     {
+      "path": "/api/settings/limits",
       "method": "PUT",
       "operationId": "api_settings_update_limits_api_settings_limits_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/limits",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderLimitsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderLimitsStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1038,13 +1054,13 @@
       }
     },
     {
+      "path": "/api/settings/log-retention",
       "method": "PUT",
       "operationId": "api_settings_update_log_retention_api_settings_log_retention_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/log-retention",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LogRetentionSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/LogRetentionStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1052,13 +1068,13 @@
       }
     },
     {
+      "path": "/api/settings/models",
       "method": "GET",
       "operationId": "api_settings_models_api_settings_models_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/models",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1066,13 +1082,13 @@
       }
     },
     {
+      "path": "/api/settings/models",
       "method": "PUT",
       "operationId": "api_settings_update_models_api_settings_models_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/models",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsPatch\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1080,6 +1096,7 @@
       }
     },
     {
+      "path": "/api/settings/models/{provider_id}/fetch-models",
       "method": "POST",
       "operationId": "api_settings_fetch_provider_models_api_settings_models__provider_id__fetch_models_post",
       "params": [
@@ -1087,7 +1104,6 @@
         "header:authorization:opt",
         "path:provider_id:req"
       ],
-      "path": "/api/settings/models/{provider_id}/fetch-models",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ModelSettingsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1095,13 +1111,13 @@
       }
     },
     {
+      "path": "/api/settings/output-save",
       "method": "PUT",
       "operationId": "api_settings_update_output_save_api_settings_output_save_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/output-save",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OutputSaveSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/OutputSaveStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1109,13 +1125,13 @@
       }
     },
     {
+      "path": "/api/settings/render-concurrency",
       "method": "PUT",
       "operationId": "api_settings_update_render_concurrency_api_settings_render_concurrency_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/render-concurrency",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderConcurrencyBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/RenderConcurrencyStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1123,13 +1139,13 @@
       }
     },
     {
+      "path": "/api/settings/single-user",
       "method": "GET",
       "operationId": "api_settings_single_user_api_settings_single_user_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/single-user",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1137,13 +1153,13 @@
       }
     },
     {
+      "path": "/api/settings/single-user",
       "method": "PUT",
       "operationId": "api_settings_set_single_user_api_settings_single_user_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/single-user",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SingleUserStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1151,13 +1167,13 @@
       }
     },
     {
+      "path": "/api/settings/status",
       "method": "GET",
       "operationId": "api_settings_status_api_settings_status_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/status",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/SettingsStatusResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1165,13 +1181,13 @@
       }
     },
     {
+      "path": "/api/settings/thumbnails",
       "method": "GET",
       "operationId": "api_settings_thumbnails_api_settings_thumbnails_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/thumbnails",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1179,13 +1195,13 @@
       }
     },
     {
+      "path": "/api/settings/thumbnails",
       "method": "PUT",
       "operationId": "api_settings_update_thumbnails_api_settings_thumbnails_put",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/thumbnails",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailSettingsBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1193,13 +1209,13 @@
       }
     },
     {
+      "path": "/api/settings/thumbnails/rebuild",
       "method": "GET",
       "operationId": "api_settings_thumbnail_rebuild_status_api_settings_thumbnails_rebuild_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/thumbnails/rebuild",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1207,13 +1223,13 @@
       }
     },
     {
+      "path": "/api/settings/thumbnails/rebuild",
       "method": "POST",
       "operationId": "api_settings_thumbnail_rebuild_api_settings_thumbnails_rebuild_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/settings/thumbnails/rebuild",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
@@ -1221,13 +1237,13 @@
       }
     },
     {
+      "path": "/api/user-groups",
       "method": "GET",
       "operationId": "api_user_groups_list_api_user_groups_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/user-groups",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/UserGroupItem\"},\"title\":\"Response Api User Groups List Api User Groups Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -1235,13 +1251,13 @@
       }
     },
     {
+      "path": "/api/user-groups",
       "method": "POST",
       "operationId": "api_user_groups_create_api_user_groups_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/user-groups",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupCreateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupItem\"}}},\"description\":\"Successful Response\"}",
@@ -1249,6 +1265,7 @@
       }
     },
     {
+      "path": "/api/user-groups/{group_id}",
       "method": "DELETE",
       "operationId": "api_user_groups_delete_api_user_groups__group_id__delete",
       "params": [
@@ -1256,7 +1273,6 @@
         "header:authorization:opt",
         "path:group_id:req"
       ],
-      "path": "/api/user-groups/{group_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api User Groups Delete Api User Groups  Group Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1264,6 +1280,7 @@
       }
     },
     {
+      "path": "/api/user-groups/{group_id}",
       "method": "PATCH",
       "operationId": "api_user_groups_update_api_user_groups__group_id__patch",
       "params": [
@@ -1271,7 +1288,6 @@
         "header:authorization:opt",
         "path:group_id:req"
       ],
-      "path": "/api/user-groups/{group_id}",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserGroupItem\"}}},\"description\":\"Successful Response\"}",
@@ -1279,13 +1295,13 @@
       }
     },
     {
+      "path": "/api/users",
       "method": "GET",
       "operationId": "api_users_list_api_users_get",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/users",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/UserAccountItem\"},\"title\":\"Response Api Users List Api Users Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
@@ -1293,13 +1309,13 @@
       }
     },
     {
+      "path": "/api/users",
       "method": "POST",
       "operationId": "api_users_create_api_users_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/users",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountCreateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -1307,6 +1323,7 @@
       }
     },
     {
+      "path": "/api/users/{user_id}",
       "method": "DELETE",
       "operationId": "api_users_delete_api_users__user_id__delete",
       "params": [
@@ -1315,7 +1332,6 @@
         "path:user_id:req",
         "query:cascade:opt"
       ],
-      "path": "/api/users/{user_id}",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Api Users Delete Api Users  User Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
@@ -1323,6 +1339,7 @@
       }
     },
     {
+      "path": "/api/users/{user_id}",
       "method": "PATCH",
       "operationId": "api_users_update_api_users__user_id__patch",
       "params": [
@@ -1330,7 +1347,6 @@
         "header:authorization:opt",
         "path:user_id:req"
       ],
-      "path": "/api/users/{user_id}",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountUpdateBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/UserAccountItem\"}}},\"description\":\"Successful Response\"}",
@@ -1338,13 +1354,13 @@
       }
     },
     {
+      "path": "/api/variation/seeds",
       "method": "POST",
       "operationId": "api_variation_seeds_api_variation_seeds_post",
       "params": [
         "cookie:inku_session:opt",
         "header:authorization:opt"
       ],
-      "path": "/api/variation/seeds",
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/VariationSeedsRequest\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/VariationSeedsResponse\"}}},\"description\":\"Successful Response\"}",
@@ -1352,17 +1368,16 @@
       }
     },
     {
+      "path": "/health",
       "method": "GET",
       "operationId": "health_health_get",
       "params": [],
-      "path": "/health",
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Response Health Health Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}"
       }
     }
   ],
-  "schema_count": 94,
   "schemas": {
     "AnimationExportBody": "{\"properties\":{\"format\":{\"default\":\"apng\",\"enum\":[\"apng\",\"gif\"],\"title\":\"Format\",\"type\":\"string\"},\"height_px\":{\"anyOf\":[{\"maximum\":12000.0,\"minimum\":64.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Height Px\"},\"hold_seconds\":{\"default\":1.0,\"maximum\":30.0,\"minimum\":0.1,\"title\":\"Hold Seconds\",\"type\":\"number\"},\"ids\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"minItems\":2,\"title\":\"Ids\",\"type\":\"array\"},\"pattern\":{\"default\":\"cut\",\"enum\":[\"cut\",\"crossfade\",\"fade_white\",\"slide\"],\"title\":\"Pattern\",\"type\":\"string\"},\"resolution\":{\"default\":\"1k\",\"enum\":[\"1k\",\"4k\",\"8k\"],\"title\":\"Resolution\",\"type\":\"string\"}},\"required\":[\"ids\"],\"title\":\"AnimationExportBody\",\"type\":\"object\"}",
     "AppInfoResponse": "{\"properties\":{\"build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Build Number\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"developer_mode\":{\"default\":false,\"title\":\"Developer Mode\",\"type\":\"boolean\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"release_version\":{\"title\":\"Release Version\",\"type\":\"string\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"single_user_mode\":{\"default\":false,\"title\":\"Single User Mode\",\"type\":\"boolean\"},\"thumbnail_hidpi\":{\"default\":false,\"title\":\"Thumbnail Hidpi\",\"type\":\"boolean\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"name\",\"version\",\"release_version\",\"render_engine_id\",\"render_engine_version\",\"ddl_version\",\"ddl_engine_version\"],\"title\":\"AppInfoResponse\",\"type\":\"object\"}",
@@ -1375,7 +1390,7 @@
     "CanvasSpec": "{\"additionalProperties\":false,\"properties\":{\"aspect\":{\"default\":\"square\",\"description\":\"キャンバス比率ID\",\"title\":\"Aspect\",\"type\":\"string\"},\"ground\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/CanvasGroundSpec\"},{\"type\":\"null\"}],\"description\":\"キャンバス地の質感\"}},\"title\":\"CanvasSpec\",\"type\":\"object\"}",
     "CardExportBody": "{\"properties\":{\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"layout\":{\"default\":\"square\",\"enum\":[\"square\",\"portrait\"],\"title\":\"Layout\",\"type\":\"string\"},\"seal\":{\"default\":true,\"title\":\"Seal\",\"type\":\"boolean\"}},\"required\":[\"id\"],\"title\":\"CardExportBody\",\"type\":\"object\"}",
     "ColorCatalogsResponse": "{\"properties\":{\"catalogs\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Catalogs\",\"type\":\"array\"},\"default_catalog_id\":{\"title\":\"Default Catalog Id\",\"type\":\"string\"},\"renamed_catalog_ids\":{\"additionalProperties\":{\"type\":\"string\"},\"title\":\"Renamed Catalog Ids\",\"type\":\"object\"}},\"required\":[\"default_catalog_id\",\"catalogs\",\"renamed_catalog_ids\"],\"title\":\"ColorCatalogsResponse\",\"type\":\"object\"}",
-    "ComposeRequest": "{\"properties\":{\"auto_repair\":{\"default\":true,\"description\":\"Stage 2 Score の自動補正を適用するか\",\"title\":\"Auto Repair\",\"type\":\"boolean\"},\"canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Canvas aspect plugin selection\",\"title\":\"Canvas Aspect\"},\"catalog_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"使用するサーバー側色カタログID\",\"title\":\"Catalog Id\"},\"color_map\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Deprecated: ignored; catalog_id is resolved server-side\",\"title\":\"Color Map\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Composition seed: it re-salts the intermediate expansion (Stage 1.5) and, from render engine 23, decides where the renderer places the marks; omitted means the placement follows the performance seed\",\"title\":\"Composition Seed\"},\"ddl\":{\"description\":\"正規化DDL テキスト\",\"maxLength\":100000,\"minLength\":1,\"title\":\"Ddl\",\"type\":\"string\"},\"description\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"作者が書いた記述 (省略可)\",\"title\":\"Description\"},\"include_trace\":{\"default\":false,\"description\":\"各層の RAW 中間生成物を trace として返すか (観測のみ)\",\"title\":\"Include Trace\",\"type\":\"boolean\"},\"instruction_lang\":{\"default\":\"auto\",\"description\":\"指示文言語 (auto / ja / en)\",\"title\":\"Instruction Lang\",\"type\":\"string\"},\"interpretation_seed\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Opaque identifier for an explicit Stage 1 re-interpretation\",\"title\":\"Interpretation Seed\"},\"model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)\",\"title\":\"Model\"},\"render_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Renderer performance seed for reproducible replay\",\"title\":\"Render Seed\"},\"seed_text\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Explicit text used only to derive the Renderer performance seed\",\"title\":\"Seed Text\"},\"sketch_grain\":{\"anyOf\":[{\"pattern\":\"^(fine|coarse)$\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)\",\"title\":\"Sketch Grain\"},\"sketch_text\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"写生層 (Stage 0.5) の出力。与えられたら記述の代わりに後段へ渡る\",\"title\":\"Sketch Text\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"UI表示言語\",\"title\":\"Ui Lang\"},\"variation_amplitude\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効\",\"title\":\"Variation Amplitude\"},\"variation_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効\",\"title\":\"Variation Seed\"},\"wild\":{\"default\":false,\"description\":\"Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed\",\"title\":\"Wild\",\"type\":\"boolean\"}},\"required\":[\"ddl\"],\"title\":\"ComposeRequest\",\"type\":\"object\"}",
+    "ComposeRequest": "{\"properties\":{\"auto_repair\":{\"default\":true,\"description\":\"Stage 2 Score の自動補正を適用するか\",\"title\":\"Auto Repair\",\"type\":\"boolean\"},\"canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Canvas aspect plugin selection\",\"title\":\"Canvas Aspect\"},\"catalog_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"使用するサーバー側色カタログID\",\"title\":\"Catalog Id\"},\"color_map\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"description\":\"Deprecated: ignored; catalog_id is resolved server-side\",\"title\":\"Color Map\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Composition seed: it re-salts the intermediate expansion (Stage 1.5) and, from render engine 23, decides where the renderer places the marks; omitted means the placement follows the performance seed\",\"title\":\"Composition Seed\"},\"ddl\":{\"description\":\"正規化DDL テキスト\",\"maxLength\":100000,\"minLength\":1,\"title\":\"Ddl\",\"type\":\"string\"},\"description\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"作者が書いた記述 (省略可)\",\"title\":\"Description\"},\"fires_on\":{\"anyOf\":[{\"maxLength\":200,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"展開層の発火だけに使う散文。DDL 直筆の作品に記述を与えないまま、プラグイン語の展開を引き出す\",\"title\":\"Fires On\"},\"include_trace\":{\"default\":false,\"description\":\"各層の RAW 中間生成物を trace として返すか (観測のみ)\",\"title\":\"Include Trace\",\"type\":\"boolean\"},\"instruction_lang\":{\"default\":\"auto\",\"description\":\"指示文言語 (auto / ja / en)\",\"title\":\"Instruction Lang\",\"type\":\"string\"},\"interpretation_seed\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Opaque identifier for an explicit Stage 1 re-interpretation\",\"title\":\"Interpretation Seed\"},\"model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Stage 2 モデル名 (未指定時は利用者の Stage 2 既定)\",\"title\":\"Model\"},\"render_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"Renderer performance seed for reproducible replay\",\"title\":\"Render Seed\"},\"seed_text\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Explicit text used only to derive the Renderer performance seed\",\"title\":\"Seed Text\"},\"sketch_grain\":{\"anyOf\":[{\"pattern\":\"^(fine|coarse)$\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)\",\"title\":\"Sketch Grain\"},\"sketch_text\":{\"anyOf\":[{\"maxLength\":100000,\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"写生層 (Stage 0.5) の出力。与えられたら記述の代わりに後段へ渡る\",\"title\":\"Sketch Text\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"UI表示言語\",\"title\":\"Ui Lang\"},\"variation_amplitude\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"変奏 (v2.0): 展開層をずらす強度 small / medium / large。variation_seed と揃って初めて有効\",\"title\":\"Variation Amplitude\"},\"variation_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効\",\"title\":\"Variation Seed\"},\"wild\":{\"default\":false,\"description\":\"Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed\",\"title\":\"Wild\",\"type\":\"boolean\"}},\"required\":[\"ddl\"],\"title\":\"ComposeRequest\",\"type\":\"object\"}",
     "ComposeResponse": "{\"properties\":{\"carriage_warnings\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"title\":\"Carriage Warnings\"},\"coerce_branch_counts\":{\"additionalProperties\":{\"type\":\"integer\"},\"title\":\"Coerce Branch Counts\",\"type\":\"object\"},\"coerce_relation_drop_rate\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"title\":\"Coerce Relation Drop Rate\"},\"coerce_relation_dropped_count\":{\"default\":0,\"title\":\"Coerce Relation Dropped Count\",\"type\":\"integer\"},\"coerce_relation_input_count\":{\"default\":0,\"title\":\"Coerce Relation Input Count\",\"type\":\"integer\"},\"coerce_relation_output_count\":{\"default\":0,\"title\":\"Coerce Relation Output Count\",\"type\":\"integer\"},\"coerce_warnings\":{\"items\":{\"type\":\"string\"},\"title\":\"Coerce Warnings\",\"type\":\"array\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Composition Seed\"},\"ddl\":{\"title\":\"Ddl\",\"type\":\"string\"},\"ddl_engine_version\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Ddl Engine Version\"},\"ddl_version\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Ddl Version\"},\"elapsed_ms\":{\"default\":0,\"title\":\"Elapsed Ms\",\"type\":\"integer\"},\"fallback_used\":{\"default\":false,\"title\":\"Fallback Used\",\"type\":\"boolean\"},\"focus\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Focus\"},\"instruction_lang_requested\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Instruction Lang Requested\"},\"instruction_lang_resolved\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Instruction Lang Resolved\"},\"interpretation_seed\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Interpretation Seed\"},\"plugin_provenance\":{\"items\":{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},\"title\":\"Plugin Provenance\",\"type\":\"array\"},\"plugin_warnings\":{\"items\":{\"type\":\"string\"},\"title\":\"Plugin Warnings\",\"type\":\"array\"},\"render_build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Build Number\"},\"render_canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Canvas Aspect\"},\"render_canvas_aspect_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Canvas Aspect Id\"},\"render_canvas_aspect_ratio\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"title\":\"Render Canvas Aspect Ratio\"},\"render_color_catalog_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Color Catalog Id\"},\"render_color_catalog_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Color Catalog Name\"},\"render_color_catalog_sub\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Color Catalog Sub\"},\"render_color_map\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Render Color Map\"},\"render_color_profile\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Render Color Profile\"},\"render_engine_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Engine Id\"},\"render_engine_version\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Engine Version\"},\"render_hash\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Hash\"},\"render_hash_short\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Hash Short\"},\"render_limit_notes\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"title\":\"Render Limit Notes\"},\"render_limits\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"integer\"},\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Render Limits\"},\"render_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Render Seed\"},\"render_wild\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"title\":\"Render Wild\"},\"retry_count\":{\"default\":0,\"title\":\"Retry Count\",\"type\":\"integer\"},\"retry_reasons\":{\"items\":{\"type\":\"string\"},\"title\":\"Retry Reasons\",\"type\":\"array\"},\"score\":{\"$ref\":\"#/components/schemas/Score\"},\"seed_text\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Seed Text\"},\"sketch_grain\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Sketch Grain\"},\"sketch_state\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Sketch State\"},\"sketch_text\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Sketch Text\"},\"source_ddl\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Source Ddl\"},\"stage2_model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Stage2 Model\"},\"stage2_prompt_digest\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Stage2 Prompt Digest\"},\"svg\":{\"title\":\"Svg\",\"type\":\"string\"},\"tokens_in\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Tokens In\"},\"tokens_out\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Tokens Out\"},\"trace\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Trace\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Ui Lang\"},\"variation_amplitude\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Variation Amplitude\"},\"variation_moved_axes\":{\"items\":{\"additionalProperties\":{\"type\":\"string\"},\"type\":\"object\"},\"title\":\"Variation Moved Axes\",\"type\":\"array\"},\"variation_seed\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Variation Seed\"}},\"required\":[\"ddl\",\"score\",\"svg\"],\"title\":\"ComposeResponse\",\"type\":\"object\"}",
     "DatabaseSettingsStatus": "{\"properties\":{\"backend\":{\"title\":\"Backend\",\"type\":\"string\"},\"database\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Database\"},\"driver\":{\"title\":\"Driver\",\"type\":\"string\"},\"file_path\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"File Path\"},\"file_size_bytes\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"File Size Bytes\"},\"is_default\":{\"title\":\"Is Default\",\"type\":\"boolean\"},\"note\":{\"title\":\"Note\",\"type\":\"string\"},\"runtime_editable\":{\"default\":false,\"title\":\"Runtime Editable\",\"type\":\"boolean\"},\"url\":{\"title\":\"Url\",\"type\":\"string\"}},\"required\":[\"backend\",\"driver\",\"url\",\"is_default\",\"note\"],\"title\":\"DatabaseSettingsStatus\",\"type\":\"object\"}",
     "DbBackupEntry": "{\"properties\":{\"at\":{\"title\":\"At\",\"type\":\"integer\"},\"generation\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Generation\"},\"kind\":{\"enum\":[\"auto\",\"manual\"],\"title\":\"Kind\",\"type\":\"string\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"size_bytes\":{\"title\":\"Size Bytes\",\"type\":\"integer\"}},\"required\":[\"kind\",\"name\",\"at\",\"size_bytes\"],\"title\":\"DbBackupEntry\",\"type\":\"object\"}",
@@ -1458,5 +1473,6 @@
     "VariationSeedsResponse": "{\"properties\":{\"amplitude\":{\"title\":\"Amplitude\",\"type\":\"string\"},\"seeds\":{\"items\":{\"type\":\"integer\"},\"title\":\"Seeds\",\"type\":\"array\"}},\"required\":[\"amplitude\",\"seeds\"],\"title\":\"VariationSeedsResponse\",\"type\":\"object\"}",
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
-  }
+  },
+  "digest": "fb9fcf87a54f825000007ea38e1d05be760b5b289949d861b7ecdd18de7cdb6d"
 }

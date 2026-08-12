@@ -16,6 +16,23 @@
 		effect: string;
 		example: string;
 		svg: string;
+		/** Raster artwork, served by its own route. Set for plugin words;
+		    built-in words carry their drawing in `svg` instead. */
+		image?: string;
+		image2x?: string;
+	};
+
+	// `fires_on_*` is what lets the editor say which plain word a wrong
+	// qualified name would have fired; `preview_url*` are where the artwork
+	// baked from the word's own expansion is served. Both ride on GET /api/saijiki.
+	type PluginEntry = {
+		qualified_name: string;
+		note_ja: string;
+		note_en: string;
+		fires_on_ja?: string[];
+		fires_on_en?: string[];
+		preview_url?: string;
+		preview_url_2x?: string;
 	};
 
 	type Props = {
@@ -36,9 +53,11 @@
 		runTokensOut: number | null;
 		error: string | null;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
+		/** The same preview a built-in word gets, built from the plugin document. */
+		previewForPlugin: (entry: PluginEntry) => SaijikiPreview;
 		// `fires_on_*` is what lets the editor say which plain word a wrong
 		// qualified name would have fired (GET /api/saijiki carries them).
-		pluginEntries?: { qualified_name: string; note_ja: string; note_en: string; fires_on_ja?: string[]; fires_on_en?: string[] }[];
+		pluginEntries?: PluginEntry[];
 		showSettings?: boolean;
 		wildValue?: boolean;
 		wildInherited?: boolean;
@@ -47,7 +66,7 @@
 		onClose: () => void;
 	};
 
-	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel, runTokensIn, runTokensOut, error, previewForWord, pluginEntries = [], showSettings = false, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose }: Props = $props();
+	let { open, isJapanese, title, subtitle, initialDdl, drawing, stage1ModelLabel, stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel, runTokensIn, runTokensOut, error, previewForWord, previewForPlugin, pluginEntries = [], showSettings = false, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose }: Props = $props();
 
 	let value = $state('');
 	let focused = $state(false);
@@ -222,6 +241,7 @@
 				{pluginEntries}
 				onInsertWord={insertWord}
 				{previewForWord}
+				{previewForPlugin}
 			/>
 		</div>
 		{#if error}<div class="ddled-error">{error}</div>{/if}

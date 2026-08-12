@@ -5917,3 +5917,21 @@ blob against **nine content rules** (`nvapi-`, `sk-`, GitHub PAT, AWS AKID, Goog
   files at all**, which the new `preview:` contradicts head-on (rewritten in both languages as the single
   exception, with its conditions); **(2) a comment in `document_format.py` said `preview: <file>.svg`** where the
   implementation accepts only `.png`.
+
+### 2026-08-12 — The stamper writes only when told (**no version bump**, tooling only)
+
+**`scripts/bump.py` writes its six files only when given `--write`** (ledger I-195, closed). The accident that
+opened the item: `--scan-build`, passed alone to *read* the next number, stamped the files then and there.
+- **`--dry-run` was removed** (author's ruling, 2026-08-12) rather than kept as a synonym for the new default —
+  the old `--scan-build --dry-run` now exits 2 through argparse, **so it cannot quietly come to mean something
+  else.**
+- **No default value was given** for the keyword, so a caller that forgets it stops with a `TypeError` instead of
+  silently not writing. Automatic callers measured: none.
+- A run without the flag prints `nothing was written (N file(s) would change) -- add --write to stamp`.
+- **Five acceptances** (`test_bump_stamps_only_when_told.py`), run against **seven files copied into a tmp tree
+  with its own `git init`** — pointed at the real repository, a regression in the guard would move the real
+  `web/BUILD_NUMBER`, which is a shared counter. The perturbation (`if write:` to `if True:`) turns three red.
+- **⚠ Five now-false command lines were corrected on the accepting side** — `AGENTS.md` and the git management
+  handoff still carried `--dry-run` and a bump without `--write`. **The implementing session had updated the
+  conventions, `CLAUDE.md`, and the memory; these two documents were missed.**
+- **Not one byte of product behaviour changed** (only `scripts/` and `server/tests/` were touched).

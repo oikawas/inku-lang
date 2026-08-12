@@ -9,6 +9,7 @@ import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
 import app.inku.mobile.pipeline.LocalFallbackPipeline
 import app.inku.mobile.pipeline.PaintRequest
+import app.inku.mobile.pipeline.RenderRequest
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -91,11 +92,25 @@ class WorkColorSnapshotTest {
         assertNull(workColorSnapshot(metadata(colorMap = JSONObject())))
     }
 
-    private fun assertRenderedCatalogId(expected: String, storedMetadata: String) {
-        val snapshot = workColorSnapshot(storedMetadata)
-        val rendered = LocalFallbackPipeline().renderFromScore(score, request(snapshot))
-        assertEquals(expected, JSONObject(rendered.renderMetadataJson).getString("render_color_catalog_id"))
-    }
+private fun renderRequest(
+    scoreJson: String = score,
+    catalogId: String = "default",
+    snapshot: WorkColorSnapshot? = null,
+) = RenderRequest(
+    scoreJson = scoreJson,
+    colorCatalogId = catalogId,
+    canvasAspect = "square",
+    svgProfile = "display",
+    renderSeed = 4242L,
+    workColorSnapshot = snapshot,
+)
+
+private fun assertRenderedCatalogId(expected: String, storedMetadata: String) {
+    val rendered = DefaultSvgRenderer().render(
+        renderRequest(snapshot = workColorSnapshot(storedMetadata)),
+    )
+    assertEquals(expected, JSONObject(rendered.metadataJson).getString("render_color_catalog_id"))
+}
     
     @Test
     fun t5_renderCatalogIdWins() {
@@ -112,19 +127,18 @@ class WorkColorSnapshotTest {
         assertRenderedCatalogId("default", metadata())
     }
     
-    @Test
-    fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
-        val current = ColorCatalogs.get("ink_season")
-        val abstractScore = score.replace("custom", "red")
-        val pipeline = LocalFallbackPipeline(DefaultSvgRenderer { current })
-        val currentDrawing = pipeline.renderFromScore(abstractScore, request(catalogId = current.id))
-        val snapshotDrawing = pipeline.renderFromScore(
-            abstractScore,
-            request(WorkColorSnapshot(current.id, current.renderMap), catalogId = current.id),
-        )
-    
-        assertEquals(currentDrawing.displaySvg, snapshotDrawing.displaySvg)
-    }
+@Test
+fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
+    val current = ColorCatalogs.get("ink_season")
+    val abstractScore = score.replace("custom", "red")
+    val renderer = DefaultSvgRenderer { current }
+    val currentDrawing = renderer.render(renderRequest(abstractScore, current.id))
+    val snapshotDrawing = renderer.render(
+        renderRequest(abstractScore, current.id, WorkColorSnapshot(current.id, current.renderMap)),
+    )
+
+    assertEquals(currentDrawing.svg, snapshotDrawing.svg)
+}
     
     @Test
     fun t7_newDrawingRoutesDoNotReadAWorkSnapshot() {

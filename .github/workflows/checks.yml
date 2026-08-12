@@ -1,0 +1,83 @@
+name: checks
+
+# The frozen-corpus workflow proves the deterministic layers are stable off one
+# Mac. It cannot see a regression the corpora do not cover, so these jobs run
+# the suites a human would otherwise have to remember to run (ledger I-192).
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      # Temporary while this workflow is being proved on Linux; removed before merge.
+      - ci/the-backstop-runs-more-than-the-corpus
+  workflow_dispatch:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # ruff first: seconds against minutes, and it names an undefined symbol
+      # that a green suite can still walk past.
+      - name: Lint
+        working-directory: server
+        run: uv run ruff check src tests scripts
+      - name: Test
+        working-directory: server
+        run: uv run pytest -q
+
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Lint
+        working-directory: cli
+        run: uv run ruff check src tests scripts
+      - name: Test
+        working-directory: cli
+        run: uv run pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        working-directory: web
+        run: npm ci
+      - name: Types and Svelte
+        working-directory: web
+        run: npm run check
+      - name: Unit tests
+        working-directory: web
+        run: npm run test:unit
+      # The display strings are Japanese-canonical; this reads the English side
+      # against the glossary. It does not look at manual/.
+      - name: English display strings
+        working-directory: web
+        run: npm run lint:i18n
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bilingual documents
+        run: python3 server/scripts/check_docs.py

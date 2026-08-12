@@ -23,6 +23,7 @@ from inku_server import counts
 from inku_server.counts import (
     _DEFAULT_COUNT_LANG,
     _explicit_counts_from_ddl,
+    _is_literal_grid_request,
     _numeral_is_a_bare_count,
     count_hint_from_ddl,
 )
@@ -143,3 +144,109 @@ def test_t4_every_caller_of_coerce_score_hands_it_a_language() -> None:
     silent = [(path, line) for path, line, has_lang in senders if not has_lang]
     assert silent == [], f"call sites of coerce_score that name no language: {silent}"
     assert len(senders) == 5, f"expected five senders, found {sorted(senders)}"
+
+
+# --- T-5 to T-8 -----------------------------------------------------------
+
+
+def test_t5_the_two_readers_make_the_same_judgement() -> None:
+    """Compare the two readers, not either one against a table written by hand.
+
+    A table would go on passing from the day the rule next moves, and freeze the
+    drift it was written to catch.  What is being measured is that "how many did
+    the description say" has one answer: whatever the hint names, the set of
+    stated counts has to contain.
+    """
+    for ddl in SAMPLE_DESCRIPTIONS:
+        for lang in (None, "ja", "en"):
+            stated = _explicit_counts_from_ddl(ddl, lang=lang)
+            hint = count_hint_from_ddl(ddl, lang=lang)
+            if hint is not None:
+                assert hint in stated, (ddl, lang, hint, sorted(stated))
+            # Outside a literal-grid request the two also agree on *whether* a
+            # count was stated. A grid request narrows the hint to the clauses
+            # that ask for tiling, so there the hint may stay silent about a
+            # count stated elsewhere in the description.
+            if not _is_literal_grid_request(ddl):
+                assert (hint is None) == (not stated), (ddl, lang, hint, sorted(stated))
+
+
+def test_t6_the_english_path_reads_a_numeral_and_asks_for_no_particular_noun() -> None:
+    """The two narrownesses [I-212] B removed, one description each."""
+    assert count_hint_from_ddl("Draw 12 circles.") == 12  # a numeral, and no listed noun
+    assert count_hint_from_ddl("Draw 12 lines.") == 12  # a numeral beside a listed noun
+    assert count_hint_from_ddl("Scatter twelve small ellipses.") == 12  # no listed noun
+
+
+def test_t7_what_was_already_read_is_still_read() -> None:
+    assert count_hint_from_ddl("Draw twelve lines.") == 12
+    assert count_hint_from_ddl("円を12個描く。") == 12
+    assert _explicit_counts_from_ddl("Draw twelve lines.") == frozenset({12})
+    assert _explicit_counts_from_ddl("円を12個描く。") == frozenset({12})
+
+
+def test_t8_a_digit_inside_another_number_is_still_not_a_count() -> None:
+    """Ruling A of [I-214] keeps these out, and widening the reader does not.
+
+    Both are read as an English body on purpose: with `ja` the CJK exclusion
+    would answer first, and this test would stop measuring the exclusion it is
+    named for.
+    """
+    radius = "Place a circle of radius 0.11 near the center."
+    assert _explicit_counts_from_ddl(radius, lang="en") == frozenset()
+    assert count_hint_from_ddl(radius, lang="en") is None
+
+    fraction = "Draw lines across the 画面下1/3 band."
+    stated = _explicit_counts_from_ddl(fraction, lang="en")
+    assert 1 not in stated and 3 not in stated, sorted(stated)
+
+
+# --- T-23, T-24 -----------------------------------------------------------
+# Added by the author's ruling of 2026-08-12, mid-contract: dropping the noun
+# table let `four directions` read as four marks, which took the four off the
+# thing it qualifies and lost the field coverage the same sentence asks for.
+# What replaced the table is its inverse -- a closed list of words naming an axis
+# rather than an object.
+
+
+def test_t23_a_number_that_counts_an_axis_is_not_a_count_of_marks() -> None:
+    """And both languages answer the same way, which is the point of the table.
+
+    Before the ruling the English side read every one of these and the Japanese
+    side read none: Japanese requires a counter, and `度` `行` `列` `種類` `層`
+    are not counters, so it never needed a list.
+    """
+    pairs = (
+        ("Tile thin black lines in four directions across the wall.", "黒い線を四つの方向で敷き詰める。"),
+        ("Draw black lines in a grid of three rows and four columns.", "黒い線を三行四列の格子に並べる。"),
+        ("Rotate the cube 30 degrees.", "立方体を30度回転する。"),
+        ("Use three kinds of gray.", "灰を三種類使う。"),
+        ("Draw lines in two layers.", "線を二層に描く。"),
+    )
+    for english, japanese in pairs:
+        assert _explicit_counts_from_ddl(english, lang="en") == frozenset(), english
+        assert count_hint_from_ddl(english, lang="en") is None, english
+        assert _explicit_counts_from_ddl(japanese, lang="ja") == frozenset(), japanese
+        assert count_hint_from_ddl(japanese, lang="ja") is None, japanese
+
+    # The control: the exclusion takes the axis word's number and leaves the
+    # mark's. Both numbers sit in one sentence, so a table that swallowed the
+    # sentence would fail here.
+    both = "Draw 12 lines in four directions."
+    assert _explicit_counts_from_ddl(both, lang="en") == frozenset({12})
+    assert count_hint_from_ddl(both, lang="en") == 12
+
+
+def test_t24_an_index_is_which_one_not_how_many() -> None:
+    """The DDL coerce reads is post-expansion, and the expander writes indices.
+
+    `Place member 2 in region [...] with rotation 21 degrees.` is written by the
+    plugin layer, not by the author. Reading its `2` as a stated count made
+    `with_stated_count_fidelity` build a group of two out of a member's number.
+    """
+    expanded = "Place member 2 in region [0.165, 0.168, 0.285, 0.288] with rotation 21 degrees."
+    assert _explicit_counts_from_ddl(expanded, lang="en") == frozenset()
+    assert _explicit_counts_from_ddl("第2の線を引く。", lang="ja") == frozenset()
+
+    # The control: the same digit, counting marks instead of naming one.
+    assert _explicit_counts_from_ddl("Place 2 marks.", lang="en") == frozenset({2})

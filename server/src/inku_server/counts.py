@@ -89,6 +89,8 @@ def count_hint_from_ddl(
         match = re.search(pattern, candidate)
         if not match:
             continue
+        if _names_an_axis_ja(candidate, match.end()):
+            continue
         value = _parse_small_japanese_number(match.group(1))
         if value is not None:
             maximum = limits.ddl_count_max_grid if literal_grid else limits.ddl_count_max
@@ -135,42 +137,26 @@ ENGLISH_COUNT_UNITS: dict[str, int] = {
 def _english_count_hint(
     ddl: str, limits: Limits = DEFAULT_LIMITS, *, lang: str | None = None
 ) -> int | None:
+    """The count this description states first, once the counter pass found none.
+
+    Ruling B ([I-212], 2026-08-12): this reader and `_explicit_counts_from_ddl`
+    answer "how many did the description say" the same way, because they are now
+    the same scan.  They disagreed on four of six descriptions while this one
+    kept a walk of its own: it dropped numerals on the floor (`re.findall` over
+    `[a-z]+` alone) and demanded one of twelve counted nouns within nine words,
+    so `Draw 12 circles.` and `Scatter twelve small ellipses.` read as nothing at
+    all.  Both narrownesses are gone with the walk that held them.
+    """
     literal_grid = _is_literal_grid_request(ddl)
-    clauses = re.split(r"[.!?]+", ddl)
+    # Split the way `count_hint_from_ddl` splits. Two answers to "which clause is
+    # the tiling request" is the same defect as two answers to "how many": with
+    # `[.!?]+` alone a Japanese description is one clause, and this fallback then
+    # read a count from a sentence that asked for no tiling at all.
+    clauses = re.split(r"[。.!?]+", ddl)
     candidates = [clause for clause in clauses if _is_literal_grid_request(clause)] if literal_grid else [ddl]
-    words = re.findall(r"[a-z]+", " ".join(candidates).lower().replace("-", " "))
-    count_nouns = {
-        "line", "lines", "stroke", "strokes", "square", "squares",
-        "cloudform", "cloudforms", "tile", "tiles", "brick", "bricks",
-    }
-    number_words = set(ENGLISH_COUNT_UNITS) | {"hundred", "thousand", "and"}
-    for start, word in enumerate(words):
-        if word not in number_words or word == "and":
-            continue
-        end = start
-        phrase: list[str] = []
-        while end < len(words) and words[end] in number_words:
-            phrase.append(words[end])
-            end += 1
-        if not any(noun in count_nouns for noun in words[end : end + 9]):
-            continue
-        total = 0
-        current = 0
-        for token in phrase:
-            if token == "and":
-                continue
-            if token == "hundred":
-                current = max(current, 1) * 100
-            elif token == "thousand":
-                total += max(current, 1) * 1000
-                current = 0
-            else:
-                current += ENGLISH_COUNT_UNITS[token]
-        value = total + current
-        if value:
-            maximum = (
-                limits.ddl_count_max_grid if _is_literal_grid_request(ddl) else limits.ddl_count_max
-            )
+    maximum = limits.ddl_count_max_grid if literal_grid else limits.ddl_count_max
+    for candidate in candidates:
+        for _, value in _counts_in_reading_order(candidate, lang=lang):
             return min(max(value, 1), maximum)
     return None
 
@@ -195,6 +181,72 @@ _COUNT_TOKEN_PATTERN = re.compile(r"[a-z]+|\d+")
 _CJK_PATTERN = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿]")
 _CJK_WINDOW = 12
 _NUMBER_EXPRESSION_PUNCTUATION = ".,/:"
+
+# Ruling (2026-08-12): a number is a count of marks only if what it counts is a
+# thing that gets drawn.  The old guard had this the wrong way round -- it listed
+# what MAY be counted (32 words, then 12), and the set of drawable things is open,
+# so `circles`, `ellipses` and `petals` leaked out of it and went unread.  This
+# lists what may NOT be: words naming an axis or a dimension rather than an
+# object.  That set is closed and small, which is the whole reason it can be
+# written down.
+#
+# It is the same judgement `_numeral_is_a_bare_count` already makes about `0.11`
+# and `1/3` -- "this digit belongs to another kind of quantity" -- with the
+# quantity marked by a word instead of by punctuation.  `四つの方向` was the one
+# case of it the tree already held, written into the counter pattern itself; both
+# languages now read it off one table, so `four directions` and `四つの方向`
+# answer the same way.
+#
+# Reading the four in `four directions` as a mark count does not deliver more of
+# the description, it delivers less: the number is taken off the thing it
+# qualifies, and `across the wall` -- the field coverage the same sentence asks
+# for -- is lost with it.
+_AXIS_WORDS_EN = frozenset(
+    {
+        "direction", "directions", "degree", "degrees", "row", "rows",
+        "column", "columns", "kind", "kinds", "type", "types",
+        "layer", "layers", "percent", "time", "times",
+    }
+)
+_AXIS_WORDS_JA = ("方向", "向き", "種類", "層", "行", "列", "度", "回", "倍", "割")
+# How far past the number the noun it qualifies may sit. Three covers a number
+# with up to two adjectives (`four different directions`); the old table looked
+# nine words ahead, which is far enough to catch a noun belonging to something
+# else entirely.
+_AXIS_LOOKAHEAD = 3
+
+# The same ruling, applied to the word before the number instead of after it. An
+# index says WHICH ONE, not HOW MANY. This matters because the DDL coerce reads
+# is the one the plugin layer has already expanded, and that layer writes its own
+# `Place member 2 in region [...] with rotation 21 degrees.` into it -- machine
+# text the reader was taking for a count the author stated.
+_INDEX_WORDS_EN = frozenset({"member", "no"})
+_INDEX_WORDS_JA = ("第",)
+
+
+def _names_an_axis_ja(text: str, end: int) -> bool:
+    """Does an axis word follow this counter, as in `四つの方向`?"""
+    rest = text[end:]
+    if rest.startswith("の"):
+        rest = rest[1:]
+    return rest.startswith(_AXIS_WORDS_JA)
+
+
+def _names_an_axis_en(tokens: list[tuple[str, int, int]], after: int) -> bool:
+    """Does an axis word follow this number, as in `four directions`?"""
+    return any(
+        token in _AXIS_WORDS_EN for token, _, _ in tokens[after : after + _AXIS_LOOKAHEAD]
+    )
+
+
+def _is_an_index_en(tokens: list[tuple[str, int, int]], at: int) -> bool:
+    """Is this number an index, as in `member 2`?"""
+    return at > 0 and tokens[at - 1][0] in _INDEX_WORDS_EN
+
+
+def _is_an_index_ja(text: str, start: int) -> bool:
+    """Is this number an index, as in `第2`?"""
+    return text[:start].endswith(_INDEX_WORDS_JA)
 
 # What a reader falls back to when its caller does not name a language.  Every
 # call site that predates the language port resolves here, so opening the port
@@ -253,25 +305,32 @@ def _numeral_is_a_bare_count(text: str, start: int, end: int, *, lang: str | Non
 # Limits, so the band exists under one name only.
 
 
-def _explicit_counts_from_ddl(ddl: str | None, *, lang: str | None = None) -> frozenset[int]:
-    """Every count the description states outright, in either language.
+def _counts_in_reading_order(
+    ddl: str | None, *, lang: str | None = None
+) -> list[tuple[int, int]]:
+    """Every count the description states, as (position, value), in reading order.
 
-    `count_hint_from_ddl` answers "what is the count here" and stops at the first
-    match. This answers "which counts were asked for at all", which is what tells a
-    group written to order apart from one a governor is free to thin.
+    The one scan both readers stand on.  `_explicit_counts_from_ddl` asks it which
+    counts were stated at all; `_english_count_hint` asks it which one comes
+    first.  Two readers over one scan cannot disagree about what a count is, and
+    they did disagree -- on four of six descriptions, measured 2026-08-12 -- for
+    as long as the hint kept a walk of its own.
 
-    `lang` is the language the body is written in, and only the exclusions consult
-    it. A caller that does not know resolves to `_DEFAULT_COUNT_LANG`, which is
-    what every caller did before the port was opened.
+    Counter-marked numbers (`三つ`, `12個`) and bare numbers are gathered in the
+    same pass so that "first" means first in the text, not first in whichever
+    pass happened to run first.
     """
     if not ddl:
-        return frozenset()
-    counts: set[int] = set()
-    for token in JAPANESE_COUNT_PATTERN.findall(ddl):
-        value = _parse_small_japanese_number(token)
-        if value:
-            counts.add(value)
+        return []
+    # One coordinate system for both passes: `lower()` leaves digits and CJK
+    # alone and `replace` keeps the length, so a position means the same thing to
+    # the counter pattern and to the token walk.
     text = ddl.lower().replace("-", " ")
+    found: list[tuple[int, int]] = []
+    for match in JAPANESE_COUNT_PATTERN.finditer(text):
+        value = _parse_small_japanese_number(match.group(1))
+        if value and not _names_an_axis_ja(text, match.end()):
+            found.append((match.start(), value))
     tokens = [(match.group(0), match.start(), match.end()) for match in _COUNT_TOKEN_PATTERN.finditer(text)]
     number_words = set(ENGLISH_COUNT_UNITS) | {"hundred", "thousand", "and"}
     index = 0
@@ -279,8 +338,14 @@ def _explicit_counts_from_ddl(ddl: str | None, *, lang: str | None = None) -> fr
         token, start, stop = tokens[index]
         if token.isdigit():
             value = int(token)
-            if value and _numeral_is_a_bare_count(text, start, stop, lang=lang):
-                counts.add(value)
+            if (
+                value
+                and _numeral_is_a_bare_count(text, start, stop, lang=lang)
+                and not _names_an_axis_en(tokens, index + 1)
+                and not _is_an_index_en(tokens, index)
+                and not _is_an_index_ja(text, start)
+            ):
+                found.append((start, value))
             index += 1
             continue
         if token not in number_words or token == "and":
@@ -303,10 +368,26 @@ def _explicit_counts_from_ddl(ddl: str | None, *, lang: str | None = None) -> fr
                 current = 0
             else:
                 current += ENGLISH_COUNT_UNITS[word]
-        if total + current:
-            counts.add(total + current)
+        if total + current and not _names_an_axis_en(tokens, end):
+            found.append((start, total + current))
         index = end
-    return frozenset(counts)
+    found.sort()
+    return found
+
+
+def _explicit_counts_from_ddl(ddl: str | None, *, lang: str | None = None) -> frozenset[int]:
+    """Every count the description states outright, in either language.
+
+    `count_hint_from_ddl` answers "what is the count here" and stops at the first
+    match. This answers "which counts were asked for at all", which is what tells a
+    group written to order apart from one a governor is free to thin.  Both read
+    `_counts_in_reading_order`, so the two answers cannot come from two rules.
+
+    `lang` is the language the body is written in, and only the exclusions consult
+    it. A caller that does not know resolves to `_DEFAULT_COUNT_LANG`, which is
+    what every caller did before the port was opened.
+    """
+    return frozenset(value for _, value in _counts_in_reading_order(ddl, lang=lang))
 
 
 def _count_follows_ddl_request(

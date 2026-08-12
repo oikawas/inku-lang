@@ -18,6 +18,7 @@ import ast
 import importlib.util
 import json
 import pathlib
+import re
 
 from inku_server import counts
 from inku_server.counts import (
@@ -289,3 +290,72 @@ def test_t10_a_japanese_body_still_leaves_a_bare_numeral_unread() -> None:
     """
     assert _explicit_counts_from_ddl("立方体の向き: 30度回転", lang="ja") == frozenset()
     assert _explicit_counts_from_ddl("立方体の向き: 30度回転", lang="en") == frozenset({30})
+
+
+# --- T-11 to T-13 ---------------------------------------------------------
+
+
+def _expansion(ddl: str, *, lang: str):
+    document = parse_plugin_document(NATURE_PLUGIN.read_text(encoding="utf-8"))
+    return expand_plugin_ddl(
+        ddl, source_text=ddl, lang=lang, documents=[document], seed_text="reference"
+    )
+
+
+def _requested_over_budget(result) -> list[int]:
+    """The counts the layer read but had no room for.
+
+    The warning names the count it declined, so a description whose count cannot
+    fit still says whether the count was read at all. Without this, a count that
+    reached the layer and a count that never did look identical: both leave
+    `units` at one.
+    """
+    return [int(match) for warning in result.warnings for match in re.findall(r": (\d+) units", warning)]
+
+
+def test_t11_a_count_outside_the_naming_phrase_reaches_the_expansion() -> None:
+    """The phrase names the plugin, a later phrase states how many.
+
+    Two halves, because the work budget is a separate rule: the first shows the
+    count is read, the second shows the units are placed when there is room for
+    them. `Nature.枯草` costs fourteen marks a unit, so thirty of it is 420
+    against a 400-mark work, and the layer declines the whole count by a rule
+    that predates this contract.
+    """
+    outside = "Nature.枯草の細い鉛筆の縦線を、画面下半分に三十本、不揃いに並べる。"
+    read = _expansion(outside, lang="ja")
+    assert [int(entry["units"]) for entry in read.provenance] == [1]
+    assert _requested_over_budget(read) == [30]
+
+    affordable = "Nature.枯葉の小さな影を、画面下半分に三十個、不揃いに並べる。"
+    placed = _expansion(affordable, lang="ja")
+    assert [int(entry["units"]) for entry in placed.provenance] == [30]
+    assert placed.warnings == ()
+
+
+def test_t12_a_count_the_phrase_states_is_not_overruled_by_the_sentence() -> None:
+    """The control for T-11: widening happens on silence, never on a spoken count.
+
+    Two plugins, two counts, one description. Read at sentence granularity both
+    would see both counts and the ambiguity rule would drop each to one unit.
+    """
+    both = (
+        "Nature.枯草の細い縦線を下半分に百二十本並べる。"
+        "Nature.落葉の小さな楕円を右下にひとつ置く。"
+    )
+    result = _expansion(both, lang="ja")
+    # 枯草 keeps its own 120 -- over budget, so declined whole, but read as 120.
+    assert _requested_over_budget(result) == [120]
+    # 落葉 keeps its one, and does not pick up 枯草's count from the sentence.
+    assert [int(entry["units"]) for entry in result.provenance] == [1, 1]
+
+
+def test_t13_a_sentence_stating_two_counts_stays_at_one_unit() -> None:
+    """The existing ambiguity rule, still in force at the widened scope.
+
+    Choosing between the two would place a number nobody wrote.
+    """
+    ambiguous = "Nature.枯葉の小さな影を、三十個と十個に分けて並べる。"
+    result = _expansion(ambiguous, lang="ja")
+    assert [int(entry["units"]) for entry in result.provenance] == [1]
+    assert result.warnings == ()

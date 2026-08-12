@@ -941,6 +941,18 @@ def _phrase_that_names(text: str, marker: str, *, lang: str) -> str | None:
     return None
 
 
+def _sentence_that_names(text: str, marker: str, *, lang: str) -> str | None:
+    """The sentence the plugin is named in -- where the body states how many when
+    the phrase does not."""
+    if not text or not marker:
+        return None
+    folded = marker.casefold()
+    for sentence in _sentences_of(text, lang=lang):
+        if folded in sentence.casefold():
+            return sentence
+    return None
+
+
 def _stated_unit_count(clause: str | None, *, lang: str) -> int | None:
     """How many whole units the body asked for, or None if it did not say.
 
@@ -1052,13 +1064,25 @@ def expand_plugin_ddl(
             # explicit reference states its count in the DDL clause that names the
             # plugin; a firing word states it in the description, which is the only
             # place that word appears at all.
-            if explicit:
-                phrase = _phrase_that_names(result, trigger, lang=lang) or _phrase_that_names(
-                    source, trigger, lang=lang
-                )
-            else:
-                phrase = _phrase_that_names(source, trigger, lang=lang)
+            texts = (result, source) if explicit else (source,)
+            phrase = next(
+                (found for found in (_phrase_that_names(text, trigger, lang=lang) for text in texts) if found),
+                None,
+            )
             requested = _stated_unit_count(phrase, lang=lang)
+            # Ruling B ([I-215], 2026-08-12): when the phrase naming the plugin
+            # says nothing about how many, the sentence around it does.  Widening
+            # only on silence is the whole of the rule -- a phrase that states a
+            # count is never overruled by the sentence it sits in, so a body
+            # naming two plugins with two counts keeps each one where it was
+            # written.  The sentence is read by the same reader, so a sentence
+            # holding two counts still resolves to one unit.
+            if requested is None and not _explicit_counts_from_ddl(phrase, lang=lang):
+                sentence = next(
+                    (found for found in (_sentence_that_names(text, trigger, lang=lang) for text in texts) if found),
+                    None,
+                )
+                requested = _stated_unit_count(sentence, lang=lang)
             unit_cost = _expansion_cost(expansion, entry_instructions, lang=lang)
             expansions = [expansion]
             units = 1

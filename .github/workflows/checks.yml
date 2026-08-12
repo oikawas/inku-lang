@@ -9,8 +9,6 @@ on:
   push:
     branches:
       - main
-      # Temporary while this workflow is being proved on Linux; removed before merge.
-      - ci/the-backstop-runs-more-than-the-corpus
   workflow_dispatch:
 
 jobs:

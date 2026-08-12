@@ -246,8 +246,19 @@ UI は日英で、切替は設定画面から行う（既定は `ja`）。
 
 **決定的な層**（`coerce/`・`ddl_expander.py`・`renderer.py`・`stroke_engine.py`・`schema.py`・`saijiki.py`・`language_support/{ja,en}.py`）に触れたときは、凍結コーパスの照合を必ず通す。
 
-**CI が回すのは凍結コーパスの再生成だけである。**
-pytest も ruff も `npm run check` も CI では走らないので、**コーパスが見ていない退行は自動では誰も止めない。**
+**CI は 2 本の workflow を回す。**
+`reference-corpus` が凍結コーパスの再生成を照合し、`checks` が
+**server（ruff と pytest）・cli（ruff と pytest）・web（`npm run check`・`test:unit`・`lint:i18n`）・
+公開文書（`check_docs.py`）**を回す。
+
+**⚠ CI が見ていないものは残っている。**
+**① 鍵の要る経路**（NVIDIA NIM を叩く 30 件は鍵が無いので skip する）、
+**② ローカル専用の材料**（`cli/bench/leaf` を使う 9 件と `cairosvg` の 1 件）、
+**③ darwin で焼いた凍結物と照合する 2 件**（Android の参照 fixture の焼き直しと、
+platform 安定性の対のテスト。**linux で焼くと違う値になるので CI では外してある**）、
+**④ Android の JVM テスト**（gradle wrapper が無いため未搭載）、
+**⑤ `no-git-sync/` の運用スクリプト**（git が追跡しないので CI から見えない）。
+**手元の全走とは母集団が違う。**
 
 ### 残っている課題について
 

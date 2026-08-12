@@ -314,9 +314,19 @@ The **deterministic layers** are `coerce/`, `ddl_expander.py`, `renderer.py`, `s
 `schema.py`, `saijiki.py`, and `language_support/{ja,en}.py`.
 Touching any of them requires running the frozen-corpus comparison.
 
-**CI runs only the frozen-corpus regeneration.**
-Neither pytest, ruff, nor `npm run check` runs in CI, so **a regression the corpora do not observe is
-not stopped by anything automatic.**
+**CI runs two workflows.**
+`reference-corpus` re-bakes the frozen corpora and requires byte-identical output; `checks` runs
+**server (ruff and pytest), cli (ruff and pytest), web (`npm run check`, `test:unit`, `lint:i18n`),
+and the published documents (`check_docs.py`).**
+
+**⚠ Some surfaces are still outside it.**
+**(1) paths that need a key** — the thirty tests that call NVIDIA NIM skip without one;
+**(2) local-only material** — nine tests that use `cli/bench/leaf`, and one that wants `cairosvg`;
+**(3) two comparisons against bytes baked on darwin** — the Android reference fixtures and the
+platform-stability pair test, **which read the Linux bake as a defect and are deselected there**;
+**(4) the Android JVM tests**, which are not on CI because there is no gradle wrapper;
+**(5) the operational scripts under `no-git-sync/`**, which git does not track.
+**The population is not the same as a full local run.**
 
 ### On open issues
 

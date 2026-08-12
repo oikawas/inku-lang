@@ -1080,6 +1080,15 @@ def _rhythm_t(i: int, n: int, seed: int, rhythm_spacing: str) -> float:
     return base
 
 
+# engine 32: the cross-axis spreads a path puts around its line. They are
+# named because the gate that tells "the description's number, put on the short
+# side" from "a constant fraction of the short side" has to move the stated
+# number and see the drawing follow.
+_PATH_WAVE_AMPLITUDE = 0.22
+_PATH_JITTER = 0.08
+_PATH_SPREAD = 0.30
+
+
 def _path_pos(
     i: int,
     n: int,
@@ -1087,27 +1096,46 @@ def _path_pos(
     margin: float,
     path: str,
     rhythm_spacing: str = "none",
+    canvas: CanvasSize | None = None,
 ) -> tuple[float, float]:
+    """Where member `i` of a path-following group lands, in normalized space.
+
+    engine 32: the cross-axis spread goes on the short side. A path has two
+    quantities and they are not the same kind. Along its line, `margin + t *
+    span` says how much of the paper the group uses -- that is the paper's own
+    length and stays proportional. Across it, the wave's swing and the jitter
+    are the shape of the path, and written straight they became `0.22 * width`
+    across and `0.22 * height` down, so the same wave came out with a swing of
+    220px on the square canvas and 44px on the pillar. Only the second is
+    levelled here; `margin` and `span` are untouched (author, 2026-08-12).
+    """
     span = 1.0 - 2 * margin
     t = _rhythm_t(i, n, seed, rhythm_spacing)
     jitter_a = _hash01(i, seed, "a") - 0.5
     jitter_b = _hash01(i, seed, "b") - 0.5
+    scale_x, scale_y = _short_side_scales(canvas)
 
     if path == "diagonal":
         x = margin + t * span
         y = 1.0 - margin - t * span
-        return _clamp01(x + jitter_a * 0.08), _clamp01(y + jitter_b * 0.08)
+        return (
+            _clamp01(x + jitter_a * _PATH_JITTER * scale_x),
+            _clamp01(y + jitter_b * _PATH_JITTER * scale_y),
+        )
     if path == "wave":
         x = margin + t * span
-        y = 0.5 + math.sin(t * math.pi * 2.0) * 0.22 + jitter_b * 0.08
+        y = 0.5 + (
+            math.sin(t * math.pi * 2.0) * _PATH_WAVE_AMPLITUDE
+            + jitter_b * _PATH_JITTER
+        ) * scale_y
         return _clamp01(x), _clamp01(y)
     if path == "top_to_bottom":
-        x = 0.5 + jitter_a * 0.30
+        x = 0.5 + jitter_a * _PATH_SPREAD * scale_x
         y = margin + t * span
         return _clamp01(x), _clamp01(y)
     if path == "left_to_right":
         x = margin + t * span
-        y = 0.5 + jitter_b * 0.30
+        y = 0.5 + jitter_b * _PATH_SPREAD * scale_y
         return _clamp01(x), _clamp01(y)
     if path == "right_half":
         x = 0.56 + _hash01(i, seed, "x") * (0.44 - margin)
@@ -1137,11 +1165,19 @@ def _clustered_pos(
     density: str,
     preserve_space: bool,
     rhythm_spacing: str = "none",
+    canvas: CanvasSize | None = None,
 ) -> tuple[float, float]:
     """大数量の配置を、均一散布ではなく複数のまとまりとして決定的に配置する。
 
     クラスタ内部を円周状に並べると、異なる絵に同じ輪状の記号が現れやすい。
     そのため、内部配置はパス方向を持つ短い帯として広げる。
+
+    engine 32: the band is a shape, so it goes on the short side. Where the
+    cluster sits is not, so it does not -- and `canvas` is deliberately not
+    forwarded to the `_path_pos` call below, which resolves the cluster's
+    centre. Forwarding it there would level the centres too, and "the middle
+    cluster is above the others" would stop meaning the same thing on paper of
+    a different shape (R3, author 2026-08-12).
     """
     cluster_count = max(1, min(cluster_count, n))
     cluster_index = i % cluster_count
@@ -1193,8 +1229,16 @@ def _clustered_pos(
         * radius
         * 0.55
     )
-    x = cx + tx * along + nx * (cross + bend)
-    y = cy + ty * along + ny * (cross + bend)
+    # The band is built in a rotated frame, so the offset is rotated first and
+    # put on the short side second. Scaling `along` and `cross` before the
+    # rotation would turn the rotation itself into a shear on a canvas that is
+    # not square, and the band would come out neither its own shape nor the
+    # canvas's.
+    off_x = tx * along + nx * (cross + bend)
+    off_y = ty * along + ny * (cross + bend)
+    scale_x, scale_y = _short_side_scales(canvas)
+    x = cx + off_x * scale_x
+    y = cy + off_y * scale_y
     return _clamp01(x), _clamp01(y)
 
 
@@ -1330,7 +1374,9 @@ def _short_side_scales(canvas: CanvasSize | None) -> tuple[float, float]:
     """Per-axis factors that put a normalized extent on the short edge.
 
     Engine 30 did this for a mark's own size (`_size_px`); engine 31 does it for
-    what the arrangement layer spreads. A normalized extent becomes pixels
+    what the arrangement layer spreads -- the ring and the region -- and engine
+    32 for the cluster's band and a path's cross-axis spread. A normalized
+    extent becomes pixels
     through `canvas.width` on x and `canvas.height` on y, so on a non-square
     canvas the same number means a different number of pixels per axis. Scaling
     each axis by `unit / that axis` makes both come out `unit` pixels, which is
@@ -2199,6 +2245,7 @@ def _expand_arrangement_layout(
                 density=arr.density,
                 preserve_space=arr.preserve_space,
                 rhythm_spacing=arr.rhythm_spacing,
+                canvas=canvas,
             )
             for i in range(n)
         ]
@@ -2208,7 +2255,7 @@ def _expand_arrangement_layout(
     if arr.layout == "horizontal":
         if arr.path != "none":
             targets = [
-                _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing)
+                _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing, canvas)
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
@@ -2224,7 +2271,7 @@ def _expand_arrangement_layout(
     if arr.layout == "vertical":
         if arr.path != "none":
             targets = [
-                _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing)
+                _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing, canvas)
                 for i in range(n)
             ]
             result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]
@@ -2271,7 +2318,7 @@ def _expand_arrangement_layout(
 
     if arr.layout == "scatter":
         targets = [
-            _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing)
+            _path_pos(i, n, seed, margin, arr.path, arr.rhythm_spacing, canvas)
             for i in range(n)
         ]
         result = [_shift(ins, tx - ax, ty - ay) for tx, ty in targets]

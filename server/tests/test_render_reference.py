@@ -77,11 +77,16 @@ def test_render_reference_case_counts() -> None:
     # the five carrying a `radial` were every one of them square and not one
     # carried an `at.region`, so the corpus could not see either half of the
     # rule that keeps an arrangement's shape off the canvas aspect.
-    assert len(cases) == 569
+    # Engine 32 added thirteen to D: a cluster and three paths, each on the
+    # square canvas and on the papers whose long side is the axis it spreads
+    # on. The ten cluster and path cases the corpus already held are every one
+    # of them square, so the two arrangements that carry 36.2% of production's
+    # expanded marks had no non-square case anywhere in the record.
+    assert len(cases) == 582
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 64, "D": 48, "E": 119, "F": 128, "G": 50}
+    } == {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128, "G": 50}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -194,6 +199,60 @@ def test_engine_19_moves_the_tools_the_sheet_meets_and_no_others() -> None:
         }
         assert len(only) == expected, (group, len(only))
         assert only <= changed, sorted(only - changed)
+
+
+ENGINE_32_NEW_CASES = {
+    f"D-canvas-{aspect}-{subject}"
+    for subject, aspects in (
+        ("cluster", ("square", "pillar", "vertical", "wide")),
+        ("path-wave", ("square", "pillar", "vertical")),
+        ("path-diagonal", ("square", "pillar", "vertical", "wide")),
+        ("path-top_to_bottom", ("square", "wide")),
+    )
+    for aspect in aspects
+}
+
+
+def test_engine_32_moves_only_its_own_new_cluster_and_path_cases() -> None:
+    """engine 32 が動かしたのは、自分が足した 13 件だけである。
+
+    engine 32 は正方形では恒等なので、既存 569 件は 1 件も動かないのが正しい。
+    ⚠ したがって「差分が空でないこと」は主張の材料にならない —— 新規 ID は
+    すべて changed に数えられる (生成器の `case_id not in before`)。動く 9 件と
+    対照 4 件を manifest から見分けることはできず、判別力は摂動でしか示せない。
+    ここで測るのは「動いたのが新規 13 件と一致すること」だけ。
+
+    版の一致も見る。`default.py` と manifest がずれると、コーパスは走っている
+    実装ではなく別の実装の記録になる。
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "32" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == ENGINE_32_NEW_CASES
+    assert len(ENGINE_32_NEW_CASES) == 13
+
+
+def test_engine_32_cases_match_the_current_renderer() -> None:
+    """新しい 13 件を、凍結物ではなく生きた renderer で描き直して突き合わせる。
+
+    このファイルの他の検査は凍結 SVG と凍結 manifest を比べるので、`_path_pos`
+    や `_clustered_pos` を壊しても全部緑のままになる。群 G を生描きする検査が
+    同じ理由で置かれているが、G は全件 square なので engine 32 の規則を 1 つも
+    通らない。非正方形を通る生描きはここにしかない。
+
+    描画は bake 自身の呼び出しを通す。引数を書き写すと、生成器が鍵を送るのを
+    やめた日にこの検査だけが古い呼び方で緑になる。
+    """
+    generator = _generator()
+    manifest = _manifest()
+    inputs = generator.build_inputs()
+    checked = 0
+    for case_id in sorted(ENGINE_32_NEW_CASES):
+        svg = generator.render_case(inputs[case_id])
+        assert generator._normalized_digest(svg) == (
+            manifest["cases"][case_id]["digest"]
+        ), case_id
+        checked += 1
+    assert checked == 13
 
 
 def test_engine_18_palette_cases_cover_the_resolution_chain() -> None:

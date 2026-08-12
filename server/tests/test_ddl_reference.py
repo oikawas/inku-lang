@@ -74,7 +74,7 @@ def test_ddl_reference_versions_and_parts() -> None:
     # this layer carried a version number from the start and never a frozen
     # output. Freezing A and B alone would have recorded a version of a layer the
     # change never traversed, which is what engine 12 wrote two cases to avoid.
-    assert DDL_ENGINE_VERSION == "13"
+    assert DDL_ENGINE_VERSION == "14"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -114,15 +114,23 @@ def test_ddl_reference_versions_and_parts() -> None:
     # new branch's key in its branch report whether or not the branch fired, so
     # the digest moves everywhere and the transform moves in eight. No expand case
     # moves; the change lives entirely inside coerce, like engines 8 and 9.
-    assert len(manifest["cases"]) == 40
+    # Engine 14 (2026-08-12): every reader counts the same way (ledger I-212 to
+    # I-216). C gained the two cases the widened rules needed -- a count stated
+    # outside the naming phrase, and a bare numeral inside one -- so the part is
+    # six. A and B do not move: the readers this version widened are reached by
+    # the plugin layer, and the count a coerce case states was already read.
+    assert len(manifest["cases"]) == 42
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
     assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 23
-    assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 4
-    # Four, and all four are the new part. No carried-over case moves: the layer
-    # this version changed is reached by nothing in parts A and B.
+    assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 6
+    # Three entries, and they are two different quantities: `beside-cjk` is the
+    # one case whose judgement moved (one unit to twelve, because the exclusion is
+    # now cut by the body's language), and the other two are new files, which the
+    # manifest also calls changed. Reading the length alone would say "three cases
+    # moved" for a version that moved one.
     assert manifest["changed_from_previous"] == [
-        "C-plugin-count-as-a-numeral-beside-cjk", "C-plugin-count-in-an-english-body",
-        "C-plugin-count-in-the-phrase", "C-plugin-count-over-the-ceiling",
+        "C-plugin-count-as-a-bare-numeral", "C-plugin-count-as-a-numeral-beside-cjk",
+        "C-plugin-count-outside-the-phrase",
     ]
     assert sorted(
         case_id
@@ -231,10 +239,18 @@ def test_ddl_reference_plugin_expand_discriminators() -> None:
     declined = sorted(cid for cid, case in cases.items()
                       if case["part"] == "c_plugin_expand" and case["declined"])
     assert declined == ["C-plugin-count-over-the-ceiling"]
-    # Two cases whose only difference is `twelve` against `12` must not share a
-    # body, or the case that records the gap records nothing.
+    # The pair whose only difference is `twelve` against `12`. Until ddl engine
+    # 14 they had to differ: the numeral sat within twelve characters of the CJK
+    # in `Nature.青葉` and the reader dropped it whatever language the body was
+    # in, so the spelled-out case asked for twelve and the numeral case for one.
+    # The ruling cuts that exclusion by the language of the body (ledger I-216),
+    # and the two spellings now mean the same thing -- which is the claim, so the
+    # gate is the equality. Re-introducing the exclusion in an English body pulls
+    # the digests apart again and turns this red.
     assert (cases["C-plugin-count-in-an-english-body"]["digest"]
-            != cases["C-plugin-count-as-a-numeral-beside-cjk"]["digest"])
+            == cases["C-plugin-count-as-a-numeral-beside-cjk"]["digest"])
+    assert cases["C-plugin-count-in-an-english-body"]["units"] == \
+        cases["C-plugin-count-as-a-numeral-beside-cjk"]["units"]
 
 def test_ddl_reference_coerce_discriminators() -> None:
     cases = _manifest()["cases"]

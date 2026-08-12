@@ -450,3 +450,37 @@ def test_t17_both_added_cases_tell_the_old_judgement_from_the_new() -> None:
     # The old rule left a Japanese numeral with no counter alone, everywhere.
     assert _explicit_counts_from_ddl(bare, lang="ja") == frozenset()
     assert [int(entry["units"]) for entry in _expansion(bare, lang="ja").provenance] == [50]
+
+
+# --- T-25: where the two rulings meet ---------------------------------------
+
+
+def test_t25_a_bare_numeral_outside_the_phrase_is_read_and_the_exclusions_hold() -> None:
+    """Added by the accepting session: the input where I-215 meets I-213.
+
+    Widening to the sentence (I-215) enlarges the region a bare numeral is read
+    in (I-213), because the sentence names the plugin even where the phrase does
+    not. No acceptance in this file stands on that square: T-14 puts the numeral
+    inside the phrase, and T-15 measures the coerce reader, which never widens.
+    The composition was measured to be right on the day this was accepted -- the
+    point of the gate is that it stays right.
+
+    The second half is the half that can rot: the exclusions have to survive at
+    the wider scope, or a sentence that mentions an angle, a ratio, a label or an
+    axis starts placing that number of marks.
+    """
+    read = _expansion("Nature.下草を、画面下半分に50、散らす。", lang="ja")
+    assert [int(entry["units"]) for entry in read.provenance] == [50]
+
+    for body in (
+        "Nature.下草を、30度傾けて散らす。",  # an angle, caught by the axis table
+        "Nature.下草を、0.11 の半径で散らす。",  # a ratio, caught by the decimal rule
+        "Nature.下草を、A1-1 の入力に対する下半分へ置く。",  # a label
+        "Nature.下草を、四つの方向へ散らす。",  # the axis word the ruling added
+    ):
+        placed = [int(entry["units"]) for entry in _expansion(body, lang="ja").provenance]
+        assert placed == [1], f"{body} placed {placed}"
+
+    # And a count inside the phrase still wins over a number outside it.
+    both = _expansion("緑のNature.下草を50、30度傾けて散らす。", lang="ja")
+    assert [int(entry["units"]) for entry in both.provenance] == [50]

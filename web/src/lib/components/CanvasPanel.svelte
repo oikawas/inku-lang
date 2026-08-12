@@ -9,6 +9,7 @@
 	import type { LineageGraph, LineageNode } from './LineagePanel.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
+	import VariationLanes from './VariationLanes.svelte';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -134,6 +135,8 @@
 		variationGridTaskLabel: string;
 		variationGridDone: number;
 		variationGridTotal: number;
+		variationGridSlots: Array<'waiting' | 'running' | 'done'>;
+		variationGridSlotLabels: string[];
 		variationGridStatus: string | null;
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
@@ -272,6 +275,8 @@
 		variationGridTaskLabel = '',
 		variationGridDone = 0,
 		variationGridTotal = 0,
+		variationGridSlots = [],
+		variationGridSlotLabels = [],
 		variationGridStatus = null,
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
@@ -843,6 +848,11 @@
 											tokensOut={variationTokensOut}
 											onStop={variationGridBusy && variationGridCanAbort ? onAbortVariationCandidates : null}
 										/>
+										<!-- The candidates are drawn side by side, so the waiting
+										     is shown side by side too. -->
+										{#if variationGridBusy}
+											<VariationLanes states={variationGridSlots} labels={variationGridSlotLabels} />
+										{/if}
 									{/if}
 									</div>
 								</section>

@@ -496,6 +496,8 @@
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
+	/** Where one candidate of a fan-out is: queued for a lane, drawing, or done. */
+	type VariationSlotState = 'waiting' | 'running' | 'done';
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
 	let lineageIntermediateNotice = $state<string | null>(null);
@@ -511,6 +513,10 @@
 	// not "which one is being processed".
 	let variationGridDone = $state(0);
 	let variationGridTotal = $state(0);
+	// One entry per candidate, so the panel can show the fan-out as the several
+	// jobs it is rather than as a single counter that moves once at the end.
+	let variationGridSlots = $state<VariationSlotState[]>([]);
+	let variationGridSlotLabels = $state<string[]>([]);
 	let variationGridAbortController: AbortController | null = null;
 	let variationGridStatus = $state<string | null>(null);
 	let targetContextVersion = 0;
@@ -4776,6 +4782,8 @@ $effect(() => {
 			variationGridTaskLabel = '';
 			variationGridDone = 0;
 			variationGridTotal = 0;
+			variationGridSlots = [];
+			variationGridSlotLabels = [];
 			variationGridStatus = null;
 		}
 
@@ -5513,13 +5521,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// track the server's own render slot count. The 503 retry in apiFetch covers
 	// slots taken by other work.
 
-	async function runWithLimit<T>(thunks: Array<() => Promise<T>>, limit: number, onEach?: () => void): Promise<T[]> {
+	// The hooks are per job rather than per completion: a fan-out that only counts
+	// finishes cannot say which jobs are in flight, and the progress it draws
+	// looks like nothing happening until everything lands at once.
+	async function runWithLimit<T>(
+		thunks: Array<() => Promise<T>>,
+		limit: number,
+		hooks?: { onStart?: (index: number) => void; onDone?: (index: number) => void }
+	): Promise<T[]> {
 		const results = new Array<T>(thunks.length);
 		let next = 0;
 		const workers = Array.from({ length: Math.max(1, Math.min(limit, thunks.length)) }, async () => {
 			for (let index = next++; index < thunks.length; index = next++) {
+				hooks?.onStart?.(index);
 				results[index] = await thunks[index]();
-				onEach?.();
+				hooks?.onDone?.(index);
 			}
 		});
 		await Promise.all(workers);
@@ -5573,6 +5589,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		variationGridStatus = null;
 		variationGridDone = 0;
 		variationGridTotal = count;
+		// Seated before the seeds are asked for, so the lanes are on screen for
+		// the whole run rather than appearing once the first job starts.
+		variationGridSlotLabels = Array.from({ length: count }, () => '');
+		variationGridSlots = Array.from({ length: count }, () => 'waiting' as VariationSlotState);
 		const abortTimer = window.setTimeout(() => {
 			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
 		}, 3000);
@@ -5585,27 +5605,44 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
 			// 変奏の seed 採番はサーバー側なので、候補生成前に count 個まとめて確保する。
 			const variationSeeds = kind === "variation" ? await allocateVariationSeeds(amplitude ?? "medium", count) : [];
-			const jobs = Array.from({ length: count }, (_, index) => {
+			// The label is lifted out of the job so the lane can be named before the
+			// job that fills it has started.
+			const plans = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
-					return () => renderWordTouchCandidate(normalizedTouchWords, t().canvasVaryPerformance, abortController.signal);
+					const label = t().canvasVaryPerformance;
+					return { label, run: () => renderWordTouchCandidate(normalizedTouchWords, label, abortController.signal) };
 				}
 				if (kind === "layout") {
 					const compositionSeed = createSafeIntegerSeed(usedVarySeeds);
 					usedVarySeeds.add(compositionSeed);
-					return () => composeVariationCandidate(compositionSeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
+					const label = t().canvasVaryComposition + " " + sequence;
+					return { label, run: () => composeVariationCandidate(compositionSeed, label, abortController.signal) };
 				}
 				if (kind === "reading") {
-					return () => interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
+					const label = t().canvasVaryInterpretation + " " + sequence;
+					return { label, run: () => interpretationVariationCandidate(label, abortController.signal) };
 				}
 				if (kind === "variation") {
-					return () => variationCandidateLabel(amplitude ?? "medium", variationSeeds[index], t().variationTitle + " " + sequence, abortController.signal);
+					const label = t().variationTitle + " " + sequence;
+					return { label, run: () => variationCandidateLabel(amplitude ?? "medium", variationSeeds[index], label, abortController.signal) };
 				}
 				const catalogId = catalogIds[index];
-				return () => renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
+				const label = t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId);
+				return { label, run: () => renderColorCatalogCandidate(catalogId, label, abortController.signal) };
 			});
-			variationCandidates = await runWithLimit(jobs, renderFanoutLimit, () => {
-				if (variationGridAbortController === abortController) variationGridDone += 1;
+			variationGridSlotLabels = plans.map((plan) => plan.label);
+			variationGridSlots = plans.map(() => 'waiting' as VariationSlotState);
+			const seatSlot = (index: number, state: VariationSlotState) => {
+				if (variationGridAbortController !== abortController) return;
+				variationGridSlots = variationGridSlots.map((current, i) => i === index ? state : current);
+			};
+			variationCandidates = await runWithLimit(plans.map((plan) => plan.run), renderFanoutLimit, {
+				onStart: (index) => seatSlot(index, 'running'),
+				onDone: (index) => {
+					seatSlot(index, 'done');
+					if (variationGridAbortController === abortController) variationGridDone += 1;
+				},
 			});
 			for (const candidate of variationCandidates) {
 				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
@@ -6561,6 +6598,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{variationGridTaskLabel}
 				{variationGridDone}
 				{variationGridTotal}
+				{variationGridSlots}
+				{variationGridSlotLabels}
 				{variationGridStatus}
 				runTokensIn={activeRunTokensIn}
 				runTokensOut={activeRunTokensOut}

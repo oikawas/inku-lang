@@ -56,6 +56,11 @@ REGION_GRID = {
     **REGION_SINGLE,
     "arrangement": {"count": 12, "layout": "grid", "jitter": 0.0},
 }
+REGION_SCATTER = {
+    **REGION_SINGLE,
+    "arrangement": {"count": 12, "layout": "scatter", "margin": 0.1,
+                    "jitter": 0.0},
+}
 
 
 def _placed_px(
@@ -243,30 +248,42 @@ def test_square_canvas_returns_the_region_unchanged(region: list[float]):
     assert _region_in_short_side_units(region, square) == tuple(region)
 
 
-def test_square_canvas_svg_is_byte_identical_without_the_rule(monkeypatch):
+@pytest.mark.parametrize(
+    "name,instructions",
+    [
+        ("region-single", [REGION_SINGLE]),
+        ("region-grid", [REGION_GRID]),
+        ("region-scatter", [REGION_SCATTER]),
+        ("all-three-sites", [RING, REGION_SINGLE, REGION_GRID]),
+    ],
+)
+@pytest.mark.parametrize("render_seed", (7, 12345))
+def test_square_canvas_svg_is_byte_identical_without_the_rule(
+    monkeypatch, name: str, instructions: list[dict], render_seed: int
+):
     """T-7, at the drawing: engine 31 changes nothing on a square canvas.
 
     The comparison is against the rule switched off, which is what the previous
-    engine did on this path -- the short-side factors are exactly 1.0 on a
-    square canvas, so the two have to agree byte for byte. The score below runs
-    all three sites the ruling touches: the ring, the single region mark and
-    the grid over a region.
+    engine did here -- the short-side factors are exactly 1.0 on a square
+    canvas, so the two have to agree byte for byte.
+
+    Both subject and seed are varied because one score is not enough to see
+    this: the drift the shortcut prevents is 2.78e-17, and whether it crosses a
+    rounding boundary depends on which region, which mark index and which seed.
+    A single combined score run at one seed stays green while two of the frozen
+    square cases move.
     """
     score_input = {
         "version": "0.1.0", "canvas": "square", "background": "white",
-        "instructions": [
-            copy.deepcopy(RING),
-            copy.deepcopy(REGION_SINGLE),
-            copy.deepcopy(REGION_GRID),
-        ],
+        "instructions": [copy.deepcopy(item) for item in instructions],
     }
 
     def draw() -> str:
         return render(
             Score.model_validate(copy.deepcopy(score_input)),
-            render_seed=7,
-            composition_seed=7,
-            svg_profile="display",
+            render_seed=render_seed,
+            composition_seed=render_seed,
+            svg_profile="editable",
         )
 
     with_rule = draw()

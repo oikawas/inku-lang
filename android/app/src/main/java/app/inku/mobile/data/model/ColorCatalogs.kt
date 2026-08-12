@@ -74,6 +74,8 @@ object ColorCatalogs {
 
     private val byId = all.associateBy { it.id }
 
+    fun find(id: String?): ColorCatalog? = byId[id]
+
     fun get(id: String?): ColorCatalog = byId[id] ?: byId.getValue("default")
 
     fun paletteFor(id: String): Map<String, String> = when (id) {

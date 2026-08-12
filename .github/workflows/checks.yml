@@ -11,6 +11,9 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
 jobs:
   server:
     runs-on: ubuntu-latest

@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-12 — Unreleased v2.13.9 Baseline (Web Build 894)
+
+Updated the 13 places that name a version to v2.13.9 / Build 894, and rewrote the UI mode description in §3 of `Creating Images` now that the Simple UI keeps its history.
+
+- **The history is available under the Simple UI.** A work can be looked at again afterwards and taken out as one sheet with `Share card` (the card has two doors: the canvas toolbar and the history panel).
+- **The canvas toolbar stays in every mode.** Under the Simple UI, `Share card` is the only control on it.
+- **The history strip gained `Oldest` and a `for revision` filter.**
+- **During a batch run the input area becomes the one line being painted**, with the sketch below it.
+- **A four-way generation shows its progress as four lanes, one per candidate.**
+- **Copying from a lineage hands over the digest alone** (64 hex characters); the scheme name (`rh3` and the like) is shown in the heading.
+
 ## 2026-08-12 — Unreleased v2.13.8 Baseline (Web Build 893)
 
 Updated the 13 places that name a version to v2.13.8 / Build 893, and added a sentence to §7 of `Creating Images` now that an arrangement of marks no longer depends on the canvas ratio either.

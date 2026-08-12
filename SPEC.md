@@ -719,9 +719,14 @@ paring a text down.
 **How much is shown is the writer's choice (v2.9.8).** The number of tools on
 screen is too many for someone opening inku for the first time and too few for
 someone building a work up, so the visible surface is one of three **UI modes**,
-stored per logged-in user in the server database. **Simple UI** shows only what
-is required — the user menu, the way into settings, the single description
-input, the drawing controls and the canvas. **Full UI** shows everything, as
+stored per logged-in user in the server database. **Simple UI** shows what
+is required and the history — the user menu, the way into settings, the single
+description input, the drawing controls, the canvas and the history. **History
+is one of the required things so that the simple screen is not one where a work
+is drawn, looked at and lost, and because both doors that take a work out as one
+sheet (the share card) belong to the history group** (v2.13.9). **The canvas
+toolbar stays in every mode**; under Simple UI the share card is the only control
+left on it. **Full UI** shows everything, as
 before. **Custom UI** adds any of seven groups (batch drawing, drawing settings,
 instruction tools, detailed status, work tools, history, auxiliary controls) to
 that required set. **A newly created account starts in Simple UI.** A mode

@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.8 (Web Build 893). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.9 (Web Build 894). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -34,11 +34,11 @@ The UI language and the description language are separate. Ordinary painting det
 
 | UI mode | Contents |
 |---|---|
-| Simple UI | Shows only the essential items |
+| Simple UI | Shows the essential items and the history |
 | Full UI | Shows every available item |
 | Custom UI | Adds the items you choose to the essential ones |
 
-The user menu, settings, single description and painting, and the canvas are always visible. Custom UI can add seven groups: batch and demo; model, color, sketch, and canvas settings; view and edit instructions; timing, tokens, and provenance; refinement, comparison, export, and work actions; history and work navigation; theme, language, and work information.
+The user menu, settings, single description and painting, the canvas and the history are always visible. **The history is always there so that a work can be looked at again and taken out as one sheet with `Share card`** (the card has two doors, one on the canvas toolbar and one in the history panel, and both belong to the history side). Custom UI can add seven groups: batch and demo; model, color, sketch, and canvas settings; view and edit instructions; timing, tokens, and provenance; refinement, comparison, export, and work actions; history and work navigation; theme, language, and work information.
 
 This manual assumes Full UI. Under Simple UI some of the operations described here are not on screen.
 

@@ -5717,3 +5717,45 @@ old Japanese title and was changed with it.** **No code changed.** `check_docs.p
   Kotlin renderer still carries the same anisotropy (ledger I-217, a separate contract). **⚠ Three call sites in
   `gen_android_reference.py` resolve the performance without passing a `canvas`**, so when I-217 ports this,
   those sites need one or the Android expectations will keep asserting pre-31 behaviour.
+
+### v2.13.9 — Every mode keeps its history, and a work leaves from there as one sheet (Build 894, 2026-08-12, one contract plus ten dialogue-driven UI improvements)
+
+- **The Simple UI now keeps its history.** Until now the simple screen was one where a work is **drawn, looked at
+  and lost**: **both doors that take a work out as one sheet (the share card) belong to the history group**, so
+  under Simple UI both were closed. **`SIMPLE_UI_VISIBILITY.history` is now true and the canvas toolbar stays in
+  every mode** (under Simple UI the share card is the only control left on it). The principle that **a mode
+  changes the display layer and nothing else** is unchanged.
+- **The trash count is read from one source** (ledger I-218). Two props carried the same quantity; the `$effect`'s
+  dependency was **pointed at that same one** rather than dropped — dropping it would stop the lineage from being
+  refetched when a work moves in or out of the trash.
+- **A dead path was removed** (ledger I-206): `preloadHistoryManagerFirstPage` and `preloadFirstPage` were never
+  reached.
+- **The page size has a canonical source** (ledger I-205). **`calculatePageSize`, which measures the real grid, is
+  the canonical one**; the page-side function is **an estimate for the first fetch before the modal opens**. Both
+  constants now agree with the CSS (`minmax(142px, 1fr)`), and the gate is **"the formula agrees with the CSS"**
+  rather than "the two numbers are equal".
+- **The English label for the root of a lineage is `Origin`, not `Root`** (ledger I-179). The Japanese `起点` is
+  unchanged.
+- **The layer versions are named the same way everywhere** (`Render engine version` / `DDL version` / `DDL engine
+  version`), and **the info modal now shows all three**.
+- **During a batch run the input area becomes the one line being painted**, with the sketch shown in the space
+  that frees up, and the observation block **names the line of the body its content came from**.
+- **A four-way generation is shown as the four parallel jobs it is** (one lane per candidate; the mascot is the
+  unselected one and the phases are scattered at random).
+- **The history strip gained an `Oldest` button and a `for revision` filter.** Its pressed state reads the same
+  `--action-bg` / `--action-fg` as the history manager.
+- **Deleting the displayed work from the modal now moves the canvas with the strip** as it reseats.
+- **A hash's scheme (`rh3:` and the like) is a property of the value, not part of it.** The reading is collected in
+  `web/src/lib/hashIdentity.ts`, and **a copy hands over the digest alone**. **⚠ The stored form is still
+  `<scheme>:<digest>`, and neither the server nor the database changed by a byte** — what changed is what a copy
+  puts on the clipboard, and **the prefixed form matched nothing anywhere in the app** (lookup is by the last four
+  characters).
+- **Checks:** **web 245 passed / 0 failed** (20 new; one existing test was rewritten, leaving the count unchanged),
+  **`npm run check` 253 FILES / 0 ERRORS / 2 WARNINGS** (the two existing a11y ones), **`lint:i18n` 1,049 strings /
+  0 warnings / 0 errors** (one new string), **server 2,978 passed / 31 skipped**, **cli 220 passed**, **ruff clean**.
+  **Eleven perturbations, no misses.** ⚠ **Sixteen tests turned red against a prediction of twelve, and all four
+  discrepancies were on the "redder than predicted" side.** A metagate left by an earlier contract, which runs every
+  other test file in a child process, is dragged in by every perturbation, which brings the total to 27.
+- **⚠ The contract covers the first commit only; the other ten are an override the author gave on 2026-08-12**
+  (one item at a time: instruction, implementation, look at the screen, commit). **All of them are closed inside
+  `web`; not one needed a server change.**

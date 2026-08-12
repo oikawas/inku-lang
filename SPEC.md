@@ -107,7 +107,7 @@ It stands at the intersection of three traditions:
 3. Emotional adjectives are excluded from core vocabulary.
 4. Physical, spatial, material, and motion words are preferred.
 5. Coordinates carry no absolute dimensions such as pixels, so one description applies to a wall as readily as to a screen. The aspect ratio is not fixed either: it is a constraint that shapes the world of the work, not a dimension the description carries.
-6. Output is still image SVG; the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "solid", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92.
+6. Output is still image SVG; the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "flat", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92.
 7. The input language is constrained enough to support iteration.
 8. Optional concrete worlds belong in plugins, not the core language.
 9. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (see "Principles that outlast a version" in the [render engine version history](docs/spec/render-engine-history.md)).
@@ -134,7 +134,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
 | touches | てざわり | silverpoint, pencil, pen (default), rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
 | continuity | つらなり | solid (default), dashed, dotted, dash-dot |
-| surfaces | おもて | empty (default), solid, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
+| surfaces | おもて | empty (default), flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
 | relations | あいだ | along, not touching, cutting, between, touching — with fixed phrases such as `along the previous line` and `touching the previous arc at both ends` |
@@ -168,13 +168,13 @@ wide / byobu / vertical.
 - **the surfaces category holds state nouns for how a surface is** (added by the
   author's ruling of 2026-08-12): where continuity says how a *line* is (solid,
   dashed, dotted, dash-dot), surfaces says **how the inside of a closed shape
-  is**. **No verbs** -- "solid", not "to paint". A word for the act would collide
+  is**. **No verbs** -- "flat", not "to paint". A word for the act would collide
   both with §2 principle 6 and with "placing rather than drawing", and stays out
   for the same reason 描く was pruned. It carries two dimensions, **quality**
-  (empty, solid, pale ink wash, grain, stipple, hatch, crosshatch, bleeding,
+  (empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding,
   aquatint) and **density** (dense, faint), the same shape movements has with its
   amplitude, frequency, and quality. **`dense` and `faint` are relative, never an
-  absolute darkness**: the same solid fill varies widely with the tool (measured
+  absolute darkness**: the same flat fill varies widely with the tool (measured
   mean luminance 17.4 to 131.1 at the native 1618px). **Paper grain does not
   belong here** -- it is a quality of the support, and `Ground:` takes it. **An
   instruction to fill the background is not about a surface** either; it goes to

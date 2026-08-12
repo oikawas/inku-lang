@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.11 / Build 896**
+**Target version: v2.13.12 / Build 897**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -103,8 +103,8 @@ To learn why something took its current shape, search the changelog by term, ver
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 31 | `server/src/inku_server/render_engines/default.py` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 14 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.23` | `android/VERSION` (a namespace separate from web and server) |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 15 | `server/src/inku_server/layer_versions.py` |
+| Android | `2.1.4-android.24` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -122,6 +122,10 @@ holds the mapping to Japanese terms.
 The saijiki table is a single source: the Stage 1 prompt vocabulary block, plugin closure markers,
 relation phrases, the web Saijiki display, and reference §1 are all derived from it.
 Vocabulary changes go through the table and its golden tests.
+The saijiki holds ten categories, and `おもて` / surfaces (eleven words) says how the inside of a
+closed shape is (ddl-engine 15) — the counterpart to continuity, which says how a line is, with
+state nouns rather than actions. A surface attached to an instruction that encloses nothing is moved
+by coerce to the closed shape before it, and dropped where there is none.
 
 ### Pipeline layers
 
@@ -297,7 +301,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-31` (569 cases) and `ddl-engine-14` (42 cases) are current, and CI enforces
+`render-engine-31` (569 cases) and `ddl-engine-15` (45 cases) are current, and CI enforces
 byte-identical regeneration.
 - **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
 same way. The port reads the directory for the version it declares, so **raising the server engine

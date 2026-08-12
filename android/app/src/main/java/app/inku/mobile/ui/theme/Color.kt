@@ -143,6 +143,7 @@ val SaijikiGroupAmber = Color(0xFFF2B66D)
 val SaijikiGroupSlate = Color(0xFFAEB7D8)
 val SaijikiGroupBlossom = Color(0xFFE7A9C1)
 val SaijikiGroupMoss = Color(0xFFC3CC91)
+val SaijikiGroupShell = Color(0xFFD8C4B6)
 
 // --- Status -----------------------------------------------------------------
 

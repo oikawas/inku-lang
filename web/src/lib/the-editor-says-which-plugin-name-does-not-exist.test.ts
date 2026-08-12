@@ -119,15 +119,34 @@ test('T-5: the English phrases fire too, and each name is listed once', () => {
 
 // ── T-7: the four callers that hand over no index ──────────────────────────
 
+// 2026-08-12, ddl-engine 15: the saijiki gained おもて / surfaces, and 薄墨 is
+// one of its eleven words. The editor paints a saijiki word wherever it stands,
+// so the four frozen cases that spell 薄墨 now wrap it -- a consequence of the
+// vocabulary growing, not of the plugin-name index this contract added. The
+// fixture is declared, not rebaked: unwinding this one substitution has to
+// reproduce the frozen bytes exactly, so any other drift still fails.
+const DECLARED_SUBSTITUTIONS: readonly [RegExp, string][] = [
+	[/<span class="ddl-token ddl-token-word">薄墨<\/span>/g, '薄墨']
+];
+
 test('T-7: without the index the output is byte-identical to the branch point', () => {
 	const frozen = JSON.parse(
 		read('fixtures/highlight-without-plugin-names.2f98dbc8.json')
 	) as Record<string, string>;
 	assert.ok(Object.keys(frozen).length >= 60, 'the frozen corpus is thinner than it was');
+	let declared = 0;
 	for (const [key, expected] of Object.entries(frozen)) {
 		const [text, caret] = JSON.parse(key) as [string, number | null];
-		assert.equal(highlightDDL(text, caret), expected, `changed for ${key}`);
+		const actual = highlightDDL(text, caret);
+		if (actual === expected) continue;
+		const unwound = DECLARED_SUBSTITUTIONS.reduce(
+			(html, [pattern, plain]) => html.replace(pattern, plain),
+			actual
+		);
+		assert.equal(unwound, expected, `changed for ${key}`);
+		declared += 1;
 	}
+	assert.equal(declared, 4, 'the declared substitution covers four cases, no more and no fewer');
 });
 
 test('T-7: the four callers pass no index, and the editor passes one', () => {

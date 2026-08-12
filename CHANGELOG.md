@@ -5935,3 +5935,58 @@ opened the item: `--scan-build`, passed alone to *read* the next number, stamped
   handoff still carried `--dry-run` and a bump without `--write`. **The implementing session had updated the
   conventions, `CLAUDE.md`, and the memory; these two documents were missed.**
 - **Not one byte of product behaviour changed** (only `scripts/` and `server/tests/` were touched).
+
+### v2.13.12 — A shape can say how its surface is (the saijiki gains `おもて` / surfaces, ddl-engine 15) (Build 897, 2026-08-12)
+
+**The lower layers held the mechanism and the upper layer had no word for it.** Among the 1,139 works holding a
+closed shape, a fill was **asked for in words** in **1.3%** of them (15), while **96.7% of the works that came out
+filled** (235 of 243) had never been asked to be. The cause was that **the words Stage 1 can write and the words
+Stage 2 reads had an empty intersection in Japanese** — Stage 1 wrote 埋める and Stage 2 read 塗る. An
+**eleven-word category, `おもて` / `surfaces`**, now stands directly after `つらなり` / continuity: **where
+continuity says how a line is, surfaces says how the inside of a closed shape is.**
+
+- **The words are state nouns, never actions** (author's ruling) — Japanese takes the noun **塗り** (not the verb
+  塗る) and English takes **`flat`**. `solid` was not available: **continuity's `実線` already holds it**, and two
+  adjacent lines of the vocabulary block would have carried the same word with different meanings. `fill` was not
+  available either — movements' `埋める` holds it. **`flat` collides with no word in the ten categories or the
+  relations** (checked mechanically).
+- **The eleven words**: empty (default), flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding,
+  aquatint, dense, faint. **Paper grain stays out** — it is a quality of the support, so `Ground:` keeps it.
+  **`にじみ` (a noun) is kept apart from movements' `滲む` (a verb) by part of speech.**
+- **Defect A fixed (the two sides named the same thing differently)** — Stage 1 wrote `面: 斜めに埋める。` while
+  the Stage 2 table read `平行線`. **It appeared four times in DDL and zero times in a Score.** Both sides now
+  say `平行線` / `hatch` (**Stage 1 already had `面: 平行線（粗から密）。`; only one of its two phrasings was
+  missing from the table**).
+- **Defect B fixed (a surface on a line drew not one pixel)** — the renderer requires a closed shape in two
+  places, so **a `surface` on a line or an arc is never drawn. Measured: 798 of 1,495 surfaces (53.4%) were dead**
+  (739 on `line`, 59 on `arc`; `wash` 453, `grain` 251, `bleed` 83, `paper_grain` 9, `hatch` 2). **A deterministic
+  layer (coerce) now moves such a surface to the nearest closed shape before it, and drops it where there is none
+  or where that shape already carries one** (**never guessing an interior into being, and never duplicating one
+  texture request across two instructions**). The branch records itself in `coerce_branch_counts`, and **it is
+  wired into the `INKU_COERCE_DISABLE` exit too** — whether a thing can be drawn is not a matter of style.
+- **`_CLOSED_SHAPES` moved to `schema.py`** — coerce held five scattered copies that were missing `cloudform`,
+  and **two layers deciding separately means one of them is always the stale one.**
+- **The metadata reported textures that were never drawn** — `build_texture_metadata` now uses the renderer's test.
+- **`DDL_ENGINE_VERSION` 14 to 15, and `ddl-engine-15/` holds 45 cases** (42 + 3). **⚠ The three added cases are
+  the ones that traverse this change** — not one of the 42 inputs frozen at 14 carried a `面:` clause, so refreezing
+  as it stood would have produced **the same corpus with a new version marker**, and the digest gate would have
+  measured nothing.
+- **⚠ The reach is not there yet (measured)** — `面: 塗り。` reaches `filled=true` **0 times out of 4**, and the
+  pre-existing English `Fill it solid.` **0 out of 1**, so **it is not that the word is new**. Texture does arrive:
+  `薄墨` to `wash` **4/4**, `平行線` to `hatch` **2/4** (the model chose `paper_grain`, which is not in the table,
+  for the other two). **The coerce move fired 4/4 in production, leaving zero surfaces on open shapes.**
+- **⚠ Three side findings, none of them addressed (all filed in the ledger)** — (1) `面: 薄墨。` came out fainter
+  than the default (0.35/0.28 to 0.20/0.15): the model applies the new Stage 2 line to **the 薄 in 薄墨 itself**;
+  (2) Stage 2 picks `paper_grain` out of the enum although the table never offers it; (3) `layer_versions.py`
+  carries no note for engine 14.
+- **Checks:** **server 3,048 passed / 31 skipped** (15 new), **cli 224 passed**, **web 272 passing** (0 type
+  errors, the two known a11y warnings unchanged), **frozen corpora byte-identical**, **Android JVM 269 tests / 0
+  failures**, `check_docs.py` consistent. **All fourteen perturbations turned something red.**
+- **⚠ Three things were fixed on the accepting side** — **(1) four frozen web fixtures** (the editor paints every
+  saijiki word, so `薄墨` gained colour the moment it became one): **the fixture was not rebaked; the substitution
+  is declared and the test pins it at exactly four cases**; **(2) the four duplicated prompt constants in Kotlin**
+  (`WebDdlSpec.kt` — when the server's wording moves, `PromptFingerprintTest` must go red; **a tool now copies
+  them over wholesale**); **(3) the Android saijiki UI**, whose colour list held ten entries, so **the eleventh
+  category quietly borrowed the first one's colour** (the lookup is `[index % size]`, which cannot fail).
+- **⚠ This version moves the prompt layer and the clients; `render_engine_version` stays at 31.**
+

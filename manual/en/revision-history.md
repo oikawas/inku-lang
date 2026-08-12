@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-12 — Unreleased v2.13.12 Baseline (Web Build 897)
+
+Updated the 13 places that name a version to v2.13.12 / Build 897. **The Saijiki gains `Surfaces`, so a description can say how the inside of a shape is** (a row was added to the vocabulary table in §3 of `Creating Images`).
+
+- **`Surfaces` holds eleven words for how the inside of a closed shape is:** empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, and faint. The default is `empty`.
+- **The words are state nouns, not actions.** Write "flat", not "to paint".
+- **`Dense` and `faint` are relative.** They stand alone or attach to another surface word, as in "pale ink wash (dense)".
+- **Paper grain does not belong to `Surfaces`.** It is a quality of the support, so the ground still takes it.
+- **A surface attached to a line now moves to the closed shape before it,** and is dropped where there is none. Until now a surface on a line or an arc was never drawn at all.
+
 ## 2026-08-12 — Unreleased v2.13.11 Baseline (Web Build 896)
 
 Updated the 13 places that name a version to v2.13.11 / Build 896. **The describe panel folds differently and a plugin word looks different in the Saijiki** (explanations were added to §4 and §5 of `Creating Images`). The CLI gains one flag (`CLI Reference`).

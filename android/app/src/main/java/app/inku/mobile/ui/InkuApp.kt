@@ -371,6 +371,10 @@ private val saijikiGroupColors = listOf(
     SaijikiGroupSlate,
     SaijikiGroupBlossom,
     SaijikiGroupMoss,
+    // The eleventh, for おもて / surfaces (ddl-engine 15). The lookup is
+    // `[index % size]`, so a list one short takes the first colour again
+    // instead of failing.
+    SaijikiGroupShell,
 )
 
 /**

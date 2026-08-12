@@ -219,8 +219,8 @@ DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `t
 番人は CLI 側に 2 つ置いた（`--tenkei` が `SystemExit` になること／
 **旗の一覧そのものに `tenkei` を含むものが無いこと**。名指しの一覧は穴を残すため）。
 
-> **歳時記のローマ字は別扱いである。** `/api/saijiki` と歳時記のカテゴリ鍵 9 個
-> （`katachi` / `katamuki` / `tezawari` / `tsuranari` / `iro` / `yuragi` / `basho` / `ugoki` / `wariai`）は
+> **歳時記のローマ字は別扱いである。** `/api/saijiki` と歳時記のカテゴリ鍵 10 個
+> （`katachi` / `katamuki` / `tezawari` / `tsuranari` / `omote` / `iro` / `yuragi` / `basho` / `ugoki` / `wariai`）は
 > **辞書が 歳時記 = `Saijiki`（固有名詞・大文字）と定めているとおりで、ローマ字が正しい英語表記**である。
 > `renga` / `hacho` も同じ扱い。**`sumi` / `washi` は識別子ではなく DDL の語彙値**
 > （`sumi` は `black` の同義語として `ink` / `obsidian` / `黒` と並ぶ、記述者が書く語）。

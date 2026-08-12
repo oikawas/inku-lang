@@ -35,6 +35,15 @@ ScoreVersion = Literal["0.1.0"]
 Primitive = Literal[
     "line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "cloudform"
 ]
+# The primitives that enclose an interior, and so the only ones a `surface` is
+# drawn on. It lives here because two layers decide by it and they must not
+# decide differently: the renderer skips the surface of anything outside this
+# set, and coerce moves a surface off an instruction the renderer would skip.
+# A copy in the second layer would freeze whatever the first layer had on the
+# day it was copied.
+CLOSED_SHAPES = frozenset(
+    {"circle", "ellipse", "square", "triangle", "polygon", "cloudform"}
+)
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 Weight = Literal[
     "silverpoint",

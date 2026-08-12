@@ -27,6 +27,12 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['実線', '破線', '点線', '一点鎖線']
 	},
 	{
+		key: 'omote',
+		label: 'おもて',
+		en: 'surfaces',
+		words: ['空', '塗り', '薄墨', '粒', '点', '平行線', '交差線', 'にじみ', 'アクアチント', '濃い', '薄い']
+	},
+	{
 		key: 'iro',
 		label: 'いろ',
 		en: 'colors',
@@ -88,6 +94,12 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		label: 'つらなり',
 		en: 'continuity',
 		words: ['solid', 'dashed', 'dotted', 'dash-dot']
+	},
+	{
+		key: 'omote',
+		label: 'おもて',
+		en: 'surfaces',
+		words: ['empty', 'flat', 'pale ink wash', 'grain', 'stipple', 'hatch', 'crosshatch', 'bleeding', 'aquatint', 'dense', 'faint']
 	},
 	{
 		key: 'iro',

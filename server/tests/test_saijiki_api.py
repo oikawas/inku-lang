@@ -95,6 +95,17 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "tsuranari": (
         ("実線", "solid"), ("破線", "dashed"), ("点線", "dotted"), ("一点鎖線", "dash-dot"),
     ),
+    # おもて (2026-08-12).
+    # おもて's 塗り is `flat` and not `solid`: つらなり's 実線 already holds `solid`,
+    # and one word in two adjacent lines of the vocabulary block meaning two
+    # different things is a collision the author ruled out (2026-08-12). The
+    # Japanese is the noun 塗り, not the verb 塗る, by the same ruling.
+    "omote": (
+        ("空", "empty"), ("塗り", "flat"), ("薄墨", "pale ink wash"), ("粒", "grain"),
+        ("点", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
+        ("にじみ", "bleeding"), ("アクアチント", "aquatint"),
+        ("濃い", "dense"), ("薄い", "faint"),
+    ),
     "iro": (
         ("白", "white"), ("黒", "black"), ("青", "blue"),
         ("赤", "red"), ("緑", "green"), ("灰", "gray"),

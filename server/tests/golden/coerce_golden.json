@@ -24,6 +24,7 @@
   "with_shape_delivery_repair",
   "with_stated_count_fidelity",
   "with_structural_duplicate_repair",
+  "with_surface_on_a_closed_shape",
   "with_total_density_budget",
   "with_unintentional_filled_shape_tempering",
   "with_visual_event_type_hints",
@@ -56,6 +57,7 @@
   "with_shape_delivery_repair",
   "with_stated_count_fidelity",
   "with_structural_duplicate_repair",
+  "with_surface_on_a_closed_shape",
   "with_total_density_budget",
   "with_unintentional_filled_shape_tempering",
   "with_visual_event_type_hints",
@@ -336,6 +338,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -918,6 +921,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -1592,6 +1596,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -1969,17 +1974,7 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "bleed",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.7,
-        "bleed": 0.2,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 2,
-        "seed": 1234567890
-       }
+       "surface": null
       }
      ]
     },
@@ -2009,6 +2004,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 1,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -2284,6 +2280,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -2421,17 +2418,7 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "wash",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.6,
-        "bleed": 0.2,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 3,
-        "seed": null
-       }
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -2605,6 +2592,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 1,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -2909,7 +2897,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "grain",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.6,
+        "bleed": 0.1,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 2,
+        "seed": 1234567890
+       }
       },
       {
        "primitive": "line",
@@ -2971,17 +2969,7 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "grain",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.6,
-        "bleed": 0.1,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 2,
-        "seed": 1234567890
-       }
+       "surface": null
       },
       {
        "primitive": "polygon",
@@ -3049,6 +3037,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 2,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -3404,6 +3393,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -3816,6 +3806,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -4204,7 +4195,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "wash",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.6,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       },
       {
        "primitive": "line",
@@ -4266,17 +4267,7 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "wash",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.6,
-        "bleed": 0.0,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 3,
-        "seed": null
-       }
+       "surface": null
       },
       {
        "primitive": "line",
@@ -4338,17 +4329,7 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "grain",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.28,
-        "bleed": 0.0,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 3,
-        "seed": null
-       }
+       "surface": null
       },
       {
        "primitive": "line",
@@ -4411,17 +4392,7 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "bleed",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.28,
-        "bleed": 0.0,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 3,
-        "seed": null
-       }
+       "surface": null
       },
       {
        "primitive": "arc",
@@ -4511,6 +4482,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 4,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -4952,6 +4924,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -5217,6 +5190,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -5370,17 +5344,7 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "wash",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.8,
-        "bleed": 0.1,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 3,
-        "seed": 1234567890
-       }
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -5608,6 +5572,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 1,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -6179,6 +6144,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -6520,6 +6486,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -6853,6 +6820,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -7148,6 +7116,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -7491,6 +7460,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -7695,17 +7665,7 @@
        },
        "relation": null,
        "thinness": null,
-       "surface": {
-        "texture": "grain",
-        "density": 0.35,
-        "scale": 0.35,
-        "opacity": 0.8,
-        "bleed": 0.1,
-        "direction": "none",
-        "spacing_gradient": "none",
-        "tone_steps": 2,
-        "seed": 1234567890
-       }
+       "surface": null
       },
       {
        "primitive": "ellipse",
@@ -7845,6 +7805,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 1,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -8245,6 +8206,7 @@
      "with_shape_delivery_repair": 1,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -8555,6 +8517,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -8922,6 +8885,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -9108,6 +9072,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -9213,6 +9178,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -9405,6 +9371,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -9624,6 +9591,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -9765,6 +9733,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -9899,6 +9868,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 1,
      "with_visual_event_type_hints": 0,
@@ -10007,6 +9977,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -10129,6 +10100,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -10253,6 +10225,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -10369,6 +10342,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -10509,6 +10483,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -10641,6 +10616,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -10793,6 +10769,7 @@
      "with_shape_delivery_repair": 1,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -10916,6 +10893,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -11045,6 +11023,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 1,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -11171,6 +11150,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -11407,6 +11387,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 2,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -11585,6 +11566,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 0,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 1,
@@ -11779,6 +11761,7 @@
      "with_shape_delivery_repair": 0,
      "with_stated_count_fidelity": 1,
      "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
      "with_total_density_budget": 0,
      "with_unintentional_filled_shape_tempering": 0,
      "with_visual_event_type_hints": 0,
@@ -11789,7 +11772,7 @@
    }
   }
  },
- "commit": "e022efb0d1e89fa5fdf4ed9a5a870956be41d29e",
+ "commit": "7e60357e43e018b4b53ec87d26ff4e3e04924da9",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

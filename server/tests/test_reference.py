@@ -85,6 +85,7 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
         "かたむき",
         "てざわり",
         "つらなり",
+        "おもて",
         "いろ",
         "ゆらぎ",
         "ばしょ",

@@ -26,27 +26,34 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-11"
+FROZEN_AT = "2026-08-12"
 REASON = (
-    "a plugin hands over one whole unit, and a count stated in the phrase that "
-    "names it says how many of those units to place. The document plugin layer "
-    "placed the unit once and read nothing; a body saying `Nature.青葉を三つ置く。` "
-    "got one leaf group. The count is now read by the shared reader in "
-    "`counts.py` -- one definition, where coerce reads it too -- and a count the "
-    "work has no room for is declined whole rather than trimmed, so the number "
-    "that survives is one somebody chose. The English side of that reader reads "
-    "Arabic numerals and no longer requires a noun from a 32-word table, which "
-    "is why `Draw 12 circles.` was invisible to it. Part C is new: this layer "
-    "carried a version number from the start and never a frozen output, because "
-    "part A's plugin work is the `Nature.` macro regex in `ddl_expander` and the "
-    "document manager is called from the render route alone. Its four cases are "
-    "the whole of `changed_from_previous`; not one of the 13 expand cases or the "
-    "23 coerce scores moved, and nothing else in the corpus reaches the layer "
-    "this version changed. The fourth records where the two readings do not "
-    "meet: a numeral with CJK within twelve characters is left to the Japanese "
-    "path, and a plugin named `Nature.青葉` is CJK beside the number, so `Place "
-    "12 Nature.青葉 marks.` places one unit where `Place twelve Nature.青葉 "
-    "marks.` places twelve."
+    "a shape can say how its surface is. The saijiki gains おもて / surfaces, "
+    "eleven state nouns for how the inside of a closed shape is, and the two "
+    "prompt tables learn to write and read them -- none of which this corpus "
+    "can see, because the LLM layers are not called here. What it can see is "
+    "the one deterministic branch the version carries: a surface attached to a "
+    "primitive with no interior moves to the nearest closed shape before it, "
+    "and is dropped where there is none or where that shape already carries "
+    "one. In production 53.4% of every surface written sat on a `line` (739) "
+    "or an `arc` (59) -- wash 453, grain 251, bleed 83, paper_grain 9, hatch 2 "
+    "-- and the renderer draws not one of them, because both "
+    "`_has_surface_texture` and the surface group require a closed shape. "
+    "Stage 2 attaches a 「面:」 sentence to whatever instruction precedes it, so "
+    "a line standing between the sentence and its shape lost the request "
+    "whole. Three cases are new: none of the 42 inputs frozen at engine 14 held "
+    "a 「面:」 clause -- the two files that hold one are `c_plugin_expand` output "
+    "written by a plugin -- so refreezing without them would have recorded a "
+    "version whose change the corpus never traversed. They are a set of three "
+    "on purpose: a surface already where it belongs must not move, one on a "
+    "line must go back to the shape, and one with nowhere to go must be let "
+    "go, so the record carries the guard as well as the repair. "
+    "`changed_from_previous` names all 26 coerce cases and not three, and the "
+    "twenty-three older ones did not move a score: adding a branch adds its "
+    "name to every `branch_report`, so each of them gained the one line "
+    "`with_surface_on_a_closed_shape: 0` and nothing else. Engine 11 read the "
+    "same way when it added `with_stated_count_fidelity`. Neither the 13 expand "
+    "cases nor the 6 plugin cases moved at all."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
@@ -298,6 +305,57 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
                 ),
             ]),
             ddl="黒いペンの円を二百三十三個散らす。",
+        ),
+        # ddl-engine 15. Not one of the 42 inputs frozen at engine 14 carried a
+        # 「面:」 clause -- the two files holding one are `c_plugin_expand`
+        # output, written by a plugin -- so the corpus could not see this
+        # version's change at all. These three are the branch: a surface that
+        # is already where it belongs, one on a line that has a shape to go
+        # back to, and one with nowhere to go. The middle case is the shape the
+        # defect actually took in production, where 53.4% of every surface
+        # written sat on a `line` or an `arc` and was drawn as nothing.
+        "B-surface-already-on-a-closed-shape": _coerce_input(
+            _score([_instruction(
+                primitive="circle", **{"from": None}, to=None, center=[0.5, 0.5], radius=0.18,
+                surface={
+                    "texture": "wash", "density": 0.35, "scale": 0.35, "opacity": 0.28,
+                    "bleed": 0.0, "direction": "none", "spacing_gradient": "none",
+                    "tone_steps": 3, "seed": None,
+                },
+            )]),
+            ddl="黒い円を中央に置く。面: 薄墨。",
+            lang="ja",
+        ),
+        # The line comes after the circle, which is what Stage 2 does when the
+        # 「面:」 sentence follows a sentence about a line: the surface lands on
+        # the line and the shape it was about keeps nothing.
+        "B-surface-on-a-line-moves-back": _coerce_input(
+            _score([
+                _instruction(
+                    primitive="circle", **{"from": None}, to=None, center=[0.35, 0.5], radius=0.18,
+                ),
+                _instruction(
+                    **{"from": [0.1, 0.8]}, to=[0.9, 0.8],
+                    surface={
+                        "texture": "hatch", "density": 0.35, "scale": 0.35, "opacity": 0.28,
+                        "bleed": 0.0, "direction": "none", "spacing_gradient": "none",
+                        "tone_steps": 3, "seed": None,
+                    },
+                ),
+            ]),
+            ddl="黒い円を左に置く。細いペンの横線を下に引く。面: 平行線。",
+            lang="ja",
+        ),
+        # Nothing with an interior anywhere in the score, so the request is let
+        # go rather than guessed into a shape nobody asked for.
+        "B-surface-with-nowhere-to-move": _coerce_input(
+            _score([_instruction(surface={
+                "texture": "grain", "density": 0.35, "scale": 0.35, "opacity": 0.28,
+                "bleed": 0.0, "direction": "none", "spacing_gradient": "none",
+                "tone_steps": 3, "seed": None,
+            })]),
+            ddl="細いペンの横線を中央に引く。面: 粒。",
+            lang="ja",
         ),
         "B-production-multiline": _coerce_input(
             _score([_instruction(color="white")], background="black"),

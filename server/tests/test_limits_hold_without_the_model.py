@@ -454,11 +454,12 @@ def test_t10_regression_guard_only_the_frozen_corpora_do_not_gate_this_work() ->
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     coerce_cases = {k: v for k, v in manifest["cases"].items() if v["part"] == "b_coerce"}
-    # 23 at ddl-engine 12, which added a stated-count pair. The property below is
-    # what this counts for, and it still holds: the larger of the two stands at
-    # 205 marks, well under the ceiling, and only becomes interesting once a
-    # repair tries to write a stated count on top of it.
-    assert len(coerce_cases) == 23
+    # 23 at ddl-engine 12, which added a stated-count pair; 26 at ddl-engine 15,
+    # which added three surface cases. The property below is what this counts
+    # for, and it still holds: the larger of the two stands at 205 marks, well
+    # under the ceiling, and only becomes interesting once a repair tries to
+    # write a stated count on top of it.
+    assert len(coerce_cases) == 26
 
     for case in coerce_cases.values():
         data = (manifest_path.parent / case["output_path"]).read_bytes()

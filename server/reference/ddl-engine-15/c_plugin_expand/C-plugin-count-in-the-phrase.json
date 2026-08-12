@@ -1,0 +1,735 @@
+{
+  "ddl": "面: 薄墨。面: 薄墨。面: 薄墨。",
+  "instructions": [
+    {
+      "angle_end": 300.0,
+      "angle_start": 240.0,
+      "at": {
+        "region": [
+          0.1703,
+          0.4055,
+          0.277,
+          0.5788
+        ]
+      },
+      "center": [
+        0.2237,
+        0.4922
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": -27.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 296.0,
+      "angle_start": 244.0,
+      "center": [
+        0.2237,
+        0.4922
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 304.0,
+      "angle_start": 236.0,
+      "at": {
+        "region": [
+          0.2962,
+          0.4211,
+          0.4029,
+          0.5944
+        ]
+      },
+      "center": [
+        0.3495,
+        0.5077
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 34.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "center": [
+        0.3495,
+        0.5077
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 304.0,
+      "angle_start": 236.0,
+      "at": {
+        "region": [
+          0.3947,
+          0.4145,
+          0.5014,
+          0.5878
+        ]
+      },
+      "center": [
+        0.448,
+        0.5011
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 4.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "center": [
+        0.448,
+        0.5011
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 308.0,
+      "angle_start": 232.0,
+      "at": {
+        "region": [
+          0.4857,
+          0.4017,
+          0.5924,
+          0.5751
+        ]
+      },
+      "center": [
+        0.539,
+        0.4884
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 22.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 306.0,
+      "angle_start": 234.0,
+      "center": [
+        0.539,
+        0.4884
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "at": {
+        "region": [
+          0.5879,
+          0.3981,
+          0.6945,
+          0.5714
+        ]
+      },
+      "center": [
+        0.6412,
+        0.4847
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 18.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 294.0,
+      "angle_start": 246.0,
+      "center": [
+        0.6412,
+        0.4847
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 302.0,
+      "angle_start": 238.0,
+      "at": {
+        "region": [
+          0.7074,
+          0.4085,
+          0.8141,
+          0.5819
+        ]
+      },
+      "center": [
+        0.7608,
+        0.4952
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": -19.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 306.0,
+      "angle_start": 234.0,
+      "center": [
+        0.7608,
+        0.4952
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 303.0,
+      "angle_start": 237.0,
+      "at": {
+        "region": [
+          0.2051,
+          0.4338,
+          0.3118,
+          0.6071
+        ]
+      },
+      "center": [
+        0.2585,
+        0.5204
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 5.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 304.0,
+      "angle_start": 236.0,
+      "center": [
+        0.2585,
+        0.5204
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 302.0,
+      "angle_start": 238.0,
+      "at": {
+        "region": [
+          0.2914,
+          0.4172,
+          0.3981,
+          0.5905
+        ]
+      },
+      "center": [
+        0.3447,
+        0.5038
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 25.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 297.0,
+      "angle_start": 243.0,
+      "center": [
+        0.3447,
+        0.5038
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 306.0,
+      "angle_start": 234.0,
+      "at": {
+        "region": [
+          0.3678,
+          0.3926,
+          0.4744,
+          0.5659
+        ]
+      },
+      "center": [
+        0.4211,
+        0.4792
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": -33.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 294.0,
+      "angle_start": 246.0,
+      "center": [
+        0.4211,
+        0.4792
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 302.0,
+      "angle_start": 238.0,
+      "at": {
+        "region": [
+          0.4979,
+          0.4116,
+          0.6046,
+          0.585
+        ]
+      },
+      "center": [
+        0.5512,
+        0.4983
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 35.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 296.0,
+      "angle_start": 244.0,
+      "center": [
+        0.5512,
+        0.4983
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 311.0,
+      "angle_start": 229.0,
+      "at": {
+        "region": [
+          0.5997,
+          0.4077,
+          0.7064,
+          0.581
+        ]
+      },
+      "center": [
+        0.6531,
+        0.4944
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 16.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 301.0,
+      "angle_start": 239.0,
+      "center": [
+        0.6531,
+        0.4944
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 309.0,
+      "angle_start": 231.0,
+      "at": {
+        "region": [
+          0.7027,
+          0.4047,
+          0.8093,
+          0.578
+        ]
+      },
+      "center": [
+        0.756,
+        0.4913
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "rotation": 10.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 294.0,
+      "angle_start": 246.0,
+      "center": [
+        0.756,
+        0.4913
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.048,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 308.0,
+      "angle_start": 232.0,
+      "at": {
+        "region": [
+          0.1733,
+          0.4079,
+          0.2533,
+          0.5812
+        ]
+      },
+      "center": [
+        0.2133,
+        0.4946
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": 28.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 300.0,
+      "angle_start": 240.0,
+      "center": [
+        0.2133,
+        0.4946
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "at": {
+        "region": [
+          0.2679,
+          0.4197,
+          0.3479,
+          0.5931
+        ]
+      },
+      "center": [
+        0.3079,
+        0.5064
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": 3.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 305.0,
+      "angle_start": 235.0,
+      "center": [
+        0.3079,
+        0.5064
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 311.0,
+      "angle_start": 229.0,
+      "at": {
+        "region": [
+          0.3418,
+          0.4148,
+          0.4218,
+          0.5881
+        ]
+      },
+      "center": [
+        0.3818,
+        0.5014
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": -12.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 306.0,
+      "angle_start": 234.0,
+      "center": [
+        0.3818,
+        0.5014
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 302.0,
+      "angle_start": 238.0,
+      "at": {
+        "region": [
+          0.4218,
+          0.4148,
+          0.5018,
+          0.5881
+        ]
+      },
+      "center": [
+        0.4618,
+        0.5015
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": 14.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 300.0,
+      "angle_start": 240.0,
+      "center": [
+        0.4618,
+        0.5015
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 308.0,
+      "angle_start": 232.0,
+      "at": {
+        "region": [
+          0.4929,
+          0.4076,
+          0.5729,
+          0.5809
+        ]
+      },
+      "center": [
+        0.5329,
+        0.4942
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": 9.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 294.0,
+      "angle_start": 246.0,
+      "center": [
+        0.5329,
+        0.4942
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 304.0,
+      "angle_start": 236.0,
+      "at": {
+        "region": [
+          0.5597,
+          0.3968,
+          0.6397,
+          0.5702
+        ]
+      },
+      "center": [
+        0.5997,
+        0.4835
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": -4.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 306.0,
+      "angle_start": 234.0,
+      "center": [
+        0.5997,
+        0.4835
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 308.0,
+      "angle_start": 232.0,
+      "at": {
+        "region": [
+          0.6456,
+          0.4016,
+          0.7256,
+          0.575
+        ]
+      },
+      "center": [
+        0.6856,
+        0.4883
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": 26.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 298.0,
+      "angle_start": 242.0,
+      "center": [
+        0.6856,
+        0.4883
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 310.0,
+      "angle_start": 230.0,
+      "at": {
+        "region": [
+          0.7375,
+          0.4113,
+          0.8175,
+          0.5847
+        ]
+      },
+      "center": [
+        0.7775,
+        0.498
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "rotation": -9.0,
+      "weight": "brush_thin"
+    },
+    {
+      "angle_end": 292.0,
+      "angle_start": 248.0,
+      "center": [
+        0.7775,
+        0.498
+      ],
+      "color": "green",
+      "primitive": "arc",
+      "radius": 0.036,
+      "relation": {
+        "type": "touching"
+      },
+      "weight": "brush_thin"
+    }
+  ],
+  "provenance": [
+    {
+      "input_term": "Nature.青葉",
+      "plugin_name": "leaves",
+      "plugin_term": "Nature.青葉",
+      "plugin_version": "0.3.0",
+      "units": "3"
+    }
+  ],
+  "warnings": []
+}

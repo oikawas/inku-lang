@@ -30,8 +30,11 @@ def empty_plugin_vocabulary(monkeypatch):
         # 契約 background-color-openness (2026-08-02): Stage 1 の背景 3 行が動いた。
         # 添景水準の 3 行 (v2.11.0 で廃止) が抜けたので、残るのは水準なしの 1 行ずつ。
         # 値は旧 auto と同一 — auto は規範文を足していなかった。
-        ("ja", 18_981, "1430ea03025e3f8c"),
-        ("en", 18_020, "b056eb26fc3748ef"),
+        # 契約 a-shape-can-say-how-its-surface-is (2026-08-12, ddl-engine 15):
+        # 歳時記に おもて が 1 行増え、面の定型が状態の名詞へ揃って 3 行増えた。
+        # ja 18_981 -> 19_584 / en 18_020 -> 18_511。
+        ("ja", 19_584, "0c03e4dfb10715eb"),
+        ("en", 18_511, "db354e9052756d6d"),
     ],
 )
 def test_stage1_prompt_base_digest_expected_values(
@@ -51,9 +54,9 @@ def test_stage1_prompt_base_digest_expected_values(
 @pytest.mark.parametrize(
     ("text", "lang", "expected_bytes", "expected_digest"),
     [
-        ("中心に円を置く。", "ja", 19_668, "e1e1a3563ea0e35f"),
-        ("雨上がりの水面に光が散る。", "ja", 19_837, "1f49d277ab509e0d"),
-        ("Place one circle at the center.", "en", 18_694, "246ae8b96397bf7c"),
+        ("中心に円を置く。", "ja", 20_271, "47dd9922a40d0e6a"),
+        ("雨上がりの水面に光が散る。", "ja", 20_440, "e50b1b9e51e98be0"),
+        ("Place one circle at the center.", "en", 19_185, "ed276cc0d78e1872"),
     ],
 )
 def test_stage1_actual_prompt_digest_expected_values(
@@ -74,7 +77,7 @@ def test_stage1_base_digest_excludes_input_dependent_examples():
         "雨上がりの水面に光が散る。"
     )
     assert _digest(first_prompt) != _digest(second_prompt)
-    assert _digest(first_base) == _digest(second_base) == "1430ea03025e3f8c"
+    assert _digest(first_base) == _digest(second_base) == "0c03e4dfb10715eb"
 
 
 @pytest.mark.usefixtures("empty_plugin_vocabulary")
@@ -110,10 +113,10 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 44_589
-    assert _digest(composer.SYSTEM_PROMPT) == "1612296fc2102f90"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 42_585
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "ffee4a72b70fbdee"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 45_134
+    assert _digest(composer.SYSTEM_PROMPT) == "0799e1fcd37506bc"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 43_106
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "4723bd39d1bf2285"
     # `hair` -> `silverpoint` の改名で、Stage 2 の素材語対応表 2 行と作例 8 件、
     # そして weight の enum と description が動いた。tool schema は 17_696 -> 17_713。
     # 色選択の一行が `palette` を捨てて `抽象色` / `the abstract colors` になった
@@ -140,8 +143,13 @@ def test_stage2_prompt_and_tool_expected_values():
     # 日英で足した。**tool schema は動いていない** (18_492 / c1c1... のまま) —
     # 変わったのは散文だけで、スキーマには触れていない。**上の 4 行は動く** —
     # プロンプト本文そのもののバイト数と指紋だから。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "c5f553c03edb2879"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "fa2f5c7f35b96cc7"
+    # 契約 a-shape-can-say-how-its-surface-is (2026-08-12, ddl-engine 15): 面の
+    # 質感対応表に 塗り / 空 / 濃い / 薄い の 2 行が日英とも入り、質感の語を名詞へ
+    # 揃え、塗りつぶし規則に「面: 塗り」を足した。ja 44_589 -> 45_134 /
+    # en 42_585 -> 43_106。**tool schema は動いていない** (18_492 / c1c1... のまま)
+    # —— 動かしたのは散文だけで、`SurfaceSpec` のフィールドにも enum にも触れていない。
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "cfa0e44d64743a14"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "c4c26cdbeb3383e7"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -194,8 +202,8 @@ def test_saijiki_word_changes_both_stage1_base_digests(monkeypatch):
         for category in original_categories
     )
     expected = {
-        "ja": (19_017, "5509baecdfcf78d8"),
-        "en": (18_038, "d7e2a61ee0fb116a"),
+        "ja": (19_620, "bbb014f56cf2682d"),
+        "en": (18_529, "23983c0eda349eb9"),
     }
     for lang, prefix in (
         ("ja", interpreter.SYSTEM_PROMPT_PREFIX),
@@ -246,8 +254,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     # The temporary schema change must remain visible after the nine-color update.
     # The digest reads declaration order too, so moving `thinness` before `surface`
     # (contract stage2-score-shrinkage, 2026-08-03) moves this value as well.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "be01ae6ed62cef7a"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "1612296fc2102f90"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "9ae03fcd67ac79db"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "0799e1fcd37506bc"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

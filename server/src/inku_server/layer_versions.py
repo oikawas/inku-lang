@@ -1,5 +1,32 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 15 (2026-08-12): a shape can say how its surface is. The saijiki gains おもて /
+# surfaces -- eleven state nouns for how the inside of a closed shape is, beside
+# つらなり, which says the same about a line. The vocabulary grew, so the version
+# rises, exactly as it did for yellow, orange, and purple at 3 and 4. The reason
+# for the category is that the lower layers had the mechanism and the upper layer
+# had no word: a fill was asked for in words in 1.3% of the works holding a
+# closed shape, 96.7% of the works that came out filled had never been asked to
+# be, and five descriptions that stated a fill outright reached `filled` zero
+# times out of five -- because Stage 1 could write 埋める while Stage 2 read 塗る,
+# an intersection that was empty in Japanese. The word is the noun 塗り and not
+# the verb 塗る (author's ruling, 2026-08-12): principle 5 and the pruning of 描く
+# in v1.92 both say a saijiki word names a state, not a hand's action.
+# The transform this version moves is one branch, because the vocabulary and the
+# two prompt tables are read by an LLM and the frozen corpus calls none. A
+# surface attached to a primitive with no interior is moved to the nearest closed
+# shape before it, and dropped where there is none or where that shape already
+# carries one. Measured on production, 53.4% of every surface written sat on a
+# `line` (739) or an `arc` (59) -- `wash` 453, `grain` 251, `bleed` 83,
+# `paper_grain` 9, `hatch` 2 -- and the renderer draws none of them: both
+# `_has_surface_texture` and the surface group require a closed shape. Stage 2
+# attaches a 「面: ...」 sentence to whatever instruction precedes it, and where a
+# line came between the sentence and its shape the request was lost whole. The
+# repair corrects the attachment and never guesses an interior into being.
+# Three cases join the coerce corpus. Not one of the 42 inputs frozen at
+# ddl-engine 14 carried a 「面:」 clause -- the two files that hold one are plugin
+# output -- so refreezing without them would have recorded a version whose change
+# the corpus never traversed, and left T-11 green for having looked at nothing.
 # 13 (2026-08-11): a plugin hands over one whole unit, and the count stated in
 # the phrase that names it says how many of those units to place. The document
 # plugin layer placed the unit once and read nothing, so `Nature.青葉を三つ置く。`
@@ -110,7 +137,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "14"
+DDL_ENGINE_VERSION = "15"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

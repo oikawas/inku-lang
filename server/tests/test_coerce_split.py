@@ -16,6 +16,10 @@ GOLDEN_PATH = Path(__file__).resolve().parent / "golden" / "coerce_golden.json"
 EXPECTED_BRANCH_ORDER = [
     "with_background_dominance_governor",
     "coerce_and_repair_instruction",
+    # Before anything downstream reads a surface or copies an instruction that
+    # carries one (ddl-engine 15), so every later branch sees the attachment the
+    # `面: ...` sentence meant rather than the one Stage 2 happened to write.
+    "with_surface_on_a_closed_shape",
     "without_spontaneous_grid",
     "dedupe_instructions",
     "with_ddl_coverage",

@@ -19,6 +19,13 @@ Stage 1 プロンプト全文。許可差分は作者裁定による語彙削剪
 - ja/en: 背景色を抽象九色へ開放 (2026-08-02・契約 background-color-openness)。
   背景の色集合を 5 色に限る記述と gray の名指しの禁止を落とした。本番 DB 2,061 作品で
   背景に出ていたのは白・黒・青の 3 色だけで、黄・橙は全期間 0 件だった
+- ja/en: 歳時記に おもて / surfaces カテゴリを新設 (2026-08-12・契約
+  a-shape-can-say-how-its-surface-is・裁定 RULING-omote-surface-category-20260812)。
+  差分は 2 箇所ずつある。① 語彙ブロックに つらなり の直後の 1 行が増える。
+  ② 面の定型が状態の名詞へ揃い、「面: 塗り。」と「面: 濃い。」/「面: 薄い。」が加わる。
+  ②の中に段 4 (欠陥 A) の実体がある: Stage 1 は「面: 斜めに埋める。」と書き
+  Stage 2 の対応表は「平行線」を読んでいて、その語は表に無かった (DDL に 4 件出て
+  Score に 0 件)。両側を 平行線 / hatch へ揃えた。fixture は再生成していない
 
 これ以外の差分 (空白・順序・行の脱落 = 組み立てバグ) はテスト失敗とする。
 """
@@ -109,6 +116,34 @@ _REORDERED_JA = (
         "- 灰色は背景にも、前景の線・点・四角の色にも使える。",
         1,
     ),
+    # --- 2026-08-12: 契約 a-shape-can-say-how-its-surface-is = おもての新設 ---
+    # 面の定型を状態の名詞へ揃え、「面: 塗り。」と濃さの 2 語を足す。
+    # 「面: 斜めに埋める。」→「面: 平行線。」が段 4 (欠陥 A) の実体。
+    (
+        "- 点で埋める、点描の面 → 「面: 点で埋める。」\n"
+        "- 斜線で埋める、ハッチ → 「面: 斜めに埋める。」\n"
+        "- 粒立つ、かすれ → 「面: 粒立つ。」\n"
+        "- 薄墨で満たす、水彩の面 → 「面: 薄墨。」\n"
+        "- 端が滲む → 「面: 滲む。」\n",
+        "- 塗る、塗りつぶす、ベタ、中を塗る、面で満たす → 「面: 塗り。」\n"
+        "- 点で埋める、点描の面 → 「面: 点。」\n"
+        "- 斜線で埋める、ハッチ → 「面: 平行線。」\n"
+        "- 粒立つ、かすれ → 「面: 粒。」\n"
+        "- 薄墨で満たす、水彩の面 → 「面: 薄墨。」\n"
+        "- 端が滲む → 「面: にじみ。」\n"
+        "- 面の中身が濃い、密、深い → 「面: 濃い。」。面の中身が薄い、淡い、かすか → 「面: 薄い。」。"
+        "他の面の語と併せるときは「面: 塗り（濃い）。」「面: 薄墨（薄い）。」の形にする\n"
+        "- 「面: ...」の語は状態の名詞であって動作ではない。"
+        "「面: 塗る。」「面: 埋める。」のように動詞では書かない\n",
+        1,
+    ),
+    # 語彙ブロックの 1 行。つらなり (線の在り方) の直後が おもて (面の在り方)。
+    (
+        "つらなり: 実線(既定)、破線、点線、一点鎖線\n",
+        "つらなり: 実線(既定)、破線、点線、一点鎖線\n"
+        "おもて: 空(既定)、塗り、薄墨、粒、点、平行線、交差線、にじみ、アクアチント、濃い、薄い\n",
+        1,
+    ),
 )
 _REORDERED_EN = (
     ("hair, ", "silverpoint, ", 2),
@@ -175,6 +210,33 @@ _REORDERED_EN = (
         "Strong solid backgrounds such as black, red, blue, or green are allowed",
         "Strong solid backgrounds such as black, gray, red, orange, yellow, green, blue, "
         "or purple are allowed",
+        1,
+    ),
+    # --- 2026-08-12: 契約 a-shape-can-say-how-its-surface-is = おもての新設 ---
+    (
+        '- stippled or dotted fill → "Surface: stippled."\n'
+        '- hatch or crosshatch → "Surface: hatched diagonally."\n',
+        '- fill, paint, solid fill, filled interior → "Surface: flat."\n'
+        '- stippled or dotted fill → "Surface: stipple."\n'
+        '- hatch, hatched, hatching → "Surface: hatch."\n',
+        1,
+    ),
+    (
+        '- bleeding edge → "Surface: bleeding."\n',
+        '- bleeding edge → "Surface: bleeding."\n'
+        "- a dense, deep, or heavy interior → \"Surface: dense.\"; "
+        'a faint, pale, or thin interior → "Surface: faint." '
+        'Combine with another surface word as "Surface: flat (dense)." '
+        'or "Surface: pale ink wash (faint)."\n'
+        '- The "Surface: ..." words are state nouns, never actions. '
+        'Never write "Surface: paint." or "Surface: fill."\n',
+        1,
+    ),
+    (
+        "continuity: solid (default), dashed, dotted, dash-dot\n",
+        "continuity: solid (default), dashed, dotted, dash-dot\n"
+        "surfaces: empty (default), flat, pale ink wash, grain, stipple, hatch, "
+        "crosshatch, bleeding, aquatint, dense, faint\n",
         1,
     ),
     (

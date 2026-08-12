@@ -136,7 +136,9 @@ test('T-23: the artwork is a raster in an img, never markup', () => {
 		const source = read(panel);
 		const art = source.slice(source.indexOf('<div class="saijiki-preview-art">'));
 		assert.match(art, /<img\s/, panel);
-		assert.match(art, /src=\{activePreview\.image\}/, panel);
+		// Anchored on the whitespace before the attribute: a bare /src=/ also
+		// matches inside `data-src=`, which is a rename that shows nothing.
+		assert.match(art, /\ssrc=\{activePreview\.image\}/, panel);
 		// The HiDPI file is offered as 2x rather than swapped in blindly.
 		assert.match(art, /activePreview\.image2x \? `\$\{activePreview\.image\} 1x, \$\{activePreview\.image2x\} 2x`/, panel);
 		// A word with no artwork still shows the built-in fallback drawing.

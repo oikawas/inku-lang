@@ -5990,3 +5990,32 @@ continuity says how a line is, surfaces says how the inside of a closed shape is
   category quietly borrowed the first one's colour** (the lookup is `[index % size]`, which cannot fail).
 - **⚠ This version moves the prompt layer and the clients; `render_engine_version` stays at 31.**
 
+### 2026-08-12 — The stamper scans every face of the shared counter (**no version bump**, tooling only)
+
+**`python3 scripts/bump.py --scan-build` now reads all three faces itself** (ledger I-196, closed).
+**A scan short one face prints the same shape of answer as a complete one** — the missing face is invisible
+in the very line that hands out the number. It had been reading `refs/heads/` alone, while **a comment in
+the same file told a human to "also check `ssh pentala`".**
+
+- **The three faces**: the refs (**including `refs/remotes/`** — a number another clone took and pushed
+  lives nowhere else), **every worktree's working copy** (**a number taken but not yet committed lives
+  nowhere else**), and the deployment host over one `ssh`. **The faces read are printed in the line that
+  gives the number** — `next build number: 898 (scanned: 163 refs, 7 worktrees, ddl-server@pentala)`.
+- **Where the host lives** comes from `INKU_REMOTE_HOST` / `INKU_REMOTE_REPO` first, then from the two
+  default lines of the untracked `deploy.sh` (**the public repository does not carry the deployment
+  target**, author's ruling 2026-08-12). **If those lines change shape it stops rather than guesses.**
+- **If the ssh does not go through, no number is reported and the exit is 1** (same ruling). **`--local`
+  drops only the host face and says so in the same line. `--local` alone exits 2** — a flag that silently
+  does nothing is not worth having.
+- **Thirteen acceptances** (`server/tests/test_bump_scans_every_face.py`), run in a tmp tree with its own
+  git repository, a linked worktree, and an `ssh` stub first on `PATH`, **moving one face at a time.** The
+  six perturbations turned **1 / 7 / 1 / 2 / 2 / 1** red, **each matching a prediction frozen before the
+  code was written.**
+- **⚠ One perturbation found a hole and the implementing session filled it** — the environment variables
+  win along two paths (an early return when both are set, and a per-name override after `deploy.sh` is
+  read), and **the acceptances went through only the first.**
+- **The accepting side ran the product path** — three faces arrive from both the main checkout and a
+  worktree, both reporting `next build number: 898`, agreeing with `cycle.sh build`'s own scan. **An
+  unreachable host exits 1 and prints no number at all.**
+- **Not one byte of product behaviour changed** (only `scripts/` and `server/tests/` were touched).
+  **Checks went 3,048 to 3,061 passed / 31 skipped.**

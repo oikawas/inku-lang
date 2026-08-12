@@ -176,9 +176,16 @@ def _render_score_svg(
     lang = (work or {}).get("instruction_lang_resolved")
     with using_limits(limits):
         score = coerce_score(Score.model_validate(score_payload), limits=limits, lang=lang)
+    # Three answers to "which paper", in the order they bind: the caller's
+    # override, the paper the work was performed on, and the Score's own
+    # declaration. The middle one is read off the work's row because the Score
+    # now records what the composition was built for, which is not always the
+    # paper the picture was drawn on.
     canvas = _validated_canvas_aspect_override(canvas_aspect)
-    if canvas is not None:
-        score = _score_with_canvas(score, canvas)
+    if canvas is None and work is not None:
+        recorded = work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect")
+        if recorded is not None:
+            canvas = normalize_canvas_aspect_id(str(recorded))
     render_metadata, resolved_catalog_id, color_source = _color_render_metadata(
         work=work, catalog_id=catalog_id
     )
@@ -187,6 +194,7 @@ def _render_score_svg(
             score,
             color_map=render_metadata["render_color_map"],
             catalog_id=render_metadata.get("render_color_catalog_id"),
+            canvas_aspect=canvas,
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=render_seed,
             composition_seed=_composition_seed(composition_seed),
@@ -341,6 +349,9 @@ def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: s
             score,
             color_map=render_metadata["render_color_map"],
             catalog_id=render_metadata.get("render_color_catalog_id"),
+            # The paper performed on, from the one place that records it. When
+            # the metadata names none, the Score's own declaration stands.
+            canvas_aspect=render_metadata.get("render_canvas_aspect_id"),
             svg_profile=_validated_svg_profile(svg_profile),
             render_seed=effective_seed,
             composition_seed=composition_seed,

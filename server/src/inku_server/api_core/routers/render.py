@@ -22,7 +22,7 @@ from ...color_catalogs import color_catalog_ids
 from ...color_selector import select_catalog_id
 from ...description_labels import pipeline_description
 from ...coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
-from ...composer import _finalize_score, compose
+from ...composer import _finalize_score, canvas_retry_line, compose
 from ...interpreter import _sanitize_placement_words, interpret_detail
 from ...languages import expand_intermediate_for_lang
 from ...limits import DEFAULT_LIMITS, Limits, limits_as_dict, using_limits
@@ -849,11 +849,13 @@ def _should_retry_compose_result(score: Score, *, tokens_out: int | None, elapse
     return _compose_retry_reason(score, tokens_out=tokens_out, elapsed_ms=elapsed_ms) != "none"
 
 
-def _compose_retry_prompt(*, reason: str, lang: str) -> str:
+def _compose_retry_prompt(*, reason: str, lang: str, canvas_aspect: str | None = None) -> str:
+    canvas_line = canvas_retry_line(canvas_aspect, lang)
     if lang == "en":
         return (
             "# Compact Stage 2 retry\n"
             f"The previous Stage 2 result was invalid or inefficient: {reason}.\n"
+            f"{canvas_line}"
             "Submit a valid Score through the submit_score tool.\n"
             "Required: instructions must contain 1-5 drawable items.\n"
             "Allowed primitives: line, circle, ellipse, triangle, square, polygon, arc, cloudform.\n"
@@ -866,6 +868,7 @@ def _compose_retry_prompt(*, reason: str, lang: str) -> str:
     return (
         "# 空描画リトライ / コンパクト描画リトライ\n"
         f"直前の Stage 2 出力は無効または非効率: {reason}。\n"
+        f"{canvas_line}"
         "submit_score tool で有効な Score を提出する。\n"
         "必須: instructions には描画可能な命令を1〜5個入れる。空配列は禁止。\n"
         "使用できる primitive: line, circle, ellipse, triangle, square, polygon, arc, cloudform。\n"
@@ -895,6 +898,10 @@ def _call_compose_detail(
     variation_amplitude: str | None = None,
     variation_seed: int | None = None,
     limits: Limits = DEFAULT_LIMITS,
+    # The support this work will be drawn on, already settled. The raw request
+    # field is not accepted here: `None` there means "square", and a second
+    # place deciding that default is a second place to get it wrong.
+    canvas_aspect: str | None = None,
 ) -> ComposeDetail:
     stage1_ddl_in = ddl  # trace: Stage 1 output before plugin expansion
     # Two arguments of one call with different jobs: `source_text` is the prose
@@ -967,6 +974,8 @@ def _call_compose_detail(
                 # The prompt states these numbers, so it is built from the same
                 # limits coerce will apply to the answer.
                 "limits": limits,
+                # ... and the same support the renderer will draw the answer on.
+                "canvas_aspect": canvas_aspect,
             }
             if sink is not None:  # only when tracing: keep the no-trace call byte-identical
                 kwargs["trace_sink"] = sink
@@ -1034,7 +1043,7 @@ def _call_compose_detail(
     retry_reasons.append(reason)
     try:
         retry_score, retry_tokens_in, retry_tokens_out, _retry_elapsed_ms = invoke(
-            _compose_retry_prompt(reason=reason, lang=lang)
+            _compose_retry_prompt(reason=reason, lang=lang, canvas_aspect=canvas_aspect)
         )
     except StageHardTimeoutError:
         fallback_used = True
@@ -1372,6 +1381,11 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     # applies a limit: the prompt, coerce, and the count clamp inside
     # Score.model_validate (which reaches it through using_limits).
     limits = _effective_limits()
+    # Settled before Stage 2 rather than after it: the composition is told which
+    # paper it composes for, and it cannot be told a value that has not been
+    # decided yet. The 422 for an unsupported id therefore now answers before
+    # Stage 2 runs instead of after it.
+    canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     try:
         with using_limits(limits):
             compose_detail = _call_compose_detail(
@@ -1387,6 +1401,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
                 variation_amplitude=resolved_variation_amplitude,
                 variation_seed=resolved_variation_seed,
                 limits=limits,
+                canvas_aspect=canvas_aspect,
             )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("compose", 502) from e
@@ -1427,10 +1442,12 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         score = _finalize_score(score, compose_detail.ddl)
         coerce_report["coerce_relation_output_count"] = _score_relation_count(score)
 
-    canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
-    score = _score_with_canvas(score, canvas_aspect)
+    # The Score keeps whatever support Stage 2 declared, including a declaration
+    # that disagrees with the request: it is the record of which paper the
+    # composition was built for. The paper actually performed on rides in
+    # render_canvas_aspect* and reaches the renderer from there.
     render_metadata = {
-        **_render_metadata(req.catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+        **_render_metadata(req.catalog_id, canvas_aspect=canvas_aspect),
         "stage2_prompt_digest": compose_detail.stage2_prompt_digest,
         "instruction_lang_requested": instruction_lang_requested,
         "instruction_lang_resolved": instruction_lang_resolved,
@@ -1868,6 +1885,9 @@ def _paint_events(
             interpret_detail_result.stage1_prompt_base_digest
         )
     yield stage1_event
+    # Settled before Stage 2, for the reason given at the /api/compose call
+    # site: the composition is told which paper it composes for.
+    canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
     try:
         with using_limits(limits):
             compose_detail = _call_compose_detail(
@@ -1880,6 +1900,7 @@ def _paint_events(
                 variation_amplitude=resolved_variation_amplitude,
                 variation_seed=resolved_variation_seed,
                 limits=limits,
+                canvas_aspect=canvas_aspect,
             )
     except Exception as e:  # noqa: BLE001
         raise _stage_http_error("compose", 502) from e
@@ -1921,10 +1942,10 @@ def _paint_events(
         score = _finalize_score(score, compose_detail.ddl)
         coerce_report["coerce_relation_output_count"] = _score_relation_count(score)
 
-    canvas_aspect = _validated_canvas_aspect(req.canvas_aspect)
-    score = _score_with_canvas(score, canvas_aspect)
+    # The Score keeps Stage 2's declaration -- see the note at the /api/compose
+    # call site.
     render_metadata = {
-        **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+        **_render_metadata(catalog_id, canvas_aspect=canvas_aspect),
         "stage1_prompt_digest": interpret_detail_result.stage1_prompt_digest,
         "stage1_prompt_base_digest": interpret_detail_result.stage1_prompt_base_digest,
         "stage2_prompt_digest": compose_detail.stage2_prompt_digest,

@@ -110,7 +110,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "13"
+DDL_ENGINE_VERSION = "14"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

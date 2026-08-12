@@ -207,7 +207,7 @@ def test_ddl_reference_expand_discriminators() -> None:
     assert not [case_id for case_id in cases if case_id.startswith("A-tenkei-")]
 
 def test_ddl_reference_plugin_expand_discriminators() -> None:
-    """The four C cases measure two quantities, not one.
+    """The six C cases measure two quantities, not one.
 
     `units` is how many whole units the body asked for; `declined` is whether the
     layer refused to deliver them.  A change that trims an over-budget count
@@ -217,10 +217,17 @@ def test_ddl_reference_plugin_expand_discriminators() -> None:
     cases = _manifest()["cases"]
     assert cases["C-plugin-count-in-the-phrase"]["units"] == [3]
     assert cases["C-plugin-count-in-an-english-body"]["units"] == [12]
-    # The count is dropped, not misread: the numeral sits within twelve characters
-    # of the CJK in `Nature.青葉`, which the reader leaves to the Japanese path.
-    assert cases["C-plugin-count-as-a-numeral-beside-cjk"]["units"] == [1]
+    # ddl engine 14: the numeral sits within twelve characters of the CJK in
+    # `Nature.青葉`, and until then the reader left every such numeral to the
+    # Japanese path -- in an English body it read nothing at all and the case
+    # froze at one unit.  The exclusion is now cut by the language of the body
+    # (ledger I-216), so an English body reads the twelve it states.
+    assert cases["C-plugin-count-as-a-numeral-beside-cjk"]["units"] == [12]
     assert cases["C-plugin-count-over-the-ceiling"]["units"] == [1]
+    # The count a phrase does not carry is read from the sentence (I-215), and a
+    # bare numeral inside a phrase that names a plugin is a count (I-213).
+    assert cases["C-plugin-count-outside-the-phrase"]["units"] == [20]
+    assert cases["C-plugin-count-as-a-bare-numeral"]["units"] == [50]
     declined = sorted(cid for cid, case in cases.items()
                       if case["part"] == "c_plugin_expand" and case["declined"])
     assert declined == ["C-plugin-count-over-the-ceiling"]

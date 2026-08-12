@@ -57,17 +57,18 @@ cd inku-lang-source-<build>
 
 ## git clone から作業する
 
-clone のときだけ 1 手ぶん多い。`web/BUILD_NUMBER` は共有のカウンタなので、
+`web/BUILD_NUMBER` は共有のカウンタなので、
 2 つの枝が両方とも採番したことは食い違いではない — 大きいほうの番号が答えである。
 これを自動で解く merge driver は版管理されない `.git/config` に置く決まりなので、
-clone ごとに 1 回だけ実行する。
+clone の直後に実行する。
 
 ```sh
 scripts/git/setup.sh
 ```
 
-worktree は `.git/config` を共有するので、1 回で全部に効く。
-実行し忘れても危なくはない — このファイルが従来どおりマージで競合するだけである。
+worktree は `.git/config` を共有するので、1 回で全部に効く。実行を忘れた clone でも、
+リポジトリ直下の `make test` / `make test-server` / `make test-cli` / `make test-web` が
+テスト開始前に同じ設定を冪等に適用する。
 
 ## コンテナで動かす
 

@@ -5675,3 +5675,45 @@ carries. **Four places changed**: the design principle in `SPEC.md` / `SPEC.ja.m
 `README.md` / `README.ja.md`. **The English `SPEC.md` was already right in intent** ("not fixed pixels") **and was
 brought to the same two sentences as the Japanese; `README.md`'s "No fixed canvas" was a literal translation of the
 old Japanese title and was changed with it.** **No code changed.** `check_docs.py` is consistent.
+
+### v2.13.8 — The arrangement of marks keeps its shape on any canvas (Build 893, 2026-08-12, ledger I-135 rulings R2 and R3, render engine 31)
+
+- **A ring's radius and a region's extent now become pixels through the canvas's short edge.** Engine 30 put
+  **a mark's own** size on the short edge, but **the layer that arranges those marks was still stretched by the
+  aspect**: a `radial` ring became pixels through `canvas.width` across and `canvas.height` down, so on the
+  pillar (1:5) **the ring came out with an aspect of 0.19** — round dots sitting on a flattened ring. An
+  `at.region` behaved the same way: **a box written as a square came out as tall, or as wide, as the canvas.**
+- **The region's centre is deliberately untouched** (author's ruling, 2026-08-12). **"Upper right" is the upper
+  right of any canvas**, and placement still scales with width and height. **Only the extent moved.**
+- **`arrangement.margin` is unchanged** (R1 was rejected in the same ruling): spreading to the frame is what
+  `scatter`, `horizontal` and `vertical` mean.
+- **Two sites read the region, and both now go through one helper** — `_resolve_at_region`, the anchor every
+  region instruction passes through, and the grid branch, which reads it again for itself. **Fixing only one
+  leaves the other's test green.**
+- **A square canvas comes out byte-identical.** Centre ± half-extent does not round-trip in floating point even
+  at a factor of 1.0 (for region `[0.6, 0.18, 0.82, 0.4]` `y0` moves by **2.78e-17**), which was enough to cross
+  a rounding boundary and move the controls. **A short circuit returns the region untouched when both factors
+  are 1.0.**
+- **Sixteen cases were added to the corpus, which now holds 569.** Of the 553 cases before, **the five carrying a
+  `radial` were every one of them square, and not one carried an `at.region`** — so this change would have left
+  nothing at all in the record. The new cases are four subjects (a ring, a region resolved for one mark, a grid
+  over a region, and a group whose region is only its anchor) on all four aspects: **the twelve non-square cases
+  all move and the four square controls all stay**, measured on both trees. **None of the existing 553 moved.**
+- **Reach in production** (2,939 live works, measured 2026-08-12): **515 are non-square (17.5%)**; of those,
+  **R2 reaches the 63 carrying a `radial` (12.2%)** and **R3 reaches the 113 carrying an `at.region` (21.9%)**.
+  Of the 181 instructions carrying an `at.region`, **the box confines marks in the 88 single ones and in grids**;
+  for the rest only the anchor moves, which does not show.
+- **Checks:** **server 2,978 passed / 31 skipped** (**37 new**, `test_arrangement_aspect.py`), **cli 220 passed**,
+  **ruff clean**, **Android JVM 530 tests / 0 failures** (98 suites). **Seven perturbations, no misses** — the
+  contract's six plus one the implementing session added for the version bump itself.
+- **⚠ The implementing session reported that its first T-7 was vacuous**: with one Score and a single seed the
+  2.78e-17 never crossed a rounding boundary, so the perturbation left it green. **Splitting the subjects into
+  separate Scores and using two seeds turned five of eight red**, and the gate now sits in two layers, the other
+  being an exact-equality check on the arithmetic.
+- **⚠ The contract had missed one red**: the guard that hard-codes the case counts (`553` / `D: 32`) turns red
+  from **stage 5** (adding cases), and the contract counted its reds before the cases were added. **It now reads
+  569 / `D: 48`.**
+- **The Android reference fixture (64 files under `render-engine-31/`) was baked on the accepting side.** The
+  Kotlin renderer still carries the same anisotropy (ledger I-217, a separate contract). **⚠ Three call sites in
+  `gen_android_reference.py` resolve the performance without passing a `canvas`**, so when I-217 ports this,
+  those sites need one or the Android expectations will keep asserting pre-31 behaviour.

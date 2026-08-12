@@ -58,6 +58,8 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **31** | v2.13.8 | 893 | 2026-08-12 | 569 | **16** | **553** |
+| **30** | v2.13.6 | 891 | 2026-08-11 | 553 | **7** | **546** |
 | **29** | v2.11.17 | 873 | 2026-08-09 | 549 | **454** | **95** |
 | **28** | v2.11.13 | 869 | 2026-08-09 | 549 | **454** | **95** |
 | **27** | v2.11.10 | 866 | 2026-08-09 | 549 | **45** | **504** |
@@ -127,14 +129,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `30` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `31` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `13` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.7 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.8 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 892 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 893 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -410,6 +412,48 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 31 — the arrangement of marks keeps its shape on any canvas (v2.13.8)
+
+**Engine 30 put a mark's own extents on the short edge, but the layer that arranges those marks was still
+stretched by the aspect.** A `radial` ring became pixels through `canvas.width` across and `canvas.height`
+down, so on the pillar (1:5) **the ring came out with an aspect of 0.19** -- round dots sitting on a flattened
+ring. An `at.region` behaved the same way: **a box written as a square came out as tall, or as wide, as the
+canvas.**
+
+### Only the extent moved; the centre did not
+
+**A ring's radius and a region's half-extents become pixels through the canvas's short edge (`canvas.unit`) on
+both axes.** **A region's centre stays proportional** -- "upper right" is the upper right of any canvas, and
+putting placement on the short edge would change the composition itself (author's ruling, 2026-08-12).
+
+**`arrangement.margin` was left alone** (rejected in the same ruling): spreading to the frame is what `scatter`,
+`horizontal` and `vertical` mean, and the 0.83-of-the-short-edge gap above and below on the pillar is kept as
+the specification.
+
+**Two sites read the region** -- `_resolve_at_region`, **the anchor every region instruction passes through**,
+and the grid branch, which reads it again for itself. **Both go through one helper. Fixing only one leaves the
+other's test green.**
+
+**On a square canvas the two arithmetics are the same.** Centre plus or minus half-extent does not round-trip in
+floating point even at a factor of 1.0, though: for region `[0.6, 0.18, 0.82, 0.4]` `y0` moves by **2.78e-17**,
+which crossed the digest's rounding boundary and **moved two square controls**. A short circuit returns the
+region untouched when both factors are 1.0.
+
+### The corpus grew by sixteen, to 569
+
+**The corpus could not see this change at all before** -- of 553 cases the five carrying a `radial` were **every
+one of them square**, and **not one** carried an `at.region`. The sixteen new cases are four subjects (a ring, a
+region resolved for one mark, a grid over a region, and a group whose region is only its anchor) on all four
+aspects: **the twelve non-square cases all move and the four square controls all stay**, measured on both trees.
+**None of the existing 553 moved.**
+
+### The same wiring exists on Android
+
+**The Kotlin renderer stretches arrangements per axis too** (ledger I-217). **This change is server-side only;
+the Android catch-up is a separate contract.** The reference fixture (64 files under `render-engine-31/`) was
+baked on the accepting side. **⚠ `gen_android_reference.py` resolves the performance without a `canvas`**, so
+when the port lands those sites need one, or the Android expectations will keep asserting pre-31 behaviour.
 
 ## engine 30 — a mark keeps the shape its description gave it on any canvas (v2.13.6)
 

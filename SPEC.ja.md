@@ -186,7 +186,7 @@ v1.29 時点では、参照実装として `canvas-aspect` プラグインを追
 - 参照実装の `canvas-aspect` は、サーバー側では `server/src/inku_server/plugins/system/canvas_aspect/`、Web 側では `web/src/lib/plugins/system/canvas-aspect/` に配置する
 - キャンバス比率を変更した場合、既存の描画表示はクリアし、選択比率に合わせたプレースホルダー画像へ切り替える。ただし表示中作品の系譜文脈は保持し、次に保存する作品を表示中作品の子として `canvas_aspect_change`（UI表示: キャンバス変更）で記録する
 - `/api/paint`、`/api/compose`、履歴保存時に `canvas_aspect` を渡し、Renderer が SVG の `width` / `height` / `viewBox` を決定する
-- 正規化座標は 0.0〜1.0 のまま維持する。**痕の寸法（`size`）は縦横とも短辺基準で画素へ直し、記述が述べた形をどの比でも保つ**（円・弧の半径も同じ規則。v2.13.6 / render engine 30 で `size` を持つ全図形へ広げた）。**置き場所は従来どおり幅と高さに比例する** —— 縦横比は痕がどこに座るかを決め、痕がどんな形かは決めない
+- 正規化座標は 0.0〜1.0 のまま維持する。**痕の寸法（`size`）は縦横とも短辺基準で画素へ直し、記述が述べた形をどの比でも保つ**（円・弧の半径も同じ規則。v2.13.6 / render engine 30 で `size` を持つ全図形へ広げた）。**痕を並べる層も同じ規則に従う** —— `radial` の環の半径と `at.region` の広がりは短辺基準で画素へ直し、述べられた並びの形をどの比でも保つ（v2.13.8 / render engine 31）。**置き場所と領域の中心は従来どおり幅と高さに比例する** —— 縦横比は痕がどこに座るかを決め、痕と並びがどんな形かは決めない。`arrangement.margin` はその軸の長さの一定割合のままで、`scatter` / `horizontal` / `vertical` が枠いっぱいに広がることは layout の意味である
 
 `canvas-aspect` が扱う比率は、`square`、`golden`、`a4`、`b4`、`pillar`、`oban`、`wide`、`byobu`、`vertical` とする。
 

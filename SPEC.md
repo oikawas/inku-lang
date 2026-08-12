@@ -2901,8 +2901,11 @@ files, PNG files, and other artifacts are derived outputs.
 Coordinates remain normalized from `0.0` to `1.0`. Canvas aspect changes do not
 change DDL coordinates. **A mark's extents (`size`) become pixels through the short edge on both axes, so the shape the description
 stated is kept on any aspect** (the same rule the circle and arc radius already used; widened to every form
-with a `size` in v2.13.6 / render engine 30). **Placement still scales with width and height** -- the aspect
-decides where a mark sits, not what shape it is. Changing the aspect clears the rendered display and shows
+with a `size` in v2.13.6 / render engine 30). **The layer that arranges marks follows the same rule** -- a `radial` ring's radius and an `at.region`'s extent
+become pixels through the short edge, so the arrangement the description stated is kept on any aspect
+(v2.13.8 / render engine 31). **Placement, and a region's centre, still scale with width and height** -- the aspect
+decides where a mark sits, not what shape it or its arrangement is. `arrangement.margin` remains a fraction of
+each axis: spreading to the frame is what `scatter`, `horizontal` and `vertical` mean. Changing the aspect clears the rendered display and shows
 a placeholder for the new aspect, but retains the displayed work as lineage context.
 The next saved work is recorded as its child with `canvas_aspect_change`.
 

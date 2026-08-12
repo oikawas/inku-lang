@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-12 — Unreleased v2.13.8 Baseline (Web Build 893)
+
+Updated the 13 places that name a version to v2.13.8 / Build 893, and added a sentence to §7 of `Creating Images` now that an arrangement of marks no longer depends on the canvas ratio either.
+
+- **The shape an arrangement makes is measured against the canvas's short edge too.** A ring laid out radially is drawn as round on every ratio, and a region stated as a square is treated as a square (render engine 31).
+- **Placement, and a region's centre, still spread with the ratio.** "Upper right" is the upper right of any canvas.
+- **The margin of the arrangements that spread to the frame (scatter, horizontal, vertical) is unchanged.** Reaching the frame is what those arrangements mean.
+- **Nothing changes on the square canvas** (the short and long edges are the same length, so the old and new rules are the same arithmetic).
+
 ## 2026-08-11 — Unreleased v2.13.7 Baseline (Web Build 892)
 
 Updated the 13 places that name a version to v2.13.7 / Build 892, and added a line to §14 of `Creating Images` now that the words for moving agree everywhere.

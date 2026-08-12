@@ -59,18 +59,6 @@
 		display: inline-flex;
 	}
 	.aspect-trigger { display: inline-flex; align-items: center; }
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-		white-space: nowrap;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
 	.aspect-menu {
 		position: absolute;
 		top: calc(100% + 6px);

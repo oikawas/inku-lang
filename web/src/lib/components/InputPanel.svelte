@@ -508,18 +508,6 @@
 	.input-label-text { min-width: 0; }
 	.input-label :global(.tooltip-wrap) { flex: none; }
 	.input-label strong { font-weight: 600; color: var(--fg); }
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-		white-space: nowrap;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
 	.wild-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 	.wild-btn.active:hover { background: var(--accent); }
 	.catalog-btn {

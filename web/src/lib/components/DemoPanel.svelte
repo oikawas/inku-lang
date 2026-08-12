@@ -338,17 +338,6 @@
 		color: var(--fg3);
 		margin-left: auto;
 	}
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font: inherit;
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-	}
-	.ghost-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 	.demo-save-row {
 		display: flex;
 		align-items: center;

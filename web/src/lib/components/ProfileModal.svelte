@@ -192,7 +192,6 @@
 		padding: 12px 16px 14px;
 		border-top: 1px solid var(--border);
 	}
-	.ghost-btn,
 	.primary-btn {
 		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);
@@ -208,7 +207,6 @@
 		background: var(--accent-light);
 		color: var(--accent);
 	}
-	.ghost-btn:disabled,
 	.primary-btn:disabled {
 		opacity: 0.55;
 		cursor: default;

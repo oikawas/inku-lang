@@ -7245,6 +7245,30 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--thumb-plate-fg-read: rgba(40,36,30,0.72);
 	}
 
+	/* Shared controls are global because Svelte scopes component styles. */
+	:global(.ghost-btn) {
+		padding: var(--btn-sm-padding);
+		border: 1px solid var(--border2);
+		border-radius: var(--btn-sm-radius);
+		background: var(--panel);
+		color: var(--fg2);
+		font-family: inherit;
+		font-size: var(--btn-sm-font-size);
+		cursor: pointer;
+	}
+	:global(.ghost-btn:hover:not(:disabled)) { background: var(--bg2); }
+	:global(.ghost-btn:disabled) { opacity: 0.55; cursor: not-allowed; }
+	:global(.ghost-btn.ghost-active) {
+		background: var(--action-bg);
+		color: var(--action-fg);
+		border-color: var(--action-bg);
+	}
+	:global(.saijiki-chip.plugin-chip) {
+		color: var(--accent);
+		border-color: var(--accent);
+		background: var(--accent-light);
+	}
+
 	:global(html[data-theme='dark']) {
 		color-scheme: dark;
 		--bg:           #171716;

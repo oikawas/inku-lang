@@ -11,10 +11,10 @@ import { test } from 'node:test';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-// Both panels render the same list. Svelte scopes styles per component, so a
-// rule written in one is not shared with the other -- every claim below has to
-// hold in both files or it holds in neither panel.
+// Both panels render the same list and share their accent from the page-level
+// global rule. Panel-local rules only describe each panel's layout.
 const PANELS = ['./SaijikiDrawer.svelte', './SaijikiInline.svelte'];
+const PAGE = '../../routes/+page.svelte';
 
 /** The plugin section of a panel: from its heading to the end of that block. */
 function pluginSection(source: string): string {
@@ -28,35 +28,29 @@ function pluginSection(source: string): string {
 
 test('T-20: a plugin chip is a saijiki chip, so it is the built-in size', () => {
 	for (const panel of PANELS) {
-		const source = read(panel);
-		const section = pluginSection(source);
-		// The size comes from `.saijiki-chip`; `plugin-chip` may only add accent.
+		const section = pluginSection(read(panel));
 		assert.match(section, /class="saijiki-chip plugin-chip"/, panel);
-		const accent = source.match(/\.saijiki-chip\.plugin-chip \{([^}]*)\}/);
-		assert.ok(accent, `${panel}: no plugin chip rule`);
-		for (const property of ['padding', 'font-size', 'line-height', 'border-radius']) {
-			assert.doesNotMatch(
-				accent[1],
-				new RegExp(`\\b${property}\\s*:`),
-				`${panel}: plugin chips set their own ${property}`
-			);
-		}
+	}
+	const accent = read(PAGE).match(/:global\(\.saijiki-chip\.plugin-chip\) \{([^}]*)\}/);
+	assert.ok(accent, 'the shared plugin chip rule is missing');
+	for (const property of ['padding', 'font-size', 'line-height', 'border-radius']) {
+		assert.doesNotMatch(accent[1], new RegExp(`\\b${property}\\s*:`), `plugin chips set their own ${property}`);
 	}
 });
 
 test('T-20: the accent is blue, and it comes from the tokens', () => {
+	const page = read(PAGE);
+	const accent = page.match(/:global\(\.saijiki-chip\.plugin-chip\) \{([^}]*)\}/);
+	assert.ok(accent);
+	assert.match(accent[1], /var\(--accent\)/);
+	assert.match(accent[1], /var\(--accent-light\)/);
 	for (const panel of PANELS) {
 		const source = read(panel);
-		// The old accent was a pair of hard-coded reds plus a dark-theme copy.
 		assert.doesNotMatch(source, /#9f4b3b|#f0a58f|185,\s*88,\s*69|226,\s*138,\s*112/, panel);
-		const accent = source.match(/\.saijiki-chip\.plugin-chip \{([^}]*)\}/);
-		assert.ok(accent);
-		assert.match(accent[1], /var\(--accent\)/, panel);
-		assert.match(accent[1], /var\(--accent-light\)/, panel);
+		assert.doesNotMatch(source, /\.saijiki-chip\.plugin-chip\s*\{/, panel);
 		assert.match(source, /\.saijiki-cat\.plugin-cat \{[^}]*var\(--accent\)/, panel);
-		// A hard-coded colour needs a second rule for dark; a token does not.
-		assert.doesNotMatch(source, /data-theme='dark'\]\) \.saijiki-chip\.plugin-chip/, panel);
 	}
+	assert.doesNotMatch(page, /data-theme='dark'\]\) \.saijiki-chip\.plugin-chip/);
 });
 
 test('T-20: plugin words are packed, not stacked one per row', () => {

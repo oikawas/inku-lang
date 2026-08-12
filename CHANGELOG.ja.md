@@ -5381,3 +5381,25 @@ server は `api_core/rendering.py` の `_base_render_metadata` で**両方を必
 
 **直したのは日英それぞれ 6 箇所**（§2 原則 5・§3.1 のカテゴリ数・§3.1 の語彙表・§3.1 のコアの性質・§7.5・§13.6）。
 **コードは 1 行も変えていない。**`check_docs.py` は一致。
+
+### 2026-08-12 — コーパスが見ていない退行を、CI が止めるようになった（**採番なし**・CI のみ）
+
+**`checks` workflow を新設した**（[I-192] 決着）—— **server（`ruff` と `pytest`）・cli（`ruff` と `pytest`）・
+web（`npm run check`・`test:unit`・`lint:i18n`）・公開文書（`check_docs.py`）**の 4 job。
+既存の `reference-corpus`（凍結コーパスの再生成を照合する 3 job）はそのまま置いてある。
+**これまで CI が回していたのは凍結コーパスの再生成だけで、pytest も ruff も 1 行も無かった。**
+- **linux で初めて回したら 2 本落ちた** —— **① Android の参照 fixture の焼き直し**
+  （`render-engine-31/manifest.json` と `renderer_variation_primitives.json` が違う）と、
+  **② platform 安定性の対のテスト**（動いた case の集合が凍結値と違う）。
+  **どちらも darwin で焼いた凍結物と照合する検査で、linux で焼いた値を欠陥と読む。**
+  **CI では外し、理由を workflow に書いた。手元では従来どおり両方が走る。**
+- **⚠ Android の参照 fixture のディレクトリは、既存の CI が照合していなかった** ——
+  `reference-corpus` が見ているのは `server/reference/` と `android/design/preview/` の 2 つで、
+  `android/app/src/test/resources/server_reference/` は入っていない。**OS 差は今回はじめて観測された。**
+- **linux の実測**: server **2,987 passed / 40 skipped / 2 deselected**（299 秒）・cli **220 passed**・
+  web **245 pass** ＋ 型 **0 errors**（既知の a11y 2 件）＋ i18n **0 errors**・`check_docs.py` 一致。
+  **手元の 3,029 collected と数が合う。**
+- **CI が見ていないものを列挙した**（workflow のコメントと PROJECT_CONTEXT）—— 鍵の要る **30 件**・
+  ローカル専用の材料 **10 件**（`cli/bench/leaf` の 9 と `cairosvg` の 1）・上の **2 件**・
+  **Android の JVM テスト**（gradle wrapper が無い）・**`no-git-sync/`**（git が追跡しない）。
+  **skip の理由は `-rs` で毎回印字する。緑の件数ではなくこの一覧を読む。**

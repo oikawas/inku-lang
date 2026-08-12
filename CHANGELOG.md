@@ -5825,3 +5825,26 @@ reference §1** (as §3.1 already says), so **the spec stands ahead of the code 
 
 **Six places were changed in each language** (§2 principle 6, the §3.1 category count, the §3.1 vocabulary table,
 the §3.1 core property, §7.5, and §13.6). **Not one line of code changed.** `check_docs.py` is consistent.
+
+### 2026-08-12 — CI now stops the regressions the corpora cannot see (**no version bump**, CI only)
+
+**A `checks` workflow was added** (ledger I-192, closed) — four jobs: **server (`ruff` and `pytest`), cli (`ruff`
+and `pytest`), web (`npm run check`, `test:unit`, `lint:i18n`), and the published documents
+(`check_docs.py`).** The existing `reference-corpus` workflow (three jobs re-baking the frozen corpora) stays as
+it was. **Until now CI ran the corpus regeneration and nothing else: not one line of pytest or ruff.**
+- **The first Linux run turned two tests red** — **(1) the Android reference fixture re-bake**
+  (`render-engine-31/manifest.json` and `renderer_variation_primitives.json` differ) and **(2) the
+  platform-stability pair test** (the set of cases that move is not the frozen set). **Both compare against bytes
+  baked on darwin and read the Linux bake as a defect.** They are deselected on CI with the reason written into
+  the workflow; **both still run on the Mac, as before.**
+- **⚠ The Android fixture directory was not being compared by the existing CI at all** — `reference-corpus`
+  watches `server/reference/` and `android/design/preview/`, and
+  `android/app/src/test/resources/server_reference/` is in neither. **The OS difference was observed here for the
+  first time.**
+- **Measured on Linux**: server **2,987 passed, 40 skipped, 2 deselected** (299s), cli **220 passed**, web **245
+  passing** plus **0 type errors** (the two known a11y warnings) and **0 i18n errors**, `check_docs.py`
+  consistent. **The numbers add up to the 3,029 collected locally.**
+- **What CI still cannot see is now enumerated** (in the workflow and in PROJECT_CONTEXT): the **thirty**
+  key-dependent tests, **ten** that need local-only material (nine `cli/bench/leaf`, one `cairosvg`), the **two**
+  above, the **Android JVM tests** (no gradle wrapper), and **`no-git-sync/`** (untracked). **Skip reasons are
+  printed every run with `-rs`: read that list rather than the pass count.**

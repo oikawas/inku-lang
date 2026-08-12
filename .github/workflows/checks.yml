@@ -1,0 +1,95 @@
+name: checks
+
+# The frozen-corpus workflow proves the deterministic layers are stable off one
+# Mac. It cannot see a regression the corpora do not cover, so these jobs run
+# the suites a human would otherwise have to remember to run (ledger I-192).
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # ruff first: seconds against minutes, and it names an undefined symbol
+      # that a green suite can still walk past.
+      - name: Lint
+        working-directory: server
+        run: uv run ruff check src tests scripts
+      # Two tests compare bytes baked on darwin against a bake made here, so
+      # they read a platform difference as a defect (ledger I-111, measured on
+      # this runner 2026-08-12). They stay green on the Mac, where the git
+      # management session runs the full suite before every merge.
+      #   - the Android fixtures under android/app/src/.../server_reference/
+      #     differ in render-engine-31/manifest.json and
+      #     renderer_variation_primitives.json
+      #   - the platform-stability pair test freezes the set of cases that move,
+      #     and that set is what changes between the two machines
+      # -rs prints the reason for every skip: what does not run here is part of
+      # what this backstop cannot see.
+      - name: Test
+        working-directory: server
+        run: >
+          uv run pytest -q -rs
+          --deselect tests/test_android_reference_fixtures_are_current.py::test_every_android_fixture_matches_a_fresh_bake
+          --deselect tests/test_render_platform_stability.py::test_without_the_stabilisers_the_same_perturbation_is_seen
+
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Lint
+        working-directory: cli
+        run: uv run ruff check src tests scripts
+      - name: Test
+        working-directory: cli
+        run: uv run pytest -q -rs
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        working-directory: web
+        run: npm ci
+      - name: Types and Svelte
+        working-directory: web
+        run: npm run check
+      - name: Unit tests
+        working-directory: web
+        run: npm run test:unit
+      # The display strings are Japanese-canonical; this reads the English side
+      # against the glossary. It does not look at manual/.
+      - name: English display strings
+        working-directory: web
+        run: npm run lint:i18n
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bilingual documents
+        run: python3 server/scripts/check_docs.py

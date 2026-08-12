@@ -33,24 +33,32 @@ CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-12"
 REASON = (
-    "The arrangement of marks keeps its shape on any canvas. Engine 30 put a "
-    "mark's own size on the short edge, so a circle stayed a circle whatever "
-    "the canvas was; what arranged those marks was still stretched by the "
-    "aspect. A `radial` ring became pixels through `canvas.width` across and "
-    "`canvas.height` down, so on the pillar (1:5) the ring came out with an "
-    "aspect of 0.19 -- round dots sitting on a flattened ring -- and an "
-    "`at.region` written as a square box came out as tall, or as wide, as the "
-    "canvas. Engine 31 puts the ring's radius and the region's extent on the "
-    "short edge, the region through one helper both of its sites go through. "
-    "The region's centre is deliberately untouched: \"upper right\" is the "
-    "upper right of any canvas, and placement still scales with width and "
-    "height. `arrangement.margin` is unchanged (author, 2026-08-12): spreading "
-    "to the frame is what `scatter`, `horizontal` and `vertical` mean. On a "
-    "square canvas the two arithmetics are the same, so only the non-square "
-    "cases move. The sixteen `D-canvas-*-radial` and `D-canvas-*-region-*` "
-    "cases are new: of 553 cases the five carrying a `radial` were every one "
-    "of them square and not one carried an `at.region`, so neither rule could "
-    "be seen in the record at all."
+    "A cluster and a path keep their shape on any canvas. Engine 31 did this "
+    "for the ring and the region; the two arrangements that carry 36.2% of the "
+    "marks production expands were still stretched by the aspect. A cluster's "
+    "band is built in a rotated frame and then written straight into "
+    "normalized space, so on the pillar (1:5) one clump came out as a narrow "
+    "vertical stripe and on CinemaScope as a wide one -- the band's own aspect "
+    "moved by a factor of 8.8 between those two papers for the one "
+    "description. A `wave` swung 220px on the square canvas and 44px on the "
+    "pillar, and the jitter of a `diagonal` or a `top_to_bottom` bought a "
+    "different number of pixels on each axis. Engine 32 rotates the cluster's "
+    "offset first and puts it on the short side second -- scaling before the "
+    "rotation would turn the rotation into a shear -- and puts the paths' "
+    "cross-axis spread on the short side. What the group does along its line "
+    "is untouched: `margin`, `span`, `right_half`'s reach and the cluster's "
+    "centre all say how much of the paper is used and where the group sits, "
+    "not what shape it is, and whether a layout should use the paper's long "
+    "direction is [I-135] (3)-b and unruled. `_scatter_pos` is untouched too: "
+    "an affine map takes a uniform scatter to a uniform scatter, so it already "
+    "means the same thing on every sheet. On a square canvas the factors are "
+    "exactly 1.0, so only the non-square cases move. Thirteen "
+    "`D-canvas-*-cluster` and `D-canvas-*-path-*` cases are new, nine of them "
+    "discriminating and four square controls: the corpus held ten cluster and "
+    "path cases and every one of them was square, so neither rule could be "
+    "seen in the record at all. Each subject is drawn on the papers whose long "
+    "side is the axis it spreads on -- a `top_to_bottom` on the pillar has a "
+    "factor of exactly 1.0 and would be frozen unable to fail."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -347,6 +355,53 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         for name, instruction in arrangements.items():
             _case(cases, f"D-canvas-{aspect}-{name}", instruction, aspect=aspect)
 
+    # Engine 32: the cluster and the path, the two remaining arrangements whose
+    # own shape the canvas was stretching, and together 36.2% of the marks
+    # production expands. The corpus could not see either: `G-cluster-*` and
+    # `G-path-*` are ten cases and every one of them is square, so not one
+    # non-square cluster or path existed anywhere in the record.
+    #
+    # Each subject is drawn on the square canvas and on the papers whose long
+    # side is the axis it spreads on. That pairing is the whole point: a
+    # `top_to_bottom` spreads on x, so on the pillar its factor is exactly 1.0
+    # and the case would be frozen without being able to fail. The square
+    # column is the control -- the arithmetic is the identity there, so those
+    # four must draw what engine 31 drew.
+    cluster_group = copy.deepcopy(BASE_ARRANGEMENT)
+    cluster_group.update({"count": 36, "layout": "scatter", "cluster_count": 3,
+                          "density": "medium", "path": "none", "jitter": 0.0})
+    wave_group = copy.deepcopy(BASE_ARRANGEMENT)
+    wave_group.update({"count": 40, "layout": "scatter", "path": "wave",
+                       "jitter": 0.0})
+    diagonal_group = copy.deepcopy(BASE_ARRANGEMENT)
+    diagonal_group.update({"count": 40, "layout": "scatter", "path": "diagonal",
+                           "jitter": 0.0})
+    top_to_bottom_group = copy.deepcopy(BASE_ARRANGEMENT)
+    top_to_bottom_group.update({"count": 40, "layout": "scatter",
+                                "path": "top_to_bottom", "jitter": 0.0})
+    spreads = {
+        # Clumps: the band is rotated, so it spreads on both axes and every
+        # non-square paper can see it.
+        "cluster": (_instruction("circle", radius=0.012, weight="pen",
+                                 arrangement=cluster_group),
+                    ("square", "pillar", "vertical", "wide")),
+        # The wave swings on y.
+        "path-wave": (_instruction("circle", radius=0.012, weight="pen",
+                                   arrangement=wave_group),
+                      ("square", "pillar", "vertical")),
+        # The diagonal jitters on both.
+        "path-diagonal": (_instruction("circle", radius=0.012, weight="pen",
+                                       arrangement=diagonal_group),
+                          ("square", "pillar", "vertical", "wide")),
+        # This one spreads on x, so it is drawn on the wide canvas only.
+        "path-top_to_bottom": (_instruction("circle", radius=0.012, weight="pen",
+                                            arrangement=top_to_bottom_group),
+                               ("square", "wide")),
+    }
+    for name, (instruction, aspects) in spreads.items():
+        for aspect in aspects:
+            _case(cases, f"D-canvas-{aspect}-{name}", instruction, aspect=aspect)
+
     for style in ("solid", "dashed", "dotted", "dash_dot"):
         _case(cases, f"D-style-{style}", _instruction("arc", weight="pen", style=style))
 
@@ -599,9 +654,13 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # The corpus held five `radial` cases, all square, and no `at.region` at
     # all, so both rules the ruling states would have gone into the record
     # unrecorded.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 48, "E": 119, "F": 128, "G": 50}
+    # D gained 13 in engine 32: a cluster and three paths, each on the square
+    # canvas and on the papers whose long side is the axis it spreads on. Nine
+    # of the thirteen draw something engine 31 could not; the four square ones
+    # are the control and must not move.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128, "G": 50}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 569:
+    if actual != expected or len(cases) != 582:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

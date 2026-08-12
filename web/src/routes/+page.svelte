@@ -95,6 +95,7 @@
 		resolveStripSelection,
 		type HistoryNavTarget
 	} from '$lib/historyNavigation';
+	import { hashDigest } from '$lib/hashIdentity';
 	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
@@ -5928,11 +5929,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const canvasId = displayedHistoryItem?.render_canvas_aspect_id ?? displayedHistoryItem?.render_canvas_aspect ?? displayedHistoryItem?.score?.canvas ?? result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? null;
 		return canvasId ? getCanvasAspectOption(canvasId).label : '-';
 	});
-	const statusHashFull = $derived(
+	// The digest, not the stored `<scheme>:<digest>`: the scheme is a property of
+	// the value rather than part of it, and nothing in the app takes a prefixed
+	// string as input. See lib/hashIdentity.ts.
+	const statusHashFull = $derived(hashDigest(
 		displayedHistoryItem?.render_hash
 			?? result?.render_hash
 			?? ''
-	);
+	));
 	const statusHashLabel = $derived((
 		displayedHistoryItem?.render_hash_short
 			?? displayedHistoryItem?.render_hash?.slice(-4)

@@ -10,6 +10,7 @@
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import VariationLanes from './VariationLanes.svelte';
+	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -472,8 +473,15 @@
 	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
 	const detailVarySeed = $derived(statusHistoryItem?.composition_seed ?? result?.composition_seed ?? null);
 	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
-	const detailDescriptionHash = $derived(statusHistoryItem?.description_hash ?? result?.description_hash ?? '');
-	const detailRenderHash = $derived(statusHistoryItem?.render_hash ?? result?.render_hash ?? '');
+	// The stored form is `<scheme>:<digest>`. The scheme is named in the row's
+	// label and the digest stands alone in the cell, so the value shown is the
+	// value copied. See lib/hashIdentity.ts.
+	const storedDescriptionHash = $derived(statusHistoryItem?.description_hash ?? result?.description_hash ?? '');
+	const storedRenderHash = $derived(statusHistoryItem?.render_hash ?? result?.render_hash ?? '');
+	const detailDescriptionHash = $derived(hashDigest(storedDescriptionHash));
+	const detailRenderHash = $derived(hashDigest(storedRenderHash));
+	const detailDescriptionHashLabel = $derived(hashRowLabel('description hash', storedDescriptionHash));
+	const detailRenderHashLabel = $derived(hashRowLabel('render hash', storedRenderHash));
 	const detailEngineVersion = $derived(statusHistoryItem?.render_engine_version ?? result?.render_engine_version ?? '');
 	const detailDdlVersion = $derived(statusHistoryItem?.ddl_version ?? result?.ddl_version ?? '');
 	const detailDdlEngineVersion = $derived(statusHistoryItem?.ddl_engine_version ?? result?.ddl_engine_version ?? '');
@@ -1130,8 +1138,8 @@
 						<section class="detail-group">
 							<h4>{t().provenanceSectionIdentity}</h4>
 							<dl>
-								{@render term('render hash', t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
-								{@render term('description hash', t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
+								{@render term(detailRenderHashLabel, t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
+								{@render term(detailDescriptionHashLabel, t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
 								{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>
 								{@render term(t().provenanceLabelDdlSpec, t().provenanceHintDdlSpec)}<dd>{detailDdlVersion || t().historyVersionNotRecorded}</dd>
 								{@render term(t().provenanceLabelTransformLayer, t().provenanceHintTransformLayer)}<dd>{detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import SketchSelect from './SketchSelect.svelte';
 	import { DEFAULT_SKETCH_GRAIN, normalizeSketchGrain, sketchModeLabel, type SketchGrain, type SketchMode } from '$lib/sketch';
+	import { hashDigest, hashSchemeLabel, shortHashDigest } from '$lib/hashIdentity';
 	import { onMount, tick } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
@@ -249,23 +250,6 @@
 		return [...grouped.entries()].sort(([a], [b]) => a - b);
 	});
 
-	function shortHash(value?: string | null): string {
-		if (!value) return '—';
-		const [prefix, digest] = value.split(':', 2);
-		return digest ? `${prefix}:${digest.slice(0, 10)}…` : `${value.slice(0, 12)}…`;
-	}
-
-	/** The digest on its own, without the scheme it is stored under.
-	 *
-	 *  A stored hash is `<scheme>:<digest>` (dh1, rh2, rh3…). The row already
-	 *  says which one it is, and the value beside it shows the scheme as well,
-	 *  so a copy that carries it hands the reader the label a third time --
-	 *  pasted anywhere else it reads as `rh2:` glued to the front of the hash.
-	 *  A value with no scheme is copied whole. */
-	function hashDigest(value: string): string {
-		const [prefix, digest] = value.split(':', 2);
-		return digest || prefix;
-	}
 
 	// The details row shows the hash abbreviated, so the button copies the whole
 	// value the way the history manager does -- a truncated hash identifies nothing.
@@ -959,10 +943,13 @@ $effect(() => {
 										<summary>{isJapanese ? '詳細' : 'Details'}</summary>
 										<dl>
 											<dt>{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
-											<dt>dh1</dt><dd>{shortHash(node.description_hash)}</dd>
-											<dt>rh2</dt>
+											<!-- The scheme each value names, read off the value: a row
+											     labelled with a constant went on saying rh2 while the
+											     works below it were being saved as rh3. -->
+											<dt>{hashSchemeLabel(node.description_hash, 'dh')}</dt><dd>{shortHashDigest(node.description_hash)}</dd>
+											<dt>{hashSchemeLabel(node.render_hash, 'rh')}</dt>
 											<dd class="hash-cell">
-												<span>{shortHash(node.render_hash)}</span>
+												<span>{shortHashDigest(node.render_hash)}</span>
 												{#if node.render_hash}
 													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={t().historyHashCopyTitle} onclick={(event) => copyRenderHash(node, event)}>
 														{copiedHashNodeId === node.id ? t().promptCopied : t().promptCopy}

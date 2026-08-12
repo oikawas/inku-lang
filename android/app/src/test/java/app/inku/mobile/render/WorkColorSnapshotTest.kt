@@ -220,11 +220,12 @@ fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
     @Test
     fun t9_recordedNameAndSubtitleDoNotChangeTheSvg() {
         val current = ColorCatalogs.get("ink_season")
+        val abstractScore = score.replace("custom", "red")
         val first = DefaultSvgRenderer().render(
-            renderRequest(snapshot = WorkColorSnapshot(current.id, current.renderMap, "First", "One")),
+            renderRequest(abstractScore, snapshot = WorkColorSnapshot(current.id, current.renderMap, "First", "One")),
         )
         val second = DefaultSvgRenderer().render(
-            renderRequest(snapshot = WorkColorSnapshot(current.id, current.renderMap, "Second", "Two")),
+            renderRequest(abstractScore, snapshot = WorkColorSnapshot(current.id, current.renderMap, "Second", "Two")),
         )
 
         assertEquals(first.svg, second.svg)

@@ -82,8 +82,13 @@ def _changed(before: dict[str, bytes], tree: pathlib.Path) -> list[str]:
 
 
 def test_scan_build_alone_reports_the_next_number_and_writes_nothing(tree):
+    """--local because the scratch tree has no deployment host to scan (I-196).
+
+    The faces the scan reads are what test_bump_scans_every_face.py measures;
+    what matters here is that reading still writes nothing.
+    """
     before = _snapshot(tree)
-    result = _run(tree, "--scan-build")
+    result = _run(tree, "--scan-build", "--local")
 
     assert result.returncode == 0, result.stderr
     assert "next build number" in result.stderr

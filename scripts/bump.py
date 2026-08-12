@@ -7,6 +7,7 @@ from one pair of values so a miss is not possible, and
 server/tests/test_version_consistency.py fails if they ever disagree again.
 
     python3 scripts/bump.py --version v2.9.25 --scan-build          # report only
+    python3 scripts/bump.py --scan-build --local                    # no ssh
     python3 scripts/bump.py --version v2.9.25 --build 822 --write
     python3 scripts/bump.py --show
 
@@ -17,9 +18,12 @@ I-195).  A flag that has to be remembered is not a guard, so the writing is now
 the flag and the looking is the default.
 
 The build number is a *shared* counter: other branches may already have taken
-the next value.  --scan-build reads every local ref and picks max+1, which is
-the part that is easy to get wrong by hand.  It cannot see the deployment host,
-so check `ssh pentala cat .../web/BUILD_NUMBER` as well before you take one.
+the next value.  --scan-build picks max+1 across all three faces the number
+lives on -- every ref, every worktree's working copy (where a number taken but
+not yet committed only shows up), and the deployment host -- because a scan that
+covers two of them reads exactly like a scan that covers all three (ledger
+I-196).  --local drops the host face, which is the only one that needs ssh; the
+scan stops rather than reporting a number it knows is short a face.
 
 This script does not touch APP_VERSION inside +page.svelte, because the UI now
 reads web/APP_VERSION through the vite define.  It also does not touch
@@ -30,6 +34,7 @@ only when a release is tagged.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -39,6 +44,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 APP_VERSION_FILE = ROOT / "web" / "APP_VERSION"
 BUILD_NUMBER_FILE = ROOT / "web" / "BUILD_NUMBER"
+
+# Where the deployment target is written down.  The deploy script is untracked
+# and lives in the main working tree only, so the lookup walks the worktrees
+# rather than assuming this checkout is the one that has it.
+DEPLOY_SCRIPT = Path("no-git-sync") / "scripts" / "deploy.sh"
+DEPLOY_DEFAULTS = (
+    ("INKU_REMOTE_HOST", r'^REMOTE_HOST="\$\{INKU_REMOTE_HOST:-([^}"]+)\}"'),
+    ("INKU_REMOTE_REPO", r'^REMOTE_REPO="\$\{INKU_REMOTE_REPO:-([^}"]+)\}"'),
+)
 
 # (path, pattern, replacement template).  Each pattern must match exactly once;
 # a pattern that stops matching is a failure, not something to skip silently.
@@ -83,10 +97,25 @@ def read_current() -> tuple[str, str]:
     )
 
 
-def scan_build_numbers() -> tuple[int, dict[str, int]]:
-    """Return max+1 across every local ref, with the per-ref values it saw."""
+def _number(text: str) -> int | None:
+    digits = "".join(ch for ch in text if ch.isdigit())
+    return int(digits) if digits else None
+
+
+def worktree_paths() -> list[Path]:
+    """Every working tree of this repository, main one first."""
+    listing = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout
+    return [Path(line[len("worktree "):]) for line in listing.splitlines()
+            if line.startswith("worktree ")]
+
+
+def scan_refs() -> dict[str, int]:
+    """web/BUILD_NUMBER as every ref carries it -- local branches and remotes."""
     refs = subprocess.run(
-        ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/"],
+        ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/", "refs/remotes/"],
         cwd=ROOT, capture_output=True, text=True, check=True,
     ).stdout.split()
     seen: dict[str, int] = {}
@@ -97,12 +126,112 @@ def scan_build_numbers() -> tuple[int, dict[str, int]]:
         )
         if blob.returncode != 0:
             continue
-        digits = "".join(ch for ch in blob.stdout if ch.isdigit())
-        if digits:
-            seen[ref] = int(digits)
+        value = _number(blob.stdout)
+        if value is not None:
+            seen[ref] = value
+    return seen
+
+
+def scan_worktrees(paths: list[Path]) -> dict[str, int]:
+    """The number on disk in each working tree.
+
+    A number taken in a worktree but not yet committed exists nowhere else, so
+    dropping this face makes the scan hand out a value someone already holds.
+    """
+    seen: dict[str, int] = {}
+    for path in paths:
+        number_file = path / "web" / "BUILD_NUMBER"
+        if not number_file.is_file():
+            continue
+        value = _number(number_file.read_text(encoding="utf-8"))
+        if value is not None:
+            seen[f"{path} (working tree)"] = value
+    return seen
+
+
+def deploy_target(paths: list[Path]) -> tuple[str, str]:
+    """(host, repo) for the deployment host, from the environment or deploy.sh.
+
+    The defaults live in the untracked deploy script so that this file -- which
+    is public -- does not carry the deployment target.  A deploy script whose
+    shape changed fails here rather than falling back to a guess.
+    """
+    from_env = {name: os.environ.get(name) for name, _ in DEPLOY_DEFAULTS}
+    if all(from_env.values()):
+        return from_env["INKU_REMOTE_HOST"], from_env["INKU_REMOTE_REPO"]
+
+    for path in paths:
+        script = path / DEPLOY_SCRIPT
+        if not script.is_file():
+            continue
+        text = script.read_text(encoding="utf-8")
+        found: list[str] = []
+        for name, pattern in DEPLOY_DEFAULTS:
+            match = re.search(pattern, text, re.MULTILINE)
+            if match is None:
+                raise LookupError(
+                    f"{script}: no default for {name}; the script's shape changed, "
+                    f"so set {name} in the environment or fix scripts/bump.py"
+                )
+            found.append(os.environ.get(name) or match.group(1))
+        return found[0], found[1]
+
+    raise LookupError(
+        f"the deployment target is unknown: no worktree has {DEPLOY_SCRIPT} and "
+        f"INKU_REMOTE_HOST / INKU_REMOTE_REPO are not both set"
+    )
+
+
+def scan_host(host: str, repo: str) -> dict[str, int]:
+    """The number the deployment host is serving.
+
+    A failure raises: the host is shared, and a scan that quietly skipped it
+    would report the same shape of answer as one that reached it.
+    """
+    probe = subprocess.run(
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", host,
+         f"cat {repo}/web/BUILD_NUMBER"],
+        capture_output=True, text=True,
+    )
+    if probe.returncode != 0:
+        raise LookupError(
+            f"{host}: {(probe.stderr.strip() or 'ssh failed').splitlines()[-1]}"
+        )
+    value = _number(probe.stdout)
+    if value is None:
+        raise LookupError(f"{host}: {repo}/web/BUILD_NUMBER holds no number")
+    return {f"{host}:{repo}/web/BUILD_NUMBER": value}
+
+
+def scan_build_numbers(*, local: bool) -> tuple[int, dict[str, int], list[str]]:
+    """Return max+1 across the faces the counter lives on, and which were read.
+
+    `local` drops the deployment host -- the one face that needs ssh -- and the
+    caller has to say so in what it prints.
+    """
+    paths = worktree_paths()
+    refs = scan_refs()
+    trees = scan_worktrees(paths)
+    seen = {**refs, **trees}
+    scanned = [f"{len(refs)} refs", f"{len(trees)} worktrees"]
+
+    if local:
+        scanned.append("no deployment host (--local)")
+    else:
+        try:
+            host, repo = deploy_target(paths)
+            seen.update(scan_host(host, repo))
+        except LookupError as exc:
+            raise SystemExit(
+                f"the deployment host was not scanned: {exc}\n"
+                f"it carries the same counter, so no number is reported; "
+                f"pass --local to take one from the refs and worktrees alone"
+            ) from exc
+        scanned.append(host)
+
     if not seen:
-        raise SystemExit("no branch carries web/BUILD_NUMBER")
-    return max(seen.values()) + 1, seen
+        raise SystemExit("nothing carries web/BUILD_NUMBER")
+    return max(seen.values()) + 1, seen, scanned
 
 
 def apply(version: str, build: str, *, write: bool) -> list[str]:
@@ -142,11 +271,20 @@ def main() -> int:
     parser.add_argument("--version", help="application version, e.g. v2.9.25")
     parser.add_argument("--build", help="build number, e.g. 822")
     parser.add_argument("--scan-build", action="store_true",
-                        help="choose the build number as max+1 across every local ref")
+                        help="choose the build number as max+1 across every ref, every "
+                             "worktree's working copy and the deployment host")
+    parser.add_argument("--local", action="store_true",
+                        help="do not ssh to the deployment host; the number then comes "
+                             "from the refs and worktrees only")
     parser.add_argument("--show", action="store_true", help="print current values and exit")
     parser.add_argument("--write", action="store_true",
                         help="stamp the files; without it nothing on disk changes")
     args = parser.parse_args()
+
+    # A flag that quietly does nothing is how the caller comes to believe the
+    # host was scanned when nothing scanned anything (ledger I-196).
+    if args.local and not args.scan_build:
+        parser.error("--local narrows --scan-build; it means nothing on its own")
 
     version, build = read_current()
 
@@ -156,11 +294,10 @@ def main() -> int:
         return 0
 
     if args.scan_build:
-        nxt, seen = scan_build_numbers()
-        for ref, value in sorted(seen.items(), key=lambda kv: -kv[1]):
-            print(f"  {value:>6}  {ref}", file=sys.stderr)
-        print(f"next build number: {nxt} "
-              f"(local refs only -- also check the deployment host)", file=sys.stderr)
+        nxt, seen, scanned = scan_build_numbers(local=args.local)
+        for source, value in sorted(seen.items(), key=lambda kv: -kv[1]):
+            print(f"  {value:>6}  {source}", file=sys.stderr)
+        print(f"next build number: {nxt} (scanned: {', '.join(scanned)})", file=sys.stderr)
         build = str(nxt)
     elif args.build:
         build = args.build

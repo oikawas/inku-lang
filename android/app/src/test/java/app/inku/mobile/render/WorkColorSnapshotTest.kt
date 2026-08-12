@@ -96,12 +96,13 @@ private fun renderRequest(
     scoreJson: String = score,
     catalogId: String = "default",
     snapshot: WorkColorSnapshot? = null,
+    renderSeed: Long = 4242L,
 ) = RenderRequest(
     scoreJson = scoreJson,
     colorCatalogId = catalogId,
     canvasAspect = "square",
     svgProfile = "display",
-    renderSeed = 4242L,
+    renderSeed = renderSeed,
     workColorSnapshot = snapshot,
 )
 
@@ -132,12 +133,18 @@ fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
     val current = ColorCatalogs.get("ink_season")
     val abstractScore = score.replace("custom", "red")
     val renderer = DefaultSvgRenderer { current }
-    val currentDrawing = renderer.render(renderRequest(abstractScore, current.id))
-    val snapshotDrawing = renderer.render(
-        renderRequest(abstractScore, current.id, WorkColorSnapshot(current.id, current.renderMap)),
-    )
-
-    assertEquals(currentDrawing.svg, snapshotDrawing.svg)
+    (1L..200L).forEach { seed ->
+        val currentDrawing = renderer.render(renderRequest(abstractScore, current.id, renderSeed = seed))
+        val snapshotDrawing = renderer.render(
+            renderRequest(
+                abstractScore,
+                current.id,
+                WorkColorSnapshot(current.id, current.renderMap),
+                renderSeed = seed,
+            ),
+        )
+        assertEquals("seed=$seed", currentDrawing.svg, snapshotDrawing.svg)
+    }
 }
     
     @Test

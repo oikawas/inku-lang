@@ -75,6 +75,7 @@ def coerce_score(
     branch_report: dict[str, int] | None = None,
     limits: Limits = DEFAULT_LIMITS,
     limit_notes: list[str] | None = None,
+    lang: str | None = None,
 ) -> Score:
     """LLM 生成 Score の欠損・不正フィールドを補修して Renderer が安全に描画できる状態にする。
 
@@ -84,6 +85,12 @@ def coerce_score(
     surface tension mark or a focal-event reaction were folded away with the
     staffage level (v2.11.0), because adding what the description does not ask
     for works against the purpose of the application.
+
+    `lang` is the language the description is written in. Only the count readers
+    consult it, and only for the exclusions: a numeral with CJK beside it is a
+    count in an English body and an angle or a fraction in a Japanese one. Every
+    caller passes it; a caller that did not would keep answering 200 while
+    reading counts by the other language's rules.
     """
     if _style_coerce_disabled():
         _branch_before = score.instructions
@@ -93,7 +100,7 @@ def coerce_score(
         instructions = _without_spontaneous_grid(instructions, ddl=ddl)
         _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)
         _branch_before = instructions
-        instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
+        instructions = _with_literal_grid_fidelity(instructions, ddl=ddl, lang=lang)
         _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
         _branch_before = instructions
         instructions = _drop_invalid_relations(instructions)
@@ -133,7 +140,9 @@ def coerce_score(
     instructions = _dedupe_instructions(instructions)
     _record_branch_fire(branch_report, "dedupe_instructions", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_ddl_coverage(instructions, ddl=ddl, background=background, limits=limits)
+    instructions = _with_ddl_coverage(
+        instructions, ddl=ddl, background=background, limits=limits, lang=lang
+    )
     _record_branch_fire(branch_report, "with_ddl_coverage", _branch_before, instructions)
     _branch_before = instructions
     # The repair runs first because the promotion can only read what is already
@@ -170,7 +179,9 @@ def coerce_score(
     instructions = [_with_unintentional_filled_shape_tempering(ins, ddl=ddl) for ins in instructions]
     _record_branch_fire(branch_report, "with_unintentional_filled_shape_tempering", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_context_density_governor(instructions, ddl=ddl, background=background)
+    instructions = _with_context_density_governor(
+        instructions, ddl=ddl, background=background, lang=lang
+    )
     _record_branch_fire(branch_report, "with_context_density_governor", _branch_before, instructions)
     _branch_before = instructions
     instructions = _with_motion_energy(instructions, ddl=ddl)
@@ -218,11 +229,11 @@ def coerce_score(
     # 1..11 band this branch repairs is never the one they take. So the position
     # is right but nothing distinguishes it, and no test here pretends to.
     instructions = _with_stated_count_fidelity(
-        instructions, ddl=ddl, background=background, limits=limits
+        instructions, ddl=ddl, background=background, limits=limits, lang=lang
     )
     _record_branch_fire(branch_report, "with_stated_count_fidelity", _branch_before, instructions)
     _branch_before = instructions
-    instructions = _with_literal_grid_fidelity(instructions, ddl=ddl)
+    instructions = _with_literal_grid_fidelity(instructions, ddl=ddl, lang=lang)
     _record_branch_fire(branch_report, "with_literal_grid_fidelity", _branch_before, instructions)
     _branch_before = instructions
     instructions = _drop_invalid_relations(instructions)

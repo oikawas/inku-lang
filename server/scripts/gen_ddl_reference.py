@@ -146,6 +146,20 @@ def build_plugin_expand_inputs() -> dict[str, dict[str, Any]]:
     one is the only place a `plugin_warnings` line is frozen.  The seed is fixed
     because the breakdown inside one unit is drawn from it.
 
+    Two more since 2026-08-12, one per ruling that widened the reader.  The fifth
+    states its count in a phrase that does not name the plugin, which the layer
+    could not reach before ruling B ([I-215]); the sixth states it as a bare
+    numeral with no counter, which ruling C ([I-213]) reads inside a phrase that
+    names a plugin and nowhere else.  Neither shape was in this corpus, so
+    without them both rulings would freeze without moving a byte.
+
+    The fifth says twenty where the contract that added it said thirty.
+    `Nature.枯草` costs fourteen marks a unit, and thirty of it is 420 against a
+    400-mark work, so the layer declines the whole count -- the case would then
+    have recorded the ceiling, which `C-plugin-count-over-the-ceiling` already
+    records, instead of recording the ruling.  Twenty is 280 and lands (author's
+    ruling, 2026-08-12).
+
     The fourth freezes where the two rulings do not meet.  The English side of
     the reader was widened to Arabic numerals, but a numeral with CJK within
     twelve characters is left to the Japanese path -- and a plugin named
@@ -163,10 +177,22 @@ def build_plugin_expand_inputs() -> dict[str, dict[str, Any]]:
             "Place 12 Nature.青葉 marks.", lang="en"
         ),
         "C-plugin-count-over-the-ceiling": _plugin_expand_input("Nature.青葉を百二十個置く。"),
+        "C-plugin-count-outside-the-phrase": _plugin_expand_input(
+            "Nature.枯草の細い鉛筆の縦線を、画面下半分に二十本、不揃いに並べる。"
+        ),
+        "C-plugin-count-as-a-bare-numeral": _plugin_expand_input(
+            "緑のNature.下草を50散らす。"
+        ),
     }
 
-def _coerce_input(score: dict[str, Any], *, ddl: str | None = None) -> dict[str, Any]:
-    return {"score": copy.deepcopy(score), "ddl": ddl}
+# `lang` is named on every case rather than left to the default: the count
+# readers consult it, so a case that does not say which language it is in does
+# not say what it measures. `None` is a value here, not an omission -- it is
+# what every one of these cases handed coerce before the port existed.
+def _coerce_input(
+    score: dict[str, Any], *, ddl: str | None = None, lang: str | None = None
+) -> dict[str, Any]:
+    return {"score": copy.deepcopy(score), "ddl": ddl, "lang": lang}
 
 def build_coerce_inputs() -> dict[str, dict[str, Any]]:
     line = _instruction()
@@ -308,7 +334,7 @@ def _render_cases() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     for case_id, input_data in sorted(build_coerce_inputs().items()):
         report: dict[str, int] = {}
         score = coerce_score(Score.model_validate(input_data["score"]), ddl=input_data["ddl"],
-                             branch_report=report)
+                             lang=input_data["lang"], branch_report=report)
         text = _canonical_output({"score": score.model_dump(by_alias=True, mode="json"), "branch_report": report})
         path = f"b_coerce/{case_id}.json"
         outputs[path] = text

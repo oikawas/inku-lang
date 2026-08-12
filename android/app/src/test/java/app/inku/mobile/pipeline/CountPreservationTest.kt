@@ -189,6 +189,51 @@ class CountPreservationTest {
         assertEquals(emptySet<Int>(), ServerScoreCounts.explicitCountsFromDdl("下草を50散らす。"))
     }
 
+    /**
+     * T-18: the port answers "how many did the description say" the way the server does.
+     *
+     * The expected values are generated from the server implementation into
+     * `count_preservation.json`, never written here. A table written here would go on
+     * passing from the day the server rule next moves, and freeze the drift in place --
+     * which is exactly what the twenty-one-kanji table this replaced was doing.
+     */
+    @Test
+    fun testTheCountHintMatchesTheServer() {
+        val cases = corpus().getJSONArray("count_hint_cases")
+        assertEquals(6, cases.length())
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val ddl = case.getString("ddl")
+            val lang = if (case.isNull("lang")) null else case.getString("lang")
+            val separates = case.getString("separates")
+
+            val expectedHint = if (case.isNull("count_hint")) null else case.getInt("count_hint")
+            assertEquals("$ddl ($separates)", expectedHint, ServerScoreSemantics.countHintFromDdl(ddl, lang))
+
+            val expected = case.getJSONArray("explicit_counts")
+            val expectedCounts = (0 until expected.length()).map { expected.getInt(it) }.toSet()
+            assertEquals("$ddl ($separates)", expectedCounts, ServerScoreCounts.explicitCountsFromDdl(ddl, lang))
+        }
+    }
+
+    /**
+     * T-19: the hand-written kanji table is gone, and the shared reader answers instead.
+     *
+     * The table read the first digit run anywhere in the description with none of the
+     * exclusions, so these three answered 0, 30 and 1 before.
+     */
+    @Test
+    fun testTheHandWrittenKanjiTableIsGone() {
+        val semantics = ServerScoreSemantics::class.java
+        val source = semantics.declaredMethods.count { it.name == "countHintFromDdl" }
+        assertTrue("countHintFromDdl must still exist on ServerScoreSemantics", source > 0)
+
+        assertEquals(null, ServerScoreSemantics.countHintFromDdl("Place a circle of radius 0.11 here."))
+        assertEquals(null, ServerScoreSemantics.countHintFromDdl("\u7acb\u65b9\u4f53\u306e\u5411\u304d: 30\u5ea6\u56de\u8ee2"))
+        // A number the twenty-one-entry table had no row for, and could not have read.
+        assertEquals(43, ServerScoreSemantics.countHintFromDdl("\u7dda\u3092\u56db\u5341\u4e09\u672c\u4e26\u3079\u308b\u3002"))
+    }
+
     @Test
     fun testADigitInsideAnotherNumberIsNotACount() {
         assertEquals(

@@ -330,15 +330,18 @@ internal object ServerScoreSemantics {
         else -> JSONArray(listOf(0.5, 0.5))
     }
 
-    fun countHintFromDdl(text: String): Int? {
-        Regex("""\d+""").find(text)?.value?.toIntOrNull()?.let { return it }
-        return listOf(
-            "千" to 1000, "六百十" to 610, "三百" to 300, "百三十七" to 137, "百二十" to 120,
-            "三十四" to 34, "三十" to 30, "二十一" to 21, "二十" to 20, "十六" to 16,
-            "十二" to 12, "十一" to 11, "十" to 10, "八" to 8, "七" to 7, "六" to 6,
-            "五" to 5, "四" to 4, "三" to 3, "二" to 2, "一" to 1,
-        ).firstOrNull { (marker, _) -> text.contains(marker) }?.second
-    }
+    /**
+     * What is the count here, read the way `ServerScoreCounts` reads every count.
+     *
+     * Ruling C ([I-212], 2026-08-12). What stood here was a hand-written table of
+     * twenty-one kanji numbers behind `Regex("""\d+""").find(text)`: it took the
+     * first digit run anywhere in the description with none of the exclusions, so
+     * `radius 0.11` answered 0 and a 30-degree rotation answered 30, and the kanji
+     * table matched on substrings so it could not read a number the table had no
+     * entry for. The shared reader was already in this package.
+     */
+    fun countHintFromDdl(text: String, lang: String? = null): Int? =
+        ServerScoreCounts.countHintFromDdl(text, lang)
 
     fun vagueCount(text: String): Int = when {
         text.containsAny("無数", "満天", "砂", "雨", "雪") -> 110

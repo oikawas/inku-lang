@@ -985,6 +985,7 @@ def _with_context_density_governor(
     *,
     ddl: str | None,
     background: str,
+    lang: str | None = None,
 ) -> list[Instruction]:
     """静けさ・膜・記憶系の入力で、密度や大きな反復面が主題を上書きするのを抑える。"""
     if not _context_has_density_governor(ddl):
@@ -992,7 +993,7 @@ def _with_context_density_governor(
 
     has_vertical_context = _context_has_vertical_density(ddl)
     has_neon_blur_context = _context_has_neon_blur_density(ddl)
-    requested_counts = _explicit_counts_from_ddl(ddl)
+    requested_counts = _explicit_counts_from_ddl(ddl, lang=lang)
     adjusted: list[Instruction] = []
     governed_count = 0
     for ins in instructions:
@@ -1749,7 +1750,12 @@ def _sensory_kind(clause: str) -> str | None:
 
 
 def _fallback_instruction_from_clause(
-    clause: str, *, index: int, background: str, limits: Limits = DEFAULT_LIMITS
+    clause: str,
+    *,
+    index: int,
+    background: str,
+    limits: Limits = DEFAULT_LIMITS,
+    lang: str | None = None,
 ) -> Instruction:
     lower = clause.lower()
     primitive = _primitive_from_clause(clause)
@@ -1840,7 +1846,7 @@ def _fallback_instruction_from_clause(
     elif any(marker in clause or marker in lower for marker in ("上端", "upper edge", "top edge")) and "center" in common:
         common["center"] = [common["center"][0], 0.22]
 
-    count = count_hint_from_ddl(clause, limits)
+    count = count_hint_from_ddl(clause, limits, lang=lang)
     cycle = _color_cycle_from_clause(clause, background)
     if count and _is_literal_grid_request(clause):
         common["arrangement"] = {
@@ -1992,6 +1998,7 @@ def _with_ddl_coverage(
     ddl: str | None,
     background: str,
     limits: Limits = DEFAULT_LIMITS,
+    lang: str | None = None,
 ) -> list[Instruction]:
     clauses = _ddl_clauses(ddl)
     if len(instructions) != 1 or len(clauses) <= 1:
@@ -2009,7 +2016,7 @@ def _with_ddl_coverage(
         if len(augmented) >= 5:
             break
         fallback = _fallback_instruction_from_clause(
-            clause, index=len(augmented), background=background, limits=limits
+            clause, index=len(augmented), background=background, limits=limits, lang=lang
         )
         key = (fallback.primitive, fallback.color, fallback.weight)
         if key in existing:
@@ -2126,11 +2133,12 @@ def _with_literal_grid_fidelity(
     instructions: list[Instruction],
     *,
     ddl: str | None,
+    lang: str | None = None,
 ) -> list[Instruction]:
     """Preserve explicit literal-tiling count and full-field coverage."""
     if not _is_literal_grid_request(ddl):
         return instructions
-    count_hint = count_hint_from_ddl(ddl or "")
+    count_hint = count_hint_from_ddl(ddl or "", lang=lang)
     if instructions and not any(
         ins.arrangement is not None and ins.arrangement.layout == "grid"
         for ins in instructions
@@ -2290,6 +2298,7 @@ def _group_the_clause_names(
     background: str,
     limits: Limits,
     spoken_for: frozenset[int],
+    lang: str | None = None,
 ) -> int | None:
     """Which group this clause is about, when exactly one answer is available.
 
@@ -2310,7 +2319,9 @@ def _group_the_clause_names(
     the hundred and fifty-five circles standing next to them.
     """
     fallback = _with_ddl_instruction_hints(
-        _fallback_instruction_from_clause(clause, index=index, background=background, limits=limits),
+        _fallback_instruction_from_clause(
+            clause, index=index, background=background, limits=limits, lang=lang
+        ),
         ddl=ddl,
     )
     candidates = [
@@ -2377,6 +2388,7 @@ def _with_stated_count_fidelity(
     ddl: str | None,
     background: str,
     limits: Limits = DEFAULT_LIMITS,
+    lang: str | None = None,
 ) -> list[Instruction]:
     """Make a count stated in plain words true of the group the clause names.
 
@@ -2405,7 +2417,7 @@ def _with_stated_count_fidelity(
     """
     if not ddl or not instructions:
         return instructions
-    every_stated_count = _explicit_counts_from_ddl(ddl)
+    every_stated_count = _explicit_counts_from_ddl(ddl, lang=lang)
     stated = {
         value
         for value in every_stated_count
@@ -2423,7 +2435,7 @@ def _with_stated_count_fidelity(
         # circles, so "three black pen circles" reads as no count at all.
         values = {
             value
-            for value in _explicit_counts_from_ddl(clause)
+            for value in _explicit_counts_from_ddl(clause, lang=lang)
             if value in stated
         }
         if len(values) != 1:
@@ -2453,6 +2465,7 @@ def _with_stated_count_fidelity(
             background=background,
             limits=limits,
             spoken_for=frozenset(every_stated_count - {value}),
+            lang=lang,
         )
         if target is None:
             continue

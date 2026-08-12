@@ -1508,6 +1508,7 @@ def count_preservation_fixtures() -> None:
     3 関数だけ**を通した結果を焼く。coerce 全体ではないので apples-to-apples。
     """
     from inku_server.coerce.compose import _with_context_density_governor
+    from inku_server.counts import _explicit_counts_from_ddl, count_hint_from_ddl
     from inku_server.coerce.normalize import (
         _with_per_instruction_density_budget,
         _with_total_density_budget,
@@ -1583,6 +1584,27 @@ def count_preservation_fixtures() -> None:
             "requested_survives": 99 in numeral_counts,
         }
     )
+    # The reader the port shares with the server. Each description names the one
+    # thing it separates; the answers are the server's, never the port's.
+    count_hint_probes: tuple[tuple[str, str | None, str], ...] = (
+        ("Draw 12 circles.", None, "a numeral, and a noun no table listed"),
+        ("Scatter twelve small ellipses.", None, "a number word, same missing noun"),
+        ("Place 12 Nature.\u9752\u8449 marks.", "en", "an English body naming a Japanese plugin"),
+        ("\u7acb\u65b9\u4f53\u306e\u5411\u304d: 30\u5ea6\u56de\u8ee2", "ja", "a Japanese body keeps the bare-numeral exclusion"),
+        ("Tile thin black lines in four directions across the wall.", "en", "a number counting an axis, not marks"),
+        ("Place a circle of radius 0.11 near the center.", "en", "a digit inside another number"),
+    )
+    count_hint_cases = [
+        {
+            "ddl": ddl,
+            "lang": lang,
+            "separates": separates,
+            "count_hint": count_hint_from_ddl(ddl, lang=lang),
+            "explicit_counts": sorted(_explicit_counts_from_ddl(ddl, lang=lang)),
+        }
+        for ddl, lang, separates in count_hint_probes
+    ]
+
     literal = [case for case in cases if case["kind"] == "literal"]
     represented = [case for case in cases if case["kind"] == "represented"]
     out = {
@@ -1602,6 +1624,14 @@ def count_preservation_fixtures() -> None:
         "represented_counts": sorted({count for case in represented for count in case["expected_counts"]}),
         "total": len(cases),
         "cases": cases,
+        "count_hint_note": (
+            "[I-212]..[I-216] (2026-08-12). The port answers `how many did the "
+            "description say` with the same rule the server does. Every value here is "
+            "read off the server implementation, so a hand-written table on the port "
+            "cannot go stale without this fixture going stale with it. Six descriptions, "
+            "one per narrowness the rulings removed, plus the two exclusions that stay."
+        ),
+        "count_hint_cases": count_hint_cases,
     }
     out_path("count_preservation.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 

@@ -77,7 +77,9 @@ def _is_literal_grid_request(ddl: str | None) -> bool:
     return re.search(r"\b(?:tile|tiled|tiling)\b", lower) is not None
 
 
-def count_hint_from_ddl(ddl: str, limits: Limits = DEFAULT_LIMITS) -> int | None:
+def count_hint_from_ddl(
+    ddl: str, limits: Limits = DEFAULT_LIMITS, *, lang: str | None = None
+) -> int | None:
     """Extract a conservative count hint from a normalized DDL fragment."""
     literal_grid = _is_literal_grid_request(ddl)
     clauses = re.split(r"[。.!?]+", ddl)
@@ -91,7 +93,7 @@ def count_hint_from_ddl(ddl: str, limits: Limits = DEFAULT_LIMITS) -> int | None
         if value is not None:
             maximum = limits.ddl_count_max_grid if literal_grid else limits.ddl_count_max
             return min(max(value, 1), maximum)
-    return _english_count_hint(ddl, limits)
+    return _english_count_hint(ddl, limits, lang=lang)
 
 
 ENGLISH_SMALL_NUMBERS: dict[str, int] = {
@@ -130,7 +132,9 @@ ENGLISH_COUNT_UNITS: dict[str, int] = {
 }
 
 
-def _english_count_hint(ddl: str, limits: Limits = DEFAULT_LIMITS) -> int | None:
+def _english_count_hint(
+    ddl: str, limits: Limits = DEFAULT_LIMITS, *, lang: str | None = None
+) -> int | None:
     literal_grid = _is_literal_grid_request(ddl)
     clauses = re.split(r"[.!?]+", ddl)
     candidates = [clause for clause in clauses if _is_literal_grid_request(clause)] if literal_grid else [ddl]
@@ -192,23 +196,44 @@ _CJK_PATTERN = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿]")
 _CJK_WINDOW = 12
 _NUMBER_EXPRESSION_PUNCTUATION = ".,/:"
 
+# What a reader falls back to when its caller does not name a language.  Every
+# call site that predates the language port resolves here, so opening the port
+# moves nothing: `ja` is the language the exclusions below were measured on.
+_DEFAULT_COUNT_LANG = "ja"
 
-def _numeral_is_a_bare_count(text: str, start: int, end: int) -> bool:
+
+def _cjk_neighbourhood_is_excluded(lang: str | None) -> bool:
+    """Does a numeral with CJK beside it stay unread?
+
+    Ruling B ([I-216], 2026-08-12): what decides this is the language the body is
+    written in, not the characters that happen to sit next to the digit.  An
+    English body naming a plugin whose word is Japanese placed one unit because
+    of the name it referred to.  A Japanese body keeps the exclusion: it writes
+    angles, fractions and percentages as bare numerals, and reading those moved
+    true and false readings in equal number.
+    """
+    return (lang or _DEFAULT_COUNT_LANG) != "en"
+
+
+def _numeral_is_a_bare_count(text: str, start: int, end: int, *, lang: str | None = None) -> bool:
     """Is this digit run a count, or a piece of some other number?
 
     Two exclusions, both measured on the stored works (2026-08-11):
 
-    - CJK within twelve characters.  Japanese writes angles, fractions and
-      percentages as bare numerals, and reading those moved nineteen works with
-      true and false readings in equal number.  Whether Japanese should read a
-      numeral with no counter needs its own ruling; this is not it.
+    - CJK within twelve characters, in a body written in Japanese.  Japanese
+      writes angles, fractions and percentages as bare numerals, and reading
+      those moved nineteen works with true and false readings in equal number.
+      Which language the body is in decides this exclusion, not which characters
+      neighbour the digit -- see `_cjk_neighbourhood_is_excluded`.
     - a digit that belongs to a decimal, fraction or ratio (`radius 0.11`,
       `1/3 of the screen`), or carries a percent sign.  Ruling B calls those false
       on the Japanese side, and the digits inside them are no more a count in
       English.  Measured: without this, one work in the fifty-case count corpus
       reads a radius as the counts 0 and 11.
     """
-    if _CJK_PATTERN.search(text[max(0, start - _CJK_WINDOW) : end + _CJK_WINDOW]):
+    if _cjk_neighbourhood_is_excluded(lang) and _CJK_PATTERN.search(
+        text[max(0, start - _CJK_WINDOW) : end + _CJK_WINDOW]
+    ):
         return False
     if start >= 2 and text[start - 1] in _NUMBER_EXPRESSION_PUNCTUATION and text[start - 2].isdigit():
         return False
@@ -228,12 +253,16 @@ def _numeral_is_a_bare_count(text: str, start: int, end: int) -> bool:
 # Limits, so the band exists under one name only.
 
 
-def _explicit_counts_from_ddl(ddl: str | None) -> frozenset[int]:
+def _explicit_counts_from_ddl(ddl: str | None, *, lang: str | None = None) -> frozenset[int]:
     """Every count the description states outright, in either language.
 
     `count_hint_from_ddl` answers "what is the count here" and stops at the first
     match. This answers "which counts were asked for at all", which is what tells a
     group written to order apart from one a governor is free to thin.
+
+    `lang` is the language the body is written in, and only the exclusions consult
+    it. A caller that does not know resolves to `_DEFAULT_COUNT_LANG`, which is
+    what every caller did before the port was opened.
     """
     if not ddl:
         return frozenset()
@@ -250,7 +279,7 @@ def _explicit_counts_from_ddl(ddl: str | None) -> frozenset[int]:
         token, start, stop = tokens[index]
         if token.isdigit():
             value = int(token)
-            if value and _numeral_is_a_bare_count(text, start, stop):
+            if value and _numeral_is_a_bare_count(text, start, stop, lang=lang):
                 counts.add(value)
             index += 1
             continue

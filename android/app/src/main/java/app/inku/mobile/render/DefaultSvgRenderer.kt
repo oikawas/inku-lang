@@ -2,6 +2,7 @@ package app.inku.mobile.render
 
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.CanvasSize
+import app.inku.mobile.data.model.ColorCatalog
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.pipeline.RenderRequest
@@ -20,13 +21,17 @@ internal const val FILL_DAB_MIN_TRAVEL = 0.90
 internal const val FRAME_LO = 0.02
 internal const val FRAME_HI = 0.98
 
-class DefaultSvgRenderer : SvgRenderer {
+class DefaultSvgRenderer(
+    private val catalogResolver: (String?) -> ColorCatalog = ColorCatalogs::get,
+) : SvgRenderer {
     override fun render(request: RenderRequest): RenderResult {
         // Saved works carry retired tool names. Migrate before anything reads `weight`,
         // the way the server's Instruction validator does on the way in.
         val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
-        val catalog = ColorCatalogs.get(request.colorCatalogId)
+        val catalog = catalogResolver(request.colorCatalogId)
+        val colorMap = request.workColorSnapshot?.colorMap ?: catalog.renderMap
+        val catalogId = request.workColorSnapshot?.catalogId ?: catalog.id
         // The request decides; the Score is the fallback.
         //
         // The server takes the seed as an argument
@@ -39,11 +44,11 @@ class DefaultSvgRenderer : SvgRenderer {
         // this file.
         val renderSeed = request.renderSeed
             ?: if (score.has("render_seed") && !score.isNull("render_seed")) score.optLong("render_seed") else null
-        val cmap = ServerRendererStyle.DEFAULT_COLOR_MAP + catalog.renderMap
+        val cmap = ServerRendererStyle.DEFAULT_COLOR_MAP + colorMap
         val assignment = ServerRendererStyle.computeColorAssignment(
-            catalogMap = catalog.renderMap,
+            catalogMap = colorMap,
             renderSeed = renderSeed,
-            catalogId = catalog.id
+            catalogId = catalogId
         )
         val colors = cmap + assignment
         val bgKey = score.optString("background", "white")
@@ -120,11 +125,11 @@ class DefaultSvgRenderer : SvgRenderer {
             .put("render_canvas_aspect", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_id", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_ratio", CanvasAspects.ratioFor(request.canvasAspect))
-            .put("render_color_catalog_id", catalog.id)
+            .put("render_color_catalog_id", catalogId)
             .put("render_color_catalog_name", catalog.name)
             .put("render_color_catalog_sub", catalog.sub)
             .put("render_color_profile", JSONObject().put("id", "srgb").put("name", "sRGB IEC61966-2.1").put("standard", "IEC 61966-2-1:1999"))
-            .put("render_color_map", JSONObject(catalog.renderMap))
+            .put("render_color_map", JSONObject(colorMap))
         val hash = sha256(svg + metadata.toString())
         return RenderResult(svg = svg, metadataJson = metadata.put("render_hash", hash).toString(), renderHash = hash)
     }

@@ -1,6 +1,8 @@
 package app.inku.mobile.data.refinement
 
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.model.WorkColorSnapshot
+import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.inkuError
 
@@ -82,6 +84,7 @@ data class RefinementParent(
      */
     val sketchText: String? = null,
     val sketchGrain: String? = null,
+    val workColorSnapshot: WorkColorSnapshot? = null,
 ) {
     companion object {
         /**
@@ -103,6 +106,7 @@ data class RefinementParent(
             seeds = PaintSeeds.of(item),
             sketchText = item.sketchText,
             sketchGrain = item.sketchGrain,
+            workColorSnapshot = workColorSnapshot(item.renderMetadataJson),
         )
     }
 }

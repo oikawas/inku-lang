@@ -542,6 +542,7 @@ class InkuRepository(
             // candidate (+page.svelte:5116). `requested` stays false: nothing is
             // being asked of the layer, and the state derives from the prose.
             sketch = SketchInput(text = parent.sketchText, grain = parent.sketchGrain),
+            workColorSnapshot = if (plan.route == RefinementRoute.RenderFromScore) parent.workColorSnapshot else null,
         )
         return when (plan.route) {
             RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)

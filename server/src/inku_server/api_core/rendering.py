@@ -169,8 +169,13 @@ def _render_score_svg(
     # Site 1 of 5. `using_limits` covers Score.model_validate, whose count clamp
     # cannot take an argument; `limits=` covers coerce. Both come from one read.
     limits = _effective_limits()
+    # This route redraws a stored Score and hands coerce no DDL, so no count is
+    # read here today. The language still travels, and it comes off the work's
+    # own row rather than from today's default: a caller that starts handing a
+    # DDL over must not silently get the reading rules of the other language.
+    lang = (work or {}).get("instruction_lang_resolved")
     with using_limits(limits):
-        score = coerce_score(Score.model_validate(score_payload), limits=limits)
+        score = coerce_score(Score.model_validate(score_payload), limits=limits, lang=lang)
     canvas = _validated_canvas_aspect_override(canvas_aspect)
     if canvas is not None:
         score = _score_with_canvas(score, canvas)

@@ -165,8 +165,14 @@ def build_plugin_expand_inputs() -> dict[str, dict[str, Any]]:
         "C-plugin-count-over-the-ceiling": _plugin_expand_input("Nature.青葉を百二十個置く。"),
     }
 
-def _coerce_input(score: dict[str, Any], *, ddl: str | None = None) -> dict[str, Any]:
-    return {"score": copy.deepcopy(score), "ddl": ddl}
+# `lang` is named on every case rather than left to the default: the count
+# readers consult it, so a case that does not say which language it is in does
+# not say what it measures. `None` is a value here, not an omission -- it is
+# what every one of these cases handed coerce before the port existed.
+def _coerce_input(
+    score: dict[str, Any], *, ddl: str | None = None, lang: str | None = None
+) -> dict[str, Any]:
+    return {"score": copy.deepcopy(score), "ddl": ddl, "lang": lang}
 
 def build_coerce_inputs() -> dict[str, dict[str, Any]]:
     line = _instruction()
@@ -308,7 +314,7 @@ def _render_cases() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     for case_id, input_data in sorted(build_coerce_inputs().items()):
         report: dict[str, int] = {}
         score = coerce_score(Score.model_validate(input_data["score"]), ddl=input_data["ddl"],
-                             branch_report=report)
+                             lang=input_data["lang"], branch_report=report)
         text = _canonical_output({"score": score.model_dump(by_alias=True, mode="json"), "branch_report": report})
         path = f"b_coerce/{case_id}.json"
         outputs[path] = text

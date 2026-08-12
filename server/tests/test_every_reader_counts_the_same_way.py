@@ -14,6 +14,7 @@ next moves and freeze the drift in place.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import pathlib
@@ -114,3 +115,31 @@ def test_t3_a_japanese_body_still_leaves_a_numeral_beside_cjk_unread() -> None:
     assert not _numeral_is_a_bare_count(text, start, start + 2)
     assert counts._cjk_neighbourhood_is_excluded("ja")
     assert counts._cjk_neighbourhood_is_excluded(None)
+
+
+# --- T-4 ------------------------------------------------------------------
+
+
+def test_t4_every_caller_of_coerce_score_hands_it_a_language() -> None:
+    """A roll call, because a sender that stays silent still answers 200.
+
+    Nothing downstream fails when the language is left out; the route just keeps
+    deciding counts by the other language's rules. So the check is on the senders
+    themselves, and it counts them: a sixth call site added without a language is
+    the same defect as one of these five losing it.
+    """
+    senders: list[tuple[str, int, bool]] = []
+    for path in sorted((SERVER_ROOT / "src").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", "")
+            if name != "coerce_score":
+                continue
+            keywords = {keyword.arg for keyword in node.keywords}
+            senders.append((str(path.relative_to(SERVER_ROOT)), node.lineno, "lang" in keywords))
+
+    silent = [(path, line) for path, line, has_lang in senders if not has_lang]
+    assert silent == [], f"call sites of coerce_score that name no language: {silent}"
+    assert len(senders) == 5, f"expected five senders, found {sorted(senders)}"

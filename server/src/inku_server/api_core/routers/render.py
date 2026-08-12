@@ -1402,6 +1402,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
                     # branches author instructions from words the DDL never carried.
                     ddl=compose_detail.ddl,
                     limits=limits,
+                    lang=instruction_lang_resolved,
                 )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001
@@ -1669,6 +1670,10 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
                 ddl=req.ddl,
                 limits=limits,
                 limit_notes=limit_notes,
+                # This route begins at Stage 2 and carries no language field, so
+                # the language is settled the same way the paint route settles
+                # it -- off the author's own words, through the one resolver.
+                lang=_resolve_instruction_lang(req.ddl or req.input, "auto"),
             )
         canvas_aspect = _validated_canvas_aspect_override(req.canvas_aspect)
         if canvas_aspect is not None:
@@ -1891,6 +1896,7 @@ def _paint_events(
                     # The DDL alone -- see the note at the /api/compose call site.
                     ddl=ddl,
                     limits=limits,
+                    lang=instruction_lang_resolved,
                 )
             coerce_report = {**_coerce_relation_report(before_coerce, score), "coerce_branch_counts": branch_counts}
     except Exception as e:  # noqa: BLE001

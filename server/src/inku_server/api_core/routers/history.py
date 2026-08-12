@@ -355,7 +355,11 @@ def api_history_post(
         # Site 2 of 5.
         limits = _effective_limits()
         with using_limits(limits):
-            score = coerce_score(Score.model_validate(body.score), limits=limits)
+            score = coerce_score(
+                Score.model_validate(body.score),
+                limits=limits,
+                lang=body.instruction_lang_resolved,
+            )
         catalog_id = _resolved_catalog_id(body.catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:

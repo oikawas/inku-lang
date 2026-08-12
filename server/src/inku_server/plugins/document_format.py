@@ -969,8 +969,14 @@ def _stated_unit_count(clause: str | None, *, lang: str) -> int | None:
     Without it, `Place 12 Nature.青葉 marks.` placed one unit -- the reader saw
     CJK beside the numeral and left it to the Japanese path, and the CJK it saw
     was the plugin's own name.
+
+    Ruling C ([I-213], 2026-08-12): this clause names a plugin, so a bare numeral
+    in it is how many of that plugin to place -- `緑のNature.下草を50散らす。` asks
+    for fifty.  `names_a_plugin` is what says so; nowhere else reads a Japanese
+    numeral that carries no counter, because nowhere else knows the number is
+    about a thing being placed.
     """
-    stated = _explicit_counts_from_ddl(clause, lang=lang)
+    stated = _explicit_counts_from_ddl(clause, lang=lang, names_a_plugin=True)
     if len(stated) != 1:
         return None
     value = next(iter(stated))
@@ -1077,7 +1083,9 @@ def expand_plugin_ddl(
             # naming two plugins with two counts keeps each one where it was
             # written.  The sentence is read by the same reader, so a sentence
             # holding two counts still resolves to one unit.
-            if requested is None and not _explicit_counts_from_ddl(phrase, lang=lang):
+            if requested is None and not _explicit_counts_from_ddl(
+                phrase, lang=lang, names_a_plugin=True
+            ):
                 sentence = next(
                     (found for found in (_sentence_that_names(text, trigger, lang=lang) for text in texts) if found),
                     None,

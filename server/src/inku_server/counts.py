@@ -267,7 +267,9 @@ def _cjk_neighbourhood_is_excluded(lang: str | None) -> bool:
     return (lang or _DEFAULT_COUNT_LANG) != "en"
 
 
-def _numeral_is_a_bare_count(text: str, start: int, end: int, *, lang: str | None = None) -> bool:
+def _numeral_is_a_bare_count(
+    text: str, start: int, end: int, *, lang: str | None = None, names_a_plugin: bool = False
+) -> bool:
     """Is this digit run a count, or a piece of some other number?
 
     Two exclusions, both measured on the stored works (2026-08-11):
@@ -277,14 +279,23 @@ def _numeral_is_a_bare_count(text: str, start: int, end: int, *, lang: str | Non
       those moved nineteen works with true and false readings in equal number.
       Which language the body is in decides this exclusion, not which characters
       neighbour the digit -- see `_cjk_neighbourhood_is_excluded`.
+
+      `names_a_plugin` lifts it.  Ruling C ([I-213], 2026-08-12): inside the
+      phrase that names a plugin, a bare numeral IS how many of it to place --
+      `緑のNature.下草を50散らす。` asks for fifty.  Proximity to CJK was only ever
+      a stand-in for "this might be an angle or a fraction", and inside that
+      phrase the axis table says so directly, which is why lifting the blunt rule
+      here does not let `30度` through.
     - a digit that belongs to a decimal, fraction or ratio (`radius 0.11`,
       `1/3 of the screen`), or carries a percent sign.  Ruling B calls those false
       on the Japanese side, and the digits inside them are no more a count in
       English.  Measured: without this, one work in the fifty-case count corpus
       reads a radius as the counts 0 and 11.
     """
-    if _cjk_neighbourhood_is_excluded(lang) and _CJK_PATTERN.search(
-        text[max(0, start - _CJK_WINDOW) : end + _CJK_WINDOW]
+    if (
+        not names_a_plugin
+        and _cjk_neighbourhood_is_excluded(lang)
+        and _CJK_PATTERN.search(text[max(0, start - _CJK_WINDOW) : end + _CJK_WINDOW])
     ):
         return False
     if start >= 2 and text[start - 1] in _NUMBER_EXPRESSION_PUNCTUATION and text[start - 2].isdigit():
@@ -306,7 +317,7 @@ def _numeral_is_a_bare_count(text: str, start: int, end: int, *, lang: str | Non
 
 
 def _counts_in_reading_order(
-    ddl: str | None, *, lang: str | None = None
+    ddl: str | None, *, lang: str | None = None, names_a_plugin: bool = False
 ) -> list[tuple[int, int]]:
     """Every count the description states, as (position, value), in reading order.
 
@@ -340,8 +351,9 @@ def _counts_in_reading_order(
             value = int(token)
             if (
                 value
-                and _numeral_is_a_bare_count(text, start, stop, lang=lang)
+                and _numeral_is_a_bare_count(text, start, stop, lang=lang, names_a_plugin=names_a_plugin)
                 and not _names_an_axis_en(tokens, index + 1)
+                and not _names_an_axis_ja(text, stop)
                 and not _is_an_index_en(tokens, index)
                 and not _is_an_index_ja(text, start)
             ):
@@ -375,7 +387,9 @@ def _counts_in_reading_order(
     return found
 
 
-def _explicit_counts_from_ddl(ddl: str | None, *, lang: str | None = None) -> frozenset[int]:
+def _explicit_counts_from_ddl(
+    ddl: str | None, *, lang: str | None = None, names_a_plugin: bool = False
+) -> frozenset[int]:
     """Every count the description states outright, in either language.
 
     `count_hint_from_ddl` answers "what is the count here" and stops at the first
@@ -387,7 +401,10 @@ def _explicit_counts_from_ddl(ddl: str | None, *, lang: str | None = None) -> fr
     it. A caller that does not know resolves to `_DEFAULT_COUNT_LANG`, which is
     what every caller did before the port was opened.
     """
-    return frozenset(value for _, value in _counts_in_reading_order(ddl, lang=lang))
+    return frozenset(
+        value
+        for _, value in _counts_in_reading_order(ddl, lang=lang, names_a_plugin=names_a_plugin)
+    )
 
 
 def _count_follows_ddl_request(

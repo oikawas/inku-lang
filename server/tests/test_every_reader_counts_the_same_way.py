@@ -284,12 +284,13 @@ def test_t9_an_english_body_reads_a_numeral_beside_a_japanese_plugin_name() -> N
 def test_t10_a_japanese_body_still_leaves_a_bare_numeral_unread() -> None:
     """The other side of stage 4: `ja` keeps the exclusion `en` gives up.
 
-    The probe is a bare numeral rather than a counter phrase on purpose. A
-    counter phrase like `四つの方向` is held out by the axis table as well, and a
-    case two exclusions both cover cannot measure either one.
+    The probe is a bare numeral with no axis word beside it, on purpose. `30度`
+    is held out by the axis table as well, and a case two exclusions both cover
+    cannot measure either one.
     """
-    assert _explicit_counts_from_ddl("立方体の向き: 30度回転", lang="ja") == frozenset()
-    assert _explicit_counts_from_ddl("立方体の向き: 30度回転", lang="en") == frozenset({30})
+    bare = "緑の下草を50散らす。"
+    assert _explicit_counts_from_ddl(bare, lang="ja") == frozenset()
+    assert _explicit_counts_from_ddl(bare, lang="en") == frozenset({50})
 
 
 # --- T-11 to T-13 ---------------------------------------------------------
@@ -359,3 +360,39 @@ def test_t13_a_sentence_stating_two_counts_stays_at_one_unit() -> None:
     result = _expansion(ambiguous, lang="ja")
     assert [int(entry["units"]) for entry in result.provenance] == [1]
     assert result.warnings == ()
+
+
+# --- T-14, T-15 -----------------------------------------------------------
+
+
+def test_t14_a_bare_numeral_inside_a_reference_phrase_is_a_count() -> None:
+    """Ruling C [I-213]: `緑のNature.下草を50散らす。` asks for fifty.
+
+    Japanese writes a count with a counter, and a bare numeral is usually part of
+    some other quantity -- which is why the reader leaves one alone by default.
+    Inside the phrase naming a plugin it is not ambiguous: the number is about the
+    thing being placed.
+    """
+    result = _expansion("緑のNature.下草を50散らす。", lang="ja")
+    assert [int(entry["units"]) for entry in result.provenance] == [50]
+    assert result.warnings == ()
+
+    # The exclusions that survive the lift. Proximity to CJK was only ever a
+    # stand-in for "this might be an angle"; inside the phrase the axis table
+    # says it directly, so `30度` stays one unit.
+    angle = _expansion("Nature.下草を30度回転して置く。", lang="ja")
+    assert [int(entry["units"]) for entry in angle.provenance] == [1]
+
+
+def test_t15_a_bare_numeral_outside_a_reference_phrase_is_still_not_a_count() -> None:
+    """The control for T-14, measured where the widening must not reach.
+
+    coerce reads whole descriptions through the same function, and there a bare
+    Japanese numeral is an input label, an angle or a ratio far more often than a
+    count -- `A1-1 の入力に対する` was the measured case. Only the plugin layer,
+    which knows the number is about a thing being placed, asks for the wider read.
+    """
+    label = "A1-1 の入力に対する"
+    assert _explicit_counts_from_ddl(label, lang="ja") == frozenset()
+    # And the flag is what gates it, not some other property of the text.
+    assert _explicit_counts_from_ddl(label, lang="ja", names_a_plugin=True) == frozenset({1})

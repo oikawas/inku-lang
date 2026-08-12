@@ -16,6 +16,7 @@
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
+	import { SURFACE_PREVIEWS, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -623,16 +624,6 @@
 		image2x?: string;
 	};
 
-	// One entry per saijiki word. The copy exists in both UI languages; the
-	// artwork is shared, since the preview shows the same drawing either way.
-	type PreviewEntry = {
-		effect: string;
-		example: string;
-		effectEn: string;
-		exampleEn: string;
-		svg: string;
-	};
-
 	// Entries are keyed by the Japanese surface. The caller pairs the two
 	// display lists by position to derive the canonical word, an invariant the
 	// saijiki table holds and server tests lock (test_saijiki_api.py).
@@ -652,7 +643,6 @@
 			svg: entry.svg,
 		});
 		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
-		const shapeSvg = (shape: string) => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
 		const touchSvg = (kind: string) => {
 			const defs = '<defs><filter id="touch-soft"><feGaussianBlur stdDeviation="1.8"/></filter></defs>';
 			const paths: Record<string, string> = {
@@ -715,6 +705,8 @@
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', effectEn: 'Places short segments with gaps between them.', exampleEn: 'A dashed arc', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', effectEn: 'Draws as a run of dots.', exampleEn: 'Enclose with a dotted line', svg: lineSvg('stroke-dasharray="1 12"') },
 			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線を引く', effectEn: 'Alternates long dashes with dots.', exampleEn: 'Draw a dash-dot line', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
+			// おもて: eleven words, one contour, eleven interiors (saijiki-surface.ts).
+			...SURFACE_PREVIEWS,
 			白: { effect: '白系の色で描く。背景との対比に注意。', example: '白い円', effectEn: 'Draws in a white tone. Mind the contrast against the ground.', exampleEn: 'A white circle', svg: shapeSvg('<rect x="48" y="18" width="84" height="56" fill="#2b2b2b" opacity="0.16"/><circle cx="90" cy="46" r="24" fill="#ffffff" stroke="#c9c2b5" stroke-width="4"/>') },
 			黒: { effect: '黒で描く。最も強い輪郭になる。', example: '黒い円', effectEn: 'Draws in black, giving the strongest contour.', exampleEn: 'A black circle', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#2b2b2b"/>') },
 			青: { effect: '青系の色で描く。', example: '青い線', effectEn: 'Draws in a blue tone.', exampleEn: 'A blue line', svg: lineSvg('', 5, 'round', '#2c5fb8') },

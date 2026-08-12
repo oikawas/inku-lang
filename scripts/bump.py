@@ -6,9 +6,15 @@ project-context target line, in both languages).  This script writes all of them
 from one pair of values so a miss is not possible, and
 server/tests/test_version_consistency.py fails if they ever disagree again.
 
-    python3 scripts/bump.py --version v2.9.25 --build 822
-    python3 scripts/bump.py --version v2.9.25 --scan-build
+    python3 scripts/bump.py --version v2.9.25 --scan-build          # report only
+    python3 scripts/bump.py --version v2.9.25 --build 822 --write
     python3 scripts/bump.py --show
+
+Nothing is written without --write.  The default used to be the other way
+round, and --scan-build -- which reads like "print the next number" -- stamped
+six files on a checkout where the number was only being looked up (ledger
+I-195).  A flag that has to be remembered is not a guard, so the writing is now
+the flag and the looking is the default.
 
 The build number is a *shared* counter: other branches may already have taken
 the next value.  --scan-build reads every local ref and picks max+1, which is
@@ -99,14 +105,19 @@ def scan_build_numbers() -> tuple[int, dict[str, int]]:
     return max(seen.values()) + 1, seen
 
 
-def apply(version: str, build: str, *, dry_run: bool) -> list[str]:
+def apply(version: str, build: str, *, write: bool) -> list[str]:
+    """Report every file that would change, and change them only if `write`.
+
+    The keyword has no default on purpose: a caller that forgets it gets a
+    TypeError rather than a silent stamping.
+    """
     changes: list[str] = []
 
     for path, value in ((APP_VERSION_FILE, version), (BUILD_NUMBER_FILE, build)):
         before = path.read_text(encoding="utf-8").strip()
         if before != value:
             changes.append(f"{path.relative_to(ROOT)}: {before} -> {value}")
-            if not dry_run:
+            if write:
                 path.write_text(value + "\n", encoding="utf-8")
 
     for path, pattern, template in DOC_RULES:
@@ -120,7 +131,7 @@ def apply(version: str, build: str, *, dry_run: bool) -> list[str]:
             )
         if new_text != text:
             changes.append(f"{path.relative_to(ROOT)}: {pattern[:40]}...")
-            if not dry_run:
+            if write:
                 path.write_text(new_text, encoding="utf-8")
 
     return changes
@@ -131,9 +142,10 @@ def main() -> int:
     parser.add_argument("--version", help="application version, e.g. v2.9.25")
     parser.add_argument("--build", help="build number, e.g. 822")
     parser.add_argument("--scan-build", action="store_true",
-                        help="take max+1 across every local ref")
+                        help="choose the build number as max+1 across every local ref")
     parser.add_argument("--show", action="store_true", help="print current values and exit")
-    parser.add_argument("--dry-run", action="store_true", help="report without writing")
+    parser.add_argument("--write", action="store_true",
+                        help="stamp the files; without it nothing on disk changes")
     args = parser.parse_args()
 
     version, build = read_current()
@@ -159,12 +171,14 @@ def main() -> int:
     if not args.version and not args.build and not args.scan_build:
         parser.error("give --version and/or --build (or --scan-build), or --show")
 
-    changes = apply(version, build, dry_run=args.dry_run)
+    changes = apply(version, build, write=args.write)
     if not changes:
         print("nothing to change")
         return 0
     for line in changes:
-        print(("would write " if args.dry_run else "wrote ") + line)
+        print(("wrote " if args.write else "would write ") + line)
+    if not args.write:
+        print(f"nothing was written ({len(changes)} file(s) would change) -- add --write to stamp")
     return 0
 
 

@@ -6019,3 +6019,30 @@ the same file told a human to "also check `ssh pentala`".**
   unreachable host exits 1 and prints no number at all.**
 - **Not one byte of product behaviour changed** (only `scripts/` and `server/tests/` were touched).
   **Checks went 3,048 to 3,061 passed / 31 skipped.**
+
+### 2026-08-12 — One entry point for the suites, and no stale bytecode answering for it (**no version bump**, tooling only)
+
+**A `Makefile` at the repository root makes `make test` the entry point for server, cli, and web**
+(ledger I-198). **The trap was one you avoided by remembering it**: `uv run pytest` and
+`./.venv/bin/python -m pytest` resolve a different `python` through PATH, so the same tree answers
+differently. **The environment the conventions named is now closed inside the entry point.**
+
+- **Four entries**: `make test` (all three), `make test-server`, `make test-cli`, `make test-web`.
+  **Each is callable from the repository root** — the recipes `cd` for themselves.
+- **`UV_CACHE_DIR` and `UV_PYTHON_INSTALL_DIR`** live in the Makefile. **They use `?=`, so a surface
+  that supplies them from outside — CI does — keeps its own values.**
+- **The three CI jobs were moved onto the same entry.** **The server's two `--deselect` arguments are
+  carried through `PYTEST_ARGS`** (ledger I-222: two tests compare bytes baked on darwin against a
+  bake made on linux).
+- **`PYTHONDONTWRITEBYTECODE=1` is now set on three surfaces** (ledger I-197) — the Makefile, both CI
+  workflows, and the operational tooling (not public). **A reverted perturbation can no longer be
+  answered by a stale `.pyc` on any of them.**
+- **Measured by perturbation**: with `__pycache__` removed first, the guard leaves **0 `.pyc` files;
+  without it, 141**. **Observing that no `.pyc` appeared is not evidence on its own** — an already
+  current cache produces the same reading.
+- **Checks**: server **3,061 passed / 31 skipped** (655s), cli **224 passed**, web **272 passed / 0
+  failed**. **Not one line of product code moved** — only the `Makefile`, CI, and the tooling.
+- **⚠ There is still more than one entry** — typing `uv run pytest` by hand is not blocked. **Both
+  traps therefore stay on the record even though the mechanism landed.**
+- **⚠ A hole left open**: `make test PYTEST_ARGS=…` passes server-shaped arguments to cli as well.
+  **CI only ever passes them to `test-server`, so nothing is broken today.**

@@ -5553,3 +5553,26 @@ Stage 2 は `塗る` を読んでいた。歳時記に **11 語のカテゴリ `
   **届かない host を渡すと exit 1 で番号を 1 つも印字しない。**
 - **製品の振る舞いは 1 バイトも変わっていない**（触ったのは `scripts/` と `server/tests/` だけ）。
   **検査は 3,048 → 3,061 passed / 31 skipped。**
+
+### 2026-08-12 — テストの入口が 1 本になり、古いバイトコードが答えなくなった（**採番なし**・道具のみ）
+
+**リポジトリ直下に `Makefile` を置き、`make test` を server・cli・web の入口にした**（[I-198] 決着）。
+**呼び方で結果が変わる罠は、覚えて避けるものだった** —— `uv run pytest` と `./.venv/bin/python -m pytest` は
+PATH の `python` が違うので同じ木でも別の答えを出す。**実行規約が名指していた環境変数を入口の中へ閉じた。**
+
+- **入口は 4 つ**: `make test`（3 つ全部）・`make test-server`・`make test-cli`・`make test-web`。
+  **どれもリポジトリ直下から呼べる**（各レシピが自分で `cd` する）
+- **`UV_CACHE_DIR` と `UV_PYTHON_INSTALL_DIR`** を Makefile が持つ。**`?=` なので、CI のように
+  外から与えられている面では外の値が勝つ**
+- **CI の 3 ジョブを同じ入口へ寄せた。****server の `--deselect` 2 件は `PYTEST_ARGS` で維持した**（[I-222]。
+  darwin で焼いた凍結物を linux で照合すると落ちる 2 本）
+- **`PYTHONDONTWRITEBYTECODE=1` を 3 面で立てた**（[I-197] 決着）—— Makefile・CI の workflow 2 本・
+  運用の道具（非公開）。**戻した摂動が古い `.pyc` に答えられる罠が、その 3 面では消えた**
+- **摂動で確かめた**: `__pycache__` を消してから回すと、**番人ありで `.pyc` は 0 件・番人を外すと 141 件**。
+  **「`.pyc` が増えていない」という観察だけでは、キャッシュが既に最新だった場合と区別できない**
+- **検査**: server **3,061 passed / 31 skipped**（655 秒）・cli **224 passed**・web **272 passed / 0 failed**。
+  **製品コードは 1 行も動いていない**（触ったのは `Makefile` と CI と運用の道具だけ）
+- **⚠ 入口はまだ 1 本ではない** —— 手で `uv run pytest` を叩く道は塞がっていない。**したがってこの 2 つの罠は、
+  機構が入っても記録から消さない**
+- **⚠ 残した穴**: `make test PYTEST_ARGS=…` は server 向けの引数を cli にも渡す。
+  **CI は `test-server` にしか渡さないので、今日は無害である**

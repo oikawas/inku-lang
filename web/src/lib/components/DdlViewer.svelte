@@ -3,6 +3,7 @@
 	import Tooltip from './Tooltip.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 
 	type Props = {
 		/** Input-side DDL: the Stage 1 output, or the DDL the user wrote. */
@@ -35,7 +36,9 @@
 	// The legacy branch shows an expanded DDL the caller cannot re-perform, so the
 	// button follows the input-side text the caller actually holds.
 	const paintBlocked = $derived(paintDisabled || !ddl.trim());
-	let expandedOpen = $state(false);
+	// The fold is the user's, not this instance's: it is restored at login and
+	// saved on every toggle, so it outlives both the artwork and the page.
+	const expandedOpen = $derived(describePanelSettings.ddlExpandedOpen);
 </script>
 
 <div class="ddl-viewer">
@@ -54,7 +57,7 @@
 	{#if showExpanded}
 		<div class="ddl-expanded">
 			<Tooltip placement="right" text={t().tooltipDdlExpandedToggle}>
-				<button class="ddl-expanded-toggle" type="button" onclick={() => (expandedOpen = !expandedOpen)}>
+				<button class="ddl-expanded-toggle" type="button" onclick={describePanelSettings.toggleDdlExpanded}>
 					<span class="ddl-expanded-arrow" class:open={expandedOpen}>▶</span>
 					<span>{expandedLabel}</span>
 				</button>

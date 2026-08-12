@@ -39,7 +39,10 @@ PUBLIC = {  # every entry needs a reason
 #   +1 for POST /api/history/export-card, the shareable one-sheet card.
 #   The last two landed in the same cycle from two branches, and each had
 #   written 93 on its own: the merged count is the base plus both, not either.
-EXPECTED_ROUTE_COUNT = 94
+#   +1 for GET /api/saijiki/plugin-preview, which serves a plugin word's
+#   artwork so the picture stays out of the saijiki payload the browser
+#   asks for on every hydration.
+EXPECTED_ROUTE_COUNT = 95
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

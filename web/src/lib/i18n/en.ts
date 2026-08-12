@@ -238,6 +238,7 @@ export const en: LangPack = {
 	tooltipDdlEdit: 'Edit the instructions of the displayed work and perform them again as a child of that work.',
 	tooltipSaijikiToggle: 'Open the saijiki to see how each season word affects the drawing, with examples (browsing only).',
 	tooltipDdlExpandedToggle: 'Show the DDL Stage 2 actually received, including the structure lines the expansion layer added.',
+	tooltipSketchToggle: 'Show the prose the sketch-from-life layer wrote. Whether it is open is remembered for your account.',
 	tooltipStatsToggle: 'Show the elapsed time and token counts for interpretation and performance.',
 	tooltipInputClear: 'Clear text input',
 	tooltipSubmit: 'Reads your description, chooses composition and touch, and paints one work.',

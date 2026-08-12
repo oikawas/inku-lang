@@ -47,6 +47,9 @@ PRE_ACL_SCHEMA_COUNT = 82
 # appears without being listed here fails, which is the point: "the count went
 # up by two" would also pass if one route were added and another replaced.
 ADDED_OPERATIONS = {
+    # v2.14: the saijiki preview artwork route (see
+    # test_the_card_only_adds_one_route.py for the same declaration).
+    "GET /api/saijiki/plugin-preview",
     "GET /api/history/{item_id}/acl",
     "PUT /api/history/{item_id}/acl",
     "GET /api/settings/single-user",
@@ -98,6 +101,11 @@ CHANGED_SCHEMAS = {
     # Contract 2: the client asks for the second thumbnail size only where the
     # server keeps it, and /api/info is where it learns that.
     "AppInfoResponse": {"added": {"thumbnail_hidpi"}, "removed": set()},
+    # v2.14: whether a plugin expands is decided by prose. A work authored
+    # straight in DDL has no description and must not be given one to make one
+    # expand, so the prose rides in its own optional key. Callers that never
+    # send it are unaffected.
+    "ComposeRequest": {"added": {"fires_on"}, "removed": set()},
 }
 
 # Operations that predate this branch and are declared to change, with exactly

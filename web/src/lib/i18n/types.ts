@@ -247,6 +247,7 @@ export interface LangPack {
 	tooltipDdlEdit: string;
 	tooltipSaijikiToggle: string;
 	tooltipDdlExpandedToggle: string;
+	tooltipSketchToggle: string;
 	tooltipStatsToggle: string;
 	tooltipSubmit: string;
 	tooltipDdlPaint: string;

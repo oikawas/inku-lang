@@ -31,8 +31,27 @@ CARD_ROUTE = "/api/history/export-card"
 # same cycle from another branch. Whatever arrived beside the card is declared
 # here by name, the way test_the_acl_only_adds_to_the_api_surface.py does it:
 # the check stays a set difference, so an undeclared route still fails.
-ADDED_OPERATIONS = {f"POST {CARD_ROUTE}", "GET /api/history/state"}
+ADDED_OPERATIONS = {
+    f"POST {CARD_ROUTE}",
+    "GET /api/history/state",
+    # v2.14: the saijiki preview serves a plugin word's artwork from its own
+    # route, so the picture stays out of the payload the browser asks for on
+    # every hydration. Declared by name, as the docstring above requires.
+    "GET /api/saijiki/plugin-preview",
+}
 ADDED_SCHEMAS = {"CardExportBody", "HistoryStateResponse"}
+
+# Schemas that predate the card and are declared to change, with exactly what
+# may move in them -- the mechanism test_the_acl_only_adds_to_the_api_surface.py
+# uses, mirrored here for the same reason. Any OTHER movement in a declared
+# schema, and any movement at all in an undeclared one, still fails.
+CHANGED_SCHEMAS = {
+    # v2.14: whether a plugin expands is decided by prose. A work authored
+    # straight in DDL has no description and must not be given one to make one
+    # expand, so the prose rides in its own optional key. Callers that never
+    # send it are unaffected.
+    "ComposeRequest": {"added": {"fires_on"}, "removed": set()},
+}
 
 
 def _before() -> dict:
@@ -70,6 +89,12 @@ def test_the_surface_gained_exactly_the_card_and_nothing_else() -> None:
         operations.pop(key)
     for name in ADDED_SCHEMAS:
         schemas.pop(name)
+    # The declared changes, checked field by field before being set aside.
+    for name, expected in CHANGED_SCHEMAS.items():
+        was = set(json.loads(before["schemas"][name])["properties"])
+        now = set(json.loads(schemas.pop(name))["properties"])
+        assert now - was == expected["added"], f"{name} gained {sorted(now - was)}"
+        assert was - now == expected["removed"], f"{name} lost {sorted(was - now)}"
 
     before_operations = {
         f"{op['method']} {op['path']}": _stable(op) for op in before["operations"]
@@ -79,9 +104,12 @@ def test_the_surface_gained_exactly_the_card_and_nothing_else() -> None:
         "allowed; altering or losing one that was already there is not: "
         f"{sorted(set(operations) ^ set(before_operations)) or [k for k in operations if operations[k] != before_operations.get(k)]}"
     )
-    assert schemas == before["schemas"], (
+    before_schemas = {
+        name: body for name, body in before["schemas"].items() if name not in CHANGED_SCHEMAS
+    }
+    assert schemas == before_schemas, (
         "a schema that predates the card has changed: "
-        f"{sorted(set(schemas) ^ set(before['schemas'])) or [n for n in schemas if schemas[n] != before['schemas'].get(n)]}"
+        f"{sorted(set(schemas) ^ set(before_schemas)) or [n for n in schemas if schemas[n] != before_schemas.get(n)]}"
     )
 
 

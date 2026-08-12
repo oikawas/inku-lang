@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { placeholderMotifTransform } from '$lib/canvas-placeholder';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { Score } from '$lib/historyManagerState.svelte';
@@ -403,6 +404,13 @@
 	const placeholderUnit = $derived(Math.max(0.001, Math.min(canvasAspectWidth, canvasAspectHeight)));
 	const placeholderWidth = $derived(Math.round(1000 * canvasAspectWidth / placeholderUnit));
 	const placeholderHeight = $derived(Math.round(1000 * canvasAspectHeight / placeholderUnit));
+	// The motif is drawn in a square of its own and centred in the frame, so a
+	// circle stays a circle and a square stays a square whatever the canvas
+	// proportion is. Writing each coordinate as a fraction of the width AND of
+	// the height -- which is what this did -- makes the shapes take the frame's
+	// proportion: at Pillar (1:5) the triangle became a needle. The placement
+	// itself lives in $lib/canvas-placeholder so it can be measured.
+	const placeholderTransform = $derived(placeholderMotifTransform(placeholderWidth, placeholderHeight));
 	const displayInstructionText = $derived((instructionText || '').trim());
 	const canShowInstructionCaption = $derived(!!displayInstructionText);
 
@@ -623,12 +631,12 @@
 							<div class="canvas-placeholder-art" aria-label={t().canvasPlaceholder}>
 								<svg viewBox="0 0 {placeholderWidth} {placeholderHeight}" role="img">
 									<rect x="0" y="0" width={placeholderWidth} height={placeholderHeight} rx="6" fill="#fffdf8" />
-									<g opacity="0.72">
-										<path d="M {placeholderWidth * 0.16} {placeholderHeight * 0.67} C {placeholderWidth * 0.26} {placeholderHeight * 0.52} {placeholderWidth * 0.35} {placeholderHeight * 0.78} {placeholderWidth * 0.46} {placeholderHeight * 0.61} S {placeholderWidth * 0.65} {placeholderHeight * 0.40} {placeholderWidth * 0.83} {placeholderHeight * 0.58}" fill="none" stroke="#cfc6b6" stroke-width="7" stroke-linecap="round" />
-										<path d="M {placeholderWidth * 0.17} {placeholderHeight * 0.38} C {placeholderWidth * 0.26} {placeholderHeight * 0.32} {placeholderWidth * 0.33} {placeholderHeight * 0.42} {placeholderWidth * 0.41} {placeholderHeight * 0.37} C {placeholderWidth * 0.49} {placeholderHeight * 0.32} {placeholderWidth * 0.56} {placeholderHeight * 0.22} {placeholderWidth * 0.66} {placeholderHeight * 0.28} C {placeholderWidth * 0.73} {placeholderHeight * 0.32} {placeholderWidth * 0.78} {placeholderHeight * 0.39} {placeholderWidth * 0.85} {placeholderHeight * 0.36}" fill="none" stroke="#ded6c9" stroke-width="4" stroke-linecap="round" stroke-dasharray="18 18" />
-										<circle cx={placeholderWidth * 0.33} cy={placeholderHeight * 0.53} r={Math.min(placeholderWidth, placeholderHeight) * 0.055} fill="none" stroke="#d8cfc0" stroke-width="6" />
-										<rect x={placeholderWidth * 0.63} y={placeholderHeight * 0.48} width={placeholderWidth * 0.09} height={placeholderHeight * 0.11} rx="2" fill="none" stroke="#d8cfc0" stroke-width="6" transform="rotate(-12 {placeholderWidth * 0.675} {placeholderHeight * 0.535})" />
-										<path d="M {placeholderWidth * 0.49} {placeholderHeight * 0.40} L {placeholderWidth * 0.54} {placeholderHeight * 0.57} L {placeholderWidth * 0.44} {placeholderHeight * 0.57} Z" fill="none" stroke="#d8cfc0" stroke-width="6" stroke-linejoin="round" />
+									<g opacity="0.72" transform={placeholderTransform}>
+										<path d="M 160 670 C 260 520 350 780 460 610 S 650 400 830 580" fill="none" stroke="#cfc6b6" stroke-width="7" stroke-linecap="round" />
+										<path d="M 170 380 C 260 320 330 420 410 370 C 490 320 560 220 660 280 C 730 320 780 390 850 360" fill="none" stroke="#ded6c9" stroke-width="4" stroke-linecap="round" stroke-dasharray="18 18" />
+										<circle cx="330" cy="530" r="55" fill="none" stroke="#d8cfc0" stroke-width="6" />
+										<rect x="630" y="480" width="90" height="110" rx="2" fill="none" stroke="#d8cfc0" stroke-width="6" transform="rotate(-12 675 535)" />
+										<path d="M 490 400 L 540 570 L 440 570 Z" fill="none" stroke="#d8cfc0" stroke-width="6" stroke-linejoin="round" />
 									</g>
 								</svg>
 							</div>

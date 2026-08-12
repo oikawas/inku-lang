@@ -216,7 +216,14 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # It is named here and taken back out before hashing, so the frozen digest
     # still measures the other 77 byte for byte -- declaring the one change
     # keeps the gate rather than regenerating past it.
-    declared_additions = {"AppInfoResponse": {"thumbnail_hidpi"}}
+    # v2.14 added one optional key to a schema that predates permission
+    # groups, for the same reason and by the same rule: named here, taken
+    # back out before hashing, so the frozen digest still measures the rest
+    # byte for byte.
+    declared_additions = {
+        "AppInfoResponse": {"thumbnail_hidpi"},
+        "ComposeRequest": {"fires_on"},
+    }
     others = {}
     for name in frozen_names:
         body = after["schemas"][name]

@@ -9,12 +9,20 @@
 		effect: string;
 		example: string;
 		svg: string;
+		/** Raster artwork, served by its own route. Set for plugin words;
+		    built-in words carry their drawing in `svg` instead. */
+		image?: string;
+		image2x?: string;
 	};
 
 	type PluginEntry = {
 		qualified_name: string;
 		note_ja: string;
 		note_en: string;
+		fires_on_ja?: string[];
+		fires_on_en?: string[];
+		preview_url?: string;
+		preview_url_2x?: string;
 	};
 
 	type Props = {
@@ -23,6 +31,8 @@
 		pluginEntries?: PluginEntry[];
 		onInsertWord: (word: string) => void;
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string) => SaijikiPreview;
+		/** The same preview a built-in word gets, built from the plugin document. */
+		previewForPlugin: (entry: PluginEntry) => SaijikiPreview;
 	};
 
 	let {
@@ -30,6 +40,7 @@
 		pluginEntries = [],
 		onInsertWord,
 		previewForWord,
+		previewForPlugin,
 	}: Props = $props();
 
 	const isJapanese = $derived(t().code === 'ja');
@@ -42,7 +53,21 @@
 	</div>
 	<div class="saijiki-preview" class:empty={!activePreview}>
 		{#if activePreview}
-			<div class="saijiki-preview-art">{@html activePreview.svg}</div>
+			<!-- A plugin word's artwork is a raster from its own route, so it
+				     goes in an <img>: nothing a plugin document ships can put
+				     markup on screen. Built-in words keep their inline drawing. -->
+				<div class="saijiki-preview-art">
+					{#if activePreview.image}
+						<img
+							src={activePreview.image}
+							srcset={activePreview.image2x ? `${activePreview.image} 1x, ${activePreview.image2x} 2x` : undefined}
+							alt=""
+							loading="lazy"
+						/>
+					{:else}
+						{@html activePreview.svg}
+					{/if}
+				</div>
 			<div class="saijiki-preview-copy">
 				<div class="saijiki-preview-title">{activePreview.word}</div>
 				<div class="saijiki-preview-effect">{activePreview.effect}</div>
@@ -81,18 +106,19 @@
 					<span class="saijiki-cat-ja">Plugin</span>
 					<span class="saijiki-cat-en">namespaced vocabulary</span>
 				</div>
+				<!-- Packed the same way the built-in words are, and reached the
+				     same way: hover or focus shows the word in the preview above,
+				     a click inserts it. The note that used to sit under each chip
+				     is what the preview now says. -->
 				<div class="saijiki-chips">
 					{#each pluginEntries as entry (entry.qualified_name)}
-						<div class="plugin-word-with-note">
-							<button
-								class="saijiki-chip plugin-chip"
-								onpointerdown={(e) => e.preventDefault()}
-								onclick={() => onInsertWord(entry.qualified_name)}
-							>{entry.qualified_name}</button>
-							{#if isJapanese ? entry.note_ja : entry.note_en}
-								<span class="plugin-note">{isJapanese ? entry.note_ja : entry.note_en}</span>
-							{/if}
-						</div>
+						<button
+							class="saijiki-chip plugin-chip"
+							onpointerdown={(e) => e.preventDefault()}
+							onclick={() => onInsertWord(entry.qualified_name)}
+							onpointerenter={() => (activePreview = previewForPlugin(entry))}
+							onfocus={() => (activePreview = previewForPlugin(entry))}
+						>{entry.qualified_name}</button>
 					{/each}
 				</div>
 			</div>
@@ -140,17 +166,26 @@
 	.saijiki-preview.empty {
 		background: var(--bg2);
 	}
+	/* Sized to the artwork rather than to the panel: a plugin preview is a
+	   raster, and it is baked at exactly these pixels so it is never
+	   scaled. Built-in words draw vectors and are unaffected by the
+	   width; both sit centred, which is what they did before. */
 	.saijiki-preview-art {
-		height: 76px;
+		width: 216px;
+		max-width: 100%;
+		height: 92px;
+		margin: 0 auto;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		overflow: hidden;
 		background: var(--canvas-paper);
 	}
+	.saijiki-preview-art img,
 	.saijiki-preview-art :global(svg) {
 		display: block;
 		width: 100%;
 		height: 100%;
+		object-fit: contain;
 	}
 	.saijiki-preview-copy {
 		display: flex;
@@ -227,11 +262,12 @@
 		line-height: 1.25;
 		transition: background 0.1s, border-color 0.1s;
 	}
-	.saijiki-cat.plugin-cat { border-left: 2px solid rgba(185, 88, 69, 0.45); }
-	.saijiki-chip.plugin-chip { color: #9f4b3b; border-color: rgba(185, 88, 69, 0.35); background: rgba(185, 88, 69, 0.08); }
-	:global(html[data-theme='dark']) .saijiki-chip.plugin-chip { color: #f0a58f; border-color: rgba(226, 138, 112, 0.45); background: rgba(185, 88, 69, 0.22); }
-	.plugin-word-with-note { display: flex; flex-direction: column; gap: 3px; max-width: 18rem; }
-	.plugin-note { color: var(--fg3); font-size: 0.68rem; line-height: 1.25; }
+	/* The plugin accent is the app's blue, from the tokens, so it follows the
+	   theme instead of carrying its own pair of hard-coded colours. Only the
+	   accent differs from a built-in chip -- size, padding and packing are the
+	   ones above. */
+	.saijiki-cat.plugin-cat { border-left: 2px solid var(--accent); }
+	.saijiki-chip.plugin-chip { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
 	.saijiki-chip:hover,
 	.saijiki-chip:focus-visible {
 		background: var(--bg2);

@@ -1998,10 +1998,15 @@ def _compose_payload(
         or getattr(args, "catalog_id", None)
         or DEFAULT_COLOR_CATALOG_ID
     )
+    # A work authored straight in DDL has no description, and omitting the key
+    # is the same shape the web sends when it draws a new instruction sheet.
+    # `--fires-on` supplies prose for the expansion alone, because whether a
+    # plugin expands is decided by prose and not by the DDL: the server reads it
+    # as `source_text` and only hashes the DDL (`seed_text`), so a DDL that
+    # spells a firing phrase still expands to nothing without this. It rides in
+    # its own key, never in `description`: the description is the work's origin.
+    fires_on = (getattr(args, "fires_on", None) or "").strip()
     payload: dict[str, Any] = {
-        # No description key at all: a work authored straight in DDL has no
-        # description, and this is the same shape the web sends when it draws a
-        # new instruction sheet. The seed falls to the DDL on both sides.
         "ddl": ddl,
         "model": stage2_model if stage2_model is not None else args.stage2_model,
         "instruction_lang": args.instruction_lang,
@@ -2018,6 +2023,10 @@ def _compose_payload(
         # False, and sending a bare False would change the request shape of every
         # existing bench.
         "include_trace": getattr(args, "trace", False) or None,
+        # Empty stays absent: the filter below drops None. This is not the
+        # description -- a work authored straight in DDL has none, and giving it
+        # one to make a plugin expand would record an origin it does not have.
+        "fires_on": fires_on or None,
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -2070,6 +2079,12 @@ def _compose_response_as_paint_result(
         "coerce_relation_output_count": result.get("coerce_relation_output_count"),
         "coerce_relation_dropped_count": result.get("coerce_relation_dropped_count"),
         "coerce_warnings": result.get("coerce_warnings"),
+        # `/api/compose` has always returned these, but this mapping never
+        # named them, so a plugin that expanded in ddl input mode left no trace
+        # in the saved JSON and the run read as "nothing fired". Carried now,
+        # because `--fires-on` cannot be checked from the output without them.
+        "plugin_provenance": result.get("plugin_provenance") or [],
+        "plugin_warnings": result.get("plugin_warnings") or [],
         "catalog_id": result.get("render_color_catalog_id"),
         # Only present when --trace asked for it; the saver writes the file when
         # this is not None, and skips it otherwise.
@@ -3804,6 +3819,10 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     parser.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")
     parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
+    parser.add_argument(
+        "--fires-on",
+        help="in --input-mode ddl, the prose a plugin expansion fires on; without it a DDL that spells a plugin word still expands to nothing",
+    )
     # Spelled straight from the server request keys (`sketch_grain` -> `--sketch-grain`).
     # These layers have always been accepted by /api/paint; the CLI simply never named
     # them, so every run so far took the server default rather than a chosen one.

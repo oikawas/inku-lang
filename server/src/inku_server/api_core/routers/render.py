@@ -189,6 +189,11 @@ class ComposeRequest(BaseModel):
     composition_seed: int | None = Field(default=None, description="Composition seed: it re-salts the intermediate expansion (Stage 1.5) and, from render engine 23, decides where the renderer places the marks; omitted means the placement follows the performance seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
+    fires_on: str | None = Field(
+        default=None,
+        max_length=200,
+        description="展開層の発火だけに使う散文。DDL 直筆の作品に記述を与えないまま、プラグイン語の展開を引き出す",
+    )
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
     # Stage 0.5: this endpoint starts at Stage 2, so it never runs 0.5 itself.
     # A caller that already has a sketch text (a candidate, a replay) passes it
@@ -878,6 +883,10 @@ def _call_compose_detail(
     model: str | None = None,
     original_description: str | None = None,
     plugin_seed_text: str | None = None,
+    # v2.14: prose that decides only WHETHER a plugin fires. A work authored
+    # straight in DDL has no description and must not be given one to make a
+    # plugin expand -- the description is the work's origin, not a switch.
+    plugin_fires_on: str | None = None,
     system_prompt: str | None = None,
     lang: str = "ja",
     composition_seed: int | None = None,
@@ -894,7 +903,7 @@ def _call_compose_detail(
     # is stable across repetitions and bound to the identity of the work.
     plugin_expansion = DOCUMENT_PLUGIN_MANAGER.expand(
         ddl,
-        source_text=original_description,
+        source_text=plugin_fires_on or original_description,
         lang=lang,
         seed_text=plugin_seed_text or ddl,
     )
@@ -1370,6 +1379,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
                 model=resolved_stage2_model,
                 original_description=source_text,
                 plugin_seed_text=description,
+                plugin_fires_on=(req.fires_on or "").strip() or None,
                 system_prompt=None,
                 lang=instruction_lang_resolved,
                 composition_seed=req.composition_seed,

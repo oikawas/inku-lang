@@ -51,8 +51,8 @@ object SaijikiGenerated {
             key = "omote",
             nameJa = "おもて",
             nameEn = "surfaces",
-            wordsJa = listOf("空", "べた", "薄墨", "粒", "点", "平行線", "交差線", "にじみ", "アクアチント", "濃い", "薄い"),
-            wordsEn = listOf("empty", "solid", "pale ink wash", "grain", "stipple", "hatch", "crosshatch", "bleeding", "aquatint", "dense", "faint"),
+            wordsJa = listOf("空", "塗り", "薄墨", "粒", "点", "平行線", "交差線", "にじみ", "アクアチント", "濃い", "薄い"),
+            wordsEn = listOf("empty", "flat", "pale ink wash", "grain", "stipple", "hatch", "crosshatch", "bleeding", "aquatint", "dense", "faint"),
         ),
         Category(
             key = "iro",

@@ -186,7 +186,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         marker_class=None,
         words=(
             _w("空", "empty", default=True),
-            _w("べた", "solid"),
+            _w("塗り", "flat"),
             _w("薄墨", "pale ink wash", score_value="wash"),
             _w("粒", "grain", score_value="grain"),
             _w("点", "stipple", score_value="stipple"),

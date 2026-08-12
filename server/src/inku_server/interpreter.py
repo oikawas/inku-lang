@@ -153,13 +153,13 @@ _SYSTEM_PROMPT_PREFIX_TEMPLATE = ("""あなたは inku DDL の第一段階イン
 - 紙目を残す、生成りの紙、和紙 → 「地: 生成りの紙、細かい紙目。」
 - 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」
 - 入力が支持体を「〜の地」「〜を地に」「〜の紙に」と明示した場合は、必ず「地: ...」として残し、「背景...」へ言い換えない。
-- 塗る、塗りつぶす、ベタ、中を塗る、面で満たす → 「面: べた。」
+- 塗る、塗りつぶす、ベタ、中を塗る、面で満たす → 「面: 塗り。」
 - 点で埋める、点描の面 → 「面: 点。」
 - 斜線で埋める、ハッチ → 「面: 平行線。」
 - 粒立つ、かすれ → 「面: 粒。」
 - 薄墨で満たす、水彩の面 → 「面: 薄墨。」
 - 端が滲む → 「面: にじみ。」
-- 面の中身が濃い、密、深い → 「面: 濃い。」。面の中身が薄い、淡い、かすか → 「面: 薄い。」。他の面の語と併せるときは「面: べた（濃い）。」「面: 薄墨（薄い）。」の形にする
+- 面の中身が濃い、密、深い → 「面: 濃い。」。面の中身が薄い、淡い、かすか → 「面: 薄い。」。他の面の語と併せるときは「面: 塗り（濃い）。」「面: 薄墨（薄い）。」の形にする
 - 「面: ...」の語は状態の名詞であって動作ではない。「面: 塗る。」「面: 埋める。」のように動詞では書かない
 - ビュラン、ドライポイントは入力にその技法名がある場合だけ同名のてざわりとして残す。
 - メゾチント地は「地: 黒いメゾチント地。」、平行線・交差線・アクアチントは「面: 平行線（粗から密）。」「面: 交差線。」「面: アクアチント三段。」と固定する。
@@ -1016,13 +1016,13 @@ Texture must not create extra helper shapes. If it belongs to a shape interior, 
 - paper grain, off-white paper, washi → "Ground: off-white paper, fine paper grain."
 - ink-wash ground → "Ground: ink wash."
 - If the input explicitly names the support as "... ground", "on ... paper", or "with ... as the ground", always preserve it as "Ground: ..."; never rewrite it as "Fill background ...".
-- fill, paint, solid fill, filled interior → "Surface: solid."
+- fill, paint, solid fill, filled interior → "Surface: flat."
 - stippled or dotted fill → "Surface: stipple."
 - hatch, hatched, hatching → "Surface: hatch."
 - grainy, rough, scuffed → "Surface: grain."
 - ink wash or watercolor fill → "Surface: pale ink wash."
 - bleeding edge → "Surface: bleeding."
-- a dense, deep, or heavy interior → "Surface: dense."; a faint, pale, or thin interior → "Surface: faint." Combine with another surface word as "Surface: solid (dense)." or "Surface: pale ink wash (faint)."
+- a dense, deep, or heavy interior → "Surface: dense."; a faint, pale, or thin interior → "Surface: faint." Combine with another surface word as "Surface: flat (dense)." or "Surface: pale ink wash (faint)."
 - The "Surface: ..." words are state nouns, never actions. Never write "Surface: paint." or "Surface: fill."
 - Preserve burin and drypoint only when the input literally names them.
 - Normalize print fields to fixed phrases: "Ground: black mezzotint.", "Surface: hatching (coarse to dense).", "Surface: crosshatching.", and "Surface: three-step aquatint."

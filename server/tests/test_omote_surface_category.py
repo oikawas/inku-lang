@@ -71,10 +71,10 @@ def test_omote_texture_values_cover_the_enum_minus_ground_and_default() -> None:
 
 
 def test_the_four_words_that_are_not_textures_carry_no_texture_value() -> None:
-    """べた falls to `filled`, not to a texture, and the density words to neither.
+    """塗り falls to `filled`, not to a texture, and the density words to neither.
 
     Pinned by pair rather than by set: `wash` is already in the set from 薄墨, so
-    giving べた a second copy of it would leave a set comparison green while the
+    giving 塗り a second copy of it would leave a set comparison green while the
     word had quietly become a texture. The distinction is the whole point of the
     word -- a solid fill is `filled=true`, and `surface` is a printmaker's mark,
     which is why a `surface` does not stand in for a fill (measured brightness
@@ -83,7 +83,7 @@ def test_the_four_words_that_are_not_textures_carry_no_texture_value() -> None:
     values = {word.surface_ja: word.score_value for word in _omote().words}
     assert values == {
         "空": None,
-        "べた": None,
+        "塗り": None,
         "薄墨": "wash",
         "粒": "grain",
         "点": "stipple",
@@ -117,7 +117,7 @@ def test_api_and_reference_publish_the_category() -> None:
     """T-2. `GET /api/saijiki` and the reference document both carry おもて."""
     headers, user, group, token = _auth()
     try:
-        for lang, name, word in (("ja", "おもて", "べた"), ("en", "surfaces", "solid")):
+        for lang, name, word in (("ja", "おもて", "塗り"), ("en", "surfaces", "flat")):
             response = client.get(f"/api/saijiki?lang={lang}", headers=headers)
             assert response.status_code == 200
             categories = response.json()["categories"]
@@ -134,8 +134,8 @@ def test_api_and_reference_publish_the_category() -> None:
     saijiki_section = build_reference()["saijiki"]
     assert "おもて" in saijiki_section["core_categories_ja"]
     assert "surfaces" in saijiki_section["core_categories_en"]
-    assert "べた" in saijiki_section["core_categories_ja"]["おもて"]
-    assert "solid" in saijiki_section["core_categories_en"]["surfaces"]
+    assert "塗り" in saijiki_section["core_categories_ja"]["おもて"]
+    assert "flat" in saijiki_section["core_categories_en"]["surfaces"]
 
 
 def test_display_flag_and_membership_are_separate_properties() -> None:
@@ -168,11 +168,14 @@ def test_every_surface_word_is_a_state_noun() -> None:
     Principle 5 says the output is a static image and SPEC §3.1 says the action
     vocabulary is about placing, not marking; `描く` was pruned in v1.92 for
     being the second kind. Adding 塗る would reverse that ruling, so the word is
-    べた -- how a surface is, not what a hand did to it. The named three are the
+    塗り, the noun -- how a surface is, not what a hand did to it (author's
+    ruling, 2026-08-12, which chose the noun over べた). The named three are the
     ones the contract lists; the ending test is what catches the next one
     (粒立つ and 滲む were both verbs in the Stage 1 phrases this replaces).
     """
     words = _omote().words
+    # 塗る is the verb and 塗り is the noun: the ruling turns on exactly that
+    # difference, so the verb stays forbidden while the noun is the word.
     named_verbs = {"塗る", "塗りつぶす", "埋める", "paint", "fill"}
     assert not named_verbs & {w.surface_ja for w in words}
     assert not named_verbs & {w.surface_en for w in words}
@@ -191,8 +194,8 @@ def test_stage1_prompt_defines_the_solid_surface_phrase() -> None:
     nothing. The contract's own note on P-4 -- that reverting only the Stage 1
     side of the hatch fix would miss -- is this gap named.
     """
-    assert "「面: べた。」" in SYSTEM_PROMPT_PREFIX
-    assert '"Surface: solid."' in SYSTEM_PROMPT_PREFIX_EN
+    assert "「面: 塗り。」" in SYSTEM_PROMPT_PREFIX
+    assert '"Surface: flat."' in SYSTEM_PROMPT_PREFIX_EN
     # T-4's other half, the one defect A was: Stage 1 wrote 面: 斜めに埋める。 and
     # the Stage 2 table read 平行線, which was not in it. Four in the DDL, zero
     # in the Score.
@@ -220,10 +223,10 @@ def test_golden_fixture_is_not_regenerated() -> None:
     en = (_FIXTURES / "stage1_prefix_en.golden.txt").read_text(encoding="utf-8")
     # The pre-change text is still there, in both directions.
     assert "面: 斜めに埋める。" in ja
-    assert "「面: べた。」" not in ja
+    assert "「面: 塗り。」" not in ja
     assert "おもて:" not in ja
     assert '"Surface: hatched diagonally."' in en
-    assert '"Surface: solid."' not in en
+    assert '"Surface: flat."' not in en
     assert "surfaces: empty" not in en
 
     declarations = Path(__file__).with_name("test_saijiki_golden.py").read_text(

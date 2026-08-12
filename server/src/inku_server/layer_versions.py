@@ -9,9 +9,9 @@
 # closed shape, 96.7% of the works that came out filled had never been asked to
 # be, and five descriptions that stated a fill outright reached `filled` zero
 # times out of five -- because Stage 1 could write 埋める while Stage 2 read 塗る,
-# an intersection that was empty in Japanese. The word is べた rather than 塗る:
-# principle 5 and the pruning of 描く in v1.92 both say a saijiki word is a state,
-# not a hand's action.
+# an intersection that was empty in Japanese. The word is the noun 塗り and not
+# the verb 塗る (author's ruling, 2026-08-12): principle 5 and the pruning of 描く
+# in v1.92 both say a saijiki word names a state, not a hand's action.
 # The transform this version moves is one branch, because the vocabulary and the
 # two prompt tables are read by an LLM and the frozen corpus calls none. A
 # surface attached to a primitive with no interior is moved to the nearest closed

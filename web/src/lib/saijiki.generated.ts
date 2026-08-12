@@ -30,7 +30,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'omote',
 		label: 'おもて',
 		en: 'surfaces',
-		words: ['空', 'べた', '薄墨', '粒', '点', '平行線', '交差線', 'にじみ', 'アクアチント', '濃い', '薄い']
+		words: ['空', '塗り', '薄墨', '粒', '点', '平行線', '交差線', 'にじみ', 'アクアチント', '濃い', '薄い']
 	},
 	{
 		key: 'iro',
@@ -99,7 +99,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'omote',
 		label: 'おもて',
 		en: 'surfaces',
-		words: ['empty', 'solid', 'pale ink wash', 'grain', 'stipple', 'hatch', 'crosshatch', 'bleeding', 'aquatint', 'dense', 'faint']
+		words: ['empty', 'flat', 'pale ink wash', 'grain', 'stipple', 'hatch', 'crosshatch', 'bleeding', 'aquatint', 'dense', 'faint']
 	},
 	{
 		key: 'iro',

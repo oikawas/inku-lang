@@ -22,6 +22,9 @@
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		batchActiveLine: number | null;
+		batchRunningLineText: string;
+		batchSketchText: string | null;
+		batchSketchGrainLabel: string;
 		batchActiveDdlHighlighted: string;
 		batchTotal: number;
 		batchCurrent: number;
@@ -54,6 +57,9 @@
 		batchNonEmpty,
 		batchRunning,
 		batchActiveLine,
+		batchRunningLineText,
+		batchSketchText,
+		batchSketchGrainLabel,
 		batchActiveDdlHighlighted,
 		batchTotal,
 		batchCurrent,
@@ -78,37 +84,11 @@
 		settings,
 	}: Props = $props();
 
-	// Row pitch of the textarea (13px × 1.65). The gutter, the active-line band
-	// and the follow-the-run scrolling all step by it.
-	const LINE_HEIGHT = 21.45;
-	const TEXT_PAD_TOP = 9;
-
 	let batchTextareaEl = $state<HTMLTextAreaElement | null>(null);
 	let batchScrollTop = $state(0);
 	let batchScrollLeft = $state(0);
 	let selectedHistoryPrompt = $state('');
 	const displayLineNumbersText = $derived(batchInput.trim() ? lineNumbersText : t().batchPlaceholder.split('\n').map((_, i) => String(i + 1)).join('\n'));
-	const batchActiveLineStyle = $derived(
-		batchActiveLine === null
-			? ''
-			: `--batch-active-top: ${TEXT_PAD_TOP + (batchActiveLine - 1) * LINE_HEIGHT - batchScrollTop}px`
-	);
-
-	// The box no longer grows with the line count, so on a long batch the line
-	// being painted can sit below the fold. Keep it in view while the box is
-	// read-only; once the run ends the caret is the user's again.
-	$effect(() => {
-		const line = batchActiveLine;
-		const el = batchTextareaEl;
-		if (!batchRunning || line === null || !el) return;
-		const top = (line - 1) * LINE_HEIGHT;
-		const viewTop = el.scrollTop;
-		const viewBottom = viewTop + el.clientHeight - LINE_HEIGHT * 2;
-		if (top < viewTop || top > viewBottom) {
-			el.scrollTop = Math.max(0, top - el.clientHeight / 2);
-		}
-	});
-
 	function normalizePrompt(text: string): string {
 		return text.trim().replace(/\r\n/g, '\n');
 	}
@@ -137,34 +117,41 @@
 <div class="batch-label">
 	<span class="batch-label-text"><strong>{t().batchSectionLabel}</strong>{t().batchSectionHint}</span>
 </div>
-<div class="batch-wrap">
-	<div class="line-nums" aria-hidden="true">
-		<!-- The gutter is a plain block, so it is scrolled by hand to stay level
-		     with the textarea it labels. -->
-		<div class="line-nums-inner" style={`transform: translateY(${-batchScrollTop}px)`}>{displayLineNumbersText}</div>
+{#if batchRunning}
+	<!-- The box is read-only for the length of the run, so the whole list is not
+	     worth its height: the one line being painted is what the author is
+	     watching. Its number is kept -- it is how the failure report, the
+	     history label and the observer below all name this work. -->
+	<div class="batch-current">
+		<span class="batch-current-num">{batchActiveLine ?? '-'}</span>
+		<span class="batch-current-text">{batchRunningLineText}</span>
 	</div>
-	<div class="batch-ta-wrap">
-		{#if batchRunning && batchActiveLine !== null}
-			<div class="batch-active-line" style={batchActiveLineStyle}></div>
-		{/if}
-		<LabelHighlight text={batchInput} wrap={false} scrollTop={batchScrollTop} scrollLeft={batchScrollLeft} />
-		<textarea
-			class="batch-ta"
-			bind:this={batchTextareaEl}
-			bind:value={batchInput}
-			rows="5"
-			spellcheck="false"
-			wrap="off"
-			placeholder={t().batchPlaceholder}
-			readonly={batchRunning}
-			onscroll={() => {
-				batchScrollTop = batchTextareaEl?.scrollTop ?? 0;
-				batchScrollLeft = batchTextareaEl?.scrollLeft ?? 0;
-			}}
-		></textarea>
+{:else}
+	<div class="batch-wrap">
+		<div class="line-nums" aria-hidden="true">
+			<!-- The gutter is a plain block, so it is scrolled by hand to stay level
+			     with the textarea it labels. -->
+			<div class="line-nums-inner" style={`transform: translateY(${-batchScrollTop}px)`}>{displayLineNumbersText}</div>
+		</div>
+		<div class="batch-ta-wrap">
+			<LabelHighlight text={batchInput} wrap={false} scrollTop={batchScrollTop} scrollLeft={batchScrollLeft} />
+			<textarea
+				class="batch-ta"
+				bind:this={batchTextareaEl}
+				bind:value={batchInput}
+				rows="5"
+				spellcheck="false"
+				wrap="off"
+				placeholder={t().batchPlaceholder}
+				onscroll={() => {
+					batchScrollTop = batchTextareaEl?.scrollTop ?? 0;
+					batchScrollLeft = batchTextareaEl?.scrollLeft ?? 0;
+				}}
+			></textarea>
+		</div>
 	</div>
-</div>
-{#if batchNonEmpty > 0}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
+{/if}
+{#if batchNonEmpty > 0 && !batchRunning}<p class="batch-info">{t().batchCount(batchNonEmpty)}</p>{/if}
 
 <!-- Restoring a past batch refills the input box, so the picker sits directly
      under it rather than down with the run options. -->
@@ -205,6 +192,20 @@
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}
+<!-- 写生 (Stage 0.5), read-only here. Above the instructions because it comes
+     before them, the same order the describe tab keeps. Written when a line
+     returns, so it is the prose of the work the observer below is showing. -->
+{#if batchRunning && batchSketchText !== null}
+	<div class="batch-observe batch-sketch">
+		<div class="batch-observe-head">
+			<span>{t().sketchLabel}</span>
+			<div class="batch-observe-meta">
+				<span>{t().sketchGrainLabel}: {batchSketchGrainLabel}</span>
+			</div>
+		</div>
+		<div class="batch-observe-body batch-sketch-body">{batchSketchText}</div>
+	</div>
+{/if}
 {#if batchRunning}
 	<div class="batch-observe">
 		<div class="batch-observe-head">
@@ -282,9 +283,32 @@
 		height: 100%;
 	}
 	.batch-ta:focus { border-color: var(--accent); }
-	.batch-ta:read-only {
-		color: var(--fg2);
-		cursor: default;
+	/* The line being painted, in place of the box. The gutter's look is kept for
+	   the number so the two read as the same column they were. */
+	.batch-current {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		box-sizing: border-box;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: var(--bg2);
+		padding: 8px 10px;
+		font-size: 13px;
+		line-height: 1.65;
+	}
+	.batch-current-num {
+		flex: 0 0 auto;
+		min-width: 2rem;
+		text-align: right;
+		color: var(--fg3);
+		font-variant-numeric: tabular-nums;
+		user-select: none;
+	}
+	.batch-current-text {
+		min-width: 0;
+		color: var(--fg);
+		word-break: break-word;
 	}
 	.batch-ta-wrap {
 		position: relative;
@@ -312,17 +336,9 @@
 		font-family: inherit;
 		font-size: 11px;
 	}
-	.batch-active-line {
-		position: absolute;
-		top: var(--batch-active-top, -100px);
-		left: 0;
-		right: 0;
-		height: 21.45px;
-		background: #fff0c2;
-		border-top: 1px solid rgba(189, 143, 52, 0.25);
-		border-bottom: 1px solid rgba(189, 143, 52, 0.25);
-		pointer-events: none;
-		z-index: 0;
+	.batch-sketch-body {
+		white-space: pre-wrap;
+		word-break: break-word;
 	}
 	.batch-progress-wrap { margin-top: 8px; }
 	.batch-metric-label {
@@ -411,11 +427,6 @@
 	}
 	/* The batch panel's status blocks were authored in light-theme paper colours
 	   only, so on the dark theme they read as white sheets over the panel. */
-	:global(html[data-theme='dark']) .batch-active-line {
-		background: rgba(189, 143, 52, 0.26);
-		border-top-color: rgba(226, 191, 130, 0.35);
-		border-bottom-color: rgba(226, 191, 130, 0.35);
-	}
 	:global(html[data-theme='dark']) .batch-observe {
 		border-color: var(--border2);
 		background: var(--panel);

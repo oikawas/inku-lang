@@ -373,6 +373,12 @@
 	let batchPromptHistory = $state<string[]>([]);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
+	// 写生 (Stage 0.5) for the batch, kept apart from the single-mode prose: that
+	// one is an editable draft bound to one description, and a batch must not
+	// overwrite what the author is editing there. Written when a line returns,
+	// the same moment batchActiveDdl is, so the two always describe one work.
+	let batchSketchText = $state<string | null>(null);
+	let batchSketchGrain = $state<unknown>(null);
 	let batchActiveTokensIn = $state<number | null>(null);
 	let batchActiveTokensOut = $state<number | null>(null);
 	let batchTokensInTotal = $state(0);
@@ -2725,6 +2731,14 @@
 	// and a bracketed note has nothing to draw, and would come back a 400.
 	const batchNonEmpty = $derived(batchLines.filter((l) => pipelineDescription(l).trim()).length);
 	const batchRunning = $derived(activeRunMode === 'batch' && loading);
+	// The line being painted, shown in place of the input box while the run holds
+	// that box read-only anyway. The whole line is kept, numbering and all.
+	const batchRunningLineText = $derived(
+		batchActiveLine === null ? '' : (batchLines[batchActiveLine - 1] ?? '').trim()
+	);
+	const batchSketchGrainLabel = $derived(
+		sketchModeLabel(sketchModeOf(batchSketchGrain), getLang() === 'ja')
+	);
 	const singleRunning = $derived((activeRunMode === 'single' && loading) || reloading);
 	const demoRunning = $derived(activeRunMode === 'demo' && loading);
 	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
@@ -3344,6 +3358,7 @@ if (unreadWords.length > 0) {
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
 		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null;
+		batchSketchText = null; batchSketchGrain = null;
 		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 		if (submittedMode === 'batch') {
 			batchLatestResult = null;
@@ -3436,6 +3451,8 @@ if (unreadWords.length > 0) {
 						});
 						if (submitStopRequested) return null;
 						batchActiveDdl = r.ddl;
+						batchSketchText = r.sketch_text ?? null;
+						batchSketchGrain = r.sketch_grain ?? null;
 						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
 						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
 						batchTokensInTotal += batchActiveTokensIn ?? 0;
@@ -6212,6 +6229,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						hideRunStatus={reloading}
 						singleDdlReady={ddl !== null}
 						{batchActiveLine}
+						{batchRunningLineText}
+						{batchSketchText}
+						{batchSketchGrainLabel}
 						{batchActiveDdlHighlighted}
 						{batchTotal}
 						{batchCurrent}

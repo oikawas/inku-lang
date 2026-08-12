@@ -43,6 +43,7 @@ from .normalize import (
     _with_per_instruction_density_budget,
     _with_presence_auxiliary_shape_repair,
     _with_structural_duplicate_repair,
+    _with_surface_on_a_closed_shape,
     _with_total_density_budget,
     ensure_renderable_score,
 )
@@ -97,6 +98,12 @@ def coerce_score(
         instructions = [_coerce_instruction(ins) for ins in score.instructions]
         _record_branch_fire(branch_report, "coerce_instruction", _branch_before, instructions)
         _branch_before = instructions
+        # On this exit too: a surface the renderer will not draw is a
+        # renderability defect, not a matter of style, so switching the style
+        # coercion off must not switch it back on.
+        instructions = _with_surface_on_a_closed_shape(instructions)
+        _record_branch_fire(branch_report, "with_surface_on_a_closed_shape", _branch_before, instructions)
+        _branch_before = instructions
         instructions = _without_spontaneous_grid(instructions, ddl=ddl)
         _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)
         _branch_before = instructions
@@ -133,6 +140,11 @@ def coerce_score(
         for ins in score.instructions
     ]
     _record_branch_fire(branch_report, "coerce_and_repair_instruction", _branch_before, instructions)
+    _branch_before = instructions
+    # Before anything downstream reads a surface or copies an instruction that
+    # carries one, so every later branch sees the attachment the sentence meant.
+    instructions = _with_surface_on_a_closed_shape(instructions)
+    _record_branch_fire(branch_report, "with_surface_on_a_closed_shape", _branch_before, instructions)
     _branch_before = instructions
     instructions = _without_spontaneous_grid(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "without_spontaneous_grid", _branch_before, instructions)

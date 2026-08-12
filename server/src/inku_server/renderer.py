@@ -24,6 +24,7 @@ from .color_catalogs import DEFAULT_COLOR_CATALOG_ID
 from .master_grid import fmt
 from .plugins import CanvasSize, canvas_size_for_aspect
 from .schema import (
+    CLOSED_SHAPES,
     Arrangement,
     CanvasGroundSpec,
     CanvasSpec,
@@ -3283,7 +3284,11 @@ def build_texture_metadata(score: Score, *, svg_profile: str | None = None) -> d
     ground = _score_canvas_ground(score)
     surfaces = []
     for idx, ins in enumerate(score.instructions):
-        if ins.surface is not None and ins.surface.texture != "none":
+        # The same three conditions `_has_surface_texture` uses. Without the
+        # primitive test this reported a texture on every line and arc that
+        # carried one -- 53.4% of all surfaces in production -- and the render
+        # JSON said a texture was there that not one pixel of the SVG showed.
+        if _has_surface_texture(ins):
             surfaces.append(
                 {
                     "instruction_index": idx,
@@ -3538,9 +3543,9 @@ def render(
     return _apply_master_grid(svg)
 
 
-_CLOSED_SHAPES = frozenset(
-    {"circle", "ellipse", "square", "triangle", "polygon", "cloudform"}
-)
+# The set moved to `schema.py` so coerce decides by the same one. The private
+# name stays because this module reads it in three places.
+_CLOSED_SHAPES = CLOSED_SHAPES
 
 
 def _texture_filter_weights(score: Score) -> set[str]:

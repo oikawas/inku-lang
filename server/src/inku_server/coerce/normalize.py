@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from ..limits import DEFAULT_LIMITS, Limits
-from ..schema import Instruction, Score
+from ..schema import CLOSED_SHAPES, Instruction, Score
 
 
 def _coerce_marker_values(name: str) -> tuple[Any, ...]:
@@ -264,6 +264,48 @@ def _with_structural_duplicate_repair(instructions: list[Instruction]) -> list[I
             continue
         seen.add(key)
         repaired.append(ins)
+    return repaired
+
+
+def _with_surface_on_a_closed_shape(instructions: list[Instruction]) -> list[Instruction]:
+    """Move a surface off a primitive whose interior is never drawn.
+
+    A `面: ...` sentence belongs to the shape it follows, and Stage 2 attaches it
+    to whatever instruction came before it. When that is a line or an arc the
+    renderer draws nothing at all: `_has_surface_texture` and the surface group
+    both require `CLOSED_SHAPES`. In production 53.4% of every surface written
+    sat on a `line` (739) or an `arc` (59) and was invisible -- `wash` 453,
+    `grain` 251, `bleed` 83, `paper_grain` 9, `hatch` 2.
+
+    So the surface goes back to the nearest closed shape before it, which is the
+    shape the sentence was about. Where there is no such shape, or where it
+    already carries a surface of its own, the stray one is dropped instead: this
+    corrects a misattachment and never guesses an interior into being. Dropping
+    is also what keeps one texture request from becoming two textured
+    instructions, which the Stage 2 rules forbid.
+    """
+    repaired = list(instructions)
+    for index, ins in enumerate(repaired):
+        surface = ins.surface
+        if surface is None or surface.texture == "none":
+            continue
+        if ins.primitive in CLOSED_SHAPES:
+            continue
+        repaired[index] = ins.model_copy(update={"surface": None})
+        target = next(
+            (
+                back
+                for back in range(index - 1, -1, -1)
+                if repaired[back].primitive in CLOSED_SHAPES
+            ),
+            None,
+        )
+        if target is None:
+            continue
+        holder = repaired[target]
+        if holder.surface is not None and holder.surface.texture != "none":
+            continue
+        repaired[target] = holder.model_copy(update={"surface": surface})
     return repaired
 
 

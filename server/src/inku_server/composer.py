@@ -161,7 +161,9 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 - **余白は構図要素。小さな焦点、端寄りの線、反復の欠落、画面外へ続く方向で余白に圧力を作る。余白を全面散布で埋めない**
 - variation は明示された揺らぎがある場合のみ付ける
 - **形容語・動作語・質感語は、DDL で指定された主図形へ適用する。震える・揺れる・滲む・太い・細い等を理由に、DDL にない補助線・補助図形・別色の instruction を追加してはいけない**
-- **面の質感は instruction.surface へ入れる。点で埋める=texture="stipple"、平行線=texture="hatch"、交差線=texture="crosshatch"、アクアチント=texture="aquatint"、粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
+- **面の質感は instruction.surface へ入れる。点=texture="stipple"、平行線=texture="hatch"、交差線=texture="crosshatch"、アクアチント=texture="aquatint"、粒/粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、にじみ/端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
+- **「面: べた」は質感ではなく filled=true。「面: 空」は既定なので surface も filled も出さない**
+- **「面: 濃い」は surface.density=0.60, surface.opacity=0.50。「面: 薄い」は surface.density=0.20, surface.opacity=0.15 (既定は density=0.35, opacity=0.28)。濃い・薄いは相対の語で、質感の語に添えられたときはその質感の濃さを動かす。「面: 薄墨（濃い）」は texture="wash" のまま density と opacity を上げる**
 - **紙目・生成りの紙・和紙・薄墨の地は canvas.ground へ入れる。canvas は {"aspect":"square","ground":{...}} 形式にしてよい。地は background ではなく支持体の質感であり、座標系を変えない**
 - **「地: ...」の文は canvas.ground へだけ変換し、その文から instruction を追加しない。「面: ...」の文は直前に指定された主図形の surface に入れる。一つの質感要求を複数の質感付き instruction に複製しない**
 - **正規化DDL に「地: ...」の文が無い場合、canvas.ground を出力しない。雰囲気や情景からの推測で ground を追加しない**
@@ -195,7 +197,7 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 
 ## 塗り・背景・色
 
-- **塗りつぶし指示 (塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。輪郭のみは filled 省略 (default false)**
+- **塗りつぶし指示 (「面: べた」・塗る・塗りつぶす・ベタ・中を塗る等) → filled=true。「面: 空」と輪郭のみは filled 省略 (default false)**
 - **背景色 → Score の background フィールド。「背景を黒で埋める」→ {"background":"black","instructions":[...]}。保存済み作品にある旧表現「背景を黒で塗りつぶす」も同じ background として受ける。この文は面を要素で埋める指示ではないので、密度・数量の規則を当てない**
 - **背景色と描画色が同じで、実質的に見えない instruction を作ってはいけない。background と同色なら面積の少ない側を変更する。通常は線・小図形・点の color を黒・白・青・赤・緑などの文脈に合う可視色へ寄せる。大きな主題図形が同色の場合だけ background 側を変更してよい**
 - **background は white/black/gray/red/orange/yellow/green/blue/purple の九色すべてから文脈に合う色を選ぶ。正規化DDL が灰背景を要求したら background="gray" をそのまま使う**
@@ -550,7 +552,9 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Negative space is compositional pressure. Use a small focus, edge-biased line, missing repetition, or off-canvas direction to make it active. Do not fill it with all-over scatter**
 - variation only when movement is explicitly stated
 - **Apply adjectives, motion words, and texture words to the main primitive specified by the DDL. Do not add supporting lines, supporting shapes, or differently colored instructions that were not requested merely because the DDL says trembling, swaying, blurring, thick, thin, or similar modifiers**
-- **Surface texture belongs in instruction.surface. dotted/stippled fill → texture="stipple"; hatch → texture="hatch"; crosshatch → texture="crosshatch"; aquatint → texture="aquatint"; grainy/rough/scuffed → texture="grain"; ink wash/watercolor wash → texture="wash"; bleeding edge → texture="bleed". Do not turn texture into independent helper instructions**
+- **Surface texture belongs in instruction.surface. stipple → texture="stipple"; hatch → texture="hatch"; crosshatch → texture="crosshatch"; aquatint → texture="aquatint"; grain/grainy/rough/scuffed → texture="grain"; pale ink wash/watercolor wash → texture="wash"; bleeding → texture="bleed". Do not turn texture into independent helper instructions**
+- **"Surface: solid" is not a texture; it is filled=true. "Surface: empty" is the default, so emit neither surface nor filled**
+- **"Surface: dense" is surface.density=0.60, surface.opacity=0.50. "Surface: faint" is surface.density=0.20, surface.opacity=0.15 (defaults are density=0.35, opacity=0.28). Dense and faint are relative words: attached to a texture word they move how dense that texture is, so "Surface: pale ink wash (dense)" keeps texture="wash" and raises density and opacity**
 - **Paper grain, off-white paper, washi, and ink-wash ground belong in canvas.ground. Use canvas={"aspect":"square","ground":{...}} when needed. Ground is support texture, not a coordinate or composition change**
 - **A "Ground: ..." sentence maps only to canvas.ground; do not add any instruction from it. A "Surface: ..." sentence goes into the surface of the main shape it follows. Never duplicate one texture request across multiple textured instructions**
 - **Do not emit canvas.ground unless the normalized DDL contains a "Ground: ..." sentence. Never add ground from mood or scene inference**
@@ -584,7 +588,7 @@ If "original text" is provided, use normalized DDL as primary; use original text
 
 ## Fill, background, and color
 
-- **fill/paint/solid fill → filled=true. Outline only = omit filled (default false)**
+- **"Surface: solid"/fill/paint/solid fill → filled=true. "Surface: empty" and outline only = omit filled (default false)**
 - **background → Score background field. "Fill background with black" → {"background":"black","instructions":[...]}. This sentence is not a request to fill an area with elements, so do not apply the density or count rules to it**
 - **Do not create effectively invisible instructions whose drawing color matches the background. If they match, change the smaller visual area. Usually change line/small-shape/dot color to a context-fitting visible color such as black, white, blue, red, or green. Change the background only when the matching subject is large and dominant**
 - **Choose the background from all nine abstract colors: white/black/gray/red/orange/yellow/green/blue/purple. If normalized DDL asks for a gray background, keep background="gray"**

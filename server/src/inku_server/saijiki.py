@@ -53,7 +53,7 @@ class SaijikiWord:
     prompt: bool = True  # Stage 1 語彙ブロック・列挙へ出す
     display: bool = True  # 歳時記表示 (web / API) へ出す
     marker: bool | None = None  # 閉包マーカー所属 (None = prompt に従う)
-    score_value: str | None = None  # Weight / Color の Score enum 値
+    score_value: str | None = None  # Weight / Color / SurfaceTexture の Score enum 値
     # マーカー表面の言語別上書き。en「line-up」は従来マーカー「arrange」を保つ。
     marker_surfaces_ja: tuple[str, ...] | None = None
     marker_surfaces_en: tuple[str, ...] | None = None
@@ -175,6 +175,27 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("破線", "dashed"),
             _w("点線", "dotted"),
             _w("一点鎖線", "dash-dot"),
+        ),
+    ),
+    SaijikiCategory(
+        key="omote",
+        name_ja="おもて",
+        name_en="surfaces",
+        # No closure markers, exactly as つらなり has none: this category says how
+        # an interior is, not what to place, so the plugin closure never quotes it.
+        marker_class=None,
+        words=(
+            _w("空", "empty", default=True),
+            _w("べた", "solid"),
+            _w("薄墨", "pale ink wash", score_value="wash"),
+            _w("粒", "grain", score_value="grain"),
+            _w("点", "stipple", score_value="stipple"),
+            _w("平行線", "hatch", score_value="hatch"),
+            _w("交差線", "crosshatch", score_value="crosshatch"),
+            _w("にじみ", "bleeding", score_value="bleed"),
+            _w("アクアチント", "aquatint", score_value="aquatint"),
+            _w("濃い", "dense"),
+            _w("薄い", "faint"),
         ),
     ),
     SaijikiCategory(
@@ -314,7 +335,7 @@ def _prompt_words(category: SaijikiCategory, lang: str) -> tuple[SaijikiWord, ..
 
 
 def prompt_block(lang: str) -> str:
-    """Stage 1 プロンプトの歳時記カテゴリブロック (9 行)。"""
+    """Stage 1 プロンプトの歳時記カテゴリブロック (10 行)。"""
     lines = []
     joiner = "、" if lang == "ja" else ", "
     for category in SAIJIKI:

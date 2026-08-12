@@ -95,6 +95,16 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "tsuranari": (
         ("実線", "solid"), ("破線", "dashed"), ("点線", "dotted"), ("一点鎖線", "dash-dot"),
     ),
+    # おもて (2026-08-12). Note that "solid" says two things in English: つらなり's
+    # 実線 is a line style and おもて's べた is a filled interior. The pair is what
+    # SPEC.md:137 and SPEC.ja.md:96 name, and the DDL always writes the second
+    # one as "Surface: solid.", which is where the two part.
+    "omote": (
+        ("空", "empty"), ("べた", "solid"), ("薄墨", "pale ink wash"), ("粒", "grain"),
+        ("点", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
+        ("にじみ", "bleeding"), ("アクアチント", "aquatint"),
+        ("濃い", "dense"), ("薄い", "faint"),
+    ),
     "iro": (
         ("白", "white"), ("黒", "black"), ("青", "blue"),
         ("赤", "red"), ("緑", "green"), ("灰", "gray"),

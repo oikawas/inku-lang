@@ -74,7 +74,18 @@ def test_ddl_reference_versions_and_parts() -> None:
     # this layer carried a version number from the start and never a frozen
     # output. Freezing A and B alone would have recorded a version of a layer the
     # change never traversed, which is what engine 12 wrote two cases to avoid.
-    assert DDL_ENGINE_VERSION == "14"
+    # Engine 15 (2026-08-12): a shape can say how its surface is. The saijiki and
+    # both prompt tables move, and this corpus sees none of that -- it calls no
+    # LLM. What it sees is the one deterministic branch: a surface attached to a
+    # primitive with no interior moves to the nearest closed shape before it.
+    # **THREE cases are new and 26 are listed as changed**, and the 23 carried
+    # over did not move a Score: adding a branch adds its name to every
+    # `branch_report`, exactly as engine 11 records above. Not one of the 42
+    # inputs frozen at engine 14 held a 「面:」 clause -- the two files that hold
+    # one are `c_plugin_expand` output written by a plugin -- so freezing without
+    # the three would have recorded a version whose change the corpus never
+    # traversed, which is the mistake engines 12 and 13 both wrote cases to avoid.
+    assert DDL_ENGINE_VERSION == "15"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -119,19 +130,43 @@ def test_ddl_reference_versions_and_parts() -> None:
     # outside the naming phrase, and a bare numeral inside one -- so the part is
     # six. A and B do not move: the readers this version widened are reached by
     # the plugin layer, and the count a coerce case states was already read.
-    assert len(manifest["cases"]) == 42
+    assert len(manifest["cases"]) == 45
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 23
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 26
     assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 6
     # Three entries, and they are two different quantities: `beside-cjk` is the
     # one case whose judgement moved (one unit to twelve, because the exclusion is
     # now cut by the body's language), and the other two are new files, which the
     # manifest also calls changed. Reading the length alone would say "three cases
     # moved" for a version that moved one.
-    assert manifest["changed_from_previous"] == [
-        "C-plugin-count-as-a-bare-numeral", "C-plugin-count-as-a-numeral-beside-cjk",
-        "C-plugin-count-outside-the-phrase",
-    ]
+    # Engine 15 lists every b_coerce case and no other part. Three are new; for
+    # the other 23 the only difference from engine 14 is the line the added
+    # branch puts in every report whether or not it fires. That is measured
+    # below rather than asserted by hand, because "26 changed" and "23 of them
+    # did not move a Score" are two different claims and only the second one
+    # says the version did what it says it did.
+    new_cases = {
+        "B-surface-already-on-a-closed-shape",
+        "B-surface-on-a-line-moves-back",
+        "B-surface-with-nowhere-to-move",
+    }
+    assert manifest["changed_from_previous"] == sorted(
+        case_id
+        for case_id, case in manifest["cases"].items()
+        if case["part"] == "b_coerce"
+    )
+    previous_root = MANIFEST_PATH.parent.parent / "ddl-engine-14"
+    for case_id in manifest["changed_from_previous"]:
+        if case_id in new_cases:
+            continue
+        relative = f"b_coerce/{case_id}.json"
+        before = json.loads((previous_root / relative).read_text(encoding="utf-8"))
+        after = json.loads((MANIFEST_PATH.parent / relative).read_text(encoding="utf-8"))
+        assert after["score"] == before["score"], case_id
+        assert set(after["branch_report"]) - set(before["branch_report"]) == {
+            "with_surface_on_a_closed_shape"
+        }, case_id
+        assert after["branch_report"]["with_surface_on_a_closed_shape"] == 0, case_id
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()
@@ -417,8 +452,9 @@ def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> No
         checked += 1
     # Say how many were looked at: a gate that silently checked nothing reads
     # exactly like a gate that passed. 15 at ddl-engine 12, which added two coerce
-    # cases that carry a DDL.
-    assert checked == 15
+    # cases that carry a DDL; 18 at ddl-engine 15, whose three surface cases each
+    # carry one.
+    assert checked == 18
 
 
 def test_the_corpus_holds_a_case_of_the_production_shape() -> None:

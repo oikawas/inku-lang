@@ -300,16 +300,6 @@ export class HistoryManagerState {
 		}
 	};
 
-	preloadFirstPage(activeItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
-		const nextPageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
-		this.trashTotal = trashTotal;
-		this.activeTotal = activeTotal;
-		if (this.preloadMatches('active', 0, nextPageSize, '', false, false, activeTotal)) return;
-		this.pageSize = nextPageSize;
-		if (activeItems.length > this.activeItems.length) this.activeItems = activeItems;
-		void this.fetch({ view: 'active', page: 0, search: '', starredOnly: false, forRevisionOnly: false, pageSize: nextPageSize, silent: true });
-	}
-
 	/**
 	 * Hand the manager what the history strip is holding.
 	 *

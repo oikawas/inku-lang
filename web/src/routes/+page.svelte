@@ -95,6 +95,7 @@
 		resolveStripSelection,
 		type HistoryNavTarget
 	} from '$lib/historyNavigation';
+	import { hashDigest } from '$lib/hashIdentity';
 	import { setThumbnailHidpi } from '$lib/thumbnailSource';
 
 	const PROVIDER_STAGE1_KEY = 'inku-provider-stage1';
@@ -373,6 +374,17 @@
 	let batchPromptHistory = $state<string[]>([]);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
+	// Which line the observer block is showing. Not batchActiveLine: that one is
+	// taken when a line starts, while the instructions, the tokens and the prose
+	// only exist once it comes back. Naming the block with the line being painted
+	// put the previous line's work under the next line's number.
+	let batchObservedLine = $state<number | null>(null);
+	// 写生 (Stage 0.5) for the batch, kept apart from the single-mode prose: that
+	// one is an editable draft bound to one description, and a batch must not
+	// overwrite what the author is editing there. Written when a line returns,
+	// the same moment batchActiveDdl is, so the two always describe one work.
+	let batchSketchText = $state<string | null>(null);
+	let batchSketchGrain = $state<unknown>(null);
 	let batchActiveTokensIn = $state<number | null>(null);
 	let batchActiveTokensOut = $state<number | null>(null);
 	let batchTokensInTotal = $state(0);
@@ -485,6 +497,8 @@
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
+	/** Where one candidate of a fan-out is: queued for a lane, drawing, or done. */
+	type VariationSlotState = 'waiting' | 'running' | 'done';
 	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let variationCandidates = $state<VariationCandidate[]>([]);
 	let lineageIntermediateNotice = $state<string | null>(null);
@@ -500,6 +514,10 @@
 	// not "which one is being processed".
 	let variationGridDone = $state(0);
 	let variationGridTotal = $state(0);
+	// One entry per candidate, so the panel can show the fan-out as the several
+	// jobs it is rather than as a single counter that moves once at the end.
+	let variationGridSlots = $state<VariationSlotState[]>([]);
+	let variationGridSlotLabels = $state<string[]>([]);
 	let variationGridAbortController: AbortController | null = null;
 	let variationGridStatus = $state<string | null>(null);
 	let targetContextVersion = 0;
@@ -575,6 +593,8 @@
 	// so the button is withheld there rather than opening onto an empty list.
 	let shareTarget = $state<HistoryItem | null>(null);
 	let currentRenderEngineVersion = $state<string | null>(null);
+	let currentDdlVersion = $state<string | null>(null);
+	let currentDdlEngineVersion = $state<string | null>(null);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
 
@@ -2231,19 +2251,25 @@
 
 	async function loadPublicAppInfo() {
 		currentRenderEngineVersion = null;
+		currentDdlVersion = null;
+		currentDdlEngineVersion = null;
 		try {
 			const r = await fetch('/api/info', {
 				cache: 'no-store',
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string };
+			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string; ddl_version?: string; ddl_engine_version?: string };
 			developerMode = data.developer_mode === true;
 			singleUserMode = data.single_user_mode === true;
 			setThumbnailHidpi(data.thumbnail_hidpi === true);
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
 				? data.render_engine_version
 				: null;
+			// The three layer versions the app info panel shows. They come from the
+			// same call the render engine version does, so one answer carries all.
+			currentDdlVersion = typeof data.ddl_version === 'string' ? data.ddl_version : null;
+			currentDdlEngineVersion = typeof data.ddl_engine_version === 'string' ? data.ddl_engine_version : null;
 		} catch (error) {
 			console.warn('failed to load public app info', error);
 		}
@@ -2698,6 +2724,16 @@
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
 	const historyTotalPages = $derived(Math.max(1, Math.ceil(historyTotal / historyWindowSize)));
 	let historyStarredOnly = $state(false);
+	// The strip's own 推敲のみ filter. Separate from the manager's: the two
+	// boxes are filtered independently, the same way starred already is.
+	let historyForRevisionOnly = $state(false);
+	// Whether the strip is showing a filtered listing rather than the whole one.
+	// Three places ask this to decide whether the page in hand is the plain
+	// newest-first listing: what to seed the manager with, what the strip may
+	// slice, and whether a freshness check may compare its first item with the
+	// newest work. Read through one name so a fourth filter cannot be added to
+	// some of them and forgotten in the rest.
+	const historyStripFiltered = $derived(historyStarredOnly || historyForRevisionOnly);
 	let trashItems = $state<Iteration[]>([]);
 	let trashTotal = $state(0);
 	let externalHistoryRefreshInFlight = false;
@@ -2717,6 +2753,14 @@
 	// and a bracketed note has nothing to draw, and would come back a 400.
 	const batchNonEmpty = $derived(batchLines.filter((l) => pipelineDescription(l).trim()).length);
 	const batchRunning = $derived(activeRunMode === 'batch' && loading);
+	// The line being painted, shown in place of the input box while the run holds
+	// that box read-only anyway. The whole line is kept, numbering and all.
+	const batchRunningLineText = $derived(
+		batchActiveLine === null ? '' : (batchLines[batchActiveLine - 1] ?? '').trim()
+	);
+	const batchSketchGrainLabel = $derived(
+		sketchModeLabel(sketchModeOf(batchSketchGrain), getLang() === 'ja')
+	);
 	const singleRunning = $derived((activeRunMode === 'single' && loading) || reloading);
 	const demoRunning = $derived(activeRunMode === 'demo' && loading);
 	const demoCanSaveCurrent = $derived(!!result && !!demoGeneratedPrompt && !!demoGeneratedDdl && !demoCurrentSaved);
@@ -3111,7 +3155,7 @@ if (unreadWords.length > 0) {
 	// The same guard already protects the strip from externally saved works.
 	async function refreshHistoryAfterServerSave() {
 		if (historyOffset !== 0) {
-			if (!historyStarredOnly) historyTotal += 1;
+			if (!historyStarredOnly && !historyForRevisionOnly) historyTotal += 1;
 			return;
 		}
 		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
@@ -3335,7 +3379,8 @@ if (unreadWords.length > 0) {
 		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null;
+		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchObservedLine = null;
+		batchSketchText = null; batchSketchGrain = null;
 		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 		if (submittedMode === 'batch') {
 			batchLatestResult = null;
@@ -3413,8 +3458,6 @@ if (unreadWords.length > 0) {
 				/** true = painted, string = the failure message, null = the run was interrupted. */
 				const paintBatchLine = async (item: { line: number; input: string }): Promise<true | string | null> => {
 					batchActiveLine = item.line;
-					batchActiveTokensIn = null;
-					batchActiveTokensOut = null;
 					try {
 						const r = await paintOne(item.input, {
 							historyInput: `#${item.line} ${item.input}`,
@@ -3427,7 +3470,12 @@ if (unreadWords.length > 0) {
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) return null;
+						// The observer's four quantities are written together, so the
+						// block always describes one work.
+						batchObservedLine = item.line;
 						batchActiveDdl = r.ddl;
+						batchSketchText = r.sketch_text ?? null;
+						batchSketchGrain = r.sketch_grain ?? null;
 						batchActiveTokensIn = (r.tokens_in_stage1 ?? 0) + (r.tokens_in_stage2 ?? 0) || null;
 						batchActiveTokensOut = (r.tokens_out_stage1 ?? 0) + (r.tokens_out_stage2 ?? 0) || null;
 						batchTokensInTotal += batchActiveTokensIn ?? 0;
@@ -3517,7 +3565,7 @@ if (unreadWords.length > 0) {
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;
 			submitStopRequested = false;
-			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
+			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchObservedLine = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
@@ -3692,29 +3740,24 @@ if (unreadWords.length > 0) {
 	}
 
 	// ── History ─────────────────────────────────────────────
+	// A prediction, used only for the first fetch made before the manager opens.
+	// The canonical page size is what the manager measures on its own grid
+	// (calculatePageSize() in HistoryManager.svelte); this estimate never
+	// overrides it. minCardWidth mirrors the minmax() in that component's
+	// .history-thumb-grid rule and must move whenever the CSS does.
 	function estimatedHistoryManagerPageSize(): number {
 		const modalWidth = Math.max(320, windowWidth * 0.8);
 		const modalHeight = Math.max(280, windowHeight * 0.8);
 		const gridWidth = Math.max(1, modalWidth - 20);
 		const gridHeight = Math.max(1, modalHeight - 94);
 		const gap = 8;
-		const minCardWidth = 104;
+		const minCardWidth = 142;
 		const columns = Math.max(1, Math.floor((gridWidth + gap) / (minCardWidth + gap)));
 		const cardWidth = Math.max(minCardWidth, (gridWidth - gap * (columns - 1)) / columns);
 		const imageWidth = Math.max(1, cardWidth - 12);
 		const cardHeight = imageWidth * 58 / 82 + 75;
 		const rows = Math.max(1, Math.floor((gridHeight + gap) / (cardHeight + gap)));
 		return Math.max(historyWindowSize, Math.min(100, columns * rows));
-	}
-
-	function preloadHistoryManagerFirstPage() {
-		if (!authToken || historyManager.open || historyStarredOnly || historyOffset !== 0) return;
-		historyManager.preloadFirstPage(
-			historyItems,
-			historyTotal,
-			trashTotal,
-			estimatedHistoryManagerPageSize()
-		);
 	}
 
 	async function fetchHistoryOffset(offset: number, options: { preserveSelection?: boolean; anchorId?: string } = {}): Promise<boolean> {
@@ -3752,6 +3795,8 @@ if (unreadWords.length > 0) {
 				include_svg: 'false',
 			});
 			if (historyStarredOnly) params.set('starred', 'true');
+			// The two marks are independent, so asking for both means both.
+			if (historyForRevisionOnly) params.set('for_revision', 'true');
 			if (options.anchorId) params.set('anchor_id', options.anchorId);
 			const r = await apiFetch(`/api/history?${params.toString()}`);
 			if (requestId !== historyFetchRequest) return false;
@@ -3762,7 +3807,7 @@ if (unreadWords.length > 0) {
 				const lastOffset = Math.floor((data.total - 1) / historyWindowSize) * historyWindowSize;
 				return await fetchHistoryOffset(lastOffset);
 			}
-			const stripItems = resolvedOffset === 0 && !historyStarredOnly
+			const stripItems = resolvedOffset === 0 && !historyStripFiltered
 				? data.items.slice(0, historyWindowSize)
 				: data.items;
 			// Immediately before the four quantities are written, so no await added
@@ -3778,15 +3823,11 @@ if (unreadWords.length > 0) {
 				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
 			}
-			if (!historyManager.open) {
-				if (resolvedOffset === 0 && !historyStarredOnly) {
-					// The strip's items are what we have; the manager's page size is a
-					// different quantity, so it is passed separately. The manager is
-					// seeded, not filled: it fetches its own page when it opens.
-					historyManager.seedFromStrip(data.items, data.total, trashTotal, estimatedHistoryManagerPageSize());
-				} else {
-					preloadHistoryManagerFirstPage();
-				}
+			if (!historyManager.open && resolvedOffset === 0 && !historyStripFiltered) {
+				// The strip's items are what we have; the manager's page size is a
+				// different quantity, so it is passed separately. The manager is
+				// seeded, not filled: it fetches its own page when it opens.
+				historyManager.seedFromStrip(data.items, data.total, trashTotal, estimatedHistoryManagerPageSize());
 			}
 			return options.anchorId ? historyCursor >= 0 && historyItems[historyCursor]?.id === options.anchorId : true;
 		} catch {
@@ -3813,9 +3854,14 @@ if (unreadWords.length > 0) {
 			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
 			return;
 		}
-		if (!found && historyStarredOnly) {
+		if (!found && historyStripFiltered) {
+			// Both filters come off together: which of them was hiding the work
+			// is not known from here, and the point is to show it.
+			const clearedStarred = historyStarredOnly;
 			historyStarredOnly = false;
-			showHistoryStarredFilterClearedNotice();
+			historyForRevisionOnly = false;
+			if (clearedStarred) showHistoryStarredFilterClearedNotice();
+			else showHistoryForRevisionFilterClearedNotice();
 			found = await fetchHistoryOffset(0, { anchorId: item.id });
 		}
 		if (requestId !== historySelectionSyncRequest) {
@@ -3868,7 +3914,7 @@ if (unreadWords.length > 0) {
 				total: historyTotal,
 				newestId: historyItems[0]?.id ?? null,
 				newestAt: historyItems[0]?.at ?? null,
-				showsTheNewestFirst: historyOffset === 0 && !historyStarredOnly,
+				showsTheNewestFirst: historyOffset === 0 && !historyStripFiltered,
 			})) return;
 			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
 			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
@@ -3905,6 +3951,13 @@ if (unreadWords.length > 0) {
 
 	async function gotoHistoryOlderPage(): Promise<void> {
 		const target = historyPageTarget(historyNavState, 'older');
+		if (!target) return;
+		if (!(await fetchHistoryOffset(target.offset))) return;
+		loadIteration(historyNavIndex(target));
+	}
+
+	async function gotoHistoryOldestPage(): Promise<void> {
+		const target = historyPageTarget(historyNavState, 'oldest');
 		if (!target) return;
 		if (!(await fetchHistoryOffset(target.offset))) return;
 		loadIteration(historyNavIndex(target));
@@ -4009,7 +4062,16 @@ if (unreadWords.length > 0) {
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const updated = await r.json() as Iteration;
 			updateHistoryForRevisionState(updated);
-			if (historyManager.forRevisionOnly) await historyManager.fetch();
+			const refreshes: Promise<unknown>[] = [];
+			if (historyForRevisionOnly) {
+				// The work just left the listing the strip is showing, so the
+				// filter comes off rather than leaving the strip on a work it no
+				// longer holds -- the same rule the starred filter follows.
+				if (!updated.for_revision) historyForRevisionOnly = false;
+				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
+			}
+			if (historyManager.forRevisionOnly) refreshes.push(historyManager.fetch());
+			if (refreshes.length > 0) await Promise.all(refreshes);
 		} catch (e) {
 			updateHistoryForRevisionState(item);
 			console.warn('failed to update the revision mark', e);
@@ -4135,6 +4197,7 @@ if (unreadWords.length > 0) {
 		batchFailureReportStore.set(null);
 		batchActiveLine = null;
 		batchActiveDdl = null;
+		batchObservedLine = null;
 		batchLatestPrompt = '';
 		outputTab = 'canvas';
 		elapsedStage1Ms = 0;
@@ -4164,6 +4227,11 @@ if (unreadWords.length > 0) {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
 		});
+		// Taken before the flag below rewrites it: whether the work on the canvas
+		// is one of the works leaving the listing.
+		const displayedLeavesTheListing = !!displayedHistoryItem?.id
+			&& ids.includes(displayedHistoryItem.id)
+			&& (path === '/api/history/trash' || path === '/api/history/permanent-delete');
 		if (displayedHistoryItem?.id && ids.includes(displayedHistoryItem.id)) {
 			if (path === '/api/history/trash') {
 				displayedHistoryItem = { ...displayedHistoryItem, trashed: true };
@@ -4180,6 +4248,20 @@ if (unreadWords.length > 0) {
 		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
 		if (lineageGraph?.focus_node_id) await fetchLineage(lineageGraph.focus_node_id, true);
 		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
+		// The strip re-seats its cursor once the listing has been read again, and
+		// the canvas has to be showing the work the badge is on. Left to itself
+		// the canvas kept the work that just left the listing, so the badge sat
+		// on one work and the artwork beside it was another.
+		if (displayedLeavesTheListing) {
+			if (historyCursor >= 0 && historyCursor < historyItems.length) {
+				loadIteration(historyCursor);
+			} else {
+				// Nothing left to seat the cursor on: the canvas empties rather
+				// than holding the last work the listing no longer has.
+				displayedHistoryItem = null;
+				result = null;
+			}
+		}
 	}
 
 	function askTrash(ids: string[]) {
@@ -4424,8 +4506,9 @@ function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
 async function showNewLineageChild(historyId: string | null | undefined, nodeId: string | null | undefined): Promise<void> {
 	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The finished work could not be saved to the lineage.');
 	let found = await fetchHistoryOffset(0, { anchorId: historyId });
-	if (!found && historyStarredOnly) {
+	if (!found && historyStripFiltered) {
 		historyStarredOnly = false;
+		historyForRevisionOnly = false;
 		found = await fetchHistoryOffset(0, { anchorId: historyId });
 	}
 	const saved = historyItems.find((item) => item.id === historyId);
@@ -4734,6 +4817,8 @@ $effect(() => {
 			variationGridTaskLabel = '';
 			variationGridDone = 0;
 			variationGridTotal = 0;
+			variationGridSlots = [];
+			variationGridSlotLabels = [];
 			variationGridStatus = null;
 		}
 
@@ -4888,7 +4973,8 @@ $effect(() => {
 	const historyPageNavDisabled = $derived({
 		latest: historyNavButtonsDisabled.latest,
 		newer: historyPageTarget(historyNavState, 'newer') === null,
-		older: historyPageTarget(historyNavState, 'older') === null
+		older: historyPageTarget(historyNavState, 'older') === null,
+		oldest: historyPageTarget(historyNavState, 'oldest') === null
 	});
 	// Left as it was: 0 / N is how "nothing is selected" is shown, and is not a
 	// claim about which work is current.
@@ -5025,7 +5111,7 @@ $effect(() => {
 	}
 
 	/**
-	 * Say that the starred filter was cleared, because nothing else says it.
+	 * Say that a strip filter was cleared, because nothing else says it.
 	 *
 	 * Clearing it is a rescue and stays: a work reached from somewhere else --
 	 * a lineage, a shared link, the manager -- can be unstarred, and leaving the
@@ -5034,13 +5120,21 @@ $effect(() => {
 	 * having failed. Same mechanism as the lineage notice above: a string and a
 	 * five second timer.
 	 */
-	function showHistoryStarredFilterClearedNotice(): void {
-		historyStarredFilterNotice = t().historyStarredFilterClearedNotice;
+	function showHistoryFilterClearedNotice(text: string): void {
+		historyStarredFilterNotice = text;
 		if (historyStarredFilterNoticeTimer !== null) window.clearTimeout(historyStarredFilterNoticeTimer);
 		historyStarredFilterNoticeTimer = window.setTimeout(() => {
 			historyStarredFilterNotice = null;
 			historyStarredFilterNoticeTimer = null;
 		}, 5000);
+	}
+
+	function showHistoryStarredFilterClearedNotice(): void {
+		showHistoryFilterClearedNotice(t().historyStarredFilterClearedNotice);
+	}
+
+	function showHistoryForRevisionFilterClearedNotice(): void {
+		showHistoryFilterClearedNotice(t().historyForRevisionFilterClearedNotice);
 	}
 
 	function currentLineageParentId(): string | null {
@@ -5471,13 +5565,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// track the server's own render slot count. The 503 retry in apiFetch covers
 	// slots taken by other work.
 
-	async function runWithLimit<T>(thunks: Array<() => Promise<T>>, limit: number, onEach?: () => void): Promise<T[]> {
+	// The hooks are per job rather than per completion: a fan-out that only counts
+	// finishes cannot say which jobs are in flight, and the progress it draws
+	// looks like nothing happening until everything lands at once.
+	async function runWithLimit<T>(
+		thunks: Array<() => Promise<T>>,
+		limit: number,
+		hooks?: { onStart?: (index: number) => void; onDone?: (index: number) => void }
+	): Promise<T[]> {
 		const results = new Array<T>(thunks.length);
 		let next = 0;
 		const workers = Array.from({ length: Math.max(1, Math.min(limit, thunks.length)) }, async () => {
 			for (let index = next++; index < thunks.length; index = next++) {
+				hooks?.onStart?.(index);
 				results[index] = await thunks[index]();
-				onEach?.();
+				hooks?.onDone?.(index);
 			}
 		});
 		await Promise.all(workers);
@@ -5531,6 +5633,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		variationGridStatus = null;
 		variationGridDone = 0;
 		variationGridTotal = count;
+		// Seated before the seeds are asked for, so the lanes are on screen for
+		// the whole run rather than appearing once the first job starts.
+		variationGridSlotLabels = Array.from({ length: count }, () => '');
+		variationGridSlots = Array.from({ length: count }, () => 'waiting' as VariationSlotState);
 		const abortTimer = window.setTimeout(() => {
 			if (variationGridAbortController === abortController && variationGridBusy) variationGridCanAbort = true;
 		}, 3000);
@@ -5543,27 +5649,44 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const catalogIds = kind === "color" ? colorCatalogCandidateIds(count) : [];
 			// 変奏の seed 採番はサーバー側なので、候補生成前に count 個まとめて確保する。
 			const variationSeeds = kind === "variation" ? await allocateVariationSeeds(amplitude ?? "medium", count) : [];
-			const jobs = Array.from({ length: count }, (_, index) => {
+			// The label is lifted out of the job so the lane can be named before the
+			// job that fills it has started.
+			const plans = Array.from({ length: count }, (_, index) => {
 				const sequence = index + 1;
 				if (kind === "touch") {
-					return () => renderWordTouchCandidate(normalizedTouchWords, t().canvasVaryPerformance, abortController.signal);
+					const label = t().canvasVaryPerformance;
+					return { label, run: () => renderWordTouchCandidate(normalizedTouchWords, label, abortController.signal) };
 				}
 				if (kind === "layout") {
 					const compositionSeed = createSafeIntegerSeed(usedVarySeeds);
 					usedVarySeeds.add(compositionSeed);
-					return () => composeVariationCandidate(compositionSeed, t().canvasVaryComposition + " " + sequence, abortController.signal);
+					const label = t().canvasVaryComposition + " " + sequence;
+					return { label, run: () => composeVariationCandidate(compositionSeed, label, abortController.signal) };
 				}
 				if (kind === "reading") {
-					return () => interpretationVariationCandidate(t().canvasVaryInterpretation + " " + sequence, abortController.signal);
+					const label = t().canvasVaryInterpretation + " " + sequence;
+					return { label, run: () => interpretationVariationCandidate(label, abortController.signal) };
 				}
 				if (kind === "variation") {
-					return () => variationCandidateLabel(amplitude ?? "medium", variationSeeds[index], t().variationTitle + " " + sequence, abortController.signal);
+					const label = t().variationTitle + " " + sequence;
+					return { label, run: () => variationCandidateLabel(amplitude ?? "medium", variationSeeds[index], label, abortController.signal) };
 				}
 				const catalogId = catalogIds[index];
-				return () => renderColorCatalogCandidate(catalogId, t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId), abortController.signal);
+				const label = t().canvasVaryColor + " " + sequence + " · " + catalogName(catalogId);
+				return { label, run: () => renderColorCatalogCandidate(catalogId, label, abortController.signal) };
 			});
-			variationCandidates = await runWithLimit(jobs, renderFanoutLimit, () => {
-				if (variationGridAbortController === abortController) variationGridDone += 1;
+			variationGridSlotLabels = plans.map((plan) => plan.label);
+			variationGridSlots = plans.map(() => 'waiting' as VariationSlotState);
+			const seatSlot = (index: number, state: VariationSlotState) => {
+				if (variationGridAbortController !== abortController) return;
+				variationGridSlots = variationGridSlots.map((current, i) => i === index ? state : current);
+			};
+			variationCandidates = await runWithLimit(plans.map((plan) => plan.run), renderFanoutLimit, {
+				onStart: (index) => seatSlot(index, 'running'),
+				onDone: (index) => {
+					seatSlot(index, 'done');
+					if (variationGridAbortController === abortController) variationGridDone += 1;
+				},
 			});
 			for (const candidate of variationCandidates) {
 				variationTokensIn = addTokens(variationTokensIn, paintTokensIn(candidate.result));
@@ -5806,11 +5929,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const canvasId = displayedHistoryItem?.render_canvas_aspect_id ?? displayedHistoryItem?.render_canvas_aspect ?? displayedHistoryItem?.score?.canvas ?? result?.render_canvas_aspect_id ?? result?.render_canvas_aspect ?? result?.score?.canvas ?? null;
 		return canvasId ? getCanvasAspectOption(canvasId).label : '-';
 	});
-	const statusHashFull = $derived(
+	// The digest, not the stored `<scheme>:<digest>`: the scheme is a property of
+	// the value rather than part of it, and nothing in the app takes a prefixed
+	// string as input. See lib/hashIdentity.ts.
+	const statusHashFull = $derived(hashDigest(
 		displayedHistoryItem?.render_hash
 			?? result?.render_hash
 			?? ''
-	);
+	));
 	const statusHashLabel = $derived((
 		displayedHistoryItem?.render_hash_short
 			?? displayedHistoryItem?.render_hash?.slice(-4)
@@ -5881,6 +6007,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 	function setHistoryStarredOnly(value: boolean) {
 		historyStarredOnly = value;
+		historyOffset = 0;
+		historyCursor = -1;
+		void fetchHistoryOffset(0);
+	}
+
+	function setHistoryForRevisionOnly(value: boolean) {
+		historyForRevisionOnly = value;
 		historyOffset = 0;
 		historyCursor = -1;
 		void fetchHistoryOffset(0);
@@ -6213,6 +6346,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						hideRunStatus={reloading}
 						singleDdlReady={ddl !== null}
 						{batchActiveLine}
+						{batchObservedLine}
+						{batchRunningLineText}
+						{batchSketchText}
+						{batchSketchGrainLabel}
 						{batchActiveDdlHighlighted}
 						{batchTotal}
 						{batchCurrent}
@@ -6515,6 +6652,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{variationGridTaskLabel}
 				{variationGridDone}
 				{variationGridTotal}
+				{variationGridSlots}
+				{variationGridSlotLabels}
 				{variationGridStatus}
 				runTokensIn={activeRunTokensIn}
 				runTokensOut={activeRunTokensOut}
@@ -6580,15 +6719,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onNewerPage={gotoHistoryNewerPage}
 			onOlderPage={gotoHistoryOlderPage}
 			onLatestPage={gotoHistoryLatestPage}
+			onOldestPage={gotoHistoryOldestPage}
 			onLoadItem={loadIterationItem}
 			onToggleStar={toggleHistoryStar}
 			interactionLocked={demoRunning}
 			navLatestDisabled={historyPageNavDisabled.latest}
 			navNewerPageDisabled={historyPageNavDisabled.newer}
 			navOlderPageDisabled={historyPageNavDisabled.older}
+			navOldestDisabled={historyPageNavDisabled.oldest}
 			starredFilterClearedNotice={historyStarredFilterNotice}
 			{historyStarredOnly}
 			onSetStarredOnly={setHistoryStarredOnly}
+			{historyForRevisionOnly}
+			onSetForRevisionOnly={setHistoryForRevisionOnly}
 			{historyIndexLabel}
 			{historyModelStage1Short}
 			{historyModelStage1Full}
@@ -6773,20 +6916,24 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		</div>
 		<div class="app-info-body">
 			<dl class="app-info-meta">
-				<div>
+				<div class="app-info-row">
 					<dt>{t().appInfoVersionLabel}</dt>
 					<dd>{APP_VERSION}</dd>
-				</div>
-				<div>
+					<dt>{t().appInfoBuildLabel}</dt>
+					<dd>{__BUILD_NUMBER__}</dd>
 					<dt>{t().appInfoBuildDateLabel}</dt>
 					<dd>{buildDateLabel ?? t().historyVersionNotRecorded}</dd>
 				</div>
-				{#if developerMode}
-					<div>
-						<dt>{t().appInfoBuildLabel}</dt>
-						<dd>{__BUILD_NUMBER__}</dd>
-					</div>
-				{/if}
+				<!-- The three layer versions the server is running, in the same order
+				     and under the same names the provenance drawer uses. -->
+				<div class="app-info-row">
+					<dt>Render engine version</dt>
+					<dd>{currentRenderEngineVersion ?? t().historyVersionNotRecorded}</dd>
+					<dt>DDL version</dt>
+					<dd>{currentDdlVersion ?? t().historyVersionNotRecorded}</dd>
+					<dt>DDL engine version</dt>
+					<dd>{currentDdlEngineVersion ?? t().historyVersionNotRecorded}</dd>
+				</div>
 				<div>
 					<dt>{t().appInfoRepositoryLabel}</dt>
 					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
@@ -6870,7 +7017,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			historyManagerShownTo={historyManager.shownTo}
 			managedHistoryItems={historyManager.items}
 			managedHistoryTotal={historyManager.total}
-			managerTrashTotal={historyManager.trashTotal}
 			{trashTotal}
 			selectedHistoryIds={historyManager.selectedIds}
 			animationExportSettings={exportSettings.animation}
@@ -7081,8 +7227,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-work-tools :global(.png-wrap),
 	.ui-hide-history :global(.nav-left),
 	.ui-hide-history :global(.nav-right),
-	.ui-hide-history :global(.nearby-mirror),
-	.ui-hide-detail-status.ui-hide-work-tools :global(.status-bar) {
+	.ui-hide-history :global(.nearby-mirror) {
 		display: none;
 	}
 	.tooltips-disabled :global(.tooltip-bubble) {
@@ -7390,6 +7535,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.app-info-meta div {
 		display: contents;
+	}
+	/* A row that carries several label/value pairs on one line, rather than one
+	   pair per grid row. It spans both columns and wraps on a narrow window. */
+	.app-info-meta .app-info-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 2px 14px;
+		grid-column: 1 / -1;
+	}
+	.app-info-meta .app-info-row dd {
+		margin-right: 4px;
 	}
 	.app-info-meta dt {
 		color: var(--fg3);

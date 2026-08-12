@@ -38,6 +38,7 @@
 		onNewerPage: () => void | Promise<void>;
 		onOlderPage: () => void | Promise<void>;
 		onLatestPage: () => void | Promise<void>;
+		onOldestPage: () => void | Promise<void>;
 		onLoadItem: (item: HistoryItem) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		interactionLocked: boolean;
@@ -46,10 +47,14 @@
 		navLatestDisabled: boolean;
 		navNewerPageDisabled: boolean;
 		navOlderPageDisabled: boolean;
+		// Counted in works too, so the two ends of the listing answer alike.
+		navOldestDisabled: boolean;
 		/** Said when the filter was cleared for the user rather than by them. */
 		starredFilterClearedNotice: string | null;
 		historyStarredOnly: boolean;
 		onSetStarredOnly: (value: boolean) => void;
+		historyForRevisionOnly: boolean;
+		onSetForRevisionOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
 		historyModelStage1Short: (item: HistoryItem) => string;
 		historyModelStage1Full: (item: HistoryItem) => string;
@@ -71,15 +76,19 @@
 		onNewerPage,
 		onOlderPage,
 		onLatestPage,
+		onOldestPage,
 		onLoadItem,
 		onToggleStar,
 		interactionLocked,
 		navLatestDisabled,
 		navNewerPageDisabled,
 		navOlderPageDisabled,
+		navOldestDisabled,
 		starredFilterClearedNotice,
 		historyStarredOnly,
 		onSetStarredOnly,
+		historyForRevisionOnly,
+		onSetForRevisionOnly,
 		historyIndexLabel,
 		historyModelStage1Short,
 		historyModelStage1Full,
@@ -134,10 +143,16 @@
 							class:ghost-active={historyStarredOnly}
 							onclick={() => onSetStarredOnly(!historyStarredOnly)}
 						>{t().historyStarredOnly}</button>
+						<button
+							class="ghost-btn history-filter-btn"
+							class:ghost-active={historyForRevisionOnly}
+							onclick={() => onSetForRevisionOnly(!historyForRevisionOnly)}
+						>{t().historyForRevisionOnly}</button>
 						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
 						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || navNewerPageDisabled}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
 						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={interactionLocked || navOlderPageDisabled}>{t().historyOlderPage(historyNavSpan)}</button>
+						<button class="ghost-btn history-oldest-btn" onclick={onOldestPage} disabled={interactionLocked || navOldestDisabled}>{t().historyOldest}</button>
 					</div>
 				{/if}
 				<button
@@ -175,7 +190,7 @@
 							{#if developerMode && it.tenkei}<div class="tooltip-row"><span>{isJapanese ? '添景' : 'Staffage'}</span><strong>{it.tenkei}</strong></div>{/if}
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
-							<div class="tooltip-row"><span>render engine</span><strong>{it.render_engine_id || it.render_engine_version ? [it.render_engine_id, it.render_engine_version].filter(Boolean).join(" / ") : t().historyVersionNotRecorded}</strong></div>
+							<div class="tooltip-row"><span>Render engine version</span><strong>{it.render_engine_version || t().historyVersionNotRecorded}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 						</div>
 						<HistoryThumbnail item={it} scope="strip" size="strip" />
@@ -282,9 +297,16 @@
 		margin-bottom: 7px;
 	}
 	.history-nav-btn { min-width: 92px; }
-	.history-latest-btn { min-width: 54px; }
+	/* Both ends of the listing, sized alike so the row does not shuffle. */
+	.history-latest-btn,
+	.history-oldest-btn { min-width: 54px; }
 	.history-filter-btn { min-width: 76px; }
-	.ghost-btn.ghost-active { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+	/* The same treatment the history manager gives its filter buttons, and the
+	   one the project's colour rule names for a filled button: --action-bg with
+	   --action-fg. The strip used --fg over --panel, which is the paper inverted
+	   rather than an action colour, so a pressed filter here did not read as the
+	   same thing as a pressed filter in the manager. */
+	.ghost-btn.ghost-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); }
 	.history-collapse-btn {
 		width: 28px;
 		min-width: 28px;

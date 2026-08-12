@@ -431,6 +431,7 @@ export interface LangPack {
 	unsavedRefinementPreviewLabel: string;
 	lineageIntermediateSavedNotice: string;
 	historyStarredFilterClearedNotice: string;
+	historyForRevisionFilterClearedNotice: string;
 	lineageIntermediateSaveFailed: string;
 
 	settingsTitle: string;

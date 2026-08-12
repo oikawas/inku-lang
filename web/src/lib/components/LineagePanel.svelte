@@ -1,6 +1,7 @@
 <script lang="ts">
 	import SketchSelect from './SketchSelect.svelte';
 	import { DEFAULT_SKETCH_GRAIN, normalizeSketchGrain, sketchModeLabel, type SketchGrain, type SketchMode } from '$lib/sketch';
+	import { hashDigest, hashSchemeLabel, shortHashDigest } from '$lib/hashIdentity';
 	import { onMount, tick } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
@@ -249,11 +250,6 @@
 		return [...grouped.entries()].sort(([a], [b]) => a - b);
 	});
 
-	function shortHash(value?: string | null): string {
-		if (!value) return '—';
-		const [prefix, digest] = value.split(':', 2);
-		return digest ? `${prefix}:${digest.slice(0, 10)}…` : `${value.slice(0, 12)}…`;
-	}
 
 	// The details row shows the hash abbreviated, so the button copies the whole
 	// value the way the history manager does -- a truncated hash identifies nothing.
@@ -263,8 +259,8 @@
 	function copyRenderHash(node: LineageNode, event: MouseEvent): void {
 		event.stopPropagation();
 		event.preventDefault();
-		const hash = node.render_hash;
-		if (!hash) return;
+		if (!node.render_hash) return;
+		const hash = hashDigest(node.render_hash);
 		if (navigator.clipboard?.writeText) {
 			void navigator.clipboard.writeText(hash).catch(() => fallbackCopy(hash));
 		} else {
@@ -294,13 +290,6 @@
 	// Same shape the canvas provenance uses: the engine id and its version share a
 	// line. Works recorded before the field existed carry neither, and an em dash
 	// says that more quietly than a bare slash.
-	function engineLabel(history: HistoryItem): string {
-		const id = history.render_engine_id ?? '';
-		const version = history.render_engine_version ?? '';
-		if (!id && !version) return '—';
-		return version ? `${id || '—'} / ${version}` : id;
-	}
-
 	function operationLabel(kind?: string): string {
 		return derivationKindLabel(kind, isJapanese);
 	}
@@ -954,17 +943,20 @@ $effect(() => {
 										<summary>{isJapanese ? '詳細' : 'Details'}</summary>
 										<dl>
 											<dt>{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
-											<dt>dh1</dt><dd>{shortHash(node.description_hash)}</dd>
-											<dt>rh2</dt>
+											<!-- The scheme each value names, read off the value: a row
+											     labelled with a constant went on saying rh2 while the
+											     works below it were being saved as rh3. -->
+											<dt>{hashSchemeLabel(node.description_hash, 'dh')}</dt><dd>{shortHashDigest(node.description_hash)}</dd>
+											<dt>{hashSchemeLabel(node.render_hash, 'rh')}</dt>
 											<dd class="hash-cell">
-												<span>{shortHash(node.render_hash)}</span>
+												<span>{shortHashDigest(node.render_hash)}</span>
 												{#if node.render_hash}
 													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={t().historyHashCopyTitle} onclick={(event) => copyRenderHash(node, event)}>
 														{copiedHashNodeId === node.id ? t().promptCopied : t().promptCopy}
 													</button>
 												{/if}
 											</dd>
-											<dt>render engine</dt><dd>{engineLabel(node.history)}</dd>
+											<dt>Render engine version</dt><dd>{node.history.render_engine_version || '—'}</dd>
 											<dt>{t().provenanceLabelTransformLayer}</dt><dd>{node.history.ddl_engine_version || '—'}</dd>
 											<dt>Build</dt><dd>{node.history.render_build_number || '—'}</dd>
 											<dt>Stage 1</dt><dd>{node.history.stage1_model ? modelDisplayName(node.history.stage1_model) : '—'}</dd>

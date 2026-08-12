@@ -4187,6 +4187,11 @@ if (unreadWords.length > 0) {
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
 		});
+		// Taken before the flag below rewrites it: whether the work on the canvas
+		// is one of the works leaving the listing.
+		const displayedLeavesTheListing = !!displayedHistoryItem?.id
+			&& ids.includes(displayedHistoryItem.id)
+			&& (path === '/api/history/trash' || path === '/api/history/permanent-delete');
 		if (displayedHistoryItem?.id && ids.includes(displayedHistoryItem.id)) {
 			if (path === '/api/history/trash') {
 				displayedHistoryItem = { ...displayedHistoryItem, trashed: true };
@@ -4203,6 +4208,20 @@ if (unreadWords.length > 0) {
 		await Promise.all([fetchHistoryOffset(historyOffset), fetchTrashPage(), historyManager.fetch()]);
 		if (lineageGraph?.focus_node_id) await fetchLineage(lineageGraph.focus_node_id, true);
 		if (historyItems.length === 0 && historyOffset > 0) await fetchHistoryOffset(Math.max(0, historyOffset - historyWindowSize));
+		// The strip re-seats its cursor once the listing has been read again, and
+		// the canvas has to be showing the work the badge is on. Left to itself
+		// the canvas kept the work that just left the listing, so the badge sat
+		// on one work and the artwork beside it was another.
+		if (displayedLeavesTheListing) {
+			if (historyCursor >= 0 && historyCursor < historyItems.length) {
+				loadIteration(historyCursor);
+			} else {
+				// Nothing left to seat the cursor on: the canvas empties rather
+				// than holding the last work the listing no longer has.
+				displayedHistoryItem = null;
+				result = null;
+			}
+		}
 	}
 
 	function askTrash(ids: string[]) {

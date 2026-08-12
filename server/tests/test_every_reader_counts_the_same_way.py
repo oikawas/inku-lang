@@ -396,3 +396,47 @@ def test_t15_a_bare_numeral_outside_a_reference_phrase_is_still_not_a_count() ->
     assert _explicit_counts_from_ddl(label, lang="ja") == frozenset()
     # And the flag is what gates it, not some other property of the text.
     assert _explicit_counts_from_ddl(label, lang="ja", names_a_plugin=True) == frozenset({1})
+
+
+# --- T-16, T-17 -----------------------------------------------------------
+
+
+def _phrase_naming(ddl: str, marker: str, *, lang: str) -> str | None:
+    from inku_server.plugins.document_format import _phrase_that_names
+
+    return _phrase_that_names(ddl, marker, lang=lang)
+
+
+def test_t16_the_generator_carries_a_case_for_each_widened_rule() -> None:
+    """Neither shape was in the corpus, so without them both rulings freeze silently.
+
+    A version whose corpus does not move is a version that says it changed
+    nothing. Part C had four cases and every one of them states its count in the
+    phrase that names the plugin, with a counter attached.
+    """
+    inputs = _generator().build_plugin_expand_inputs()
+    assert "C-plugin-count-outside-the-phrase" in inputs
+    assert "C-plugin-count-as-a-bare-numeral" in inputs
+    assert len(inputs) == 6
+
+
+def test_t17_both_added_cases_tell_the_old_judgement_from_the_new() -> None:
+    """One unit under the rule that stood before, twenty and fifty under this one.
+
+    Twenty, not the thirty the contract drafted: `Nature.枯草` costs fourteen
+    marks a unit and thirty of it is 420 against a 400-mark work, so the layer
+    declines the whole count and the case would have recorded the ceiling instead
+    of the ruling (author's ruling, 2026-08-12).
+    """
+    inputs = _generator().build_plugin_expand_inputs()
+
+    outside = inputs["C-plugin-count-outside-the-phrase"]["ddl"]
+    # The old rule read the phrase that names the plugin and stopped there.
+    phrase = _phrase_naming(outside, "Nature.枯草", lang="ja")
+    assert _explicit_counts_from_ddl(phrase, lang="ja", names_a_plugin=True) == frozenset()
+    assert [int(entry["units"]) for entry in _expansion(outside, lang="ja").provenance] == [20]
+
+    bare = inputs["C-plugin-count-as-a-bare-numeral"]["ddl"]
+    # The old rule left a Japanese numeral with no counter alone, everywhere.
+    assert _explicit_counts_from_ddl(bare, lang="ja") == frozenset()
+    assert [int(entry["units"]) for entry in _expansion(bare, lang="ja").provenance] == [50]

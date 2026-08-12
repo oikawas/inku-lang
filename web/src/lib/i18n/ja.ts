@@ -238,6 +238,7 @@ export const ja: LangPack = {
 	tooltipDdlEdit: '表示中の作品の指示書を編集して、その子として描き直します',
 	tooltipSaijikiToggle: '歳時記を開き、季語や語彙が描画にどう効くかを作例つきで確認します（閲覧のみ）',
 	tooltipDdlExpandedToggle: '展開層が補った構造文を含む、Stage 2 が実際に受け取ったDDLを表示します',
+	tooltipSketchToggle: '写生層が書いた文章を表示します。開閉の状態はアカウントごとに保存されます',
 	tooltipStatsToggle: '解釈・描画それぞれの所要時間とトークン数を表示します',
 	tooltipInputClear: '入力をクリアする',
 	tooltipSubmit: '入力文を読み取り、配置とタッチを決めて1枚生成します。',

@@ -54,6 +54,7 @@
 	// Persisted settings: one feature, one file.  Adding a setting must not send
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
+	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
 	import { colorCatalogOverride } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
@@ -303,6 +304,8 @@
 		okugaki_model?: string;
 		instruction_caption_visible?: boolean;
 		color_catalog_id?: string;
+		sketch_open?: boolean;
+		ddl_expanded_open?: boolean;
 	};
 	type ModelProviderSetting = {
 		label?: string;
@@ -1575,6 +1578,20 @@
 		} catch (e) { console.warn('failed to save color catalog selection', e); }
 	}
 	bindColorCatalogPersist((selected) => { void persistColorCatalogSelection(selected); });
+
+	// The folds ride in the user's model_settings for the same reason the
+	// catalogue does: neither section has anything to show without a session.
+	// A failed save leaves the fold as the user just set it -- it is a view
+	// state, and refolding it under them would be worse than forgetting it.
+	async function persistDescribePanelFolds(fields: Record<string, boolean>) {
+		if (!currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			currentUser = await r.json() as UserItem;
+		} catch (e) { console.warn('failed to save describe panel folds', e); }
+	}
+	bindDescribePanelPersist((fields) => { void persistDescribePanelFolds(fields); });
 	// Where `auto` lands when the server cannot read a description.
 	bindColorCatalogFallback(() => defaultCatalogId);
 
@@ -6450,27 +6467,36 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{#if inputMode === 'single' && (sketchText !== null || result !== null)}
 						<section class="panel-section sketch-section">
 							<div class="sketch-head">
-								<span class="sketch-title">{t().sketchLabel}</span>
+								<Tooltip placement="right" text={t().tooltipSketchToggle}>
+									<button class="sketch-toggle" type="button" onclick={describePanelSettings.toggleSketch}>
+										<span class="sketch-arrow" class:open={describePanelSettings.sketchOpen}>▶</span>
+										<span class="sketch-title">{t().sketchLabel}</span>
+									</button>
+								</Tooltip>
 								{#if sketchText !== null}
 									<span class="sketch-grain">{t().sketchGrainLabel}: {sketchModeLabel(sketchModeOf(result?.sketch_grain ?? sketchGrainOf(sketchMode)), getLang() === 'ja')}</span>
-									<button type="button" class="sketch-edit-btn" onclick={() => (sketchEditing = !sketchEditing)}>
+									<!-- Editing needs the prose on screen, so the button unfolds the
+									     section rather than acting on what the author cannot see. -->
+									<button type="button" class="sketch-edit-btn" onclick={() => { sketchEditing = !sketchEditing; if (sketchEditing) describePanelSettings.revealSketch(); }}>
 										{sketchEditing ? t().ddlDoneBtn : t().ddlEditBtn}
 									</button>
 								{/if}
 							</div>
-							{#if result?.sketch_fallback_used}
-								<p class="sketch-note">{t().sketchFallbackNote}</p>
-							{:else if sketchText === null}
-								<!-- No prose. Which of the silences this is comes from the
-								     record, not from the absence: a work drawn with the
-								     layer off and a work drawn before the layer was
-								     recorded read the same here otherwise. -->
-								<p class="sketch-note">{sketchStateNote(sketchState, getLang() === 'ja')}</p>
-							{:else if sketchEditing}
-								<textarea class="sketch-editor" rows="7" bind:value={sketchDraft} spellcheck="true"></textarea>
-								<p class="sketch-note">{t().sketchEditHint}</p>
-							{:else}
-								<p class="sketch-body">{sketchDraft}</p>
+							{#if describePanelSettings.sketchOpen}
+								{#if result?.sketch_fallback_used}
+									<p class="sketch-note">{t().sketchFallbackNote}</p>
+								{:else if sketchText === null}
+									<!-- No prose. Which of the silences this is comes from the
+									     record, not from the absence: a work drawn with the
+									     layer off and a work drawn before the layer was
+									     recorded read the same here otherwise. -->
+									<p class="sketch-note">{sketchStateNote(sketchState, getLang() === 'ja')}</p>
+								{:else if sketchEditing}
+									<textarea class="sketch-editor" rows="7" bind:value={sketchDraft} spellcheck="true"></textarea>
+									<p class="sketch-note">{t().sketchEditHint}</p>
+								{:else}
+									<p class="sketch-body">{sketchDraft}</p>
+								{/if}
 							{/if}
 						</section>
 					{/if}
@@ -7602,6 +7628,26 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.sketch-section { display: grid; gap: 6px; }
 	.sketch-head { display: flex; align-items: center; gap: 8px; }
 	.sketch-title { font-size: 11px; color: var(--fg3); }
+	/* Matches the expanded-DDL toggle: the two folds in this panel are one
+	   control repeated, so they read and behave the same. */
+	.sketch-toggle {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		padding: 2px 0;
+		border: 0;
+		background: none;
+		color: var(--fg3);
+		font-family: inherit;
+		cursor: pointer;
+		text-align: left;
+	}
+	.sketch-arrow {
+		display: inline-block;
+		font-size: 8px;
+		transition: transform 0.15s ease;
+	}
+	.sketch-arrow.open { transform: rotate(90deg); }
 	.sketch-grain { font-size: 11px; color: var(--fg3); margin-left: auto; }
 	.sketch-edit-btn {
 		padding: var(--btn-sm-padding);

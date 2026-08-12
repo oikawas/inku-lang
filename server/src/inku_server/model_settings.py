@@ -284,6 +284,12 @@ def default_user_model_settings() -> dict[str, Any]:
         # The colour catalogue the user draws with. "auto" is not a catalogue:
         # it asks the server to read each description (see color_selector).
         "color_catalog_id": "default",
+        # Whether each foldable section of the describe panel is open. The
+        # sketch prose was always visible before it could be folded, so an
+        # account that has never folded it keeps seeing it; the expanded DDL
+        # was always folded, so its default stays closed.
+        "sketch_open": True,
+        "ddl_expanded_open": False,
     }
 
 
@@ -460,6 +466,10 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
     clean["instruction_caption_visible"] = settings.get("instruction_caption_visible") is not False
     clean["color_catalog_id"] = _normalize_catalog_choice(settings.get("color_catalog_id"))
+    # Each fold keeps its own default, so the test is written against the
+    # default rather than as one shared shape: absent means "never folded".
+    clean["sketch_open"] = settings.get("sketch_open") is not False
+    clean["ddl_expanded_open"] = settings.get("ddl_expanded_open") is True
     return clean
 
 
@@ -477,6 +487,9 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
         clean["model_inspection_selected_models"] = _normalize_selected_model_ids(patch.get("model_inspection_selected_models"))
     if "color_catalog_id" in patch:
         clean["color_catalog_id"] = _normalize_catalog_choice(patch.get("color_catalog_id"))
+    for key in ("sketch_open", "ddl_expanded_open"):
+        if key in patch:
+            clean[key] = bool(patch[key])
     return normalize_user_model_settings(clean)
 
 

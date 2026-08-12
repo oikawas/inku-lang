@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.13.10 (Web Build 895).
+It covers inku v2.13.11 (Web Build 896).
 
 ## Basics
 
@@ -54,6 +54,7 @@ JSON artifacts record the version of the DDL layer that drew the work in `ddl_ve
 | `--png` | Also write PNG when `--out-dir` is set |
 | `--svg-profile {display,editable,compat}` | SVG profile for saved files |
 | `--input-mode {paint,ddl}` | `paint` sends prose through Stage 1; `ddl` sends instructions straight to Stage 2 and the performance |
+| `--fires-on PROSE` | **`--input-mode ddl` only.** The prose a plugin expansion fires on. **What fires an expansion is the description, not the instructions**, so without this a DDL that spells a plugin word expands to nothing |
 | `--ddl-text DDL` | **`render-score` only.** Hands the instructions to coerce, so the instruction-driven repairs run as they do in paint (a stated count or relation reaches the picture). **Omit it and those repairs stay off, as before** |
 | `--ddl-file PATH` | **`render-score` only.** Reads the instructions from a file; `-` means stdin. Cannot be combined with `--ddl-text` |
 | `--save-history` | Save to the server's history |

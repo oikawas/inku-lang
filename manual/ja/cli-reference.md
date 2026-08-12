@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.13.10（Web Build 895）です。
+対象はinku v2.13.11（Web Build 896）です。
 
 ## 基本操作
 
@@ -54,6 +54,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--png` | `--out-dir` を指定したとき、PNGも書き出す |
 | `--svg-profile {display,editable,compat}` | 保存するSVGのプロファイル |
 | `--input-mode {paint,ddl}` | `paint` は自然文をStage 1へ、`ddl` は指示書を直接Stage 2と演奏へ渡す |
+| `--fires-on PROSE` | **`--input-mode ddl` 専用。**プラグイン展開を発火させる自然文を渡す。**発火を決めるのは記述であって指示書ではない**ので、これが無いと指示書にプラグイン語を綴っても展開は起きない |
 | `--ddl-text DDL` | **`render-score` 専用。**指示書をcoerceへ手渡す。paintと同じく、指示書に基づく補修が働く（本数や関係の指定が絵に出る）。**渡さなければ従来どおり補修は働かない** |
 | `--ddl-file PATH` | **`render-score` 専用。**指示書をファイルから読む。`-` は標準入力。`--ddl-text` とは併用できない |
 | `--save-history` | サーバーの履歴へ保存する |

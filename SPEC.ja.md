@@ -214,7 +214,7 @@ Nature.雨  →  短い線を上から下に多数散らす
 
 ### 4.6 宣言的プラグイン文書フォーマット（v1.90.0 / Build 589）
 
-語彙プラグインはコードではなく、UTF-8の宣言的文書（1プラグイン=1個の `.inku-plugin.md`）としてロードする。文書はfront matterのmanifestと語エントリからなり、manifestには `namespace` / `name` / semantic version / `authors` / `languages` / `license` / 日英descriptionを必須とする。語エントリは名前空間付き見出し語、日英surface、自然文発火語 `fires_on`、任意の日英note、日英の展開テンプレートを持つ。任意コード、URL、外部ファイル参照は許さない。
+語彙プラグインはコードではなく、UTF-8の宣言的文書（1プラグイン=1個の `.inku-plugin.md`）としてロードする。文書はfront matterのmanifestと語エントリからなり、manifestには `namespace` / `name` / semantic version / `authors` / `languages` / `license` / 日英descriptionを必須とする。語エントリは名前空間付き見出し語、日英surface、自然文発火語 `fires_on`、任意の日英note、**任意の `preview`（歳時記プレビューの絵・v2.14）**、日英の展開テンプレートを持つ。任意コードとURLは許さない。**外部ファイル参照も許さず、唯一の例外が `preview` である** — 文書自身のディレクトリの中のPNGを1枚だけ指せる（条件は下の語ブロックの項）。
 
 展開層は **Stage 1出力 → プラグイン展開 → コアDDL → Stage 1.5 → Stage 2** の位置に置く。テンプレートは通常のコアDDLに加え、次の限定構文だけを使える。
 
@@ -223,6 +223,7 @@ Nature.雨  →  短い線を上から下に多数散らす
 - `N〜M枚（個／本／箇所）` および en の `marks／items／lines／leaf forms／forms／blades／cloudforms／spots／arcs`（Build 591で複数語単位を追加）: 入力hashから個数を決定し、memberごとに別regionと回転を割り当てる。単数形は単位を保存する（一枚／一本／一個、one leaf form 等）。
 - `member 名前: 定義`（Build 591）: プラグイン内ローカルの複合形。参照行の各memberへ定義をインライン展開する。名前は当該プラグイン内でのみ有効で、未定義参照はロード時に拒否する。
 - `注: …` / `note: …`（Build 591）: コメント行。展開にも閉包検査にも関与せず、読み手と歳時記傍注のために保存する。
+- `preview: …`（v2.14）: 歳時記プレビューの絵。**文書自身のディレクトリの中の `.png` を 1 枚だけ相対で指す。**展開にも閉包検査にも関与しない。**ディレクトリの外（相対・絶対とも）・非 PNG・512 KB 超・不在は拒む。拒んでも文書は落とさず、絵の無い語は組み込みと同じ落とし先へ落ちる**（絵は装飾であって、語が正しく展開できることとは別である）。**HiDPI の相方は宣言でなく名前で探す**（`名前@2x.png`。無ければ「2x が無い」と「絵が無い」を区別して返す）。絵は歳時記の payload に載せず `GET /api/saijiki/plugin-preview` が配り、`<img>` で表示する — **したがって文書は画面にマークアップを置けない。**
 - `anchor 名前`: 領域を確定し、後続memberをanchorの帯へ決定的に配置する。コアrelationの直前参照へは翻訳しない。`anchor … を N〜M箇所 置く`（Build 591）は、箇所反復×各anchorからのmember反復の入れ子（深さ2まで）とし、各箇所は個別の帯regionを持つ。
 - `{領域: 中域}` 等: コアの正規化regionへ翻訳する。登録キーの正規リストはreference §3が公開し（実装が正）、`下端の帯`（Build 591で追加）を含む。「左上から右下への斜めの帯」（Build 591）は矩形ではなく展開層計算（下降対角線に沿うmember小region列）とする。
 

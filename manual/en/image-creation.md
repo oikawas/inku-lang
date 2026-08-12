@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.10 (Web Build 895). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.11 (Web Build 896). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -116,6 +116,8 @@ The sketch reaches three consumers in place of the description: interpretation, 
 
 If the layer does not answer, the description goes to interpretation unchanged and the work records that. A work painted with the layer off carries the same kind of record.
 
+`Sketch from life (Stage 0.5)` and `Instructions (normalized DDL)` each fold from the triangle in their heading. Folded, the heading, the rule, and `Edit` stay visible, and pressing `Edit` while folded opens the section. **The fold is saved on the account, not in the browser** — another machine opens it the same way. The sketch starts open and the instructions start folded.
+
 ## 5. Consult the Saijiki
 
 The `Saijiki` is inku's vocabulary dictionary.
@@ -125,6 +127,8 @@ The `Saijiki` is inku's vocabulary dictionary.
 3. Choose a word to insert it at the cursor position in the instructions.
 
 The Saijiki is not autocompletion. Consult it when needed; it does not narrow a description to the existing vocabulary on its own. It is for reading, and pressing it does not start a painting.
+
+Plugin words appear in the same row and wear the same face as built-in ones. The explanation is not under the word but in the preview above it, which carries four parts: name, effect, example, and picture. The picture appears only when the plugin document ships one; a word without one gets the same fallback picture a built-in word gets.
 
 ## 6. Read and Edit the Instructions
 

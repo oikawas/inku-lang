@@ -191,7 +191,7 @@ class PluginEntry:
     templates: dict[str, tuple[str, ...]]
     members: dict[str, dict[str, str]] = field(default_factory=dict)
     comments: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    # v2.14: `preview: <file>.svg` -- artwork for the saijiki preview, as a path
+    # v2.14: `preview: <file>.png` -- artwork for the saijiki preview, as a path
     # relative to the plugin document. Held as the declared path, not as the
     # file's contents: parsing stays free of I/O, and the reader below decides
     # what a document is allowed to put on screen. One image per word, shared

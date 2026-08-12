@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-12 — Unreleased v2.13.11 Baseline (Web Build 896)
+
+Updated the 13 places that name a version to v2.13.11 / Build 896. **The describe panel folds differently and a plugin word looks different in the Saijiki** (explanations were added to §4 and §5 of `Creating Images`). The CLI gains one flag (`CLI Reference`).
+
+- **`Sketch from life` and `Instructions` each fold.** Folded, the heading and `Edit` stay, and pressing `Edit` while folded opens the section.
+- **The fold is saved on the account.** Another machine opens it the same way. The sketch starts open and the instructions start folded.
+- **Plugin words now look like built-in words.** The explanation is in the preview above rather than under the word, and the preview carries four parts: name, effect, example, and picture.
+- **A plugin document can ship a picture per word.** A word without one gets the same fallback picture a built-in word gets.
+- **`inku-cli` gains `--fires-on`.** In `--input-mode ddl` it supplies the prose a plugin expansion fires on; without it, a DDL that spells a plugin word expands to nothing.
+- **The empty-canvas graphic no longer distorts on a long, narrow canvas.**
+
 ## 2026-08-12 — Unreleased v2.13.10 Baseline (Web Build 895)
 
 Updated the 13 places that name a version to v2.13.10 / Build 895. **Nothing on screen moved, but the counts you write in a description are read differently** (one sentence was added to the count explanation in §7 of `Creating Images`).

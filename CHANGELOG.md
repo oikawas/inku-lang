@@ -5871,3 +5871,49 @@ blob against **nine content rules** (`nvapi-`, `sk-`, GitHub PAT, AWS AKID, Goog
   escape hatch. **It refuses to overwrite a `pre-commit` hook it did not write** (identified by a marker).
 - **A public clone gets nothing and is told nothing** — the guard itself is local-only material and is not part of
   the published tree, so this step is silent there (verified against a simulated clone). `--no-verify` still bypasses it.
+
+### v2.13.11 — The describe panel folds, and a plugin word wears the face of a built-in one (Build 896, 2026-08-12, empty contract "the UI improves in conversation", stages 1-3)
+
+**A contract handed over as a frame and filled one stage at a time in conversation. Three stages landed.**
+
+- **Both foldable sections of the describe panel remember their fold** (stage 1) — the sketch (Stage 0.5)
+  gains a toggle, and the existing toggle for the expanded DDL (Stage 2 input) is now persisted. **The fold
+  lives on the account, not in the browser** (`model_settings` allows `sketch_open`, default open, and
+  `ddl_expanded_open`, default closed). **⚠ The premise measured at issue time turned out to be false**: the
+  contract said the expanded section already persisted its state, and it did not — **it was stored nowhere and
+  closed itself on every reload**. **With no example to copy, the author ruled, and both were given one.** Only
+  the sketch body folds; the head — toggle, rule, edit button — stays. **Opening the editor unfolds it.**
+- **A plugin word is shown the way a built-in word is shown** (stage 2) — the colour comes from `--accent` /
+  `--accent-light` (six hard-coded reds removed), the chip is the same size as a built-in one, and **the
+  explanation moves out from under the chip and out of `title` into the preview above.** The preview carries the
+  same four parts as a built-in one: name, effect, example, picture. In the drawer and in the DDL editor modal.
+- **A plugin document can now declare a picture** (stage 2, a spec addition) — a word block accepts
+  **`preview:`**, naming **one PNG inside the document's own directory**. A path that leaves the directory
+  (relative or absolute), a name that is not PNG, a file over 512 KB, and a missing file are refused, and **a
+  refusal does not stop the document loading** (the word falls back to the shared picture a built-in word without
+  one gets). **The HiDPI sibling is found by name, not declared** (`name@2x.png`). The picture is served by
+  **`GET /api/saijiki/plugin-preview`** rather than riding in the Saijiki payload, and is shown in an `<img>` —
+  **a document cannot put markup on screen.** Pictures for the seven `nature-leaves` words ship with it.
+- **`inku-cli` gains `--fires-on`** (stage 2) — `--input-mode ddl` sends no prose, so **a DDL that spells a
+  plugin word expanded to nothing.** What fires an expansion is the description, not the DDL.
+- **The empty-canvas graphic no longer distorts with the canvas proportion** (stage 3) — the shapes were written
+  as **separate fractions of width and height**, so the frame's ratio became the shapes' ratio (at Pillar 1:5 the
+  triangle became a needle and the square a flake). **Only the circle survived, because its radius used one
+  dimension for both axes.** The shapes are now drawn in a fixed square coordinate system and placed with **a
+  single scale** against the short side, centred along the long one.
+- **API surface**: one route added (`GET /api/saijiki/plugin-preview`, session required) and an optional
+  `fires_on` on `ComposeRequest` (default None; callers that omit it are unaffected). **Nothing removed or
+  renamed.**
+- **Checks:** **server 3,028 passed / 31 skipped** (30 new), **cli 224 passed** (+4), **web 272 passing** (+27)
+  with **0 type errors** (the two known a11y warnings unchanged) and **0 i18n errors**, **frozen corpora
+  byte-identical**, `check_docs.py` consistent. **Twenty-three perturbations.**
+- **⚠ Two perturbations missed, and the implementing session fixed the gates** — (1) the picture gate matched
+  `/src=/`, **which also matches `data-src=`**, so renaming the attribute took the picture off the screen and
+  left the test green; (2) the traversal perturbation did nothing to one case, because **the absolute-path
+  example named a file that does not exist** and was being refused by the existence check rather than the guard.
+- **⚠ The implementing session found and filled one missing acceptance** — **nobody had measured that the new
+  flag does anything, in the cycle that added it.**
+- **⚠ Two things were fixed on the accepting side** — **(1) the SPEC said plugin documents may not reference
+  files at all**, which the new `preview:` contradicts head-on (rewritten in both languages as the single
+  exception, with its conditions); **(2) a comment in `document_format.py` said `preview: <file>.svg`** where the
+  implementation accepts only `.png`.

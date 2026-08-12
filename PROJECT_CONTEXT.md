@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.10 / Build 895**
+**Target version: v2.13.11 / Build 896**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -244,7 +244,7 @@ so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 
-- The 93 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
+- The 95 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
 `feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`).
 The count is owned by `EXPECTED_ROUTE_COUNT` in `server/tests/test_route_authorization.py`.
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.

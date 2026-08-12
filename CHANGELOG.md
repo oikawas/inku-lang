@@ -5800,3 +5800,28 @@ old Japanese title and was changed with it.** **No code changed.** `check_docs.p
   bodies pulls them apart again and turns it red); **(3) the square where two rulings meet had no acceptance** —
   no test covered a bare numeral read through the widened sentence, so **T-25 was added** and shown to turn red
   under two separate perturbations.
+
+### 2026-08-12 — The words for how a surface is were written into the spec ahead of the code (**no version bump**, documents only)
+
+**The Saijiki gains a category called `おもて` (`surfaces`)** — empty, solid, pale ink wash, grain, stipple, hatch,
+crosshatch, bleeding, aquatint, dense, faint: eleven words, with `empty` as the default.
+**Where continuity says how a line is (solid, dashed, dotted, dash-dot), surfaces says how the inside of a closed
+shape is.**
+**⚠ This entry moved the specification only; the implementation is not there yet.** The saijiki table still holds
+nine categories and seventy words with no `おもて` in it, and `GET /api/saijiki` and `inku-cli reference` return
+what they returned before. **The current values of the vocabulary are owned by the implementation and published by
+reference §1** (as §3.1 already says), so **the spec stands ahead of the code until the implementation lands.**
+- **No verbs** (author's ruling, 2026-08-12) — "solid", not "to paint". **How a surface is is a state of the still
+  image, not the passage of time**, so a word for the act would collide both with §2 principle 6 and with §3.1's
+  "placing, not drawing". It stays out for the same reason 描く was pruned in v1.92.
+- It carries **two dimensions: quality** (empty, solid, pale ink wash, grain, stipple, hatch, crosshatch, bleeding,
+  aquatint) **and density** (dense, faint) — the same shape movements has with its amplitude, frequency, and quality.
+- **⚠ `dense` and `faint` are relative, never an absolute darkness** — the same solid fill varies widely with the
+  tool (measured mean luminance 17.4 to 131.1 at the native 1618px).
+- **⚠ Paper grain does not belong here** — it is a quality of the support, and `Ground:` takes it. **An instruction
+  to fill the background is not about a surface** either; it goes to the `background` field.
+- **The `blurring` of movements and the `bleeding` of surfaces are now written as different things** (§13.6) —
+  the line itself trembling and smearing is not the edge of a filled area spreading. **They part as verb and noun.**
+
+**Six places were changed in each language** (§2 principle 6, the §3.1 category count, the §3.1 vocabulary table,
+the §3.1 core property, §7.5, and §13.6). **Not one line of code changed.** `check_docs.py` is consistent.

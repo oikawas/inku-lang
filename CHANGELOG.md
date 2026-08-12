@@ -6128,3 +6128,39 @@ saved work is redrawn in different colors.** The server fixed this on 2026-08-09
 - **⚠ Kotlin's `pathPosition` and `clusteredPosition` hold no short-side basis at all** (filed as
   ledger I-233) — the gap spans **three versions, 30, 31 and 32**. **On the day it is ported, the
   point is not to pass `canvas` to the one call that resolves the centre.**
+
+### 2026-08-13 — The test entry points repair a clone that missed the git setup (**no version bump**, tooling only)
+
+**All four entry points — `make test`, `test-server`, `test-cli`, `test-web` — apply
+`scripts/git/setup.sh` once before the suite starts** (ledger I-199). **The trap was one you avoided
+by remembering it**: the merge driver that keeps `web/BUILD_NUMBER` from conflicting has its command
+in `.git/config`, which is not versioned, **so the one line in `.gitattributes` never fires on its
+own and every clone needed a human to run the setup.**
+
+- **All four carry `git-setup` as a prerequisite.** Make runs a shared prerequisite once, so
+  **`make test` still emits `setup.sh` exactly once** — which is what the test measures.
+- **`SETUP.ja.md` and `SETUP.md` were both updated** — from "once per clone" to "immediately after
+  cloning, and if it was missed the make test entry points apply it idempotently."
+- **Five tests were added** (`test_merge_driver.py` goes from 5 to **10**) — **that `make -n` prints
+  `setup.sh` exactly once for each of the four entries** (4 cases), and **that an unconfigured clone,
+  built for real and branched to 901 and 902 on `web/BUILD_NUMBER`, merges without a conflict and
+  keeps 902** (1 case). **The last one reads both `.git/config` and the merge result.**
+- **Checks**: server **3,106 passed / 31 skipped** on the merged tree (816s; **the +5 over the 3,101
+  baseline is exactly the five new cases**), cli **224 passed**, ruff clean. **Not one line of
+  product code moved** — only the `Makefile`, both `SETUP` files, and the tests.
+- **Five perturbations, none vacuous.** Dropping the prerequisite from one entry reddens 1, from all
+  four reddens 4, replacing the `git-setup` recipe with `@true` reddens 5, dropping the driver
+  configuration from `setup.sh` reddens 1, and **making the driver keep the smaller side reddens 4**.
+- **⚠ The accepting side's prediction matched on four of five and missed the driver one** (3
+  predicted, 4 measured) — **the case that counts a non-numeric side as 0 writes its own 0 rather
+  than the larger side once the comparison is inverted.**
+- **⚠ Only the test entry point was closed.** The ledger's one-pager said "the test **and deploy**
+  entry points apply it"; **the deploy entry point does not. A clone that never runs `make` is still
+  unconfigured** — **and the failure direction is the safe one**: it conflicts the way it always did,
+  it never produces a wrong merge.
+- **⚠ Outside a git checkout `setup.sh` exits 128** (measured), so **`make test` fails in a tree
+  unpacked from a source archive.** `SETUP` never asks for tests to be run there and the containers
+  do not invoke `make`, so nothing operational is affected.
+- **⚠ `setup.sh` installs more than the merge driver** — the pre-commit secret guard (ledger I-193)
+  comes with it, so **the hook is rewritten idempotently on every test run** (a hook somebody else
+  placed is left alone).

@@ -112,22 +112,22 @@ private fun assertRenderedCatalogId(expected: String, storedMetadata: String) {
     )
     assertEquals(expected, JSONObject(rendered.metadataJson).getString("render_color_catalog_id"))
 }
-    
+
     @Test
     fun t5_renderCatalogIdWins() {
         assertRenderedCatalogId("rendered-with", metadata(renderCatalogId = "rendered-with", catalogId = "catalog"))
     }
-    
+
     @Test
     fun t5_catalogIdIsTheFirstFallback() {
         assertRenderedCatalogId("catalog", metadata(catalogId = "catalog"))
     }
-    
+
     @Test
     fun t5_defaultIsTheLastFallback() {
         assertRenderedCatalogId("default", metadata())
     }
-    
+
 @Test
 fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
     val current = ColorCatalogs.get("ink_season")
@@ -146,7 +146,7 @@ fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
         assertEquals("seed=$seed", currentDrawing.svg, snapshotDrawing.svg)
     }
 }
-    
+
     @Test
     fun t7_newDrawingRoutesDoNotReadAWorkSnapshot() {
         val provider = object : ModelProvider {
@@ -162,7 +162,7 @@ fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
                 request(WorkColorSnapshot("default", changedMap)),
             )
         }
-    
+
         assertEquals(withoutSnapshot.displaySvg, withSnapshot.displaySvg)
     }
 

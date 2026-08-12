@@ -41,11 +41,8 @@ jobs:
       # -rs prints the reason for every skip: what does not run here is part of
       # what this backstop cannot see.
       - name: Test
-        working-directory: server
         run: >
-          uv run pytest -q -rs
-          --deselect tests/test_android_reference_fixtures_are_current.py::test_every_android_fixture_matches_a_fresh_bake
-          --deselect tests/test_render_platform_stability.py::test_without_the_stabilisers_the_same_perturbation_is_seen
+          make test-server PYTEST_ARGS="--deselect tests/test_android_reference_fixtures_are_current.py::test_every_android_fixture_matches_a_fresh_bake --deselect tests/test_render_platform_stability.py::test_without_the_stabilisers_the_same_perturbation_is_seen"
 
   cli:
     runs-on: ubuntu-latest
@@ -60,8 +57,7 @@ jobs:
         working-directory: cli
         run: uv run ruff check src tests scripts
       - name: Test
-        working-directory: cli
-        run: uv run pytest -q -rs
+        run: make test-cli
 
   web:
     runs-on: ubuntu-latest
@@ -81,8 +77,7 @@ jobs:
         working-directory: web
         run: npm run check
       - name: Unit tests
-        working-directory: web
-        run: npm run test:unit
+        run: make test-web
       # The display strings are Japanese-canonical; this reads the English side
       # against the glossary. It does not look at manual/.
       - name: English display strings

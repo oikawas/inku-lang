@@ -2947,8 +2947,12 @@ change DDL coordinates. **A mark's extents (`size`) become pixels through the sh
 stated is kept on any aspect** (the same rule the circle and arc radius already used; widened to every form
 with a `size` in v2.13.6 / render engine 30). **The layer that arranges marks follows the same rule** -- a `radial` ring's radius and an `at.region`'s extent
 become pixels through the short edge, so the arrangement the description stated is kept on any aspect
-(v2.13.8 / render engine 31). **Placement, and a region's centre, still scale with width and height** -- the aspect
-decides where a mark sits, not what shape it or its arrangement is. `arrangement.margin` remains a fraction of
+(v2.13.8 / render engine 31). A cluster's band and a path's cross-axis spread follow it too
+(v2.13.13 / render engine 32; **the band is rotated first and put on the short side second** -- scaling the axes
+before the rotation would turn the rotation into a shear). **Placement, a region's centre, and a cluster's centre
+still scale with width and height** -- the aspect
+decides where a mark sits, not what shape it or its arrangement is. How far a path travels along its own line
+(`margin` and `span`) is not a shape and is not put on the short edge; `arrangement.margin` remains a fraction of
 each axis: spreading to the frame is what `scatter`, `horizontal` and `vertical` mean. Changing the aspect clears the rendered display and shows
 a placeholder for the new aspect, but retains the displayed work as lineage context.
 The next saved work is recorded as its child with `canvas_aspect_change`.

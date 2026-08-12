@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-12 — Unreleased v2.13.13 Baseline (Web Build 898)
+
+Updated the 13 places that name a version to v2.13.13 / Build 898, and **added a sentence to §7 of `Creating Images` now that a cluster and a path keep their shape whatever the canvas ratio**.
+
+- **One clump of a cluster scatter is now the same shape on every ratio.** It used to come out as a narrow vertical stripe on the pillar and a wide one on CinemaScope: the same description drew a different figure on different paper.
+- **The swing of a path (wave, diagonal, top to bottom) is measured the same way.** A wave swung 220 pixels on the square canvas and 44 on the pillar.
+- **How far along the paper a path travels is unchanged.** How much of the paper is used is not a shape.
+- **Nothing changes on a square canvas** (the short and long edges are the same length, so the old and new rules are the same arithmetic).
+
 ## 2026-08-12 — Unreleased v2.13.12 Baseline (Web Build 897)
 
 Updated the 13 places that name a version to v2.13.12 / Build 897. **The Saijiki gains `Surfaces`, so a description can say how the inside of a shape is** (a row was added to the vocabulary table in §3 of `Creating Images`).

@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.13.12 / Build 897**
+**対象バージョン: v2.13.13 / Build 898**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -89,7 +89,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 31 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 32 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 15 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.25` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
@@ -143,10 +143,11 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 閾値以上は代表化の領分なので触らない。**帯に別の名前を与えない。**
 **強制した数が命令ごとの上限か作品全体の上限を越えるときは、切り詰めずに強制しない** ——
 切り詰めると、述べた数でも代表数でもない中途半端な数が絵に出るからである。
-- **Render Engine 31** — SVG の演奏。
+- **Render Engine 32** — SVG の演奏。
 痕の寸法はキャンバスの短辺で画素へ直すので、同じ記述はどの縦横比でも同じ形の痕を描く（置き場所は従来どおり幅と高さに比例する）。
-痕を並べる層も同じ規則に従い、`radial` の環の半径と `at.region` の広がりを短辺で画素へ直す。
-領域の中心は比例のままなので、「右上」はどの比でも右上である。
+痕を並べる層も同じ規則に従い、`radial` の環の半径と `at.region` の広がり、まとまり（クラスタ）の帯と道筋（`path`）の交差軸のずれを短辺で画素へ直す。
+領域の中心とまとまりの中心は比例のままなので、「右上」はどの比でも右上である。
+道筋が自分の線に沿って紙をどれだけ使うか（`margin` と `span`）は形ではないので触っていない。
 群の成員は一人ひとりが自分の大きさ（±35%）と傾き（±27°）を持つ。
 揺らぎの振幅は図形の大きさではなく**その道具の線幅**で決まり（fine 0.35 / medium 0.6 / broad 2.0 倍）、
 道具のトーン（材質輪郭）は意図した幾何ではなく**演奏された墨**からオフセットを取る。
@@ -238,7 +239,7 @@ UI は日英で、切替は設定画面から行う（既定は `ja`）。
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
-現役は `render-engine-31`（569 件）と `ddl-engine-15`（45 件）で、再生成のバイト一致を CI が強制する。
+現役は `render-engine-32`（582 件）と `ddl-engine-15`（45 件）で、再生成のバイト一致を CI が強制する。
 - **Android の参照コーパス** — `android/app/src/test/resources/server_reference/` も同じ作法で版ごとに分かれる。
 移植は自分が名乗る版のディレクトリを読むので、**server が engine を上げてもディレクトリが増えるだけで移植は赤くならない**。
 旧版は焼き直せないので、各版の `manifest.json` が名前と digest で押さえる。

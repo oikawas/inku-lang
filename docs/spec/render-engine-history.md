@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **32** | v2.13.13 | 898 | 2026-08-12 | 582 | **13** | **569** |
 | **31** | v2.13.8 | 893 | 2026-08-12 | 569 | **16** | **553** |
 | **30** | v2.13.6 | 891 | 2026-08-11 | 553 | **7** | **546** |
 | **29** | v2.11.17 | 873 | 2026-08-09 | 549 | **454** | **95** |
@@ -129,14 +130,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `31` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `render_engine_version` | the drawing engine | `32` | **the same Score and seed perform differently, or the performable vocabulary grows** |
 | `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `15` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.12 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.13 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 897 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 898 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -412,6 +413,60 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 32 — a cluster and a path keep their shape on any canvas (v2.13.13)
+
+**Engine 31 put the ring and the region on the short edge, but a cluster and a path were still stretched by the
+aspect.** Those two arrangements carry **36.2% of the marks production expands** (27.1% cluster, 9.1% path).
+
+**A cluster's band is built in a rotated frame and then written straight into normalized space.** On the pillar
+(1:5) one clump came out as a narrow vertical stripe and on CinemaScope as a wide one -- **for one description,
+the band's own aspect moved by a factor of 8.8 between those papers** (0.0395 to 0.4646). A path did the same:
+**a `wave` swung 220px on the square canvas and 44px on the pillar**, and the jitter of a `diagonal` or a
+`top_to_bottom` bought a different number of pixels on each axis.
+
+### Rotate first, put it on the short side second (the order decides the result)
+
+**The cluster's offset is rotated first and scaled second.** Scaling the axes before the rotation would turn the
+rotation itself into a shear, and the band would come out neither its own shape nor the canvas's. A path is
+scaled **on its cross axis only**. Measured, the cluster's bounding aspect came out at 0.19771 -- the square
+canvas's value -- on all five papers.
+
+### What was left alone (**none of it is shape; all of it is how much paper is used**)
+
+- **`margin` and `span`** -- how far a path travels along its own line. **Whether `horizontal` and `vertical`
+  should use the paper's long direction is [I-135] (3)-b and unruled**, and this change does not touch it
+- **`right_half`'s reach** and **`_path_pos`'s default branch** (which returns `_scatter_pos`)
+- **`_scatter_pos`** -- an affine map takes a uniform scatter to a uniform scatter, so it already means the same
+  thing on every sheet
+- **The cluster's centre** -- `_clustered_pos` calls `_path_pos` itself to resolve that centre, and **`canvas` is
+  deliberately not forwarded there.** Forwarding it would level the centres too, and "the middle cluster is
+  above the others" would stop meaning the same thing on paper of a different shape (R3)
+
+### Not one coordinate moves on a square canvas
+
+**On a square canvas the factors are exactly 1.0.** Two layers hold that: the engine 31 placement coordinates
+frozen for four subjects, and a byte comparison of the whole SVG against a drawing made with the rule dropped
+(four subjects × two seeds).
+
+### The corpus grew by thirteen, to 582
+
+**The corpus could not see this change at all before** -- it held ten cluster and path cases and **every one of
+them was square** (`_case`'s default). The thirteen new cases are **nine that move and four square controls**.
+**None of the existing 569 moved.**
+
+**⚠ Each subject is drawn on the papers whose long side is the axis it spreads on**: a `top_to_bottom` on the
+pillar has a factor of exactly 1.0 and would be frozen unable to fail. **⚠ Every new ID counts as
+`changed_from_previous`**, so **the nine and the four cannot be told apart in the manifest. Only a perturbation
+can show which case discriminates.**
+
+### The same wiring exists on Android (**three versions behind**)
+
+**Kotlin's `pathPosition` and `clusteredPosition` hold no short-side basis at all** (ledger I-233): the gap is
+not engine 32 alone but **30 (a mark's extents), 31 (the ring and the region) and 32 (the cluster and the
+path)**. **On the day it is ported, the point is not to pass `canvas` to the one call `clusteredPosition` makes
+to resolve its centre.** The reference fixture (64 files under `render-engine-32/`) was baked by the
+implementing session.
 
 ## engine 31 — the arrangement of marks keeps its shape on any canvas (v2.13.8)
 

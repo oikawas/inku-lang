@@ -6078,3 +6078,53 @@ saved work is redrawn in different colors.** The server fixed this on 2026-08-09
 - **⚠ One difference left**: when drawing from the record, the catalog name and subtitle come from
   today's catalog. **The server falls back to the id itself when the catalog is unknown.** That line
   was not quoted by the contract; it went to the ledger.
+
+### v2.13.13 — a cluster and a path keep their shape on any canvas (Build 898, 2026-08-12, ledger I-135 (3), render engine 32)
+
+- **A cluster's band, and a path's cross-axis spread, now become pixels through the canvas's short
+  edge.** Engine 31 did this for the ring and the `at.region`; **these two arrangements were still
+  stretched by the aspect** — and **36.2% of the marks production expands pass through them** (27.1%
+  cluster, 9.1% path).
+- **A cluster's band is built in a rotated frame and then written straight into normalized space** —
+  a narrow vertical stripe on the pillar (1:5), a wide one on CinemaScope. **For one description the
+  band's own aspect moved by a factor of 8.8 between those papers** (0.0395 to 0.4646). **At engine 32
+  it comes out at 0.19771 — the square canvas's value — on all five papers** (measured). A path did
+  the same: **a `wave` swung 220px on the square canvas and 44px on the pillar.**
+- **⚠ The order decides the result: the offset is rotated first and put on the short side second.**
+  **Scaling the axes before the rotation would turn the rotation itself into a shear.**
+- **Left alone**: `margin` and `span` (how much paper a path uses along its own line — **[I-135] (3)-b
+  is unruled**), `right_half`'s reach, `_path_pos`'s default branch, `_scatter_pos` (an affine map
+  takes a uniform scatter to a uniform scatter), and **the cluster's centre**.
+- **⚠ There are five wiring sites, not four** — `_clustered_pos` calls `_path_pos` itself to resolve
+  its centre. **Forwarding `canvas` there would level the centres too, and "the middle cluster is
+  above the others" would stop meaning the same thing on paper of a different shape** (R3). **The
+  reason not to is recorded in a code comment.**
+- **Not one coordinate moves on a square canvas.** Two layers hold it: the engine 31 placement
+  coordinates frozen for four subjects, and a byte comparison of the whole SVG against a drawing made
+  with the rule dropped (four subjects × two seeds).
+- **The corpus grew by thirteen, to 582** — **the ten cluster and path cases it already held were
+  every one of them square.** The new cases are **nine that move and four square controls**, and
+  **none of the existing 569 moved**. **⚠ Each subject is drawn on the papers whose long side is the
+  axis it spreads on**: a `top_to_bottom` on the pillar has a factor of exactly 1.0 and would be
+  frozen unable to fail.
+- **⚠ Every new ID counts as `changed_from_previous`**, so **the nine and the four cannot be told
+  apart in the manifest. Only a perturbation can show which case discriminates.**
+- **Checks**: server **3,101 passed / 31 skipped** on the merged tree (569s; **40 new cases**, 38 in
+  `test_cluster_path_aspect.py` and 2 in `test_render_reference.py`), cli **224 passed**, ruff clean,
+  frozen corpora byte-identical, Android JVM **278 cases / 0 failures**.
+- **⚠ Two of the eleven perturbations found defects in the implementer's own acceptance tests, which
+  were fixed and re-applied** — **both of the "measuring on the short side is green whatever you
+  break" kind**. **P-5** used a `wave`, whose cross axis is only y, so on papers whose long side is x
+  the perturbation was vacuous (switching the subject to `diagonal` reddened 4 of 4). **P-7** measured
+  `horizontal`'s `span`, an x quantity, on tall papers, where the perturbation is the identity
+  (papers were narrowed to match the axis; T-9 went from 8 cases to 4).
+- **⚠ The prediction frozen before any code was written said 3,091; the measurement was 3,092** (off
+  by one, reported with its direction). **Four of eleven perturbations matched the prediction; five of
+  the seven misses were the prediction being coarse** — `_density_radius` is read from outside the
+  cluster as well, so P-8 reddened 12 cases against a prediction of 4.
+- **Two changes the contract did not name** (both consequences of the version rising): four version
+  literals in `test_api.py`, and **the Android expectation fixture (64 files under
+  `render-engine-32/`)**. **No Kotlin source was touched.**
+- **⚠ Kotlin's `pathPosition` and `clusteredPosition` hold no short-side basis at all** (filed as
+  ledger I-233) — the gap spans **three versions, 30, 31 and 32**. **On the day it is ported, the
+  point is not to pass `canvas` to the one call that resolves the centre.**

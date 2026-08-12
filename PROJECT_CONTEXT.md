@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.12 / Build 897**
+**Target version: v2.13.13 / Build 898**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -102,7 +102,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 31 | `server/src/inku_server/render_engines/default.py` |
+| Render Engine | 32 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 15 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.25` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
@@ -171,10 +171,11 @@ literal (up to 239 by default) and leaves everything at or above the threshold t
 **The boundary is not given a second name.**
 **When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
 than trimmed** — a trimmed count is neither the number stated nor the represented one.
-- **Render Engine 31** — the SVG performance.
+- **Render Engine 32** — the SVG performance.
 A mark's extents become pixels through the canvas's short edge, so the same description draws the same shape on any aspect (placement still scales with width and height).
-The layer that arranges marks follows the same rule: a `radial` ring's radius and an `at.region`'s extent become pixels through the short edge.
-A region's centre stays proportional, so "upper right" is the upper right of any canvas.
+The layer that arranges marks follows the same rule: a `radial` ring's radius, an `at.region`'s extent, a cluster's band, and the cross-axis spread of a `path` all become pixels through the short edge.
+A region's centre and a cluster's centre stay proportional, so "upper right" is the upper right of any canvas.
+How much of the paper a group uses along its own line (`margin` and `span`) is not a shape and is untouched.
 It carries closed-shape outlines and fills, arcs, the material layer, ground resistance, and master
 grid quantization of coordinates.
 Each member of a group holds a size (±35%) and a turn (±27°) of its own.
@@ -301,7 +302,7 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-31` (569 cases) and `ddl-engine-15` (45 cases) are current, and CI enforces
+`render-engine-32` (582 cases) and `ddl-engine-15` (45 cases) are current, and CI enforces
 byte-identical regeneration.
 - **The Android reference corpus** — `android/app/src/test/resources/server_reference/` is filed the
 same way. The port reads the directory for the version it declares, so **raising the server engine

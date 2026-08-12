@@ -301,7 +301,12 @@
 	.history-latest-btn,
 	.history-oldest-btn { min-width: 54px; }
 	.history-filter-btn { min-width: 76px; }
-	.ghost-btn.ghost-active { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+	/* The same treatment the history manager gives its filter buttons, and the
+	   one the project's colour rule names for a filled button: --action-bg with
+	   --action-fg. The strip used --fg over --panel, which is the paper inverted
+	   rather than an action colour, so a pressed filter here did not read as the
+	   same thing as a pressed filter in the manager. */
+	.ghost-btn.ghost-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); }
 	.history-collapse-btn {
 		width: 28px;
 		min-width: 28px;

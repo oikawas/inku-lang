@@ -31,22 +31,26 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-11"
+FROZEN_AT = "2026-08-12"
 REASON = (
-    "A mark keeps the proportion its description gave it on any canvas. "
-    "Engine 29 turned `size` into pixels through `canvas.width` and "
-    "`canvas.height` separately, so the same description drew a different shape "
-    "on every aspect: a square written `size [0.3, 0.3]` came out 1.61:1 on the "
-    "golden canvas and 0.20:1 on the pillar, and an ellipse written "
-    "`size [0.4, 0.2]` -- wide, 2:1 -- came out 0.40 on the pillar, upright, the "
-    "reverse of what the description said. Engine 30 puts both extents on the "
-    "short edge, through one helper all twelve sites go through. Placement is "
-    "unchanged: coordinates still scale with width and height, so the aspect "
-    "still decides where a mark sits and no longer what shape it is. On a "
-    "square canvas the two rules are the same arithmetic, so only the "
-    "non-square cases drawn from `size` move. `D-canvas-*-ellipse-pen` is new: "
-    "the corpus had no wide mark on a narrow canvas, and so could not tell a "
-    "widened mark from a preserved one."
+    "The arrangement of marks keeps its shape on any canvas. Engine 30 put a "
+    "mark's own size on the short edge, so a circle stayed a circle whatever "
+    "the canvas was; what arranged those marks was still stretched by the "
+    "aspect. A `radial` ring became pixels through `canvas.width` across and "
+    "`canvas.height` down, so on the pillar (1:5) the ring came out with an "
+    "aspect of 0.19 -- round dots sitting on a flattened ring -- and an "
+    "`at.region` written as a square box came out as tall, or as wide, as the "
+    "canvas. Engine 31 puts the ring's radius and the region's extent on the "
+    "short edge, the region through one helper both of its sites go through. "
+    "The region's centre is deliberately untouched: \"upper right\" is the "
+    "upper right of any canvas, and placement still scales with width and "
+    "height. `arrangement.margin` is unchanged (author, 2026-08-12): spreading "
+    "to the frame is what `scatter`, `horizontal` and `vertical` mean. On a "
+    "square canvas the two arithmetics are the same, so only the non-square "
+    "cases move. The sixteen `D-canvas-*-radial` and `D-canvas-*-region-*` "
+    "cases are new: of 553 cases the five carrying a `radial` were every one "
+    "of them square and not one carried an `at.region`, so neither rule could "
+    "be seen in the record at all."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -306,6 +310,43 @@ def build_inputs() -> dict[str, dict[str, Any]]:
         for name, instruction in representatives.items():
             _case(cases, f"D-canvas-{aspect}-{name}", instruction, aspect=aspect)
 
+    # Engine 31: the layer that arranges marks, on all four aspects. The corpus
+    # could not see this rule at all before -- of 553 cases the five carrying a
+    # `radial` were every one of them square, and not one case carried an
+    # `at.region`. The square column is the control: on a square canvas the two
+    # arithmetics are the same, so those four must not move.
+    arrangement_region = [0.6, 0.18, 0.82, 0.4]  # a square box, 0.22 x 0.22
+    ring = copy.deepcopy(BASE_ARRANGEMENT)
+    ring.update({"count": 12, "layout": "radial", "radius": 0.3,
+                 "center": [0.5, 0.5], "jitter": 0.0})
+    region_grid = copy.deepcopy(BASE_ARRANGEMENT)
+    region_grid.update({"count": 12, "layout": "grid", "jitter": 0.0})
+    region_scatter = copy.deepcopy(BASE_ARRANGEMENT)
+    region_scatter.update({"count": 12, "layout": "scatter", "jitter": 0.0})
+    arrangements = {
+        # The ring the ruling is about: round marks were sitting on a ring the
+        # canvas had flattened to its own aspect.
+        "radial": _instruction("circle", radius=0.02, weight="brush_thick",
+                               arrangement=ring),
+        # A region resolved for a single mark -- the site every region
+        # instruction goes through, whatever its layout.
+        "region-single": _instruction("circle", radius=0.012,
+                                      at={"region": arrangement_region}),
+        # The grid reads the region a second time, in its own branch. A fix
+        # applied only to the first site leaves `region-single` unchanged and
+        # this one stretched.
+        "region-grid": _instruction("circle", radius=0.012, arrangement=region_grid,
+                                    at={"region": arrangement_region}),
+        # A layout for which the region is only an anchor: nothing is confined
+        # to the box, but the anchor still moves. Kept so the record shows it.
+        "region-scatter": _instruction("circle", radius=0.012,
+                                       arrangement=region_scatter,
+                                       at={"region": arrangement_region}),
+    }
+    for aspect in ("square", "wide", "pillar", "vertical"):
+        for name, instruction in arrangements.items():
+            _case(cases, f"D-canvas-{aspect}-{name}", instruction, aspect=aspect)
+
     for style in ("solid", "dashed", "dotted", "dash_dot"):
         _case(cases, f"D-style-{style}", _instruction("arc", weight="pen", style=style))
 
@@ -554,9 +595,13 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # Until then no case put a mark wider than it is tall on a canvas taller
     # than it is wide, so nothing in the record could tell a mark that kept its
     # proportion from one the canvas had stretched.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 32, "E": 119, "F": 128, "G": 50}
+    # D gained 16 in engine 31: four arrangement subjects on all four aspects.
+    # The corpus held five `radial` cases, all square, and no `at.region` at
+    # all, so both rules the ruling states would have gone into the record
+    # unrecorded.
+    expected = {"A": 88, "B": 72, "C": 64, "D": 48, "E": 119, "F": 128, "G": 50}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 553:
+    if actual != expected or len(cases) != 569:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

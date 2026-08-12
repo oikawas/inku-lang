@@ -71,9 +71,14 @@ CLUSTER = {**_BASE, "arrangement": {
 # site, the `_path_pos` inside `_clustered_pos` that resolves a cluster's
 # centre. A `path="none"` cluster takes its centre from `_scatter_pos` instead,
 # and would leave that site untested.
+#
+# The path is a `diagonal` because that is the one that spreads on both axes.
+# With a `wave` the centres move only on y, so on a paper whose long side is x
+# the factor is 1.0 and wiring the canvas into that call changes nothing --
+# measured: the perturbation reddened two of the four papers instead of four.
 CLUSTER_ON_PATH = {**_BASE, "arrangement": {
     **_ARR, "count": 36, "cluster_count": 3, "density": "low",
-    "path": "wave"}}
+    "path": "diagonal"}}
 PATH_WAVE = {**_BASE, "arrangement": {**_ARR, "path": "wave"}}
 PATH_DIAGONAL = {**_BASE, "arrangement": {**_ARR, "path": "diagonal"}}
 PATH_TTB = {**_BASE, "arrangement": {**_ARR, "path": "top_to_bottom"}}
@@ -354,14 +359,18 @@ def test_square_canvas_svg_is_byte_identical_without_the_rule(
 # --- T-9: how much paper a layout uses is not this contract's business ---
 
 
-@pytest.mark.parametrize("aspect", ASPECTS)
+@pytest.mark.parametrize("aspect", X_LONG)
 def test_horizontal_layout_still_covers_the_stated_span(aspect: str):
     """T-9: `horizontal` covers `span` of the width, as it did at engine 31.
 
     Whether a layout should use the paper's long direction is [I-135] (3)-b and
-    unruled; this records that engine 32 did not settle it by accident. A group
-    put on the short side here would cover 160px of the pillar's width instead
-    of... 160px -- so the pillar cannot see it, and the wide canvas can.
+    unruled; this records that engine 32 did not settle it by accident.
+
+    Only papers whose long side is x are taken, for the same reason the gates
+    above choose their papers. On the pillar the short side IS the width, so a
+    `span` moved onto the short side would cover 160px of the pillar instead
+    of... 160px: the gate could not fail there, and it was measured passing
+    under exactly that perturbation before these papers were narrowed.
     """
     canvas = canvas_size_for_aspect(aspect)
     assert _extent_px(HORIZONTAL, aspect)[0] == pytest.approx(
@@ -369,7 +378,7 @@ def test_horizontal_layout_still_covers_the_stated_span(aspect: str):
     )
 
 
-@pytest.mark.parametrize("aspect", ASPECTS)
+@pytest.mark.parametrize("aspect", Y_LONG)
 def test_vertical_layout_still_covers_the_stated_span(aspect: str):
     """T-9, the other layout: `vertical` covers `span` of the height."""
     canvas = canvas_size_for_aspect(aspect)

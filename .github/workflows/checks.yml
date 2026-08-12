@@ -28,9 +28,23 @@ jobs:
       - name: Lint
         working-directory: server
         run: uv run ruff check src tests scripts
+      # Two tests compare bytes baked on darwin against a bake made here, so
+      # they read a platform difference as a defect (ledger I-111, measured on
+      # this runner 2026-08-12). They stay green on the Mac, where the git
+      # management session runs the full suite before every merge.
+      #   - the Android fixtures under android/app/src/.../server_reference/
+      #     differ in render-engine-31/manifest.json and
+      #     renderer_variation_primitives.json
+      #   - the platform-stability pair test freezes the set of cases that move,
+      #     and that set is what changes between the two machines
+      # -rs prints the reason for every skip: what does not run here is part of
+      # what this backstop cannot see.
       - name: Test
         working-directory: server
-        run: uv run pytest -q
+        run: >
+          uv run pytest -q -rs
+          --deselect tests/test_android_reference_fixtures_are_current.py::test_every_android_fixture_matches_a_fresh_bake
+          --deselect tests/test_render_platform_stability.py::test_without_the_stabilisers_the_same_perturbation_is_seen
 
   cli:
     runs-on: ubuntu-latest
@@ -46,7 +60,7 @@ jobs:
         run: uv run ruff check src tests scripts
       - name: Test
         working-directory: cli
-        run: uv run pytest -q
+        run: uv run pytest -q -rs
 
   web:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.9 (Web Build 894). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.10 (Web Build 895). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -96,7 +96,7 @@ Place three small red circles in the upper right.
 
 No layer adds what the description does not ask for. What is written is performed as far as it can be.
 
-A written number is drawn as written, without having to be emphasised as "three lines only". It takes effect when the sentence points to a single group. If several groups share the same shape, colour and weight so that the sentence does not settle on one of them, the count is left alone. How far the number reaches is set by the boundary in `Stated counts` in [Server configuration](server-configuration.md) — up to 239 by default; above that the work is shown as a crowd. When the number asked for would cross the limit for one work or for one group, it is left as it is rather than drawn part of the way.
+A written number is drawn as written, without having to be emphasised as "three lines only". It takes effect when the sentence points to a single group. If several groups share the same shape, colour and weight so that the sentence does not settle on one of them, the count is left alone. How far the number reaches is set by the boundary in `Stated counts` in [Server configuration](server-configuration.md) — up to 239 by default; above that the work is shown as a crowd. When the number asked for would cross the limit for one work or for one group, it is left as it is rather than drawn part of the way. **Numbers are read the same way in Japanese and in English**: a `12` written in an English description is a count even where the kanji of a plugin word stands beside it. When the phrase naming a plugin states no number, the sentence is read instead (a number in the phrase wins). **Numbers that name a direction, a kind, a degree, a row or a column are not counts, and neither are decimals** (the four of `four directions`, the thirty of `30 degrees`, `0.11`).
 
 Leading serial numbers and bracketed annotations belong to the writer, not to the drawing. If nothing but numbers and annotations remains, painting reports that there is nothing left to draw.
 

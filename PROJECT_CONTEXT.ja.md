@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.13.9 / Build 894**
+**対象バージョン: v2.13.10 / Build 895**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -90,7 +90,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
 | Render Engine | 31 | `server/src/inku_server/render_engines/default.py` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 13 | `server/src/inku_server/layer_versions.py` |
+| DDL | `ddl_version` 3 / `ddl_engine_version` 14 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.23` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
 
@@ -235,7 +235,7 @@ UI は日英で、切替は設定画面から行う（既定は `ja`）。
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
-現役は `render-engine-31`（569 件）と `ddl-engine-13`（40 件）で、再生成のバイト一致を CI が強制する。
+現役は `render-engine-31`（569 件）と `ddl-engine-14`（42 件）で、再生成のバイト一致を CI が強制する。
 - **Android の参照コーパス** — `android/app/src/test/resources/server_reference/` も同じ作法で版ごとに分かれる。
 移植は自分が名乗る版のディレクトリを読むので、**server が engine を上げてもディレクトリが増えるだけで移植は赤くならない**。
 旧版は焼き直せないので、各版の `manifest.json` が名前と digest で押さえる。

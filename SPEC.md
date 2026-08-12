@@ -2294,6 +2294,25 @@ nothing would remove the excess, and a trimmed count is **neither the number
 stated nor the represented one**. **Where the number cannot be reached, leaving
 it alone is the honest answer to the description.**
 
+**Every reader counts the same way (v2.13.10, ddl-engine 14).** There is more than one place a count is
+read, but only one way of reading it.
+
+- **The language of the description decides.** The exclusion that drops a numeral sitting next to CJK applies
+  **only when the body is Japanese**: a `12` written in an English body is twelve even where a plugin word puts
+  kanji beside it (before this it was dropped). **All five callers of coerce hand the language over.**
+- **The sentence is read only when the phrase naming the plugin states no count.** A count in the phrase is
+  never overruled by the sentence.
+- **A bare numeral inside a phrase that names a plugin is a count** (`緑のNature.下草を50散らす。` asks for
+  fifty). **A bare numeral elsewhere in the same sentence is read too** — with the exclusions below still in
+  force at that wider scope.
+- **A number beside a word that names an axis is not a count** (direction, orientation, kind, layer, row,
+  column, degree, time, fold, part, and their English equivalents): neither the four of "four directions" nor
+  the thirty of "30 degrees". **An index is not a count either** — the 2 of `member 2` says which, not how many.
+- **Decimals and fractions are not counts** (the 0.11 of "radius 0.11").
+
+**The Android port carries the same rule in the same shape**: its hand-written table of kanji numerals is gone,
+and its expectations are generated from what the server actually reads.
+
 **The treatments that reduce density in quiet, membrane, or memory contexts are
 not applied to a group whose count was stated.** Quietness is a reading of the
 scene; a written number is not a reading. Those treatments act only on groups

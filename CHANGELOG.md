@@ -5759,3 +5759,44 @@ old Japanese title and was changed with it.** **No code changed.** `check_docs.p
 - **⚠ The contract covers the first commit only; the other ten are an override the author gave on 2026-08-12**
   (one item at a time: instruction, implementation, look at the screen, commit). **All of them are closed inside
   `web`; not one needed a server change.**
+
+### v2.13.10 — Every reader counts the same way (Build 895, 2026-08-12, ledger I-212 to I-216, ddl engine 14)
+
+- **A count is read in more than one place, and the places disagreed.** Five rulings landed in one contract.
+- **The language of the description now decides** (I-212, I-216). The exclusion that drops a numeral sitting next
+  to CJK applies **only when the body is Japanese**: **a `12` written in an English body is now twelve** even
+  where a plugin word puts kanji beside it — before, it was dropped and the case froze at one unit. **All five
+  callers of coerce hand the language over** (a roll-call gate counts them).
+  **⚠ One of the places the contract said held a language did not**, and the implementing session resolved it
+  through the same resolver the painting path uses, and reported the discrepancy.
+- **The sentence is read only when the phrase naming the plugin states no count** (I-215); a count in the phrase
+  is never overruled.
+- **A bare numeral inside a phrase that names a plugin is a count** (I-213).
+- **The English and Japanese paths now share one scan** (I-214). The twelve-word noun table and the separate walk
+  that only the English side had **are gone**, and the two paths split clauses the same way.
+- **⚠ Two rulings arrived while the work was running** — **(1) an exclusion for words that name an axis**
+  (direction, orientation, kind, layer, row, column, degree, time, fold, part, and the English equivalents).
+  Dropping the noun table made the four of `four directions` a count, **collapsing a 400-mark grid to four
+  marks**. **(2) an exclusion for indices** (the 2 of `member 2` says which, not how many) — the expansion layer
+  was building a group from a member number it had written itself. **Two acceptances were added, so the full
+  score went from 22 to 24.**
+- **Android was brought to the server's rule** (I-214). `ServerScoreSemantics.countHintFromDdl` is two lines of
+  delegation and **the hand-written table of twenty-one kanji numerals is gone**. **The old implementation had
+  neither ceiling nor exclusion**: it returned 0 for `radius 0.11` and 30 for a 30-degree rotation. **Its
+  expectations are generated from what the server actually reads, not written by hand.**
+- **The reference corpus was baked as `ddl-engine-14` (42 cases).** The two new ones are **a count stated outside
+  the naming phrase (20 units)** and **a bare numeral inside one (50 units)**; **one case's judgement moved**
+  (`C-plugin-count-as-a-numeral-beside-cjk`, one unit to twelve). **⚠ Two of the three entries in the bake's diff
+  are new files, not cases that moved.**
+- **Checks:** **server 2,997 passed / 31 skipped** (19 new, plus one the accepting session added), **cli 220
+  passed**, **Android JVM 532 tests / 0 failures**, **ruff clean**, **frozen corpora byte-identical**,
+  `check_docs.py` consistent. **Fourteen perturbations, 27 reds** against a prediction of twelve and fourteen.
+  **One perturbation missed, and the implementing session fixed the gate rather than the claim**: T-12's input
+  had a clause and a sentence that were the same string, so "always read the sentence" changed nothing.
+- **⚠ Three things were fixed on the accepting side** — **(1) three hard-coded version literals**
+  (two in `test_ddl_reference.py`, four lines in `test_api.py`); **(2) a gate that lost its discriminating power**:
+  "the `twelve` and `12` cases must have different digests" became the opposite of a claim once the ruling made
+  the two mean the same thing, so **it was inverted to measure equality** (restoring the exclusion for English
+  bodies pulls them apart again and turns it red); **(3) the square where two rulings meet had no acceptance** —
+  no test covered a bare numeral read through the widened sentence, so **T-25 was added** and shown to turn red
+  under two separate perturbations.

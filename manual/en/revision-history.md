@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-12 — Unreleased v2.13.10 Baseline (Web Build 895)
+
+Updated the 13 places that name a version to v2.13.10 / Build 895. **Nothing on screen moved, but the counts you write in a description are read differently** (one sentence was added to the count explanation in §7 of `Creating Images`).
+
+- **A numeral in an English description is now read.** Until now a numeral standing next to the kanji of a plugin word was dropped.
+- **When the phrase naming a plugin states no count, the sentence is read instead.** A count in the phrase still wins.
+- **A numeral with no counter is a count inside a phrase that names a plugin** (`緑のNature.下草を50散らす。` asks for fifty).
+- **Numbers that name a direction, a kind, a degree, a row or a column are not counts** (the four of `four directions`, the thirty of `30 degrees`), and neither are decimals (`0.11`).
+
 ## 2026-08-12 — Unreleased v2.13.9 Baseline (Web Build 894)
 
 Updated the 13 places that name a version to v2.13.9 / Build 894, and rewrote the UI mode description in §3 of `Creating Images` now that the Simple UI keeps its history.

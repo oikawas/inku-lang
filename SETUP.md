@@ -57,17 +57,17 @@ cd inku-lang-source-<build>
 
 ## Working from a git clone
 
-A clone needs one extra step that a source tarball does not. `web/BUILD_NUMBER`
-is a shared counter, so two branches bumping it is never a real disagreement --
-a merge driver keeps the larger number. Merge drivers live in `.git/config`,
-which is not versioned, so run this once per clone:
+`web/BUILD_NUMBER` is a shared counter, so two branches bumping it is never a
+real disagreement -- a merge driver keeps the larger number. Merge drivers live
+in `.git/config`, which is not versioned, so run this immediately after cloning:
 
 ```sh
 scripts/git/setup.sh
 ```
 
-Worktrees share `.git/config`, so one run covers all of them. Skipping it is
-safe: the file simply conflicts on merge the way it always did.
+Worktrees share `.git/config`, so one run covers all of them. If it was missed,
+`make test`, `make test-server`, `make test-cli`, and `make test-web` from the
+repository root apply the same setup idempotently before testing.
 
 ## Running in Containers
 

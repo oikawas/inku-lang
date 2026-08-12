@@ -5,6 +5,7 @@ merge.  It runs non-interactively inside git, so it must always exit 0 and must
 always leave a single number in %A -- there is no operator to fall back on.
 """
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DRIVER = REPO_ROOT / "scripts" / "git" / "build-number-merge.sh"
+SETUP = REPO_ROOT / "scripts" / "git" / "setup.sh"
 
 # The development server carries only what the two services need, so `scripts/`
 # is not there (ledger I-059). Skip on the DIRECTORY, never on the driver file:
@@ -53,3 +55,59 @@ def test_driver_keeps_the_larger_side(tmp_path, ours, theirs, expected):
     # git treats a non-zero exit as a conflict, so the driver must never fail.
     assert rc == 0
     assert result == expected
+
+
+def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, check=True
+    )
+
+
+@pytest.mark.parametrize("target", ["test", "test-server", "test-cli", "test-web"])
+@git_scripts_only
+def test_make_test_entry_points_apply_repository_git_setup(target):
+    result = subprocess.run(
+        ["make", "-n", target],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.splitlines().count("./scripts/git/setup.sh") == 1
+
+
+@git_scripts_only
+def test_setup_repairs_an_unconfigured_clone_before_merge(tmp_path):
+    repo = tmp_path / "clone"
+    repo.mkdir()
+    run_git(repo, "init", "-q")
+    run_git(repo, "config", "user.name", "Test User")
+    run_git(repo, "config", "user.email", "test@example.invalid")
+
+    (repo / "scripts" / "git").mkdir(parents=True)
+    (repo / "web").mkdir()
+    shutil.copy2(DRIVER, repo / "scripts" / "git" / DRIVER.name)
+    shutil.copy2(SETUP, repo / "scripts" / "git" / SETUP.name)
+    shutil.copy2(REPO_ROOT / "Makefile", repo / "Makefile")
+    (repo / ".gitattributes").write_text("web/BUILD_NUMBER merge=buildnumber\n")
+    (repo / "web" / "BUILD_NUMBER").write_text("900\n")
+    run_git(repo, "add", ".")
+    run_git(repo, "commit", "-qm", "base")
+
+    run_git(repo, "branch", "-M", "main")
+    run_git(repo, "switch", "-qc", "other")
+    (repo / "web" / "BUILD_NUMBER").write_text("901\n")
+    run_git(repo, "commit", "-qam", "other build")
+    run_git(repo, "switch", "-q", "main")
+    (repo / "web" / "BUILD_NUMBER").write_text("902\n")
+    run_git(repo, "commit", "-qam", "main build")
+
+    subprocess.run(
+        ["make", "git-setup"], cwd=repo, capture_output=True, text=True, check=True
+    )
+    configured = run_git(repo, "config", "--get", "merge.buildnumber.driver")
+    assert str(repo / "scripts" / "git" / DRIVER.name) in configured.stdout
+
+    run_git(repo, "merge", "--no-edit", "other")
+    assert (repo / "web" / "BUILD_NUMBER").read_text() == "902\n"

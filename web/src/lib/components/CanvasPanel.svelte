@@ -469,7 +469,6 @@
 	const detailInterpretationSeed = $derived(statusHistoryItem?.interpretation_seed ?? result?.interpretation_seed ?? null);
 	const detailDescriptionHash = $derived(statusHistoryItem?.description_hash ?? result?.description_hash ?? '');
 	const detailRenderHash = $derived(statusHistoryItem?.render_hash ?? result?.render_hash ?? '');
-	const detailEngine = $derived(statusHistoryItem?.render_engine_id ?? result?.render_engine_id ?? '');
 	const detailEngineVersion = $derived(statusHistoryItem?.render_engine_version ?? result?.render_engine_version ?? '');
 	const detailDdlVersion = $derived(statusHistoryItem?.ddl_version ?? result?.ddl_version ?? '');
 	const detailDdlEngineVersion = $derived(statusHistoryItem?.ddl_engine_version ?? result?.ddl_engine_version ?? '');
@@ -1123,7 +1122,7 @@
 							<dl>
 								{@render term('render hash', t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
 								{@render term('description hash', t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
-								{@render term('render engine', t().provenanceHintRenderEngine)}<dd>{detailEngine || '-'}{detailEngineVersion ? ' / ' + detailEngineVersion : ''}</dd>
+								{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>
 								{@render term(t().provenanceLabelDdlSpec, t().provenanceHintDdlSpec)}<dd>{detailDdlVersion || t().historyVersionNotRecorded}</dd>
 								{@render term(t().provenanceLabelTransformLayer, t().provenanceHintTransformLayer)}<dd>{detailDdlEngineVersion || t().historyVersionNotRecorded}</dd>
 								{@render term(t().provenanceLabelStage1PromptDigest, t().provenanceHintStage1PromptDigest)}<dd><code>{detailStage1PromptDigest || t().historyVersionNotRecorded}</code></dd>

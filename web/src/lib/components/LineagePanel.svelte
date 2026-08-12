@@ -294,13 +294,6 @@
 	// Same shape the canvas provenance uses: the engine id and its version share a
 	// line. Works recorded before the field existed carry neither, and an em dash
 	// says that more quietly than a bare slash.
-	function engineLabel(history: HistoryItem): string {
-		const id = history.render_engine_id ?? '';
-		const version = history.render_engine_version ?? '';
-		if (!id && !version) return '—';
-		return version ? `${id || '—'} / ${version}` : id;
-	}
-
 	function operationLabel(kind?: string): string {
 		return derivationKindLabel(kind, isJapanese);
 	}
@@ -964,7 +957,7 @@ $effect(() => {
 													</button>
 												{/if}
 											</dd>
-											<dt>render engine</dt><dd>{engineLabel(node.history)}</dd>
+											<dt>Render engine version</dt><dd>{node.history.render_engine_version || '—'}</dd>
 											<dt>{t().provenanceLabelTransformLayer}</dt><dd>{node.history.ddl_engine_version || '—'}</dd>
 											<dt>Build</dt><dd>{node.history.render_build_number || '—'}</dd>
 											<dt>Stage 1</dt><dd>{node.history.stage1_model ? modelDisplayName(node.history.stage1_model) : '—'}</dd>

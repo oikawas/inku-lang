@@ -575,6 +575,8 @@
 	// so the button is withheld there rather than opening onto an empty list.
 	let shareTarget = $state<HistoryItem | null>(null);
 	let currentRenderEngineVersion = $state<string | null>(null);
+	let currentDdlVersion = $state<string | null>(null);
+	let currentDdlEngineVersion = $state<string | null>(null);
 	let exportTemplates = $state<ExportTemplate[]>(DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item })));
 	let exportTemplateStatus = $state<string | null>(null);
 
@@ -2231,19 +2233,25 @@
 
 	async function loadPublicAppInfo() {
 		currentRenderEngineVersion = null;
+		currentDdlVersion = null;
+		currentDdlEngineVersion = null;
 		try {
 			const r = await fetch('/api/info', {
 				cache: 'no-store',
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string };
+			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string; ddl_version?: string; ddl_engine_version?: string };
 			developerMode = data.developer_mode === true;
 			singleUserMode = data.single_user_mode === true;
 			setThumbnailHidpi(data.thumbnail_hidpi === true);
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
 				? data.render_engine_version
 				: null;
+			// The three layer versions the app info panel shows. They come from the
+			// same call the render engine version does, so one answer carries all.
+			currentDdlVersion = typeof data.ddl_version === 'string' ? data.ddl_version : null;
+			currentDdlEngineVersion = typeof data.ddl_engine_version === 'string' ? data.ddl_engine_version : null;
 		} catch (error) {
 			console.warn('failed to load public app info', error);
 		}
@@ -6764,20 +6772,24 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		</div>
 		<div class="app-info-body">
 			<dl class="app-info-meta">
-				<div>
+				<div class="app-info-row">
 					<dt>{t().appInfoVersionLabel}</dt>
 					<dd>{APP_VERSION}</dd>
-				</div>
-				<div>
+					<dt>{t().appInfoBuildLabel}</dt>
+					<dd>{__BUILD_NUMBER__}</dd>
 					<dt>{t().appInfoBuildDateLabel}</dt>
 					<dd>{buildDateLabel ?? t().historyVersionNotRecorded}</dd>
 				</div>
-				{#if developerMode}
-					<div>
-						<dt>{t().appInfoBuildLabel}</dt>
-						<dd>{__BUILD_NUMBER__}</dd>
-					</div>
-				{/if}
+				<!-- The three layer versions the server is running, in the same order
+				     and under the same names the provenance drawer uses. -->
+				<div class="app-info-row">
+					<dt>Render engine version</dt>
+					<dd>{currentRenderEngineVersion ?? t().historyVersionNotRecorded}</dd>
+					<dt>DDL version</dt>
+					<dd>{currentDdlVersion ?? t().historyVersionNotRecorded}</dd>
+					<dt>DDL engine version</dt>
+					<dd>{currentDdlEngineVersion ?? t().historyVersionNotRecorded}</dd>
+				</div>
 				<div>
 					<dt>{t().appInfoRepositoryLabel}</dt>
 					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
@@ -7379,6 +7391,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.app-info-meta div {
 		display: contents;
+	}
+	/* A row that carries several label/value pairs on one line, rather than one
+	   pair per grid row. It spans both columns and wraps on a narrow window. */
+	.app-info-meta .app-info-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 2px 14px;
+		grid-column: 1 / -1;
+	}
+	.app-info-meta .app-info-row dd {
+		margin-right: 4px;
 	}
 	.app-info-meta dt {
 		color: var(--fg3);

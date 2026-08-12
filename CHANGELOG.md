@@ -6046,3 +6046,35 @@ differently. **The environment the conventions named is now closed inside the en
   traps therefore stay on the record even though the mechanism landed.**
 - **⚠ A hole left open**: `make test PYTEST_ARGS=…` passes server-shaped arguments to cli as well.
   **CI only ever passes them to `test-server`, so nothing is broken today.**
+
+### Android — a work remembers its own colors too (android `2.1.4-android.25`, 2026-08-12)
+
+**When a work's colors live only as a catalog id, the day the catalog is redefined is the day every
+saved work is redrawn in different colors.** The server fixed this on 2026-08-09 (ledger I-123).
+**Android had the same hole in a different shape** — the record was already being written
+(`render_color_map` has been in the metadata since the first commit). **It was never read back.**
+
+- **`WorkColorSnapshot`** reads the record out of the saved row's `render_metadata_json`. **The
+  conditions are copied from the server's `_snapshot_render_metadata` as conditions**: **not a
+  `JSONObject`, or empty, means no record** (not replaced by a defaulted lookup — an empty map has to
+  take its own path), and **the id is `render_color_catalog_id`, then `catalog_id`, then the default**.
+- **Only a redraw carries the record.** Of the three refinement routes, only `RenderFromScore` passes
+  it; **a new drawing (`paint` / `composeFromDdl`) uses today's definition**, which is the branch the
+  server takes for a request that names no work.
+- **⚠ Drawing from the record does not rewrite the catalog id.** **The id is not only a nameplate —
+  it is also part of the seed that assigns each chromatic color**, so the same map under a different
+  id assigns differently. **The server's asymmetry is copied exactly: the recorded id when there is a
+  record, the id today's catalog resolves when there is none.**
+- **A work with no record is not refused.** Refusing would leave exactly the works that predate the
+  record unable to be redrawn.
+- **Nine acceptance cases** (`WorkColorSnapshotTest.kt`). **The id fallback is measured with three
+  inputs, and seed stability across 1..200** — a single fixed seed can assign identically even when
+  the id is swapped.
+- **Six perturbations** (re-applied on the accepting side): **2 / 1 / 1 / 3 / 2 / 1** cases went red.
+  **⚠ Substituting the *resolved* id reddens only two** — for a known id, resolved and raw are the
+  same value. **Only the contract's form, substituting the default, reddens the third (the seed test).**
+- **Checks**: Android JVM **278 passed / 0 failed / 0 skipped** on the merged tree. **`APP_VERSION`
+  and `web/BUILD_NUMBER` did not move** — Android versions only `android/VERSION`.
+- **⚠ One difference left**: when drawing from the record, the catalog name and subtitle come from
+  today's catalog. **The server falls back to the id itself when the catalog is unknown.** That line
+  was not quoted by the contract; it went to the ledger.

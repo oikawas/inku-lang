@@ -373,6 +373,11 @@
 	let batchPromptHistory = $state<string[]>([]);
 	let batchActiveLine = $state<number | null>(null);
 	let batchActiveDdl = $state<string | null>(null);
+	// Which line the observer block is showing. Not batchActiveLine: that one is
+	// taken when a line starts, while the instructions, the tokens and the prose
+	// only exist once it comes back. Naming the block with the line being painted
+	// put the previous line's work under the next line's number.
+	let batchObservedLine = $state<number | null>(null);
 	// 写生 (Stage 0.5) for the batch, kept apart from the single-mode prose: that
 	// one is an editable draft bound to one description, and a batch must not
 	// overwrite what the author is editing there. Written when a line returns,
@@ -3357,7 +3362,7 @@ if (unreadWords.length > 0) {
 		historyCursor = -1;
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
 		tokensInStage1 = null; tokensOutStage1 = null; tokensInStage2 = null; tokensOutStage2 = null;
-		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null;
+		batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchObservedLine = null;
 		batchSketchText = null; batchSketchGrain = null;
 		batchActiveTokensIn = null; batchActiveTokensOut = null; batchTokensInTotal = 0; batchTokensOutTotal = 0;
 		if (submittedMode === 'batch') {
@@ -3436,8 +3441,6 @@ if (unreadWords.length > 0) {
 				/** true = painted, string = the failure message, null = the run was interrupted. */
 				const paintBatchLine = async (item: { line: number; input: string }): Promise<true | string | null> => {
 					batchActiveLine = item.line;
-					batchActiveTokensIn = null;
-					batchActiveTokensOut = null;
 					try {
 						const r = await paintOne(item.input, {
 							historyInput: `#${item.line} ${item.input}`,
@@ -3450,6 +3453,9 @@ if (unreadWords.length > 0) {
 							signal: abortController.signal,
 						});
 						if (submitStopRequested) return null;
+						// The observer's four quantities are written together, so the
+						// block always describes one work.
+						batchObservedLine = item.line;
 						batchActiveDdl = r.ddl;
 						batchSketchText = r.sketch_text ?? null;
 						batchSketchGrain = r.sketch_grain ?? null;
@@ -3542,7 +3548,7 @@ if (unreadWords.length > 0) {
 		} finally {
 			if (submitAbortController === abortController) submitAbortController = null;
 			submitStopRequested = false;
-			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
+			stopTimer(); loading = false; reloading = false; activeRunMode = null; stageLabel = ''; batchCurrent = 0; batchRetryRound = 0; batchActiveLine = null; batchActiveDdl = null; batchObservedLine = null; batchActiveTokensIn = null; batchActiveTokensOut = null;
 		}
 	}
 
@@ -4151,6 +4157,7 @@ if (unreadWords.length > 0) {
 		batchFailureReportStore.set(null);
 		batchActiveLine = null;
 		batchActiveDdl = null;
+		batchObservedLine = null;
 		batchLatestPrompt = '';
 		outputTab = 'canvas';
 		elapsedStage1Ms = 0;
@@ -6229,6 +6236,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						hideRunStatus={reloading}
 						singleDdlReady={ddl !== null}
 						{batchActiveLine}
+						{batchObservedLine}
 						{batchRunningLineText}
 						{batchSketchText}
 						{batchSketchGrainLabel}

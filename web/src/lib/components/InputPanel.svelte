@@ -39,6 +39,7 @@
 		runTokensOut: number | null;
 		singleDdlReady: boolean;
 		batchActiveLine: number | null;
+		batchObservedLine: number | null;
 		batchRunningLineText: string;
 		batchSketchText: string | null;
 		batchSketchGrainLabel: string;
@@ -116,6 +117,7 @@
 		runTokensOut,
 		singleDdlReady,
 		batchActiveLine,
+		batchObservedLine,
 		batchRunningLineText,
 		batchSketchText,
 		batchSketchGrainLabel,
@@ -382,6 +384,7 @@
 			{batchNonEmpty}
 			{batchRunning}
 			{batchActiveLine}
+			{batchObservedLine}
 			{batchRunningLineText}
 			{batchSketchText}
 			{batchSketchGrainLabel}

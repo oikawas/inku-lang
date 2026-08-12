@@ -22,6 +22,7 @@
 		batchNonEmpty: number;
 		batchRunning: boolean;
 		batchActiveLine: number | null;
+		batchObservedLine: number | null;
 		batchRunningLineText: string;
 		batchSketchText: string | null;
 		batchSketchGrainLabel: string;
@@ -57,6 +58,7 @@
 		batchNonEmpty,
 		batchRunning,
 		batchActiveLine,
+		batchObservedLine,
 		batchRunningLineText,
 		batchSketchText,
 		batchSketchGrainLabel,
@@ -200,6 +202,7 @@
 		<div class="batch-observe-head">
 			<span>{t().sketchLabel}</span>
 			<div class="batch-observe-meta">
+				{#if batchObservedLine !== null}<span>{t().batchActiveLine(batchObservedLine)}</span>{/if}
 				<span>{t().sketchGrainLabel}: {batchSketchGrainLabel}</span>
 			</div>
 		</div>
@@ -211,7 +214,9 @@
 		<div class="batch-observe-head">
 			<span>{t().batchActiveDdlLabel}</span>
 			<div class="batch-observe-meta">
-				{#if batchActiveLine !== null}<span>{t().batchActiveLine(batchActiveLine)}</span>{/if}
+				<!-- The line the instructions below came from, not the one being
+				     painted: the two differ for the length of every line. -->
+				{#if batchObservedLine !== null}<span>{t().batchActiveLine(batchObservedLine)}</span>{/if}
 				<span><span class="batch-metric-label">{t().statsTokens}</span>{tokenPair(batchActiveTokensIn, batchActiveTokensOut)}</span>
 			</div>
 		</div>

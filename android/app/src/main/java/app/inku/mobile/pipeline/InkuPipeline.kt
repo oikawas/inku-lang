@@ -1,5 +1,7 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.data.model.WorkColorSnapshot
+
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.render.SvgRenderer
 
@@ -120,6 +122,7 @@ data class PaintRequest(
      * default of `fine`.
      */
     val sketch: SketchInput = SketchInput(),
+    val workColorSnapshot: WorkColorSnapshot? = null,
 )
 
 /**
@@ -215,4 +218,5 @@ data class RenderRequest(
     // seed. It travels beside the score rather than inside it, the way
     // `renderer.render(..., composition_seed=...)` takes it on the server.
     val compositionSeed: Long? = null,
+    val workColorSnapshot: WorkColorSnapshot? = null,
 )

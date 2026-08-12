@@ -225,6 +225,7 @@ class LocalFallbackPipeline(
                 svgProfile = "display",
                 renderSeed = renderSeed,
                 compositionSeed = request.compositionSeed,
+                workColorSnapshot = request.workColorSnapshot,
             ),
         )
         val metadataJson = withRenderSeed(render.metadataJson, renderSeed)

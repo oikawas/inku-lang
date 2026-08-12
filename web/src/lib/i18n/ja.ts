@@ -423,6 +423,7 @@ export const ja: LangPack = {
 	unsavedRefinementPreviewLabel: '未保存の推敲候補',
 	lineageIntermediateSavedNotice: '未保存の推敲候補を中間作品として系譜に記録しました。通常履歴には表示されません。',
 	historyStarredFilterClearedNotice: '星付きの絞り込みを解除しました（選んだ作品を表示するため）',
+	historyForRevisionFilterClearedNotice: '推敲のみの絞り込みを解除しました（選んだ作品を表示するため）',
 	lineageIntermediateSaveFailed: '推敲候補を系譜へ保存できなかったため、描画を開始しませんでした。',
 
 	settingsTitle: '設定',

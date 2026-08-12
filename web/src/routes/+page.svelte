@@ -2723,6 +2723,16 @@
 	const historyPage = $derived(Math.floor(historyOffset / historyWindowSize));
 	const historyTotalPages = $derived(Math.max(1, Math.ceil(historyTotal / historyWindowSize)));
 	let historyStarredOnly = $state(false);
+	// The strip's own 推敲のみ filter. Separate from the manager's: the two
+	// boxes are filtered independently, the same way starred already is.
+	let historyForRevisionOnly = $state(false);
+	// Whether the strip is showing a filtered listing rather than the whole one.
+	// Three places ask this to decide whether the page in hand is the plain
+	// newest-first listing: what to seed the manager with, what the strip may
+	// slice, and whether a freshness check may compare its first item with the
+	// newest work. Read through one name so a fourth filter cannot be added to
+	// some of them and forgotten in the rest.
+	const historyStripFiltered = $derived(historyStarredOnly || historyForRevisionOnly);
 	let trashItems = $state<Iteration[]>([]);
 	let trashTotal = $state(0);
 	let externalHistoryRefreshInFlight = false;
@@ -3144,7 +3154,7 @@ if (unreadWords.length > 0) {
 	// The same guard already protects the strip from externally saved works.
 	async function refreshHistoryAfterServerSave() {
 		if (historyOffset !== 0) {
-			if (!historyStarredOnly) historyTotal += 1;
+			if (!historyStarredOnly && !historyForRevisionOnly) historyTotal += 1;
 			return;
 		}
 		const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? null;
@@ -3784,6 +3794,8 @@ if (unreadWords.length > 0) {
 				include_svg: 'false',
 			});
 			if (historyStarredOnly) params.set('starred', 'true');
+			// The two marks are independent, so asking for both means both.
+			if (historyForRevisionOnly) params.set('for_revision', 'true');
 			if (options.anchorId) params.set('anchor_id', options.anchorId);
 			const r = await apiFetch(`/api/history?${params.toString()}`);
 			if (requestId !== historyFetchRequest) return false;
@@ -3794,7 +3806,7 @@ if (unreadWords.length > 0) {
 				const lastOffset = Math.floor((data.total - 1) / historyWindowSize) * historyWindowSize;
 				return await fetchHistoryOffset(lastOffset);
 			}
-			const stripItems = resolvedOffset === 0 && !historyStarredOnly
+			const stripItems = resolvedOffset === 0 && !historyStripFiltered
 				? data.items.slice(0, historyWindowSize)
 				: data.items;
 			// Immediately before the four quantities are written, so no await added
@@ -3810,7 +3822,7 @@ if (unreadWords.length > 0) {
 				if (historyCursor >= stripItems.length) historyCursor = stripItems.length > 0 ? 0 : -1;
 				if (historyCursor < 0 && stripItems.length > 0) historyCursor = 0;
 			}
-			if (!historyManager.open && resolvedOffset === 0 && !historyStarredOnly) {
+			if (!historyManager.open && resolvedOffset === 0 && !historyStripFiltered) {
 				// The strip's items are what we have; the manager's page size is a
 				// different quantity, so it is passed separately. The manager is
 				// seeded, not filled: it fetches its own page when it opens.
@@ -3841,9 +3853,14 @@ if (unreadWords.length > 0) {
 			if (displayedHistoryItem) void syncHistoryStripToItem(displayedHistoryItem);
 			return;
 		}
-		if (!found && historyStarredOnly) {
+		if (!found && historyStripFiltered) {
+			// Both filters come off together: which of them was hiding the work
+			// is not known from here, and the point is to show it.
+			const clearedStarred = historyStarredOnly;
 			historyStarredOnly = false;
-			showHistoryStarredFilterClearedNotice();
+			historyForRevisionOnly = false;
+			if (clearedStarred) showHistoryStarredFilterClearedNotice();
+			else showHistoryForRevisionFilterClearedNotice();
 			found = await fetchHistoryOffset(0, { anchorId: item.id });
 		}
 		if (requestId !== historySelectionSyncRequest) {
@@ -3896,7 +3913,7 @@ if (unreadWords.length > 0) {
 				total: historyTotal,
 				newestId: historyItems[0]?.id ?? null,
 				newestAt: historyItems[0]?.at ?? null,
-				showsTheNewestFirst: historyOffset === 0 && !historyStarredOnly,
+				showsTheNewestFirst: historyOffset === 0 && !historyStripFiltered,
 			})) return;
 			const activeHistoryId = displayedHistoryItem?.id ?? result?.history_id ?? historyItems[historyCursor]?.id ?? null;
 			if (activeHistoryId) await fetchHistoryOffset(0, { anchorId: activeHistoryId });
@@ -3933,6 +3950,13 @@ if (unreadWords.length > 0) {
 
 	async function gotoHistoryOlderPage(): Promise<void> {
 		const target = historyPageTarget(historyNavState, 'older');
+		if (!target) return;
+		if (!(await fetchHistoryOffset(target.offset))) return;
+		loadIteration(historyNavIndex(target));
+	}
+
+	async function gotoHistoryOldestPage(): Promise<void> {
+		const target = historyPageTarget(historyNavState, 'oldest');
 		if (!target) return;
 		if (!(await fetchHistoryOffset(target.offset))) return;
 		loadIteration(historyNavIndex(target));
@@ -4037,7 +4061,16 @@ if (unreadWords.length > 0) {
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const updated = await r.json() as Iteration;
 			updateHistoryForRevisionState(updated);
-			if (historyManager.forRevisionOnly) await historyManager.fetch();
+			const refreshes: Promise<unknown>[] = [];
+			if (historyForRevisionOnly) {
+				// The work just left the listing the strip is showing, so the
+				// filter comes off rather than leaving the strip on a work it no
+				// longer holds -- the same rule the starred filter follows.
+				if (!updated.for_revision) historyForRevisionOnly = false;
+				refreshes.push(fetchHistoryOffset(0, { anchorId: updated.id }));
+			}
+			if (historyManager.forRevisionOnly) refreshes.push(historyManager.fetch());
+			if (refreshes.length > 0) await Promise.all(refreshes);
 		} catch (e) {
 			updateHistoryForRevisionState(item);
 			console.warn('failed to update the revision mark', e);
@@ -4472,8 +4505,9 @@ function lineageCanvasAspectId(node: LineageNode): CanvasAspectId {
 async function showNewLineageChild(historyId: string | null | undefined, nodeId: string | null | undefined): Promise<void> {
 	if (!historyId || !nodeId) throw new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The finished work could not be saved to the lineage.');
 	let found = await fetchHistoryOffset(0, { anchorId: historyId });
-	if (!found && historyStarredOnly) {
+	if (!found && historyStripFiltered) {
 		historyStarredOnly = false;
+		historyForRevisionOnly = false;
 		found = await fetchHistoryOffset(0, { anchorId: historyId });
 	}
 	const saved = historyItems.find((item) => item.id === historyId);
@@ -4938,7 +4972,8 @@ $effect(() => {
 	const historyPageNavDisabled = $derived({
 		latest: historyNavButtonsDisabled.latest,
 		newer: historyPageTarget(historyNavState, 'newer') === null,
-		older: historyPageTarget(historyNavState, 'older') === null
+		older: historyPageTarget(historyNavState, 'older') === null,
+		oldest: historyPageTarget(historyNavState, 'oldest') === null
 	});
 	// Left as it was: 0 / N is how "nothing is selected" is shown, and is not a
 	// claim about which work is current.
@@ -5075,7 +5110,7 @@ $effect(() => {
 	}
 
 	/**
-	 * Say that the starred filter was cleared, because nothing else says it.
+	 * Say that a strip filter was cleared, because nothing else says it.
 	 *
 	 * Clearing it is a rescue and stays: a work reached from somewhere else --
 	 * a lineage, a shared link, the manager -- can be unstarred, and leaving the
@@ -5084,13 +5119,21 @@ $effect(() => {
 	 * having failed. Same mechanism as the lineage notice above: a string and a
 	 * five second timer.
 	 */
-	function showHistoryStarredFilterClearedNotice(): void {
-		historyStarredFilterNotice = t().historyStarredFilterClearedNotice;
+	function showHistoryFilterClearedNotice(text: string): void {
+		historyStarredFilterNotice = text;
 		if (historyStarredFilterNoticeTimer !== null) window.clearTimeout(historyStarredFilterNoticeTimer);
 		historyStarredFilterNoticeTimer = window.setTimeout(() => {
 			historyStarredFilterNotice = null;
 			historyStarredFilterNoticeTimer = null;
 		}, 5000);
+	}
+
+	function showHistoryStarredFilterClearedNotice(): void {
+		showHistoryFilterClearedNotice(t().historyStarredFilterClearedNotice);
+	}
+
+	function showHistoryForRevisionFilterClearedNotice(): void {
+		showHistoryFilterClearedNotice(t().historyForRevisionFilterClearedNotice);
 	}
 
 	function currentLineageParentId(): string | null {
@@ -5965,6 +6008,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		void fetchHistoryOffset(0);
 	}
 
+	function setHistoryForRevisionOnly(value: boolean) {
+		historyForRevisionOnly = value;
+		historyOffset = 0;
+		historyCursor = -1;
+		void fetchHistoryOffset(0);
+	}
+
 	$effect(() => {
 		const q = historyManager.search.trim();
 		if (!historyManager.open) return;
@@ -6665,15 +6715,19 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onNewerPage={gotoHistoryNewerPage}
 			onOlderPage={gotoHistoryOlderPage}
 			onLatestPage={gotoHistoryLatestPage}
+			onOldestPage={gotoHistoryOldestPage}
 			onLoadItem={loadIterationItem}
 			onToggleStar={toggleHistoryStar}
 			interactionLocked={demoRunning}
 			navLatestDisabled={historyPageNavDisabled.latest}
 			navNewerPageDisabled={historyPageNavDisabled.newer}
 			navOlderPageDisabled={historyPageNavDisabled.older}
+			navOldestDisabled={historyPageNavDisabled.oldest}
 			starredFilterClearedNotice={historyStarredFilterNotice}
 			{historyStarredOnly}
 			onSetStarredOnly={setHistoryStarredOnly}
+			{historyForRevisionOnly}
+			onSetForRevisionOnly={setHistoryForRevisionOnly}
 			{historyIndexLabel}
 			{historyModelStage1Short}
 			{historyModelStage1Full}

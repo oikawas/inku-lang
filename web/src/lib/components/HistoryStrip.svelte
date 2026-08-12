@@ -38,6 +38,7 @@
 		onNewerPage: () => void | Promise<void>;
 		onOlderPage: () => void | Promise<void>;
 		onLatestPage: () => void | Promise<void>;
+		onOldestPage: () => void | Promise<void>;
 		onLoadItem: (item: HistoryItem) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		interactionLocked: boolean;
@@ -46,10 +47,14 @@
 		navLatestDisabled: boolean;
 		navNewerPageDisabled: boolean;
 		navOlderPageDisabled: boolean;
+		// Counted in works too, so the two ends of the listing answer alike.
+		navOldestDisabled: boolean;
 		/** Said when the filter was cleared for the user rather than by them. */
 		starredFilterClearedNotice: string | null;
 		historyStarredOnly: boolean;
 		onSetStarredOnly: (value: boolean) => void;
+		historyForRevisionOnly: boolean;
+		onSetForRevisionOnly: (value: boolean) => void;
 		historyIndexLabel: (index: number) => number;
 		historyModelStage1Short: (item: HistoryItem) => string;
 		historyModelStage1Full: (item: HistoryItem) => string;
@@ -71,15 +76,19 @@
 		onNewerPage,
 		onOlderPage,
 		onLatestPage,
+		onOldestPage,
 		onLoadItem,
 		onToggleStar,
 		interactionLocked,
 		navLatestDisabled,
 		navNewerPageDisabled,
 		navOlderPageDisabled,
+		navOldestDisabled,
 		starredFilterClearedNotice,
 		historyStarredOnly,
 		onSetStarredOnly,
+		historyForRevisionOnly,
+		onSetForRevisionOnly,
 		historyIndexLabel,
 		historyModelStage1Short,
 		historyModelStage1Full,
@@ -134,10 +143,16 @@
 							class:ghost-active={historyStarredOnly}
 							onclick={() => onSetStarredOnly(!historyStarredOnly)}
 						>{t().historyStarredOnly}</button>
+						<button
+							class="ghost-btn history-filter-btn"
+							class:ghost-active={historyForRevisionOnly}
+							onclick={() => onSetForRevisionOnly(!historyForRevisionOnly)}
+						>{t().historyForRevisionOnly}</button>
 						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
 						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || navNewerPageDisabled}>{t().historyNewerPage(historyNavSpan)}</button>
 						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
 						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={interactionLocked || navOlderPageDisabled}>{t().historyOlderPage(historyNavSpan)}</button>
+						<button class="ghost-btn history-oldest-btn" onclick={onOldestPage} disabled={interactionLocked || navOldestDisabled}>{t().historyOldest}</button>
 					</div>
 				{/if}
 				<button
@@ -282,7 +297,9 @@
 		margin-bottom: 7px;
 	}
 	.history-nav-btn { min-width: 92px; }
-	.history-latest-btn { min-width: 54px; }
+	/* Both ends of the listing, sized alike so the row does not shuffle. */
+	.history-latest-btn,
+	.history-oldest-btn { min-width: 54px; }
 	.history-filter-btn { min-width: 76px; }
 	.ghost-btn.ghost-active { background: var(--fg); color: var(--panel); border-color: var(--fg); }
 	.history-collapse-btn {

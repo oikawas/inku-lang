@@ -201,7 +201,9 @@ test('T-11 a strip that cannot show the newest work first is never current', () 
 test('T-11 the page derives that from the same state the guards read', () => {
 	assert.match(
 		REFRESH,
-		/showsTheNewestFirst: historyOffset === 0 && !historyStarredOnly/,
+		// The strip carries two filters now, and either one means the page in
+		// hand is not the plain newest-first listing.
+		/showsTheNewestFirst: historyOffset === 0 && !historyStripFiltered/,
 		'the page no longer tells the comparison whether the strip can answer'
 	);
 });

@@ -39,6 +39,15 @@ export type HistoryNavState = {
 export type HistoryNavButton = 'latest' | 'newer' | 'older';
 
 /**
+ * The pager's buttons. It has one the per-work navigation does not: 'oldest'
+ * jumps to the far end of the listing, which only makes sense a page at a time.
+ * Kept as a widening of HistoryNavButton rather than as a fourth member of it,
+ * so `historyNavDisabled` still answers for exactly the three buttons the canvas
+ * and the strip share.
+ */
+export type HistoryPageButton = HistoryNavButton | 'oldest';
+
+/**
  * Which item is selected, counted from the newest. -1 when nothing is.
  *
  * Nothing selected is a real state the user reaches without asking for it --
@@ -100,11 +109,19 @@ export function historyNavTarget(state: HistoryNavState, button: HistoryNavButto
 }
 
 /** The same three buttons, moving a page at a time (the strip's pager). */
-export function historyPageTarget(state: HistoryNavState, button: HistoryNavButton): HistoryNavTarget | null {
+export function historyPageTarget(state: HistoryNavState, button: HistoryPageButton): HistoryNavTarget | null {
 	if (state.busy || state.locked || state.total === 0) return null;
 	const size = Math.max(1, state.windowSize);
 	const page = Math.floor(Math.max(0, state.offset) / size);
 	const totalPages = Math.max(1, Math.ceil(state.total / size));
+	if (button === 'oldest') {
+		// The mirror of 'latest', and counted the same way -- in works, not in
+		// pages -- so the two ends of the listing are disabled by the same rule
+		// the per-work buttons use. It lands on the oldest work rather than on
+		// the newest of the last page, which is what its name says.
+		if (historyNavDisabled(state).older) return null;
+		return { offset: Math.floor(Math.max(0, state.total - 1) / size) * size, select: 'oldest-on-page' };
+	}
 	if (button === 'latest') {
 		// Counted in works, not in pages, so this button and the canvas's "latest"
 		// are never enabled and disabled at the same moment on the same screen.

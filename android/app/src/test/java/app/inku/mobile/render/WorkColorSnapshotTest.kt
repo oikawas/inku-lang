@@ -4,8 +4,12 @@ import app.inku.mobile.data.model.ColorCatalog
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.WorkColorSnapshot
 import app.inku.mobile.data.model.workColorSnapshot
+import app.inku.mobile.llm.ModelProvider
+import app.inku.mobile.llm.ModelRequest
+import app.inku.mobile.llm.ModelResponse
 import app.inku.mobile.pipeline.LocalFallbackPipeline
 import app.inku.mobile.pipeline.PaintRequest
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -24,11 +28,14 @@ class WorkColorSnapshotTest {
         return base.copy(map = base.map + ("custom" to red))
     }
 
-    private fun request(snapshot: WorkColorSnapshot? = null) = PaintRequest(
+    private fun request(
+        snapshot: WorkColorSnapshot? = null,
+        catalogId: String = "default",
+    ) = PaintRequest(
         description = "red line",
         stage1Model = "stage1",
         stage2Model = "stage2",
-        colorCatalogId = "default",
+        colorCatalogId = catalogId,
         canvasAspect = "square",
         autoRepair = false,
         renderSeed = 4242L,
@@ -84,52 +91,58 @@ class WorkColorSnapshotTest {
         assertNull(workColorSnapshot(metadata(colorMap = JSONObject())))
     }
 
+    private fun assertRenderedCatalogId(expected: String, storedMetadata: String) {
+        val snapshot = workColorSnapshot(storedMetadata)
+        val rendered = LocalFallbackPipeline().renderFromScore(score, request(snapshot))
+        assertEquals(expected, JSONObject(rendered.renderMetadataJson).getString("render_color_catalog_id"))
+    }
+    
     @Test
     fun t5_renderCatalogIdWins() {
-        assertEquals(
-            "rendered-with",
-            workColorSnapshot(metadata(renderCatalogId = "rendered-with", catalogId = "catalog"))?.catalogId,
-        )
+        assertRenderedCatalogId("rendered-with", metadata(renderCatalogId = "rendered-with", catalogId = "catalog"))
     }
-
+    
     @Test
     fun t5_catalogIdIsTheFirstFallback() {
-        assertEquals(
-            "catalog",
-            workColorSnapshot(metadata(catalogId = "catalog"))?.catalogId,
-        )
+        assertRenderedCatalogId("catalog", metadata(catalogId = "catalog"))
     }
-
+    
     @Test
     fun t5_defaultIsTheLastFallback() {
-        assertEquals(
-            "default",
-            workColorSnapshot(metadata())?.catalogId,
-        )
+        assertRenderedCatalogId("default", metadata())
     }
-
+    
     @Test
     fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
-        val current = catalog("#aa0000")
+        val current = ColorCatalogs.get("ink_season")
+        val abstractScore = score.replace("custom", "red")
         val pipeline = LocalFallbackPipeline(DefaultSvgRenderer { current })
-        val currentDrawing = pipeline.renderFromScore(score, request())
+        val currentDrawing = pipeline.renderFromScore(abstractScore, request(catalogId = current.id))
         val snapshotDrawing = pipeline.renderFromScore(
-            score,
-            request(WorkColorSnapshot("default", current.renderMap)),
+            abstractScore,
+            request(WorkColorSnapshot(current.id, current.renderMap), catalogId = current.id),
         )
-
+    
         assertEquals(currentDrawing.displaySvg, snapshotDrawing.displaySvg)
     }
-
+    
     @Test
-    fun t7_newDrawingsStillReadTheCurrentCatalog() {
-        var current = catalog("#aa0000")
-        val pipeline = LocalFallbackPipeline(DefaultSvgRenderer { current })
-        val before = pipeline.renderFromScore(score, request())
-
-        current = catalog("#00aa00")
-        val after = pipeline.renderFromScore(score, request())
-
-        assertNotEquals(before.displaySvg, after.displaySvg)
+    fun t7_newDrawingRoutesDoNotReadAWorkSnapshot() {
+        val provider = object : ModelProvider {
+            override val providerId = "test"
+            override suspend fun generate(request: ModelRequest) = ModelResponse("", request.modelId)
+        }
+        val pipeline = LocalFallbackPipeline(modelProvider = provider)
+        val withoutSnapshot = runBlocking { pipeline.composeFromDdl("中央に赤い線を一本引く。", request()) }
+        val changedMap = ColorCatalogs.get("default").renderMap.mapValues { "#00aa00" }
+        val withSnapshot = runBlocking {
+            pipeline.composeFromDdl(
+                "中央に赤い線を一本引く。",
+                request(WorkColorSnapshot("default", changedMap)),
+            )
+        }
+    
+        assertEquals(withoutSnapshot.displaySvg, withSnapshot.displaySvg)
     }
+
 }

@@ -28,10 +28,14 @@ from inku_server.counts import (
     count_hint_from_ddl,
 )
 from inku_server.layer_versions import DDL_ENGINE_VERSION
+from inku_server.plugins.document_format import expand_plugin_ddl, parse_plugin_document
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_ddl_reference.py"
 MANIFEST_PATH = SERVER_ROOT / "reference" / f"ddl-engine-{DDL_ENGINE_VERSION}" / "manifest.json"
+# The shipped plugin, the one the frozen corpus expands. Its `Nature.青葉` is the
+# Japanese name that was switching numeral reading off in an English body.
+NATURE_PLUGIN = SERVER_ROOT / "plugins" / "nature-leaves.inku-plugin.md"
 
 
 def _generator():
@@ -250,3 +254,38 @@ def test_t24_an_index_is_which_one_not_how_many() -> None:
 
     # The control: the same digit, counting marks instead of naming one.
     assert _explicit_counts_from_ddl("Place 2 marks.", lang="en") == frozenset({2})
+
+
+# --- T-9, T-10 ------------------------------------------------------------
+
+
+def _units_placed(ddl: str, *, lang: str) -> list[int]:
+    """How many whole units the expansion layer placed, per plugin fired."""
+    document = parse_plugin_document(NATURE_PLUGIN.read_text(encoding="utf-8"))
+    result = expand_plugin_ddl(
+        ddl, source_text=ddl, lang=lang, documents=[document], seed_text="reference"
+    )
+    return [int(entry["units"]) for entry in result.provenance if "units" in entry]
+
+
+def test_t9_an_english_body_reads_a_numeral_beside_a_japanese_plugin_name() -> None:
+    """The CJK the reader saw was the plugin's own name.
+
+    `Place 12 Nature.青葉 marks.` placed one unit while `Place twelve Nature.青葉
+    marks.` placed twelve -- the same description, differing only in how the
+    number was written.
+    """
+    assert _units_placed("Place 12 Nature.青葉 marks.", lang="en") == [12]
+    # The number word was never blocked, and must not move.
+    assert _units_placed("Place twelve Nature.青葉 marks.", lang="en") == [12]
+
+
+def test_t10_a_japanese_body_still_leaves_a_bare_numeral_unread() -> None:
+    """The other side of stage 4: `ja` keeps the exclusion `en` gives up.
+
+    The probe is a bare numeral rather than a counter phrase on purpose. A
+    counter phrase like `四つの方向` is held out by the axis table as well, and a
+    case two exclusions both cover cannot measure either one.
+    """
+    assert _explicit_counts_from_ddl("立方体の向き: 30度回転", lang="ja") == frozenset()
+    assert _explicit_counts_from_ddl("立方体の向き: 30度回転", lang="en") == frozenset({30})

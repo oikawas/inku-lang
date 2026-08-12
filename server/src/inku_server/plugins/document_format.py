@@ -941,7 +941,7 @@ def _phrase_that_names(text: str, marker: str, *, lang: str) -> str | None:
     return None
 
 
-def _stated_unit_count(clause: str | None) -> int | None:
+def _stated_unit_count(clause: str | None, *, lang: str) -> int | None:
     """How many whole units the body asked for, or None if it did not say.
 
     Ruling A (2026-08-11): what a plugin offers is one unit, and a count in the
@@ -952,8 +952,13 @@ def _stated_unit_count(clause: str | None) -> int | None:
     A phrase stating more than one count is left at one unit: which of them is the
     unit count is not decidable here, and choosing would place a number nobody
     wrote.
+
+    Ruling B ([I-216], 2026-08-12): the language reaches the reader from here.
+    Without it, `Place 12 Nature.青葉 marks.` placed one unit -- the reader saw
+    CJK beside the numeral and left it to the Japanese path, and the CJK it saw
+    was the plugin's own name.
     """
-    stated = _explicit_counts_from_ddl(clause)
+    stated = _explicit_counts_from_ddl(clause, lang=lang)
     if len(stated) != 1:
         return None
     value = next(iter(stated))
@@ -1053,7 +1058,7 @@ def expand_plugin_ddl(
                 )
             else:
                 phrase = _phrase_that_names(source, trigger, lang=lang)
-            requested = _stated_unit_count(phrase)
+            requested = _stated_unit_count(phrase, lang=lang)
             unit_cost = _expansion_cost(expansion, entry_instructions, lang=lang)
             expansions = [expansion]
             units = 1

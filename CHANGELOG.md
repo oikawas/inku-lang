@@ -5848,3 +5848,26 @@ it was. **Until now CI ran the corpus regeneration and nothing else: not one lin
   key-dependent tests, **ten** that need local-only material (nine `cli/bench/leaf`, one `cairosvg`), the **two**
   above, the **Android JVM tests** (no gradle wrapper), and **`no-git-sync/`** (untracked). **Skip reasons are
   printed every run with `-rs`: read that list rather than the pass count.**
+
+### 2026-08-12 — a guard at the commit, where the exclude rules cannot help (**no version bump**, tooling only)
+
+**`scripts/git/setup.sh` now installs a `pre-commit` secret guard** (ledger I-193). It scans every staged
+blob against **nine content rules** (`nvapi-`, `sk-`, GitHub PAT, AWS AKID, Google, Slack, PRIVATE KEY,
+`Bearer …`, and a `24+ hex . token` shape) and **nine path rules** (`.pem`, `.p12`, `.pfx`, `.key`,
+`id_rsa`-family, `*_key.txt`, `.env` — `.env.example` excluded), and refuses the commit on a hit.
+**It prints the rule name and the line number, never the value.**
+- **Why exclude rules are not enough.** Local-only working material is `.gitignore`d, so putting it under
+  version control takes `git add -f` — and **`-f` is precisely the flag that turns the exclude rules off**.
+  The same keystroke stages a credential sitting beside it. **A guard has to live after the index.**
+- **What a scanner cannot see is what the flag lets in.** A `grep` that honours `.gitignore` does not scan
+  ignored directories at all, so **an audit of the work tree reports zero while `add -f` would stage them** (measured).
+- **git silently skips a hook it cannot run** (measured). The hook was first installed as a symlink, with a
+  comment claiming a dangling link would make git refuse the commit — **that was false; the commit went through.**
+  A guard that disappears without a sound is the very failure this step exists to prevent, so the hook is now a
+  wrapper that **checks its own target and refuses the commit when it is missing**. The rules still live in one file.
+- **Zero false positives**: the nine content rules over **10,858** tracked text files (483 over 1 MB excluded),
+  the nine path rules over all **17,204** tracked paths. Acceptance was measured
+  five ways: two positives, one missing-guard case, one harmless commit, and the deliberate `INKU_ALLOW_SECRET=1`
+  escape hatch. **It refuses to overwrite a `pre-commit` hook it did not write** (identified by a marker).
+- **A public clone gets nothing and is told nothing** — the guard itself is local-only material and is not part of
+  the published tree, so this step is silent there (verified against a simulated clone). `--no-verify` still bypasses it.

@@ -1325,10 +1325,48 @@ def _move_anchor_to(
     return Instruction.model_validate(data)
 
 
-def _resolve_at_region(ins: Instruction, seed: int, index: int) -> Instruction:
+def _short_side_scales(canvas: CanvasSize | None) -> tuple[float, float]:
+    """Per-axis factors that put a normalized extent on the short edge.
+
+    Engine 30 did this for a mark's own size (`_size_px`); engine 31 does it for
+    what the arrangement layer spreads. A normalized extent becomes pixels
+    through `canvas.width` on x and `canvas.height` on y, so on a non-square
+    canvas the same number means a different number of pixels per axis. Scaling
+    each axis by `unit / that axis` makes both come out `unit` pixels, which is
+    what keeps a ring round and a square region square.
+    """
+    if canvas is None:
+        return (1.0, 1.0)
+    return (canvas.unit / canvas.width, canvas.unit / canvas.height)
+
+
+def _region_in_short_side_units(
+    region: Sequence[float], canvas: CanvasSize | None
+) -> tuple[float, float, float, float]:
+    """R3: the region's centre stays put, its extent goes to short-side units.
+
+    The centre is deliberately left proportional -- "upper right" is the upper
+    right of any canvas -- so only the half-extents are scaled.
+    """
+    x0, y0, x1, y1 = region
+    sx, sy = _short_side_scales(canvas)
+    if sx == 1.0 and sy == 1.0:
+        # A square canvas has to come out byte-identical, and centre +/-
+        # half-extent does not round-trip in floating point: for
+        # [0.6, 0.18, 0.82, 0.4] it moves y0 by 2.78e-17, enough to cross a
+        # rounding boundary downstream and change a frozen square case.
+        return (x0, y0, x1, y1)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    hx, hy = (x1 - x0) / 2, (y1 - y0) / 2
+    return (cx - hx * sx, cy - hy * sy, cx + hx * sx, cy + hy * sy)
+
+
+def _resolve_at_region(
+    ins: Instruction, seed: int, index: int, canvas: CanvasSize | None = None
+) -> Instruction:
     if ins.at is None:
         return ins
-    x0, y0, x1, y1 = ins.at.region
+    x0, y0, x1, y1 = _region_in_short_side_units(ins.at.region, canvas)
     x = x0 + (x1 - x0) * _hash01(index, seed, "region-x")
     y = y0 + (y1 - y0) * _hash01(index, seed, "region-y")
     return _move_anchor_to(ins, (x, y), keep_relation=True)
@@ -1707,7 +1745,9 @@ def _resolve_relation(
     return _move_anchor_to(ins, target)
 
 
-def _resolve_performance_score(score: Score, performance_seed: int | None) -> Score:
+def _resolve_performance_score(
+    score: Score, performance_seed: int | None, canvas: CanvasSize | None = None
+) -> Score:
     if performance_seed is None:
         return score
     resolved: list[Instruction] = []
@@ -1725,7 +1765,7 @@ def _resolve_performance_score(score: Score, performance_seed: int | None) -> Sc
             data.pop("relation", None)
             ins = Instruction.model_validate(data)
         else:
-            ins = _resolve_at_region(ins, seed, index)
+            ins = _resolve_at_region(ins, seed, index, canvas)
             ins = _resolve_relation(ins, resolved, seed, index)
         resolved.append(ins)
     data = score.model_dump(by_alias=True)
@@ -2086,7 +2126,7 @@ def _expand_arrangement_layout(
 
     if arr.layout == "grid":
         if ins.at is not None:
-            x0, y0, x1, y1 = ins.at.region
+            x0, y0, x1, y1 = _region_in_short_side_units(ins.at.region, canvas)
         else:
             x0 = y0 = margin
             x1 = y1 = 1.0 - margin
@@ -2203,15 +2243,22 @@ def _expand_arrangement_layout(
         cx = arr.center[0] if arr.center else ax
         cy = arr.center[1] if arr.center else ay
         r = arr.radius if arr.radius else 0.3
+        # engine 31: the stated radius is one length, so it has to buy the same
+        # number of pixels on both axes. Written straight, `r` in normalized
+        # coordinates becomes `r * width` across and `r * height` down, and the
+        # ring came out with the canvas's own aspect (0.19 on the pillar). The
+        # radius stays the description's; only its trip to pixels is levelled.
+        scale_x, scale_y = _short_side_scales(canvas)
+        rx, ry = r * scale_x, r * scale_y
         targets = [
             (
                 cx
-                + r
+                + rx
                 * math.cos(
                     math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)
                 ),
                 cy
-                - r
+                - ry
                 * math.sin(
                     math.radians(_rhythm_t(i, n, seed, arr.rhythm_spacing) * 360)
                 ),
@@ -3318,12 +3365,15 @@ def render(
     wild: bool = False,
 ) -> str:
     profile = _normalize_svg_profile(svg_profile)
-    score = _resolve_performance_score(score, render_seed)
+    # Built before the score is resolved because `_resolve_at_region` needs it.
+    # Resolution only replaces `instructions` and passes `canvas` through, so
+    # the aspect read here is the same one the old order read after it.
+    canvas = canvas_size_for_aspect(canvas_aspect or _score_canvas_aspect(score))
+    score = _resolve_performance_score(score, render_seed, canvas)
     structured = profile != "display"
     use_filters = profile == "display"
     cmap = {**COLOR_MAP, **(color_map or {})}
     work_assignment = _work_color_assignment(cmap, render_seed, catalog_id)
-    canvas = canvas_size_for_aspect(canvas_aspect or _score_canvas_aspect(score))
     dwg = svgwrite.Drawing(
         size=(canvas.width, canvas.height),
         viewBox=f"0 0 {canvas.width} {canvas.height}",

@@ -255,6 +255,18 @@
 		return digest ? `${prefix}:${digest.slice(0, 10)}…` : `${value.slice(0, 12)}…`;
 	}
 
+	/** The digest on its own, without the scheme it is stored under.
+	 *
+	 *  A stored hash is `<scheme>:<digest>` (dh1, rh2, rh3…). The row already
+	 *  says which one it is, and the value beside it shows the scheme as well,
+	 *  so a copy that carries it hands the reader the label a third time --
+	 *  pasted anywhere else it reads as `rh2:` glued to the front of the hash.
+	 *  A value with no scheme is copied whole. */
+	function hashDigest(value: string): string {
+		const [prefix, digest] = value.split(':', 2);
+		return digest || prefix;
+	}
+
 	// The details row shows the hash abbreviated, so the button copies the whole
 	// value the way the history manager does -- a truncated hash identifies nothing.
 	let copiedHashNodeId = $state<string | null>(null);
@@ -263,8 +275,8 @@
 	function copyRenderHash(node: LineageNode, event: MouseEvent): void {
 		event.stopPropagation();
 		event.preventDefault();
-		const hash = node.render_hash;
-		if (!hash) return;
+		if (!node.render_hash) return;
+		const hash = hashDigest(node.render_hash);
 		if (navigator.clipboard?.writeText) {
 			void navigator.clipboard.writeText(hash).catch(() => fallbackCopy(hash));
 		} else {

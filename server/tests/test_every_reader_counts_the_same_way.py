@@ -340,15 +340,25 @@ def test_t12_a_count_the_phrase_states_is_not_overruled_by_the_sentence() -> Non
     Two plugins, two counts, one description. Read at sentence granularity both
     would see both counts and the ambiguity rule would drop each to one unit.
     """
-    both = (
+    # Two plugins, two counts, ONE sentence. This shape is what tells the rule
+    # apart from "always read the sentence": with the two counts in separate
+    # sentences the phrase and the sentence hold the same text, and a reader that
+    # ignored phrases entirely would answer identically.
+    one_sentence = "Nature.枯草を百二十本、Nature.落葉を三枚、並べる。"
+    result = _expansion(one_sentence, lang="ja")
+    # 落葉 keeps its own three and does not fall to the sentence's ambiguity.
+    assert 3 in [int(entry["units"]) for entry in result.provenance]
+    # 枯草 keeps its own 120 -- over budget, so declined whole, but read as 120.
+    assert _requested_over_budget(result) == [120]
+
+    # The contract's own pair, where each count sits in its own sentence.
+    separate = (
         "Nature.枯草の細い縦線を下半分に百二十本並べる。"
         "Nature.落葉の小さな楕円を右下にひとつ置く。"
     )
-    result = _expansion(both, lang="ja")
-    # 枯草 keeps its own 120 -- over budget, so declined whole, but read as 120.
-    assert _requested_over_budget(result) == [120]
-    # 落葉 keeps its one, and does not pick up 枯草's count from the sentence.
-    assert [int(entry["units"]) for entry in result.provenance] == [1, 1]
+    apart = _expansion(separate, lang="ja")
+    assert _requested_over_budget(apart) == [120]
+    assert [int(entry["units"]) for entry in apart.provenance] == [1, 1]
 
 
 def test_t13_a_sentence_stating_two_counts_stays_at_one_unit() -> None:

@@ -24,6 +24,7 @@ from typing import Any, get_args
 from .limits import DEFAULT_LIMITS, Limits, current_limits
 from .llm_retry import call_with_llm_retry
 from .model_settings import connection_for, provider_for_model
+from .plugins import CANVAS_ASPECTS, CanvasAspect
 from .provider_limits import provider_slot
 from .saijiki import relation_literal_markers
 from .schema import Score, ScoreVersion, Variation, count_field_description
@@ -43,6 +44,20 @@ _logger = logging.getLogger(__name__)
 # `.format` because the body is full of literal braces (at={"region":[...]}).
 _COUNT_DENSITY_SLOT = "%%COUNT_DENSITY%%"
 _GRID_COUNT_SLOT = "%%GRID_COUNT%%"
+# The support slot. Unlike the two above it can resolve to nothing: a call that
+# names no paper leaves the prompt byte-identical to the paperless body, which
+# is what keeps the module-level constants free of a paper they cannot know.
+_CANVAS_SLOT = "%%CANVAS%%"
+# The slot swallows its own trailing blank line, so the paperless body has no
+# gap where the block would have been.
+_CANVAS_SLOT_LINE = _CANVAS_SLOT + "\n\n"
+# The heading the support block opens with, in both languages. A gate on the
+# block has to cut this region out of the prompt: the same words appear in the
+# conversion rules, so a search over the whole body is satisfied by the wrong
+# occurrence.
+_CANVAS_BLOCK_HEADING_JA = "## 支持体（この作品を描く紙）"
+_CANVAS_BLOCK_HEADING_EN = "## Support (the paper this work is drawn on)"
+_CANVAS_ASPECT_BY_ID: dict[str, CanvasAspect] = {item.id: item for item in CANVAS_ASPECTS}
 
 # The density bands under the count ceiling. The final upper edge IS the ceiling;
 # the interior edges are prose about density, so they are kept as written and
@@ -115,8 +130,97 @@ def _grid_count_line_en(limits: Limits) -> str:
     )
 
 
-def build_system_prompt(lang: str, limits: Limits = DEFAULT_LIMITS) -> str:
-    """The Stage 2 prompt with the effective limits written into it."""
+def _ratio_text(value: float) -> str:
+    """`1.0` as "1", `2.35` as "2.35" -- the ratio as a reader would write it."""
+    return f"{value:g}"
+
+
+def _canvas_orientation(aspect: CanvasAspect, lang: str) -> str:
+    # Not the word "横長": the conversion rules already teach it as the
+    # proportion of a SHAPE ("横長の四角" is an ellipse twice as wide as tall).
+    # The support is described with words that cannot be read as an adjective
+    # of a mark.
+    if aspect.ratio_w > aspect.ratio_h:
+        return "a support wider than it is tall" if lang == "en" else "横に広い支持体"
+    if aspect.ratio_w < aspect.ratio_h:
+        return "a support taller than it is wide" if lang == "en" else "縦に長い支持体"
+    return "a square support" if lang == "en" else "正方形の支持体"
+
+
+def _canvas_block(canvas_aspect: str, lang: str) -> str:
+    """What the composition is told about the paper it is composing for.
+
+    Three statements, in the order they bind: which paper this is, that the
+    paper may move size and placement, and that it may not overrule a size the
+    description itself stated.
+    """
+    aspect = _CANVAS_ASPECT_BY_ID.get(canvas_aspect)
+    if aspect is None:
+        return ""
+    ratio = f"{_ratio_text(aspect.ratio_w)}:{_ratio_text(aspect.ratio_h)}"
+    if lang == "en":
+        return "\n".join(
+            (
+                _CANVAS_BLOCK_HEADING_EN,
+                "",
+                f'- **This work is drawn on the support `{canvas_aspect}` -- {_canvas_orientation(aspect, "en")}, ratio {ratio}. Compose for this support, not for a square**',
+                f'- **Write this support into canvas.aspect: {{"canvas":{{"aspect":"{canvas_aspect}"}}}}. Keep canvas.ground when the normalized DDL asks for one: {{"canvas":{{"aspect":"{canvas_aspect}","ground":{{...}}}}}}**',
+                "- **What the support may move is the SIZE and the PLACEMENT of the marks. A mark that would be a speck on this support is drawn at the size this support asks for, and the placement follows the long side**",
+                "- **The support may not move the COUNT. The count comes from the normalized DDL. Do not add or remove marks because the support is narrow or wide**",
+                "- **The support may not overrule a size the description stated. When the normalized DDL says small, thin, or faint, the mark stays small, thin, or faint on every support**",
+            )
+        )
+    return "\n".join(
+        (
+            _CANVAS_BLOCK_HEADING_JA,
+            "",
+            f"- **この作品を描く支持体は `{canvas_aspect}`（{_canvas_orientation(aspect, 'ja')}・比 {ratio}）。正方形ではなくこの支持体のために構図を組む**",
+            f'- **この支持体を canvas.aspect へ書く: {{"canvas":{{"aspect":"{canvas_aspect}"}}}}。正規化DDL が地を求めている場合は ground を併記する: {{"canvas":{{"aspect":"{canvas_aspect}","ground":{{...}}}}}}**',
+            "- **支持体に合わせてよいのは痕の大きさと配置である。この支持体の上で塵のようになる大きさは、この支持体が求める大きさで描き、配置は長辺に沿わせる**",
+            "- **支持体で個数を変えない。個数は正規化DDL が決める。支持体が細いから、広いからという理由で痕を増減しない**",
+            "- **記述が述べた大きさを支持体の都合で覆さない。正規化DDL が「小さい」「細い」「かすか」と述べている痕は、どの支持体でも小さいまま・細いまま・かすかなままにする**",
+        )
+    )
+
+
+def canvas_retry_line(canvas_aspect: str | None, lang: str) -> str:
+    """The support, for the compact retry prompt.
+
+    The retry replaces the whole system prompt, so a retry that does not state
+    the support composes on a paper it was never told about -- the same defect
+    the main prompt just fixed, showing up only on the runs that happened to
+    retry. Empty when no support was requested, which keeps the retry body of
+    such a run byte-identical to what it was before.
+    """
+    aspect = _CANVAS_ASPECT_BY_ID.get(canvas_aspect or "")
+    if aspect is None:
+        return ""
+    ratio = f"{_ratio_text(aspect.ratio_w)}:{_ratio_text(aspect.ratio_h)}"
+    if lang == "en":
+        return (
+            f'The support is `{aspect.id}` -- {_canvas_orientation(aspect, "en")}, ratio {ratio}. '
+            f'Compose for it and write it into canvas.aspect: {{"canvas":{{"aspect":"{aspect.id}"}}}}. '
+            "The support may move the size and placement of the marks, never their count, "
+            "and never a size the description itself stated.\n"
+        )
+    return (
+        f"支持体は `{aspect.id}`（{_canvas_orientation(aspect, 'ja')}・比 {ratio}）。"
+        f'この支持体のために構図を組み、canvas.aspect へ書く: {{"canvas":{{"aspect":"{aspect.id}"}}}}。'
+        "支持体に合わせてよいのは痕の大きさと配置だけで、個数は変えず、記述が述べた大きさも覆さない。\n"
+    )
+
+
+def build_system_prompt(
+    lang: str,
+    limits: Limits = DEFAULT_LIMITS,
+    canvas_aspect: str | None = None,
+) -> str:
+    """The Stage 2 prompt with the effective limits and the support written into it.
+
+    `canvas_aspect=None` states no support at all -- the body is then the
+    paperless one, byte for byte. The module-level constants are built that way
+    because they are read at import time, before any request exists.
+    """
     if lang == "en":
         template, block, grid = (
             _SYSTEM_PROMPT_EN_TEMPLATE,
@@ -129,7 +233,11 @@ def build_system_prompt(lang: str, limits: Limits = DEFAULT_LIMITS) -> str:
             _count_density_block_ja(limits),
             _grid_count_line_ja(limits),
         )
-    return template.replace(_COUNT_DENSITY_SLOT, block).replace(_GRID_COUNT_SLOT, grid)
+    prompt = template.replace(_COUNT_DENSITY_SLOT, block).replace(_GRID_COUNT_SLOT, grid)
+    canvas_block = _canvas_block(canvas_aspect, lang) if canvas_aspect is not None else ""
+    if not canvas_block:
+        return prompt.replace(_CANVAS_SLOT_LINE, "")
+    return prompt.replace(_CANVAS_SLOT_LINE, canvas_block + "\n\n")
 
 
 # 手順のみ。フィールド仕様は submit_score スキーマの description を参照。
@@ -138,6 +246,8 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 正規化DDL を解析し submit_score を呼び出せ。
 フィールド仕様は submit_score スキーマの description フィールドが正典。
 「原文」が付いている場合は正規化DDL を主とし、原文は省略された属性（色・素材・数量など）の補完に使え。
+
+%%CANVAS%%
 
 # 変換ルール (厳守)
 
@@ -288,6 +398,9 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 
 入力: 黒い縦線を横に三本並べる。地: 薄墨。
 出力: {"canvas":{"aspect":"square","ground":{"material":"ink_wash","tone":"gray","density":0.25,"opacity":0.14}},"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"black","arrangement":{"count":3,"layout":"horizontal"}}]}
+
+入力: （支持体が pillar・縦に長い・比 1:5 と告げられている場合）黒い細い線を中心へひとつ置く。
+出力: {"canvas":{"aspect":"pillar"},"instructions":[{"primitive":"line","from":[0.5,0.08],"to":[0.5,0.92],"color":"black","weight":"pen"}]}
 
 入力: 縦の実線を横に三本並べる。
 出力: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
@@ -530,6 +643,8 @@ Parse the normalized DDL and call submit_score.
 Field specifications in the submit_score schema descriptions are authoritative.
 If "original text" is provided, use normalized DDL as primary; use original text to fill missing attributes (color, material, count, etc.).
 
+%%CANVAS%%
+
 # Conversion Rules (strict)
 
 ## Shapes and compression
@@ -680,6 +795,9 @@ Output: {"canvas":{"aspect":"square","ground":{"material":"paper","tone":"off_wh
 
 Input: Line up three vertical black lines horizontally. Ground: ink wash.
 Output: {"canvas":{"aspect":"square","ground":{"material":"ink_wash","tone":"gray","density":0.25,"opacity":0.14}},"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"black","arrangement":{"count":3,"layout":"horizontal"}}]}
+
+Input: (when the support announced is pillar -- taller than wide, ratio 1:5) Place one thin black line at center.
+Output: {"canvas":{"aspect":"pillar"},"instructions":[{"primitive":"line","from":[0.5,0.08],"to":[0.5,0.92],"color":"black","weight":"pen"}]}
 
 Input: Line up three vertical solid lines horizontally.
 Output: {"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"arrangement":{"count":3,"layout":"horizontal"}}]}
@@ -1447,6 +1565,7 @@ def compose(
     trace_sink: list[dict] | None = None,
     prompt_metadata: dict[str, str] | None = None,
     limits: Limits = DEFAULT_LIMITS,
+    canvas_aspect: str | None = None,
 ) -> tuple[Score, int | None, int | None]:
     """(score, tokens_in, tokens_out) を返す。system_prompt 指定時はスナップショット使用。
 
@@ -1461,8 +1580,9 @@ def compose(
         effective_prompt = system_prompt
     else:
         # Built here, not read off the module constant: the limits the model is
-        # told about must be the ones coerce will apply to its answer.
-        effective_prompt = build_system_prompt(lang, limits)
+        # told about must be the ones coerce will apply to its answer, and the
+        # support it composes for must be the one the request asked for.
+        effective_prompt = build_system_prompt(lang, limits, canvas_aspect)
     if prompt_metadata is not None:
         prompt_metadata["stage2_prompt_digest"] = _stage2_prompt_digest(effective_prompt)
     settings = _current_model_settings()

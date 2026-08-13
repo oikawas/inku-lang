@@ -1006,7 +1006,12 @@ def test_compose_applies_canvas_aspect_plugin(monkeypatch, auth_context):
 
     assert r.status_code == 200
     data = r.json()
-    assert data["score"]["canvas"] == "pillar"
+    # Contract the-composition-knows-what-paper-it-is-on (2026-08-13): the Score
+    # keeps what Stage 2 declared -- here nothing, so the default stands -- and
+    # the requested paper reaches the picture through render_canvas_aspect*
+    # instead of by overwriting the declaration.
+    assert data["score"]["canvas"] == "square"
+    assert data["render_canvas_aspect_id"] == "pillar"
     assert 'viewBox="0 0 200 1000"' in data["svg"]
 
 
@@ -1029,8 +1034,12 @@ def test_compose_canvas_aspect_override_preserves_ground(monkeypatch, auth_conte
 
     assert r.status_code == 200
     data = r.json()
-    assert data["score"]["canvas"]["aspect"] == "pillar"
+    # The declaration and its ground both survive the override -- see the note
+    # in test_compose_applies_canvas_aspect_plugin.
+    assert data["score"]["canvas"]["aspect"] == "square"
     assert data["score"]["canvas"]["ground"]["material"] == "paper"
+    assert data["render_canvas_aspect_id"] == "pillar"
+    assert 'viewBox="0 0 200 1000"' in data["svg"]
 
 
 def test_compose_accepts_byobu_canvas_with_multiline_ddl(monkeypatch, auth_context):
@@ -1052,7 +1061,8 @@ def test_compose_accepts_byobu_canvas_with_multiline_ddl(monkeypatch, auth_conte
 
     assert r.status_code == 200
     data = r.json()
-    assert data["score"]["canvas"] == "byobu"
+    assert data["score"]["canvas"] == "square"
+    assert data["render_canvas_aspect_id"] == "byobu"
     assert 'viewBox="0 0 2200 1000"' in data["svg"]
 
 
@@ -3897,7 +3907,7 @@ def test_render_svg_forwards_wild_to_the_renderer(auth_context, monkeypatch):
     captured: dict = {}
 
     def fake_render_svg(
-        score, *, color_map=None, catalog_id=None, svg_profile=None,
+        score, *, color_map=None, catalog_id=None, canvas_aspect=None, svg_profile=None,
         render_seed=None, composition_seed=None, wild=False
     ):
         captured["wild"] = wild

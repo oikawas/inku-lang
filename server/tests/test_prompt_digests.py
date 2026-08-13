@@ -113,10 +113,10 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 45_134
-    assert _digest(composer.SYSTEM_PROMPT) == "0799e1fcd37506bc"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 43_106
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "4723bd39d1bf2285"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 45_412
+    assert _digest(composer.SYSTEM_PROMPT) == "2838b9cacb1c551e"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 43_363
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "fd7c46cf4a5a8f2f"
     # `hair` -> `silverpoint` の改名で、Stage 2 の素材語対応表 2 行と作例 8 件、
     # そして weight の enum と description が動いた。tool schema は 17_696 -> 17_713。
     # 色選択の一行が `palette` を捨てて `抽象色` / `the abstract colors` になった
@@ -148,8 +148,13 @@ def test_stage2_prompt_and_tool_expected_values():
     # 揃え、塗りつぶし規則に「面: 塗り」を足した。ja 44_589 -> 45_134 /
     # en 42_585 -> 43_106。**tool schema は動いていない** (18_492 / c1c1... のまま)
     # —— 動かしたのは散文だけで、`SurfaceSpec` のフィールドにも enum にも触れていない。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "cfa0e44d64743a14"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "c4c26cdbeb3383e7"
+    # 契約 the-composition-knows-what-paper-it-is-on (2026-08-13): 支持体のスロットを
+    # 足し、square でない紙の作例を日英に 1 件ずつ入れた。ja 45_134 -> 45_412 /
+    # en 43_106 -> 43_363。**tool schema は動いていない** (18_492 / c1c1... のまま)
+    # —— 動かしたのは散文と作例だけである。**この 2 行が凍結しているのは紙を告げない
+    # 本文の指紋**で、要求ごとに組む本文は紙ごとに別の値になる。
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "c422ced8671cf02a"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "b10c32d1968f0fc7"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -254,8 +259,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     # The temporary schema change must remain visible after the nine-color update.
     # The digest reads declaration order too, so moving `thinness` before `surface`
     # (contract stage2-score-shrinkage, 2026-08-03) moves this value as well.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "9ae03fcd67ac79db"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "0799e1fcd37506bc"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "33aa0fcc50ded4a2"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "2838b9cacb1c551e"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

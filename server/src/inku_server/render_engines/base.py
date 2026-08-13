@@ -22,6 +22,11 @@ class RenderEngine(Protocol):
         *,
         color_map: dict[str, str] | None = None,
         catalog_id: str | None = None,
+        # The support to perform on. `None` performs on the one the Score
+        # declares; a value overrules it without editing the Score, which is
+        # how a composition can be drawn on a paper it did not compose for and
+        # still say so.
+        canvas_aspect: str | None = None,
         svg_profile: str | None = None,
         render_seed: int | None = None,
         composition_seed: int | None = None,

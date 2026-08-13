@@ -1,5 +1,26 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 16 (2026-08-13): a mark the description called small is small whoever wrote it.
+# Stage 2 writes a circle and leaves the radius empty often enough to matter --
+# 115 of 2,972 production works carry a mark at coerce's default size -- and
+# `_coerce_instruction` then fills it from `PRIMITIVE_SPECS` with 0.15, a number
+# that reads not one character of the description. When coerce writes the mark
+# itself it does read the clause and answers 0.038, so the same description
+# produced marks four times apart depending on which layer wrote them.
+# `_with_stated_size` runs on the instruction the model handed over, before the
+# defaults erase the difference between a size omitted and a size stated, and
+# fills an empty radius or ellipse size from the one clause that names that
+# primitive with a size word in it. It borrows both the values and the two
+# readers from `_fallback_instruction_from_clause` rather than writing a second
+# table, which is the whole claim: the answer cannot drift apart again without
+# both paths drifting together. It fills nothing where two clauses fit (the
+# description does not say which one the mark answers) and overrules nothing the
+# model stated. Both exits run it, the `INKU_COERCE_DISABLE` one included: being
+# faithful to a size the description stated is not a matter of style, for the
+# same reason the two grid branches already run there. Four cases are new and
+# they are the whole of `changed_from_previous` -- no branch name was added to
+# the report, so the 26 carried-over cases are byte-identical, unlike engines 11
+# and 15.
 # 15 (2026-08-12): a shape can say how its surface is. The saijiki gains おもて /
 # surfaces -- eleven state nouns for how the inside of a closed shape is, beside
 # つらなり, which says the same about a line. The vocabulary grew, so the version
@@ -147,7 +168,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "15"
+DDL_ENGINE_VERSION = "16"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

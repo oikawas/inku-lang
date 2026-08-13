@@ -26,34 +26,32 @@ OUTPUT_DIR = REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}"
 MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-12"
+FROZEN_AT = "2026-08-13"
 REASON = (
-    "a shape can say how its surface is. The saijiki gains おもて / surfaces, "
-    "eleven state nouns for how the inside of a closed shape is, and the two "
-    "prompt tables learn to write and read them -- none of which this corpus "
-    "can see, because the LLM layers are not called here. What it can see is "
-    "the one deterministic branch the version carries: a surface attached to a "
-    "primitive with no interior moves to the nearest closed shape before it, "
-    "and is dropped where there is none or where that shape already carries "
-    "one. In production 53.4% of every surface written sat on a `line` (739) "
-    "or an `arc` (59) -- wash 453, grain 251, bleed 83, paper_grain 9, hatch 2 "
-    "-- and the renderer draws not one of them, because both "
-    "`_has_surface_texture` and the surface group require a closed shape. "
-    "Stage 2 attaches a 「面:」 sentence to whatever instruction precedes it, so "
-    "a line standing between the sentence and its shape lost the request "
-    "whole. Three cases are new: none of the 42 inputs frozen at engine 14 held "
-    "a 「面:」 clause -- the two files that hold one are `c_plugin_expand` output "
-    "written by a plugin -- so refreezing without them would have recorded a "
-    "version whose change the corpus never traversed. They are a set of three "
-    "on purpose: a surface already where it belongs must not move, one on a "
-    "line must go back to the shape, and one with nowhere to go must be let "
-    "go, so the record carries the guard as well as the repair. "
-    "`changed_from_previous` names all 26 coerce cases and not three, and the "
-    "twenty-three older ones did not move a score: adding a branch adds its "
-    "name to every `branch_report`, so each of them gained the one line "
-    "`with_surface_on_a_closed_shape: 0` and nothing else. Engine 11 read the "
-    "same way when it added `with_stated_count_fidelity`. Neither the 13 expand "
-    "cases nor the 6 plugin cases moved at all."
+    "a mark the description called small is small whoever wrote it. When Stage 2 "
+    "writes a circle and leaves the radius empty, `_coerce_instruction` fills it "
+    "from `PRIMITIVE_SPECS` -- 0.15, a number that reads not one character of the "
+    "description -- so 「小さな円を三つ」 and 「円を三つ」 were drawn at exactly the same "
+    "size. When coerce writes the mark itself it reads the clause and answers "
+    "0.038, so the same description produced marks four times apart depending on "
+    "which layer wrote them. `_with_stated_size` runs on the instruction the model "
+    "handed over, before the defaults erase the difference between a size omitted "
+    "and a size stated, and fills an empty radius or ellipse size from the one "
+    "clause naming that primitive with a size word in it -- borrowing the values "
+    "and both readers from `_fallback_instruction_from_clause` rather than writing "
+    "a second table. Of 2,972 production works, 643 state a small mark and the "
+    "rule reaches 55 of them (78 marks); the 189 marks whose primitive no small "
+    "clause names, and the 20 answered by two clauses at once, are left alone. "
+    "Four cases are new and they are the whole of `changed_from_previous`: not one "
+    "of the 26 inputs frozen at engine 15 hands over a circle or an ellipse with "
+    "its size empty -- measured with `_ddl_clauses`, `_primitive_from_clause` and "
+    "`_is_small_mark_clause` themselves -- so refreezing without them would have "
+    "recorded a version whose change the corpus never traversed. Two of the four "
+    "move and two are controls: a description with no size word, and a size the "
+    "model did state, both of which keep what they had. No branch was added to "
+    "the report this time, which is why the 26 carried-over cases are byte-"
+    "identical and are not listed, unlike engines 11 and 15. Neither the 13 "
+    "expand cases nor the 6 plugin cases moved at all."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
@@ -363,6 +361,44 @@ def build_coerce_inputs() -> dict[str, dict[str, Any]]:
                 "地: 生成りの紙、細かい紙目。\n"
                 "背景を黒で塗りつぶす。白い右下がりの小さな楕円を百三十七個を散らす。"
             ),
+        ),
+        # ddl-engine 16. Not one of the 26 inputs frozen at engine 15 hands over a
+        # circle or an ellipse with its size left empty -- measured with the
+        # product's own readers -- so the corpus could not see a version that
+        # fills exactly that. These four are the branch and its two edges: the
+        # size word reaching an empty radius, reaching an empty ellipse, a
+        # description with no size word, and a size the model did state.
+        "B-small-circle-with-no-radius": _coerce_input(
+            _score([_instruction(
+                primitive="circle", **{"from": None}, to=None, center=[0.5, 0.5], radius=None,
+            )]),
+            ddl="小さな円を三つ並べる。",
+            lang="ja",
+        ),
+        "B-small-ellipse-with-no-size": _coerce_input(
+            _score([_instruction(
+                primitive="ellipse", **{"from": None}, to=None, center=[0.5, 0.5], size=None,
+            )]),
+            ddl="ごく小さな楕円を五つ散らす。",
+            lang="ja",
+        ),
+        # The controls, and they are the half that says what the version did not
+        # do. Without them the corpus would record a layer that shrinks a mark
+        # and not one that reads a description: the first says nothing about
+        # size, the second says it in the Score, and both keep what they had.
+        "B-no-size-word-keeps-the-default": _coerce_input(
+            _score([_instruction(
+                primitive="circle", **{"from": None}, to=None, center=[0.5, 0.5], radius=None,
+            )]),
+            ddl="円を三つ並べる。",
+            lang="ja",
+        ),
+        "B-stated-size-outranks-the-word": _coerce_input(
+            _score([_instruction(
+                primitive="circle", **{"from": None}, to=None, center=[0.5, 0.5], radius=0.3,
+            )]),
+            ddl="小さな円を三つ並べる。",
+            lang="ja",
         ),
     }
     return cases

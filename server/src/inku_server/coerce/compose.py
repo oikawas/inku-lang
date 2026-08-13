@@ -2480,6 +2480,51 @@ def _with_stated_count_fidelity(
     return repaired
 
 
+def _with_stated_size(coerced: Instruction, *, raw: Instruction, ddl: str | None) -> Instruction:
+    """Fill a size the model left empty from the clause that asked for the mark.
+
+    `raw` is the instruction before _coerce_instruction filled the defaults: it is the only
+    place where "the model said nothing" and "the model said 0.15" still differ.
+
+    The values are borrowed from `_fallback_instruction_from_clause`, which reads the same
+    clause with the same two readers when coerce writes the mark itself. That is the whole
+    claim: a description that says "small" reaches the same size whether Stage 2 wrote the
+    mark or coerce did, and before this the two answers were 0.15 and 0.038.
+
+    Exactly one clause, or nothing. With two the description does not say which of them this
+    mark answers, and reading the DDL whole instead of clause by clause would shrink a circle
+    because an ellipse elsewhere in the description is small.
+
+    Only circle and ellipse: `_is_small_mark_clause` carries no 四角 / 三角 among its mark
+    words, so a square clause cannot make it true, and arc and polygon have no small-clause
+    size to borrow.
+    """
+    primitive = coerced.primitive
+    if primitive == "circle":
+        if raw.radius is not None:
+            return coerced
+    elif primitive == "ellipse":
+        if raw.size is not None:
+            return coerced
+    else:
+        return coerced
+
+    stated = [
+        clause
+        for clause in _ddl_clauses(ddl)
+        if _primitive_from_clause(clause) == primitive and _is_small_mark_clause(clause)
+    ]
+    if len(stated) != 1:
+        return coerced
+
+    data = coerced.model_dump(by_alias=True)
+    if primitive == "circle":
+        data["radius"] = _radius_hint_from_clause(stated[0]) or 0.038
+    else:
+        data["size"] = [0.06, 0.032]
+    return Instruction.model_validate(data)
+
+
 def _with_ddl_instruction_hints(ins: Instruction, *, ddl: str | None) -> Instruction:
     hinted = _with_material_hint(ins, ddl)
     return _with_variation_hint(hinted, ddl)

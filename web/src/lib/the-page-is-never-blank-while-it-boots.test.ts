@@ -16,6 +16,23 @@ function ruleFor(selectorPattern: string): string {
 	return match[1];
 }
 
+/**
+ * The ground colour the app itself declares for the dark theme.  Read it rather
+ * than restating it: a copy here would have to be edited by hand every time the
+ * token moves, and the shell would be free to drift until someone noticed.
+ */
+function canonicalDarkBackground(): string {
+	const darkTheme = page.match(/:global\(html\[data-theme='dark'\]\)\s*\{([\s\S]*?)\n\s*\}/)?.[1];
+	assert.ok(darkTheme, 'the canonical dark theme is missing');
+	const background = darkTheme.match(/--bg:\s*(#[0-9a-fA-F]{6})\s*;/)?.[1];
+	assert.ok(background, 'the canonical dark background is missing');
+	return background;
+}
+
+function backgroundOf(selectorPattern: string): string | undefined {
+	return ruleFor(selectorPattern).match(/(?:^|;)\s*background:\s*(#[0-9a-fA-F]{6})\s*;/)?.[1];
+}
+
 // ── T-30 ────────────────────────────────────────────────────────────────────
 test('T-30  the boot curtain precedes the app and covers the viewport', () => {
 	const curtainAt = app.indexOf('<div id="boot-curtain">');
@@ -33,7 +50,7 @@ test('T-31  the boot curtain is styled inline without a stylesheet request', () 
 	const head = app.match(/<head>([\s\S]*?)<\/head>/)?.[1] ?? '';
 	assert.match(head, /<style>[\s\S]*#boot-curtain\s*\{/);
 	assert.doesNotMatch(app, /<link\b[^>]*\brel=["']stylesheet["']/i);
-	assert.match(ruleFor('html,\\s*body'), /(?:^|;)\s*background:\s*#171716\s*;/);
+	assert.equal(backgroundOf('html,\\s*body'), canonicalDarkBackground());
 });
 
 // ── T-32 ────────────────────────────────────────────────────────────────────
@@ -45,11 +62,5 @@ test('T-32  main dismisses the boot curtain without JavaScript', () => {
 
 // ── T-33 ────────────────────────────────────────────────────────────────────
 test('T-33  the boot curtain uses the canonical dark background', () => {
-	const darkTheme = page.match(/:global\(html\[data-theme='dark'\]\)\s*\{([\s\S]*?)\n\s*\}/)?.[1];
-	assert.ok(darkTheme, 'the canonical dark theme is missing');
-	const canonicalBackground = darkTheme.match(/--bg:\s*(#[0-9a-fA-F]{6})\s*;/)?.[1];
-	assert.ok(canonicalBackground, 'the canonical dark background is missing');
-
-	const curtainBackground = ruleFor('#boot-curtain').match(/(?:^|;)\s*background:\s*(#[0-9a-fA-F]{6})\s*;/)?.[1];
-	assert.equal(curtainBackground, canonicalBackground);
+	assert.equal(backgroundOf('#boot-curtain'), canonicalDarkBackground());
 });

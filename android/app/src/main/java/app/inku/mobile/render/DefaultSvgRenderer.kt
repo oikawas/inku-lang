@@ -30,8 +30,16 @@ class DefaultSvgRenderer(
         val score = ServerScoreCompat.migrateScore(JSONObject(request.scoreJson))
         val canvas = CanvasAspects.sizeFor(request.canvasAspect.ifBlank { score.optString("canvas", "square") })
         val catalog = catalogResolver(request.colorCatalogId)
-        val colorMap = request.workColorSnapshot?.colorMap ?: catalog.renderMap
-        val catalogId = request.workColorSnapshot?.catalogId ?: catalog.id
+        val snapshot = request.workColorSnapshot
+        val colorMap = snapshot?.colorMap ?: catalog.renderMap
+        val catalogId = snapshot?.catalogId ?: catalog.id
+        val recordedCatalog = snapshot?.let { ColorCatalogs.find(it.catalogId) }
+        val catalogName = snapshot?.catalogName?.takeIf { it.isNotEmpty() }
+            ?: recordedCatalog?.name
+            ?: catalogId
+        val catalogSub = snapshot?.catalogSub?.takeIf { it.isNotEmpty() }
+            ?: recordedCatalog?.sub
+            ?: ""
         // The request decides; the Score is the fallback.
         //
         // The server takes the seed as an argument
@@ -126,8 +134,8 @@ class DefaultSvgRenderer(
             .put("render_canvas_aspect_id", CanvasAspects.normalize(request.canvasAspect))
             .put("render_canvas_aspect_ratio", CanvasAspects.ratioFor(request.canvasAspect))
             .put("render_color_catalog_id", catalogId)
-            .put("render_color_catalog_name", catalog.name)
-            .put("render_color_catalog_sub", catalog.sub)
+            .put("render_color_catalog_name", if (snapshot == null) catalog.name else catalogName)
+            .put("render_color_catalog_sub", if (snapshot == null) catalog.sub else catalogSub)
             .put("render_color_profile", JSONObject().put("id", "srgb").put("name", "sRGB IEC61966-2.1").put("standard", "IEC 61966-2-1:1999"))
             .put("render_color_map", JSONObject(colorMap))
         val hash = sha256(svg + metadata.toString())

@@ -5,6 +5,8 @@ import org.json.JSONObject
 data class WorkColorSnapshot(
     val catalogId: String,
     val colorMap: Map<String, String>,
+    val catalogName: String? = null,
+    val catalogSub: String? = null,
 )
 
 fun workColorSnapshot(renderMetadataJson: String): WorkColorSnapshot? = runCatching {
@@ -19,5 +21,7 @@ fun workColorSnapshot(renderMetadataJson: String): WorkColorSnapshot? = runCatch
     WorkColorSnapshot(
         catalogId = drawnWith,
         colorMap = colorMap.keys().asSequence().associateWith { colorMap.get(it).toString() },
+        catalogName = metadata.optString("render_color_catalog_name"),
+        catalogSub = metadata.optString("render_color_catalog_sub"),
     )
 }.getOrNull()

@@ -166,4 +166,79 @@ fun t6_snapshotAndMatchingCurrentDefinitionUseTheSameSeedInputs() {
         assertEquals(withoutSnapshot.displaySvg, withSnapshot.displaySvg)
     }
 
+    private fun renderedMetadata(snapshot: WorkColorSnapshot? = null, catalogId: String = "default") =
+        JSONObject(DefaultSvgRenderer().render(renderRequest(catalogId = catalogId, snapshot = snapshot)).metadataJson)
+
+    @Test
+    fun t4_recordedCatalogNameAndSubtitleWin() {
+        val snapshot = WorkColorSnapshot(
+            "default",
+            ColorCatalogs.get("default").renderMap,
+            catalogName = "Recorded Name",
+            catalogSub = "Recorded Subtitle",
+        )
+        val metadata = renderedMetadata(snapshot)
+
+        assertEquals("Recorded Name", metadata.getString("render_color_catalog_name"))
+        assertEquals("Recorded Subtitle", metadata.getString("render_color_catalog_sub"))
+    }
+
+    @Test
+    fun t5_currentCatalogNameFillsAMissingRecordedName() {
+        val current = ColorCatalogs.get("ink_season")
+        val metadata = renderedMetadata(WorkColorSnapshot(current.id, current.renderMap))
+
+        assertEquals(current.name, metadata.getString("render_color_catalog_name"))
+    }
+
+    @Test
+    fun t6_unknownRecordedCatalogFallsBackToItsId() {
+        val snapshot = WorkColorSnapshot("retired_catalog", ColorCatalogs.get("default").renderMap)
+        val metadata = renderedMetadata(snapshot)
+
+        assertEquals("retired_catalog", metadata.getString("render_color_catalog_name"))
+    }
+
+    @Test
+    fun t7_unknownRecordedCatalogHasAnEmptySubtitle() {
+        val snapshot = WorkColorSnapshot("retired_catalog", ColorCatalogs.get("default").renderMap)
+        val metadata = renderedMetadata(snapshot)
+
+        assertEquals("", metadata.getString("render_color_catalog_sub"))
+    }
+
+    @Test
+    fun t8_emptyRecordedNameFallsThroughToTheCurrentCatalog() {
+        val current = ColorCatalogs.get("ink_season")
+        val snapshot = WorkColorSnapshot(current.id, current.renderMap, catalogName = "", catalogSub = "")
+        val metadata = renderedMetadata(snapshot)
+
+        assertEquals(current.name, metadata.getString("render_color_catalog_name"))
+        assertEquals(current.sub, metadata.getString("render_color_catalog_sub"))
+    }
+
+    @Test
+    fun t9_recordedNameAndSubtitleDoNotChangeTheSvg() {
+        val current = ColorCatalogs.get("ink_season")
+        val abstractScore = score.replace("custom", "red")
+        val first = DefaultSvgRenderer().render(
+            renderRequest(abstractScore, snapshot = WorkColorSnapshot(current.id, current.renderMap, "First", "One")),
+        )
+        val second = DefaultSvgRenderer().render(
+            renderRequest(abstractScore, snapshot = WorkColorSnapshot(current.id, current.renderMap, "Second", "Two")),
+        )
+
+        assertEquals(first.svg, second.svg)
+    }
+
+    @Test
+    fun t10_drawingWithoutASnapshotKeepsTheRequestedCatalogMetadata() {
+        val current = ColorCatalogs.get("vivid_material")
+        val metadata = renderedMetadata(snapshot = null, catalogId = current.id)
+
+        assertEquals(current.id, metadata.getString("render_color_catalog_id"))
+        assertEquals(current.name, metadata.getString("render_color_catalog_name"))
+        assertEquals(current.sub, metadata.getString("render_color_catalog_sub"))
+    }
+
 }

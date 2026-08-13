@@ -43,9 +43,28 @@
 		previewForWord,
 		previewForPlugin,
 	}: Props = $props();
+
+	let drawerEl = $state<HTMLDivElement | null>(null);
 </script>
 
-<div class="saijiki-drawer" class:open aria-hidden={!open}>
+<svelte:window
+	onpointerdown={(event) => {
+		// Pressing outside closes it, the way the provenance drawer already does.
+		// The button that opens it is not "outside": it toggles itself, so closing
+		// here would be undone by the click that follows this pointerdown, and the
+		// drawer would never close from its own button. It is found by the
+		// attribute rather than by a class, because a class is a style that can be
+		// renamed without anything noticing this reads it.
+		if (!open) return;
+		const target = event.target as Element | null;
+		if (!target) return;
+		if (drawerEl?.contains(target)) return;
+		if (target.closest?.('[data-saijiki-toggle]')) return;
+		onClose();
+	}}
+/>
+
+<div bind:this={drawerEl} class="saijiki-drawer" class:open aria-hidden={!open}>
 	<div class="saijiki-inner">
 		<div class="saijiki-head">
 			<div>

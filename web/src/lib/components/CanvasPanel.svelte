@@ -1297,6 +1297,7 @@
 			<button
 				type="button"
 				class="ghost-btn saijiki-open-btn"
+				data-saijiki-toggle
 				onclick={onToggleSaijiki}
 			>{t().saijikiToggleBtn}</button>
 		</Tooltip>

@@ -85,7 +85,19 @@ def test_ddl_reference_versions_and_parts() -> None:
     # one are `c_plugin_expand` output written by a plugin -- so freezing without
     # the three would have recorded a version whose change the corpus never
     # traversed, which is the mistake engines 12 and 13 both wrote cases to avoid.
-    assert DDL_ENGINE_VERSION == "15"
+    # Engine 16 (2026-08-13): a mark the description called small is small whoever
+    # wrote it. **FOUR cases are new and they are the whole of
+    # `changed_from_previous`** -- the opposite of engines 11 and 15, which listed
+    # every coerce case because they added a branch name every report carries.
+    # Nothing was added to the report here, so the 45 carried-over entries are
+    # byte-identical, which is asserted below rather than described. Not one of the
+    # 26 inputs frozen at engine 15 hands coerce a circle or an ellipse with its
+    # size left empty, so freezing without the four would again have recorded a
+    # version whose change the corpus never traversed. **Two of the four are
+    # controls** -- a description with no size word, and a size the model did state
+    # -- because a corpus holding only the two that move would record a layer that
+    # shrinks marks rather than one that reads a description.
+    assert DDL_ENGINE_VERSION == "16"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -130,43 +142,45 @@ def test_ddl_reference_versions_and_parts() -> None:
     # outside the naming phrase, and a bare numeral inside one -- so the part is
     # six. A and B do not move: the readers this version widened are reached by
     # the plugin layer, and the count a coerce case states was already read.
-    assert len(manifest["cases"]) == 45
+    # Engine 16 (2026-08-13): B gains the four cases the size rule needed -- two it
+    # moves and two it must leave alone -- so the part is thirty. A and C do not
+    # move: the rule lives inside coerce and reads a clause the expander never
+    # writes.
+    assert len(manifest["cases"]) == 49
     assert sum(case["part"] == "a_expand" for case in manifest["cases"].values()) == 13
-    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 26
+    assert sum(case["part"] == "b_coerce" for case in manifest["cases"].values()) == 30
     assert sum(case["part"] == "c_plugin_expand" for case in manifest["cases"].values()) == 6
     # Three entries, and they are two different quantities: `beside-cjk` is the
     # one case whose judgement moved (one unit to twelve, because the exclusion is
     # now cut by the body's language), and the other two are new files, which the
     # manifest also calls changed. Reading the length alone would say "three cases
     # moved" for a version that moved one.
-    # Engine 15 lists every b_coerce case and no other part. Three are new; for
-    # the other 23 the only difference from engine 14 is the line the added
-    # branch puts in every report whether or not it fires. That is measured
-    # below rather than asserted by hand, because "26 changed" and "23 of them
-    # did not move a Score" are two different claims and only the second one
-    # says the version did what it says it did.
+    # Engine 16 lists four entries and every one of them is a new file. Engine 15
+    # listed all 26 because it added a branch name every report carries; this
+    # version added no name, so the claim to measure is the other one -- that not
+    # one carried-over case moved by a byte. Reading the length alone would say
+    # "four cases moved" without saying that the other 45 did not.
     new_cases = {
-        "B-surface-already-on-a-closed-shape",
-        "B-surface-on-a-line-moves-back",
-        "B-surface-with-nowhere-to-move",
+        "B-no-size-word-keeps-the-default",
+        "B-small-circle-with-no-radius",
+        "B-small-ellipse-with-no-size",
+        "B-stated-size-outranks-the-word",
     }
-    assert manifest["changed_from_previous"] == sorted(
-        case_id
-        for case_id, case in manifest["cases"].items()
-        if case["part"] == "b_coerce"
-    )
-    previous_root = MANIFEST_PATH.parent.parent / "ddl-engine-14"
-    for case_id in manifest["changed_from_previous"]:
+    assert manifest["changed_from_previous"] == sorted(new_cases)
+    previous = json.loads(
+        (MANIFEST_PATH.parent.parent / "ddl-engine-15" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
         if case_id in new_cases:
             continue
-        relative = f"b_coerce/{case_id}.json"
-        before = json.loads((previous_root / relative).read_text(encoding="utf-8"))
-        after = json.loads((MANIFEST_PATH.parent / relative).read_text(encoding="utf-8"))
-        assert after["score"] == before["score"], case_id
-        assert set(after["branch_report"]) - set(before["branch_report"]) == {
-            "with_surface_on_a_closed_shape"
-        }, case_id
-        assert after["branch_report"]["with_surface_on_a_closed_shape"] == 0, case_id
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        assert case["bytes"] == previous[case_id]["bytes"], case_id
+        carried += 1
+    assert carried == 45
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()
@@ -359,6 +373,23 @@ def test_ddl_reference_coerce_discriminators() -> None:
         # declines because the work has no room for it.
         "B-stated-count-in-the-wide-band": {"with_stated_count_fidelity"},
         "B-stated-count-over-the-work-budget": set(),
+        # The four added at ddl-engine 16, and they are asserted here for the same
+        # reason the pair above is. `coerce_and_repair_instruction` covers both the
+        # defaults going in and the size rule filling one, so it cannot separate
+        # them by itself -- what separates them is the last case: the model stated
+        # 0.3, nothing else in the instruction needed repairing, and the pass that
+        # would have moved it does not fire at all. The count branch fires on all
+        # four because each description states how many.
+        "B-small-circle-with-no-radius": {
+            "coerce_and_repair_instruction", "with_stated_count_fidelity",
+        },
+        "B-small-ellipse-with-no-size": {
+            "coerce_and_repair_instruction", "with_stated_count_fidelity",
+        },
+        "B-no-size-word-keeps-the-default": {
+            "coerce_and_repair_instruction", "with_stated_count_fidelity",
+        },
+        "B-stated-size-outranks-the-word": {"with_stated_count_fidelity"},
     }
     for case_id, fired in expected.items():
         assert set(cases[case_id]["fired_branches"]) == fired, case_id
@@ -453,8 +484,8 @@ def test_the_corpus_carries_the_shape_production_hands_coerce(monkeypatch) -> No
     # Say how many were looked at: a gate that silently checked nothing reads
     # exactly like a gate that passed. 15 at ddl-engine 12, which added two coerce
     # cases that carry a DDL; 18 at ddl-engine 15, whose three surface cases each
-    # carry one.
-    assert checked == 18
+    # carry one; 22 at ddl-engine 16, whose four size cases each carry one too.
+    assert checked == 22
 
 
 def test_the_corpus_holds_a_case_of_the_production_shape() -> None:

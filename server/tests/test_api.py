@@ -154,7 +154,7 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "32"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "15"
+    assert data["ddl_engine_version"] == "16"
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
     enabled = client.get("/api/info")
@@ -1499,7 +1499,7 @@ def test_compose_hands_coerce_the_ddl_alone_over_http(monkeypatch, auth_context)
     assert r.json()["render_engine_id"] == "default"
     assert r.json()["render_engine_version"] == "32"
     assert r.json()["ddl_version"] == "3"
-    assert r.json()["ddl_engine_version"] == "15"
+    assert r.json()["ddl_engine_version"] == "16"
     assert r.json()["render_canvas_aspect"] == "square"
     assert r.json()["render_canvas_aspect_id"] == "square"
     assert r.json()["render_canvas_aspect_ratio"] == 1.0
@@ -1536,7 +1536,7 @@ def test_paint_pipeline(monkeypatch, auth_context):
     assert data["render_engine_id"] == "default"
     assert data["render_engine_version"] == "32"
     assert data["ddl_version"] == "3"
-    assert data["ddl_engine_version"] == "15"
+    assert data["ddl_engine_version"] == "16"
     assert data["render_canvas_aspect"] == "square"
     assert data["render_canvas_aspect_id"] == "square"
     assert data["render_canvas_aspect_ratio"] == 1.0
@@ -2230,7 +2230,7 @@ def test_paint_can_save_server_generated_history(monkeypatch, auth_context):
     assert item["render_engine_id"] == "default"
     assert item["render_engine_version"] == "32"
     assert item["ddl_version"] == "3"
-    assert item["ddl_engine_version"] == "15"
+    assert item["ddl_engine_version"] == "16"
     assert item["render_canvas_aspect"] == "wide"
     assert item["render_canvas_aspect_id"] == "wide"
     assert item["render_canvas_aspect_ratio"] == 2.35

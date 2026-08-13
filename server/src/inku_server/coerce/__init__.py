@@ -27,6 +27,7 @@ from .compose import (
     _with_semantic_visual_event_hints,
     _with_shape_delivery_repair,
     _with_stated_count_fidelity,
+    _with_stated_size,
     _with_unintentional_filled_shape_tempering,
     _with_visual_event_type_hints,
     _without_explicit_region_support,
@@ -95,7 +96,13 @@ def coerce_score(
     """
     if _style_coerce_disabled():
         _branch_before = score.instructions
-        instructions = [_coerce_instruction(ins) for ins in score.instructions]
+        # On this exit too, and for the same reason the two grid branches below run
+        # here: being faithful to the description is not a matter of style. A size
+        # the description stated is as much the description's as a count is.
+        instructions = [
+            _with_stated_size(_coerce_instruction(ins), raw=ins, ddl=ddl)
+            for ins in score.instructions
+        ]
         _record_branch_fire(branch_report, "coerce_instruction", _branch_before, instructions)
         _branch_before = instructions
         # On this exit too: a surface the renderer will not draw is a
@@ -133,7 +140,13 @@ def coerce_score(
     _branch_before = score.instructions
     instructions = [
         _repair_coerced_instruction(
-            _with_ddl_instruction_hints(_coerce_instruction(ins), ddl=ddl),
+            _with_ddl_instruction_hints(
+                # Immediately after the defaults go in, and holding `ins`: this is the
+                # last point where a size the model omitted is still distinguishable
+                # from one it wrote.
+                _with_stated_size(_coerce_instruction(ins), raw=ins, ddl=ddl),
+                ddl=ddl,
+            ),
             original_background=score.background,
             background=background,
         )

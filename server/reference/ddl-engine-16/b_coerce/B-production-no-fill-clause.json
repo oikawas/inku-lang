@@ -1,0 +1,315 @@
+{
+  "branch_report": {
+    "coerce_and_repair_instruction": 1,
+    "dedupe_instructions": 0,
+    "drop_invalid_relations": 0,
+    "presence_from_ddl": 0,
+    "with_background_dominance_governor": 1,
+    "with_color_delivery_repair": 1,
+    "with_complex_motif_repair": 0,
+    "with_context_density_governor": 0,
+    "with_crescent_sensory_suppression": 0,
+    "with_ddl_coverage": 4,
+    "with_existing_event_counterweight": 2,
+    "with_explicit_constraint_enforcement": 0,
+    "with_literal_grid_fidelity": 0,
+    "with_ma_pressure": 2,
+    "with_motion_energy": 5,
+    "with_per_instruction_density_budget": 0,
+    "with_presence_auxiliary_shape_repair": 0,
+    "with_primary_color_delivery": 0,
+    "with_repetition_event_variation": 1,
+    "with_rhythm_variation": 0,
+    "with_semantic_visual_event_hints": 0,
+    "with_shape_delivery_repair": 0,
+    "with_stated_count_fidelity": 0,
+    "with_structural_duplicate_repair": 0,
+    "with_surface_on_a_closed_shape": 0,
+    "with_total_density_budget": 0,
+    "with_unintentional_filled_shape_tempering": 0,
+    "with_visual_event_type_hints": 0,
+    "without_explicit_region_support": 0,
+    "without_spontaneous_grid": 0,
+    "without_unrequested_color_cycle": 0
+  },
+  "score": {
+    "background": "white",
+    "canvas": {
+      "aspect": "square",
+      "ground": null
+    },
+    "instructions": [
+      {
+        "angle_end": null,
+        "angle_start": null,
+        "arrangement": {
+          "center": [
+            0.82,
+            0.218
+          ],
+          "cluster_count": null,
+          "color_cycle": [
+            "black",
+            "gray"
+          ],
+          "cols": null,
+          "count": 110,
+          "density": "low",
+          "fade": "directional",
+          "jitter": 0.12,
+          "layout": "vertical",
+          "margin": 0.22,
+          "path": "wave",
+          "preserve_space": true,
+          "radius": null,
+          "rhythm_spacing": "syncopated",
+          "rows": null
+        },
+        "at": null,
+        "carve_depth": null,
+        "center": null,
+        "color": "black",
+        "color_hint": null,
+        "filled": false,
+        "from": [
+          0.22,
+          0.535
+        ],
+        "mode": "additive",
+        "note": "material inferred from DDL: brush_thin; white foreground made visible; motion energy restored through trajectory and rotation; visual event shaped with syncopated gaps; ma pressure restored through spacing and preserved negative space; visual event counterweight preserved through opposing placement",
+        "position": null,
+        "primitive": "line",
+        "radius": null,
+        "relation": null,
+        "rotation": null,
+        "sides": null,
+        "size": null,
+        "style": "solid",
+        "surface": null,
+        "thinness": null,
+        "to": [
+          0.72,
+          0.46499999999999997
+        ],
+        "variation": {
+          "amplitude": "medium",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ],
+          "frequency": "medium",
+          "quality": "pink"
+        },
+        "weight": "brush_thin"
+      },
+      {
+        "angle_end": 330.0,
+        "angle_start": 210.0,
+        "arrangement": {
+          "center": null,
+          "cluster_count": null,
+          "color_cycle": [
+            "black",
+            "white"
+          ],
+          "cols": null,
+          "count": 120,
+          "density": "low",
+          "fade": "outward",
+          "jitter": 0.12,
+          "layout": "scatter",
+          "margin": 0.22,
+          "path": "diagonal",
+          "preserve_space": true,
+          "radius": null,
+          "rhythm_spacing": "loose",
+          "rows": null
+        },
+        "at": null,
+        "carve_depth": null,
+        "center": [
+          0.635,
+          0.39
+        ],
+        "color": "black",
+        "color_hint": null,
+        "filled": false,
+        "from": null,
+        "mode": "additive",
+        "note": "coverage from DDL clause: 静かな気配の中に、白い細筆の細い縦線を三百本、上から下へ散らす; white restored in color_cycle from DDL color intent; motion energy restored through trajectory and rotation; ma pressure restored through spacing and preserved negative space",
+        "position": null,
+        "primitive": "arc",
+        "radius": 0.11,
+        "relation": null,
+        "rotation": null,
+        "sides": null,
+        "size": null,
+        "style": "solid",
+        "surface": null,
+        "thinness": null,
+        "to": null,
+        "variation": {
+          "amplitude": "medium",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ],
+          "frequency": "slow",
+          "quality": "wave"
+        },
+        "weight": "brush_thin"
+      },
+      {
+        "angle_end": null,
+        "angle_start": null,
+        "arrangement": {
+          "center": [
+            0.27,
+            0.714
+          ],
+          "cluster_count": null,
+          "color_cycle": [
+            "black"
+          ],
+          "cols": null,
+          "count": 2,
+          "density": "low",
+          "fade": "outward",
+          "jitter": 0.12,
+          "layout": "scatter",
+          "margin": 0.24,
+          "path": "wave",
+          "preserve_space": true,
+          "radius": null,
+          "rhythm_spacing": "loose",
+          "rows": null
+        },
+        "at": null,
+        "carve_depth": null,
+        "center": [
+          0.68,
+          0.3
+        ],
+        "color": "black",
+        "color_hint": null,
+        "filled": true,
+        "from": null,
+        "mode": "additive",
+        "note": "coverage from DDL clause: 黒い細い余白線を存在の重心として右上の焦点へ二本引く; small focal mark kept compact with preserved negative space; motion energy restored through trajectory and rotation; visual event preserved as compact focal accent; visual event counterweight preserved through opposing placement",
+        "position": null,
+        "primitive": "circle",
+        "radius": 0.038,
+        "relation": null,
+        "rotation": null,
+        "sides": null,
+        "size": null,
+        "style": "solid",
+        "surface": null,
+        "thinness": null,
+        "to": null,
+        "variation": null,
+        "weight": "pen"
+      },
+      {
+        "angle_end": null,
+        "angle_start": null,
+        "arrangement": {
+          "center": null,
+          "cluster_count": 3,
+          "color_cycle": [],
+          "cols": null,
+          "count": 5,
+          "density": "low",
+          "fade": "outward",
+          "jitter": 0.12,
+          "layout": "scatter",
+          "margin": 0.24,
+          "path": "diagonal",
+          "preserve_space": true,
+          "radius": null,
+          "rhythm_spacing": "loose",
+          "rows": null
+        },
+        "at": null,
+        "carve_depth": null,
+        "center": [
+          0.545,
+          0.5700000000000001
+        ],
+        "color": "black",
+        "color_hint": "membrane haze",
+        "filled": true,
+        "from": null,
+        "mode": "additive",
+        "note": "coverage from DDL clause: 透明な膜を重ねる; motion energy restored through trajectory and rotation",
+        "position": null,
+        "primitive": "ellipse",
+        "radius": null,
+        "relation": null,
+        "rotation": 9.0,
+        "sides": null,
+        "size": [
+          0.16,
+          0.09
+        ],
+        "style": "solid",
+        "surface": null,
+        "thinness": null,
+        "to": null,
+        "variation": {
+          "amplitude": "medium",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ],
+          "frequency": "slow",
+          "quality": "wave"
+        },
+        "weight": "chalk"
+      },
+      {
+        "angle_end": null,
+        "angle_start": null,
+        "arrangement": null,
+        "at": null,
+        "carve_depth": null,
+        "center": null,
+        "color": "black",
+        "color_hint": null,
+        "filled": false,
+        "from": [
+          0.52,
+          0.4
+        ],
+        "mode": "additive",
+        "note": "coverage from DDL clause: 境界が滲む; motion energy restored through trajectory and rotation",
+        "position": null,
+        "primitive": "line",
+        "radius": null,
+        "relation": null,
+        "rotation": 20.0,
+        "sides": null,
+        "size": null,
+        "style": "solid",
+        "surface": null,
+        "thinness": null,
+        "to": [
+          0.78,
+          0.6599999999999999
+        ],
+        "variation": {
+          "amplitude": "medium",
+          "dimensions": [
+            "position_x",
+            "position_y"
+          ],
+          "frequency": "slow",
+          "quality": "wave"
+        },
+        "weight": "pen"
+      }
+    ],
+    "presence": null,
+    "version": "0.1.0"
+  }
+}

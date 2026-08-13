@@ -12,6 +12,7 @@
   "with_ddl_coverage",
   "with_existing_event_counterweight",
   "with_explicit_constraint_enforcement",
+  "with_fill_as_a_surface_word",
   "with_literal_grid_fidelity",
   "with_ma_pressure",
   "with_motion_energy",
@@ -45,6 +46,7 @@
   "with_ddl_coverage",
   "with_existing_event_counterweight",
   "with_explicit_constraint_enforcement",
+  "with_fill_as_a_surface_word",
   "with_literal_grid_fidelity",
   "with_ma_pressure",
   "with_motion_energy",
@@ -204,7 +206,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       },
       {
        "primitive": "line",
@@ -326,6 +338,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -830,7 +843,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       },
       {
        "primitive": "line",
@@ -909,6 +932,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -1566,7 +1590,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -1584,6 +1618,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -1992,6 +2027,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 1,
@@ -2268,6 +2304,7 @@
      "with_ddl_coverage": 2,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -2580,6 +2617,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -3025,6 +3063,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -3381,6 +3420,7 @@
      "with_ddl_coverage": 1,
      "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 2,
@@ -3776,7 +3816,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -3794,6 +3844,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -4470,6 +4521,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -4912,6 +4964,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -5178,6 +5231,7 @@
      "with_ddl_coverage": 2,
      "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 2,
@@ -5560,6 +5614,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -6132,6 +6187,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -6474,6 +6530,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -6790,7 +6847,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -6808,6 +6875,7 @@
      "with_ddl_coverage": 3,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 2,
      "with_motion_energy": 0,
@@ -7104,6 +7172,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 1,
@@ -7448,6 +7517,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -7793,6 +7863,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -8194,6 +8265,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 2,
@@ -8505,6 +8577,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -8855,7 +8928,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -8873,6 +8956,7 @@
      "with_ddl_coverage": 3,
      "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 2,
      "with_motion_energy": 4,
@@ -9060,6 +9144,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -9166,6 +9251,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -9359,6 +9445,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -9579,6 +9666,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -9721,6 +9809,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 2,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -9838,7 +9927,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -9856,6 +9955,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -9965,6 +10065,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -10088,6 +10189,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 1,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -10213,6 +10315,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -10312,7 +10415,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -10330,6 +10443,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -10471,6 +10585,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -10604,6 +10719,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 1,
@@ -10757,6 +10873,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -10881,6 +10998,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -11011,6 +11129,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -11120,7 +11239,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -11138,6 +11267,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -11375,6 +11505,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -11536,7 +11667,17 @@
        "at": null,
        "relation": null,
        "thinness": null,
-       "surface": null
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
       }
      ]
     },
@@ -11554,6 +11695,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 1,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 1,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -11749,6 +11891,7 @@
      "with_ddl_coverage": 0,
      "with_existing_event_counterweight": 0,
      "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 0,
      "with_literal_grid_fidelity": 0,
      "with_ma_pressure": 0,
      "with_motion_energy": 0,
@@ -11770,9 +11913,218 @@
      "without_unrequested_color_cycle": 0
     }
    }
+  },
+  "S-fill-as-a-surface-word": {
+   "input": {
+    "ddl": "黒い円をひとつ置く。面: 塗り。灰色の円をもうひとつ置く。面: 塗り。",
+    "score": {
+     "background": "white",
+     "instructions": [
+      {
+       "primitive": "circle",
+       "center": [
+        0.32,
+        0.5
+       ],
+       "radius": 0.12,
+       "color": "black",
+       "weight": "pen",
+       "surface": {
+        "texture": "solid"
+       }
+      },
+      {
+       "primitive": "circle",
+       "center": [
+        0.68,
+        0.5
+       ],
+       "radius": 0.12,
+       "color": "gray",
+       "weight": "pen",
+       "filled": true
+      },
+      {
+       "primitive": "line",
+       "from": [
+        0.2,
+        0.85
+       ],
+       "to": [
+        0.8,
+        0.85
+       ],
+       "color": "black",
+       "weight": "pen",
+       "filled": true
+      }
+     ]
+    }
+   },
+   "note": "both ways of asking for a fill, plus a line that must not gain a surface",
+   "source": "synthetic",
+   "targets": "with_fill_as_a_surface_word",
+   "expected": {
+    "score": {
+     "version": "0.1.0",
+     "canvas": "square",
+     "background": "white",
+     "presence": null,
+     "instructions": [
+      {
+       "primitive": "circle",
+       "note": null,
+       "from": null,
+       "to": null,
+       "center": [
+        0.32,
+        0.5
+       ],
+       "radius": 0.12,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": true,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": null,
+       "variation": null,
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
+      },
+      {
+       "primitive": "circle",
+       "note": null,
+       "from": null,
+       "to": null,
+       "center": [
+        0.68,
+        0.5
+       ],
+       "radius": 0.12,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": true,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "gray",
+       "color_hint": null,
+       "variation": null,
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": {
+        "texture": "solid",
+        "density": 0.35,
+        "scale": 0.35,
+        "opacity": 0.28,
+        "bleed": 0.0,
+        "direction": "none",
+        "spacing_gradient": "none",
+        "tone_steps": 3,
+        "seed": null
+       }
+      },
+      {
+       "primitive": "line",
+       "note": null,
+       "from": [
+        0.2,
+        0.85
+       ],
+       "to": [
+        0.8,
+        0.85
+       ],
+       "center": null,
+       "radius": null,
+       "sides": null,
+       "position": null,
+       "size": null,
+       "angle_start": null,
+       "angle_end": null,
+       "rotation": null,
+       "filled": true,
+       "style": "solid",
+       "weight": "pen",
+       "mode": "additive",
+       "carve_depth": null,
+       "color": "black",
+       "color_hint": null,
+       "variation": null,
+       "arrangement": null,
+       "at": null,
+       "relation": null,
+       "thinness": null,
+       "surface": null
+      }
+     ]
+    },
+    "instruction_count": 3,
+    "branch_report": {
+     "coerce_and_repair_instruction": 0,
+     "dedupe_instructions": 0,
+     "drop_invalid_relations": 0,
+     "presence_from_ddl": 0,
+     "with_background_dominance_governor": 0,
+     "with_color_delivery_repair": 0,
+     "with_complex_motif_repair": 0,
+     "with_context_density_governor": 0,
+     "with_crescent_sensory_suppression": 0,
+     "with_ddl_coverage": 0,
+     "with_existing_event_counterweight": 0,
+     "with_explicit_constraint_enforcement": 0,
+     "with_fill_as_a_surface_word": 2,
+     "with_literal_grid_fidelity": 0,
+     "with_ma_pressure": 0,
+     "with_motion_energy": 0,
+     "with_per_instruction_density_budget": 0,
+     "with_presence_auxiliary_shape_repair": 0,
+     "with_primary_color_delivery": 0,
+     "with_repetition_event_variation": 0,
+     "with_rhythm_variation": 0,
+     "with_semantic_visual_event_hints": 0,
+     "with_shape_delivery_repair": 0,
+     "with_stated_count_fidelity": 0,
+     "with_structural_duplicate_repair": 0,
+     "with_surface_on_a_closed_shape": 0,
+     "with_total_density_budget": 0,
+     "with_unintentional_filled_shape_tempering": 0,
+     "with_visual_event_type_hints": 0,
+     "without_explicit_region_support": 0,
+     "without_spontaneous_grid": 0,
+     "without_unrequested_color_cycle": 0
+    }
+   }
   }
  },
- "commit": "7e60357e43e018b4b53ec87d26ff4e3e04924da9",
+ "commit": "984c2b63ae768d88d21d9391c6b6de56c6678645",
  "frozen_at": "2026-07-26",
  "golden_format_version": "1",
  "purpose": "Freeze coerce_score's output so a refactor that moves its branches between modules cannot change what it produces. The render-engine reference corpus does not exercise coerce at all, and the ddl-engine corpus reaches only ten of its branches."

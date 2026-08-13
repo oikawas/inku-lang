@@ -58,32 +58,44 @@ def test_omote_holds_eleven_words_and_one_default() -> None:
     assert keys[keys.index("tsuranari") + 1] == "omote"
 
 
-def test_omote_texture_values_cover_the_enum_minus_ground_and_default() -> None:
-    """The `score_value`s are the SurfaceTexture enum, minus two by ruling.
+def test_omote_texture_values_cover_the_enum_minus_ground() -> None:
+    """The `score_value`s are the SurfaceTexture enum, minus one by ruling.
 
-    `none` is what 空 means (no texture at all) and `paper_grain` is ground
-    rather than surface, so 地: keeps it. Without this the values would be a
-    field nothing reads, free to drift into a texture the renderer has never
-    heard of.
+    `paper_grain` is ground rather than surface, so 地: keeps it (I-229). Without
+    this the values would be a field nothing reads, free to drift into a texture
+    the renderer has never heard of.
+
+    **Two by ruling until 2026-08-13, when `none` joined.** 空 does mean "no
+    texture at all", and while that was written as "the word carries no value"
+    the category had two roads out of it -- eight words to `surface.texture` and
+    塗り to `filled` -- and the measurement said the second road did not carry
+    (ddl-engine 18).
     """
     values = {word.score_value for word in _omote().words if word.score_value}
-    assert values == set(get_args(schema.SurfaceTexture)) - {"none", "paper_grain"}
+    assert values == set(get_args(schema.SurfaceTexture)) - {"paper_grain"}
 
 
-def test_the_four_words_that_are_not_textures_carry_no_texture_value() -> None:
-    """塗り falls to `filled`, not to a texture, and the density words to neither.
+def test_the_two_words_that_are_not_qualities_carry_no_texture_value() -> None:
+    """塗り is a texture like the other eight; the density words are not qualities.
 
     Pinned by pair rather than by set: `wash` is already in the set from 薄墨, so
-    giving 塗り a second copy of it would leave a set comparison green while the
-    word had quietly become a texture. The distinction is the whole point of the
-    word -- a solid fill is `filled=true`, and `surface` is a printmaker's mark,
-    which is why a `surface` does not stand in for a fill (measured brightness
-    224.9 against 41.9-131.1).
+    giving another word a second copy of it would leave a set comparison green
+    while that word had quietly become a wash.
+
+    **This test said the opposite until 2026-08-13** -- 塗り fell to `filled` and
+    carried no texture value, which the 2026-08-12 ruling chose deliberately: a
+    solid fill is the material's default way of filling and `surface` was the
+    printmaker's mark (measured brightness 224.9 against 41.9-131.1). What the
+    later ruling changed is not that judgement but where the word is *said*. The
+    renderer still keeps the two apart -- `solid` reaches the fill layer and
+    never the surface-texture layer -- and 塗り now travels in the field the
+    other eight travel in, because that is the only field the model writes into
+    (0/14 in English through `filled`, 12/14 through `texture`).
     """
     values = {word.surface_ja: word.score_value for word in _omote().words}
     assert values == {
-        "空": None,
-        "塗り": None,
+        "空": "none",
+        "塗り": "solid",
         "薄墨": "wash",
         "粒": "grain",
         "点": "stipple",

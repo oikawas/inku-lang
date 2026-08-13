@@ -53,7 +53,13 @@ CHANGED_SCHEMAS = {
     "ComposeRequest": {"added": {"fires_on"}, "removed": set()},
     # I-143: one arrangement may repeat a contiguous Score instruction unit.
     "Arrangement": {"added": {"group_size"}, "removed": set()},
+    # ddl-engine 18: a fill is a surface word like the other eight, so the
+    # `texture` enum gains `solid`. Nothing gains a property, which is why the
+    # enum is named below rather than left to the property-set comparison.
+    "SurfaceSpec": {"added": set(), "removed": set()},
 }
+
+SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
 
 
 def _before() -> dict:
@@ -93,10 +99,20 @@ def test_the_surface_gained_exactly_the_card_and_nothing_else() -> None:
         schemas.pop(name)
     # The declared changes, checked field by field before being set aside.
     for name, expected in CHANGED_SCHEMAS.items():
-        was = set(json.loads(before["schemas"][name])["properties"])
-        now = set(json.loads(schemas.pop(name))["properties"])
+        was_body = json.loads(before["schemas"][name])
+        now_body = json.loads(schemas.pop(name))
+        was = set(was_body["properties"])
+        now = set(now_body["properties"])
         assert now - was == expected["added"], f"{name} gained {sorted(now - was)}"
         assert was - now == expected["removed"], f"{name} lost {sorted(was - now)}"
+        if name == "SurfaceSpec":
+            # Changed inside a property rather than by gaining one, so the
+            # comparison above sees nothing. Name the movement or the
+            # declaration excuses the whole schema.
+            was_enum = set(was_body["properties"]["texture"]["enum"])
+            now_enum = set(now_body["properties"]["texture"]["enum"])
+            assert now_enum - was_enum == SURFACE_TEXTURE_ENUM_ADDED
+            assert was_enum - now_enum == set()
 
     before_operations = {
         f"{op['method']} {op['path']}": _stable(op) for op in before["operations"]

@@ -217,8 +217,11 @@ def test_the_57_write_sites_remain_split_by_role() -> None:
     assert len(re.findall(r'"color_hint"\s*:', compose_source)) == 5
     # Four in normalize since the hard ceiling arrived: the fourth is `_with_note`,
     # the single helper both ceiling sites go through rather than writing the field
-    # themselves.
-    assert len(re.findall(r'\["note"\]\s*=', normalize_source)) == 4
+    # themselves. Five since ddl-engine 18: `_with_visible_particle` fills a shape
+    # the description never asked to fill and now says so, the way its neighbour
+    # `_with_visible_color` always has -- a repair whose only evidence is the
+    # drawing cannot be told apart from a Stage 2 that asked for it.
+    assert len(re.findall(r'\["note"\]\s*=', normalize_source)) == 5
     assert len(re.findall(r'(?:\["note"\]\s*=|"note"\s*:)', api_source)) == 10
 
 

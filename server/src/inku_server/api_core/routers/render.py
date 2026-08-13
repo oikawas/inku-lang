@@ -21,7 +21,12 @@ from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, visio
 from ...color_catalogs import color_catalog_ids
 from ...color_selector import select_catalog_id
 from ...description_labels import pipeline_description
-from ...coerce import coerce_score, count_hint_from_ddl, ensure_renderable_score
+from ...coerce import (
+    coerce_score,
+    count_hint_from_ddl,
+    enforce_hard_ceiling,
+    ensure_renderable_score,
+)
 from ...composer import _finalize_score, canvas_retry_line, compose
 from ...interpreter import _sanitize_placement_words, interpret_detail
 from ...languages import expand_intermediate_for_lang
@@ -124,7 +129,12 @@ def _resolved_stage2_model(model: str | None, actor: dict | None = None) -> str:
     return _resolved_stage_model(model, actor, stage="stage2")
 
 
-def _score_with_plugin_instructions(score: Score, instructions: list[dict]) -> Score:
+def _score_with_plugin_instructions(
+    score: Score,
+    instructions: list[dict],
+    *,
+    limits: Limits = DEFAULT_LIMITS,
+) -> Score:
     """展開層の決定的転写 instruction を coerce 後の Score へ合流させる (v1.94 輪1)。
 
     機械生成の instruction は構築時に確定済みのため coerce の対象にしない。
@@ -134,7 +144,7 @@ def _score_with_plugin_instructions(score: Score, instructions: list[dict]) -> S
         return score
     data = score.model_dump(by_alias=True)
     data["instructions"] = list(data["instructions"]) + [dict(i) for i in instructions]
-    return Score.model_validate(data)
+    return enforce_hard_ceiling(Score.model_validate(data), limits)
 
 
 def _resolved_paint_catalog_id(catalog_id: str | None, *, mode: str, source_text: str) -> str:
@@ -930,7 +940,9 @@ def _call_compose_detail(
     stage15_ddl = ddl  # trace: Stage 1.5 output = Stage 2 input (== ComposeDetail.ddl)
     plugin_provenance = list(plugin_expansion.provenance)
     plugin_warnings = list(plugin_expansion.warnings)
-    plugin_instructions = list(plugin_expansion.instructions)
+    plugin_instructions = list(
+        getattr(plugin_expansion, "score_instructions", plugin_expansion.instructions)
+    )
     retry_count = 0
     retry_reasons: list[str] = []
     fallback_used = False
@@ -1435,7 +1447,9 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
 
-    score = _score_with_plugin_instructions(score, compose_detail.plugin_instructions)
+    score = _score_with_plugin_instructions(
+        score, compose_detail.plugin_instructions, limits=limits
+    )
 
     normalized_compose_ddl = compose_detail.ddl.lower()
     if "雲形" in compose_detail.ddl or "cloudform" in normalized_compose_ddl:
@@ -1935,7 +1949,9 @@ def _paint_events(
     except Exception as e:  # noqa: BLE001
         raise _unexpected_http_error("compose", 502) from e
 
-    score = _score_with_plugin_instructions(score, compose_detail.plugin_instructions)
+    score = _score_with_plugin_instructions(
+        score, compose_detail.plugin_instructions, limits=limits
+    )
 
     normalized_compose_ddl = compose_detail.ddl.lower()
     if "雲形" in compose_detail.ddl or "cloudform" in normalized_compose_ddl:

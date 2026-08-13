@@ -223,6 +223,7 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     declared_additions = {
         "AppInfoResponse": {"thumbnail_hidpi"},
         "ComposeRequest": {"fires_on"},
+        "Arrangement": {"group_size"},
     }
     others = {}
     for name in frozen_names:

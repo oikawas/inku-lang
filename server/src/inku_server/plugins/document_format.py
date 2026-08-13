@@ -268,10 +268,10 @@ class PluginExpansionResult:
     ddl: str
     provenance: tuple[dict[str, str], ...] = ()
     warnings: tuple[str, ...] = ()
-    # v1.94 輪1: 対 member（relation literal を含む member 定義）の決定的転写。
-    # 機械が書いた member 文は LLM を通さず、ここに Score instruction 断片として
-    # 確定する（DDL テキストからは除外される）。coerce の対象にもしない。
+    # The stable transcription remains the public expansion result and DDL corpus.
     instructions: tuple[dict, ...] = ()
+    # The API consumes this compact form; the frozen payload deliberately does not.
+    score_instructions: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -687,14 +687,14 @@ def _resolve_count(match: "re.Match[str]", seed_text: str, salt: str) -> int:
     return low + _stable_int(seed_text, salt) % (high - low + 1)
 
 
-# v1.94 対分離: member 定義内の relation literal（前の弧に両端で触れる 等）
+# Pair separation: relation literals inside member definitions.
 _RELATION_LITERALS = {
     "ja": tuple(lit for word in RELATIONS for lit in word.literals_ja),
     "en": tuple(lit for word in RELATIONS for lit in word.literals_en),
 }
 
 
-# v1.94 輪1: 対 member の決定的転写 ------------------------------------------
+# Pair pass 1: deterministic transcription of pair members -------------------
 
 _SLIM_HINTS = ("膨らみは細く", "bulge kept slim")
 
@@ -705,14 +705,15 @@ def _pair_instructions(
     *,
     seed_text: str,
     salt: str,
-) -> list[dict]:
-    """対 member（配置弧 + touching 弧）を Score instruction へ決定的に転写する。
+    placement_region: tuple[float, float, float, float],
+    placement_kind: str,
+) -> tuple[list[dict], list[dict]]:
+    """Return the stable expansion and compact Score form of one pair run.
 
-    幾何は member region・回転・seed から導出し、掃引角は member ごとに揺らす
-    （固定値のスタンプ化を避ける）。「膨らみは細く」ヒントは細い掃引へ写像する。
-    place 弧は `at` を保持し、領域内の位置決めは従来どおり演奏（seed）に属する。
-    weight / color は既定のまま返し、直後の様式行（素材で、色で。）が消費時に
-    上書きする。
+    Geometry comes from each member region, rotation, and seed. The public
+    expansion retains every resolved pair for DDL-engine compatibility. The API
+    receives one prototype pair plus a composite arrangement, allowing the
+    renderer to repeat the pair as a unit.
     """
     slim = any(h in seg for seg in segments for h in _SLIM_HINTS)
     out: list[dict] = []
@@ -749,7 +750,17 @@ def _pair_instructions(
                 "relation": {"type": "touching"},
             }
         )
-    return out
+    score_out = [dict(out[0]), dict(out[1])]
+    arrangement: dict[str, object] = {
+        "count": len(member_regions),
+        "layout": "scatter",
+        "group_size": 2,
+    }
+    if placement_kind == "diagonal":
+        arrangement["path"] = "diagonal"
+    score_out[0]["arrangement"] = arrangement
+    score_out[0]["at"] = {"region": [round(value, 4) for value in placement_region]}
+    return out, score_out
 
 
 def _parse_style_line(line: str, lang: str) -> dict[str, str] | None:
@@ -829,7 +840,7 @@ def _expand_range_line(
     lang: str,
     seed_text: str,
     salt: str,
-) -> tuple[list[str], list[dict]]:
+) -> tuple[list[str], list[dict], list[dict]]:
     count = _resolve_count(match, seed_text, f"count-{salt}")
     member_name = _referenced_member(line, members)
     if kind == "diagonal":
@@ -838,20 +849,24 @@ def _expand_range_line(
         member_regions = _member_regions(region, count, f"{seed_text}:{salt}")
 
     if member_name is not None:
-        # A-2: inline the member definition at each member's region.
-        # v1.94 対分離: relation literal を含む定義は対の各要素を独立文にする。
+        # Inline the member definition at each member's region.
         segments = _split_pair_segments(members[member_name].rstrip("。."), lang)
         if len(segments) >= 2:
-            # v1.94 輪1: 対 member は決定的転写（テキストは出力しない）
-            return [], _pair_instructions(
-                segments, member_regions, seed_text=seed_text, salt=salt
+            stable, compact = _pair_instructions(
+                segments,
+                member_regions,
+                seed_text=seed_text,
+                salt=salt,
+                placement_region=region,
+                placement_kind=kind,
             )
+            return [], stable, compact
         out: list[str] = []
         for index, (member_region, rotation) in enumerate(member_regions, start=1):
             suffix = _member_suffix(member_region, rotation, index, lang=lang)
             for segment in segments:
                 out.append(segment + suffix)
-        return out, []
+        return out, [], []
 
     singular = _singular_for_unit(match.group("unit"), lang)  # A-5 unit-preserving
     adj = match.groupdict().get("adj")
@@ -868,22 +883,21 @@ def _expand_range_line(
     return [
         base + _member_suffix(member_region, rotation, index, lang=lang)
         for index, (member_region, rotation) in enumerate(member_regions, start=1)
-    ], []
+    ], [], []
 
 
 def _expand_entry(
     entry: PluginEntry, *, lang: str, seed_text: str, warnings: list[str]
-) -> tuple[str, list[dict]]:
+) -> tuple[str, list[dict], list[dict]]:
     lines = entry.templates.get(lang, ())
     members = entry.members.get(lang, {})
     anchor_regions: list[tuple[float, float, float, float]] = [_DEFAULT_REGION]
     expanded: list[str] = []
     instructions: list[dict] = []
-    pending_style_targets: list[dict] = []  # 直前の対 member 転写（様式行の適用先）
+    score_instructions: list[dict] = []
+    pending_style_targets: list[dict] = []
     for line_idx, line in enumerate(lines):
-        # v1.94 輪1: 対 member 転写の直後の様式は消費して適用する。
-        # 行頭の様式文（「鉛筆で、緑で。」）だけを消費し、続く運動句などの
-        # 残余（「細かく震える。」）はテキストとして残す。
+        # Consume a leading style sentence after a pair and retain any motion.
         if pending_style_targets:
             targets, pending_style_targets = pending_style_targets, []
             if lang == "ja":
@@ -937,8 +951,9 @@ def _expand_entry(
             targets = [("rect", spot) for spot in anchor_regions]
 
         line_instructions: list[dict] = []
+        line_score_instructions: list[dict] = []
         for spot_idx, (kind, region) in enumerate(targets):
-            text_lines, instr_dicts = _expand_range_line(
+            text_lines, instr_dicts, score_instr_dicts = _expand_range_line(
                 line,
                 match,
                 kind,
@@ -950,16 +965,18 @@ def _expand_entry(
             )
             expanded.extend(text_lines)
             line_instructions.extend(instr_dicts)
+            line_score_instructions.extend(score_instr_dicts)
         if line_instructions:
             instructions.extend(line_instructions)
-            pending_style_targets = line_instructions
+            score_instructions.extend(line_score_instructions)
+            pending_style_targets = line_instructions + line_score_instructions
 
     if _instruction_budget(tuple(expanded)) + len(instructions) > MAX_ENTRY_INSTRUCTIONS:
         raise PluginFormatError([f"{entry.heading}: runtime expansion exceeds {MAX_ENTRY_INSTRUCTIONS}"])
     separator = "" if lang == "ja" else " "
     ending = "。" if lang == "ja" else "."
     text = separator.join(part if part.endswith(("。", ".", "!", "?")) else part + ending for part in expanded)
-    return text, instructions
+    return text, instructions, score_instructions
 
 
 def _phrase_positions(source_folded: str, phrase_folded: str) -> list[int]:
@@ -1074,6 +1091,7 @@ def expand_plugin_ddl(
     warnings: list[str] = []
     instructions: list[dict] = []
     source = source_text or ""
+    score_instructions: list[dict] = []
     source_folded = source.casefold()
     result_folded = result.casefold()
 
@@ -1124,7 +1142,7 @@ def expand_plugin_ddl(
             # expanded, which is the fallback render.py already writes by hand.
             unit_seed = seed_text or result or qualified
             try:
-                expansion, entry_instructions = _expand_entry(
+                expansion, entry_instructions, entry_score_instructions = _expand_entry(
                     entry,
                     lang=lang,
                     seed_text=unit_seed,
@@ -1185,7 +1203,7 @@ def expand_plugin_ddl(
                         # score N copies of one figure, which the duplicate repair
                         # would then collapse back to one.
                         try:
-                            more_text, more_instructions = _expand_entry(
+                            more_text, more_instructions, more_score_instructions = _expand_entry(
                                 entry,
                                 lang=lang,
                                 seed_text=f"{unit_seed}#unit-{index}",
@@ -1198,12 +1216,14 @@ def expand_plugin_ddl(
                             break
                         expansions.append(more_text)
                         entry_instructions.extend(more_instructions)
+                        entry_score_instructions.extend(more_score_instructions)
                         units += 1
             joiner = "" if lang == "ja" else " "
             result = joiner.join(
                 part for part in (base.strip(), *(text.strip() for text in expansions)) if part
             )
             instructions.extend(entry_instructions)
+            score_instructions.extend(entry_score_instructions)
             provenance.append(
                 {
                     "input_term": trigger,
@@ -1246,6 +1266,7 @@ def expand_plugin_ddl(
         provenance=tuple(provenance),
         warnings=tuple(warnings),
         instructions=tuple(instructions),
+        score_instructions=tuple(score_instructions),
     )
 
 

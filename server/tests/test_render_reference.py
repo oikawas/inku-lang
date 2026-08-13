@@ -99,7 +99,10 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
     assert score_fields == set(Score.model_fields)
     assert set(generator.BASE_SURFACE) == set(SurfaceSpec.model_fields)
     assert set(generator.BASE_GROUND) == set(CanvasGroundSpec.model_fields)
-    assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields)
+    # group_size=1 is intentionally omitted so engine-32 legacy inputs remain stable.
+    assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields) - {
+        "group_size"
+    }
     for case_id, case in generator.build_inputs().items():
         score = case["score"]
         assert set(score) == score_fields

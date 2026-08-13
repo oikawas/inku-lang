@@ -83,7 +83,13 @@ class DefaultSvgRenderer(
             }
         val placementSeed = if (compositionSeed != null) compositionSeed else renderSeed
 
-        val resolvedInstructions = resolvePerformanceScore(instructions, renderSeed)
+        val compositeInstructions = expandCompositeGroups(
+            instructions,
+            placementSeed,
+            renderSeed,
+            canvas,
+        )
+        val resolvedInstructions = resolvePerformanceScore(compositeInstructions, renderSeed)
         val structured = request.svgProfile == "editable"
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
@@ -2343,6 +2349,150 @@ class DefaultSvgRenderer(
 
         sb.append("</g>")
         return sb.toString()
+    }
+
+    private fun instructionExtent(ins: JSONObject): Double {
+        if (ins.has("radius") && !ins.isNull("radius")) {
+            return max(kotlin.math.abs(ins.optDouble("radius")), 1e-9)
+        }
+        val size = ins.optJSONArray("size")
+        if (size != null) {
+            return max(kotlin.math.hypot(size.optDouble(0), size.optDouble(1)), 1e-9)
+        }
+        val from = ins.optJSONArray("from_") ?: ins.optJSONArray("from")
+        val to = ins.optJSONArray("to")
+        if (from != null && to != null) {
+            return max(
+                kotlin.math.hypot(
+                    to.optDouble(0) - from.optDouble(0),
+                    to.optDouble(1) - from.optDouble(1),
+                ),
+                1e-9,
+            )
+        }
+        return 1.0
+    }
+
+    private fun scaleInstruction(ins: JSONObject, scale: Double): JSONObject {
+        val copy = copyJsonObject(ins)
+        if (kotlin.math.abs(scale - 1.0) < 1e-12) return copy
+        val (ax, ay) = anchor(copy)
+        val fromKey = if (copy.has("from_")) "from_" else "from"
+        val from = copy.optJSONArray(fromKey)
+        val to = copy.optJSONArray("to")
+        if (from != null && to != null) {
+            copy.put(
+                fromKey,
+                JSONArray(
+                    listOf(
+                        ax + (from.optDouble(0) - ax) * scale,
+                        ay + (from.optDouble(1) - ay) * scale,
+                    )
+                ),
+            )
+            copy.put(
+                "to",
+                JSONArray(
+                    listOf(
+                        ax + (to.optDouble(0) - ax) * scale,
+                        ay + (to.optDouble(1) - ay) * scale,
+                    )
+                ),
+            )
+        }
+        if (copy.has("radius") && !copy.isNull("radius")) {
+            copy.put("radius", copy.optDouble("radius") * scale)
+        }
+        val size = copy.optJSONArray("size")
+        if (size != null) {
+            copy.put(
+                "size",
+                JSONArray(listOf(size.optDouble(0) * scale, size.optDouble(1) * scale)),
+            )
+        }
+        return copy
+    }
+
+    private fun compositeMemberCopy(
+        member: JSONObject,
+        sourceAnchor: Pair<Double, Double>,
+        targetHead: JSONObject,
+        rotationDelta: Double,
+        scale: Double,
+        color: String?,
+    ): JSONObject {
+        val scaled = scaleInstruction(member, scale)
+        val memberAnchor = anchor(scaled)
+        val dx = memberAnchor.first - sourceAnchor.first
+        val dy = memberAnchor.second - sourceAnchor.second
+        val radians = Math.toRadians(rotationDelta)
+        val rotated = (
+            dx * kotlin.math.cos(radians) - dy * kotlin.math.sin(radians)
+        ) to (
+            dx * kotlin.math.sin(radians) + dy * kotlin.math.cos(radians)
+        )
+        val targetAnchor = anchor(targetHead)
+        val moved = moveAnchorTo(
+            scaled,
+            (targetAnchor.first + rotated.first) to (targetAnchor.second + rotated.second),
+            keepRelation = true,
+        )
+        moved.remove("arrangement")
+        if (rotationDelta != 0.0) {
+            moved.put("rotation", member.optDouble("rotation", 0.0) + rotationDelta)
+        }
+        if (color != null) moved.put("color", color)
+        return moved
+    }
+
+    private fun expandCompositeGroups(
+        instructions: JSONArray,
+        placementSeed: Long?,
+        performanceSeed: Long?,
+        canvas: CanvasSize,
+    ): JSONArray {
+        val result = JSONArray()
+        var index = 0
+        while (index < instructions.length()) {
+            val head = instructions.optJSONObject(index) ?: break
+            val arrangement = head.optJSONObject("arrangement")
+            val groupSize = arrangement?.optInt("group_size", 1) ?: 1
+            if (arrangement == null || groupSize <= 1 || index + groupSize > instructions.length()) {
+                result.put(copyJsonObject(head))
+                index += 1
+                continue
+            }
+            var preparedHead = copyJsonObject(head)
+            if (performanceSeed != null) {
+                preparedHead = resolveAtRegion(preparedHead, performanceSeed, index)
+            }
+            val copies = expandArrangement(preparedHead, placementSeed, canvas, performanceSeed)
+            val sourceAnchor = anchor(preparedHead)
+            val sourceRotation = preparedHead.optDouble("rotation", 0.0)
+            val sourceExtent = instructionExtent(preparedHead)
+            val hasCycle = (arrangement.optJSONArray("color_cycle")?.length() ?: 0) > 0
+            for (copyHead in copies) {
+                result.put(copyHead)
+                val rotationDelta = copyHead.optDouble("rotation", 0.0) - sourceRotation
+                val scale = instructionExtent(copyHead) / sourceExtent
+                val color = if (hasCycle) copyHead.optString("color", "black") else null
+                for (memberOffset in 1 until groupSize) {
+                    val member = instructions.getJSONObject(index + memberOffset)
+                    result.put(
+                        compositeMemberCopy(
+                            member,
+                            sourceAnchor,
+                            copyHead,
+                            rotationDelta,
+                            scale,
+                            color,
+                        )
+                    )
+                }
+            }
+            index += groupSize
+        }
+        return result
     }
 
     private fun resolvePerformanceScore(instructions: JSONArray, renderSeed: Long?): JSONArray {

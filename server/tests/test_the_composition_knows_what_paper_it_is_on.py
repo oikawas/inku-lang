@@ -229,8 +229,8 @@ def test_t7_no_paper_states_no_paper(lang):
 def test_t7_the_paperless_digests_are_the_frozen_ones():
     """Measured on 2026-08-13 on this branch, after the examples of stage 3 went
     in. The pre-contract values were cfa0e44d64743a14 / c4c26cdbeb3383e7."""
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "c422ced8671cf02a"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "b10c32d1968f0fc7"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "e5ebae81b0b41055"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "e25a01dc97e8a608"
 
 
 # The senders. A request that never names `canvas_aspect` gets `None`, and `None`

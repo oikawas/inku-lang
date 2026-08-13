@@ -322,6 +322,17 @@ class Arrangement(BaseModel):
         description=COUNT_FIELD_DESCRIPTION,
     )
 
+    group_size: int = Field(
+        default=1,
+        ge=1,
+        exclude_if=lambda value: value == 1,
+        description=(
+            "One repeated unit spans this many consecutive instructions, starting with "
+            "the instruction that owns this arrangement. Use 1 for an ordinary "
+            "single-mark arrangement."
+        ),
+    )
+
     @field_validator("count", mode="before")
     @classmethod
     def _clamp_count(cls, v: object) -> object:
@@ -683,3 +694,37 @@ class Score(BaseModel):
         if v is None:
             return "square"
         return str(v)
+
+    @model_validator(mode="after")
+    def _validate_composite_arrangements(self) -> "Score":
+        """A composite is one contiguous, non-overlapping instruction span."""
+        covered_until = 0
+        for index, instruction in enumerate(self.instructions):
+            arrangement = instruction.arrangement
+            if arrangement is None or arrangement.group_size == 1:
+                continue
+            if index < covered_until:
+                raise ValueError("nested arrangement inside a composite group")
+            if instruction.relation is not None:
+                raise ValueError("composite group head cannot relate outside the group")
+            stop = index + arrangement.group_size
+            if stop > len(self.instructions):
+                raise ValueError("arrangement group_size exceeds the instruction list")
+            members = self.instructions[index + 1 : stop]
+            if any(member.arrangement is not None for member in members):
+                raise ValueError("nested arrangement inside a composite group")
+            if any(member.mode != instruction.mode for member in members):
+                raise ValueError(
+                    "all instructions in a composite group must share one mode"
+                )
+            for offset, member in enumerate(members, start=1):
+                if (
+                    member.relation is not None
+                    and member.relation.type == "between"
+                    and offset < 2
+                ):
+                    raise ValueError(
+                        "between needs two prior instructions inside its composite group"
+                    )
+            covered_until = stop
+        return self

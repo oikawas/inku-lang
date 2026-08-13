@@ -18,7 +18,6 @@
 # in the notes the response already carries. `group_size=1` is excluded from
 # serialization, so every Score written before this reads and draws exactly as
 # it did.
-DDL_ENGINE_VERSION = "17"
 # 16 (2026-08-13): a mark the description called small is small whoever wrote it.
 # Stage 2 writes a circle and leaves the radius empty often enough to matter --
 # 115 of 2,972 production works carry a mark at coerce's default size -- and
@@ -187,6 +186,7 @@ DDL_ENGINE_VERSION = "17"
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
+DDL_ENGINE_VERSION = "17"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.13 (Web Build 898). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.14 (Web Build 899). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -198,6 +198,8 @@ There are nine canvases.
 | Vertical | 9:16 | The contemporary full-screen mobile format |
 
 Coordinates stay normalized to 0.0–1.0 whatever the canvas. **A mark's size is measured against the canvas's short edge, so the same description draws the same shape on any ratio** (an ellipse written wide stays wide on the pillar canvas). **The shape an arrangement makes follows the same measure** -- a ring laid out radially is drawn as round on every ratio, and a region stated as a square is treated as a square. **So does the shape of one clump when marks are scattered in clusters, and the swing of a path (wave, diagonal, top to bottom).** Placement, a region's centre, and a cluster's centre still spread with the ratio, and **so does how far along the paper a path travels**. The canvas ratio is a system plugin, so if an administrator disables it only the square remains.
+
+**From v2.13.14 the canvas you choose also reaches the stage that builds the composition (Stage 2).** The composition is told which paper it is for, so the same description is laid out differently on a pillar than on a folding screen. **Only size and placement move with the paper** -- a number the description states is drawn as stated, and a size the description states is not changed to suit the paper.
 
 The settings of the displayed work and the settings for the next painting are separate. Distinguish the `Displayed` strip at the top of the work tab from the button row on the describe tab.
 

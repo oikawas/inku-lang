@@ -366,3 +366,34 @@ def test_the_cli_still_sends_the_paper_as_a_literal_key():
         if isinstance(node, ast.Constant) and isinstance(node.value, str)
     }
     assert "canvas_aspect" in keys
+
+
+# ------------------------------- T-6b  the redraw reads the paper it was on
+#
+# Added at acceptance, not by the contract. Stage 4 grew a third answer to
+# "which paper" when the ruling moved it from "stop overwriting the Score" to
+# "read the performed paper off the work's row", and nothing walked that
+# entrance: removing the middle branch of `_render_score_svg` left 186 tests
+# green (measured on the merged tree). It only binds for a work composed after
+# this change, because before it the Score's declaration was overwritten with
+# the requested paper and the two answers could never disagree.
+
+
+def test_t6b_a_redraw_performs_on_the_paper_the_work_was_drawn_on():
+    from inku_server.api_core.rendering import _render_score_svg
+
+    payload = _score({"aspect": "pillar"}).model_dump()
+    # The work was performed on `wide` even though the composition was built
+    # for `pillar` -- exactly the disagreement T-6 makes possible.
+    svg, _, _ = _render_score_svg(
+        payload,
+        catalog_id=None,
+        svg_profile="editable",
+        work={"render_canvas_aspect_id": "wide"},
+    )
+    # wide is 2350x1000; pillar, which the Score declares, would be 200x1000.
+    assert 'width="2350"' in svg
+
+    # With no row to read, the Score's own declaration still stands.
+    fallback, _, _ = _render_score_svg(payload, catalog_id=None, svg_profile="editable")
+    assert 'width="200"' in fallback

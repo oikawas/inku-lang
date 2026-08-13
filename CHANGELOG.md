@@ -6164,3 +6164,75 @@ own and every clone needed a human to run the setup.**
 - **⚠ `setup.sh` installs more than the merge driver** — the pre-commit secret guard (ledger I-193)
   comes with it, so **the hook is rewritten idempotently on every test run** (a hook somebody else
   placed is left alone).
+
+### v2.13.14 — The composition knows what paper it is on (Build 899, 2026-08-13, ledger I-135 A)
+
+**Stage 2 composed without knowing which paper it was composing for.** The canvas aspect reached the
+renderer, which used it to size the SVG frame, and **not one byte of it reached the side that builds
+the composition** — a pillar (1:5) or a folding screen (2.2:1) received a composition built as if for
+a square, which was then pressed into the frame. **From v2.13.14 the prompt states the paper.**
+
+- **It states three things and no more** — **which paper**, **that what may be fitted to it is size
+  and placement**, and **that a size the description states is not overruled by the paper**.
+  **⚠ The number of marks never moves** (author's ruling: 72.6% of counts are measured to come from
+  the description, so changing them for the paper would add what the description never asked for).
+- **The paper is called a "support"** — using the same word a shape uses for "wide" makes the model
+  read a statement about paper as a statement about a shape. The wording (`横に広い支持体` /
+  `a support wider than it is tall`) is kept to words that only ever describe paper.
+- **The retry states it too** (author's ruling) — a Stage 2 retry runs **a second generator with its
+  own prompt**, and leaving that one paperless would drop the paper on exactly the runs that retried.
+  **The retry was measured firing on the production path.**
+- **The examples gained one non-square pair in each language** (author's ruling: **into the static
+  body**; generating an example per paper was considered and not taken).
+- **The paper is now settled before Stage 2 is called** rather than after it, which is why there was
+  nothing to hand the composition before. **A side effect: the 422 for an unsupported aspect now
+  answers before Stage 2 runs instead of after it.**
+
+**⚠ The meaning of `Score.canvas.aspect` has changed.**
+
+- **What Stage 2 declares is no longer overwritten with the requested aspect.** `Score.canvas` is now
+  **the record of what the composition was built for**, and **the paper actually performed on rides
+  in `render_canvas_aspect*`**. **The two may disagree** (works saved before v2.13.14 carry the
+  requested aspect in both).
+- **A redraw reads three answers in order** — the caller's override, **the performed paper recorded
+  on the work's row**, then the Score's declaration. **An old work redraws exactly as it did**,
+  because that column has been filled all along.
+- **`/api/render` and `/api/history` still overwrite.** Those two receive a Score from the client, so
+  there is no Stage 2 declaration to protect.
+
+**Measurements (through the LLM; not acceptance tests)**: thirty runs were baked and read.
+
+- **The paper reached the prompt** — `stage2_prompt_digest` was identical across three papers before
+  and is distinct across all three after.
+- **The paper moves size** — a circle's radius is `0.3 / 0.1` on square against a flat `0.15` on
+  pillar; a line's length is `0.424` on square against `0.335` on pillar (before, square and pillar
+  were both `0.424`).
+- **The count did not move** (all six runs stating "one hundred twenty" came back `count=120`).
+  **That is the design.**
+- **⚠ The declaration rate is only 2/8 on non-square papers** (0/5 on square). **It arrives, but it
+  is not yet much used.**
+- **⚠ M-4 — whether a stated "small" stays small on a pillar — could not be measured**: the two runs
+  that would have answered it hit a hard timeout and fell back. **There is no evidence either way.**
+- **Retries ran on 6 of 30 (20%)**. **The past cannot be measured, so this is the first number**
+  (taken while the shared LLM was busy).
+
+**Checks**: server **3,140 passed / 31 skipped** on the merged tree (474s), cli **224 passed**, web
+**272 passed** and `check` **256 FILES / 0 ERRORS / 2 WARNINGS**, ruff clean, frozen corpora
+byte-identical, `check_docs.py` consistent, Android JVM **278 cases / 0 failures**. **34 new tests**
+(33 from the implementation, 1 added at acceptance).
+
+- **⚠ One perturbation came up empty at acceptance, and a gate was added** — a mid-flight ruling
+  moved stage 4 from "stop overwriting" to "read the performed paper off the work's row", and
+  **nothing walked that resolution order**. Removing the middle branch left **186 tests green**
+  (**for an existing work the declaration and the performance always agree, so the branch only binds
+  for works saved after this change**). **T-6b was added and reddens under the same perturbation.**
+- **⚠ The contract said "two tests freeze this digest"; the measurement was four** — two more sat in
+  other functions of the same files. **The number of lines a contract names is not the number of
+  functions.**
+- **Six of the implementation's nine perturbation predictions matched** (the three misses are
+  reported with their direction). **⚠ One of them did not reach the acceptance it aimed at** — a
+  perturbation that changes the body regardless of paper never touches the claim that carrying a
+  paper moves nothing but the block. **A tenth perturbation was added and reddened six cases.**
+- **Android**: the two duplicated prompt constants were synced and `2.1.4-android.26` was stamped
+  (`sync_android_prompts.py --write`). **No Kotlin source was written by hand** — the tool copies the
+  constants wholesale.

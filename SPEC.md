@@ -249,9 +249,12 @@ the build number and the Score-side seed stay out of it, is in "Separation From
 the Render Engine Pack" below.
 `score.canvas` remains the score-level canvas instruction, while
 `render_canvas_aspect` records the canvas aspect actually used for this rendered
-artifact.  In normal server-generated output they match, but both are retained
-so render metadata remains visible even when old records or imported Scores are
-inspected.
+artifact.  From v2.13.14 the two may disagree: Stage 2 is told which paper it
+composes for, and what it declares is kept as the record of what the composition
+was built for, while the paper actually performed on rides in
+`render_canvas_aspect*`.  Works saved before that version carry the requested
+aspect in both.  A redraw reads the performed paper from the work's row, so an
+old work redraws exactly as it did.
 `render_canvas_aspect_id` is the explicit canvas aspect identifier for new
 metadata, and `render_canvas_aspect_ratio` records the actual rendered
 width/height ratio as a number.  `render_canvas_aspect` remains for
@@ -2972,8 +2975,13 @@ The built-in `canvas-aspect` plugin currently supports:
 | Mobile | `vertical` | 9:16 | smartphone vertical format |
 
 The selected aspect is stored per user in plugin storage and passed to
-`/api/paint`, `/api/compose`, and history saving.  It is also written into
-`Score.canvas`, so history and JSON display show which aspect produced a work.
+`/api/paint`, `/api/compose`, and history saving.  **From v2.13.14 it also
+enters the Stage 2 prompt**: the composition is told which paper it composes
+for, and what it may fit to the paper is size and placement, never the number of
+marks.  **A size the description states is not overruled by the paper.**  **What
+Stage 2 declares stays in `Score.canvas`; the aspect actually performed on rides
+in `render_canvas_aspect*`**, and the two may disagree.  History and JSON display
+show both.
 
 The renderer uses the selected aspect to determine SVG `width`, `height`, and
 `viewBox`.  Circle and arc radii are based on the shorter side to avoid

@@ -1,6 +1,6 @@
 # inku プロジェクトコンテキスト
 
-**対象バージョン: v2.13.13 / Build 898**
+**対象バージョン: v2.13.14 / Build 899**
 
 この文書は、開発者とAIが毎回 `SPEC.ja.md` 全文を読み直さずに作業を始めるための入口である。
 設計判断の正本は `SPEC.ja.md` であり、この文書と食い違う場合は日本語仕様を優先する。
@@ -91,7 +91,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
 | Render Engine | 32 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 15 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.25` | `android/VERSION`（web / server とは別の名前空間） |
+| Android | `2.1.4-android.26` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
 
 ### 語彙
@@ -132,6 +132,8 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 変奏（強度 3 段）を持ち、作品ごとに保存される。**動く軸は焦点ひとつで、この層は記述に無い文を足さない。**
 - **Stage 2** — JSON Score 化。
 任意フィールドの充填率は tool schema の**宣言順に従属する**（末尾に置いた語ほど埋まる）。
+**どの紙に描くのかを告げられて組む**（v2.13.14）。合わせてよいのは大きさと配置で、個数ではない。
+**宣言した比は `Score.canvas` に残り、実際に演奏した比とは食い違いうる。**
 - **coerce** — `normalize` と `compose` の 2 つに割れている。
 不正値は可能な限り drop-only で扱い、新しい様式を自動注入しない。
 **記述が抽象色をひとつしか名指していないとき、配色サイクルはその 1 色へ畳まれる**（背景句は数えず、

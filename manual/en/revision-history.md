@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-13 — Unreleased v2.13.14 Baseline (Web Build 899)
+
+Updated the 13 places that name a version to v2.13.14 / Build 899, and **added a paragraph to §7 of `Creating Images` now that the canvas you choose also reaches the stage that builds the composition**.
+
+- **The composition is now told which paper it is for.** Until now the canvas ratio only sized the frame and never reached the side that builds the composition. The same description is laid out differently on a pillar than on a folding screen.
+- **Only size and placement move with the paper.** A number the description states is drawn as stated.
+- **A size the description states is not changed to suit the paper.**
+- **Redrawing an old work is unchanged.** A past work reads the paper it was drawn on from its own row.
+
 ## 2026-08-12 — Unreleased v2.13.13 Baseline (Web Build 898)
 
 Updated the 13 places that name a version to v2.13.13 / Build 898, and **added a sentence to §7 of `Creating Images` now that a cluster and a path keep their shape whatever the canvas ratio**.

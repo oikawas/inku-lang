@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.13 / Build 898**
+**Target version: v2.13.14 / Build 899**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -104,7 +104,7 @@ To learn why something took its current shape, search the changelog by term, ver
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
 | Render Engine | 32 | `server/src/inku_server/render_engines/default.py` |
 | DDL | `ddl_version` 3 / `ddl_engine_version` 15 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.25` | `android/VERSION` (a namespace separate from web and server) |
+| Android | `2.1.4-android.26` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
@@ -157,6 +157,9 @@ layer adds no sentence the description did not ask for.**
 - **Stage 2** — Score construction as JSON.
 The fill rate of an optional field **depends on its declaration order** in the tool schema; fields
 declared last are filled more often.
+**It is told which paper it composes for** (v2.13.14). What it may fit to the paper is size and
+placement, never the number of marks. **What it declares stays in `Score.canvas` and may disagree
+with the aspect actually performed on.**
 - **coerce** — split into `normalize` and `compose`.
 Invalid values prefer drop-only handling, and no house style is injected.
 **When the description names exactly one abstract color, the color cycle folds to that one color**

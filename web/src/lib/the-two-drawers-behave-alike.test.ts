@@ -6,7 +6,8 @@
 // not, one slid in and the other appeared whole.
 //
 // T-44 (the saijiki closes on a press outside, and its own button still
-// toggles it).
+// toggles it), T-45 (the provenance drawer is uncovered from the right edge
+// over the saijiki's own duration and curve).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -43,4 +44,38 @@ test('T-44  the marker is an attribute, not a style class', () => {
 	// `saijiki-open-btn` is a class, and a class is a style: renaming it is a
 	// styling change that would silently take the close behaviour with it.
 	assert.doesNotMatch(SAIJIKI, /closest\?\.\('\.[a-z-]+'\)/);
+});
+
+// ------------------------------------------------------------------- T-45
+
+/** The one timing the two drawers are supposed to share. */
+const REVEAL = '0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+
+test('T-45  the provenance drawer is revealed, not popped into place', () => {
+	// It used to be mounted by {#if}, so it arrived whole with no animation at
+	// all. It stays mounted now and is clipped shut.
+	assert.match(PANEL, /class:open=\{generationInfoOpen\}/);
+	assert.doesNotMatch(PANEL, /\{#if generationInfoOpen\}/);
+	assert.match(PANEL, /\.generation-info \{[^}]*clip-path: inset\(0 0 0 100%\)/);
+	assert.match(PANEL, /\.generation-info\.open \{[^}]*clip-path: inset\(0 0 0 0\)/);
+});
+
+test('T-45  it takes the saijiki drawer\'s own duration and curve', () => {
+	const provenance = PANEL.match(/\.generation-info \{[^}]*transition: clip-path ([^;]+);/);
+	assert.ok(provenance, 'the provenance drawer has no reveal');
+	const saijiki = SAIJIKI.match(/\.saijiki-drawer \{[^}]*transition: width ([^;]+);/);
+	assert.ok(saijiki, 'the saijiki drawer has no reveal');
+	// Written the same way in both files, so a change to one is visible as a
+	// difference from the other rather than as a drawer that feels wrong.
+	const normalise = (value: string) => value.replace(/\s+/g, '');
+	assert.equal(normalise(provenance[1]), normalise(REVEAL));
+	assert.equal(normalise(saijiki[1]), normalise(REVEAL));
+});
+
+test('T-45  and a drawer that is shut takes no presses', () => {
+	// Clipping hides it without collapsing the box, so the box would otherwise
+	// still swallow clicks meant for the canvas behind it.
+	assert.match(PANEL, /\.generation-info \{[^}]*pointer-events: none/);
+	assert.match(PANEL, /\.generation-info\.open \{[^}]*pointer-events: all/);
+	assert.match(PANEL, /aria-hidden=\{!generationInfoOpen\}/);
 });

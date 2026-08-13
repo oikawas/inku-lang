@@ -1109,8 +1109,13 @@
 		</div>
 	</div>
 
-	{#if generationInfoOpen}
-		<aside bind:this={generationInfoEl} class="generation-info" aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}>
+	<aside
+		bind:this={generationInfoEl}
+		class="generation-info"
+		class:open={generationInfoOpen}
+		aria-hidden={!generationInfoOpen}
+		aria-label={isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}
+	>
 			<header class="generation-info-head">
 				<strong>{isJapanese ? '\u751f\u6210\u60c5\u5831' : 'Provenance'}</strong>
 				<button type="button" class="generation-info-close" onclick={() => (generationInfoOpen = false)} aria-label="Close">&times;</button>
@@ -1249,8 +1254,7 @@
 					/>
 				{/if}
 			</div>
-		</aside>
-	{/if}
+	</aside>
 
 	<div class="status-bar">
 		<div class="status-spacer"></div>
@@ -2205,6 +2209,17 @@
 		user-select: none;
 	}
 	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--floating-control-muted) !important; }
+	/* Opens and shuts the way the saijiki drawer does: uncovered from the right
+	   edge over the same 0.25s and the same curve, with the content standing
+	   still while it is revealed.
+
+	   The saijiki gets that by animating the width of a wrapper around an inner
+	   box of a fixed 460px. This panel's width is responsive -- min(760px, 100%
+	   - 72px) -- so there is no fixed number to give an inner box, and an inner
+	   box in percent resolves against the wrapper that is mid-animation, which
+	   drew the panel a gap narrower than it should be. Clipping does the same
+	   reveal on the box itself: same duration, same curve, no second box, and
+	   the content never reflows. */
 	.generation-info {
 		position: absolute;
 		z-index: 90;
@@ -2218,6 +2233,13 @@
 		background: var(--bg);
 		border-left: 1px solid var(--border2);
 		box-shadow: -14px 0 34px rgba(0, 0, 0, .18);
+		clip-path: inset(0 0 0 100%);
+		pointer-events: none;
+		transition: clip-path 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.generation-info.open {
+		clip-path: inset(0 0 0 0);
+		pointer-events: all;
 	}
 	.generation-info-head {
 		height: 44px;

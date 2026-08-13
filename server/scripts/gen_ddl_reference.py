@@ -28,30 +28,23 @@ CORPUS_FORMAT_VERSION = "1"
 SCHEMA_VERSION = "0.1.0"
 FROZEN_AT = "2026-08-13"
 REASON = (
-    "a mark the description called small is small whoever wrote it. When Stage 2 "
-    "writes a circle and leaves the radius empty, `_coerce_instruction` fills it "
-    "from `PRIMITIVE_SPECS` -- 0.15, a number that reads not one character of the "
-    "description -- so 「小さな円を三つ」 and 「円を三つ」 were drawn at exactly the same "
-    "size. When coerce writes the mark itself it reads the clause and answers "
-    "0.038, so the same description produced marks four times apart depending on "
-    "which layer wrote them. `_with_stated_size` runs on the instruction the model "
-    "handed over, before the defaults erase the difference between a size omitted "
-    "and a size stated, and fills an empty radius or ellipse size from the one "
-    "clause naming that primitive with a size word in it -- borrowing the values "
-    "and both readers from `_fallback_instruction_from_clause` rather than writing "
-    "a second table. Of 2,972 production works, 643 state a small mark and the "
-    "rule reaches 55 of them (78 marks); the 189 marks whose primitive no small "
-    "clause names, and the 20 answered by two clauses at once, are left alone. "
-    "Four cases are new and they are the whole of `changed_from_previous`: not one "
-    "of the 26 inputs frozen at engine 15 hands over a circle or an ellipse with "
-    "its size empty -- measured with `_ddl_clauses`, `_primitive_from_clause` and "
-    "`_is_small_mark_clause` themselves -- so refreezing without them would have "
-    "recorded a version whose change the corpus never traversed. Two of the four "
-    "move and two are controls: a description with no size word, and a size the "
-    "model did state, both of which keep what they had. No branch was added to "
-    "the report this time, which is why the 26 carried-over cases are byte-"
-    "identical and are not listed, unlike engines 11 and 15. Neither the 13 "
-    "expand cases nor the 6 plugin cases moved at all."
+    "a pair leaves the expansion layer as one unit, not as six marks. "
+    "`Arrangement.group_size` says how many consecutive instructions one "
+    "repeated unit spans, and the document plugin hands the API one prototype "
+    "pair plus `count=N / group_size=2` where it used to hand over every "
+    "resolved pair in full. The public expansion is untouched: `instructions` "
+    "still holds all six and the DDL text is byte-identical, which is why every "
+    "one of the six part C cases moves on the added key alone. That key is the "
+    "point of this version -- the change lives entirely in the form the render "
+    "route consumes, and a record holding only the public expansion would freeze "
+    "a version whose change it never reaches, which is the mistake ddl-engine 15 "
+    "wrote down rather than repeat. The ceiling learned the same arithmetic: the "
+    "whole-work budget counts `count * group_size`, and the instruction ceiling "
+    "stops at a span boundary instead of cutting a unit in half. Where no span "
+    "fits at all the span is dissolved rather than the marks, because an earlier "
+    "reading emptied the instruction list and a work with nothing in it is not a "
+    "smaller work. `group_size=1` is excluded from serialization, so the 13 "
+    "expand cases and the 30 coerce cases are byte-identical and are not listed."
 )
 
 IDENTITY_FIELDS = ("corpus_format_version", "engine_version", "ddl_version", "schema_version")
@@ -449,6 +442,12 @@ def _render_cases() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
             "provenance": [dict(entry) for entry in expansion.provenance],
             "warnings": list(expansion.warnings),
             "instructions": [dict(entry) for entry in expansion.instructions],
+            # The form the API consumes, which is not the public expansion above.
+            # Engine 17 compresses a pair run here and nowhere else, so a record
+            # without this key freezes a version whose change it never reaches.
+            "score_instructions": [
+                dict(entry) for entry in expansion.score_instructions
+            ],
         })
         path = f"c_plugin_expand/{case_id}.json"
         outputs[path] = text

@@ -97,7 +97,7 @@ def test_ddl_reference_versions_and_parts() -> None:
     # controls** -- a description with no size word, and a size the model did state
     # -- because a corpus holding only the two that move would record a layer that
     # shrinks marks rather than one that reads a description.
-    assert DDL_ENGINE_VERSION == "16"
+    assert DDL_ENGINE_VERSION == "17"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -160,27 +160,39 @@ def test_ddl_reference_versions_and_parts() -> None:
     # version added no name, so the claim to measure is the other one -- that not
     # one carried-over case moved by a byte. Reading the length alone would say
     # "four cases moved" without saying that the other 45 did not.
-    new_cases = {
-        "B-no-size-word-keeps-the-default",
-        "B-small-circle-with-no-radius",
-        "B-small-ellipse-with-no-size",
-        "B-stated-size-outranks-the-word",
+    # Engine 17 lists six and not one of them is a new file: every part C case
+    # moved, because the record gained the compact Score form the API consumes
+    # and every one of these bodies names a plugin whose member is a pair. That
+    # is the third quantity this list can hold -- new files, a judgement that
+    # moved, and a record that widened -- so the two claims below are separated:
+    # the six existed before and their bytes differ, and the other 43 are
+    # byte-identical.
+    moved_cases = {
+        "C-plugin-count-as-a-bare-numeral",
+        "C-plugin-count-as-a-numeral-beside-cjk",
+        "C-plugin-count-in-an-english-body",
+        "C-plugin-count-in-the-phrase",
+        "C-plugin-count-outside-the-phrase",
+        "C-plugin-count-over-the-ceiling",
     }
-    assert manifest["changed_from_previous"] == sorted(new_cases)
+    assert manifest["changed_from_previous"] == sorted(moved_cases)
     previous = json.loads(
-        (MANIFEST_PATH.parent.parent / "ddl-engine-15" / "manifest.json").read_text(
+        (MANIFEST_PATH.parent.parent / "ddl-engine-16" / "manifest.json").read_text(
             encoding="utf-8"
         )
     )["cases"]
     carried = 0
     for case_id, case in manifest["cases"].items():
-        if case_id in new_cases:
+        if case_id in moved_cases:
+            # Not new: it was frozen before and says something different now.
+            assert case_id in previous, case_id
+            assert case["digest"] != previous[case_id]["digest"], case_id
             continue
         assert case_id in previous, case_id
         assert case["digest"] == previous[case_id]["digest"], case_id
         assert case["bytes"] == previous[case_id]["bytes"], case_id
         carried += 1
-    assert carried == 45
+    assert carried == 43
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()
@@ -198,7 +210,9 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     assert set(generator.BASE_SCORE) == set(Score.model_fields)
     assert set(generator.BASE_SCORE["canvas"]) == set(CanvasSpec.model_fields)
     assert set(generator.BASE_INSTRUCTION) == _aliases(Instruction) - {"note"}
-    # group_size=1 is intentionally omitted so engine-15 legacy inputs remain stable.
+    # Every field is stated except the span, which is stated only where a case
+    # states one: writing `group_size: 1` into the base would move every input
+    # frozen before engine 17 for a span none of them has.
     assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields) - {
         "group_size"
     }
@@ -225,7 +239,7 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
         for instruction in score["instructions"]:
             assert set(instruction) == _aliases(Instruction) - {"note"}
             if instruction["arrangement"] is not None:
-                assert set(instruction["arrangement"]) == set(
+                assert set(instruction["arrangement"]) - {"group_size"} == set(
                     Arrangement.model_fields
                 ) - {"group_size"}
             if instruction["relation"] is not None:

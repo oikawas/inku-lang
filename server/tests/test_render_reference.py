@@ -26,6 +26,7 @@ MANIFEST_PATH = CORPUS_DIR / "manifest.json"
 # 主張の対象が黙って入れ替わる。
 ENGINE_18_MANIFEST = SERVER_ROOT / "reference" / "render-engine-18" / "manifest.json"
 ENGINE_19_MANIFEST = SERVER_ROOT / "reference" / "render-engine-19" / "manifest.json"
+ENGINE_32_MANIFEST = SERVER_ROOT / "reference" / "render-engine-32" / "manifest.json"
 
 
 def _generator():
@@ -82,11 +83,16 @@ def test_render_reference_case_counts() -> None:
     # on. The ten cluster and path cases the corpus already held are every one
     # of them square, so the two arrangements that carry 36.2% of production's
     # expanded marks had no non-square case anywhere in the record.
-    assert len(cases) == 582
+    # Engine 33 opened group H: the composite unit. Every case above it draws a
+    # score of exactly one instruction, so a span -- one repeated unit made of
+    # more than one mark -- could not be stated in this corpus at all. Three
+    # state a span and `H-pair-scatter-plain` is the control: the same two
+    # instructions with no span, which is the picture engine 32 drew.
+    assert len(cases) == 586
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
-        for prefix in ("A", "B", "C", "D", "E", "F", "G")
-    } == {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128, "G": 50}
+        for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
+    } == {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -99,14 +105,20 @@ def test_render_reference_inputs_are_fully_explicit() -> None:
     assert score_fields == set(Score.model_fields)
     assert set(generator.BASE_SURFACE) == set(SurfaceSpec.model_fields)
     assert set(generator.BASE_GROUND) == set(CanvasGroundSpec.model_fields)
-    # group_size=1 is intentionally omitted so engine-32 legacy inputs remain stable.
+    # Every field is stated except the span, which is stated only where a case
+    # states one: writing `group_size: 1` into the base would move all 582
+    # inputs frozen before engine 33 for a span none of them has.
     assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields) - {
         "group_size"
     }
     for case_id, case in generator.build_inputs().items():
         score = case["score"]
         assert set(score) == score_fields
-        assert set(score["instructions"][0]) == instruction_fields
+        # Every instruction, not the first: engine 33's composite cases are the
+        # first scores here to hold more than one, and a member stated with
+        # fewer fields than its head would be an input this corpus never froze.
+        for instruction in score["instructions"]:
+            assert set(instruction) == instruction_fields
         if case_id.startswith("F-"):
             assert case["catalog_id"] is not None
             assert any(key.startswith("palette:") for key in case["color_map"])
@@ -225,13 +237,42 @@ def test_engine_32_moves_only_its_own_new_cluster_and_path_cases() -> None:
     対照 4 件を manifest から見分けることはできず、判別力は摂動でしか示せない。
     ここで測るのは「動いたのが新規 13 件と一致すること」だけ。
 
-    版の一致も見る。`default.py` と manifest がずれると、コーパスは走っている
-    実装ではなく別の実装の記録になる。
+    ⚠ engine 32 の manifest を読む。現在版の manifest を読むと、engine 33 を
+    焼いた日に主張の対象が黙って engine 33 の差分へ入れ替わる。
     """
-    manifest = _manifest()
-    assert manifest["engine_version"] == "32" == current_render_engine().version
+    manifest = json.loads(ENGINE_32_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "32"
     assert set(manifest["changed_from_previous"]) == ENGINE_32_NEW_CASES
     assert len(ENGINE_32_NEW_CASES) == 13
+
+
+def test_engine_33_moves_only_its_own_composite_cases() -> None:
+    """engine 33 が動かしたのは、自分が足した 4 件だけである。
+
+    語彙が増えた版なので、既存 582 件はバイト一致するのが正しい —— `group_size`
+    は 1 のとき直列化から外れるので、前の版の入力は 1 件も形が変わらない。
+    ⚠ 新規 ID はすべて changed に数えられるため、判別力は摂動でしか示せない。
+
+    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
+    いる実装ではなく別の実装の記録になる。
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "33" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == {
+        "H-pair-cycle-unit",
+        "H-pair-radial-unit",
+        "H-pair-scatter-plain",
+        "H-pair-scatter-unit",
+    }
+    previous = json.loads(ENGINE_32_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id.startswith("H-"):
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 582
 
 
 def test_engine_32_cases_match_the_current_renderer() -> None:

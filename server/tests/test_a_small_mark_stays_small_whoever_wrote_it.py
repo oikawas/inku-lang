@@ -31,6 +31,9 @@ from inku_server.schema import Score
 
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 REFERENCE_ROOT = SERVER_ROOT / "reference"
+# The version this file is about. Attribution belongs to the version that made
+# the change, so it is named here rather than derived from the current one.
+ENGINE_16_DIR = REFERENCE_ROOT / "ddl-engine-16"
 
 CIRCLE = {"primitive": "circle", "center": [0.5, 0.5]}
 ELLIPSE = {"primitive": "ellipse", "center": [0.5, 0.5]}
@@ -179,10 +182,12 @@ def test_the_corpus_holds_the_two_marks_that_move_and_the_two_controls() -> None
     """
     generator = _generator()
     inputs = generator.build_coerce_inputs()
+    # Pinned to 16, not to whatever the current version is. The claim is about
+    # what engine 16 moved, and a directory holds only the cases that moved in
+    # it -- reading a later manifest swaps the subject of the claim in silence
+    # and takes the four cases' frozen bytes out of reach with it.
     manifest = json.loads(
-        (REFERENCE_ROOT / f"ddl-engine-{DDL_ENGINE_VERSION}" / "manifest.json").read_text(
-            encoding="utf-8"
-        )
+        (ENGINE_16_DIR / "manifest.json").read_text(encoding="utf-8")
     )
 
     for case_id, (primitive, field, expected) in NEW_COERCE_CASES.items():
@@ -197,11 +202,7 @@ def test_the_corpus_holds_the_two_marks_that_move_and_the_two_controls() -> None
         assert written == (tuple(expected) if isinstance(expected, list) else expected), case_id
 
         # The same run reproduces the frozen file, byte for byte.
-        frozen = (
-            REFERENCE_ROOT
-            / f"ddl-engine-{DDL_ENGINE_VERSION}"
-            / manifest["cases"][case_id]["output_path"]
-        ).read_bytes()
+        frozen = (ENGINE_16_DIR / manifest["cases"][case_id]["output_path"]).read_bytes()
         assert hashlib.sha256(frozen).hexdigest()[:32] == manifest["cases"][case_id]["digest"]
         assert json.loads(frozen)["score"]["instructions"] == json.loads(
             score.model_dump_json(by_alias=True)
@@ -216,10 +217,10 @@ def test_no_frozen_engine_below_this_one_was_rewritten() -> None:
     """T-11. The version rose, so every older directory must still match its own manifest.
 
     `test_ddl_reference_output_files_match_manifest` checks the current version only.
-    Baking engine 16 is exactly the moment an older directory gets rewritten by
+    Baking engine 17 is exactly the moment an older directory gets rewritten by
     accident, which is what this reads for.
     """
-    assert DDL_ENGINE_VERSION == "16"
+    assert DDL_ENGINE_VERSION == "17"
 
     checked = 0
     for version in range(1, int(DDL_ENGINE_VERSION)):
@@ -232,4 +233,6 @@ def test_no_frozen_engine_below_this_one_was_rewritten() -> None:
             assert hashlib.sha256(data).hexdigest()[:32] == case["digest"], f"{version}/{case_id}"
             checked += 1
     # A gate that silently read nothing reads exactly like a gate that passed.
-    assert checked == 522
+    # 522 while engine 16 was the current one; engine 17 moves 16's own 49 cases
+    # into the set this reads, which is what the number rising says.
+    assert checked == 571

@@ -33,34 +33,26 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-12"
+FROZEN_AT = "2026-08-13"
 REASON = (
-    "A cluster and a path keep their shape on any canvas. Engine 31 did this "
-    "for the ring and the region; the two arrangements that carry 36.2% of the "
-    "marks production expands were still stretched by the aspect. A cluster's "
-    "band is built in a rotated frame and then written straight into "
-    "normalized space, so on the pillar (1:5) one clump came out as a narrow "
-    "vertical stripe and on CinemaScope as a wide one -- the band's own aspect "
-    "moved by a factor of 8.8 between those two papers for the one "
-    "description. A `wave` swung 220px on the square canvas and 44px on the "
-    "pillar, and the jitter of a `diagonal` or a `top_to_bottom` bought a "
-    "different number of pixels on each axis. Engine 32 rotates the cluster's "
-    "offset first and puts it on the short side second -- scaling before the "
-    "rotation would turn the rotation into a shear -- and puts the paths' "
-    "cross-axis spread on the short side. What the group does along its line "
-    "is untouched: `margin`, `span`, `right_half`'s reach and the cluster's "
-    "centre all say how much of the paper is used and where the group sits, "
-    "not what shape it is, and whether a layout should use the paper's long "
-    "direction is [I-135] (3)-b and unruled. `_scatter_pos` is untouched too: "
-    "an affine map takes a uniform scatter to a uniform scatter, so it already "
-    "means the same thing on every sheet. On a square canvas the factors are "
-    "exactly 1.0, so only the non-square cases move. Thirteen "
-    "`D-canvas-*-cluster` and `D-canvas-*-path-*` cases are new, nine of them "
-    "discriminating and four square controls: the corpus held ten cluster and "
-    "path cases and every one of them was square, so neither rule could be "
-    "seen in the record at all. Each subject is drawn on the papers whose long "
-    "side is the axis it spreads on -- a `top_to_bottom` on the pillar has a "
-    "factor of exactly 1.0 and would be frozen unable to fail."
+    "a repeated unit can be more than one mark. Every arrangement this engine "
+    "could perform repeated a single instruction, so a pair -- an arc and the "
+    "arc touching it at both ends -- had to be handed over as every resolved "
+    "pair in full, and each follower then resolved its `touching` against "
+    "whichever instruction happened to precede it rather than against its own "
+    "head. `Arrangement.group_size` names the span, and the engine copies the "
+    "whole span first and resolves each copy's relations inside it second, "
+    "which is the order that makes the relation local. A member is carried by "
+    "the transform its head received: the rotation delta about the head's "
+    "anchor, the scale its extent was given, and the cycled color where the "
+    "head has a cycle. Four `H-pair-*` cases are new and are the whole of "
+    "`changed_from_previous`, because no case above them holds a score of more "
+    "than one instruction -- freezing this version without them would record a "
+    "vocabulary the corpus never speaks, and the 582 carried-over cases are "
+    "byte-identical, `group_size=1` being excluded from serialization. Three of "
+    "the four state a span and one is the control: `H-pair-scatter-plain` is "
+    "the same two instructions with no span, which is the picture engine 32 "
+    "drew, and it must not move."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -184,6 +176,34 @@ def _case(cases: dict[str, dict[str, Any]], case_id: str, instruction: dict[str,
     # Stated only where it is stated. Writing the key unconditionally would
     # move all 531 inputs the day the key was added, and the manifest would
     # report a corpus-wide change for a case nobody drew differently.
+    if composition_seed is not None:
+        cases[case_id]["composition_seed"] = composition_seed
+
+
+def _case_unit(cases: dict[str, dict[str, Any]], case_id: str,
+               instructions: list[dict[str, Any]], *,
+               render_seed: int = DEFAULT_RENDER_SEED,
+               composition_seed: int | None = None) -> None:
+    """A case whose score holds more than one instruction.
+
+    Every other case here draws a single instruction, which is all a corpus of
+    one-mark subjects needs. A composite is a claim about a span, so it cannot
+    be stated with one.
+    """
+    if case_id in cases:
+        raise ValueError(f"duplicate case ID: {case_id}")
+    score = copy.deepcopy(BASE_SCORE)
+    score["canvas"] = {"aspect": "square", "ground": None}
+    score["background"] = "white"
+    score["instructions"] = [copy.deepcopy(item) for item in instructions]
+    cases[case_id] = {
+        "score": score,
+        "render_seed": render_seed,
+        "color_map": copy.deepcopy(DEFAULT_COLOR_MAP),
+        "catalog_id": None,
+        "svg_profile": SVG_PROFILE,
+        "wild": False,
+    }
     if composition_seed is not None:
         cases[case_id]["composition_seed"] = composition_seed
 
@@ -660,9 +680,44 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     # canvas and on the papers whose long side is the axis it spreads on. Nine
     # of the thirteen draw something engine 31 could not; the four square ones
     # are the control and must not move.
-    expected = {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128, "G": 50}
+    # H is new in engine 33: the composite unit. Every case above draws one
+    # instruction, so the corpus could not state a span at all -- freezing the
+    # version without these would record a vocabulary the record never speaks.
+    # The head repeats the whole span; the member follows its own head rather
+    # than the previous copy, which is the entire claim. `plain` is the control:
+    # the same two instructions with no span, which is the picture engine 32
+    # drew, and it must not move.
+    HEAD: dict[str, Any] = {
+        "center": [0.50, 0.50], "radius": 0.08,
+        "angle_start": 220.0, "angle_end": 320.0,
+    }
+    MEMBER: dict[str, Any] = {
+        "center": [0.50, 0.50], "radius": 0.08,
+        "angle_start": 40.0, "angle_end": 140.0,
+        "relation": {"type": "touching", "gap": "medium"},
+    }
+
+    def _pair(case_id: str, **changes: Any) -> None:
+        arrangement = copy.deepcopy(BASE_ARRANGEMENT)
+        arrangement.update({"count": 3, "layout": "scatter", "margin": 0.15})
+        arrangement.update(changes)
+        _case_unit(
+            cases, case_id,
+            [_instruction("arc", weight="pen", arrangement=arrangement, **HEAD),
+             _instruction("arc", weight="pen", **MEMBER)],
+        )
+
+    _pair("H-pair-scatter-plain")
+    _pair("H-pair-scatter-unit", group_size=2)
+    _pair("H-pair-radial-unit", group_size=2, count=6, layout="radial",
+          center=[0.5, 0.5], radius=0.3)
+    _pair("H-pair-cycle-unit", group_size=2, count=4,
+          color_cycle=["red", "blue"])
+
+    expected = {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128,
+                "G": 50, "H": 4}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 582:
+    if actual != expected or len(cases) != 586:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

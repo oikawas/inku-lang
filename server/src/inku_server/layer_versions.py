@@ -1,5 +1,24 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 17 (2026-08-13): a pair leaves the expansion layer as one unit, not as six
+# marks. `Arrangement.group_size` says how many consecutive instructions one
+# repeated unit spans, and the document plugin now hands the API one prototype
+# pair plus `count=N / group_size=2` where it used to hand over every resolved
+# pair in full. The public expansion is untouched -- `instructions` still holds
+# all six, and the DDL text is byte-identical -- so the change lives entirely in
+# the form the render route consumes, which is why `score_instructions` joins
+# the frozen part C: a record holding only the public expansion would freeze a
+# version whose change it never reaches, the mistake ddl-engine 15 wrote down
+# rather than repeat. The ceiling learned the same arithmetic: the whole-work
+# budget counts `count * group_size`, and the instruction ceiling stops at a
+# span boundary instead of cutting a unit in half. Where no span fits at all it
+# dissolves the span rather than the marks -- an earlier reading emptied the
+# instruction list, and a work with nothing in it is not a smaller work. The
+# limits are settings, so what the ceiling drops at the merge point is recorded
+# in the notes the response already carries. `group_size=1` is excluded from
+# serialization, so every Score written before this reads and draws exactly as
+# it did.
+DDL_ENGINE_VERSION = "17"
 # 16 (2026-08-13): a mark the description called small is small whoever wrote it.
 # Stage 2 writes a circle and leaves the radius empty often enough to matter --
 # 115 of 2,972 production works carry a mark at coerce's default size -- and
@@ -168,7 +187,6 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "16"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

@@ -465,6 +465,10 @@ export interface LangPack {
 	settingsTabServerMisc: string;
 	settingsTabLogs: string;
 	settingsTabLimits: string;
+	settingsDetailLabel: string;
+	settingsDetailStandard: string;
+	settingsDetailDetailed: string;
+	settingsDetailHint: string;
 	settingsRenderLimitsTitle: string;
 	settingsRenderLimitsIntro: string;
 	settingsRenderLimitsRounding: string;

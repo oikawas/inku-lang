@@ -13,6 +13,11 @@
 		holdsPermissionGroup,
 		type PermissionGroup
 	} from '$lib/permissionGroups';
+	import {
+		normalizeSettingsDetail,
+		settingsTabShownAtDetail,
+		type SettingsDetailLevel
+	} from '$lib/settingsDetail';
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -104,6 +109,10 @@
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
+	// Which of the settings dialog's tabs are on show. Kept in the browser, not
+	// on the member: it is a preference about this screen, and saving it would
+	// need a field the server does not have.
+	const SETTINGS_DETAIL_KEY = 'inku-settings-detail';
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	// Injected by vite.config from web/APP_VERSION, the single source shared with
 	// the server (/api/info) and the CLI. Never write the version here again.
@@ -551,6 +560,7 @@
 	let leftPanelCollapsed = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<SettingsTab>('connection');
+	let settingsDetail = $state<SettingsDetailLevel>('standard');
 	let pngMenuOpen  = $state(false);
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(true);
@@ -1150,12 +1160,29 @@
 		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
 	}
 
+	// Two gates, both of which have to open: the permission group says whether
+	// this member may see the tab at all, the detail level says whether they
+	// asked to. The tab bar in SettingsModal asks the second one the same way.
 	function canAccessSettingsTab(tab: SettingsTab) {
-		return canAccessSettingsTabFor(tab, currentUser);
+		return canAccessSettingsTabFor(tab, currentUser) && settingsTabShownAtDetail(tab, settingsDetail);
 	}
 
-	function defaultSettingsTab() {
-		return defaultSettingsTabFor(currentUser);
+	function defaultSettingsTab(): SettingsTab {
+		const preferred = defaultSettingsTabFor(currentUser);
+		// `plugins` -- what a member outside the administrators group would land
+		// on -- is one of the tabs the standard mode hides. `export` is the
+		// fallback because no gate can hide it: it is neither administrator-only
+		// nor detailed-only, and T-50 executes that claim.
+		return canAccessSettingsTab(preferred) ? preferred : 'export';
+	}
+
+	function setSettingsDetail(detail: SettingsDetailLevel) {
+		settingsDetail = detail;
+		try { localStorage.setItem(SETTINGS_DETAIL_KEY, detail); } catch { /* private browsing */ }
+		// Narrowing the dialog can hide the tab that is open. Route the move
+		// through selectSettingsTab so the new tab loads what it needs, the way
+		// it would if the member had pressed it.
+		if (settingsOpen && !canAccessSettingsTab(settingsTab)) selectSettingsTab(defaultSettingsTab());
 	}
 
 	function normalizeBatchPromptHistory(items: string[]): string[] {
@@ -6299,6 +6326,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
+			// Anything but 'detailed' means standard, so a cleared or corrupted
+			// entry opens the dialog at its narrow width rather than throwing.
+			settingsDetail = normalizeSettingsDetail(localStorage.getItem(SETTINGS_DETAIL_KEY));
 			loadPersistedSettings();
 		} catch {}
 		void (async () => {
@@ -6861,6 +6891,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{singleUserMode}
 			{settingsMode}
 			{settingsTab}
+			{settingsDetail}
 			{stage1Provider}
 			{stage1Model}
 			{stage2Provider}
@@ -6921,6 +6952,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onClearDownloadFolder={clearDownloadFolder}
 			onClose={closeSettingsModal}
 			onSelectSettingsTab={selectSettingsTab}
+			onSetSettingsDetail={setSettingsDetail}
 			onSetStage1Provider={setStage1Provider}
 			onSetStage1Model={setStage1Model}
 			onSetStage2Provider={setStage2Provider}

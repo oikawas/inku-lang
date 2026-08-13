@@ -457,6 +457,10 @@ export const en: LangPack = {
 	settingsTabServerMisc: 'Other (server)',
 	settingsTabLogs: 'Log retention',
 	settingsTabLimits: 'Limits',
+	settingsDetailLabel: 'Display mode',
+	settingsDetailStandard: 'Standard',
+	settingsDetailDetailed: 'Detailed',
+	settingsDetailHint: 'The detailed mode adds the Plugins, Other (server), Limits and Unread-word ledger tabs.',
 	settingsRenderLimitsTitle: 'Limits',
 	settingsRenderLimitsIntro:
 		'These decide how many marks a single work may carry. They are not speed tuning: they change how many lines get drawn. The values set here are written into what Stage 1 and Stage 2 tell the model, and recorded on every work drawn under them.',

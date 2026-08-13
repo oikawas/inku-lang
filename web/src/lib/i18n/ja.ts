@@ -457,6 +457,10 @@ export const ja: LangPack = {
 	settingsTabServerMisc: 'その他（サーバー）',
 	settingsTabLogs: 'ログ保存',
 	settingsTabLimits: '制限値',
+	settingsDetailLabel: '表示モード',
+	settingsDetailStandard: '標準',
+	settingsDetailDetailed: '詳細',
+	settingsDetailHint: '詳細モードでは、プラグイン・その他（サーバー）・制限値・未読語台帳のタブが出ます。',
 	settingsRenderLimitsTitle: '制限値',
 	settingsRenderLimitsIntro:
 		'一枚の作品が何本の墨を持てるかを決める数です。速度の調整ではなく、描かれる線の数そのものが変わります。ここで決めた値は Stage 1 / Stage 2 のプロンプトへ書き込まれ、描いた作品ごとに記録されます。',

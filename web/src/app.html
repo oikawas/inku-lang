@@ -7,9 +7,31 @@
 		<link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
 		<link rel="apple-touch-icon" sizes="192x192" href="/favicon-192.png" />
 		<title>inku</title>
+		<style>
+			html,
+			body {
+				background: #171716;
+			}
+
+			#boot-curtain {
+				position: fixed;
+				inset: 0;
+				display: grid;
+				place-items: center;
+				background: #171716;
+				color: #eee9df;
+				font: 24px/1 serif;
+				letter-spacing: 0.08em;
+			}
+
+			body:has(main) #boot-curtain {
+				display: none;
+			}
+		</style>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<div id="boot-curtain">inku</div>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

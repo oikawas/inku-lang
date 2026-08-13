@@ -48,7 +48,14 @@ from .normalize import (
     ensure_renderable_score,
 )
 
-__all__ = ["coerce_score", "count_hint_from_ddl", "ensure_renderable_score"]
+__all__ = [
+    "coerce_score",
+    "count_hint_from_ddl",
+    "enforce_hard_ceiling",
+    "ensure_renderable_score",
+]
+
+enforce_hard_ceiling = _enforce_hard_ceiling
 
 
 def _folded_of_unrequested_color_cycle(

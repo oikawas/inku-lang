@@ -51,6 +51,8 @@ CHANGED_SCHEMAS = {
     # expand, so the prose rides in its own optional key. Callers that never
     # send it are unaffected.
     "ComposeRequest": {"added": {"fires_on"}, "removed": set()},
+    # I-143: one arrangement may repeat a contiguous Score instruction unit.
+    "Arrangement": {"added": {"group_size"}, "removed": set()},
 }
 
 

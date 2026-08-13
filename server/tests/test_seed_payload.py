@@ -43,6 +43,7 @@ EXPECTED_NON_SEED_INSTRUCTION_FIELDS = {
 EXPECTED_SEED_ARRANGEMENT_FIELDS = {"jitter"}
 EXPECTED_NON_SEED_ARRANGEMENT_FIELDS = {
     "count",
+    "group_size",
     "layout",
     "rows",
     "cols",

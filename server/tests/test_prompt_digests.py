@@ -126,8 +126,8 @@ def test_stage2_prompt_and_tool_expected_values():
     # engine 16 段 3 (太さの軸) で、Stage 2 の変換表 2 つ (日英) と作例 4 件が入り、
     # `thinness` の enum + description が tool schema に出た。17_764 -> 18_257。
     # The nine-color enum and both color descriptions expand the tool schema.
-    assert len(tool_json.encode("utf-8")) == 18_492
-    assert _digest(tool_json) == "c1c12877ef486469"
+    assert len(tool_json.encode("utf-8")) == 18_761
+    assert _digest(tool_json) == "e0b83e5182b8b969"
     # `thinness` を `weight` の直後から末尾へ移し (搬送 18% -> 89%)、
     # `_stage2_prompt_digest` の `sort_keys=True` を外して指紋を並び順に開いた
     # (I-036 / I-038)。**上の 2 行はここで動かない** — この tool_json は
@@ -153,8 +153,8 @@ def test_stage2_prompt_and_tool_expected_values():
     # en 43_106 -> 43_363。**tool schema は動いていない** (18_492 / c1c1... のまま)
     # —— 動かしたのは散文と作例だけである。**この 2 行が凍結しているのは紙を告げない
     # 本文の指紋**で、要求ごとに組む本文は紙ごとに別の値になる。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "c422ced8671cf02a"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "b10c32d1968f0fc7"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "e5ebae81b0b41055"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "e25a01dc97e8a608"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -259,7 +259,7 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     # The temporary schema change must remain visible after the nine-color update.
     # The digest reads declaration order too, so moving `thinness` before `surface`
     # (contract stage2-score-shrinkage, 2026-08-03) moves this value as well.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "33aa0fcc50ded4a2"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "b42a7ea7d068adc2"
     assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "2838b9cacb1c551e"
 
 

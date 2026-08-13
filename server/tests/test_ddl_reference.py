@@ -184,7 +184,10 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
     assert set(generator.BASE_SCORE) == set(Score.model_fields)
     assert set(generator.BASE_SCORE["canvas"]) == set(CanvasSpec.model_fields)
     assert set(generator.BASE_INSTRUCTION) == _aliases(Instruction) - {"note"}
-    assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields)
+    # group_size=1 is intentionally omitted so engine-15 legacy inputs remain stable.
+    assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields) - {
+        "group_size"
+    }
     assert set(generator.BASE_RELATION) == set(Relation.model_fields)
     assert set(generator.BASE_PRESENCE) == set(Presence.model_fields)
 
@@ -208,7 +211,9 @@ def test_ddl_reference_inputs_are_fully_explicit_and_independent() -> None:
         for instruction in score["instructions"]:
             assert set(instruction) == _aliases(Instruction) - {"note"}
             if instruction["arrangement"] is not None:
-                assert set(instruction["arrangement"]) == set(Arrangement.model_fields)
+                assert set(instruction["arrangement"]) == set(
+                    Arrangement.model_fields
+                ) - {"group_size"}
             if instruction["relation"] is not None:
                 assert set(instruction["relation"]) == set(Relation.model_fields)
         if score["presence"] is not None:

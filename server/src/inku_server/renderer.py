@@ -1792,9 +1792,145 @@ def _resolve_relation(
     return _move_anchor_to(ins, target)
 
 
-def _resolve_performance_score(
-    score: Score, performance_seed: int | None, canvas: CanvasSize | None = None
+def _instruction_extent(ins: Instruction) -> float:
+    """One scalar used to carry an arrangement's member scale to its whole unit."""
+    if ins.radius is not None:
+        return max(abs(ins.radius), 1e-9)
+    if ins.size is not None:
+        return max(math.hypot(*ins.size), 1e-9)
+    if ins.from_ is not None and ins.to is not None:
+        return max(math.dist(ins.from_, ins.to), 1e-9)
+    return 1.0
+
+
+def _scale_instruction(ins: Instruction, scale: float) -> Instruction:
+    """Scale one instruction around its own anchor without consuming relation."""
+    if abs(scale - 1.0) < 1e-12:
+        return ins
+    data = ins.model_dump(by_alias=True)
+    anchor = _anchor(ins)
+    if ins.from_ is not None and ins.to is not None:
+        data["from"] = [
+            anchor[0] + (ins.from_[0] - anchor[0]) * scale,
+            anchor[1] + (ins.from_[1] - anchor[1]) * scale,
+        ]
+        data["to"] = [
+            anchor[0] + (ins.to[0] - anchor[0]) * scale,
+            anchor[1] + (ins.to[1] - anchor[1]) * scale,
+        ]
+    if ins.radius is not None:
+        data["radius"] = ins.radius * scale
+    if ins.size is not None:
+        data["size"] = [ins.size[0] * scale, ins.size[1] * scale]
+    return Instruction.model_validate(data)
+
+
+def _composite_member_copy(
+    member: Instruction,
+    *,
+    source_anchor: tuple[float, float],
+    target_head: Instruction,
+    rotation_delta: float,
+    scale: float,
+    color: str | None,
+) -> Instruction:
+    """Carry one member through the transform chosen for its composite head."""
+    scaled = _scale_instruction(member, scale)
+    member_anchor = _anchor(scaled)
+    dx = member_anchor[0] - source_anchor[0]
+    dy = member_anchor[1] - source_anchor[1]
+    radians = math.radians(rotation_delta)
+    rotated = (
+        dx * math.cos(radians) - dy * math.sin(radians),
+        dx * math.sin(radians) + dy * math.cos(radians),
+    )
+    target_anchor = _anchor(target_head)
+    moved = _move_anchor_to(
+        scaled,
+        (target_anchor[0] + rotated[0], target_anchor[1] + rotated[1]),
+        keep_relation=True,
+    )
+    data = moved.model_dump(by_alias=True)
+    data.pop("arrangement", None)
+    if rotation_delta:
+        data["rotation"] = (member.rotation or 0.0) + rotation_delta
+    if color is not None:
+        data["color"] = color
+    return Instruction.model_validate(data)
+
+
+def _expand_composite_groups(
+    score: Score,
+    *,
+    placement_seed: int | None,
+    performance_seed: int | None,
+    canvas: CanvasSize | None,
 ) -> Score:
+    """Expand each contiguous composite as copies of one ordered instruction unit."""
+    expanded: list[Instruction] = []
+    index = 0
+    while index < len(score.instructions):
+        head = score.instructions[index]
+        arrangement = head.arrangement
+        group_size = arrangement.group_size if arrangement is not None else 1
+        if arrangement is None or group_size == 1:
+            expanded.append(head)
+            index += 1
+            continue
+        members = score.instructions[index : index + group_size]
+        prepared_head = _ensure_line_coords(head)
+        if performance_seed is not None:
+            prepared_head = _resolve_at_region(
+                prepared_head, int(performance_seed), index, canvas
+            )
+        copies = _expand_arrangement(
+            prepared_head,
+            placement_seed,
+            canvas,
+            performance_seed=performance_seed,
+        )
+        source_anchor = _anchor(prepared_head)
+        source_rotation = prepared_head.rotation or 0.0
+        source_extent = _instruction_extent(prepared_head)
+        cycle = list(arrangement.color_cycle)
+        for copy_head in copies:
+            expanded.append(copy_head)
+            rotation_delta = (copy_head.rotation or 0.0) - source_rotation
+            scale = _instruction_extent(copy_head) / source_extent
+            color = copy_head.color if cycle else None
+            for member in members[1:]:
+                expanded.append(
+                    _composite_member_copy(
+                        member,
+                        source_anchor=source_anchor,
+                        target_head=copy_head,
+                        rotation_delta=rotation_delta,
+                        scale=scale,
+                        color=color,
+                    )
+                )
+        index += group_size
+    data = score.model_dump(by_alias=True)
+    data["instructions"] = [item.model_dump(by_alias=True) for item in expanded]
+    return Score.model_validate(data)
+
+
+def _resolve_performance_score(
+    score: Score,
+    performance_seed: int | None,
+    canvas: CanvasSize | None = None,
+    *,
+    composition_seed: int | None = None,
+) -> Score:
+    placement_seed = (
+        composition_seed if composition_seed is not None else performance_seed
+    )
+    score = _expand_composite_groups(
+        score,
+        placement_seed=placement_seed,
+        performance_seed=performance_seed,
+        canvas=canvas,
+    )
     if performance_seed is None:
         return score
     resolved: list[Instruction] = []
@@ -3421,7 +3557,9 @@ def render(
     # Resolution only replaces `instructions` and passes `canvas` through, so
     # the aspect read here is the same one the old order read after it.
     canvas = canvas_size_for_aspect(canvas_aspect or _score_canvas_aspect(score))
-    score = _resolve_performance_score(score, render_seed, canvas)
+    score = _resolve_performance_score(
+        score, render_seed, canvas, composition_seed=composition_seed
+    )
     structured = profile != "display"
     use_filters = profile == "display"
     cmap = {**COLOR_MAP, **(color_map or {})}

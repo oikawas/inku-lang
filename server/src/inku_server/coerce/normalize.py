@@ -616,6 +616,37 @@ def _grid_within(ins: Instruction, ceiling: int, note: str) -> Instruction:
     return _with_note(Instruction.model_validate(data), note)
 
 
+def _composite_mark_counts(instructions: list[Instruction]) -> list[int]:
+    """Put a composite's performed cost on its head and zero on its members."""
+    counts = [0] * len(instructions)
+    index = 0
+    while index < len(instructions):
+        instruction = instructions[index]
+        arrangement = instruction.arrangement
+        group_size = arrangement.group_size if arrangement is not None else 1
+        if arrangement is not None and group_size > 1:
+            counts[index] = _mark_count(instruction) * group_size
+            index += group_size
+        else:
+            counts[index] = _mark_count(instruction)
+            index += 1
+    return counts
+
+
+def _instruction_boundary(instructions: list[Instruction], limit: int) -> int:
+    """Return the last composite-safe instruction boundary at or below limit."""
+    boundary = 0
+    index = 0
+    while index < len(instructions) and index < limit:
+        arrangement = instructions[index].arrangement
+        group_size = arrangement.group_size if arrangement is not None else 1
+        stop = index + group_size
+        if stop > limit:
+            break
+        boundary = stop
+        index = stop
+    return boundary
+
 def _enforce_hard_ceiling(
     score: Score, limits: Limits = DEFAULT_LIMITS, notes: list[str] | None = None
 ) -> Score:
@@ -630,15 +661,17 @@ def _enforce_hard_ceiling(
     changed = False
 
     if len(instructions) > limits.max_instructions:
-        dropped = len(instructions) - limits.max_instructions
-        instructions = instructions[: limits.max_instructions]
-        note = f"instruction list capped at {limits.max_instructions}; {dropped} dropped"
-        instructions[-1] = _with_note(instructions[-1], note)
+        boundary = _instruction_boundary(instructions, limits.max_instructions)
+        dropped = len(instructions) - boundary
+        instructions = instructions[:boundary]
+        note = f"instruction list capped at {boundary}; {dropped} dropped"
+        if instructions:
+            instructions[-1] = _with_note(instructions[-1], note)
         if notes is not None:
             notes.append(note)
         changed = True
 
-    counts = [_mark_count(ins) for ins in instructions]
+    counts = _composite_mark_counts(instructions)
     total = sum(counts)
     if total > limits.max_expanded_primitives:
         # The ceiling the large groups share: the highest one under which the
@@ -658,6 +691,11 @@ def _enforce_hard_ceiling(
                 continue
             if ins.arrangement.layout == "grid":
                 instructions[index] = _grid_within(ins, ceiling, note)
+            elif ins.arrangement.group_size > 1:
+                group_ceiling = max(1, ceiling // ins.arrangement.group_size)
+                instructions[index] = _with_arrangement_count(
+                    ins, group_ceiling, note
+                )
             else:
                 instructions[index] = _with_arrangement_count(ins, ceiling, note)
             changed = True

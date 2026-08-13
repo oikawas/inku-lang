@@ -6326,3 +6326,38 @@ record. **The result did not match the catalog that was asked for; it matched th
   with a different breakdown, because the route layout changed.
 - **Nothing was looked at on screen.** This version contains a change to how the UI looks (I-202) and a change to the rendering
   boundary (I-090), so **it needs one look at the real screen after deployment.**
+
+### v2.13.16 — The page is never blank while it boots (Build 903, 2026-08-13, ledger I-235)
+
+**This closes the cost of `ssr = false` from v2.13.15.** The shell's HTML was empty, so
+**the screen stayed white until the app had been built** (`app.html` set no background at all, so the
+browser's default white showed through).
+
+- **A curtain now lives in `app.html`.** `html`, `body`, and the curtain are painted with the dark
+  `--bg`, and the curtain sits **before** `%sveltekit.body%` and covers the viewport.
+  **It is painted from an inline `<style>` alone, so it waits on no external resource.**
+- **The curtain is dismissed without JavaScript** — one CSS rule,
+  `body:has(main) #boot-curtain { display: none; }`. **`app.html` contains no `<script>` at all.**
+- **Note that the wait itself did not shrink.** What shrank is the time during which nothing is
+  visible: **the time until anything appears went from a median of 712 ms to 106 ms**
+  (measured against the development server, 6 samples per arm).
+  **That is faster than the 172 ms of putting SSR back** — the curtain waits on no subresource.
+- **A user on the light theme moves from the dark curtain to a light screen.**
+  The theme comes from the user row's `ui_theme`, which the shell cannot know.
+  **This was not confirmed on a real screen** (it is read from the wiring).
+
+**Checks:** **server 3,150 passed / 31 skipped** (merged tree, 7m47s), **cli 224 passed**,
+**web 279 passed** (4 new), **`check` 257 FILES / 0 ERRORS / 2 WARNINGS**,
+**`lint:i18n` 1050-47-0-0**, **ruff clean**, **`check_docs.py` passes**.
+
+- **All 4 perturbations were re-applied on the accepting side and all 4 matched the contract's
+  prediction of 2 failures each** (the named acceptance plus the web meta gate `T-15`).
+  The implementer was a different model, so nothing was skipped.
+- **A hole in the checks was closed during acceptance** — **`T-31` compared the `html, body`
+  background against a literal copy of `#171716`.** With that, **moving the canonical `--bg` reddens
+  only `T-33`, and once the curtain is fixed the shell's `html, body` stays green on the old colour.**
+  **Both now read the value from `+page.svelte`, confirmed with two perturbations:** changing
+  `html, body` alone reddens `T-31` (what the literal used to guard), and **moving the canonical
+  `--bg` reddens both `T-31` and `T-33`** (what the literal used to let through).
+- **Three frames of the screen were captured in the previous cycle** (`cli/out2/902-v2.13.15-ssr-ab/`):
+  the curtain, the app, and the white. **The deployed screen has not been looked at yet.**

@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.15 / Build 902**
+**Target version: v2.13.16 / Build 903**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -199,6 +199,9 @@ or call counts, and without persisting anything.
 
 An authenticated single-page application with description, work, batch, demo, and lineage tabs.
 **The screen is drawn by the browser** (`export const ssr = false` in `+layout.ts`).
+**Until it is built, the curtain in `app.html` is what shows** — the ground colour and the word
+`inku`, painted from inline CSS alone, so it waits on no external resource. **It is dismissed by one
+CSS rule as well: `app.html` holds no `<script>`.**
 Per-feature settings hold reactive state directly at module level in `.svelte.ts`, so drawing on the
 server could mix one person's state across requests. The boundary is stated as a setting.
 **On a server started with `INKU_SINGLE_USER`, one person is settled on and signed in automatically,

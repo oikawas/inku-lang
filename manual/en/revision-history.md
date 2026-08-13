@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-13 — Unreleased v2.13.16 Baseline (Web Build 903)
+
+Updated the 13 places that name a version to v2.13.16 / Build 903. **One thing about opening the application changed, and only that is recorded here.**
+
+- **Opening the application now shows a dark ground with the word `inku`, which becomes the workspace.** Until now the screen was white until the application had been built (a consequence of fixing rendering to the browser in v2.13.15).
+- **The wait itself is unchanged.** What changed is what is visible during it. Measured, the time until anything appears went from a median of 712 ms to 106 ms (measured against the development server).
+- **A user who has chosen the light theme moves from the dark curtain to a light screen** (the theme is stored as that user's setting and is read after the screen has been built).
+- No step, label, default, setting, or CLI flag changed.
+
 ## 2026-08-13 — Unreleased v2.13.15 Baseline (Web Build 902)
 
 Updated the 13 places that name a version to v2.13.15 / Build 902. **No step, label, default, setting, or CLI flag visible to a creator or an administrator changed, so no line was added to the body.**

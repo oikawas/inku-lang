@@ -202,3 +202,77 @@ def test_t5_explicit_single_member_group_is_byte_identical_to_the_default() -> N
     assert renderer.render(default, render_seed=17, composition_seed=23) == renderer.render(
         explicit, render_seed=17, composition_seed=23
     )
+
+
+def test_t8_the_api_merges_the_compact_score_form_not_the_public_expansion() -> None:
+    """The one line where the compact form enters the Score.
+
+    Nothing else observed it. Reverting the route to the public expansion left
+    the whole server suite green (3,170 passed) while production lost the
+    composite entirely, so the claim is asserted where it is made.
+    """
+    # Importing the app is what creates the schema for the test database.
+    from inku_server.api import app as _app  # noqa: F401
+    from inku_server.api_core.routers import render as render_routes
+
+    document = validate_plugin_document(_pair_plugin())
+
+    def fake_expand(ddl, **kwargs):
+        return expand_plugin_ddl(
+            ddl,
+            source_text=kwargs.get("source_text", ddl),
+            lang=kwargs.get("lang", "ja"),
+            documents=[document],
+        )
+
+    def fake_compose(ddl, **kwargs):
+        return Score.model_validate({"instructions": []}), 1, 2
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(render_routes.DOCUMENT_PLUGIN_MANAGER, "expand", fake_expand)
+        patch.setattr(
+            render_routes, "expand_intermediate_for_lang", lambda ddl, **kwargs: ddl
+        )
+        patch.setattr(render_routes, "compose", fake_compose)
+        patch.setattr(render_routes, "coerce_score", lambda score, **kwargs: score)
+        response = render_routes.api_compose(
+            render_routes.ComposeRequest(
+                ddl="Test.対葉を置く。",
+                description="Test.対葉を置く。",
+                instruction_lang="ja",
+            ),
+            {"id": "test-user"},
+        )
+
+    # Stage 2 handed back nothing, so the route writes its one fallback mark and
+    # the plugin's own instructions follow it.
+    instructions = response.score.instructions
+    merged = instructions[1:]
+    assert len(merged) == 2, (
+        "the route merged the public expansion (6 instructions); the compact "
+        "Score form is what carries the composite"
+    )
+    arrangement = merged[0].arrangement
+    assert arrangement is not None
+    assert arrangement.count == 3
+    assert arrangement.group_size == 2
+    assert merged[1].relation is not None
+
+
+def test_t9_a_span_the_ceiling_cannot_hold_leaves_marks_not_a_blank_work() -> None:
+    """A span longer than the whole instruction ceiling used to empty the work.
+
+    The ceiling still refuses to cut a span in half. When no span fits at all it
+    dissolves the claim instead of the marks, and says so in the notes -- the
+    limits are settings, so no caller can predict the drop.
+    """
+    score = _composite_score()
+    limits = Limits(**{**limits_as_dict(DEFAULT_LIMITS), "max_instructions": 1})
+    notes: list[str] = []
+
+    limited = enforce_hard_ceiling(score, limits, notes)
+
+    assert len(limited.instructions) == 1
+    head = limited.instructions[0].arrangement
+    assert head is not None and head.group_size == 1
+    assert notes == ["instruction list capped at 1; 1 dropped"]

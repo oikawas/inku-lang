@@ -134,6 +134,7 @@ def _score_with_plugin_instructions(
     instructions: list[dict],
     *,
     limits: Limits = DEFAULT_LIMITS,
+    notes: list[str] | None = None,
 ) -> Score:
     """展開層の決定的転写 instruction を coerce 後の Score へ合流させる (v1.94 輪1)。
 
@@ -144,7 +145,10 @@ def _score_with_plugin_instructions(
         return score
     data = score.model_dump(by_alias=True)
     data["instructions"] = list(data["instructions"]) + [dict(i) for i in instructions]
-    return enforce_hard_ceiling(Score.model_validate(data), limits)
+    # The ceiling holds here too, and what it drops is recorded: the limits are
+    # settings, so no caller can predict the drop, and a drop nobody records is
+    # a mark that left the work with no account of where it went.
+    return enforce_hard_ceiling(Score.model_validate(data), limits, notes)
 
 
 def _resolved_paint_catalog_id(catalog_id: str | None, *, mode: str, source_text: str) -> str:
@@ -1448,7 +1452,7 @@ def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> Co
         raise _unexpected_http_error("compose", 502) from e
 
     score = _score_with_plugin_instructions(
-        score, compose_detail.plugin_instructions, limits=limits
+        score, compose_detail.plugin_instructions, limits=limits, notes=limit_notes
     )
 
     normalized_compose_ddl = compose_detail.ddl.lower()
@@ -1950,7 +1954,7 @@ def _paint_events(
         raise _unexpected_http_error("compose", 502) from e
 
     score = _score_with_plugin_instructions(
-        score, compose_detail.plugin_instructions, limits=limits
+        score, compose_detail.plugin_instructions, limits=limits, notes=limit_notes
     )
 
     normalized_compose_ddl = compose_detail.ddl.lower()

@@ -647,6 +647,31 @@ def _instruction_boundary(instructions: list[Instruction], limit: int) -> int:
         index = stop
     return boundary
 
+
+def _without_group_size(ins: Instruction) -> Instruction:
+    """Return the same instruction with its span claim reduced to one member."""
+    data = ins.model_dump(by_alias=True)
+    arrangement = data.get("arrangement")
+    if arrangement is not None:
+        data["arrangement"] = {**arrangement, "group_size": 1}
+    return Instruction.model_validate(data)
+
+
+def _dissolved_composites(instructions: list[Instruction]) -> list[Instruction]:
+    """Draw what a span cannot hold whole as ordinary instructions.
+
+    The marks that fit under the ceiling are still marks; only the claim that
+    they repeat as one unit is dropped. Without this a span longer than the
+    whole instruction ceiling left the work with nothing in it.
+    """
+    return [
+        _without_group_size(ins)
+        if ins.arrangement is not None and ins.arrangement.group_size > 1
+        else ins
+        for ins in instructions
+    ]
+
+
 def _enforce_hard_ceiling(
     score: Score, limits: Limits = DEFAULT_LIMITS, notes: list[str] | None = None
 ) -> Score:
@@ -662,8 +687,15 @@ def _enforce_hard_ceiling(
 
     if len(instructions) > limits.max_instructions:
         boundary = _instruction_boundary(instructions, limits.max_instructions)
-        dropped = len(instructions) - boundary
-        instructions = instructions[:boundary]
+        if boundary == 0:
+            # No composite span fits under the ceiling. A work is still a work:
+            # keep what the ceiling allows and dissolve the span, rather than
+            # hand back a picture with nothing in it.
+            boundary = limits.max_instructions
+            instructions = _dissolved_composites(instructions[:boundary])
+        else:
+            instructions = instructions[:boundary]
+        dropped = len(score.instructions) - boundary
         note = f"instruction list capped at {boundary}; {dropped} dropped"
         if instructions:
             instructions[-1] = _with_note(instructions[-1], note)

@@ -11,7 +11,8 @@
 // their real size).
 //
 // T-53 (the icon is drawn from the mode, and the three modes are drawn
-// differently), T-54 (the mark that said nothing is gone).
+// differently), T-54 (the mark that said nothing is gone), T-55 (the menu is
+// listed in the order the icon draws).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -61,6 +62,29 @@ test('T-53  the three modes are not drawn the same', () => {
 	// Which makes the three counts 1, 2 and 3 solid bars.
 	const held = (mode: string) => (selectors.match(new RegExp(`\\.ui-mode-${mode} `, 'g')) ?? []).length;
 	assert.deepEqual([3 - held('simple'), 3 - held('custom'), 3 - held('full')], [1, 2, 3]);
+});
+
+/** How many bars each mode leaves solid, read from the icon's own fade rule. */
+function solidBars(mode: string): number {
+	const faded = RAIL.match(/((?:\.ui-mode-\w+ \.ui-mode-bar:nth-child\(\d\),?\s*)+)\{ opacity: 0\.3; \}/);
+	assert.ok(faded, 'no mode fades a bar');
+	return 3 - (faded[1].match(new RegExp(`\\.ui-mode-${mode} `, 'g')) ?? []).length;
+}
+
+// ------------------------------------------------------------------- T-55
+
+test('T-55  the menu is listed in the order the icon draws', () => {
+	const menu = RAIL.slice(RAIL.indexOf('class="rail-user-menu ui-mode-menu"'));
+	const listed = [...menu.slice(0, menu.indexOf('</div>')).matchAll(/selectUiMode\('(\w+)'\)/g)].map(
+		(match) => match[1]
+	);
+	assert.deepEqual([...listed].sort(), [...MODES].sort(), 'the menu lists all three exactly once');
+	// The claim, executed against the icon rather than restated: the list rises
+	// by how much interface each mode shows, so the middle amount is in the
+	// middle. It read simple / full / custom before, which put it last.
+	const bars = listed.map(solidBars);
+	assert.deepEqual(bars, [1, 2, 3]);
+	assert.deepEqual(listed, ['simple', 'custom', 'full']);
 });
 
 // ------------------------------------------------------------------- T-54

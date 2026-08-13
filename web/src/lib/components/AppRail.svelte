@@ -139,10 +139,13 @@
 				</button>
 			</Tooltip>
 			{#if uiModeOpen}
+				<!-- In the order the icon draws them: one bar, two, three. The menu
+				     used to read simple / full / custom, which put the middle amount
+				     last and left the list disagreeing with the mark above it. -->
 				<div class="rail-user-menu ui-mode-menu" role="menu" aria-label={t().uiModeLabel}>
 					<button type="button" role="menuitemradio" aria-checked={uiMode === 'simple'} class:selected={uiMode === 'simple'} onclick={() => selectUiMode('simple')}>{t().uiModeSimple}</button>
-					<button type="button" role="menuitemradio" aria-checked={uiMode === 'full'} class:selected={uiMode === 'full'} onclick={() => selectUiMode('full')}>{t().uiModeFull}</button>
 					<button type="button" role="menuitemradio" aria-checked={uiMode === 'custom'} class:selected={uiMode === 'custom'} onclick={() => selectUiMode('custom')}>{t().uiModeCustom}</button>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'full'} class:selected={uiMode === 'full'} onclick={() => selectUiMode('full')}>{t().uiModeFull}</button>
 				</div>
 			{/if}
 		</div>

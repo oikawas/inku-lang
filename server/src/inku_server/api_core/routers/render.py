@@ -1309,7 +1309,7 @@ class VariationSeedsResponse(BaseModel):
 
 @router.post("/api/variation/seeds", response_model=VariationSeedsResponse)
 def api_variation_seeds(
-    req: VariationSeedsRequest, actor: dict = Depends(_current_user)
+    req: VariationSeedsRequest
 ) -> VariationSeedsResponse:
     """変奏候補の seed を採番する。
 

@@ -249,7 +249,7 @@ class SettingsStatusResponse(BaseModel):
 
 
 @router.get("/api/settings/status", response_model=SettingsStatusResponse)
-def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusResponse:
+def api_settings_status() -> SettingsStatusResponse:
     # Reading the panel must not write a backup. This used to call
     # ensure_scheduled_db_backup() because it was the only trigger there was;
     # the resident scheduler asks the same question every minute now.
@@ -290,7 +290,7 @@ def api_settings_status(actor: dict = Depends(_admin_user)) -> SettingsStatusRes
 
 
 @router.get("/api/settings/models", response_model=ModelSettingsResponse)
-def api_settings_models(actor: dict = Depends(_admin_user)) -> ModelSettingsResponse:
+def api_settings_models() -> ModelSettingsResponse:
     settings = _db.get_model_settings()
     developer_mode = _env_flag("INKU_DEVELOPER_MODE")
     return ModelSettingsResponse(
@@ -304,7 +304,6 @@ def api_settings_models(actor: dict = Depends(_admin_user)) -> ModelSettingsResp
 @router.put("/api/settings/models", response_model=ModelSettingsResponse)
 def api_settings_update_models(
     body: ModelSettingsPatch,
-    actor: dict = Depends(_admin_user),
 ) -> ModelSettingsResponse:
     current = _db.get_model_settings()
     provider_patch = {
@@ -381,7 +380,6 @@ def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[st
 @router.post("/api/settings/models/{provider_id}/fetch-models", response_model=ModelSettingsResponse)
 def api_settings_fetch_provider_models(
     provider_id: str,
-    actor: dict = Depends(_admin_user),
 ) -> ModelSettingsResponse:
     current = _db.get_model_settings()
     try:
@@ -466,7 +464,6 @@ def api_settings_fetch_provider_models(
 @router.put("/api/settings/db-backup", response_model=DbBackupStatus)
 def api_settings_update_db_backup(
     body: DbBackupSettingsBody,
-    actor: dict = Depends(_admin_user),
 ) -> DbBackupStatus:
     try:
         _db.update_db_backup_settings(
@@ -483,7 +480,6 @@ def api_settings_update_db_backup(
 @router.put("/api/settings/output-save", response_model=OutputSaveStatus)
 def api_settings_update_output_save(
     body: OutputSaveSettingsBody,
-    actor: dict = Depends(_admin_user),
 ) -> OutputSaveStatus:
     try:
         output_settings = _db.update_output_save_settings(body.enabled, body.output_dir, body.png_size)
@@ -522,14 +518,13 @@ def _thumbnail_status() -> "ThumbnailStatus":
 
 
 @router.get("/api/settings/thumbnails", response_model=ThumbnailStatus)
-def api_settings_thumbnails(actor: dict = Depends(_admin_user)) -> "ThumbnailStatus":
+def api_settings_thumbnails() -> "ThumbnailStatus":
     return _thumbnail_status()
 
 
 @router.put("/api/settings/thumbnails", response_model=ThumbnailStatus)
 def api_settings_update_thumbnails(
     body: ThumbnailSettingsBody,
-    actor: dict = Depends(_admin_user),
 ) -> "ThumbnailStatus":
     """Turn the second size on or off.
 
@@ -547,14 +542,12 @@ def api_settings_update_thumbnails(
 
 
 @router.get("/api/settings/thumbnails/rebuild", response_model=ThumbnailStatus)
-def api_settings_thumbnail_rebuild_status(actor: dict = Depends(_admin_user)) -> "ThumbnailStatus":
+def api_settings_thumbnail_rebuild_status() -> "ThumbnailStatus":
     return _thumbnail_status()
 
 
 @router.post("/api/settings/thumbnails/rebuild", response_model=ThumbnailStatus)
-def api_settings_thumbnail_rebuild(
-    actor: dict = Depends(_admin_user),
-) -> "ThumbnailStatus":
+def api_settings_thumbnail_rebuild() -> "ThumbnailStatus":
     """Bake what is missing or stale, in the background, while serving.
 
     Works that already have a thumbnail keep serving the one they have until
@@ -615,7 +608,6 @@ class RenderLimitsBody(BaseModel):
 @router.put("/api/settings/limits", response_model=RenderLimitsStatus)
 def api_settings_update_limits(
     body: RenderLimitsBody,
-    actor: dict = Depends(_admin_user),
 ) -> RenderLimitsStatus:
     if body.reset_to_defaults:
         requested = limits_as_dict(DEFAULT_LIMITS)
@@ -637,7 +629,6 @@ class RenderConcurrencyBody(BaseModel):
 @router.put("/api/settings/render-concurrency", response_model=RenderConcurrencyStatus)
 def api_settings_update_render_concurrency(
     body: RenderConcurrencyBody,
-    actor: dict = Depends(_admin_user),
 ) -> RenderConcurrencyStatus:
     try:
         settings = _db.update_render_concurrency_settings(body.server_limit, body.client_limit)
@@ -651,7 +642,6 @@ def api_settings_update_render_concurrency(
 @router.put("/api/settings/log-retention", response_model=LogRetentionStatus)
 def api_settings_update_log_retention(
     body: LogRetentionSettingsBody,
-    actor: dict = Depends(_admin_user),
 ) -> LogRetentionStatus:
     try:
         log_settings = _db.update_log_retention_settings(
@@ -670,7 +660,7 @@ def api_settings_update_log_retention(
 
 
 @router.post("/api/settings/db-backup/run", response_model=DbBackupResult)
-def api_settings_run_db_backup(actor: dict = Depends(_admin_user)) -> DbBackupResult:
+def api_settings_run_db_backup() -> DbBackupResult:
     try:
         result = _db.create_db_backup(manual=True)
     except ValueError as e:
@@ -695,13 +685,13 @@ class SingleUserBody(BaseModel):
 
 
 @router.get("/api/settings/single-user", response_model=SingleUserStatus)
-def api_settings_single_user(actor: dict = Depends(_admin_user)) -> SingleUserStatus:
+def api_settings_single_user() -> SingleUserStatus:
     return SingleUserStatus(**_db.single_user_pin_status())
 
 
 @router.put("/api/settings/single-user", response_model=SingleUserStatus)
 def api_settings_set_single_user(
-    body: SingleUserBody, actor: dict = Depends(_admin_user)
+    body: SingleUserBody
 ) -> SingleUserStatus:
     """Hand the server to a different account, from the next automatic login on.
 

@@ -34,7 +34,7 @@ class PluginEnabledBody(BaseModel):
 
 
 @router.get("/api/plugins")
-def api_plugins(actor: dict = Depends(_current_user)) -> dict[str, object]:
+def api_plugins() -> dict[str, object]:
     # Entries carry `fires_on_*` so an editor can say which plain word a wrong
     # qualified name would have fired ("Nature.菖蒲" -> 下草).
     return {

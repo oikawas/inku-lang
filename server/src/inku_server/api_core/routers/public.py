@@ -25,6 +25,7 @@ from ..models import ModelSettingsResponse
 
 
 router = APIRouter()
+authenticated_router = APIRouter(dependencies=[Depends(_current_user)])
 
 
 class PromptsResponse(BaseModel):
@@ -159,10 +160,9 @@ def _enabled_plugin_entries() -> list[dict[str, object]]:
     return entries
 
 
-@router.get("/api/saijiki")
+@authenticated_router.get("/api/saijiki")
 def api_saijiki(
     lang: str = Query(default="ja", pattern="^(ja|en)$"),
-    actor: dict = Depends(_current_user),
 ) -> dict[str, object]:
     """Saijiki vocabulary for display: core categories (from the saijiki table)
     plus loaded declarative plugin words. Single delivery for web hydration."""
@@ -172,11 +172,10 @@ def api_saijiki(
     }
 
 
-@router.get(PLUGIN_PREVIEW_ROUTE)
+@authenticated_router.get(PLUGIN_PREVIEW_ROUTE)
 def api_plugin_preview(
     name: str = Query(min_length=1, max_length=200),
     scale: str = Query(default="1", pattern="^[12]$"),
-    actor: dict = Depends(_current_user),
 ) -> Response:
     """The artwork behind a plugin word in the saijiki preview.
 
@@ -196,10 +195,9 @@ def api_plugin_preview(
     )
 
 
-@router.get("/api/reference")
+@authenticated_router.get("/api/reference")
 def api_reference(
     format: str = Query(default="json", pattern="^(json|md)$"),
-    actor: dict = Depends(_current_user),
 ) -> Response:
     """Machine-generated mirror of implementation tables (read-only)."""
     reference = build_reference()
@@ -208,8 +206,8 @@ def api_reference(
     return JSONResponse(content=reference)
 
 
-@router.get("/api/client-config")
-def api_client_config(actor: dict = Depends(_current_user)) -> dict[str, object]:
+@authenticated_router.get("/api/client-config")
+def api_client_config() -> dict[str, object]:
     """Server-owned values every client needs. Editable by admins only."""
     return {"render_fanout_limit": int(_db.get_render_concurrency_settings()["client_limit"])}
 
@@ -305,8 +303,8 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
     return text
 
 
-@router.post("/api/demo/instruction", response_model=DemoInstructionResponse)
-def api_demo_instruction(req: DemoInstructionBody, _actor: dict = Depends(_current_user)) -> DemoInstructionResponse:
+@authenticated_router.post("/api/demo/instruction", response_model=DemoInstructionResponse)
+def api_demo_instruction(req: DemoInstructionBody) -> DemoInstructionResponse:
     instruction_lang = _resolve_instruction_lang(
         req.seed_phrase,
         _normalize_instruction_lang(req.instruction_lang),

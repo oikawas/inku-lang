@@ -35,6 +35,15 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const MODAL = read('./components/SettingsModal.svelte');
 const PAGE = read('../routes/+page.svelte');
 
+/**
+ * The four, written out here rather than read from the module under test.
+ * An expectation taken from the thing it is testing moves with it: the first
+ * draft of the check below asked the module which tabs were detail-only and
+ * then asserted that those were the hidden ones, and stayed green when a fifth
+ * tab was added to the list.
+ */
+const STANDARD_HIDES = ['plugins', 'server_misc', 'limits', 'unread'];
+
 /** Every tab the settings bar can carry, in the order it draws them. */
 const ALL_TABS = [
 	'models',
@@ -64,13 +73,10 @@ const HEAD = MODAL.slice(
 // ------------------------------------------------------------------- T-46
 
 test('T-46  the detailed mode is what adds exactly those four tabs', () => {
-	assert.deepEqual([...DETAILED_ONLY_SETTINGS_TABS], ['plugins', 'server_misc', 'limits', 'unread']);
+	assert.deepEqual([...DETAILED_ONLY_SETTINGS_TABS], STANDARD_HIDES);
 	// Both directions, so neither a fifth entry nor a missing one passes.
-	for (const tab of DETAILED_ONLY_SETTINGS_TABS) {
-		assert.equal(isDetailedOnlySettingsTab(tab), true, tab);
-	}
-	for (const tab of ALL_TABS.filter((tab) => !(DETAILED_ONLY_SETTINGS_TABS as readonly string[]).includes(tab))) {
-		assert.equal(isDetailedOnlySettingsTab(tab), false, tab);
+	for (const tab of ALL_TABS) {
+		assert.equal(isDetailedOnlySettingsTab(tab), STANDARD_HIDES.includes(tab), tab);
 	}
 });
 
@@ -90,8 +96,7 @@ test('T-46  the four are named for what they are, not for who may see them', () 
 
 test('T-47  the standard mode hides those four and nothing else', () => {
 	for (const tab of ALL_TABS) {
-		const hidden = (DETAILED_ONLY_SETTINGS_TABS as readonly string[]).includes(tab);
-		assert.equal(settingsTabShownAtDetail(tab, 'standard'), !hidden, tab);
+		assert.equal(settingsTabShownAtDetail(tab, 'standard'), !STANDARD_HIDES.includes(tab), tab);
 	}
 });
 
@@ -124,6 +129,7 @@ test('T-49  the bar hides exactly the tabs the guard refuses', () => {
 	// Both directions again, this time between the bar and the list: a fifth
 	// button wrapped in the guard, or one of the four left unwrapped, fails.
 	assert.deepEqual([...guarded].sort(), [...DETAILED_ONLY_SETTINGS_TABS].sort());
+	assert.deepEqual([...guarded].sort(), [...STANDARD_HIDES].sort());
 	for (const tab of guarded) {
 		assert.match(BAR, new RegExp(`showsTab\\('${tab}'\\)\\}\\s*\\n\\s*<button[^>]*settingsTab === '${tab}'`));
 	}

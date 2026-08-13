@@ -13,7 +13,7 @@
 // T-36 (the drawer reports the work on screen, not the control), T-37 (every
 // state the record can be in reaches a row, and an absent record is not
 // rounded to off), T-38 (the section is Stage 0.5 and stands before Stage 1),
-// T-39 (the prose is the layer's paragraph and only appears when there is one),
+// T-39 (the prose is not repeated here -- the describe panel holds it),
 // T-40 (the labels exist in both packs and in the type).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -26,8 +26,8 @@ const PANEL = read('./components/CanvasPanel.svelte');
 
 // ------------------------------------------------------------------- T-36
 
-test('T-36  the drawer takes all three sketch fields from the work on screen', () => {
-	for (const field of ['sketch_state', 'sketch_grain', 'sketch_text']) {
+test('T-36  the drawer takes both sketch fields from the work on screen', () => {
+	for (const field of ['sketch_state', 'sketch_grain']) {
 		assert.match(
 			PANEL,
 			new RegExp(`statusHistoryItem\\?\\.${field} \\?\\? result\\?\\.${field}`),
@@ -90,12 +90,15 @@ test('T-38  the section is Stage 0.5, and it stands before Stage 1', () => {
 
 // ------------------------------------------------------------------- T-39
 
-test('T-39  the prose appears only when the layer wrote one', () => {
-	assert.match(PANEL, /\{#if detailSketchText\}/);
-	assert.match(PANEL, /detailSketchText = \$derived\(\(statusHistoryItem\?\.sketch_text/);
-	// A paragraph, not a field: the line breaks the layer wrote are kept.
-	assert.match(PANEL, /class="detail-sketch-text"/);
-	assert.match(PANEL, /\.detail-sketch-text \{[^}]*white-space: pre-wrap/);
+test('T-39  the prose is not repeated here; the describe panel holds it', () => {
+	// Author decision, 2026-08-13. The drawer says what the layer did; the
+	// paragraph it wrote belongs where there is room to read and edit it, and
+	// showing it twice pushed interpretation and performance off the panel.
+	assert.doesNotMatch(PANEL, /detailSketchText/);
+	assert.doesNotMatch(PANEL, /sketch_text/);
+	assert.doesNotMatch(PANEL, /detail-sketch-text/);
+	// It is still on screen, in the panel that owns it.
+	assert.match(read('../routes/+page.svelte'), /class="sketch-body">\{sketchDraft\}/);
 });
 
 test('T-39  and the section is withheld when there is no work at all', () => {
@@ -111,14 +114,19 @@ test('T-40  the new labels exist in both packs and in the type', () => {
 	const types = read('./i18n/types.ts');
 	for (const key of [
 		'provenanceLabelSketchRecord',
-		'provenanceLabelSketchText',
 		'provenanceHintSketchGrain',
-		'provenanceHintSketchRecord',
-		'provenanceHintSketchText'
+		'provenanceHintSketchRecord'
 	]) {
 		assert.match(ja, new RegExp(`\\n\\t${key}: '`), `ja.ts has no ${key}`);
 		assert.match(en, new RegExp(`\\n\\t${key}: '`), `en.ts has no ${key}`);
 		assert.match(types, new RegExp(`\\n\\t${key}: string;`), `types.ts has no ${key}`);
 		assert.match(PANEL, new RegExp(`t\\(\\)\\.${key}`), `the drawer never uses ${key}`);
+	}
+	// The two keys the removed prose row used are gone from all three, so no
+	// pack carries a label nothing shows.
+	for (const key of ['provenanceLabelSketchText', 'provenanceHintSketchText']) {
+		for (const [name, pack] of [['ja', ja], ['en', en], ['types', types]] as const) {
+			assert.doesNotMatch(pack, new RegExp(key), `${name} still carries ${key}`);
+		}
 	}
 });

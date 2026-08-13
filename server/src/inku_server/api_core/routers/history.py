@@ -309,6 +309,13 @@ def api_history_svg(
                 item.get("score", {}),
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,
+                # Both seeds off the row, not one. `wild` and `composition_seed`
+                # were read here and `render_seed` was not, so the marks landed
+                # where the saved work put them and every stroke was drawn by a
+                # different hand. What separates this export from the saved
+                # picture is the engine having moved on (principle 7); a seed
+                # left behind put a second difference on top of that one.
+                render_seed=item.get("render_seed"),
                 composition_seed=item.get("composition_seed"),
                 wild=bool(item.get("render_wild")),
                 work=item,

@@ -13,6 +13,7 @@
 	import type { CardExportSettings } from '$lib/cardExport';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
+	import { settingsTabShownAtDetail, type SettingsDetailLevel } from '$lib/settingsDetail';
 
 	type PluginItem = {
 		name: string;
@@ -148,6 +149,7 @@
 		singleUserMode: boolean;
 		settingsMode: SettingsMode;
 		settingsTab: SettingsTab;
+		settingsDetail: SettingsDetailLevel;
 		stage1Provider: Provider;
 		stage1Model: string;
 		stage2Provider: Provider;
@@ -207,6 +209,7 @@
 		onClearDownloadFolder: () => void | Promise<void>;
 		onClose: () => void;
 		onSelectSettingsTab: (tab: SettingsTab) => void;
+		onSetSettingsDetail: (detail: SettingsDetailLevel) => void;
 		onSetStage1Provider: (provider: Provider) => void;
 		onSetStage1Model: (model: string) => void;
 		onSetStage2Provider: (provider: Provider) => void;
@@ -262,6 +265,7 @@
 		singleUserMode,
 		settingsMode,
 		settingsTab,
+		settingsDetail,
 		stage1Provider,
 		stage1Model,
 		stage2Provider,
@@ -321,6 +325,7 @@
 		onClearDownloadFolder,
 		onClose,
 		onSelectSettingsTab,
+		onSetSettingsDetail,
 		onSetStage1Provider,
 		onSetStage1Model,
 		onSetStage2Provider,
@@ -371,6 +376,11 @@
 		onCancelModelSelection,
 		onConfirmModelSelection,
 	}: Props = $props();
+
+	// The tab bar asks the same question the page's guard asks, from the same
+	// module: a button the guard would refuse to act on must not be drawn.
+	const showsTab = (tab: string) => settingsTabShownAtDetail(tab, settingsDetail);
+	const detailed = $derived(settingsDetail === 'detailed');
 
 	// ── User plugin management (plugins tab) ──
 	let pluginFileInput = $state<HTMLInputElement | null>(null);
@@ -771,9 +781,28 @@
 <div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 	<div class="modal-head">
 		<div class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</div>
-		<!-- onClose, not a bare `settingsOpen = false`: in model mode the close has to
-		     roll back the pending picker selection, the way the backdrop and Esc do. -->
-		<button class="catalog-close" onclick={onClose} aria-label={t().closeLabel}>×</button>
+		<div class="modal-head-tools">
+			<!-- Model mode has its own four tabs and none of them is detail-gated,
+			     so the switch would govern nothing there. -->
+			{#if settingsMode !== 'model'}
+				<button
+					type="button"
+					class="detail-switch"
+					class:detail-on={detailed}
+					role="switch"
+					aria-checked={detailed}
+					aria-label={t().settingsDetailLabel}
+					title={t().settingsDetailHint}
+					onclick={() => onSetSettingsDetail(detailed ? 'standard' : 'detailed')}
+				>
+					<span class="switch-label">{detailed ? t().settingsDetailDetailed : t().settingsDetailStandard}</span>
+					<span class="switch-track"><span class="switch-knob"></span></span>
+				</button>
+			{/if}
+			<!-- onClose, not a bare `settingsOpen = false`: in model mode the close has to
+			     roll back the pending picker selection, the way the backdrop and Esc do. -->
+			<button class="catalog-close" onclick={onClose} aria-label={t().closeLabel}>×</button>
+		</div>
 	</div>
 	{#if settingsMode === 'model'}
 		<div class="settings-tabs model-selection-tabs" role="tablist" aria-label={t().modelSelectButton}>
@@ -787,15 +816,23 @@
 			{#if isAdmin}
 				<button class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
 			{/if}
-			<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
+			{#if showsTab('plugins')}
+				<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
+			{/if}
 			{#if isAdmin}
 				<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
 				<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
-				<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
+				{#if showsTab('server_misc')}
+					<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
+				{/if}
 				<button class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
-				<button class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
+				{#if showsTab('limits')}
+					<button class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
+				{/if}
 			{/if}
-			<button class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
+			{#if showsTab('unread')}
+				<button class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
+			{/if}
 			<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
 			<button class:active={settingsTab === 'misc'} onclick={() => onSelectSettingsTab('misc')}>{t().settingsTabMisc}</button>
 		</div>
@@ -1978,6 +2015,18 @@
 		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 	}
 	.catalog-modal-title { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; }
+	.modal-head-tools { display: flex; align-items: center; gap: 12px; }
+	/* The same switch the plugin rows carry, so one control means one thing
+	   throughout the dialog. Here the word sits to the left of the track: it is
+	   read on the way to the close button, not on the way out of a row. */
+	.detail-switch {
+		border: none; background: transparent; padding: 0;
+		display: inline-flex; align-items: center; gap: 8px;
+		color: var(--fg3); cursor: pointer; font-family: inherit; font-size: 12px;
+	}
+	.detail-switch.detail-on { color: var(--accent); }
+	.detail-switch.detail-on .switch-track { background: var(--accent); }
+	.detail-switch.detail-on .switch-knob { transform: translateX(18px); }
 	.catalog-close {
 		width: 24px; height: 24px; border: none; background: none;
 		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;

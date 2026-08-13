@@ -128,15 +128,24 @@
 		<div class="rail-menu-wrap" bind:this={uiModeWrapEl}>
 			<Tooltip placement="right" text={t().uiModeLabel} disabled={uiModeOpen}>
 				<button class="rail-action" class:active={uiModeOpen} type="button" aria-haspopup="menu" aria-expanded={uiModeOpen} onclick={() => (uiModeOpen = !uiModeOpen)}>
-					<span class="rail-icon ui-mode-icon" aria-hidden="true"></span>
+					<!-- Three bars, not ::before/::after: the icon needs three of them,
+					     and which are solid is what says which mode is on. -->
+					<span class="rail-icon ui-mode-icon ui-mode-{uiMode}" aria-hidden="true">
+						<span class="ui-mode-bar"></span>
+						<span class="ui-mode-bar"></span>
+						<span class="ui-mode-bar"></span>
+					</span>
 					{#if expanded}<span class="rail-label">{uiModeLabel}</span>{/if}
 				</button>
 			</Tooltip>
 			{#if uiModeOpen}
+				<!-- In the order the icon draws them: one bar, two, three. The menu
+				     used to read simple / full / custom, which put the middle amount
+				     last and left the list disagreeing with the mark above it. -->
 				<div class="rail-user-menu ui-mode-menu" role="menu" aria-label={t().uiModeLabel}>
 					<button type="button" role="menuitemradio" aria-checked={uiMode === 'simple'} class:selected={uiMode === 'simple'} onclick={() => selectUiMode('simple')}>{t().uiModeSimple}</button>
-					<button type="button" role="menuitemradio" aria-checked={uiMode === 'full'} class:selected={uiMode === 'full'} onclick={() => selectUiMode('full')}>{t().uiModeFull}</button>
 					<button type="button" role="menuitemradio" aria-checked={uiMode === 'custom'} class:selected={uiMode === 'custom'} onclick={() => selectUiMode('custom')}>{t().uiModeCustom}</button>
+					<button type="button" role="menuitemradio" aria-checked={uiMode === 'full'} class:selected={uiMode === 'full'} onclick={() => selectUiMode('full')}>{t().uiModeFull}</button>
 				</div>
 			{/if}
 		</div>
@@ -331,25 +340,26 @@
 		border-color: var(--border2);
 		color: var(--fg);
 	}
-	/* A panel-layout mark distinguishes UI mode from a generic menu and the settings gear. */
-	.ui-mode-icon::before {
-		content: "";
-		width: 12px;
-		height: 10px;
-		border: 1.5px solid currentColor;
-		border-radius: 2px;
-		background: linear-gradient(90deg, transparent 35%, currentColor 35% 47%, transparent 47%);
-	}
-	.ui-mode-icon::after {
-		content: "";
+	/* How much of the interface is on show, drawn as how much of the mark is
+	   drawn. The frame this replaced was the same picture in all three modes,
+	   and the 4x2 dot it carried was not visible at the rail's own 22px.
+	   A faint bar is a row the mode is holding back, so the icon says which
+	   mode is on without the label the collapsed rail does not draw. */
+	.ui-mode-bar {
 		position: absolute;
-		right: 4px;
-		bottom: 4px;
-		width: 4px;
+		left: 5px;
 		height: 2px;
 		border-radius: 1px;
 		background: currentColor;
 	}
+	.ui-mode-bar:nth-child(1) { top: 6px;  width: 12px; }
+	.ui-mode-bar:nth-child(2) { top: 10px; width: 8px; }
+	.ui-mode-bar:nth-child(3) { top: 14px; width: 5px; }
+	/* simple: one row out of three. full: all of them. custom: in between --
+	   it starts from simple and adds, so it is never the whole set. */
+	.ui-mode-simple .ui-mode-bar:nth-child(2),
+	.ui-mode-simple .ui-mode-bar:nth-child(3),
+	.ui-mode-custom .ui-mode-bar:nth-child(3) { opacity: 0.3; }
 	.ui-mode-menu button.selected { color: var(--fg); font-weight: 600; }
 	.ui-mode-menu button.selected::before { content: '✓'; margin-right: 6px; }
 

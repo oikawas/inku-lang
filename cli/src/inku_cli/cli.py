@@ -636,6 +636,11 @@ def _result_with_svg_profile(
             "catalog_id": result.get("render_color_catalog_id") or color_catalog,
             "svg_profile": svg_profile,
             "render_seed": result.get("render_seed"),
+            # The performance seed was sent and the placement seed was not, so
+            # a non-display export put the marks somewhere else than the
+            # picture it was exporting. Raw: renderer.py:3486 falls back to the
+            # performance seed when there is no composition seed.
+            "composition_seed": result.get("composition_seed"),
         },
     )
     return output

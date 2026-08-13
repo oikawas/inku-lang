@@ -62,3 +62,53 @@ export const FALLBACK_CATALOG: ColorCatalog = {
 export function catalogById(catalogs: ColorCatalog[], id: string): ColorCatalog | undefined {
 	return catalogs.find((catalog) => catalog.id === id);
 }
+
+/** The colour words in the order the saijiki lists them, so a work's map is
+ *  read in the same order wherever it is shown. */
+export const COLOR_KEY_ORDER: ColorKey[] = [
+	'white',
+	'black',
+	'blue',
+	'red',
+	'green',
+	'gray',
+	'yellow',
+	'orange',
+	'purple'
+];
+
+const COLOR_KEY_JA: Record<ColorKey, string> = {
+	white: '白',
+	black: '黒',
+	blue: '青',
+	red: '赤',
+	green: '緑',
+	gray: '灰',
+	yellow: '黄',
+	orange: '橙',
+	purple: '紫'
+};
+
+/** A colour word in the language being read. The keys are the saijiki's own
+ *  colour vocabulary, so the Japanese side is the saijiki word, not a gloss. */
+export function colorWordLabel(key: string, isJapanese: boolean): string {
+	if (!isJapanese) return key;
+	return COLOR_KEY_JA[key as ColorKey] ?? key;
+}
+
+/**
+ * A work's colour map as pairs, in saijiki order, skipping what it does not
+ * carry. An empty list means the work has no map recorded -- which is not the
+ * same as a map of nine defaults.
+ *
+ * Only the colour words. `render_color_map` also carries a `palette:<name>`
+ * entry for every colour in the catalog's palette (color_catalogs.py builds it
+ * that way, and renderer.py reads those entries to pick chromatic and
+ * achromatic tones). Those are the catalog's own list of pigments copied onto
+ * the work, keyed by an English display name; the question this row answers is
+ * which colour each colour word was drawn in, and that is the nine.
+ */
+export function colorMapEntries(map: ColorMap | null | undefined): { key: string; code: string }[] {
+	if (!map) return [];
+	return COLOR_KEY_ORDER.filter((key) => map[key]).map((key) => ({ key, code: map[key] as string }));
+}

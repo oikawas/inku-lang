@@ -13,9 +13,15 @@
 		holdsPermissionGroup,
 		type PermissionGroup
 	} from '$lib/permissionGroups';
+	import {
+		normalizeSettingsDetail,
+		settingsTabShownAtDetail,
+		type SettingsDetailLevel
+	} from '$lib/settingsDetail';
 	import { highlightDDL, interpretationFeedback } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
+	import { SURFACE_PREVIEWS, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -103,6 +109,10 @@
 	const MODEL_STAGE1_KEY    = 'inku-model-stage1';
 	const PROVIDER_STAGE2_KEY = 'inku-provider-stage2';
 	const MODEL_STAGE2_KEY    = 'inku-model-stage2';
+	// Which of the settings dialog's tabs are on show. Kept in the browser, not
+	// on the member: it is a preference about this screen, and saving it would
+	// need a field the server does not have.
+	const SETTINGS_DETAIL_KEY = 'inku-settings-detail';
 	const DEFAULT_VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 	// Injected by vite.config from web/APP_VERSION, the single source shared with
 	// the server (/api/info) and the CLI. Never write the version here again.
@@ -550,6 +560,7 @@
 	let leftPanelCollapsed = $state(false);
 	let settingsMode = $state<'model' | 'settings'>('settings');
 	let settingsTab  = $state<SettingsTab>('connection');
+	let settingsDetail = $state<SettingsDetailLevel>('standard');
 	let pngMenuOpen  = $state(false);
 	let userMenuOpen = $state(false);
 	let darkMode     = $state(true);
@@ -623,16 +634,6 @@
 		image2x?: string;
 	};
 
-	// One entry per saijiki word. The copy exists in both UI languages; the
-	// artwork is shared, since the preview shows the same drawing either way.
-	type PreviewEntry = {
-		effect: string;
-		example: string;
-		effectEn: string;
-		exampleEn: string;
-		svg: string;
-	};
-
 	// Entries are keyed by the Japanese surface. The caller pairs the two
 	// display lists by position to derive the canonical word, an invariant the
 	// saijiki table holds and server tests lock (test_saijiki_api.py).
@@ -652,7 +653,6 @@
 			svg: entry.svg,
 		});
 		const lineSvg = (attrs = '', strokeWidth = 5, lineCap = 'round', stroke = '#2b2b2b') => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/><path d="M22 56 C56 26 95 76 158 38" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="${lineCap}" ${attrs}/></svg>`;
-		const shapeSvg = (shape: string) => `<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
 		const touchSvg = (kind: string) => {
 			const defs = '<defs><filter id="touch-soft"><feGaussianBlur stdDeviation="1.8"/></filter></defs>';
 			const paths: Record<string, string> = {
@@ -715,6 +715,8 @@
 			破線: { effect: '短い線分を間隔を空けて並べる。', example: '破線の弧', effectEn: 'Places short segments with gaps between them.', exampleEn: 'A dashed arc', svg: lineSvg('stroke-dasharray="14 9"') },
 			点線: { effect: '点の連なりとして描く。', example: '点線で囲む', effectEn: 'Draws as a run of dots.', exampleEn: 'Enclose with a dotted line', svg: lineSvg('stroke-dasharray="1 12"') },
 			一点鎖線: { effect: '長線と点を交互に並べる。', example: '一点鎖線を引く', effectEn: 'Alternates long dashes with dots.', exampleEn: 'Draw a dash-dot line', svg: lineSvg('stroke-dasharray="18 7 2 7"') },
+			// おもて: eleven words, one contour, eleven interiors (saijiki-surface.ts).
+			...SURFACE_PREVIEWS,
 			白: { effect: '白系の色で描く。背景との対比に注意。', example: '白い円', effectEn: 'Draws in a white tone. Mind the contrast against the ground.', exampleEn: 'A white circle', svg: shapeSvg('<rect x="48" y="18" width="84" height="56" fill="#2b2b2b" opacity="0.16"/><circle cx="90" cy="46" r="24" fill="#ffffff" stroke="#c9c2b5" stroke-width="4"/>') },
 			黒: { effect: '黒で描く。最も強い輪郭になる。', example: '黒い円', effectEn: 'Draws in black, giving the strongest contour.', exampleEn: 'A black circle', svg: shapeSvg('<circle cx="90" cy="46" r="25" fill="#2b2b2b"/>') },
 			青: { effect: '青系の色で描く。', example: '青い線', effectEn: 'Draws in a blue tone.', exampleEn: 'A blue line', svg: lineSvg('', 5, 'round', '#2c5fb8') },
@@ -1158,12 +1160,29 @@
 		return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs';
 	}
 
+	// Two gates, both of which have to open: the permission group says whether
+	// this member may see the tab at all, the detail level says whether they
+	// asked to. The tab bar in SettingsModal asks the second one the same way.
 	function canAccessSettingsTab(tab: SettingsTab) {
-		return canAccessSettingsTabFor(tab, currentUser);
+		return canAccessSettingsTabFor(tab, currentUser) && settingsTabShownAtDetail(tab, settingsDetail);
 	}
 
-	function defaultSettingsTab() {
-		return defaultSettingsTabFor(currentUser);
+	function defaultSettingsTab(): SettingsTab {
+		const preferred = defaultSettingsTabFor(currentUser);
+		// `plugins` -- what a member outside the administrators group would land
+		// on -- is one of the tabs the standard mode hides. `export` is the
+		// fallback because no gate can hide it: it is neither administrator-only
+		// nor detailed-only, and T-50 executes that claim.
+		return canAccessSettingsTab(preferred) ? preferred : 'export';
+	}
+
+	function setSettingsDetail(detail: SettingsDetailLevel) {
+		settingsDetail = detail;
+		try { localStorage.setItem(SETTINGS_DETAIL_KEY, detail); } catch { /* private browsing */ }
+		// Narrowing the dialog can hide the tab that is open. Route the move
+		// through selectSettingsTab so the new tab loads what it needs, the way
+		// it would if the member had pressed it.
+		if (settingsOpen && !canAccessSettingsTab(settingsTab)) selectSettingsTab(defaultSettingsTab());
 	}
 
 	function normalizeBatchPromptHistory(items: string[]): string[] {
@@ -4425,6 +4444,13 @@ if (unreadWords.length > 0) {
 					score: it.score,
 					canvas_aspect: canvasId,
 					render_seed: replaySeed,
+					// The comparison this feeds is meant to show what the engine
+					// version did. Leaving the placement seed behind moved the
+					// marks as well, and that difference was read as the
+					// engine's -- it is the one thing this screen must not lie
+					// about. Raw, not `?? replaySeed`: renderer.py:3486 already
+					// falls back to the performance seed when there is none.
+					composition_seed: it.composition_seed ?? null,
 					seed_text: it.seed_text,
 					...workReferencePayload(it.id),
 					...renderSettingsPayload('render-svg', { ...colorCatalogOverride(catalogId), ...wildOverride(Boolean(it.render_wild)) }),
@@ -6307,6 +6333,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			const m1 = localStorage.getItem(MODEL_STAGE1_KEY); if (m1) stage1Model = m1;
 			const p2 = localStorage.getItem(PROVIDER_STAGE2_KEY) as Provider | null; if (p2) stage2Provider = p2;
 			const m2 = localStorage.getItem(MODEL_STAGE2_KEY); if (m2) stage2Model = m2;
+			// Anything but 'detailed' means standard, so a cleared or corrupted
+			// entry opens the dialog at its narrow width rather than throwing.
+			settingsDetail = normalizeSettingsDetail(localStorage.getItem(SETTINGS_DETAIL_KEY));
 			loadPersistedSettings();
 		} catch {}
 		void (async () => {
@@ -6869,6 +6898,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{singleUserMode}
 			{settingsMode}
 			{settingsTab}
+			{settingsDetail}
 			{stage1Provider}
 			{stage1Model}
 			{stage2Provider}
@@ -6929,6 +6959,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onClearDownloadFolder={clearDownloadFolder}
 			onClose={closeSettingsModal}
 			onSelectSettingsTab={selectSettingsTab}
+			onSetSettingsDetail={setSettingsDetail}
 			onSetStage1Provider={setStage1Provider}
 			onSetStage1Model={setStage1Model}
 			onSetStage2Provider={setStage2Provider}

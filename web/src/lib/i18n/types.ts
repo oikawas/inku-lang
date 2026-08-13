@@ -465,6 +465,10 @@ export interface LangPack {
 	settingsTabServerMisc: string;
 	settingsTabLogs: string;
 	settingsTabLimits: string;
+	settingsDetailLabel: string;
+	settingsDetailStandard: string;
+	settingsDetailDetailed: string;
+	settingsDetailHint: string;
 	settingsRenderLimitsTitle: string;
 	settingsRenderLimitsIntro: string;
 	settingsRenderLimitsRounding: string;
@@ -806,7 +810,8 @@ export interface LangPack {
 	provenanceLabelVariationSeed: string;
 	provenanceLabelSeedText: string;
 	provenanceLabelWild: string;
-	provenanceLabelCatalogSub: string;
+	provenanceLabelSketchRecord: string;
+	provenanceLabelColorMap: string;
 	provenanceLabelCanvasRatio: string;
 	provenanceLabelDdlSpec: string;
 	provenanceLabelTransformLayer: string;
@@ -836,8 +841,10 @@ export interface LangPack {
 	provenanceHintRenderSeed: string;
 	provenanceHintSeedText: string;
 	provenanceHintWild: string;
+	provenanceHintSketchGrain: string;
+	provenanceHintSketchRecord: string;
 	provenanceHintCatalog: string;
-	provenanceHintCatalogSub: string;
+	provenanceHintColorMap: string;
 	provenanceHintCanvas: string;
 	provenanceHintCanvasRatio: string;
 	provenanceHintSvgSize: string;

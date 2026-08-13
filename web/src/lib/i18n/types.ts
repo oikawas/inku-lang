@@ -809,6 +809,7 @@ export interface LangPack {
 	provenanceLabelSketchRecord: string;
 	provenanceLabelSketchText: string;
 	provenanceLabelCatalogSub: string;
+	provenanceLabelColorMap: string;
 	provenanceLabelCanvasRatio: string;
 	provenanceLabelDdlSpec: string;
 	provenanceLabelTransformLayer: string;
@@ -843,6 +844,7 @@ export interface LangPack {
 	provenanceHintSketchText: string;
 	provenanceHintCatalog: string;
 	provenanceHintCatalogSub: string;
+	provenanceHintColorMap: string;
 	provenanceHintCanvas: string;
 	provenanceHintCanvasRatio: string;
 	provenanceHintSvgSize: string;

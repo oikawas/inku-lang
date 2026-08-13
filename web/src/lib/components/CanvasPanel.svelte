@@ -22,14 +22,15 @@
 	type ModelInspection = ReturnType<typeof createModelInspection>;
 	import Tooltip from './Tooltip.svelte';
 	import { normalizeSketchGrain, normalizeSketchState, sketchModeLabel, sketchStateNote } from '$lib/sketch';
+	import { catalogSubLine, colorMapEntries, colorWordLabel, type ColorCatalog, type ColorMap } from '$lib/colors';
 
 	type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type SvgProfile = 'display' | 'editable' | 'compat';
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
-	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_text?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
+	type PaintResult = { svg: string; score: Score; interpret_fallback_used?: boolean; interpret_fallback_reasons?: string[]; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_hash_short?: string | null; render_seed?: number | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | null; variation_moved_axes?: Array<{ axis: string; from: string; to: string }>; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_color_catalog_id?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: DerivationKind | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_text?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_stage1_ms: number; elapsed_stage2_ms: number; elapsed_total_ms: number; tokens_in_stage1: number | null; tokens_out_stage1: number | null; tokens_in_stage2: number | null; tokens_out_stage2: number | null };
 	type PromptsData = { stage1_system: string; stage2_system: string };
-	type HistoryItem = { id?: string; starred?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_text?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
+	type HistoryItem = { id?: string; starred?: boolean; note?: string | null; interpret_fallback?: string | null; description_hash?: string | null; render_build_number?: string | null; render_engine_id?: string | null; render_engine_version?: string | null; ddl_version?: string | null; ddl_engine_version?: string | null; render_hash?: string | null; render_seed?: number | string | null; render_wild?: boolean | null; seed_text?: string | null; focus?: string | null; composition_seed?: number | string | null; interpretation_seed?: string | null; variation_amplitude?: string | null; variation_seed?: number | string | null; stage1_prompt_digest?: string | null; stage1_prompt_base_digest?: string | null; stage2_prompt_digest?: string | null; render_color_catalog_sub?: string | null; render_color_catalog_id?: string | null; render_color_map?: ColorMap | null; render_canvas_aspect_ratio?: number | null; derivation_kind?: string | null; batch_run_id?: string | null; batch_line_number?: number | null; instruction_lang_requested?: string | null; instruction_lang_resolved?: string | null; ui_lang?: string | null; sketch_text?: string | null; sketch_grain?: string | null; sketch_state?: string | null; derivation_metadata?: Record<string, unknown>; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null };
 	type NearbyHistory = { id?: string; svg: string; input: string };
 	type VariationCandidate = { id: string; label: string; result: PaintResult & { ddl: string; thinking: string | null }; selected: boolean; saved?: boolean };
 	type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
@@ -96,6 +97,10 @@
 		// Passed through to LineagePanel for the contact sheet it builds from the
 		// checked works; CanvasPanel does not read them itself.
 		catalogName: (id: string | null | undefined) => string;
+		// Read here, not passed through: the sub line under the catalog name is
+		// stored in English on the work, and the Japanese copy lives on the catalog.
+		colorCatalogs: ColorCatalog[];
+		renamedCatalogIds: Record<string, string>;
 		formatHistoryDate: (at: number) => string;
 		historyPreviewText: (text: string) => string;
 		onGotoNext: () => void | Promise<void>;
@@ -239,6 +244,8 @@
 		animationExportSettings,
 		apiFetch,
 		catalogName,
+		colorCatalogs,
+		renamedCatalogIds,
 		formatHistoryDate,
 		historyPreviewText,
 		onGotoNext,
@@ -537,7 +544,17 @@
 	// Nothing to report when no work is on screen -- an empty canvas has not
 	// been drawn before the column existed; it has not been drawn at all.
 	const hasSketchDetails = $derived(!!(statusHistoryItem ?? result));
-	const detailCatalogSub = $derived(statusHistoryItem?.render_color_catalog_sub ?? result?.render_color_catalog_sub ?? '');
+	const detailCatalogId = $derived(statusHistoryItem?.render_color_catalog_id ?? result?.render_color_catalog_id ?? null);
+	const detailCatalogSubStored = $derived(statusHistoryItem?.render_color_catalog_sub ?? result?.render_color_catalog_sub ?? '');
+	const detailCatalogSub = $derived(
+		catalogSubLine(colorCatalogs, renamedCatalogIds, detailCatalogId, detailCatalogSubStored, isJapanese)
+	);
+	// The colours this work was actually drawn in. The catalog names the table;
+	// this is the row of it the work kept, and an empty list is a work with no
+	// map recorded rather than a work drawn at nine defaults.
+	const detailColorMap = $derived(
+		colorMapEntries(statusHistoryItem?.render_color_map ?? result?.render_color_map)
+	);
 	const detailCanvasRatio = $derived(statusHistoryItem?.render_canvas_aspect_ratio ?? result?.render_canvas_aspect_ratio ?? null);
 	const detailStage1PromptDigest = $derived(statusHistoryItem?.stage1_prompt_digest ?? result?.stage1_prompt_digest ?? '');
 	const detailStage1PromptBaseDigest = $derived(statusHistoryItem?.stage1_prompt_base_digest ?? result?.stage1_prompt_base_digest ?? '');
@@ -1173,6 +1190,15 @@
 								{@render term(isJapanese ? '色カタログ' : 'Color catalog', t().provenanceHintCatalog)}<dd>{statusCatalogName}</dd>
 								{#if detailCatalogSub}
 									{@render term(t().provenanceLabelCatalogSub, t().provenanceHintCatalogSub)}<dd>{detailCatalogSub}</dd>
+								{/if}
+								{#if detailColorMap.length > 0}
+									{@render term(t().provenanceLabelColorMap, t().provenanceHintColorMap)}<dd class="detail-color-map">
+										{#each detailColorMap as entry (entry.key)}
+											<span class="color-map-entry" title={entry.code}>
+												<span class="color-map-chip" style="background: {entry.code}"></span>{colorWordLabel(entry.key, isJapanese)}
+											</span>
+										{/each}
+									</dd>
 								{/if}
 								{@render term(isJapanese ? 'キャンバス' : 'Canvas', t().provenanceHintCanvas)}<dd>{statusCanvasName}</dd>
 								{@render term(t().provenanceLabelCanvasRatio, t().provenanceHintCanvasRatio)}<dd>{detailCanvasRatio == null ? '-' : detailCanvasRatio.toFixed(3)}</dd>
@@ -2264,6 +2290,17 @@
 	/* The sketched prose is the layer's own paragraph, not a field: it keeps its
 	   line breaks the way the comment does, and reads at the same measure. */
 	.detail-sketch-text { white-space: pre-wrap; line-height: 1.55; }
+	/* The nine colour words as they were drawn. A chip and its word travel
+	   together so the row reads as pairs rather than as a run of swatches. */
+	.detail-color-map { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+	.color-map-entry { display: inline-flex; align-items: center; gap: 4px; }
+	.color-map-chip {
+		width: 11px;
+		height: 11px;
+		border-radius: 2px;
+		border: 1px solid var(--border2);
+		flex-shrink: 0;
+	}
 	.generation-details dd { min-width: 0; margin: 0; color: var(--fg); overflow-wrap: anywhere; }
 	.generation-details code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 	.detail-copy-row { display: flex; align-items: flex-start; gap: 8px; }

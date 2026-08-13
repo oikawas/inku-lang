@@ -806,6 +806,8 @@ export interface LangPack {
 	provenanceLabelVariationSeed: string;
 	provenanceLabelSeedText: string;
 	provenanceLabelWild: string;
+	provenanceLabelSketchRecord: string;
+	provenanceLabelSketchText: string;
 	provenanceLabelCatalogSub: string;
 	provenanceLabelCanvasRatio: string;
 	provenanceLabelDdlSpec: string;
@@ -836,6 +838,9 @@ export interface LangPack {
 	provenanceHintRenderSeed: string;
 	provenanceHintSeedText: string;
 	provenanceHintWild: string;
+	provenanceHintSketchGrain: string;
+	provenanceHintSketchRecord: string;
+	provenanceHintSketchText: string;
 	provenanceHintCatalog: string;
 	provenanceHintCatalogSub: string;
 	provenanceHintCanvas: string;

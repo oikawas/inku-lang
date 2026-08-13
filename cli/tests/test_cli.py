@@ -713,6 +713,41 @@ def test_result_with_svg_profile_regenerates_non_display_svg():
     assert result["svg"] == "<svg><title>display</title></svg>"
 
 
+def test_result_with_svg_profile_sends_both_seeds():
+    """[I-157]: a non-display export is the performance it exports.
+
+    The performance seed was sent and the placement seed was not, so the file
+    written out put the marks somewhere else than the picture it came from.
+    Both are read off the result, raw: renderer.py:3486 falls back to the
+    performance seed when a work carries no composition seed, so repeating that
+    rule here would be a second copy of it.
+    """
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def request_text(self, method, path, *, data=None, query=None, auth=True):
+            self.calls.append((method, path, data, query, auth))
+            return "<svg><title>editable</title></svg>"
+
+    client = FakeClient()
+    result = {
+        "score": {"instructions": []},
+        "svg": "<svg><title>display</title></svg>",
+        "render_seed": 4242,
+        "composition_seed": 0,
+    }
+
+    cli._result_with_svg_profile(client, result, svg_profile="editable", color_catalog="default")
+
+    sent = client.calls[0][2]
+    assert sent["render_seed"] == 4242
+    # `is`, not truthiness: 0 is a seed the placement stage must honour, and an
+    # `or` here would drop it and move every mark.
+    assert sent["composition_seed"] == 0
+    assert "composition_seed" in sent
+
+
 def test_score_metrics_reports_density_cluster_and_fade_fields():
     score = {
         "instructions": [

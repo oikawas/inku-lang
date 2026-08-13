@@ -4444,6 +4444,13 @@ if (unreadWords.length > 0) {
 					score: it.score,
 					canvas_aspect: canvasId,
 					render_seed: replaySeed,
+					// The comparison this feeds is meant to show what the engine
+					// version did. Leaving the placement seed behind moved the
+					// marks as well, and that difference was read as the
+					// engine's -- it is the one thing this screen must not lie
+					// about. Raw, not `?? replaySeed`: renderer.py:3486 already
+					// falls back to the performance seed when there is none.
+					composition_seed: it.composition_seed ?? null,
 					seed_text: it.seed_text,
 					...workReferencePayload(it.id),
 					...renderSettingsPayload('render-svg', { ...colorCatalogOverride(catalogId), ...wildOverride(Boolean(it.render_wild)) }),

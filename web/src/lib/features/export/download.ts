@@ -15,8 +15,18 @@ export type SvgProfile = 'display' | 'editable' | 'compat';
  * capture-date stamp) lives here.
  */
 export type ExportDeps = {
-	/** The artwork currently on the canvas; null when nothing has been drawn. */
-	result: () => { svg: string; score: unknown; history_at?: number | null } | null;
+	/**
+	 * The artwork currently on the canvas; null when nothing has been drawn.
+	 * The two seeds are what say which performance of the score this is, so an
+	 * export that redraws has to carry them.
+	 */
+	result: () => {
+		svg: string;
+		score: unknown;
+		history_at?: number | null;
+		render_seed?: number | null;
+		composition_seed?: number | null;
+	} | null;
 	/** The description that produced it, embedded as <desc> in the display profile. */
 	input: () => string;
 	/** The history item on screen, if the artwork came from history. */
@@ -62,7 +72,16 @@ export function createExportActions(deps: ExportDeps) {
 					score: result.score,
 					catalog_id: deps.refinementCatalogId(),
 					canvas_aspect: deps.refinementCanvasAspectId(),
-					svg_profile: profile
+					svg_profile: profile,
+					// Both seeds, so the file carries the performance on screen.
+					// Neither was sent before, which made the export a different
+					// performance of the same score: other marks, drawn by
+					// another hand. The renderer decides the placement with
+					// composition_seed when there is one and render_seed
+					// otherwise (renderer.py:3486), so the raw pair is enough --
+					// repeating that rule here would be a second copy of it.
+					render_seed: result.render_seed ?? null,
+					composition_seed: result.composition_seed ?? null
 				})
 			});
 			if (!r.ok) throw await deps.apiError(r);

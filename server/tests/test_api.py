@@ -3344,6 +3344,55 @@ def test_history_neighbors_returns_ranked_items():
         db.delete_user_group(group["id"])
 
 
+def test_history_animation_export_returns_404_for_a_missing_work(auth_context):
+    headers, _user, _group = auth_context
+    response = client.post(
+        "/api/history/export-animation",
+        json={"ids": [str(uuid.uuid4()), str(uuid.uuid4())]},
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "one or more history items were not found"}
+
+
+def test_history_animation_export_returns_409_for_a_work_without_saved_svg(auth_context):
+    headers, user, _group = auth_context
+    item_ids: list[str] = []
+    try:
+        for index in range(2):
+            response = client.post(
+                "/api/history",
+                json={
+                    "input": f"animation missing svg {index}",
+                    "ddl": "中心に円",
+                    "score": {"instructions": []},
+                    "svg": "<svg></svg>",
+                    "at": 1_700_000_100_000 + index,
+                },
+                headers=headers,
+            )
+            assert response.status_code == 200
+            item_ids.append(response.json()["id"])
+
+        with db.SessionLocal() as session:
+            session.query(db.HistoryRow).filter(db.HistoryRow.id == item_ids[1]).update(
+                {db.HistoryRow.svg: ""}, synchronize_session=False
+            )
+            session.commit()
+
+        response = client.post(
+            "/api/history/export-animation",
+            json={"ids": item_ids},
+            headers=headers,
+        )
+
+        assert response.status_code == 409
+        assert response.json() == {"detail": "one or more works have no saved SVG"}
+    finally:
+        db.delete_items(user["id"], item_ids)
+
+
 def test_history_animation_export_preserves_requested_order(auth_context, monkeypatch):
     headers, user, _group = auth_context
     item_ids: list[str] = []

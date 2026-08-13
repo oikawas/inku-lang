@@ -11,6 +11,42 @@ def _png(color: str, width: int = 40, height: int = 24) -> bytes:
     return output.getvalue()
 
 
+def test_fade_white_passes_through_white_between_frames():
+    current = Image.new("RGBA", (4, 2), "red")
+    following = Image.new("RGBA", (4, 2), "blue")
+    try:
+        frames = animation_export._transition_frames(current, following, "fade_white", 3)
+        assert [frame.convert("RGB").getpixel((2, 1)) for frame in frames] == [
+            (255, 127, 127),
+            (255, 255, 255),
+            (127, 127, 255),
+        ]
+    finally:
+        current.close()
+        following.close()
+        for frame in locals().get("frames", []):
+            frame.close()
+
+
+def test_slide_moves_both_frames_across_the_canvas():
+    current = Image.new("RGBA", (4, 2), "red")
+    following = Image.new("RGBA", (4, 2), "blue")
+    try:
+        frames = animation_export._transition_frames(current, following, "slide", 1)
+        pixels = frames[0].convert("RGB")
+        assert [pixels.getpixel((x, 1)) for x in range(4)] == [
+            (255, 0, 0),
+            (255, 0, 0),
+            (0, 0, 255),
+            (0, 0, 255),
+        ]
+    finally:
+        current.close()
+        following.close()
+        for frame in locals().get("frames", []):
+            frame.close()
+
+
 def test_builds_looping_apng_in_input_order(monkeypatch):
     colors = iter(["red", "blue"])
     monkeypatch.setattr(animation_export, "svg_to_png", lambda _svg, height: _png(next(colors), height=height))
@@ -32,6 +68,63 @@ def test_builds_looping_apng_in_input_order(monkeypatch):
     assert image.convert("RGB").getpixel((20, 12)) == (255, 0, 0)
     image.seek(1)
     assert image.convert("RGB").getpixel((20, 12)) == (0, 0, 255)
+
+
+def test_4k_and_8k_presets_use_their_height_and_transition_steps(monkeypatch):
+    assert animation_export.RESOLUTION_HEIGHTS["4k"] == 2160
+    assert animation_export.RESOLUTION_HEIGHTS["8k"] == 4320
+    requested_heights = []
+
+    def fake_rasterize(svg, height):
+        requested_heights.append(height)
+        return _png("red" if svg == "first" else "blue", height=height)
+
+    monkeypatch.setattr(animation_export, "svg_to_png", fake_rasterize)
+    monkeypatch.setitem(animation_export.RESOLUTION_HEIGHTS, "4k", 40)
+    monkeypatch.setitem(animation_export.RESOLUTION_HEIGHTS, "8k", 48)
+    for resolution, expected_height, expected_steps in (("4k", 40, 4), ("8k", 48, 2)):
+        payload = animation_export.build_animation(
+            ["first", "second"],
+            output_format="apng",
+            pattern="crossfade",
+            hold_seconds=1,
+            resolution=resolution,
+        )
+        image = Image.open(BytesIO(payload))
+        assert image.height == expected_height
+        assert image.n_frames == 2 + expected_steps
+    assert requested_heights == [40, 40, 48, 48]
+
+
+def test_encoded_pixel_limit_accepts_boundary_and_rejects_one_pixel_over(monkeypatch):
+    assert animation_export.MAX_ENCODED_PIXELS == 600_000_000
+    monkeypatch.setattr(animation_export, "svg_to_png", lambda svg, height: _png("red" if svg == "first" else "blue", width=10, height=height))
+    monkeypatch.setitem(animation_export.RESOLUTION_HEIGHTS, "1k", 10)
+    monkeypatch.setitem(animation_export.TRANSITION_STEPS, "1k", 3)
+    monkeypatch.setattr(animation_export, "MAX_ENCODED_PIXELS", 500)
+
+    payload = animation_export.build_animation(
+        ["first", "second"],
+        output_format="gif",
+        pattern="crossfade",
+        hold_seconds=1,
+        resolution="1k",
+    )
+    assert Image.open(BytesIO(payload)).n_frames == 5
+
+    monkeypatch.setattr(animation_export, "MAX_ENCODED_PIXELS", 499)
+    try:
+        animation_export.build_animation(
+            ["first", "second"],
+            output_format="gif",
+            pattern="crossfade",
+            hold_seconds=1,
+            resolution="1k",
+        )
+    except ValueError as error:
+        assert str(error) == "this resolution and transition pattern produce too many frames"
+    else:
+        raise AssertionError("an animation above the encoded pixel limit should fail")
 
 
 def test_builds_gif_with_transition_frames(monkeypatch):

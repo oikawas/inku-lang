@@ -6421,3 +6421,66 @@ byte-identical** (`check_frozen_corpora.py`), **Android JVM 288 tests / 0 failur
   table in `render-engine-history` still said **drawing `render-engine-30/` 553 (7 SVG)** and
   **DDL `ddl-engine-13/` 40**, where the measured values are **`render-engine-32/` 582 (13 SVG)**
   and **`ddl-engine-16/` 49**.
+
+### v2.13.18 — Eleven items decided in conversation (Build 905, 2026-08-13, ledger I-157)
+
+**Eleven items, each pointed at by the author and fixed in the order they were decided.** The branch
+is twelve commits and is kept unsquashed: two pairs **add a row and then remove it under the author's
+ruling**, and one is **the repair of a gate its own perturbation found vacuous**.
+
+- **The eleven `Surface` words in the saijiki now carry a drawing and a note (in both languages).**
+  Before, all eleven fell back to one generic line, and **Surface was the only one of the eleven
+  categories missing entirely.** **All eleven drawings share the same outline; only the inside changes.**
+- **The generation-info drawer gained a Sketch (Stage 0.5) section.** Before, the word "sketch" did
+  not appear once in `CanvasPanel`. **This is the record of the work on screen**, not the working copy
+  the description panel shows for the next painting.
+- **A row was added for the colour words this work was actually drawn in.** `render_color_map` was
+  already being read to decide "no record" while the value itself was thrown away.
+- **⚠ Two rows were added and then removed under the author's ruling** — the sketched prose (the
+  description panel already has it, and on long works it pushed interpretation and performance out of
+  view) and the colour catalogue's tagline (a constant of the catalogue, not a fact about the work).
+- **The two drawers now behave alike**: the saijiki drawer **closes when you press outside it**, and
+  the generation-info drawer **is revealed from the right edge over 0.25s**. Each behaviour already
+  existed on the other drawer.
+- **The settings dialog opens either `Standard` or `Detailed`.** Only `Detailed` shows the `Plugins`,
+  `Limits`, `Unread Word Ledger` and `Other (server)` tabs. **One new module, `settingsDetail.ts`,
+  holds the tab names, and both the tab bar and the guard on the body read that same table** — if only
+  one of them knows, what remains is either **a panel nothing can reach** or **a button that does nothing.**
+- **The rail's UI-mode icon was redrawn and the menu reordered to match it.** **The old icon drew the
+  same picture for all three modes** (a frame and one vertical bar), and **its 4×2px dot was invisible
+  at the 22px it is displayed at.** **Now the number of dark bars is the mode** (simple 1, custom 2,
+  full 3) **and the menu follows that order** (it used to read simple / full / custom, with the middle
+  amount last). **Three designs were compared at full size and A was chosen.**
+- **Ledger I-157: a redraw is the performance that was saved.** All four paths — the non-`display`
+  profiles of `GET /api/history/{id}/svg`, the web export, the web replay, and the CLI's non-display
+  export — **now hand over both seeds the row carries.**
+  **⚠ What is promised is not "the same picture as the one saved" but "the difference is only how far
+  the engine has moved on"** — principle 7 keeps no past version, so identity cannot be promised. **The
+  dropped seed was a second difference stacked on top of the version's.**
+- **⚠ The bytes of the non-`display` response of `GET /api/history/{id}/svg` change** (route, keys and
+  shape do not). **It is not that the same input now returns a different picture; it is that it returns
+  the right one.**
+- **⚠ Two i18n keys that existed at the base commit were removed**
+  (`provenanceLabelCatalogSub` / `provenanceHintCatalogSub`). **Their absence is checked by `T-41`
+  across the Japanese pack, the English pack and the type.**
+
+**Checks:** **server 3,165 passed / 31 skipped** (merged tree, 7m43s), **cli 225 passed**,
+**web 332 passed / 0 failed**, **`check` 259 FILES / 0 ERRORS / 2 WARNINGS**,
+**`lint:i18n` 1057 / 47 / 0 / 0**, **ruff clean**, **`check_docs.py` passed**.
+**Every increment matched the branch's own report one by one** (server +4, cli +1, web +53,
+`check` +2, `lint:i18n` +7).
+
+- **The implementer was the same model (Opus 5), so the 26 perturbations and the three numbers it
+  measured on the branch were not measured again.** What was run is the merged tree's seven surfaces.
+  **⚠ 26 perturbations, none of them vacuous.**
+- **⚠ The base commit was four versions old and four files overlapped with the main side**
+  (`CanvasPanel`, `SaijikiDrawer`, `SettingsModal`, `+page.svelte`; the main side was ledger I-202's
+  shared button styles). **A clean merge is not proof of a correct one, so both sides' additions were
+  counted by name**: **no component-local base CSS came back** (I-202's removal holds),
+  **`:global(.ghost-btn)` is there**, and **the branch's `data-saijiki-toggle` and `settingsDetail`
+  are alive.**
+- **⚠ Four tests appeared to have disappeared; all four were main-side additions** the old base did
+  not have. **The branch deleted no test.**
+- **⚠ The acceptance numbering collided with ledger I-235**: both started from `T-29` and took `T-30`,
+  so the web tree now holds two sets of `T-30`-`T-33`. Nothing asserts uniqueness, so **nothing goes
+  red**, but it reads badly.

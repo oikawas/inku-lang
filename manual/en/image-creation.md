@@ -38,6 +38,8 @@ The UI language and the description language are separate. Ordinary painting det
 | Full UI | Shows every available item |
 | Custom UI | Adds the items you choose to the essential ones |
 
+The UI mode can also be switched from the icon on the left of the rail. **The number of dark bars is the mode that is on**: one for simple, two for custom, three for full. The menu is listed in the same order (simple, custom, full).
+
 The user menu, settings, single description and painting, the canvas and the history are always visible. **The history is always there so that a work can be looked at again and taken out as one sheet with `Share card`** (the card has two doors, one on the canvas toolbar and one in the history panel, and both belong to the history side). Custom UI can add seven groups: batch and demo; model, color, sketch, and canvas settings; view and edit instructions; timing, tokens, and provenance; refinement, comparison, export, and work actions; history and work navigation; theme, language, and work information.
 
 This manual assumes Full UI. Under Simple UI some of the operations described here are not on screen.
@@ -128,6 +130,8 @@ The `Saijiki` is inku's vocabulary dictionary.
 1. After the first painting, press `Saijiki` on the `Instructions (normalized DDL)` row.
 2. Point at or click a word to see how it acts on the performance, with examples.
 3. Choose a word to insert it at the cursor position in the instructions.
+
+The eleven words under `Surface` each carry a small drawing of how the face is, and a note on what it does to the performance. Every drawing shares the same outline; only what is inside it changes.
 
 The Saijiki is not autocompletion. Consult it when needed; it does not narrow a description to the existing vocabulary on its own. It is for reading, and pressing it does not start a painting.
 
@@ -266,12 +270,13 @@ Comparison results are not saved automatically. Use `Adopt` to keep one in histo
 
 Open the provenance drawer at the bottom of the work tab to see the record of the selected work. Its tabs are `Details`, `Prompts`, and `JSON`.
 
-`Details` is divided into five sections.
+`Details` is divided into six sections.
 
 | Section | Main contents |
 |---|---|
+| Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
 | Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback |
-| Performance | Stage 2 model, Stage 2 language, focus, variation and variation seed, composition seed, render seed, seed text, Wild |
+| Performance | Stage 2 model, Stage 2 language, focus, variation and variation seed, composition seed, render seed, seed text, Wild, the colour words this work was drawn in |
 | Identity | render hash, description hash, render engine, DDL specification, transform layer, prompt digests, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
@@ -328,6 +333,8 @@ Save from `SVG` or `PNG` at the bottom of the work tab.
 | Editable | Illustrator / Affinity | Regenerated from the score. Carries layer structure and stable IDs, and avoids filter and clip-path |
 | Compatibility | General SVG interchange | Regenerated from the score. Close to Editable, but favors robustness |
 | PNG | Raster image at a chosen resolution | Standard, high resolution (2×), square, square high resolution. More templates can be added in the settings |
+
+`Editable` and `Compat` are drawn again from the Score, and **a redraw uses the performance that was saved** (both the render seed and the composition seed the saved work carries). **The only difference from the stored SVG is how far the drawing engine has moved on** -- inku keeps no past version, so a redraw after the engine advances is never byte-identical.
 
 The download folder can be set in the settings. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
 
@@ -409,6 +416,8 @@ Open the settings from the application rail. Which tabs are visible depends on t
 | Unread-word ledger | Words interpretation could not map directly |
 | Other | UI mode, theme, mascot, download folder, batch retry |
 | Other (server) | Automatic saving of output files, painting concurrency |
+
+The settings dialog opens either `Standard` or `Detailed`, switched from the toggle at its top right. **The `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs appear only in `Detailed`.** The choice stays in that browser.
 
 `Limits` is not a speed control: it changes the number of lines actually drawn. The values chosen there are written into the Stage 1 and Stage 2 prompts and recorded on every work painted. See `Server Configuration` for the details.
 

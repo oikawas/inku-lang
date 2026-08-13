@@ -754,6 +754,10 @@ is changed back. The modes are not named after proficiency. **If the mode is
 changed while an input method or a work tab that it cannot show is selected,
 the view returns to the single description input or to the canvas.**
 
+**The mode can also be switched from an icon on the rail, and the icon says which mode is on by how many of its bars are dark (one for simple, two for custom, three for full). The menu is listed in that order** (v2.13.18): an icon that draws the same picture for all three modes cannot say which one is chosen.
+
+**The settings dialog carries two modes on the same reasoning (v2.13.18).** `Standard` shows only the settings in daily use; `Detailed` adds the `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs. **One module holds the tab names, and both the tab bar and the guard on the body read that same table**: if the bar hides a tab the guard admits, there is a panel nothing can reach, and the other way round leaves a button that does nothing. The choice stays in the browser and changes nothing stored on the server.
+
 ### 7.3 LLM Model Inspection
 
 A view that puts several LLM models side by side — Gemma 4 and Opus 4.7, for

@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-13 — Unreleased v2.13.18 Baseline (Web Build 905)
+
+The 13 places that name a version were updated to v2.13.18 / Build 905. **Five things changed that a user can see, so the matching sections of "Creating a Work" were updated.**
+
+- **The UI mode can now be switched from the icon on the rail, and the number of dark bars is the mode that is on** (one simple, two custom, three full). The menu is listed in the same order. The previous icon drew the same picture for all three modes.
+- **The settings dialog now opens either `Standard` or `Detailed`.** The `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs appear only in `Detailed`.
+- **The eleven `Surface` words in the saijiki now carry a drawing of how the face is, along with a note.**
+- **`Details` in the provenance now has six sections** (`Sketch` was added), and `Performance` gained a row for the colour words this work was drawn in. **The catalogue tagline row and the sketched-prose row were removed** (the first is a constant of the catalogue, the second is already in the description panel).
+- **`Editable` and `Compat` exports are now drawn again with the performance that was saved.** The only difference from the stored SVG is how far the drawing engine has moved on.
+- No default setting, environment variable or CLI flag changed.
+
 ## 2026-08-13 — Unreleased v2.13.17 Baseline (Web Build 904)
 
 The 13 places that name a version were updated to v2.13.17 / Build 904. **One thing changed in what a drawing looks like, so a paragraph was added to "Writing a Description".**

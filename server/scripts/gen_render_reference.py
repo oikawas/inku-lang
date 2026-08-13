@@ -14,7 +14,9 @@ import hashlib
 import json
 import pathlib
 import re
+import shutil
 import subprocess
+import tempfile
 from typing import Any
 
 from inku_server import renderer
@@ -901,6 +903,62 @@ def _assert_angle_cases_discriminate(inputs: dict[str, dict[str, Any]]) -> None:
             raise AssertionError(f"{case_id}: the drawing does not read `rotation`")
 
 
+def _write_output_directory(
+    output_dir: pathlib.Path,
+    manifest: dict[str, Any],
+    rendered: dict[str, str],
+    changed: list[str],
+) -> None:
+    """Write one complete corpus directory without publishing it."""
+    output_dir.mkdir()
+    for case_id in changed:
+        (output_dir / f"{case_id}.svg").write_text(rendered[case_id], encoding="utf-8")
+    (output_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def _publish_output_directory(
+    manifest: dict[str, Any],
+    rendered: dict[str, str],
+    changed: list[str],
+    *,
+    output_dir: pathlib.Path = OUTPUT_DIR,
+) -> None:
+    """Stage a complete corpus, then publish it without modifying in place."""
+    parent = output_dir.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    backup = parent / f".{output_dir.name}.previous"
+
+    # A process can be killed between the two directory renames. In that case
+    # the previous corpus remains whole under the fixed backup name, so the next
+    # run can restore it before doing any work.
+    if backup.exists():
+        if output_dir.exists():
+            shutil.rmtree(backup)
+        else:
+            backup.rename(output_dir)
+
+    staging = pathlib.Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=parent))
+    try:
+        staging.rmdir()
+        _write_output_directory(staging, manifest, rendered, changed)
+        if not output_dir.exists():
+            staging.rename(output_dir)
+            return
+
+        output_dir.rename(backup)
+        try:
+            staging.rename(output_dir)
+        except BaseException:
+            backup.rename(output_dir)
+            raise
+        shutil.rmtree(backup)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+
+
 def generate() -> None:
     existing = json.loads(MANIFEST_PATH.read_text()) if MANIFEST_PATH.exists() else None
     inputs = build_inputs()
@@ -946,14 +1004,6 @@ def generate() -> None:
         "color_map_digest": _color_map_digest(inputs),
         **frozen, "cases": cases,
     }
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    # Only the cases that moved get an SVG body. An unchanged case is already
-    # frozen in the last version where it moved; copying it forward would make
-    # the directory listing stop meaning "what this version changed".
-    for case_id in frozen["changed_from_previous"]:
-        (OUTPUT_DIR / f"{case_id}.svg").write_text(rendered[case_id], encoding="utf-8")
-    MANIFEST_PATH.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
     if existing is not None and existing.get("cases") != manifest["cases"]:
         before = tuple(existing.get(field) for field in IDENTITY_FIELDS)
         after = tuple(manifest.get(field) for field in IDENTITY_FIELDS)
@@ -962,6 +1012,11 @@ def generate() -> None:
                 "render corpus changed without an identity-field change; bump the appropriate "
                 "version instead of rewriting a frozen corpus"
             )
+
+    # Only the cases that moved get an SVG body. An unchanged case is already
+    # frozen in the last version where it moved; copying it forward would make
+    # the directory listing stop meaning "what this version changed".
+    _publish_output_directory(manifest, rendered, frozen["changed_from_previous"])
 
 
 if __name__ == "__main__":

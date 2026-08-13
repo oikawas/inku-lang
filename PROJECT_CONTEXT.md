@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.13.14 / Build 899**
+**Target version: v2.13.15 / Build 902**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.
@@ -198,6 +198,9 @@ or call counts, and without persisting anything.
 ### web (SvelteKit 2 / Svelte 5)
 
 An authenticated single-page application with description, work, batch, demo, and lineage tabs.
+**The screen is drawn by the browser** (`export const ssr = false` in `+layout.ts`).
+Per-feature settings hold reactive state directly at module level in `.svelte.ts`, so drawing on the
+server could mix one person's state across requests. The boundary is stated as a setting.
 **On a server started with `INKU_SINGLE_USER`, one person is settled on and signed in automatically,
 so the sign-in screen never appears and the sign-out control is hidden** (the multi-user machinery stays
 in place).
@@ -243,6 +246,9 @@ System Access API; the rest fall back to the browser default)
 
 UI dimensions come from the `:root` tokens in `+page.svelte` (`--btn-sm-*`) and colors from
 `--action-*` and `--accent*`; literal px values and literal colors are treated as regressions.
+**The base, hover, disabled, and `ghost-active` rules of the shared button class (`ghost-btn`) live as
+one global rule each in `+page.svelte`.** Under Svelte's scoping, writing the class name does not reach
+a rule that lives elsewhere, so **restating the base inside a component is duplication, not sharing.**
 
 A feature's settings stay inside `web/src/lib/features/<name>/`.
 Storing them in localStorage, persisting them on the server and putting them on the render request
@@ -259,8 +265,11 @@ Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
 - `api.py` holds only the `app` assembly, `_lifespan`, middleware, startup calls, and `include_router`
 lines.
 **Dependencies run one way — `api.py` → routers → shared** — and no router imports `api.py`.
-- Authorization is enforced both by per-route guards and by router-level default dependencies.
+- Authorization is enforced by router-level default dependencies.
 Every endpoint except the six on the public allowlist sits behind a guard.
+**A per-route `Depends` remains in only two cases: when the body uses the `actor` value, and when the
+route imposes a stronger guard than the router default (the seven admin-only routes in `plugins`).**
+**Restating the router's own guard as a parameter is a second enforcement point, not defence in depth.**
 What a guard asks is membership in a permission group (`admins`, `leaders`, `users`), and one member
 may hold several. The test lives in a single predicate; the `role` column that remains on the user row
 is a mirror derived from those memberships and is read by no decision. Memberships are assigned through

@@ -6267,3 +6267,62 @@ record. **The result did not match the catalog that was asked for; it matched th
   answer is N+2, so this one is `.27`.
 - **`APP_VERSION` and `web/BUILD_NUMBER` did not move, and nothing was sent to pentala**
   (`android/` is permanently excluded from every sync path).
+
+### v2.13.15 — Six ledger items, picked one number at a time (Build 902, 2026-08-13, ledger I-230, I-202, I-200, I-069, I-090, I-091)
+
+**A contract that does not decide in advance what to fix: the author names one ledger ID at a time, and each one lands as its own commit.**
+**Not a single pixel of a picture moves** (render engine 32 / ddl engine 15 are unchanged, and the frozen corpora are byte-identical).
+
+- **Ledger I-202 — the shared button class was shared in name only.**
+  `ghost-btn` was used in 17 files while **the base CSS was duplicated in 44 places inside individual components** (under Svelte's
+  scoping, writing the class name does not reach a rule that lives elsewhere). **The base, hover, disabled, and `ghost-active` rules
+  now live as one global rule each in `+page.svelte`, and the copies in 17 components are gone.** Sizes read `--btn-sm-*`; colors read
+  `--panel` / `--fg2` / `--border2` and `--action-*`. **One of them, in `ShareModal`, was a filled primary action painted with
+  `--action-bg`, so it was renamed to `.action-btn` with no change to how it looks** — it was never a ghost button.
+  The plugin chip accent rule moved to one global rule as well, replacing a copy in each of two panels.
+- **Ledger I-090 — the app is now declared to be drawn in the browser.**
+  Eleven `.svelte.ts` files hold `$state` directly at module level, and with SSR enabled **that state can be shared across requests.**
+  Since this is an authenticated single-page app, `export const ssr = false` states the boundary as a setting.
+  The alternative — moving module-level state into a per-request context — **was not done**.
+  **Note that the ledger entry asked for the latter** (see what was not done, below).
+  The check freezes both the SSR setting and the inventory of the 13 files that hold `$state` (2 instance-scoped, 11 module-scoped).
+- **Ledger I-200 — a generator run that stopped halfway corrupted the previous corpus.**
+  SVGs and the manifest were written **directly** into the version directory before the identity guard was evaluated, so
+  **a run that stopped rewrote half of the previous version, and the next version's `changed_from_previous` looked empty**
+  (8 entries measured as 0). **Everything is now written to a staging directory beside the target, the guard runs before publication,
+  and the finished tree is published with a single rename.** A run the guard stops writes zero bytes into the version directory.
+  A permitted re-freeze of an existing version moves the old directory to a fixed holding name first, and
+  **if the process stops between the two renames, the next run restores the old version.**
+- **Ledger I-230 — `layer_versions.py` had no note for ddl engine 14** (13 followed 15).
+  Ten lines were restored from the bump commit `f6082b80` and the CHANGELOG of that day, and
+  **a check now requires the notes to run down without a gap from the current version to 5** (no check read these notes before,
+  so a missing one never turned anything red).
+- **Ledger I-091 — per-route guards moved to router defaults.** **24 of the 31 unused `Depends` parameters were removed**
+  (`settings` 16, `public` 5, `plugins` 1, `render` 1, `auth` 1). A router defaulting to `_user_manager` was added in `auth`
+  and one defaulting to `_current_user` in `public`, and the routes that require authentication moved onto them.
+  **The remaining 7 are the admin-only routes in `plugins`, whose guard is stronger than the router default.**
+  **No authentication or authorization result visible to a user changed** (95 routes, 6 public, both unchanged).
+- **Ledger I-069 — checks were added for the animation export paths nothing read.**
+  That the intermediate frames of `fade_white` move from red through white to blue; that an intermediate `slide` frame holds the
+  current frame on its left half and the next one on its right; the 4K / 8K heights (2160 / 4320) and transition steps (4 / 2);
+  the 600,000,000 encoded-pixel limit at its boundary and one pixel over; the 404 when no history item exists and the 409 when a
+  work has no saved SVG. **No product code was changed.**
+
+**Checks:** **server 3,150 passed / 31 skipped** (merged tree, 7m44s), **cli 224 passed**,
+**web 275 passed, `check` 257 FILES / 0 ERRORS / 2 WARNINGS**, **ruff clean**,
+**frozen corpora byte-identical** (**with the generators actually run**), **`check_docs.py` passes**.
+**15 new checks** (12 server, 3 web). **The 257 is last cycle's 256 plus `+layout.ts`; `*.test.ts` files are not counted.**
+
+- **All 8 perturbations were re-applied on the accepting side, and all 8 turned the named acceptance check red**
+  (the implementer was a different model, so nothing was skipped).
+  **The SSR perturbation is the one whose red count differs from the implementation report** (1 reported, 2 measured) —
+  the whole web suite was run here, so the `T-15` meta gate came along. The named check goes red either way.
+- **What was not done (a deviation by the implementing session):** **I-090 did not do what the ledger asked** — moving
+  module-level state into a per-request context. Turning SSR off prevents the same accident by another route, and
+  **the 11 module-level `$state` files are untouched.**
+- **Three ledger claims disagreed with the code** (an entry records what was observed the day it was filed, not what the code is now):
+  **I-230**'s "the bump cycle moved only the version number" is wrong — `f6082b80` also moved **42 reference corpus entries, the
+  Android reference, and the reference tests**. **I-200**'s line 832 is now 949. **I-091**'s "25 can be consolidated" is now 24,
+  with a different breakdown, because the route layout changed.
+- **Nothing was looked at on screen.** This version contains a change to how the UI looks (I-202) and a change to the rendering
+  boundary (I-090), so **it needs one look at the real screen after deployment.**

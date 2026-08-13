@@ -2,6 +2,13 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-13 — Unreleased v2.13.15 Baseline (Web Build 902)
+
+Updated the 13 places that name a version to v2.13.15 / Build 902. **No step, label, default, setting, or CLI flag visible to a creator or an administrator changed, so no line was added to the body.**
+
+- This version changed **where authorization is enforced**, **how the reference corpus is written out**, **where the canonical look of a shared button lives**, **the decision that the app is drawn in the browser**, and **the automatic checks that were added**. None of them change how the screens are operated or how the CLI is used.
+- **The app is drawn in the browser.** Nothing on screen ever came from a server-side render, and that boundary is now stated as a setting. **A browser with JavaScript disabled does not build the screen** (it could not be used after login before either).
+
 ## 2026-08-13 — Unreleased v2.13.14 Baseline (Web Build 899)
 
 Updated the 13 places that name a version to v2.13.14 / Build 899, and **added a paragraph to §7 of `Creating Images` now that the canvas you choose also reaches the stage that builds the composition**.

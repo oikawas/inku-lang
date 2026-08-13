@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-13 — v2.13.19 unreleased baseline (Web Build 906)
+
+The 13 places that name a version were updated to v2.13.19 / Build 906. **⚠ The previous entry (v2.13.18 / Build 905) states that it updated those 13 places, but all 13 still read v2.13.17 / Build 904.** They are aligned here.
+
+**One change is visible to a reader, and it is in the picture.**
+
+- **A pair placed by a saijiki plugin now repeats as a pair.** For a word like `Nature.若葉`, which places an arc together with an arc touching it at both ends, the second mark of each pair used to touch whichever mark happened to precede it rather than its own partner. The unit now repeats whole, so the two marks of each pair touch each other.
+- No operation, label, default setting, environment variable, or CLI flag changed.
+
 ## 2026-08-13 — Unreleased v2.13.18 Baseline (Web Build 905)
 
 The 13 places that name a version were updated to v2.13.18 / Build 905. **Five things changed that a user can see, so the matching sections of "Creating a Work" were updated.**

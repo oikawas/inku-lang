@@ -1,0 +1,904 @@
+{
+  "note": "Expansion is deterministic and calls no LLM. Fifteen A-* cases share their inputs with server/reference/ddl-engine-1/a_expand/, so those outputs must match both corpora.",
+  "plugin_vocabulary_ja": [
+    "Nature.若葉",
+    "若葉",
+    "わかば",
+    "新芽",
+    "芽吹き",
+    "Nature.下草",
+    "下草",
+    "したくさ",
+    "草むら",
+    "菖蒲",
+    "あやめ",
+    "燕子花",
+    "かきつばた",
+    "薄",
+    "すすき",
+    "Nature.青葉",
+    "青葉",
+    "あおば",
+    "茂み",
+    "枝葉",
+    "Nature.紅葉",
+    "紅葉",
+    "もみじ",
+    "カエデ",
+    "Nature.落葉",
+    "落葉",
+    "おちば",
+    "落ち葉",
+    "散る葉",
+    "Nature.枯草",
+    "枯草",
+    "枯れ草",
+    "枯尾花",
+    "枯れ薄",
+    "Nature.枯葉",
+    "枯葉",
+    "かれは",
+    "枯れ葉",
+    "朽ち葉"
+  ],
+  "plugin_vocabulary_en": [
+    "Nature.若葉",
+    "young leaves",
+    "new leaves",
+    "budding leaves",
+    "Nature.下草",
+    "undergrowth",
+    "grasses",
+    "iris leaves",
+    "kakitsubata",
+    "pampas grass",
+    "Nature.青葉",
+    "summer leaves",
+    "green leaves",
+    "green foliage",
+    "leafy branch",
+    "Nature.紅葉",
+    "autumn leaves",
+    "maple leaves",
+    "maple",
+    "momiji",
+    "Nature.落葉",
+    "fallen leaves",
+    "falling leaves",
+    "scattering leaves",
+    "Nature.枯草",
+    "withered grass",
+    "dry grass",
+    "dead grasses",
+    "withered pampas",
+    "Nature.枯葉",
+    "withered leaves",
+    "dry leaves",
+    "dead leaves"
+  ],
+  "variation_amplitudes": [
+    "small",
+    "medium",
+    "large"
+  ],
+  "focus_ids": [
+    "lower_left",
+    "lower_right",
+    "right_half",
+    "upper_edge",
+    "upper_left",
+    "upper_right"
+  ],
+  "cases": [
+    {
+      "case": "A-base-ja",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-base-en",
+      "input": {
+        "ddl": "Place one black square near the center. Draw three white horizontal lines.",
+        "lang": "en",
+        "context_text": "Place one black square near the center. Draw three white horizontal lines.",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "Place one black square near the lower-right focus. Draw three white horizontal lines.",
+      "bytes": 85,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-amplitude-only",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-seed-only",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": 12345
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-plugin-enabled",
+      "input": {
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "lang": "ja",
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "composition_seed": null,
+        "enable_plugins": true,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "黒い線を三本引く。全体の反復配置を波打つ軌跡に沿わせる。揺らぎは大きくゆっくり。",
+      "bytes": 120,
+      "variation_report": {
+        "resolved_focus": null,
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-plugin-disabled",
+      "input": {
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "lang": "ja",
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "黒い線を三本引く。Nature.うねり。",
+      "bytes": 46,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-small-1",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "small",
+        "variation_seed": 1
+      },
+      "output": "右下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "右下"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-small-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "small",
+        "variation_seed": 12345
+      },
+      "output": "左上の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "左上"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-medium-1",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 1
+      },
+      "output": "上端寄りの焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 78,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "上端"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-medium-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "右下"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-large-1",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 1
+      },
+      "output": "右半分の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 75,
+      "variation_report": {
+        "resolved_focus": "right_half",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "右半分"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "A-variation-large-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 12345
+      },
+      "output": "右上の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "upper_right",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "右上"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-variation-seed-9223372036854775809",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 9223372036854775809
+      },
+      "output": "上端寄りの焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 78,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "上端"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-variation-seed-18446744073709551615",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "medium",
+        "variation_seed": 18446744073709551615
+      },
+      "output": "左上の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "左上"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-variation-en",
+      "input": {
+        "ddl": "Place one black square near the center. Draw three white horizontal lines.",
+        "lang": "en",
+        "context_text": "Place one black square near the center. Draw three white horizontal lines.",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 12345
+      },
+      "output": "Place one black square near the upper-right focus. Draw three white horizontal lines.",
+      "bytes": 85,
+      "variation_report": {
+        "resolved_focus": "upper_right",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "lower right",
+            "to": "upper right"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-scatter-varied",
+      "input": {
+        "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "lang": "ja",
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": "large",
+        "variation_seed": 12345
+      },
+      "output": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+      "bytes": 69,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-focus-upper_left",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": "upper_left",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "左上の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-focus-lower_right",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": "lower_right",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-focus-right_half",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": "right_half",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右半分の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 75,
+      "variation_report": {
+        "resolved_focus": "right_half",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-focus-upper_edge",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": "upper_edge",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "上端寄りの焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 78,
+      "variation_report": {
+        "resolved_focus": "upper_edge",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-focus-not-a-focus",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": "not-a-focus",
+        "variation_amplitude": "medium",
+        "variation_seed": 12345
+      },
+      "output": "右下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_right",
+        "moved_axes": [
+          {
+            "axis": "focus",
+            "from": "左下",
+            "to": "右下"
+          }
+        ],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-sensory",
+      "input": {
+        "ddl": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "lang": "ja",
+        "context_text": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "湿った空気が漂い、匂いが残る。線を三本引く。円を二つ置く。",
+      "bytes": 87,
+      "variation_report": {
+        "resolved_focus": "upper_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-music",
+      "input": {
+        "ddl": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "lang": "ja",
+        "context_text": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "祭りの太鼓が鳴り響き、色とりどりの紙が舞う。線を五本引く。円を三つ置く。四角を二つ置く。",
+      "bytes": 132,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-sensory-en",
+      "input": {
+        "ddl": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "lang": "en",
+        "context_text": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "A damp air lingers and a scent remains. Draw three lines. Place two circles.",
+      "bytes": 76,
+      "variation_report": {
+        "resolved_focus": "right_half",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-vary-seed-0",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": 0,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-vary-seed-12345",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": 12345,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-vary-seed-9223372036854775809",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "中心に黒い四角を置く。白い横線を三本引く。",
+        "composition_seed": 9223372036854775809,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-plugin-instructions-present",
+      "input": {
+        "ddl": "黒い線を三本引く。Nature.うねり。",
+        "lang": "ja",
+        "context_text": "黒い線を三本引く。Nature.うねり。",
+        "composition_seed": null,
+        "enable_plugins": true,
+        "plugin_instructions_present": true,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "黒い線を三本引く。全体の反復配置を波打つ軌跡に沿わせる。揺らぎは大きくゆっくり。",
+      "bytes": 120,
+      "variation_report": {
+        "resolved_focus": null,
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-context-differs",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": "赤い円を三つ置く。小さな点を画面全体に散らす。",
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "case": "B-context-none",
+      "input": {
+        "ddl": "中心に黒い四角を置く。白い横線を三本引く。",
+        "lang": "ja",
+        "context_text": null,
+        "composition_seed": null,
+        "enable_plugins": false,
+        "plugin_instructions_present": false,
+        "focus": null,
+        "variation_amplitude": null,
+        "variation_seed": null
+      },
+      "output": "左下の焦点に黒い四角を置く。白い横線を三本引く。",
+      "bytes": 72,
+      "variation_report": {
+        "resolved_focus": "lower_left",
+        "moved_axes": [],
+        "category_counts": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}

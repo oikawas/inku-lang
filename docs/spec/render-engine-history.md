@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **33** | v2.13.19 | 906 | 2026-08-13 | 586 | **4** | **582** |
 | **32** | v2.13.13 | 898 | 2026-08-12 | 582 | **13** | **569** |
 | **31** | v2.13.8 | 893 | 2026-08-12 | 569 | **16** | **553** |
 | **30** | v2.13.6 | 891 | 2026-08-11 | 553 | **7** | **546** |
@@ -130,14 +131,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `32` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `16` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `render_engine_version` | the drawing engine | `33` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `17` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.18 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.19 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 905 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 906 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -212,8 +213,8 @@ There are two instances as of v2.4.7.
 
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
-| Drawing | `server/reference/render-engine-32/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 582 (13 SVG) |
-| Deterministic DDL layers | `server/reference/ddl-engine-16/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` / **C** = expanded DDL, unit counts and declines from `expand_plugin_ddl` | 49 (A 13 / B 30 / C 6) |
+| Drawing | `server/reference/render-engine-33/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 586 (4 SVG) |
+| Deterministic DDL layers | `server/reference/ddl-engine-17/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` / **C** = expanded DDL, unit counts, declines and the compact Score form (`score_instructions`) from `expand_plugin_ddl` | 49 (A 13 / B 30 / C 6) |
 
 **The DDL side splits into A, B and C because the deterministic layers are not
 adjacent** ("Deterministic and non-deterministic layers" in this document). Stage 2's LLM sits between Stage 1.5 (DDL→DDL) and coercion
@@ -413,6 +414,49 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 33 — a repeated unit can be more than one mark (v2.13.19)
+
+**Every arrangement this engine could perform repeated a single instruction.** A pair -- an arc, and the arc
+touching it at both ends -- therefore had to be handed over as **every resolved pair in full**, and each
+follower's `touching` was then resolved against **whichever instruction happened to precede it** rather than
+against its own head.
+
+### Copy the span first, resolve the relations inside it second (the order decides the result)
+
+**`Arrangement.group_size` says how many consecutive instructions one repeated unit spans.** The renderer
+**copies the whole span first and resolves each copy's relations within it second** -- that order is what makes
+the relation local. A member is carried by the transform its head received: **the rotation delta about the
+head's anchor, the scale its extent was given, and the cycled colour where the head has a cycle.**
+
+### When something has to go, the claim goes and the marks stay
+
+**The whole-work budget counts `count * group_size`.** **The instruction ceiling stops at a span boundary**
+rather than cutting a unit in half, which would leave half a pair standing. **Where no span fits at all the
+span is dissolved and the work is drawn up to the ceiling** -- emptying the instruction list was a possible
+reading, but a work with nothing in it is not a smaller work. **The limits are settings**, so what the ceiling
+drops where the plugin's instructions join the Score is written into the notes the response already carries.
+
+### Nothing written before this moves by a byte
+
+**`group_size` is excluded from serialization when it is 1.** Every stored Score reads and draws exactly as it
+did, and **all 582 existing cases are byte-identical.**
+
+### The corpus grew by four to 586 (**group H is new**)
+
+**Before they were added the corpus could not see this change at all**: every case above H holds a score of
+**exactly one instruction**. Four are new -- **three state a span and one is the control**
+(`H-pair-scatter-plain`, the same two instructions with no span, which is the picture engine 32 drew).
+**⚠ Every new ID counts as `changed_from_previous`**, so the discriminating power can only be shown by
+perturbation.
+
+### The DDL layer moved in the same cycle (`ddl_engine_version` 16 to 17)
+
+**The document plugin now hands the API one prototype pair plus `count=N / group_size=2`.** **The public
+expansion did not move by a byte** -- `instructions` still holds every resolved pair and the DDL text is the
+same. **Only the form the API reads changed**, which is why **`score_instructions` joins the frozen part C**: a
+record holding the public expansion alone would freeze a version whose change the corpus never reaches. **All
+six C cases moved; the 13 A cases and the 30 B cases are byte-identical.**
 
 ## engine 32 — a cluster and a path keep their shape on any canvas (v2.13.13)
 

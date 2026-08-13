@@ -6484,3 +6484,49 @@ ruling**, and one is **the repair of a gate its own perturbation found vacuous**
 - **⚠ The acceptance numbering collided with ledger I-235**: both started from `T-29` and took `T-30`,
   so the web tree now holds two sets of `T-30`-`T-33`. Nothing asserts uniqueness, so **nothing goes
   red**, but it reads badly.
+
+### v2.13.19 — A repeated unit can be more than one mark (Build 906, 2026-08-13, ledger I-143, render engine 33 / ddl engine 17)
+
+**Every arrangement this engine could repeat was a single instruction.** A pair placed by a saijiki plugin --
+an arc, and the arc touching it at both ends -- therefore had to be handed over as **every resolved pair in
+full**, and **the second mark of each pair touched whichever mark happened to precede it** rather than its own
+partner.
+
+- **`Arrangement.group_size` says how many consecutive instructions one repeated unit spans** (default 1).
+  **The renderer copies the whole span first and resolves each copy's relations within it second** -- that
+  order is what makes the relation local. A member is carried by the transform its head received: the rotation
+  delta about the head's anchor, the scale its extent was given, and the cycled colour where the head has one.
+- **The document plugin hands the API one prototype pair plus `count=N / group_size=2`.** **The public
+  expansion did not move by a byte**: `instructions` still holds every resolved pair, and the DDL text is the
+  same.
+- **The whole-work budget counts `count * group_size`, and the instruction ceiling does not cut a unit in
+  half.**
+- **⚠ `group_size` is excluded from serialization when it is 1**, so **every stored Score reads and draws
+  exactly as it did.**
+- **The same decision was ported to Android** (`android/VERSION` is `2.1.4-android.28`).
+
+**Two findings from acceptance, both repaired** (author's ruling, 2026-08-13):
+
+- **⚠ Nothing observed the feature at all.** Reverting the one line where the plugin's compact form enters the
+  Score (`render.py`) left **the whole server suite green at 3,170 passed** while production would carry no
+  composite whatsoever. **A test that walks the API merge point was added.**
+- **⚠ A span that did not fit under the ceiling emptied the instruction list** (measured: ceiling 2, span 3,
+  zero instructions left, where the old `group_size=1` shape kept two). **The span is now dissolved and the
+  work is drawn up to the ceiling** -- a work with nothing in it is not a smaller work. **The limits are
+  settings**, so what the ceiling drops at that merge point is now recorded in the response's
+  `render_limit_notes` (**⚠ no screen reads that key yet, in web or in cli, so the drop still does not reach
+  the reader**).
+
+**Corpus:** **the drawing corpus opened group H and grew by four to 586** (4 moved, 582 unchanged). **The DDL
+corpus stays at 49 and all six part C cases moved**, because `score_instructions` joined what is frozen (A's 13
+and B's 30 are byte-identical). **⚠ Every case above H holds a score of exactly one instruction, so before
+these were added the corpus could not see this change at all.**
+
+**Checks:** **server 3,172 passed / 31 skipped**, **cli 225 passed**, **ruff clean**, **frozen corpora
+byte-identical**, **Android JVM 289 tests / 0 failures**, **`check_docs.py` passes**. **The implementation was
+Codex (GPT-5), a different model, so not one check or perturbation was skipped** -- **six perturbations** (the
+contract's two plus four added in acceptance) matched prediction **by name in all six**. **T-7, the real
+product path, was reproduced with a local server against the NIM key through `inku-cli`** (no fallbacks).
+
+- **⚠ The manual's 13 version markers still read v2.13.17 / Build 904** although the previous cycle's revision
+  history (v2.13.18 / Build 905) states that it updated them. They are aligned here.

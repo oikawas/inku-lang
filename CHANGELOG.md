@@ -6361,3 +6361,63 @@ browser's default white showed through).
   `--bg` reddens both `T-31` and `T-33`** (what the literal used to let through).
 - **Three frames of the screen were captured in the previous cycle** (`cli/out2/902-v2.13.15-ssr-ab/`):
   the curtain, the app, and the white. **The deployed screen has not been looked at yet.**
+
+### v2.13.17 — A mark the description called small is small whoever wrote it (Build 904, 2026-08-13, ledger I-234, ddl engine 16)
+
+**The same description produced marks four times apart depending on which layer wrote them.** When
+Stage 2 writes a circle and leaves the radius empty, `_coerce_instruction` fills it from
+`PRIMITIVE_SPECS` with **0.15** — a number that reads not one character of the description. Yet
+**when coerce writes the mark itself it does read the clause and answers 0.038.** So "place three
+small circles" drew large circles exactly on the runs where Stage 2 omitted the size.
+
+- **The fact that a size was omitted now travels as far as the place that fills it in.**
+  `_with_stated_size` runs on the instruction the model handed over, **before the defaults erase the
+  difference between a size omitted and a size stated**, and fills an empty radius or ellipse size
+  from the one clause that names that primitive.
+- **Both the values and the two readers are borrowed from `_fallback_instruction_from_clause`** (no
+  second table, no new constant). **That is the whole claim**: the two answers cannot drift apart
+  again without drifting together.
+- **The rule decides per clause.** For "place three small circles. Put one square." only the circle
+  becomes 0.038; the square keeps its default. **Where two clauses fit, it fills nothing** — the
+  description does not say which mark it is talking about.
+- **A size the model stated is never overwritten.** A circle with radius 0.3 stays at 0.3 even when
+  the description says "small circle", and **a clause that states the value ("a small circle of
+  radius 0.02") gives 0.02, not 0.038.**
+- **The `INKU_COERCE_DISABLE` path repairs it too** — **being faithful to a size the description
+  stated is not a matter of style**, for the same reason the two grid branches already run there.
+- **The 0.15 default in `normalize.py` did not move.** It remains the answer for a description that
+  states nothing (moving it would move all **235 works** on that side).
+- **Measured against production (2,974 works): 82 works / 108 marks** (41 circles / 67 ellipses).
+  **⚠ The 55 works / 78 marks estimated when the contract went out counted the author's `ddl`** —
+  what production hands coerce is the **`expanded_ddl` from Stage 1.5**, and counting that gives
+  82 / 108 (see ledger I-237).
+- **`ddl_engine_version` 15 → 16.** Four cases added to the reference corpus, **45 → 49**
+  (`b_coerce` 26 → 30). **`changed_from_previous` holds the four new names and nothing else, so the
+  45 carried-over cases are byte-identical** — no branch name was added to `branch_report`, unlike
+  engines 11 and 15, where adding one moved every case.
+- **The Android `ddl-engine-16/` fixture was baked as well. ⚠ No Kotlin test reads it yet**
+  (`ReferenceCorpus.kt` pins `ddlEngineVersion = "7"`; the lag is ledger I-217).
+
+**Checks:** **server 3,161 passed / 31 skipped** (merged tree, 8m13s; **the +11 is one new file**),
+**cli 224 passed**, **ruff clean** (server / cli), **`lint:models` 68 checks**, **frozen corpora
+byte-identical** (`check_frozen_corpora.py`), **Android JVM 288 tests / 0 failures**,
+**`check_docs.py` passed**.
+
+- **The implementer was the same model (Opus 5), so the nine perturbations and the full mark it
+  measured on the branch were not measured again.** What the accepting side ran is the tree nobody
+  had run: the seven surfaces of the merge.
+- **All nine perturbations were applied on the branch and all 11 acceptances went red under at least
+  one of them** (none is vacuous). **The implementation strengthened the contract in two places**:
+  a second limb for ellipses in T-5 (the contract's wording alone lets P-3 through), and T-10 as a
+  re-run of `coerce_score` compared against the digest rather than a read of the frozen bytes (which
+  would not redden when the production code is broken).
+- **⚠ One error was found in the table the contract called "measured and frozen on the issuing
+  day"** — it listed the cloudform values as square / triangle (no effect on the implementation; see
+  ledger I-238).
+- **⚠ The size predicate still has a blind spot** — it does not read "極細" (extra-fine) or "細い縦線"
+  (thin vertical line). The word table is shared with the default-size side, so it cannot be widened
+  alone (see ledger I-236).
+- **⚠ Two tables beyond the version markers had gone stale** (both fixed this cycle) — the corpus
+  table in `render-engine-history` still said **drawing `render-engine-30/` 553 (7 SVG)** and
+  **DDL `ddl-engine-13/` 40**, where the measured values are **`render-engine-32/` 582 (13 SVG)**
+  and **`ddl-engine-16/` 49**.

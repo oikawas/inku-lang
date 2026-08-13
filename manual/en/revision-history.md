@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-13 — Unreleased v2.13.17 Baseline (Web Build 904)
+
+The 13 places that name a version were updated to v2.13.17 / Build 904. **One thing changed in what a drawing looks like, so a paragraph was added to "Writing a Description".**
+
+- **A description that states a size, such as "a small circle", is now drawn at that size.** Until now the default size was used on the runs where the machine handed the mark over without a size, so the same description produced marks four times apart.
+- **It takes effect when the clause stating the size settles on one group.** Where several clauses share the same shape and it is not settled, the size is left alone — the same reasoning as for counts.
+- **Where the clause states the value itself, such as `radius 0.02`, that value is used.** A description that states no size keeps the default size.
+- No operation, label, default setting, environment variable or CLI flag changed.
+
 ## 2026-08-13 — Unreleased v2.13.16 Baseline (Web Build 903)
 
 Updated the 13 places that name a version to v2.13.16 / Build 903. **One thing about opening the application changed, and only that is recorded here.**

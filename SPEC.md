@@ -2912,6 +2912,14 @@ agreement. **A number the description states is drawn as stated up to the
 threshold of its configuration: at the defaults, two hundred thirty-three strokes
 are two hundred thirty-three. The threshold is recorded on the work** (v2.10.0).
 
+A size the description states outranks the default. A mark handed over with an empty radius
+or size is filled from the dimension that word answers -- 0.038 for a circle,
+`[0.06, 0.032]` for an ellipse, or the value itself where the clause states one -- but only
+where the clause naming that primitive carries a size word. **Where two clauses name it,
+nothing is filled**: the description does not say which mark it is talking about. **A size the
+model stated is never overwritten**, and a description that states no size keeps the default
+answer (v2.13.17, ddl engine 16).
+
 The quiet-density governor, which thins repetition for still, membranous, or
 remembered scenes, does not apply to a group whose count was stated: quiet is a
 reading of the scene, and a stated number is not a reading. When the literal

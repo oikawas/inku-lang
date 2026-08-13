@@ -185,8 +185,8 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         # an interior is, not what to place, so the plugin closure never quotes it.
         marker_class=None,
         words=(
-            _w("空", "empty", default=True),
-            _w("塗り", "flat"),
+            _w("空", "empty", default=True, score_value="none"),
+            _w("塗り", "flat", score_value="solid"),
             _w("薄墨", "pale ink wash", score_value="wash"),
             _w("粒", "grain", score_value="grain"),
             _w("点", "stipple", score_value="stipple"),
@@ -430,11 +430,19 @@ def reference_categories(lang: str) -> list[tuple[str, tuple[str, ...]]]:
     return result
 
 
-# てざわり語・いろ語 → Score enum 値。値は各二言語語エントリに付属する。
-def _surface_value_map(category_key: str) -> dict[str, str]:
+# おもての「質」9 語だけが SurfaceTexture へ写る。濃い / 薄い は濃さの語であって質では
+# なく、Score では surface.density / opacity を動かす。名指しで除くのは、値の無い語を
+# 「無いから除く」で拾うと、値を付け忘れた質の語まで静かに通ってしまうため。
+_OMOTE_NON_QUALITY_WORDS: tuple[str, ...] = ("濃い", "薄い")
+
+
+# てざわり語・いろ語・おもての質語 → Score enum 値。値は各二言語語エントリに付属する。
+def _surface_value_map(category_key: str, skip: tuple[str, ...] = ()) -> dict[str, str]:
     category = next(c for c in SAIJIKI if c.key == category_key)
     mapping: dict[str, str] = {}
     for word in category.words:
+        if word.surface_ja in skip:
+            continue
         if word.score_value is None:
             raise ValueError(f"saijiki {category_key} に Score 値のない語がある: {word.surface_ja}")
         for lang in _LANGS:
@@ -452,6 +460,15 @@ def weight_for_surface() -> dict[str, str]:
 def color_for_surface() -> dict[str, str]:
     """いろ表層語（日英）→ Color 値の対応表。"""
     return _surface_value_map("iro")
+
+
+def texture_for_surface() -> dict[str, str]:
+    """おもての質 9 語（日英）→ SurfaceTexture 値の対応表。
+
+    てざわり・いろ には同じ形の表が前からあり、おもてだけがそこへ繋がっていなかった。
+    塗り が別の真偽値へ行っていたのがその現れで、2026-08-13 の裁定で 1 つの語彙へ戻した。
+    """
+    return _surface_value_map("omote", skip=_OMOTE_NON_QUALITY_WORDS)
 
 
 def display_categories(lang: str) -> list[dict[str, object]]:

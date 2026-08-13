@@ -1,5 +1,30 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 18 (2026-08-14): a fill is a surface word like the other eight. SPEC §3.1 calls
+# the interior of a closed shape by nine quality words, and eight of them landed
+# in `surface.texture` while 塗り alone landed in the boolean `filled`. Measured
+# 2026-08-13 against a live model, that one road did not carry: `Surface: flat.`
+# reached `filled` 0 times out of 14 in English and 2 out of 4 in Japanese --
+# both of those riding a duplicated second clause -- while `Surface: hatch.`
+# reached `texture` 4 out of 4 and the three texture words together 12 out of 14.
+# It was not the language, the word count, or sentence-versus-field: `Fill it
+# solid.` shortened to `Fill it.` still reached 0 of 3, and the field form
+# `Surface: fill.` 0 of 4. The destination field was the only thing that moved.
+# So `SurfaceTexture` gains `solid`, 塗り and 空 gain the `score_value` every
+# other quality word already had, and Stage 2's four mapping lines send a fill to
+# `texture` instead of to the boolean. `filled` stays: its declaration position
+# is frozen (removing it moves twelve fields up and the tool schema's order
+# decides what optional fields the model carries, I-038), 2,972 saved works hold
+# it, and coerce writes it itself in four places for reasons that are not a
+# sentence about a surface. A branch on both exits derives each from the other,
+# so one interior state is said one way whichever way it arrived. The drawing
+# does not move: `solid` is folded out of the performance seed, so an instruction
+# that gains a `surface` here keeps the exact key it had with `filled` alone --
+# without that, adding the surface would have re-rolled the stroke seed of every
+# filled closed shape in production. Three of the thirty coerce cases move their
+# Score (five instructions, all `filled=true` with no surface of their own); the
+# other twenty-seven are listed only because the branch report gained a key, the
+# same way engine 11's twenty-one were.
 # 17 (2026-08-13): a pair leaves the expansion layer as one unit, not as six
 # marks. `Arrangement.group_size` says how many consecutive instructions one
 # repeated unit spans, and the document plugin now hands the API one prototype
@@ -186,7 +211,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "17"
+DDL_ENGINE_VERSION = "18"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from ..limits import DEFAULT_LIMITS, Limits
-from ..schema import CLOSED_SHAPES, Instruction, Score
+from ..schema import CLOSED_SHAPES, Instruction, Score, SurfaceSpec, fill_is_asked_for
 
 
 def _coerce_marker_values(name: str) -> tuple[Any, ...]:
@@ -161,7 +161,7 @@ def _shape_extent(ins: Instruction) -> float:
 def _is_tiny_unfilled_particle(ins: Instruction) -> bool:
     if ins.primitive not in ("circle", "ellipse", "square", "triangle"):
         return False
-    if ins.filled:
+    if fill_is_asked_for(ins):
         return False
     if not ins.arrangement or ins.arrangement.count < 40:
         return False
@@ -214,6 +214,13 @@ def _with_visible_particle(ins: Instruction) -> Instruction:
         data["radius"] = max(float(ins.radius or 0.0), 0.006)
     elif ins.size:
         data["size"] = [max(float(ins.size[0]), 0.008), max(float(ins.size[1]), 0.008)]
+    # The neighbouring repair has left its note since it was written, and this
+    # one filled a shape the description never said to fill without saying so.
+    # A repair whose only evidence is the drawing cannot be told from a Stage 2
+    # that asked for it.
+    note = "tiny particle made visible"
+    machine_note = data.get("note")
+    data["note"] = f"{machine_note}; {note}" if machine_note else note
     return Instruction.model_validate(data)
 
 
@@ -306,6 +313,48 @@ def _with_surface_on_a_closed_shape(instructions: list[Instruction]) -> list[Ins
         if holder.surface is not None and holder.surface.texture != "none":
             continue
         repaired[target] = holder.model_copy(update={"surface": surface})
+    return repaired
+
+
+def _with_fill_as_a_surface_word(instructions: list[Instruction]) -> list[Instruction]:
+    """Say one interior state one way, whichever way it arrived.
+
+    A fill used to be the one surface word with a road of its own: eight of the
+    nine おもて quality words landed in `surface.texture` and 塗り landed in the
+    boolean `filled`. Measured 2026-08-13, that road did not carry -- `Surface:
+    flat.` reached `filled` 0 times out of 14 in English and 2 out of 4 in
+    Japanese, while `Surface: hatch.` reached `texture` 4 out of 4. The word now
+    goes where the others go, and this branch makes the two statements one:
+
+    - `texture="solid"` derives `filled=true`, so a Score written the new way
+      still draws on every reader that only knows the boolean -- the renderer's
+      own fill, a saved work replayed, and the Android port, whose coercer drops
+      a texture it has not heard of;
+    - `filled=true` with no surface of its own derives `texture="solid"`, so the
+      2,972 works already saved say their interior in the same vocabulary the
+      new ones do.
+
+    Closed shapes only, the same rule `_with_surface_on_a_closed_shape` follows:
+    a line has no interior, so neither statement means anything on one, and
+    inventing a surface there would put back exactly the invisible surfaces that
+    branch exists to take away.
+    """
+    repaired = list(instructions)
+    for index, ins in enumerate(repaired):
+        if ins.primitive not in CLOSED_SHAPES:
+            continue
+        surface = ins.surface
+        if surface is not None and surface.texture == "solid":
+            if not ins.filled:
+                repaired[index] = ins.model_copy(update={"filled": True})
+            continue
+        if ins.filled and (surface is None or surface.texture == "none"):
+            solid = (
+                SurfaceSpec(texture="solid")
+                if surface is None
+                else surface.model_copy(update={"texture": "solid"})
+            )
+            repaired[index] = ins.model_copy(update={"surface": solid})
     return repaired
 
 

@@ -20,7 +20,7 @@ from ..counts import (
 )
 from ..language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
 from ..limits import DEFAULT_LIMITS, Limits
-from ..schema import Instruction
+from ..schema import Instruction, fill_is_asked_for
 from .normalize import (
     VISIBLE_ON_BACKGROUND,
     _budgeted_count,
@@ -427,7 +427,7 @@ def _with_unintentional_filled_shape_tempering(ins: Instruction, *, ddl: str | N
         return ins
     if _context_has_density_governor(ddl):
         return ins
-    if not ins.filled or ins.arrangement is not None:
+    if not fill_is_asked_for(ins) or ins.arrangement is not None:
         return ins
     if ins.primitive not in ("circle", "ellipse", "square", "triangle", "polygon"):
         return ins

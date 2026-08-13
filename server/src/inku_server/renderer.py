@@ -32,6 +32,7 @@ from .schema import (
     Score,
     SurfaceSpec,
     Variation,
+    fill_is_asked_for,
 )
 from .arc_geometry import (
     arc_from_endpoints_and_sagitta,
@@ -648,6 +649,15 @@ def _seed_for_instruction(ins: Instruction, performance_seed: int | None = None)
                 if name in fields
             }
     surface = payload.get("surface")
+    if isinstance(surface, dict) and surface.get("texture") == "solid":
+        # 演奏されないフィールドを key から外す作法 (`_variation_seed_fields` と同じ)。
+        # `solid` は素材の既定の埋め方で、面の質感の層はそれを 1 本も引かないから、
+        # 残りの surface フィールドは何も消費されない。`filled=true` と書いた
+        # Instruction と同じ key にする — 同じ要求の 2 通りの言い方が別の演奏に
+        # なってはいけない。これが無いと、coerce が保存済みの `filled` へ
+        # `surface` を足した瞬間に本番の全作品の筆致が振り直される。
+        payload["filled"] = True
+        payload["surface"] = surface = None
     if isinstance(surface, dict):
         if surface.get("spacing_gradient") == "none":
             surface.pop("spacing_gradient", None)
@@ -3435,7 +3445,9 @@ def _render_surface_texture(
     surface = ins.surface
     if (
         surface is None
-        or surface.texture == "none"
+        # `solid` alongside `none`: the material's default fill is drawn by the
+        # fill layer, not here, and a group left empty would still move bytes.
+        or surface.texture in ("none", "solid")
         or ins.primitive not in _CLOSED_SHAPES
     ):
         return None, None
@@ -4195,10 +4207,14 @@ def _resolve_color(
 
 
 def _has_surface_texture(ins: Instruction) -> bool:
-    """surface が内部を担うか (閉図形のみ。線・弧では surface は描かれない)。"""
+    """surface が内部を担うか (閉図形のみ。線・弧では surface は描かれない)。
+
+    `solid` は数に入らない。それは版の表現ではなく素材の既定の埋め方で、
+    面の質感を描く層はそれを 1 本も引かない (→ `_fills_interior`)。
+    """
     return (
         ins.surface is not None
-        and ins.surface.texture != "none"
+        and ins.surface.texture not in ("none", "solid")
         and ins.primitive in _CLOSED_SHAPES
     )
 
@@ -4206,13 +4222,15 @@ def _has_surface_texture(ins: Instruction) -> bool:
 def _fills_interior(ins: Instruction) -> bool:
     """内部を埋めるか。
 
-    塗り = 素材の既定の埋め方、`surface` = 明示的な版表現。両方は出さない。
+    塗り = 素材の既定の埋め方、`surface` の質感 = 明示的な版表現。両方は出さない。
+    その「塗り」は `filled=true` とも `texture="solid"` とも書ける — おもての語彙
+    では 塗り はほかの 8 語と同じ 1 語で、Score でも同じ欄へ入る (ddl engine 18)。
     閉図形が `filled` に関わらず常に塗られていた挙動 (死にフィールド) は
-    engine 9 で解消し、`filled` の記述どおりに演奏する。
+    engine 9 で解消し、記述どおりに演奏する。
     """
     if _has_surface_texture(ins):
         return False
-    return bool(ins.filled)
+    return fill_is_asked_for(ins)
 
 
 def _stroke_attrs(

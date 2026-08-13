@@ -149,7 +149,7 @@
 				</div>
 				<div class="share-sub">{itemLabel}</div>
 			</div>
-			<button class="ghost-btn" type="button" onclick={onClose}>{t().closeLabel}</button>
+			<button class="action-btn" type="button" onclick={onClose}>{t().closeLabel}</button>
 		</div>
 
 		<div class="share-body">
@@ -178,7 +178,7 @@
 										: isJapanese ? '見られる' : 'Can view'}
 								</span>
 								<button
-									class="ghost-btn"
+									class="action-btn"
 									type="button"
 									disabled={saving}
 									onclick={() => remove(entry)}
@@ -294,7 +294,7 @@
 		color: var(--fg);
 		border: 1px solid var(--border);
 	}
-	.ghost-btn {
+	.action-btn {
 		padding: var(--btn-sm-padding);
 		border-radius: var(--btn-sm-radius);
 		font-size: var(--btn-sm-font-size);
@@ -303,7 +303,7 @@
 		border: 1px solid var(--border);
 		cursor: pointer;
 	}
-	.ghost-btn:hover:not(:disabled) { background: var(--action-hover); }
+	.action-btn:hover:not(:disabled) { background: var(--action-hover); }
 	.accent-btn {
 		padding: var(--btn-sm-padding);
 		border-radius: var(--btn-sm-radius);
@@ -313,5 +313,5 @@
 		border: 1px solid transparent;
 		cursor: pointer;
 	}
-	.ghost-btn:disabled, .accent-btn:disabled { opacity: 0.55; cursor: default; }
+	.action-btn:disabled, .accent-btn:disabled { opacity: 0.55; cursor: default; }
 </style>

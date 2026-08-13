@@ -51,17 +51,6 @@ type ConfirmAction = {
 	}
 	.confirm-box p { margin-bottom: 16px; font-size: 13px; color: var(--fg); }
 	.confirm-actions { display: flex; gap: 8px; justify-content: center; }
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
 	.danger-btn, .confirm-btn {
 		padding: var(--btn-sm-padding); border: none; border-radius: var(--btn-sm-radius);
 		font-size: var(--btn-sm-font-size); cursor: pointer; font-family: inherit;

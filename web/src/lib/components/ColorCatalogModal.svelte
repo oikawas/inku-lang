@@ -170,17 +170,6 @@
 		background: var(--panel2);
 		flex-shrink: 0;
 	}
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
 	@media (max-width: 980px) {
 		.catalog-palette { grid-template-columns: repeat(5, minmax(64px, 1fr)); row-gap: 8px; }
 	}

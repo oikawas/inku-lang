@@ -90,17 +90,6 @@
 	}
 	.replay-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 	.replay-header h2 { margin: 0; color: var(--fg); font-size: 16px; font-weight: 600; }
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font: inherit;
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
 	.version-message { margin-top: 14px; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--bg2); color: var(--fg); font-size: 12px; line-height: 1.5; text-align: center; }
 	.comparison-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
 	.artwork-card { min-width: 0; overflow: hidden; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel2); }

@@ -12,6 +12,7 @@ from ..models import UserAccountItem
 
 
 router = APIRouter()
+manager_router = APIRouter(dependencies=[Depends(_user_manager)])
 
 
 _SESSION_COOKIE_MAX_AGE = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
@@ -67,8 +68,8 @@ class AuthSettingsBody(BaseModel):
     local_enabled: bool
 
 
-@router.put("/api/auth/config")
-def api_auth_config_update(body: AuthSettingsBody, actor: dict = Depends(_user_manager)) -> dict:
+@manager_router.put("/api/auth/config")
+def api_auth_config_update(body: AuthSettingsBody) -> dict:
     return _db.update_auth_settings(body.google_enabled, body.local_enabled)
 
 

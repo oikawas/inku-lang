@@ -3105,18 +3105,6 @@
 		background: var(--panel2);
 		flex-shrink: 0;
 	}
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
-	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.model-picker-entry { min-width: 0; }
 	.model-metadata-editor { margin-top: 3px; padding: 0 7px 6px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 	.model-metadata-editor summary { padding: 6px 0; color: var(--fg3); font-size: 10px; cursor: pointer; }

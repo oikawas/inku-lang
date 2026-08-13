@@ -27,6 +27,16 @@
 # ddl-engine 14 carried a 「面:」 clause -- the two files that hold one are plugin
 # output -- so refreezing without them would have recorded a version whose change
 # the corpus never traversed, and left T-11 green for having looked at nothing.
+# 14 (2026-08-12): every count reader follows the same rules. The language of the
+# description decides whether CJK beside an Arabic numeral excludes that numeral;
+# a reference phrase that states no count may widen the search to its sentence,
+# while a count already stated in the phrase wins; and a bare Arabic numeral in a
+# Japanese reference phrase is now a count. The separate English scan and noun
+# table were removed, and axis words and member indices are excluded because they
+# say which one, not how many. Android adopted the same server semantics. The DDL
+# reference corpus grew to 42 cases: two new cases cover widening beyond the phrase
+# and a bare numeral inside it, while the English numeral beside CJK case changed
+# from one unit to twelve.
 # 13 (2026-08-11): a plugin hands over one whole unit, and the count stated in
 # the phrase that names it says how many of those units to place. The document
 # plugin layer placed the unit once and read nothing, so `Nature.青葉を三つ置く。`

@@ -46,19 +46,6 @@
 	/* Svelte scopes styles per component, so `ghost-btn` alone would style nothing
 	   here and the button would fall back to the browser's own. The definition is
 	   the same one InputPanel and the other panels carry. */
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-		white-space: nowrap;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
-	.ghost-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 	.wild-btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 	.wild-btn.active:hover { background: var(--accent); }
 </style>

@@ -198,7 +198,9 @@ app.add_middleware(ConcurrencyLimitMiddleware, max_requests=_MAX_CONCURRENT_REQU
 
 
 app.include_router(public.router)
+app.include_router(public.authenticated_router)
 app.include_router(auth.router)
+app.include_router(auth.manager_router)
 app.include_router(me.router)
 app.include_router(plugins.router)
 app.include_router(settings.router)

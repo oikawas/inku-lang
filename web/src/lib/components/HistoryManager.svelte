@@ -932,7 +932,7 @@
 	.lineage-member-main :global(svg) { width: 100%; max-height: 110px; }
 	.lineage-member-main span { display: block; overflow: hidden; margin-top: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 	.lineage-member-actions { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
-	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; padding: var(--btn-sm-padding); font-size: var(--btn-sm-font-size); }
+	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; }
 	.lineage-history-list.list-mode .lineage-member-grid { display: flex; flex-direction: column; }
 	.lineage-history-list.list-mode .lineage-member { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 	.lineage-history-list.list-mode .lineage-member > .selection-checkbox { position: static; }
@@ -1354,21 +1354,8 @@
 		vertical-align: middle;
 	}
 	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
-	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded
 	   white label collapses to white-on-white in the dark theme. */
-	.ghost-btn.ghost-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); }
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }

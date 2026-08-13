@@ -2408,18 +2408,6 @@
 		white-space: nowrap;
 		font-weight: 600;
 	}
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		font-family: inherit;
-		cursor: pointer;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
-	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.presentation-overlay {
 		position: fixed;
 		inset: 0;

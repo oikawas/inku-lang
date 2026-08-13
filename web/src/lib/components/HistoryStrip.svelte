@@ -306,7 +306,6 @@
 	   --action-fg. The strip used --fg over --panel, which is the paper inverted
 	   rather than an action colour, so a pressed filter here did not read as the
 	   same thing as a pressed filter in the manager. */
-	.ghost-btn.ghost-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); }
 	.history-collapse-btn {
 		width: 28px;
 		min-width: 28px;
@@ -428,16 +427,4 @@
 		padding: 1px 4px;
 		border-radius: 2px;
 	}
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		font-family: inherit;
-		cursor: pointer;
-	}
-	.ghost-btn:hover { background: var(--bg2); }
-	.ghost-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

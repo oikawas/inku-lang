@@ -86,3 +86,52 @@ def test_public_list_names_only_real_routes():
     # otherwise sit in PUBLIC forever and silently widen it.
     paths = {r.path for r in _api_routes()}
     assert PUBLIC <= paths
+
+
+def test_only_stronger_admin_guards_remain_as_unused_route_arguments():
+    """A route argument exists only when its value or stronger guard is needed."""
+    import ast
+    from pathlib import Path
+
+    routers = Path(__file__).parents[1] / "src" / "inku_server" / "api_core" / "routers"
+    unused: set[tuple[str, str, str]] = set()
+    for path in routers.glob("*.py"):
+        tree = ast.parse(path.read_text())
+        for function in tree.body:
+            if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            is_route = any(
+                isinstance(decorator, ast.Call)
+                and isinstance(decorator.func, ast.Attribute)
+                and isinstance(decorator.func.value, ast.Name)
+                and decorator.func.value.id.endswith("router")
+                for decorator in function.decorator_list
+            )
+            if not is_route:
+                continue
+            defaults = zip(function.args.args[-len(function.args.defaults):], function.args.defaults)
+            for argument, default in defaults:
+                if not (
+                    isinstance(default, ast.Call)
+                    and isinstance(default.func, ast.Name)
+                    and default.func.id == "Depends"
+                    and default.args
+                ):
+                    continue
+                used = any(
+                    isinstance(node, ast.Name) and node.id == argument.arg
+                    for statement in function.body
+                    for node in ast.walk(statement)
+                )
+                if not used:
+                    unused.add((path.name, function.name, ast.unparse(default.args[0])))
+
+    assert unused == {
+        ("plugins.py", "api_plugin_content", "_admin_user"),
+        ("plugins.py", "api_plugin_create", "_admin_user"),
+        ("plugins.py", "api_plugin_delete", "_admin_user"),
+        ("plugins.py", "api_plugin_set_enabled", "_admin_user"),
+        ("plugins.py", "api_plugin_update", "_admin_user"),
+        ("plugins.py", "api_plugins_reload", "_admin_user"),
+        ("plugins.py", "api_plugins_validate", "_admin_user"),
+    }

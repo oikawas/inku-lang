@@ -94,20 +94,6 @@
 	/* dropdown variant (describe tab) */
 	.sketch-plugin { position: relative; display: inline-flex; }
 	.sketch-trigger { display: inline-flex; align-items: center; }
-	/* `ghost-btn` is defined per component, not shared: naming it is not enough. */
-	.ghost-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--border2);
-		border-radius: var(--btn-sm-radius);
-		background: var(--panel);
-		color: var(--fg2);
-		font-size: var(--btn-sm-font-size);
-		cursor: pointer;
-		font-family: inherit;
-		white-space: nowrap;
-	}
-	.ghost-btn:hover:not(:disabled) { background: var(--bg2); }
-	.ghost-btn:disabled { opacity: .5; cursor: not-allowed; }
 	.sketch-menu {
 		position: absolute;
 		top: calc(100% + 6px);

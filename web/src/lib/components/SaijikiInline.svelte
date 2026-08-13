@@ -267,7 +267,6 @@
 	   accent differs from a built-in chip -- size, padding and packing are the
 	   ones above. */
 	.saijiki-cat.plugin-cat { border-left: 2px solid var(--accent); }
-	.saijiki-chip.plugin-chip { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
 	.saijiki-chip:hover,
 	.saijiki-chip:focus-visible {
 		background: var(--bg2);

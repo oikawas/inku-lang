@@ -6235,4 +6235,35 @@ byte-identical, `check_docs.py` consistent, Android JVM **278 cases / 0 failures
   paper moves nothing but the block. **A tenth perturbation was added and reddened six cases.**
 - **Android**: the two duplicated prompt constants were synced and `2.1.4-android.26` was stamped
   (`sync_android_prompts.py --write`). **No Kotlin source was written by hand** — the tool copies the
-  constants wholesale.
+  constants wholesale. **⚠ That `.26` was taken by another branch the same day and shipped nowhere;
+  both changes ride on `.27`** (the Android entry below).
+
+### Android — A work keeps the name it was drawn with (android `2.1.4-android.27`, 2026-08-13, ledger I-232, I-231)
+
+**The "draw from the record" mechanism added by I-170 carried one regression.** The gate that hands
+the parent's colour record to a refinement candidate keyed on **the route alone**, so **a refinement
+asking for a different colour catalog** — which travels the same route — also received the parent's
+record. **The result did not match the catalog that was asked for; it matched the parent** (measured).
+**The gate now also asks whether the requested catalog is the parent's.**
+
+- **The name and subtitle of a work drawn from its record resolve in the server's three steps** — **a
+  non-empty recorded value, then today's catalog under the same id, then the id itself** (an empty
+  subtitle). **An empty recorded value counts as absent and falls through**, the same judgement
+  Python's `or` makes on the server.
+- **A reader was added that asks whether an unknown catalog id exists without falling back to the
+  default** (`ColorCatalogs.find`). **Not one of the fourteen catalog definitions moved.**
+- **The name and subtitle stay out of the seed** — `computeColorAssignment` still takes
+  `catalogMap`, `renderSeed`, and `catalogId`, and the two new values appear **only in the metadata**
+  (not one pixel of the drawing changes).
+- **288 tests, 0 failures** (10 new). **The accepting side measured the same number, matching the
+  frozen prediction of 278 + 10.**
+- **All nine perturbations were re-applied at acceptance** (the implementer was a different model, so
+  nothing was skipped) **and all nine reddened the acceptance the contract named.**
+  **⚠ P-8 reddened a different number here than in the report** (2 reported, 6 measured) — **the two
+  perturbations differ in reach.** Mixing the name into the seed unconditionally also moves drawings
+  that hold no record, which took four existing colour tests with it. **The named T-9 reddens either way.**
+- **⚠ Two branches stamped the same `2.1.4-android.26`** — **git reports no conflict when both sides
+  write the same bytes.** Two changes from one day were about to share one version number. The
+  answer is N+2, so this one is `.27`.
+- **`APP_VERSION` and `web/BUILD_NUMBER` did not move, and nothing was sent to pentala**
+  (`android/` is permanently excluded from every sync path).

@@ -63,34 +63,6 @@ export function catalogById(catalogs: ColorCatalog[], id: string): ColorCatalog 
 	return catalogs.find((catalog) => catalog.id === id);
 }
 
-/**
- * The line under the catalog's name in the generation info: what that catalog
- * holds, in the language being read.
- *
- * The work carries the tagline in the words it had when it was drawn, and that
- * copy is English -- the server stores `catalog["sub"]` whatever the UI is
- * speaking. The Japanese copy exists (`sub_ja`, and the catalog API sends it),
- * so the two can be paired up: when the catalog still answers to its id and its
- * English tagline is still the one on the work, the Japanese line is the same
- * statement and can be read instead.
- *
- * When they differ, the definition moved after the work was drawn, and the
- * stored line is the historical one. That is provenance, so it is shown as it
- * stands rather than quietly replaced with today's wording.
- */
-export function catalogSubLine(
-	catalogs: ColorCatalog[],
-	renamed: Record<string, string>,
-	id: string | null | undefined,
-	storedSub: string,
-	isJapanese: boolean
-): string {
-	if (!storedSub || !isJapanese || !id) return storedSub;
-	const current = catalogById(catalogs, renamed[id] ?? id);
-	if (!current || current.sub !== storedSub) return storedSub;
-	return current.sub_ja || storedSub;
-}
-
 /** The colour words in the order the saijiki lists them, so a work's map is
  *  read in the same order wherever it is shown. */
 export const COLOR_KEY_ORDER: ColorKey[] = [

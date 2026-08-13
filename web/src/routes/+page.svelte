@@ -6637,8 +6637,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 			<CanvasPanel
 				{catalogName}
-				{colorCatalogs}
-				{renamedCatalogIds}
 				{formatHistoryDate}
 				{historyPreviewText}
 				bind:outputTab

@@ -2,85 +2,51 @@
 //
 // Acceptance for the two colour rows in the generation info drawer.
 //
-// The drawer had a "what the catalog holds" row that printed the tagline stored
-// on the work -- and the server stores catalog["sub"], which is English whatever
-// the UI is speaking, so the Japanese drawer read "night air, lantern, dew".
-// The Japanese copy exists on the catalog (sub_ja) and the catalog API sends it,
-// so the line can be read in the language being read without touching the
-// server. Where the definition has moved since the work was drawn, the stored
-// line is the historical one and stands as it is.
+// The drawer had a "what the catalog holds" row that printed a tagline fixed on
+// the catalog, so it said nothing about the work: "Lantern & Dew" already tells
+// the reader what "night air, lantern, dew" tells them. It is gone (author
+// decision, 2026-08-13), and so is the reader that had localised it.
 //
-// The drawer also never showed the one colour fact that belongs to the work
+// What the drawer never showed is the one colour fact that belongs to the work
 // rather than to the catalog: which colour each colour word was actually drawn
 // in. `statusCatalogName` already read that map to decide whether to say "no
 // record", and then threw it away.
 //
-// T-41 (the sub line is read in the language being read, and only when it is
-// still the same statement), T-42 (the map is the nine colour words and not the
-// catalog's palette), T-43 (the drawer shows both, and an absent map is not an
-// empty one).
+// T-41 (the tagline is gone, the catalog name is not), T-42 (the map is the nine
+// colour words and not the catalog's palette), T-43 (the drawer shows it, and an
+// absent map is not an empty one).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import {
-	COLOR_KEY_ORDER,
-	catalogSubLine,
-	colorMapEntries,
-	colorWordLabel,
-	type ColorCatalog
-} from './colors.ts';
+import { COLOR_KEY_ORDER, colorMapEntries, colorWordLabel } from './colors.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const PANEL = read('./components/CanvasPanel.svelte');
 
-const CATALOG: ColorCatalog = {
-	id: 'lantern_dew',
-	name: 'Lantern & Dew',
-	sub: 'night air, lantern, dew',
-	sub_ja: '夜気、灯火、露',
-	map: { white: '#fff', black: '#111' },
-	swatches: [],
-	palette: []
-};
-
 // ------------------------------------------------------------------- T-41
 
-test('T-41  the Japanese drawer reads the Japanese line', () => {
-	assert.equal(
-		catalogSubLine([CATALOG], {}, 'lantern_dew', 'night air, lantern, dew', true),
-		'夜気、灯火、露'
-	);
-});
-
-test('T-41  the English drawer keeps the line the work carries', () => {
-	assert.equal(
-		catalogSubLine([CATALOG], {}, 'lantern_dew', 'night air, lantern, dew', false),
-		'night air, lantern, dew'
-	);
-});
-
-test('T-41  a definition that moved since the work was drawn stays historical', () => {
-	// The stored line is no longer what the catalog says, so today's Japanese
-	// wording would be a different statement, not a translation of this one.
-	assert.equal(
-		catalogSubLine([CATALOG], {}, 'lantern_dew', 'night air and dew', true),
-		'night air and dew'
-	);
-});
-
-test('T-41  a retired catalog keeps the line too, and a renamed one is followed', () => {
-	assert.equal(catalogSubLine([], {}, 'gone', 'some old line', true), 'some old line');
-	assert.equal(
-		catalogSubLine([CATALOG], { old_id: 'lantern_dew' }, 'old_id', 'night air, lantern, dew', true),
-		'夜気、灯火、露'
-	);
-});
-
-test('T-41  nothing stored means nothing shown, in either language', () => {
-	for (const isJapanese of [true, false]) {
-		assert.equal(catalogSubLine([CATALOG], {}, 'lantern_dew', '', isJapanese), '');
+test('T-41  the catalog tagline is not shown; the name already said it', () => {
+	// Author decision, 2026-08-13. The tagline is a constant of the catalog --
+	// "Lantern & Dew" already tells the reader what "night air, lantern, dew"
+	// tells them -- so the row said nothing about this work. The reader that
+	// localised it went with it rather than being left with no reader.
+	assert.doesNotMatch(PANEL, /detailCatalogSub/);
+	assert.doesNotMatch(PANEL, /render_color_catalog_sub/);
+	assert.doesNotMatch(PANEL, /catalogSubLine/);
+	assert.doesNotMatch(read('./colors.ts'), /catalogSubLine/);
+	for (const key of ['provenanceLabelCatalogSub', 'provenanceHintCatalogSub']) {
+		for (const pack of ['./i18n/ja.ts', './i18n/en.ts', './i18n/types.ts']) {
+			assert.doesNotMatch(read(pack), new RegExp(key), `${pack} still carries ${key}`);
+		}
 	}
+});
+
+test('T-41  and the catalog name it stood under is still there', () => {
+	// Which of the fourteen catalogs translated the colours is the fact that is
+	// about this work, and it stays.
+	assert.match(PANEL, /t\(\)\.provenanceHintCatalog\)/);
+	assert.match(PANEL, /<dd>\{statusCatalogName\}<\/dd>/);
 });
 
 // ------------------------------------------------------------------- T-42
@@ -127,15 +93,6 @@ test('T-42  the Japanese word is the saijiki word, not a gloss', () => {
 
 // ------------------------------------------------------------------- T-43
 
-test('T-43  the drawer reads the sub line through the catalog it is shown with', () => {
-	assert.match(
-		PANEL,
-		/catalogSubLine\(colorCatalogs, renamedCatalogIds, detailCatalogId, detailCatalogSubStored, isJapanese\)/
-	);
-	// And the id comes from the work on screen, not from the current selection.
-	assert.match(PANEL, /statusHistoryItem\?\.render_color_catalog_id \?\? result\?\.render_color_catalog_id/);
-});
-
 test('T-43  the map row is shown only when the work carries one', () => {
 	assert.match(PANEL, /\{#if detailColorMap\.length > 0\}/);
 	assert.match(
@@ -147,8 +104,9 @@ test('T-43  the map row is shown only when the work carries one', () => {
 	assert.match(PANEL, /title=\{entry\.code\}/);
 });
 
-test('T-43  the page hands the drawer the catalogs the line needs', () => {
-	const page = read('../routes/+page.svelte');
-	assert.match(page, /\{colorCatalogs\}/);
-	assert.match(page, /\{renamedCatalogIds\}/);
+test('T-43  and the drawer no longer asks for what only that line needed', () => {
+	// The catalog table and the rename table were passed in for the sub line.
+	// A prop nothing reads is a prop that goes stale without anything saying so.
+	assert.doesNotMatch(PANEL, /colorCatalogs/);
+	assert.doesNotMatch(PANEL, /renamedCatalogIds/);
 });

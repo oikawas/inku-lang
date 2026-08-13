@@ -6522,7 +6522,7 @@ corpus stays at 49 and all six part C cases moved**, because `score_instructions
 and B's 30 are byte-identical). **⚠ Every case above H holds a score of exactly one instruction, so before
 these were added the corpus could not see this change at all.**
 
-**Checks:** **server 3,172 passed / 31 skipped**, **cli 225 passed**, **ruff clean**, **frozen corpora
+**Checks:** **server 3,173 passed / 31 skipped**, **cli 225 passed**, **ruff clean**, **frozen corpora
 byte-identical**, **Android JVM 289 tests / 0 failures**, **`check_docs.py` passes**. **The implementation was
 Codex (GPT-5), a different model, so not one check or perturbation was skipped** -- **six perturbations** (the
 contract's two plus four added in acceptance) matched prediction **by name in all six**. **T-7, the real
@@ -6530,3 +6530,7 @@ product path, was reproduced with a local server against the NIM key through `in
 
 - **⚠ The manual's 13 version markers still read v2.13.17 / Build 904** although the previous cycle's revision
   history (v2.13.18 / Build 905) states that it updated them. They are aligned here.
+- **⚠ The full-run recorder was writing a 満点 for a red run** (`record_full_run` in `cycle.sh`): the summary
+  line still reads "N passed" when something failed, so **3,172 passed had been recorded as the score of a
+  commit the tree was never green on**. It now records nothing when the run holds a failure, and the bad row
+  was removed. A perturbation confirms zero rows on red and one on green.

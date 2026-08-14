@@ -108,7 +108,15 @@ CHANGED_SCHEMAS = {
     "ComposeRequest": {"added": {"fires_on"}, "removed": set()},
     # I-143: one arrangement may repeat a contiguous Score instruction unit.
     "Arrangement": {"added": {"group_size"}, "removed": set()},
+    # ddl-engine 18: a fill is a surface word like the other eight, so the
+    # `texture` enum gains `solid`. No property moves -- which is why the enum
+    # is checked by name below: a declaration that only counts properties would
+    # let anything else inside this schema through beside it.
+    "SurfaceSpec": {"added": set(), "removed": set()},
 }
+
+# The whole of what the declared `SurfaceSpec` change may be.
+SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
 
 # Operations that predate this branch and are declared to change, with exactly
 # what may move in them. Contract 2 gave the listing a way to be asked for the
@@ -148,10 +156,20 @@ def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> Non
         assert _stable({**after_op, "params": sorted(before_params)}) == _stable(baseline_ops[key]), key
         operations.pop(key)
     for name, expected in CHANGED_SCHEMAS.items():
-        before = set(json.loads(baseline["schemas"][name])["properties"])
-        after = set(json.loads(schemas.pop(name))["properties"])
+        before_body = json.loads(baseline["schemas"][name])
+        after_body = json.loads(schemas.pop(name))
+        before = set(before_body["properties"])
+        after = set(after_body["properties"])
         assert after - before == expected["added"], f"{name} gained {sorted(after - before)}"
         assert before - after == expected["removed"], f"{name} lost {sorted(before - after)}"
+        if name == "SurfaceSpec":
+            # This one changed inside a property rather than by gaining one, so
+            # the property-set comparison above says nothing about it. Name the
+            # movement, or the declaration excuses everything in the schema.
+            enum_before = set(before_body["properties"]["texture"]["enum"])
+            enum_after = set(after_body["properties"]["texture"]["enum"])
+            assert enum_after - enum_before == SURFACE_TEXTURE_ENUM_ADDED
+            assert enum_before - enum_after == set()
 
     assert len(operations) == PRE_ACL_OPERATION_COUNT - len(CHANGED_OPERATIONS)
     assert len(schemas) == PRE_ACL_SCHEMA_COUNT - len(CHANGED_SCHEMAS)

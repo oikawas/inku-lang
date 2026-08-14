@@ -97,7 +97,17 @@ def test_ddl_reference_versions_and_parts() -> None:
     # controls** -- a description with no size word, and a size the model did state
     # -- because a corpus holding only the two that move would record a layer that
     # shrinks marks rather than one that reads a description.
-    assert DDL_ENGINE_VERSION == "17"
+    # Engine 18 (2026-08-14): a fill is a surface word like the other eight.
+    # **`changed_from_previous` lists all 30 coerce cases and the Score moved in
+    # 3** -- the same arithmetic engines 10, 11 and 15 wrote down: a new branch
+    # name enters every case's report whether or not the branch fired, so the
+    # digest moves everywhere while the transform moves in three. The three are
+    # `B-white-filled-circle`, `B-production-fill-clause` and
+    # `B-production-no-fill-clause`, and between them they hold the five
+    # closed-shape instructions in this corpus that carry `filled=true` with no
+    # surface of their own. No expand or plugin-expand case moves: the change
+    # lives inside coerce, like engines 8, 9 and 10.
+    assert DDL_ENGINE_VERSION == "18"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -167,32 +177,61 @@ def test_ddl_reference_versions_and_parts() -> None:
     # moved, and a record that widened -- so the two claims below are separated:
     # the six existed before and their bytes differ, and the other 43 are
     # byte-identical.
+    # Engine 18 lists all 30 coerce cases and no new file at all -- the fourth
+    # shape this list can hold, and the one engines 10, 11 and 15 had: a branch
+    # name entered every report, so every coerce digest moved while the Score
+    # moved in three. So the claims are separated again, and the one that says
+    # what this version did is the SECOND: the three named below are the cases
+    # holding a closed shape with `filled=true` and no surface of its own, and
+    # every expand and plugin-expand case is byte-identical because the change
+    # lives inside coerce.
     moved_cases = {
-        "C-plugin-count-as-a-bare-numeral",
-        "C-plugin-count-as-a-numeral-beside-cjk",
-        "C-plugin-count-in-an-english-body",
-        "C-plugin-count-in-the-phrase",
-        "C-plugin-count-outside-the-phrase",
-        "C-plugin-count-over-the-ceiling",
+        case_id
+        for case_id, case in json.loads(
+            (MANIFEST_PATH.parent.parent / "ddl-engine-17" / "manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )["cases"].items()
+        if case["part"] == "b_coerce"
     }
+    scores_that_moved = {
+        "B-white-filled-circle",
+        "B-production-fill-clause",
+        "B-production-no-fill-clause",
+    }
+    assert len(moved_cases) == 30
     assert manifest["changed_from_previous"] == sorted(moved_cases)
     previous = json.loads(
-        (MANIFEST_PATH.parent.parent / "ddl-engine-16" / "manifest.json").read_text(
+        (MANIFEST_PATH.parent.parent / "ddl-engine-17" / "manifest.json").read_text(
             encoding="utf-8"
         )
     )["cases"]
     carried = 0
+    scores = 0
     for case_id, case in manifest["cases"].items():
         if case_id in moved_cases:
             # Not new: it was frozen before and says something different now.
             assert case_id in previous, case_id
             assert case["digest"] != previous[case_id]["digest"], case_id
+            # And of those, only three say something different about the Score.
+            body = json.loads(
+                (MANIFEST_PATH.parent / case["output_path"]).read_text(encoding="utf-8")
+            )
+            was = json.loads(
+                (
+                    MANIFEST_PATH.parent.parent / "ddl-engine-17" / case["output_path"]
+                ).read_text(encoding="utf-8")
+            )
+            if body["score"] != was["score"]:
+                assert case_id in scores_that_moved, case_id
+                scores += 1
             continue
         assert case_id in previous, case_id
         assert case["digest"] == previous[case_id]["digest"], case_id
         assert case["bytes"] == previous[case_id]["bytes"], case_id
         carried += 1
-    assert carried == 43
+    assert carried == 19
+    assert scores == len(scores_that_moved)
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()
@@ -325,7 +364,14 @@ def test_ddl_reference_coerce_discriminators() -> None:
     expected = {
         "B-baseline-no-ddl": set(),
         "B-white-line": {"coerce_and_repair_instruction"},
-        "B-white-filled-circle": {"coerce_and_repair_instruction"},
+        # ddl-engine 18: the case is a filled circle with no surface of its own,
+        # which is exactly the shape the new branch fires on -- it is one of the
+        # three whose Score moves in that version. That it is here and not in
+        # the entries below is the discriminator: `B-white-line` carries the
+        # same repair and no fill, so it does not.
+        "B-white-filled-circle": {
+            "coerce_and_repair_instruction", "with_fill_as_a_surface_word",
+        },
         "B-invalid-touching": {"drop_invalid_relations"},
         "B-dedupe-three": {"dedupe_instructions"},
         # The three B-trigger-* cases separated the staffage levels; with the axis

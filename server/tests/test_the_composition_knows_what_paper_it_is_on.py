@@ -228,9 +228,15 @@ def test_t7_no_paper_states_no_paper(lang):
 
 def test_t7_the_paperless_digests_are_the_frozen_ones():
     """Measured on 2026-08-13 on this branch, after the examples of stage 3 went
-    in. The pre-contract values were cfa0e44d64743a14 / c4c26cdbeb3383e7."""
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "e5ebae81b0b41055"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "e25a01dc97e8a608"
+    in. The pre-contract values were cfa0e44d64743a14 / c4c26cdbeb3383e7.
+
+    Re-measured 2026-08-14 (ddl-engine 18: a fill is a surface word like the
+    other eight). What this test is about -- that a body naming no paper carries
+    no support block -- is untouched; the digests move because the Stage 2 body
+    and the tool schema moved beneath it. The 2026-08-13 pair was
+    e5ebae81b0b41055 / e25a01dc97e8a608."""
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "10e063b6cc175427"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "7aee944049dbc058"
 
 
 # The senders. A request that never names `canvas_aspect` gets `None`, and `None`

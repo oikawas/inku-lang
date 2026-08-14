@@ -41,6 +41,7 @@ from .normalize import (
     _dedupe_instructions,
     _drop_invalid_relations,
     _repair_coerced_instruction,
+    _with_fill_as_a_surface_word,
     _with_per_instruction_density_budget,
     _with_presence_auxiliary_shape_repair,
     _with_structural_duplicate_repair,
@@ -74,6 +75,29 @@ def _folded_of_unrequested_color_cycle(
     before = instructions
     folded = _without_unrequested_color_cycle(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "without_unrequested_color_cycle", before, folded)
+    return folded
+
+
+def _folded_of_the_two_ways_to_say_a_fill(
+    instructions: list[Instruction],
+    *,
+    branch_report: dict[str, int] | None,
+) -> list[Instruction]:
+    """Run on both exits, for the reason above it.
+
+    Whether an interior is filled decides whether the work can be drawn at all,
+    so it is not something INKU_COERCE_DISABLE switches off -- the same reason
+    the hard ceiling and `_with_surface_on_a_closed_shape` hold on that exit.
+
+    It runs here, at the end, because every branch that can write `filled` or a
+    `surface` has already had its say: `_with_visible_particle` inside the
+    instruction repair, the three fallbacks inside `_with_ddl_coverage`, and the
+    tempering of a large filled shape. Saying the interior's state once is the
+    last word about it, not one more voice among them.
+    """
+    before = instructions
+    folded = _with_fill_as_a_surface_word(instructions)
+    _record_branch_fire(branch_report, "with_fill_as_a_surface_word", before, folded)
     return folded
 
 
@@ -129,6 +153,9 @@ def coerce_score(
         _branch_before = instructions
         instructions = _without_explicit_region_support(instructions, ddl=ddl)
         _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
+        instructions = _folded_of_the_two_ways_to_say_a_fill(
+            instructions, branch_report=branch_report
+        )
         instructions = _folded_of_unrequested_color_cycle(
             instructions, ddl=ddl, branch_report=branch_report
         )
@@ -273,6 +300,9 @@ def coerce_score(
     _branch_before = instructions
     instructions = _without_explicit_region_support(instructions, ddl=ddl)
     _record_branch_fire(branch_report, "without_explicit_region_support", _branch_before, instructions)
+    instructions = _folded_of_the_two_ways_to_say_a_fill(
+        instructions, branch_report=branch_report
+    )
     instructions = _folded_of_unrequested_color_cycle(
         instructions, ddl=ddl, branch_report=branch_report
     )

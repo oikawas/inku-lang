@@ -225,6 +225,14 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
         "ComposeRequest": {"fires_on"},
         "Arrangement": {"group_size"},
     }
+    # ddl-engine 18 changed a schema without adding a field to it: a fill became
+    # a surface word like the other eight, so `SurfaceTexture` gained a value.
+    # Declared the same way and taken back out the same way, so the frozen digest
+    # keeps measuring everything else byte for byte. The description names the
+    # values too, so it is restored along with the enum.
+    declared_enum_additions = {
+        "SurfaceSpec": ("texture", "solid", " / solid=塗り"),
+    }
     others = {}
     for name in frozen_names:
         body = after["schemas"][name]
@@ -234,6 +242,19 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
             for field in added:
                 assert field in parsed["properties"], f"{name} was declared to gain {field}"
                 del parsed["properties"][field]
+            body = _stable(parsed)
+        enum_added = declared_enum_additions.get(name)
+        if enum_added:
+            field, value, description_fragment = enum_added
+            parsed = json.loads(body)
+            values = parsed["properties"][field]["enum"]
+            assert value in values, f"{name}.{field} was declared to gain {value}"
+            parsed["properties"][field]["enum"] = [v for v in values if v != value]
+            description = parsed["properties"][field]["description"]
+            assert description_fragment in description, f"{name}.{field} description"
+            parsed["properties"][field]["description"] = description.replace(
+                description_fragment, "", 1
+            )
             body = _stable(parsed)
         others[name] = body
     assert (

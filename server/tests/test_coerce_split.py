@@ -56,6 +56,13 @@ EXPECTED_BRANCH_ORDER = [
     "with_literal_grid_fidelity",
     "drop_invalid_relations",
     "without_explicit_region_support",
+    # Second to last, and on both exits (ddl-engine 18). It says the interior's
+    # state once, in one vocabulary, whichever of the two ways it arrived in --
+    # so it has to run after everything that can write `filled` or a `surface`:
+    # the repair inside the instruction pass, the three fallbacks inside
+    # `with_ddl_coverage`, and the tempering of a large filled shape. Run before
+    # any of them and a fill they add is left saying only half of itself.
+    "with_fill_as_a_surface_word",
     # Last, and on both exits (ddl-engine 10). It reads the cycle the delivery
     # branches above have finished writing, so it cannot sit among them: run
     # earlier, it would fold a cycle a later branch then rebuilds.

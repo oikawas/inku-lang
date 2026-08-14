@@ -72,6 +72,14 @@ Color = Literal[
 ]
 SurfaceTexture = Literal[
     "none",
+    # The material's default fill, not a printmaker's mark. It sits in this set
+    # rather than in `filled` because the saijiki says how an interior is with
+    # one vocabulary, and 塗り is one of its nine quality words; sending that one
+    # word down a boolean of its own is what kept it from ever arriving
+    # (measured 2026-08-13: 0/14 in English, 2/4 in Japanese, against 12/14 for
+    # the words that go to `texture`). `filled` still exists and still draws --
+    # coerce derives each from the other.
+    "solid",
     "stipple",
     "hatch",
     "crosshatch",
@@ -137,7 +145,7 @@ class SurfaceSpec(BaseModel):
     texture: SurfaceTexture = Field(
         default="none",
         description=(
-            "面の質感: none=なし / stipple=点 / hatch=平行線 / crosshatch=交差線"
+            "面の質感: none=なし / solid=塗り / stipple=点 / hatch=平行線 / crosshatch=交差線"
             " / aquatint=段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / bleed=端が滲む / paper_grain=紙目"
         ),
     )
@@ -608,6 +616,20 @@ class Instruction(BaseModel):
             return min(max(int(v), 5), 8)
         except (TypeError, ValueError):
             return 5
+
+
+def fill_is_asked_for(ins: "Instruction") -> bool:
+    """`filled=true` と `surface.texture="solid"` は同じ要求の 2 通りの言い方。
+
+    ここに 1 つだけ置くのは `CLOSED_SHAPES` と同じ理由で、下の層が写しを持つと、
+    写した日の判定がそこで凍るため。読み手は renderer の塗りと、coerce の 2 つの
+    governor (小さすぎる粒の修理・大きすぎる塗り図形の抑制) の 3 つ。どれか 1 つが
+    真偽値だけを読むと、**同じ記述が書き方次第で別の道を通る** —— それが 塗り を
+    1 つの語彙へ戻した ddl engine 18 の直した defect そのものである。
+    """
+    return bool(ins.filled) or (
+        ins.surface is not None and ins.surface.texture == "solid"
+    )
 
 
 class Presence(BaseModel):

@@ -457,7 +457,12 @@ _USER_ACCOUNT_COLUMN_MIGRATIONS = {
     "export_templates": "ALTER TABLE user_accounts ADD COLUMN export_templates TEXT NOT NULL DEFAULT '[]'",
     "plugin_storage": "ALTER TABLE user_accounts ADD COLUMN plugin_storage TEXT NOT NULL DEFAULT '{}'",
 }
-_BATCH_PROMPT_HISTORY_LIMIT = 20
+# How many past batch prompts a member keeps. Cut on the way in and on the way
+# out, so lowering it later drops the tail of what is already stored. The web
+# client holds the same number (BATCH_PROMPT_HISTORY_LIMIT in +page.svelte);
+# raising one without the other changes nothing, because the shorter of the two
+# is what reaches the picker.
+_BATCH_PROMPT_HISTORY_LIMIT = 50
 _BATCH_PROMPT_HISTORY_MAX_TEXT = 20_000
 _SETTINGS_TABS = {"models", "db", "plugins", "users", "export", "misc", "server_misc", "logs"}
 _UI_MODES = {"simple", "full", "custom"}

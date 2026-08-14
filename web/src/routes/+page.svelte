@@ -124,7 +124,10 @@
 		if (Number.isNaN(stamp.getTime())) return null;
 		return stamp.toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
 	});
-	const BATCH_PROMPT_HISTORY_LIMIT = 20;
+	// Matches _BATCH_PROMPT_HISTORY_LIMIT in server/src/inku_server/db.py: the
+	// server cuts the list on both the read and the write, so the shorter of the
+	// two numbers is what the picker ever shows.
+	const BATCH_PROMPT_HISTORY_LIMIT = 50;
 	const BATCH_PROMPT_HISTORY_MAX_TEXT = 20000;
 	const EXTERNAL_HISTORY_REFRESH_MS = 12000;
 	const EXTERNAL_HISTORY_REFRESH_MIN_GAP_MS = 5000;

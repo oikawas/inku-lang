@@ -1310,7 +1310,15 @@ def test_surface_schema_accepts_canvas_ground_and_clamps_units():
     assert score.instructions[0].surface.bleed == 0.0
 
 
-def test_render_display_canvas_ground_uses_filter_behind_content():
+def test_render_display_canvas_ground_tiles_a_pattern_behind_content():
+    """engine 34: display の地も `<pattern>` である。
+
+    engine 33 まではここに `feTurbulence` の矩形が 1 枚あり、`editable` と
+    `compat` は別に点を撒いていた —— 同じ作品が、書き出したファイルによって
+    別の紙の上にあった。**測るのは層の順序**（地は内容より後ろにあってはならない）
+    で、素材ごとの描き分けは
+    `test_the_ground_is_a_support_you_can_name.py` が持つ。
+    """
     score = Score.model_validate(
         {
             "canvas": {
@@ -1325,19 +1333,20 @@ def test_render_display_canvas_ground_uses_filter_behind_content():
 
     svg = render(score, render_seed=123)
 
-    assert 'id="ground_texture_' in svg
-    assert "<feTurbulence" in svg
+    assert '<pattern id="gp0"' in svg
+    assert "ground_texture_" not in svg
+    # ⚠ 素の `<feTurbulence` で測らない —— display には演奏の触りの filter が
+    # 別にあり、地とは関係なく毎回出る（実測でここに引っかかった）。
     root = ElementTree.fromstring(svg)
-    texture_rects = [
+    tiled_rects = [
         element
         for element in root.iter()
         if element.tag.endswith("rect")
-        and element.attrib.get("fill") == "#777777"
-        and "ground_texture_" in element.attrib.get("filter", "")
+        and element.attrib.get("fill", "").startswith("url(#gp")
     ]
-    assert len(texture_rects) == 1
-    assert 0.02 <= float(texture_rects[0].attrib["opacity"]) <= 0.18
-    assert 'tableValues="0 1"' in svg
+    # The settled paper sheet: one fine field and six coarse periods.
+    assert len(tiled_rects) == 7
+    assert all("filter" not in element.attrib for element in tiled_rects)
     assert any(
         element.tag.endswith("rect")
         and element.attrib.get("fill") == "#f7f3e8"
@@ -1349,7 +1358,7 @@ def test_render_display_canvas_ground_uses_filter_behind_content():
     )
 
 
-def test_canvas_ground_non_display_profiles_remain_filter_free():
+def test_canvas_ground_every_profile_remains_filter_free():
     score = Score.model_validate(
         {
             "canvas": {
@@ -1362,10 +1371,11 @@ def test_canvas_ground_non_display_profiles_remain_filter_free():
 
     editable = render(score, svg_profile="editable", render_seed=123)
     compat = render(score, svg_profile="compat", render_seed=123)
+    display = render(score, svg_profile="display", render_seed=123)
 
-    assert '<filter id="ground_texture_' not in editable
-    assert '<filter id="ground_texture_' not in compat
-    for svg in (editable, compat):
+    for svg in (editable, compat, display):
+        assert '<filter id="ground_texture_' not in svg
+    for svg in (editable, compat, display):
         root = ElementTree.fromstring(svg)
         assert any(
             element.tag.endswith("rect")

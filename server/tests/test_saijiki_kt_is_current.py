@@ -70,8 +70,8 @@ def test_snapshot_carries_both_language_surfaces_for_every_category() -> None:
 
     ja = display_categories("ja")
     en = display_categories("en")
-    # Ten saijiki categories plus あいだ, which display_categories appends.
-    assert len(ja) == 11, f"expected eleven display categories, table has {len(ja)}"
+    # Eleven saijiki categories plus あいだ, which display_categories appends.
+    assert len(ja) == 12, f"expected twelve display categories, table has {len(ja)}"
 
     for cat_ja, cat_en in zip(ja, en):
         assert f'key = "{cat_ja["key"]}"' in text, f"category missing: {cat_ja['key']}"

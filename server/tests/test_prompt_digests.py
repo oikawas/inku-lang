@@ -33,8 +33,12 @@ def empty_plugin_vocabulary(monkeypatch):
         # 契約 a-shape-can-say-how-its-surface-is (2026-08-12, ddl-engine 15):
         # 歳時記に おもて が 1 行増え、面の定型が状態の名詞へ揃って 3 行増えた。
         # ja 18_981 -> 19_584 / en 18_020 -> 18_511。
-        ("ja", 19_584, "0c03e4dfb10715eb"),
-        ("en", 18_511, "db354e9052756d6d"),
+        # 契約 the-ground-is-a-support-you-can-name (2026-08-14, ddl-engine 19):
+        # 歳時記に じ が 1 行増え、地の定型が 3 行から 8 行へ広がり、支持体を
+        # 潰さないという 1 行が加わった。few-shot も日英 2 組ずつ増えた。
+        # ja 19_584 -> 20_110 / en 18_511 -> 18_992。
+        ("ja", 20_110, "f30c00130ae865e7"),
+        ("en", 18_992, "9cec0367687c0112"),
     ],
 )
 def test_stage1_prompt_base_digest_expected_values(
@@ -54,9 +58,9 @@ def test_stage1_prompt_base_digest_expected_values(
 @pytest.mark.parametrize(
     ("text", "lang", "expected_bytes", "expected_digest"),
     [
-        ("中心に円を置く。", "ja", 20_271, "47dd9922a40d0e6a"),
-        ("雨上がりの水面に光が散る。", "ja", 20_440, "e50b1b9e51e98be0"),
-        ("Place one circle at the center.", "en", 19_185, "ed276cc0d78e1872"),
+        ("中心に円を置く。", "ja", 20_797, "8dc8aa390819deb0"),
+        ("雨上がりの水面に光が散る。", "ja", 20_966, "e3d389b82618cc7a"),
+        ("Place one circle at the center.", "en", 19_666, "2bce9421eed27741"),
     ],
 )
 def test_stage1_actual_prompt_digest_expected_values(
@@ -77,7 +81,7 @@ def test_stage1_base_digest_excludes_input_dependent_examples():
         "雨上がりの水面に光が散る。"
     )
     assert _digest(first_prompt) != _digest(second_prompt)
-    assert _digest(first_base) == _digest(second_base) == "0c03e4dfb10715eb"
+    assert _digest(first_base) == _digest(second_base) == "f30c00130ae865e7"
 
 
 @pytest.mark.usefixtures("empty_plugin_vocabulary")
@@ -113,10 +117,10 @@ def test_stage1_digest_uses_the_actual_prefix_override(monkeypatch):
 
 def test_stage2_prompt_and_tool_expected_values():
     tool_json = json.dumps(composer._submit_tool(), ensure_ascii=False, sort_keys=True)
-    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 45_646
-    assert _digest(composer.SYSTEM_PROMPT) == "feef549d1a4bc2fa"
-    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 43_581
-    assert _digest(composer.SYSTEM_PROMPT_EN) == "d9dc0597a67d3d86"
+    assert len(composer.SYSTEM_PROMPT.encode("utf-8")) == 47_290
+    assert _digest(composer.SYSTEM_PROMPT) == "490ea3914528ee7c"
+    assert len(composer.SYSTEM_PROMPT_EN.encode("utf-8")) == 45_184
+    assert _digest(composer.SYSTEM_PROMPT_EN) == "b6e044d22034d42f"
     # `hair` -> `silverpoint` の改名で、Stage 2 の素材語対応表 2 行と作例 8 件、
     # そして weight の enum と description が動いた。tool schema は 17_696 -> 17_713。
     # 色選択の一行が `palette` を捨てて `抽象色` / `the abstract colors` になった
@@ -131,8 +135,13 @@ def test_stage2_prompt_and_tool_expected_values():
     # 18_761 -> 18_785. **This is the point of that version**: the model writes
     # what the destination field offers it, so a value it is never shown is one
     # it cannot choose (0/14 through `filled`, 12/14 through `texture`).
-    assert len(tool_json.encode("utf-8")) == 18_785
-    assert _digest(tool_json) == "0c2aed2b2dc4a32f"
+    # ddl-engine 19 / render-engine 34: `GroundMaterial` gains `canvas` and
+    # `drawing_paper`, and the field's description names both, so the tool schema
+    # moves again -- 18_785 -> 18_860. Same point as engine 18: a support the
+    # model is never shown in the destination field is one it cannot choose
+    # (washi reached 0 of 2,125 while it was named only in prose).
+    assert len(tool_json.encode("utf-8")) == 18_860
+    assert _digest(tool_json) == "17c65ccb1de737b9"
     # `thinness` を `weight` の直後から末尾へ移し (搬送 18% -> 89%)、
     # `_stage2_prompt_digest` の `sort_keys=True` を外して指紋を並び順に開いた
     # (I-036 / I-038)。**上の 2 行はここで動かない** — この tool_json は
@@ -163,8 +172,8 @@ def test_stage2_prompt_and_tool_expected_values():
     # 塗りつぶしの作例 2 件が同じ形へ揃い、`面: 塗り。` / `Surface: flat.` の作例が
     # 日英に 1 件ずつ入った。ja 45_412 -> 45_646 / en 43_363 -> 43_581。
     # **tool schema も動いた**（上の 2 行）—— enum に値が 1 つ増えたため。
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "10e063b6cc175427"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "7aee944049dbc058"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "3069d521d7cf90a5"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "228075a1e9b07192"
 
 
 def test_stage2_digest_uses_the_actual_prompt_override(monkeypatch):
@@ -217,8 +226,8 @@ def test_saijiki_word_changes_both_stage1_base_digests(monkeypatch):
         for category in original_categories
     )
     expected = {
-        "ja": (19_620, "bbb014f56cf2682d"),
-        "en": (18_529, "23983c0eda349eb9"),
+        "ja": (20_146, "616ab0deae3151d5"),
+        "en": (19_010, "279d139d29e4f80a"),
     }
     for lang, prefix in (
         ("ja", interpreter.SYSTEM_PROMPT_PREFIX),
@@ -269,8 +278,8 @@ def test_schema_description_changes_stage2_but_not_system_prompt(monkeypatch):
     # The temporary schema change must remain visible after the nine-color update.
     # The digest reads declaration order too, so moving `thinness` before `surface`
     # (contract stage2-score-shrinkage, 2026-08-03) moves this value as well.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "6ba2dfa3bdb56183"
-    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "feef549d1a4bc2fa"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "a28900833e854377"
+    assert _digest(composer.SYSTEM_PROMPT) == system_only_digest == "490ea3914528ee7c"
 
 
 def test_prompt_digest_history_columns_are_nullable_and_not_backfilled():

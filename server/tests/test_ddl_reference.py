@@ -107,7 +107,7 @@ def test_ddl_reference_versions_and_parts() -> None:
     # closed-shape instructions in this corpus that carry `filled=true` with no
     # surface of their own. No expand or plugin-expand case moves: the change
     # lives inside coerce, like engines 8, 9 and 10.
-    assert DDL_ENGINE_VERSION == "18"
+    assert DDL_ENGINE_VERSION == "19"
     assert manifest["ddl_version"] == DDL_VERSION
     assert manifest["engine_version"] == DDL_ENGINE_VERSION
     assert manifest["schema_version"] == "0.1.0"
@@ -200,27 +200,30 @@ def test_ddl_reference_versions_and_parts() -> None:
         "B-production-no-fill-clause",
     }
     assert len(moved_cases) == 30
-    assert manifest["changed_from_previous"] == sorted(moved_cases)
+    # ⚠ 帰属は版に紐づく。engine 18 が何を動かしたかは engine 18 の manifest で
+    # 読む —— 現在版の manifest で読むと、engine 19 を焼いた日に主張の対象が
+    # 黙って engine 19 の差分へ入れ替わる。
+    root = MANIFEST_PATH.parent.parent
+    eighteen_dir = root / "ddl-engine-18"
+    eighteen = json.loads((eighteen_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert eighteen["engine_version"] == "18"
+    assert eighteen["changed_from_previous"] == sorted(moved_cases)
     previous = json.loads(
-        (MANIFEST_PATH.parent.parent / "ddl-engine-17" / "manifest.json").read_text(
-            encoding="utf-8"
-        )
+        (root / "ddl-engine-17" / "manifest.json").read_text(encoding="utf-8")
     )["cases"]
     carried = 0
     scores = 0
-    for case_id, case in manifest["cases"].items():
+    for case_id, case in eighteen["cases"].items():
         if case_id in moved_cases:
             # Not new: it was frozen before and says something different now.
             assert case_id in previous, case_id
             assert case["digest"] != previous[case_id]["digest"], case_id
             # And of those, only three say something different about the Score.
             body = json.loads(
-                (MANIFEST_PATH.parent / case["output_path"]).read_text(encoding="utf-8")
+                (eighteen_dir / case["output_path"]).read_text(encoding="utf-8")
             )
             was = json.loads(
-                (
-                    MANIFEST_PATH.parent.parent / "ddl-engine-17" / case["output_path"]
-                ).read_text(encoding="utf-8")
+                (root / "ddl-engine-17" / case["output_path"]).read_text(encoding="utf-8")
             )
             if body["score"] != was["score"]:
                 assert case_id in scores_that_moved, case_id
@@ -232,6 +235,19 @@ def test_ddl_reference_versions_and_parts() -> None:
         carried += 1
     assert carried == 19
     assert scores == len(scores_that_moved)
+
+    # Engine 19 (2026-08-14): the ground is a support you can name. **This corpus
+    # does not move, and the empty list is the whole description of the version**
+    # -- the same shape engines 3 and 5 froze in. The layer here holds no prompt,
+    # and the eleventh saijiki category carries no closure marker, so nothing the
+    # version added is reachable from any input this corpus states. What moved is
+    # what the model is offered; the frozen record of that is the Android prompt
+    # fixtures keyed by this number.
+    assert manifest["changed_from_previous"] == []
+    assert set(manifest["cases"]) == set(eighteen["cases"])
+    for case_id, case in manifest["cases"].items():
+        assert case["digest"] == eighteen["cases"][case_id]["digest"], case_id
+        assert case["bytes"] == eighteen["cases"][case_id]["bytes"], case_id
     assert sorted(
         case_id
         for case_id, case in manifest["cases"].items()

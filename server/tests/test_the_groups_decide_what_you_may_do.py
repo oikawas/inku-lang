@@ -230,8 +230,18 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # Declared the same way and taken back out the same way, so the frozen digest
     # keeps measuring everything else byte for byte. The description names the
     # values too, so it is restored along with the enum.
+    # ddl-engine 19 / render-engine 34 did the same to `CanvasGroundSpec`: the
+    # ground became a support you can name, so `GroundMaterial` gained two. A
+    # schema may now declare more than one value, because this one gained two at
+    # once and a single-value shape would have had to be relaxed into "any
+    # movement in this enum is fine".
     declared_enum_additions = {
-        "SurfaceSpec": ("texture", "solid", " / solid=塗り"),
+        "SurfaceSpec": ("texture", ("solid",), (" / solid=塗り",)),
+        "CanvasGroundSpec": (
+            "material",
+            ("canvas", "drawing_paper"),
+            (" / canvas=カンバス", " / drawing_paper=画用紙"),
+        ),
     }
     others = {}
     for name in frozen_names:
@@ -245,16 +255,19 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
             body = _stable(parsed)
         enum_added = declared_enum_additions.get(name)
         if enum_added:
-            field, value, description_fragment = enum_added
+            field, added_values, description_fragments = enum_added
             parsed = json.loads(body)
             values = parsed["properties"][field]["enum"]
-            assert value in values, f"{name}.{field} was declared to gain {value}"
-            parsed["properties"][field]["enum"] = [v for v in values if v != value]
+            for value in added_values:
+                assert value in values, f"{name}.{field} was declared to gain {value}"
+            parsed["properties"][field]["enum"] = [
+                v for v in values if v not in added_values
+            ]
             description = parsed["properties"][field]["description"]
-            assert description_fragment in description, f"{name}.{field} description"
-            parsed["properties"][field]["description"] = description.replace(
-                description_fragment, "", 1
-            )
+            for fragment in description_fragments:
+                assert fragment in description, f"{name}.{field} description"
+                description = description.replace(fragment, "", 1)
+            parsed["properties"][field]["description"] = description
             body = _stable(parsed)
         others[name] = body
     assert (

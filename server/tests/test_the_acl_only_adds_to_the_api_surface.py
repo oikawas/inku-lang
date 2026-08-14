@@ -113,7 +113,15 @@ CHANGED_SCHEMAS = {
     # is checked by name below: a declaration that only counts properties would
     # let anything else inside this schema through beside it.
     "SurfaceSpec": {"added": set(), "removed": set()},
+    # ddl-engine 19 / render-engine 34: the ground is a support you can name, so
+    # the `material` enum gains `canvas` and `drawing_paper`. Same shape as
+    # `SurfaceSpec` above -- nothing gains a property, so the enum is named
+    # rather than left to the property-set comparison.
+    "CanvasGroundSpec": {"added": set(), "removed": set()},
 }
+
+# The whole of what the declared `CanvasGroundSpec` change may be.
+GROUND_MATERIAL_ENUM_ADDED = {"canvas", "drawing_paper"}
 
 # The whole of what the declared `SurfaceSpec` change may be.
 SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
@@ -169,6 +177,12 @@ def test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else() -> Non
             enum_before = set(before_body["properties"]["texture"]["enum"])
             enum_after = set(after_body["properties"]["texture"]["enum"])
             assert enum_after - enum_before == SURFACE_TEXTURE_ENUM_ADDED
+            assert enum_before - enum_after == set()
+        if name == "CanvasGroundSpec":
+            # Same reason as `SurfaceSpec`: the movement is inside a property.
+            enum_before = set(before_body["properties"]["material"]["enum"])
+            enum_after = set(after_body["properties"]["material"]["enum"])
+            assert enum_after - enum_before == GROUND_MATERIAL_ENUM_ADDED
             assert enum_before - enum_after == set()
 
     assert len(operations) == PRE_ACL_OPERATION_COUNT - len(CHANGED_OPERATIONS)

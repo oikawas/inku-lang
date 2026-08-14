@@ -131,7 +131,7 @@ val PresentationControlLabel = Color(0xFFFFFDF8)
 // Ten groups, ten hues, in the order the server's table declares them. The pill
 // under a recognised word takes the colour of the group the word belongs to.
 // The count has to match: the lookup is `[index % size]`, so a list one short
-// would give the tenth group the first group's colour instead of failing.
+// would give the last group the first group's colour instead of failing.
 
 val SaijikiGroupSand = Color(0xFFEAD7A3)
 val SaijikiGroupSky = Color(0xFF9CC6E8)
@@ -144,6 +144,7 @@ val SaijikiGroupSlate = Color(0xFFAEB7D8)
 val SaijikiGroupBlossom = Color(0xFFE7A9C1)
 val SaijikiGroupMoss = Color(0xFFC3CC91)
 val SaijikiGroupShell = Color(0xFFD8C4B6)
+val SaijikiGroupMist = Color(0xFF9FD3D8)
 
 // --- Status -----------------------------------------------------------------
 

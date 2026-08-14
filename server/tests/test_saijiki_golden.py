@@ -144,6 +144,30 @@ _REORDERED_JA = (
         "おもて: 空(既定)、塗り、薄墨、粒、点、平行線、交差線、にじみ、アクアチント、濃い、薄い\n",
         1,
     ),
+    # --- 2026-08-14: 地は、名前で呼べる 7 つの支持体になる (ddl-engine 19) ---
+    # 定型が 3 行から 8 行へ。**和紙を「紙」へ潰していた 1 行がここで直った** ——
+    # 本番 3,086 件で和紙 0 件・木炭地 0 件だった原因である。
+    (
+        "- 紙目を残す、生成りの紙、和紙 → 「地: 生成りの紙、細かい紙目。」\n"
+        "- 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」\n"
+        "- 入力が支持体を「〜の地」「〜を地に」「〜の紙に」と明示した場合は、必ず「地: ...」として残し、「背景...」へ言い換えない。\n",
+        "- 紙目を残す、生成りの紙、画仙紙 → 「地: 生成りの紙、細かい紙目。」\n"
+        "- 和紙、楮、簀の目 → 「地: 和紙。」\n"
+        "- 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」\n"
+        "- 木炭紙、木炭地、筋の入った紙 → 「地: 木炭地。」\n"
+        "- カンバス、キャンバス、画布、canvas、麻布に描く → 「地: カンバス。」\n"
+        "- 画用紙、中目の紙、ケント紙 → 「地: 画用紙。」\n"
+        "- 入力が支持体を「〜の地」「〜を地に」「〜の紙に」と明示した場合は、必ず「地: ...」として残し、「背景...」へ言い換えない。\n"
+        "- 支持体の語は上の 7 つの固定句のいずれかへ寄せる。和紙を「紙」へ、木炭地を「薄墨」へ潰さない。\n",
+        1,
+    ),
+    # 歳時記に 11 個目のカテゴリ。語彙表は生成物なので、ここは 1 行の追加として現れる。
+    (
+        "おもて: 空(既定)、塗り、薄墨、粒、点、平行線、交差線、にじみ、アクアチント、濃い、薄い\n",
+        "おもて: 空(既定)、塗り、薄墨、粒、点、平行線、交差線、にじみ、アクアチント、濃い、薄い\n"
+        "じ: 紙、和紙、薄墨地、木炭地、カンバス、画用紙、メゾチント\n",
+        1,
+    ),
 )
 _REORDERED_EN = (
     ("hair, ", "silverpoint, ", 2),
@@ -247,6 +271,27 @@ _REORDERED_EN = (
         "Choose the background from the nine abstract colors: "
         "white, black, gray, red, orange, yellow, green, blue, purple\n"
         "- Gray works as a background and as a foreground color for lines, dots, or shapes.",
+        1,
+    ),
+    # --- 2026-08-14: the ground is a support you can name (ddl-engine 19) ---
+    (
+        '- paper grain, off-white paper, washi → "Ground: off-white paper, fine paper grain."\n'
+        '- ink-wash ground → "Ground: ink wash."\n'
+        '- If the input explicitly names the support as "... ground", "on ... paper", or "with ... as the ground", always preserve it as "Ground: ..."; never rewrite it as "Fill background ...".\n',
+        '- paper grain, off-white paper, drawing sheet → "Ground: off-white paper, fine paper grain."\n'
+        '- washi, kozo, laid lines → "Ground: washi."\n'
+        '- ink-wash ground → "Ground: ink wash."\n'
+        '- charcoal paper, charcoal ground, ridged paper → "Ground: charcoal ground."\n'
+        '- canvas, linen, on cloth → "Ground: canvas."\n'
+        '- drawing paper, cartridge paper, medium tooth → "Ground: drawing paper."\n'
+        '- If the input explicitly names the support as "... ground", "on ... paper", or "with ... as the ground", always preserve it as "Ground: ..."; never rewrite it as "Fill background ...".\n'
+        '- Every support word goes to one of the seven fixed phrases above. Never flatten washi into paper, or charcoal ground into ink wash.\n',
+        1,
+    ),
+    (
+        "surfaces: empty (default), flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint\n",
+        "surfaces: empty (default), flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint\n"
+        "grounds: paper, washi, ink wash ground, charcoal ground, canvas, drawing paper, mezzotint\n",
         1,
     ),
 )

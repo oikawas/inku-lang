@@ -57,9 +57,14 @@ CHANGED_SCHEMAS = {
     # `texture` enum gains `solid`. Nothing gains a property, which is why the
     # enum is named below rather than left to the property-set comparison.
     "SurfaceSpec": {"added": set(), "removed": set()},
+    # ddl-engine 19 / render-engine 34: the ground is a support you can name, so
+    # the `material` enum gains `canvas` and `drawing_paper`. Nothing gains a
+    # property, which is why the enum is named below.
+    "CanvasGroundSpec": {"added": set(), "removed": set()},
 }
 
 SURFACE_TEXTURE_ENUM_ADDED = {"solid"}
+GROUND_MATERIAL_ENUM_ADDED = {"canvas", "drawing_paper"}
 
 
 def _before() -> dict:
@@ -112,6 +117,12 @@ def test_the_surface_gained_exactly_the_card_and_nothing_else() -> None:
             was_enum = set(was_body["properties"]["texture"]["enum"])
             now_enum = set(now_body["properties"]["texture"]["enum"])
             assert now_enum - was_enum == SURFACE_TEXTURE_ENUM_ADDED
+            assert was_enum - now_enum == set()
+        if name == "CanvasGroundSpec":
+            # Same reason as `SurfaceSpec`: the movement is inside a property.
+            was_enum = set(was_body["properties"]["material"]["enum"])
+            now_enum = set(now_body["properties"]["material"]["enum"])
+            assert now_enum - was_enum == GROUND_MATERIAL_ENUM_ADDED
             assert was_enum - now_enum == set()
 
     before_operations = {

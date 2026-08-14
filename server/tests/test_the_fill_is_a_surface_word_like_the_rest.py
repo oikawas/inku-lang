@@ -30,7 +30,6 @@ from typing import get_args
 from inku_server import composer, saijiki, schema
 from inku_server.coerce import coerce_score
 from inku_server.interpreter import SYSTEM_PROMPT_PREFIX, SYSTEM_PROMPT_PREFIX_EN
-from inku_server.layer_versions import DDL_ENGINE_VERSION
 from inku_server.renderer import render
 from inku_server.schema import Instruction, Score
 
@@ -304,9 +303,14 @@ def test_stage2_no_longer_sends_a_fill_to_the_boolean() -> None:
 
 
 def test_ddl_engine_18_is_baked_and_matches_its_manifest() -> None:
-    """T-12. Raising the version without baking freezes a record of nothing."""
-    assert DDL_ENGINE_VERSION == "18"
-    directory = SERVER_ROOT / "reference" / f"ddl-engine-{DDL_ENGINE_VERSION}"
+    """T-12. Raising the version without baking freezes a record of nothing.
+
+    Pinned to directory 18 rather than to whatever the current version is: this
+    says engine 18 was baked, and that claim does not expire when engine 19
+    arrives. Reading `DDL_ENGINE_VERSION` here would have moved the subject of
+    the sentence every time the number rose.
+    """
+    directory = SERVER_ROOT / "reference" / "ddl-engine-18"
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["engine_version"] == "18"
 

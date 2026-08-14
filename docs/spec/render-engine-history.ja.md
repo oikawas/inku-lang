@@ -120,13 +120,13 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | 名前 | 何の版か | 現在 | 上げる条件 |
 |---|---|---|---|
 | `render_engine_version` | 描画エンジン | `33` | **同一 Score + 同一 seed の演奏結果が変わるとき、または演奏できる語彙が増えたとき** |
-| `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `17` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
+| `ddl_engine_version` | 決定的変換層（展開・coerce・validator） | `18` | 同一入力 + 同一 seed の出力が変わるとき、**または `Instruction` のフィールド宣言順が変わるとき** |
 | `ddl_version` | DDL 言語仕様そのもの（文法・キーワード） | `3` | **語彙の追加・変更・廃止、または文法の追加・変更・廃止**（2026-07-30 作者裁定で明文化。v2 は太さの語で、v3 は黄・橙・紫で上げた） |
 | Score の `version` | JSON Score のスキーマ | `0.1.0` | スキーマの構造変更 |
 | `MODEL_CONFIG_VERSION` | モデルカタログの中身 | `2.5.0` | **計測値・推奨度・選択可否が変わったとき**。上げると保存済みカタログの同じ id へ組み込みのメタを貼り直す（保存済みのモデル一覧と有効/無効の選択は残る） |
-| `APP_VERSION` | アプリの版 | v2.13.19 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
+| `APP_VERSION` | アプリの版 | v2.13.20 | 採番のたび。**正本は `web/APP_VERSION` の 1 ファイル**で、UI・`/api/info` の `version`・CLI が同じ値を読む |
 | `server/pyproject.toml` | 配布物の版 | 2.7.2 | **リリースのタグを打つときだけ**。`/api/info` の `release_version` が返す。リリース保留中はアプリの版から遅れる |
-| `web/BUILD_NUMBER` | ビルド通し番号 | 906 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
+| `web/BUILD_NUMBER` | ビルド通し番号 | 907 | **UI の変更でも動く。ブランチごとの値ではなく共有の連番なので、番号は飛びうる。v2.9.23 以降は `.gitattributes` の merge driver が大きいほうを採るので、両側が採番しても競合しない**（`scripts/git/setup.sh` を clone ごとに 1 回） |
 
 **「現在」の列は書いた時点の値である。** 版を上げたら、この列も同じ commit で直す。
 
@@ -182,7 +182,7 @@ Stage 2 の LLM が挟まる。したがって「DDL から Score まで」を 1
 | コーパス | 置き場 | 何を凍結するか | ケース数 |
 |---|---|---|---|
 | 描画 | `server/reference/render-engine-33/` | `renderer.py` / `stroke_engine.py` の演奏結果（SVG） | 586（SVG 4） |
-| 決定的 DDL 層 | `server/reference/ddl-engine-17/` | **A** = `expand_intermediate_ddl` の展開後 DDL / **B** = `coerce_score` の補正後 Score + `branch_report` / **C** = `expand_plugin_ddl` の展開後 DDL + 単位数 + 断りの記録 + API へ渡す圧縮形（`score_instructions`） | 49（A 13 / B 30 / C 6） |
+| 決定的 DDL 層 | `server/reference/ddl-engine-18/` | **A** = `expand_intermediate_ddl` の展開後 DDL / **B** = `coerce_score` の補正後 Score + `branch_report` / **C** = `expand_plugin_ddl` の展開後 DDL + 単位数 + 断りの記録 + API へ渡す圧縮形（`score_instructions`） | 49（A 13 / B 30 / C 6） |
 
 **DDL 側が A・B・C の 3 部に分かれるのは、決定的な層が隣り合っていないからである**（本書の「決定的な層と非決定的な層」）。
 **C（プラグイン展開）は v2.13.1 で足した** —— この層は最初から版数を名乗っていたが、凍結出力を 1 度も持っていなかった。**A のプラグイン仕事は `ddl_expander` の `Nature.` マクロ正規表現**で、**文書プラグインの管理器を呼ぶのは render の経路だけ**だからである。
@@ -365,6 +365,20 @@ Renderer は**複合 span をコピーしてから、コピーごとにその中
 **動いたのは API が読む側だけ**なので、**凍結の C 部へ `score_instructions` を足した** ——
 公開展開だけを持つ記録は、**その版の変更をコーパスが 1 度も通らない記録**になる。
 **C の 6 件は全部動き、A の 13 件と B の 30 件はバイト一致である。**
+
+### DDL 層だけが動いた（`ddl_engine_version` 17 → 18・v2.13.20）
+
+**塗りが、ほかの面の語と同じ 1 語になった。** おもての質 9 語のうち 8 語は `surface.texture` へ行き、
+**塗り だけが真偽値 `filled` へ行っていた**。実測では行き先の欄だけが到達を決めており
+（`texture` へ行く語は 12/14、`filled` へ行く塗りは英 0/14）、`SurfaceTexture` に `solid` を足して合流させた。
+
+**`filled` は残る。** coerce の枝が**両方向を導出する**ので、どちらの言い方で届いても Score は同じ 1 つの状態を言う。
+**絵は動かない** —— `solid` は演奏 seed から畳んであり（畳まないと保存済みの塗り図形すべてで筆致 seed が振り直される）、
+`filled=true` だけの Score と `texture="solid"` だけの Score はバイト一致の SVG を出す。
+
+**`changed_from_previous` は 30（B の全件）だが、Score が動いたのは 3 件（閉図形の命令 5 本）で、
+残り 27 は `branch_report` に鍵が 1 つ増えただけである**（engine 11・15 と同じ型）。
+**A の 13 件と C の 6 件は 1 バイトも動いていない。**
 
 ## engine 32 — まとまりと道筋も、どのキャンバスでも形を保つ（v2.13.13）
 

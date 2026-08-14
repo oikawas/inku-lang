@@ -6534,3 +6534,77 @@ product path, was reproduced with a local server against the NIM key through `in
   line still reads "N passed" when something failed, so **3,172 passed had been recorded as the score of a
   commit the tree was never green on**. It now records nothing when the run holds a failure, and the bad row
   was removed. A perturbation confirms zero rows on red and one on green.
+
+### v2.13.20 — A fill is a surface word like the other eight (Build 907, 2026-08-14, ledger I-227, ddl engine 18)
+
+**A description could say "fill" and the inside of the drawing stayed empty.** The saijiki's *omote* names
+how the interior of a closed shape is in nine quality words, and **eight of them landed in
+`surface.texture` while the ninth, 塗り (fill), landed in the boolean `filled`.** Measured against a live
+model on 2026-08-13, the destination field was the only thing that decided reach: the words that go to
+`texture` arrived 12 of 14 times in both languages, while a fill through `filled` arrived **0 of 14 in
+English and 2 of 4 in Japanese** — and both Japanese hits rode a duplicated second instruction.
+
+- **`SurfaceTexture` gains `solid`, and the saijiki gives 塗り `score_value="solid"` and 空 `"none"`.**
+  All nine quality words now map to the enum (`texture_for_surface()` joins `weight_for_surface()` and
+  `color_for_surface()`; the two density words are excluded **by name** — excluding "whatever has no value"
+  would quietly pass a quality word whose value was forgotten).
+- **`filled` stays.** All three reasons measured true: the declaration order is frozen (none of
+  `Instruction`'s 25 fields moved), saved works carry it, and coerce raises it in four places of its own.
+- **A coerce branch, `_with_fill_as_a_surface_word`, derives each way of saying a fill from the other** —
+  `texture="solid"` gives `filled=true` so every reader that only knows the boolean still draws it, and a
+  `filled=true` with no surface of its own gives `texture="solid"` so works already saved say their interior
+  in the vocabulary new ones use. **It does not fire on lines or arcs**, it is wired into **both exits**, and
+  it runs on the `INKU_COERCE_DISABLE` path too — whether a work can be drawn is not a question of style.
+- **⚠ `solid` is folded out of the performance seed.** Without that, the moment the branch adds a `surface`
+  to a saved `filled=true`, **the stroke seed is redrawn for every filled closed shape in all 2,972 works in
+  production.** It follows the rule `_variation_seed_fields` already uses for variations that are never
+  performed. **No existing byte moves: not one Score holds `solid` today.**
+- **`fill_is_asked_for()` now lives once in `schema.py`, read from three places** (the renderer's fill, the
+  governor that tempers oversized filled shapes, and the one that enlarges tiny unfilled particles). Without
+  it the new way of saying a fill would slip past the governor as a page-filling black circle.
+- **Stage 2's four mapping lines are rewritten and one `面: 塗り。` / `Surface: flat.` example pair is added.**
+  **Two existing filled-circle examples that still taught `filled=true` were brought to the same form** — a
+  table stating the new rule while its examples show the old one is the internal contradiction this prompt
+  has been fixed for before. **Stage 1's fixed phrases are untouched**: the DDL still reads `面: 塗り。`.
+- **The drawing does not move.** A Score with only `filled=true` and one with only `texture="solid"` emit
+  **byte-identical SVG**.
+- **Reference corpus `ddl-engine-18` is baked.** `changed_from_previous` is **30** (all of `b_coerce`), but
+  **only 3 cases move their Score** (five closed-shape instructions); the other 27 gained one branch-report
+  key. The 13 expand and 6 plugin-expand cases do not move at all, and a second generator run is
+  byte-identical.
+- **The Kotlin prompt copy and its fingerprint were brought along in the same commit** (`WebDdlSpec.kt`'s two
+  Stage 2 constants and `prompts.json`). **No server test reads that fingerprint and CI never runs Android**,
+  so this is a surface that rots silently. `android/VERSION` is stamped **2.1.4-android.29**.
+
+**Live-model measurement (reported, not an acceptance; full run in
+`cli/out2/906-v2.13.19-fill-as-a-surface-word-reach/`):** `面: 塗り。` reached **`solid` 3/4**, up from
+`filled` 2/4 at Build 903 — and where the two earlier hits rode a duplicated second circle, **all three here
+are a single circle**. The control `面: 薄墨。` reached `wash` 4/4. **⚠ English `Surface: flat.` was 0/4**,
+below the issuing side's prediction of 5–8 of 8. **The shape of the failure changed**, though: at 903 the key
+was sometimes absent, while here all four answers write `surface` and choose the default `"none"` inside it —
+**the destination field is reached; the value chosen is different.** **⚠ Measured with the production hard
+timeout lifted** (`INKU_STAGE1/2_HARD_TIMEOUT_SECONDS=900`; 7 of 12 runs exceeded 120s, median 133.3s), with
+**zero fallback compositions**. That fact is itself material for ruling on [I-227].
+
+**Checks:** **server 3,190 passed / 31 skipped** (+17 = 16 new acceptances plus one synthesized coerce golden
+case), **cli 225 passed**, **web 332 passed**, **ruff clean**, **frozen corpora byte-identical**, **Android
+JVM 289 passed / 0 failures**, **`check_docs.py` green**. **Thirteen perturbations were applied through
+`perturb.py`**, each restored byte-identically, with prediction and measurement reported side by side.
+**⚠ P-4 (dropping only the reverse derivation) did not redden T-6** — the renderer treats `filled` and
+`solid` as the same performance, so the reverse derivation is **redundant for drawing**; what has power is
+T-5, which measures how the Score says it, and the readers downstream of it (replay of saved works, Android,
+any client that only knows the boolean).
+
+- **What acceptance measured** (the implementation was the same Opus 5, so numbers already measured on the
+  branch were not re-measured): **all eight forbidden targets show 0 files** (`android/VERSION`,
+  `APP_VERSION`, `web/BUILD_NUMBER`, `ServerScoreCoercer.kt`, `interpreter.py`, `ddl-engine-17` and earlier,
+  every render corpus, `cli/out2/903-*`); **`Instruction`'s 25-field order is byte-identical**; **the branch
+  tree and the merged tree hash the same** (`8337bac2`); and **the two tests that vanished by name are
+  renames whose claims survive** (with 塗り and 空 carrying values, "the four words with no value" became two,
+  and only `paper_grain` is subtracted from the enum).
+- **The API-surface exception is declared narrowly.** `SurfaceSpec` gained no property, so a property-set
+  comparison sees nothing; the guards now name the added enum value and assert none was removed.
+- **Three ledger entries:** **[I-248]** (Android holds two copies that cannot choose `solid` — the
+  `ServerScoreCoercer.kt` allowlist and the Score schema in `ServerScoreSchemaJson.kt`), **[I-250]**
+  (`sync_android_prompts.py` measures the main checkout even when run from a worktree, printing a false
+  green), and **[I-251]** (`texture_for_surface()` has no reader yet; `carriage.py` is the natural one).

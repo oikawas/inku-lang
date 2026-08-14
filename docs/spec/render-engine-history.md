@@ -132,13 +132,13 @@ but never asserts "the output will change"**.
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
 | `render_engine_version` | the drawing engine | `33` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `17` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `18` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.19 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.20 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 906 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 907 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -214,7 +214,7 @@ There are two instances as of v2.4.7.
 | Corpus | Location | What it freezes | Cases |
 |---|---|---|---|
 | Drawing | `server/reference/render-engine-33/` | what `renderer.py` / `stroke_engine.py` perform (SVG) | 586 (4 SVG) |
-| Deterministic DDL layers | `server/reference/ddl-engine-17/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` / **C** = expanded DDL, unit counts, declines and the compact Score form (`score_instructions`) from `expand_plugin_ddl` | 49 (A 13 / B 30 / C 6) |
+| Deterministic DDL layers | `server/reference/ddl-engine-18/` | **A** = expanded DDL from `expand_intermediate_ddl` / **B** = coerced Score plus `branch_report` from `coerce_score` / **C** = expanded DDL, unit counts, declines and the compact Score form (`score_instructions`) from `expand_plugin_ddl` | 49 (A 13 / B 30 / C 6) |
 
 **The DDL side splits into A, B and C because the deterministic layers are not
 adjacent** ("Deterministic and non-deterministic layers" in this document). Stage 2's LLM sits between Stage 1.5 (DDL→DDL) and coercion
@@ -457,6 +457,22 @@ expansion did not move by a byte** -- `instructions` still holds every resolved 
 same. **Only the form the API reads changed**, which is why **`score_instructions` joins the frozen part C**: a
 record holding the public expansion alone would freeze a version whose change the corpus never reaches. **All
 six C cases moved; the 13 A cases and the 30 B cases are byte-identical.**
+
+### Only the DDL layer moved (`ddl_engine_version` 17 to 18, v2.13.20)
+
+**A fill became a word like the other eight.** Eight of the nine *omote* quality words went to
+`surface.texture` while **only 塗り went to the boolean `filled`**. Measurement said the destination field
+was the whole of it (12/14 through `texture` against 0/14 in English through `filled`), so `SurfaceTexture`
+gained `solid` and the fill joined the road that carries.
+
+**`filled` stays.** The coerce branch **derives each way from the other**, so both ways of saying it leave
+the Score stating one interior state. **The drawing does not move**: `solid` is folded out of the
+performance seed (without that, every saved filled shape would have its stroke seed redrawn), and a Score
+with only `filled=true` and one with only `texture="solid"` emit byte-identical SVG.
+
+**`changed_from_previous` is 30 (all of B), but only 3 cases move their Score** (five closed-shape
+instructions); the other 27 gained one branch-report key, as in engines 11 and 15. **The 13 A cases and the
+6 C cases do not move at all.**
 
 ## engine 32 — a cluster and a path keep their shape on any canvas (v2.13.13)
 

@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-14 — v2.13.20 unreleased baseline (Web Build 907)
+
+Updated the 13 places that name a version to v2.13.20 / Build 907.
+
+**The only user-visible change is how reliably a fill asked for in words arrives.**
+
+- **Writing `面: 塗り。` now fills the interior more often.** A fill used to travel a different road from the other surface words, arriving 2 times out of 4 in Japanese and 0 out of 14 in English. It now travels the road the other eight words use. **English `Surface: flat.` still does not arrive** (0 of 4 after this change; the cause is being measured).
+- **The drawing itself does not change.** Works already saved look the same, and so does the touch of a fill from here on.
+- No operation, label, default setting, environment variable, or CLI flag changed.
+
 ## 2026-08-13 — v2.13.19 unreleased baseline (Web Build 906)
 
 The 13 places that name a version were updated to v2.13.19 / Build 906. **⚠ The previous entry (v2.13.18 / Build 905) states that it updated those 13 places, but all 13 still read v2.13.17 / Build 904.** They are aligned here.

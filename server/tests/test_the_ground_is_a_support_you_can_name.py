@@ -37,10 +37,24 @@ _GRADIENT = re.compile(
 )
 
 
-def _score(material: str) -> Score:
+# One seed for every support, used where the claim is about the drawing.
+#
+# ⚠ `_texture_seed` hashes the ground spec, and the material is part of it, so
+# two supports get different grain positions even when they run the exact same
+# code. Left derived, a check that "the seven differ" passes with all seven
+# drawn by one builder -- measured 2026-08-14, when swapping `drawing_paper` to
+# the paper builder reddened nothing at all. `test_ground_seed.py` had already
+# written this warning down for a narrower case.
+_PINNED_SEED = 13579
+
+
+def _score(material: str, *, seed: int | None = None) -> Score:
+    ground: dict = {"material": material}
+    if seed is not None:
+        ground["seed"] = seed
     return Score.model_validate(
         {
-            "canvas": {"aspect": "square", "ground": {"material": material}},
+            "canvas": {"aspect": "square", "ground": ground},
             "instructions": [{"primitive": "line", "from": [0.0, 0.5], "to": [1.0, 0.5]}],
         }
     )
@@ -141,7 +155,10 @@ def test_the_ground_needs_no_filter_in_any_profile(material: str) -> None:
     for profile in sorted(SVG_PROFILES):
         svg = render(score, render_seed=123, svg_profile=profile)
         layer = _ground_layer(svg)
-        assert layer, profile
+        # A tile in each profile, not merely a group: the group carries the tone
+        # rectangle whether or not anything is drawn on it, so `assert layer`
+        # alone stays green for a support that silently draws nothing.
+        assert _PATTERN.findall(svg), profile
         assert "filter" not in layer, profile
 
 
@@ -163,7 +180,9 @@ def test_the_seven_supports_differ_from_one_another() -> None:
     """
     digests = {
         material: hashlib.sha256(
-            _ground_layer(render(_score(material), render_seed=123)).encode("utf-8")
+            _ground_layer(
+                render(_score(material, seed=_PINNED_SEED), render_seed=123)
+            ).encode("utf-8")
         ).hexdigest()
         for material in SUPPORTS
     }

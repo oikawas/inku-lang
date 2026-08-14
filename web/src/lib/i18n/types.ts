@@ -71,6 +71,7 @@ export interface LangPack {
 	batchHistoryLabel: string;
 	batchHistoryPlaceholder: string;
 	batchHistoryApply: string;
+	batchResumeBtn: string;
 	colorCatalogAuto: string;
 	colorCatalogAutoSub: string;
 	colorCatalogRetired: string;

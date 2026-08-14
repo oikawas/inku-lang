@@ -142,7 +142,11 @@ test('every other listing sender is accounted for', () => {
 	const manager = readFileSync(fileURLToPath(new URL('./historyManagerState.svelte.ts', import.meta.url)), 'utf-8');
 	const getters = [...page.matchAll(/apiFetch\(`\/api\/history\?/g)].length
 		+ [...manager.matchAll(/apiFetch\(`\/api\/history\?/g)].length;
-	assert.equal(getters, 3, 'three senders ask the listing for works');
+	assert.equal(getters, 4, 'four senders ask the listing for works');
 
 	assert.match(page, /\/api\/history\?offset=0&limit=100&trashed=true/, 'the trash page still asks for drawings');
+	// The fourth, decided about here: the sender that reads whether the last
+	// batch reached the end of its prompt, and which lines of it have a work. It
+	// wants two numbers off each work and never its drawing.
+	assert.match(page, /limit: String\(limit\),\s*include_svg: 'false',/, 'the batch resume sender must ask for no drawings');
 });

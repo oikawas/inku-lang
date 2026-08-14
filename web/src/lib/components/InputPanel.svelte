@@ -57,6 +57,8 @@
 		generationDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
+		canResumeBatch: boolean;
+		onResumeBatch: () => void;
 		demoSettings: DemoSettings;
 		demoModelProviderGroups: ProviderGroup[];
 		demoRunning: boolean;
@@ -135,6 +137,8 @@
 		generationDisabled,
 		error,
 		batchPromptHistory,
+		canResumeBatch,
+		onResumeBatch,
 		demoSettings = $bindable(),
 		demoModelProviderGroups,
 		demoRunning,
@@ -402,6 +406,8 @@
 			actionDisabled={singleRunning || generationDisabled}
 			{error}
 			{batchPromptHistory}
+			{canResumeBatch}
+			{onResumeBatch}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}

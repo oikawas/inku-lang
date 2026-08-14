@@ -93,6 +93,7 @@ export const ja: LangPack = {
 	batchHistoryLabel: 'バッチ記述履歴',
 	batchHistoryPlaceholder: '履歴から選択',
 	batchHistoryApply: '復元',
+	batchResumeBtn: '中断時点から再開',
 	colorCatalogAuto: '記述から自動選択',
 	colorCatalogAutoSub: '描くたびにサーバーが記述を読んで選ぶ',
 	colorCatalogRetired: '引退済み',

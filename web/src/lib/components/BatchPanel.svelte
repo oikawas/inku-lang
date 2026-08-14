@@ -42,6 +42,9 @@
 		actionDisabled: boolean;
 		error: string | null;
 		batchPromptHistory: string[];
+		/** Set when the last run stopped before the end of its prompt. */
+		canResumeBatch: boolean;
+		onResumeBatch: () => void;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -78,6 +81,8 @@
 		actionDisabled,
 		error,
 		batchPromptHistory,
+		canResumeBatch,
+		onResumeBatch,
 		stage1ModelLabel,
 		stage2ModelLabel,
 		onRememberBatchPrompt,
@@ -230,7 +235,16 @@
 		/>
 	</div>
 {:else}
-	<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled}>{t().submitBtn}</PaintButton>
+	<!-- Left of the paint button, and only while there is something to finish:
+	     the last run stopped part-way through the batch it was given. -->
+	<div class="batch-actions">
+		{#if canResumeBatch}
+			<button type="button" class="ghost-btn batch-resume-btn" onclick={onResumeBatch} disabled={actionDisabled}>
+				{t().batchResumeBtn}
+			</button>
+		{/if}
+		<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled}>{t().submitBtn}</PaintButton>
+	</div>
 {/if}
 
 {#if error}<p class="error-text">{error}</p>{/if}
@@ -432,6 +446,20 @@
 	.batch-history-menu button.selected {
 		background: var(--bg2);
 		box-shadow: inset 3px 0 0 var(--fg2);
+	}
+	.batch-actions {
+		display: flex;
+		align-items: stretch;
+		gap: 6px;
+	}
+	/* The paint button carries the row's top margin; the one beside it matches. */
+	.batch-actions .batch-resume-btn {
+		flex: 0 0 auto;
+		margin-top: 8px;
+	}
+	.batch-actions :global(.paint-btn.block) {
+		flex: 1;
+		width: auto;
 	}
 	.batch-sketch-body {
 		white-space: pre-wrap;

@@ -2,12 +2,12 @@
   "note": "Kotlin の同名定数は server のこれと一字一句同じであること。LiteRT 用の短縮プロンプトは対象外。",
   "prompts": {
     "STAGE1_PROMPT_PREFIX_JA": {
-      "bytes": 20110,
-      "sha256": "f30c00130ae865e74c98b399723108d1315e47b299e8dd4878e970dbd1d73f0a"
+      "bytes": 20116,
+      "sha256": "6fdf17cbf2268a42c18832ab862a9718ddef68fbc3082e59d5e3ec692efebd34"
     },
     "STAGE1_PROMPT_PREFIX_EN": {
-      "bytes": 18992,
-      "sha256": "9cec0367687c01126c6e71b8ac86b379cee0f2f020232d2df1c002eff1c54594"
+      "bytes": 18999,
+      "sha256": "fcb459cea5d05f2fd71dde22599ab2d0375c6c4ad63978afc271cd7cdcd160d7"
     },
     "STAGE2_SYSTEM_PROMPT_JA": {
       "bytes": 47290,

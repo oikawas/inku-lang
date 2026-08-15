@@ -37,8 +37,11 @@ def empty_plugin_vocabulary(monkeypatch):
         # 歳時記に じ が 1 行増え、地の定型が 3 行から 8 行へ広がり、支持体を
         # 潰さないという 1 行が加わった。few-shot も日英 2 組ずつ増えた。
         # ja 19_584 -> 20_110 / en 18_511 -> 18_992。
-        ("ja", 20_110, "f30c00130ae865e7"),
-        ("en", 18_992, "9cec0367687c0112"),
+        # 同契約の測り直し (2026-08-15): 地の引き金に裸の「紙」/"paper" を足した。
+        # 名指しの「紙」は 8/8 で「画用紙」に化けていた (LLM 実測)。
+        # ja 20_110 -> 20_116 (+6 B) / en 18_992 -> 18_999 (+7 B)。
+        ("ja", 20_116, "6fdf17cbf2268a42"),
+        ("en", 18_999, "fcb459cea5d05f2f"),
     ],
 )
 def test_stage1_prompt_base_digest_expected_values(
@@ -58,9 +61,9 @@ def test_stage1_prompt_base_digest_expected_values(
 @pytest.mark.parametrize(
     ("text", "lang", "expected_bytes", "expected_digest"),
     [
-        ("中心に円を置く。", "ja", 20_797, "8dc8aa390819deb0"),
-        ("雨上がりの水面に光が散る。", "ja", 20_966, "e3d389b82618cc7a"),
-        ("Place one circle at the center.", "en", 19_666, "2bce9421eed27741"),
+        ("中心に円を置く。", "ja", 20_803, "1bec67c706c45e47"),
+        ("雨上がりの水面に光が散る。", "ja", 20_972, "aaad201f22756ce6"),
+        ("Place one circle at the center.", "en", 19_673, "97c62878855c7610"),
     ],
 )
 def test_stage1_actual_prompt_digest_expected_values(
@@ -81,7 +84,7 @@ def test_stage1_base_digest_excludes_input_dependent_examples():
         "雨上がりの水面に光が散る。"
     )
     assert _digest(first_prompt) != _digest(second_prompt)
-    assert _digest(first_base) == _digest(second_base) == "f30c00130ae865e7"
+    assert _digest(first_base) == _digest(second_base) == "6fdf17cbf2268a42"
 
 
 @pytest.mark.usefixtures("empty_plugin_vocabulary")
@@ -226,8 +229,8 @@ def test_saijiki_word_changes_both_stage1_base_digests(monkeypatch):
         for category in original_categories
     )
     expected = {
-        "ja": (20_146, "616ab0deae3151d5"),
-        "en": (19_010, "279d139d29e4f80a"),
+        "ja": (20_152, "3cadccbcdf3a98e2"),
+        "en": (19_017, "9b4a8a6a7c6523f6"),
     }
     for lang, prefix in (
         ("ja", interpreter.SYSTEM_PROMPT_PREFIX),

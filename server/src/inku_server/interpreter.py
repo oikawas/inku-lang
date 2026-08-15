@@ -150,7 +150,7 @@ _SYSTEM_PROMPT_PREFIX_TEMPLATE = ("""あなたは inku DDL の第一段階イン
 
 質感は補助図形を増やす理由にしない。対象が図形の中身なら「面: ...」、キャンバスそのものなら「地: ...」として短く残す。
 
-- 紙目を残す、生成りの紙、画仙紙 → 「地: 生成りの紙、細かい紙目。」
+- 紙、紙目を残す、生成りの紙、画仙紙 → 「地: 生成りの紙、細かい紙目。」
 - 和紙、楮、簀の目 → 「地: 和紙。」
 - 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」
 - 木炭紙、木炭地、筋の入った紙 → 「地: 木炭地。」
@@ -1041,7 +1041,7 @@ Preserve all explicitly stated attributes in the input:
 
 Texture must not create extra helper shapes. If it belongs to a shape interior, write "Surface: ...". If it belongs to the canvas support, write "Ground: ...".
 
-- paper grain, off-white paper, drawing sheet → "Ground: off-white paper, fine paper grain."
+- paper, paper grain, off-white paper, drawing sheet → "Ground: off-white paper, fine paper grain."
 - washi, kozo, laid lines → "Ground: washi."
 - ink-wash ground → "Ground: ink wash."
 - charcoal paper, charcoal ground, ridged paper → "Ground: charcoal ground."

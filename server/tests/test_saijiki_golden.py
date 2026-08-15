@@ -151,7 +151,9 @@ _REORDERED_JA = (
         "- 紙目を残す、生成りの紙、和紙 → 「地: 生成りの紙、細かい紙目。」\n"
         "- 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」\n"
         "- 入力が支持体を「〜の地」「〜を地に」「〜の紙に」と明示した場合は、必ず「地: ...」として残し、「背景...」へ言い換えない。\n",
-        "- 紙目を残す、生成りの紙、画仙紙 → 「地: 生成りの紙、細かい紙目。」\n"
+        # 2026-08-15: the bare saijiki word 「紙」 joins its own trigger list.
+        # Without it Stage 1 answered 「画用紙」 to every naming of 「紙」 (0/8 measured).
+        "- 紙、紙目を残す、生成りの紙、画仙紙 → 「地: 生成りの紙、細かい紙目。」\n"
         "- 和紙、楮、簀の目 → 「地: 和紙。」\n"
         "- 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」\n"
         "- 木炭紙、木炭地、筋の入った紙 → 「地: 木炭地。」\n"
@@ -278,7 +280,8 @@ _REORDERED_EN = (
         '- paper grain, off-white paper, washi → "Ground: off-white paper, fine paper grain."\n'
         '- ink-wash ground → "Ground: ink wash."\n'
         '- If the input explicitly names the support as "... ground", "on ... paper", or "with ... as the ground", always preserve it as "Ground: ..."; never rewrite it as "Fill background ...".\n',
-        '- paper grain, off-white paper, drawing sheet → "Ground: off-white paper, fine paper grain."\n'
+        # 2026-08-15: same repair on the English side -- bare "paper" was missing.
+        '- paper, paper grain, off-white paper, drawing sheet → "Ground: off-white paper, fine paper grain."\n'
         '- washi, kozo, laid lines → "Ground: washi."\n'
         '- ink-wash ground → "Ground: ink wash."\n'
         '- charcoal paper, charcoal ground, ridged paper → "Ground: charcoal ground."\n'

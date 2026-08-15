@@ -199,6 +199,34 @@ class DefaultSvgRendererPhase2fTest {
         }
     }
 
+    /**
+     * T-76: the machine's own hatch, compared row by row against the reference.
+     *
+     * Nothing in this suite looked at this file's rows before. The corpus-wide
+     * `d` gate does reach it, but it asserts on the first case that differs and
+     * 06 comes first, so a break here was only ever reported as a break there.
+     *
+     * The contract asks for `<line>` elements and their four coordinates. There
+     * are none: `computer` is a hand-stroke weight, so its rows go through the
+     * material engine and come out as paths, in the reference as well as here.
+     * The rows are therefore compared as paths, which is the stronger reading of
+     * the same claim -- it sees the whole travelled row, not just its two ends.
+     */
+    @Test
+    fun test21HatchComputerExactParity() {
+        val expectedSvg = readReferenceResource("21_hatch_computer.svg")
+        val actualSvg = renderSvgForReference("21_hatch_computer")
+
+        val expectedHatchPaths = extractGroupPathDList(expectedSvg, "surface-stroke-v1")
+        val actualHatchPaths = extractGroupPathDList(actualSvg, "surface-stroke-v1")
+
+        assertEquals("surface-stroke-v1 path count for 21_hatch_computer.svg must match", expectedHatchPaths.size, actualHatchPaths.size)
+        assertTrue("21_hatch_computer.svg must hold rows to compare", expectedHatchPaths.isNotEmpty())
+        for (i in expectedHatchPaths.indices) {
+            assertEquals("surface-stroke-v1 path d #$i for 21_hatch_computer.svg must match", expectedHatchPaths[i], actualHatchPaths[i])
+        }
+    }
+
     @Test
     fun test10ArcWaveExactParity() {
         val expectedSvg = readReferenceResource("10_arc_wave.svg")

@@ -476,6 +476,7 @@ export interface LangPack {
 	settingsRenderLimitsReset: string;
 	settingsRenderLimitsSaved: string;
 	settingsRenderLimitGroups: Record<string, string>;
+	settingsRenderLimitGroupTooltips: Record<string, string>;
 	settingsRenderLimitLabels: Record<string, string>;
 	settingsRenderLimitHints: Record<string, string>;
 	settingsTabUnreadWords: string;

@@ -413,6 +413,14 @@
 		return groups[group] ?? group;
 	}
 
+	// The families answer to different authorities -- the machine, the eye, and a
+	// typing guard -- and nothing on the row says so. The heading carries the
+	// reason; the per-field line under each stepper stays what that one field does.
+	function renderLimitGroupTooltip(group: string): string {
+		const tips = t().settingsRenderLimitGroupTooltips as Record<string, string>;
+		return tips[group] ?? '';
+	}
+
 	function pluginId(plugin: PluginItem): string {
 		return plugin.id ?? plugin.path ?? `${plugin.namespace ?? ''}.${plugin.name}`;
 	}
@@ -1277,7 +1285,14 @@
 					<div class="db-test-result">{t().settingsRenderLimitsIntro}</div>
 					{#each Object.entries(settingsStatus.render_limits.groups) as [groupName, fields]}
 						<div class="limits-group">
-							<div class="limits-group-label">{renderLimitGroupLabel(groupName)}</div>
+							<div class="limits-group-label">
+								<span>{renderLimitGroupLabel(groupName)}</span>
+								{#if renderLimitGroupTooltip(groupName)}
+									<Tooltip placement="bottom-right" wide text={renderLimitGroupTooltip(groupName)}>
+										<span class="settings-info-mark" aria-hidden="true">i</span>
+									</Tooltip>
+								{/if}
+							</div>
 							<div class="limits-grid">
 								{#each fields as field}
 									<!-- A div, not a label: the stepper's first labelable child is a
@@ -2158,6 +2173,7 @@
 	.limits-group { margin-top: 12px; }
 	.limits-group-label {
 		font-size: var(--btn-sm-font-size); color: var(--fg2); font-weight: 600; margin-bottom: 6px;
+		display: flex; align-items: center; gap: 6px;
 	}
 	.limits-grid {
 		display: grid;

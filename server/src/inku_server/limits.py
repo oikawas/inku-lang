@@ -64,22 +64,36 @@ LIMIT_FIELD_NAMES: tuple[str, ...] = tuple(
 )
 
 # The three families the settings tab shows, in the order it shows them. The
-# grouping is not decoration: the panel would otherwise read as nine unrelated
-# numbers, and the three families answer three different questions -- how much
-# gets drawn, how a stated number is honoured, and what a read or a validated
-# value may reach.
+# grouping is not decoration: each family answers to a different authority, and
+# the panel has to say which, or an administrator cannot tell what moving a
+# number will move.
+#
+#   capability  what THIS INSTALLATION can afford to draw. A faster machine may
+#               raise it. Measured on the development Mac at render engine 35,
+#               one grid mark costs ~13 KB of SVG with a pen and ~16 KB with a
+#               thick brush, so the 400 default already lets one work reach
+#               5-6.5 MB. This is the only family that should follow the
+#               hardware.
+#   legibility  where counting by eye stops and a group is shown as a band.
+#               A faster machine does not make an eye faster, so this family
+#               must NOT be linked to capability. What it has to keep constant
+#               is the look -- how much ink sits in one cluster -- not the
+#               threshold digits.
+#   safety      typo and runaway guards. Nothing here improves a drawing; they
+#               only stop a pasted phone number. An installation should be able
+#               to leave the whole family alone.
 LIMIT_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
-        "drawn",
-        ("max_expanded_primitives", "max_expanded_per_instruction", "max_instructions"),
+        "capability",
+        ("max_expanded_primitives", "max_expanded_per_instruction"),
     ),
     (
-        "stated",
+        "legibility",
         ("literal_count_threshold", "represented_count_min", "represented_count_max"),
     ),
     (
-        "ceiling",
-        ("ddl_count_max", "ddl_count_max_grid", "schema_count_max"),
+        "safety",
+        ("max_instructions", "ddl_count_max", "ddl_count_max_grid", "schema_count_max"),
     ),
 )
 

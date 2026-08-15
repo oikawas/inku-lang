@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.22 (Web Build 909). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.23 (Web Build 910). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -277,12 +277,14 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
 | Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback |
-| Performance | Stage 2 model, Stage 2 language, focus, variation and variation seed, composition seed, render seed, seed text, Wild, the colour words this work was drawn in |
+| Performance | Stage 2 model, Stage 2 language, focus, variation and variation seed, composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
 | Identity | render hash, description hash, render engine, DDL specification, transform layer, prompt digests, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
 
 Every row carries an explanation. The render seed is "the seed that fixes the sway of the performance; the same seed and the same score give the same picture"; the description hash is "the fingerprint of the description; it binds works that came from the same words".
+
+**The weight of a drawing is printed as three quantities.** `SVG size` is the amount of data, `SVG objects` is how many shapes the SVG holds (containers and notes — svg, defs, title, desc, metadata — are not shapes), and `SVG points` is how many points those shapes are drawn from. **None of the three stands in for the others**: at the same size, few objects with many points is a drawing of fine lines, and many objects with few points is a drawing of many forms.
 
 `Prompts` shows the Stage 1 and Stage 2 system prompts and user input; `JSON` shows the JSON Score. Do not confuse the JSON Score itself with the provenance.
 

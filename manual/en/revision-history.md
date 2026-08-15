@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-15 — v2.13.23 unreleased baseline (Web Build 910)
+
+The thirteen places that name a version were updated to v2.13.23 / Build 910. **The `Details` pane of the provenance gained two rows, so chapter 11 of "Create an Image" was revised.**
+
+- **The weight of a drawing is now printed as three quantities.** Next to the existing `SVG size` (the amount of data) there are now `SVG objects` (how many shapes the SVG holds) and `SVG points` (how many points those shapes are drawn from).
+- **None of the three stands in for the others.** Two works of the same 220 KB can hold 158 objects and 680 objects. What makes a drawing heavy is usually the number of points, and that breakdown can now be read.
+- **A work opened from the history shows the same three rows.**
+- No operation, button, default setting, environment variable, or CLI flag changed.
+
 ## 2026-08-15 — v2.13.22 unreleased baseline (Web Build 909)
 
 Updated the 13 places that name a version to v2.13.22 / Build 909. **A description can use seven new words, so a `Grounds` row was added to the vocabulary table in "Creating Images".**

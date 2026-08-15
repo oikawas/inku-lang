@@ -6725,3 +6725,46 @@ green**. **Ten perturbations, plus three re-applied after two gates were given d
 - **⚠ Four tests vanished by name: two are renames whose claim got stronger**
   (`non_display_profiles` → `every_profile`), **and two are engine 15 rules that expired** (the test that
   measured the inside of the filter, and the element-count limit).
+
+---
+
+### v2.13.23 — A drawing says what it is made of (Build 910, 2026-08-15)
+
+**The provenance drawer printed one number for weight: the size of the SVG.** Bytes are the total, not
+the composition. The two largest cases in the reference corpus are **224,749 B with 158 objects** and
+**222,230 B with 680 objects** — **the same 220 KB made of four times as many shapes**. What inflates a
+drawing is not the number of shapes but **how many points a single polyline carries**. This release adds
+two rows to the drawer and prints **three quantities side by side: bytes, objects, points**.
+
+- **One definition of the count.** The new `web/src/lib/svgWeight.ts` (`measureSvgWeight()`) is a
+  one-to-one port of `measure()` in `no-git-sync/scripts/svg_weight.py`, the script that measures the
+  trend (objects = tags other than the five containers `svg` `title` `desc` `metadata` `defs`; points =
+  whitespace-separated tokens in `points` plus numbers inside `d` divided by two; bytes = UTF-8 length).
+  **If the number on the screen and the number in the trend were counted differently, neither could be
+  used.** **⚠ It counts the `result.svg` string, not the DOM** — `querySelectorAll('*')` counts another
+  quantity (no exclusions, and comparison views hold several copies of the same drawing).
+- **The byte row now derives from the same function.** The row, the i18n key and the rendered text are
+  unchanged; leaving the `TextEncoder` line would have kept **two definitions of bytes on one screen**.
+- **History works too**, with no new wiring. `HistoryItem` carries no `svg`, so these three rows read
+  `result` instead of the `statusHistoryItem ?? result` shape the other rows use.
+- **Wording.** Two hint keys were added in all three of `ja.ts` / `en.ts` / `types.ts`, and `GLOSSARY.md`
+  gained a row for **SVG objects / SVG points** (with ~~elements~~, ~~nodes~~ and ~~vertices~~ listed as
+  translations not to use, and why).
+- **Acceptance `T-67`–`T-71`, split into 14 tests** (new `web/src/lib/svgWeight.test.ts`).
+  **The expected values in `T-71` were not counted by hand** — the fixture string was fed to
+  `svg_weight.py` itself (`bytes=702 objects=10 points=14`).
+- **All five perturbations were applied**: 14 predicted, **20 measured**. **The gap of six is two
+  meta-gates** — **`T-15` runs every other web test file in a child process**, so it reddens whenever
+  anything else does (+1 on all five), and **`T-16` runs the i18n lint**, adding one more to `P-4`.
+  **Contracts that perturb this suite should predict a flat "+1".**
+- **Cost:** 1.5 ms for the largest real drawing at hand (321,053 B, 78 objects, **13,536 points**) and
+  23 ms for a **synthetic** 5.13 MB built by repeating it sixteen times. It is a `$derived`, so it runs
+  once per drawing. **No real work of the production p90 size (4.79 MB) exists in this tree, so
+  production scale was not measured.**
+- **Cross-checked against `svg_weight.py` on 3,012 SVGs**, not one — every reference drawing from
+  `render-engine-10` to `34` and `ddl-engine-1` to `19`, **with zero disagreements on all three
+  quantities**.
+- **Verification:** `make test-web` **371 passed / 0 failed** (357 at the base, **+14 = this contract's
+  acceptance**), `npm run check` **261 FILES / 0 ERRORS / 2 WARNINGS** (+1 file, the two known a11y
+  warnings unchanged), `npm run lint:i18n` **1,062 strings / 47 exceptions / 0 warnings / 0 errors**.
+  **`server/`, `cli/`, `shared/` and `android/` are untouched, and their suites were not run.**

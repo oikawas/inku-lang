@@ -539,6 +539,26 @@ internal object ServerRendererGeometry {
         return listOf(cx - hx * sx, cy - hy * sy, cx + hx * sx, cy + hy * sy)
     }
 
+    /** Ramanujan's second approximation, which is what the server measures with. */
+    fun ellipsePerimeter(rx: Double, ry: Double): Double {
+        val a = kotlin.math.abs(rx)
+        val b = kotlin.math.abs(ry)
+        if (a + b <= 0.0) return 0.0
+        val d = (a - b) / (a + b)
+        val h = d * d
+        return Math.PI * (a + b) * (1.0 + 3.0 * h / (10.0 + sqrt(4.0 - 3.0 * h)))
+    }
+
+    /** 1:1 with renderer.py `_polygon_points`: sides clamped to 5..8, first vertex at -90 degrees. */
+    fun polygonPoints(cx: Double, cy: Double, r: Double, sides: Int, rotationDeg: Double): List<Pair<Double, Double>> {
+        val count = min(max(sides, 5), 8)
+        val start = Math.toRadians(rotationDeg - 90.0)
+        return (0 until count).map { i ->
+            val a = start + Math.PI * 2.0 * i / count
+            (cx + cos(a) * r) to (cy + sin(a) * r)
+        }
+    }
+
     fun fillScanAngle(seed: Any): Double {
         return hash01(0, seed, "fill-angle") * Math.PI
     }

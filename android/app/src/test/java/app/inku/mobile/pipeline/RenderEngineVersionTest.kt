@@ -21,7 +21,7 @@ class RenderEngineVersionTest {
                 svgProfile = "editable",
             )
         )
-        assertEquals("30", JSONObject(result.metadataJson).getString("render_engine_version"))
+        assertEquals("35", JSONObject(result.metadataJson).getString("render_engine_version"))
     }
 
     @Test
@@ -57,7 +57,7 @@ class RenderEngineVersionTest {
     // The version the UI shows is pinned to a literal so that leaving it stale fails here.
     @Test
     fun testCompatibilityConstantsDeclareTheCurrentEngine() {
-        assertEquals("30", CompatibilityConstants.renderEngineVersion)
+        assertEquals("35", CompatibilityConstants.renderEngineVersion)
         assertEquals("default", CompatibilityConstants.renderEngineId)
     }
 

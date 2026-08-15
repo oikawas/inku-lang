@@ -696,7 +696,10 @@ class DefaultSvgRenderer(
                 val atObj = ins.getJSONObject("at")
                 val reg = atObj.optJSONArray("region")
                 if (reg != null && reg.length() >= 4) {
-                    listOf(reg.getDouble(0), reg.getDouble(1), reg.getDouble(2), reg.getDouble(3))
+                    ServerRendererGeometry.regionInShortSideUnits(
+                        listOf(reg.getDouble(0), reg.getDouble(1), reg.getDouble(2), reg.getDouble(3)),
+                        canvas,
+                    )
                 } else {
                     listOf(margin, margin, 1.0 - margin, 1.0 - margin)
                 }
@@ -800,7 +803,16 @@ class DefaultSvgRenderer(
                         val declaredRadius = arr.optDouble("radius", 0.0)
                         val r = if (declaredRadius != 0.0) declaredRadius else 0.3
                         layoutCenter = cx to cy
-                        (cx + r * cos(a)) to (cy - r * sin(a))
+                        // engine 31: the stated radius is one length, so it has
+                        // to buy the same number of pixels on both axes. Written
+                        // straight, `r` in normalized coordinates becomes
+                        // `r * width` across and `r * height` down, and the ring
+                        // came out with the canvas's own aspect. The radius stays
+                        // the description's; only its trip to pixels is levelled.
+                        val (scaleX, scaleY) = ServerRendererGeometry.shortSideScales(canvas)
+                        val rx = r * scaleX
+                        val ry = r * scaleY
+                        (cx + rx * cos(a)) to (cy - ry * sin(a))
                     }
                     else -> (margin + t * (1.0 - margin * 2.0)) to 0.5
                 }
@@ -2557,10 +2569,14 @@ class DefaultSvgRenderer(
         val at = ins.optJSONObject("at") ?: return ins
         val region = at.optJSONArray("region") ?: return ins
         if (region.length() < 4) return ins
-        val x0 = region.getDouble(0)
-        val y0 = region.getDouble(1)
-        val x1 = region.getDouble(2)
-        val y1 = region.getDouble(3)
+        val scaled = ServerRendererGeometry.regionInShortSideUnits(
+            listOf(region.getDouble(0), region.getDouble(1), region.getDouble(2), region.getDouble(3)),
+            canvas,
+        )
+        val x0 = scaled[0]
+        val y0 = scaled[1]
+        val x1 = scaled[2]
+        val y1 = scaled[3]
         val x = x0 + (x1 - x0) * ServerRendererGeometry.hash01(index, seed, "region-x")
         val y = y0 + (y1 - y0) * ServerRendererGeometry.hash01(index, seed, "region-y")
         return moveAnchorTo(ins, x to y, keepRelation = true)

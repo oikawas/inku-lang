@@ -513,6 +513,32 @@ internal object ServerRendererGeometry {
     fun shortSideScales(width: Double, height: Double, unit: Double): Pair<Double, Double> =
         (unit / width) to (unit / height)
 
+    /**
+     * R3: the region's centre stays put, its extent goes to short-side units.
+     *
+     * The centre is deliberately left proportional -- "upper right" is the upper
+     * right of any canvas -- so only the half-extents are scaled.
+     */
+    fun regionInShortSideUnits(region: List<Double>, canvas: CanvasSize?): List<Double> {
+        val (sx, sy) = shortSideScales(canvas)
+        if (sx == 1.0 && sy == 1.0) {
+            // A square canvas has to come out byte-identical, and centre +/-
+            // half-extent does not round-trip in floating point: on the server
+            // [0.6, 0.18, 0.82, 0.4] moved y0 by 2.78e-17, enough to cross a
+            // rounding boundary downstream and change a frozen square case.
+            return region
+        }
+        val x0 = region[0]
+        val y0 = region[1]
+        val x1 = region[2]
+        val y1 = region[3]
+        val cx = (x0 + x1) / 2.0
+        val cy = (y0 + y1) / 2.0
+        val hx = (x1 - x0) / 2.0
+        val hy = (y1 - y0) / 2.0
+        return listOf(cx - hx * sx, cy - hy * sy, cx + hx * sx, cy + hy * sy)
+    }
+
     fun fillScanAngle(seed: Any): Double {
         return hash01(0, seed, "fill-angle") * Math.PI
     }

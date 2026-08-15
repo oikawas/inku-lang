@@ -6669,3 +6669,59 @@ first**, and it reddened as predicted.
   places across five files in stage 3.
 - **One ledger entry, resolved in the same round:** **[I-257]** (filed by acceptance; the author chose
   option B and stage 3 implemented it).
+
+### v2.13.22 — The ground is a support you can name (Build 909, 2026-08-15, render engine 34 / ddl engine 19)
+
+**The ground had four materials — paper, washi, ink-wash ground, charcoal ground — and it did not arrive
+from the description at all**: `washi` appeared in **0 of 3,086 production works** and **0 of the 2,125
+measured ones**. **There are seven supports now, and a new saijiki category `じ` lets a description name
+one.**
+
+- **The saijiki gained `じ` (grounds)** — paper, washi, ink-wash ground, charcoal ground, **canvas**,
+  **drawing paper**, mezzotint. `GroundMaterial` is eight values (`plain` plus the seven).
+- **All seven are tiled as a `<pattern>` and use no `<filter>` at all.** Through engine 33, `display`
+  alone drew a `feTurbulence` rectangle while the other two profiles scattered grains. **The same Score
+  drawn under all three profiles now gives a ground layer that matches byte for byte.**
+- **The cost limit moved from a count of elements to bytes** (24 KB, author's ruling 2026-08-14). The
+  engine 15 rule — a support is the character of noise, not something drawn — **stopped meaning anything
+  once the 80 strokes inside a tile are written to the file once.**
+- **⚠ Mezzotint is the largest in bytes (17,918 B); canvas is the largest in tiles on screen (21,626 for
+  the plain weave)** — **two different quantities**, and it is the tile count that drives the Android
+  cost. → **[I-256]**
+- **The Stage 1 prompt was written out from three lines to eight** (both languages), **including the line
+  that had been flattening washi into "paper".**
+- **The bare words 紙 / "paper" were added to the trigger lists** — before that, **all eight attempts in
+  both languages landed on `drawing_paper`** (the model picks the nearest value the list offers). After
+  the change, `paper` appeared in Stage 2's raw answer **for the first time** (1 of 4 in Japanese, 2 of 4
+  in English). **Drawing paper stayed itself in 8 of 8: the drift that was feared did not happen.**
+
+**Measured with a live LLM (reported, not an acceptance; full text in
+`cli/out2/907-v2.13.20-ground-named-by-the-llm/` and `-paper-trigger/`):** across seven materials × four
+attempts in each language, **Stage 1 wrote a ground sentence all 56 times** (0 of 2,125 on the issue date).
+**`canvas.ground` survived into the final Score 18 of 28 times in Japanese and 16 of 28 in English, so what
+drops it is Stage 2 alone.** **⚠ Two of the eight controls that asked for no ground got one** — Stage 1
+wrote it, and `_enforce_ground_literal_gate` only drops a ground Stage 2 invented, so it passes through.
+**⚠ Measured with the production hard timeout lifted** (600–1800s). **Fallback compositions: 1 Japanese, 11
+English, 2 controls.**
+
+**Checks:** **server 3,224 passed / 31 skipped**, **cli 225 passed**, **web 357 passed**, **Android JVM 578
+passed / 0 failures** (289 each for debug and release), **ruff clean**, **`npm run check` 260 FILES 0
+ERRORS 2 WARNINGS**, **`lint:i18n` 1058 / 47 / 0 / 0**, **frozen corpora byte-identical**, **`check_docs.py`
+green**. **Ten perturbations, plus three re-applied after two gates were given discriminating power.**
+
+- **⚠⚠ Acceptance rebaked the reference corpus.** **The `render-engine-34/` the branch delivered did not
+  reproduce from the branch's own commit**: **6 of 588 cases** — every one of them a `paper` ground —
+  **differed by three bytes**, and the manifest recorded the branch point `f7933235` as the commit it was
+  baked from. **It was baked before the drawing work was finished and never baked again.** Acceptance
+  removed the directory, baked it again, and confirmed **the second run is byte-identical** and
+  **`changed_from_previous` is the same 13 cases**. **`check_frozen_corpora.py` is a check the report never
+  names.**
+- **⚠ The merge conflicted on `api-surface-baseline.json`** (both this round and v2.13.21 regenerated it).
+  **Neither side was picked: it was regenerated from the merged code**, and the schemas that moved were
+  confirmed to be exactly the union **`{HistoryItem, HistoryPostBody} ∪ {CanvasGroundSpec}`**, with **no
+  route and no operation moved**.
+- **⚠ Nothing at or below `server/reference/render-engine-33` and `ddl-engine-18` moved** (all ten entries
+  of the contract's forbidden list show zero files).
+- **⚠ Four tests vanished by name: two are renames whose claim got stronger**
+  (`non_display_profiles` → `every_profile`), **and two are engine 15 rules that expired** (the test that
+  measured the inside of the filter, and the element-count limit).

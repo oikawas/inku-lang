@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-15 — v2.13.22 unreleased baseline (Web Build 909)
+
+Updated the 13 places that name a version to v2.13.22 / Build 909. **A description can use seven new words, so a `Grounds` row was added to the vocabulary table in "Creating Images".**
+
+- **The ground — the canvas itself — can now be named.** The seven words are `paper`, `washi`, `ink-wash ground`, `charcoal ground`, `canvas`, `drawing paper`, `mezzotint`. Write them as `Ground: washi.` (separate from `Surface:`, which says how the inside of a shape is).
+- **There used to be four grounds, and they barely arrived from the description.** Of 3,086 stored works, none was drawn on washi even when the description asked for it.
+- **Exporting the same work now gives the same ground in every format.** The ground used to be built differently for the on-screen and editable forms.
+- **The picture itself does not change by a single pixel for a work with no ground.**
+- No operation, label, default setting, environment variable, or CLI flag changed.
+
 ## 2026-08-15 — v2.13.21 unreleased baseline (Web Build 908)
 
 Updated the 13 places that name a version to v2.13.21 / Build 908. **Two batch operations changed, so the matching sections of "Creating Images" were added to.**

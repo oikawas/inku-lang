@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.21 (Web Build 908). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.22 (Web Build 909). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -95,6 +95,7 @@ Place three small red circles in the upper right.
 | Touch | pencil, pen, rotring, crayon, chalk, fine brush, broad brush, burin, drypoint |
 | Continuity | solid, dashed, dotted, dash-dot |
 | Surfaces | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
+| Grounds | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | Sway | fine, broad, slow, fast, waver, undulate, tremble, bleed |
 
 No layer adds what the description does not ask for. What is written is performed as far as it can be.

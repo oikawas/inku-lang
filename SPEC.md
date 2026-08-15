@@ -179,6 +179,14 @@ wide / byobu / vertical.
   belong here** -- it is a quality of the support, and `Ground:` takes it. **An
   instruction to fill the background is not about a surface** either; it goes to
   the `background` field.
+- **the grounds category holds the names of supports** (added 2026-08-15, render
+  engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
+  paper, mezzotint** -- the seven values of `canvas.ground.material`. **Where
+  surfaces says how the inside of a closed shape is, grounds says what the
+  canvas itself is**, which is why a description writes it as `Ground: ...` and
+  not `Surface: ...`. **All seven are tiled as a `<pattern>` and use no
+  `<filter>`, so the three SVG profiles emit the same ground.** **The cost limit
+  is the byte size of the ground layer (24 KB), not a count of elements.**
 
 `Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.
 

@@ -58,6 +58,7 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **34** | v2.13.22 | 909 | 2026-08-14 | 588 | **13** | **575** |
 | **33** | v2.13.19 | 906 | 2026-08-13 | 586 | **4** | **582** |
 | **32** | v2.13.13 | 898 | 2026-08-12 | 582 | **13** | **569** |
 | **31** | v2.13.8 | 893 | 2026-08-12 | 569 | **16** | **553** |
@@ -131,14 +132,14 @@ but never asserts "the output will change"**.
 
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
-| `render_engine_version` | the drawing engine | `33` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `18` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `render_engine_version` | the drawing engine | `34` | **the same Score and seed perform differently, or the performable vocabulary grows** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `19` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `3` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.1.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's content | `2.5.0` | **measurements, recommendation levels or selectability change**. A bump lays the builtin metadata back over the matching ids in a stored catalog (the stored model list and the enable/disable choices survive) |
-| `APP_VERSION` | the application version | v2.13.21 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
+| `APP_VERSION` | the application version | v2.13.22 | every stamping. **`web/APP_VERSION` is the one file that owns it**, and the UI, `/api/info` `version` and the CLI all read it |
 | `server/pyproject.toml` | the distributed package | 2.7.2 | **only when a release is tagged**. Returned as `/api/info` `release_version`; it lags the application version while releases are on hold |
-| `web/BUILD_NUMBER` | build serial | 908 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
+| `web/BUILD_NUMBER` | build serial | 909 | **moves for UI-only changes too. It is a shared counter, not a per-branch value, so numbers can be skipped. Since v2.9.23 a merge driver named in `.gitattributes` keeps the larger side, so two branches bumping it no longer conflict** (run `scripts/git/setup.sh` once per clone) |
 
 **The "current" column holds the values as of writing.** When a version goes up, this column is
 corrected in the same commit.
@@ -414,6 +415,40 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 34 — the ground is a support you can name (v2.13.22)
+
+**The ground used to be four materials — paper, washi, ink-wash ground, charcoal ground — and it did not
+arrive from the description at all**: `washi` appeared in **0** of 3,086 production works and **0** of the
+2,125 measured ones. **There are now seven supports, and a new saijiki category `じ` (grounds) lets a
+description name one.**
+
+### The seven are `<pattern>` tiles, and the profile does not decide the ground
+
+**Paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint.**
+Through engine 33, `display` drew a `feTurbulence` rectangle while the other two profiles scattered grains,
+and **the claim that a support is the character of noise was measured inside that filter.**
+**The mechanism is gone.** All seven now tile a `<pattern>` and **reference no `<filter>` at all**, so
+**the same Score drawn under all three profiles gives a ground layer that matches byte for byte.**
+
+### The cost limit is bytes now, not a count of elements
+
+The engine 15 rule — a support is the character of noise, not something drawn, which came from a version
+that drew 38 fibres and let the ground take 46% of the whole picture — **stopped meaning anything once the
+ground became a tile**: the 80 strokes inside a tile are written to the file once.
+**The limit is now the byte size of the ground layer (24 KB, author's ruling 2026-08-14).**
+**Mezzotint is the largest in bytes (17,918 B) and canvas the largest in tiles on screen (21,626 for the
+plain weave)** — **two different quantities**, and it is the tile count that drives the cost on Android.
+
+### The DDL layer moved in the same version (`ddl_engine_version` 18 → 19)
+
+It was raised because **the vocabulary that can be performed grew**. **No deterministic output moved**:
+`changed_from_previous` for `ddl-engine-19/` is **empty**.
+
+### The corpus grew by two to 588 cases, and 13 moved
+
+**All 13 that moved are ground cases** (the seven materials, plus the ground field and ground seed cases).
+**No case without a ground moved.**
 
 ## engine 33 — a repeated unit can be more than one mark (v2.13.19)
 

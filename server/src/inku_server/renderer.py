@@ -3532,11 +3532,13 @@ SURFACE_WASH_LAYERS = 2
 # One sweep's width, as a multiple of the pitch the sweeps are laid down at.
 # The band decides whether a wash reads as a field or as a set of stripes: below
 # 1.0 the paper between two sweeps is never reached by either of them.
-SURFACE_WASH_WIDTH_BASE = 0.44
-SURFACE_WASH_WIDTH_SPAN = 0.30
+SURFACE_WASH_WIDTH_BASE = 0.88
+SURFACE_WASH_WIDTH_SPAN = 0.60
 # Each sweep carries this fraction of the surface's stated opacity. The layers
 # overlap, so the ink a reader sees is the composite rather than this number.
-SURFACE_WASH_OPACITY = 0.42
+# Doubling the width above closes the gaps, which also darkened the wash; the
+# factor comes down from 0.42 so the ink lands back where it was.
+SURFACE_WASH_OPACITY = 0.22
 SURFACE_BLEED_RINGS = 3
 
 

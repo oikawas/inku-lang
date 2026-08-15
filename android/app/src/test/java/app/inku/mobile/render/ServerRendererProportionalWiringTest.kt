@@ -142,12 +142,20 @@ class ServerRendererProportionalWiringTest {
         val speckMatches = Regex("""<circle cx="[^"]+" cy="[^"]+" r="[^"]+" fill="[^"]+" stroke="none" opacity="[^"]+"/>""").findAll(resPillar.svg).toList()
         assertEquals("Speck count in pillar for crayon circle", 73, speckMatches.size)
 
-        // engine 15 took the offset gain back to 1.0 and dropped the floor to 0.0, so the
-        // strata land where the table always said. In pillar (unit = 200, scale = 0.2) the
-        // crayon offset -1.5 * 0.2 = -0.3 -> r = 40.0 - 0.3 = 39.700000. Under engine 14
-        // the 2.8x gain and the 0.7px floor put it at 39.160000.
-        assertTrue("Contains outline circle at the table's own offset r=39.700000", resPillar.svg.contains("""r="39.700000""""))
-        assertFalse("The engine 14 floored offset r=39.160000 must be gone", resPillar.svg.contains("""r="39.160000""""))
+        // engine 28: the strata are no longer a radius on the ideal circle, so there is no
+        // `r=` to read them off. They ride the performed ink, which is what this pair now
+        // asserts -- the decoration must not be found on the geometry the ink was aiming
+        // at. Where each stratum sits is measured against the server in
+        // ServerRendererThinnessTest.testMaterialOutlinesMatchTheServer, which reads the
+        // version-keyed corpus rather than a number copied into a test.
+        assertTrue(
+            "The strata must ride the ink, as polylines",
+            Regex("""<polyline[^>]*class="material-outline stratum-\d+"""").containsMatchIn(resPillar.svg)
+        )
+        assertFalse(
+            "No stratum may be drawn as a circle on the intended geometry",
+            Regex("""<circle[^>]*class="material-outline""").containsMatchIn(resPillar.svg)
+        )
     }
 
     private fun extractStrokeWidth(svg: String): Double {

@@ -45,8 +45,12 @@ data class ToolGrammar(
 // the same amount of angle variation in degrees. One constant each rather than
 // a per-tool value: the ruling was given on samples that used one amplitude
 // for four tools whose `fillHand` spans 18x.
-const val HAND_GROUP_SIZE: Double = 0.25
-const val HAND_GROUP_ROT: Double = 12.0
+// Was +/-25% and +/-12 degrees. Raised to +/-35% and +/-27 degrees in engine 27,
+// after the author read round 2b and marked the size variation "slightly short"
+// and the angle variation "short" (author, 2026-08-08). No rule and no exclusion
+// moved with them: only the width of the swing did.
+const val HAND_GROUP_SIZE: Double = 0.35
+const val HAND_GROUP_ROT: Double = 27.0
 
 // `fillHand` runs with the tool's stiffness: the stiffer the tool, the tighter
 // the hand that fills with it. The two machines are pinned at zero by hand

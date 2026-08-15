@@ -24,13 +24,57 @@ internal object ServerRendererMaterial {
     // put 3.2 in the straight-line path alone.
     private const val SPECK_SPREAD_GAIN = 1.8
 
-    // The tools that own a material outline. `_material_line_group` reads the same set as
-    // the closed contours do, so a tool cannot come out clothed on a circle and bare on a
-    // line. burin and drypoint are deliberately absent: they carry plate_tone and burr
-    // instead, which are separate mechanisms.
-    private val MATERIAL_OUTLINE_WEIGHTS = setOf(
-        "pencil", "chalk", "brush_thin", "brush_thick", "crayon", "pen"
+    // The material layer is a tone beside the mark, not a second mark: no stratum may be
+    // wider than this share of the tool's own stroke. The tools that already state their
+    // strata as a ratio chose 0.20-0.28 and the absolute ones land between 0.17 and 0.47,
+    // so the cap is set where pencil and chalk already sit: it moves the two outliers and
+    // leaves the rest untouched (author's ruling, 2026-08-09).
+    internal const val MATERIAL_OUTLINE_MAX_WIDTH_RATIO = 0.33
+
+    /** (offsetPx, absolute width px, baseWidth ratio, opacity, dasharray) -- all unit-relative. */
+    private data class OutlineSpec(
+        val offset: Double,
+        val absWidth: Double,
+        val widthRatio: Double,
+        val opacity: Double,
+        val dash: String
     )
+
+    // The tools that own a material outline. `lineGroup` reads the same table as the closed
+    // contours do, so a tool cannot come out clothed on a circle and bare on a line. burin
+    // and drypoint are deliberately absent: they carry plate_tone and burr instead, which
+    // are separate mechanisms.
+    private val MATERIAL_OUTLINE_SPECS: Map<String, List<OutlineSpec>> = mapOf(
+        "pencil" to listOf(
+            OutlineSpec(-1.0, 0.45, 0.0, 0.24, "1,7"),
+            OutlineSpec(1.2, 0.5, 0.0, 0.20, "1,5")
+        ),
+        "chalk" to listOf(
+            OutlineSpec(-3.2, 1.2, 0.0, 0.30, "8,12,1,8"),
+            OutlineSpec(3.6, 1.0, 0.0, 0.24, "5,10,1,6")
+        ),
+        "brush_thin" to listOf(
+            OutlineSpec(-1.6, 1.0, 0.0, 0.32, "22,9"),
+            OutlineSpec(1.8, 1.4, 0.0, 0.28, "14,8")
+        ),
+        "brush_thick" to listOf(
+            OutlineSpec(-4.0, 0.0, 0.28, 0.36, "18,7,3,11"),
+            OutlineSpec(3.2, 0.0, 0.22, 0.28, "11,9")
+        ),
+        "crayon" to listOf(
+            OutlineSpec(-3.4, 0.0, 0.24, 0.24, "2,5,9,7"),
+            OutlineSpec(-1.5, 0.0, 0.20, 0.20, "4,8"),
+            OutlineSpec(2.4, 0.0, 0.22, 0.22, "2,5,9,7")
+        ),
+        // engine 15: the most used tool in production stops being a bare one. The trace
+        // is the two tines of a split nib, running just outside the band edge at +/-1.40px.
+        "pen" to listOf(
+            OutlineSpec(-1.40, 0.38, 0.0, 0.24, "14,3"),
+            OutlineSpec(1.40, 0.34, 0.0, 0.20, "12,4")
+        ),
+    )
+
+    private val MATERIAL_OUTLINE_WEIGHTS = MATERIAL_OUTLINE_SPECS.keys
 
     fun usesMaterialOutline(weight: String): Boolean = materialOutlineProfile(weight, 1000.0).isNotEmpty() || baseSpeckProfile(weight) != null
 
@@ -75,6 +119,197 @@ internal object ServerRendererMaterial {
         return v1 * (1.0 - t) + v2 * t
     }
 
+    /**
+     * How far a stratum drifts off its own offset along the path.
+     *
+     * Strata that stay exactly parallel read as engraved rails rather than as a tool's own
+     * edges. Both emitters (the straight tools and the performed contours) ask here, so
+     * the amount is stated once and a test can bound the layer's distance to the ink
+     * without restating the formula.
+     */
+    fun outlineWanderPx(offsetPx: Double, unit: Double): Double =
+        0.35 * kotlin.math.abs(offsetPx) + 0.6 * (unit / 1000.0)
+
+    /**
+     * The coverage and grain a tool's dash pattern implies.
+     *
+     * The patterns in [MATERIAL_OUTLINE_SPECS] carry a tool's character -- the pen is
+     * nearly continuous, the pencil is mostly gap -- and that tuning is worth keeping once
+     * the cadence is gone. Coverage is the share of the path the pattern marked; grain is
+     * its natural wavelength.
+     */
+    fun dashSpecStats(dash: String?): Pair<Double, Double> {
+        if (dash.isNullOrBlank()) return Pair(1.0, 0.0)
+        var values = dash.split(",").mapNotNull { it.trim().takeIf { s -> s.isNotEmpty() }?.toDouble() }
+            .map { kotlin.math.abs(it) }
+        if (values.isEmpty() || values.sum() <= 0.0) return Pair(1.0, 0.0)
+        // An odd-length pattern swaps marks and gaps on every repeat, so read it twice.
+        if (values.size % 2 == 1) values = values + values
+        val marks = values.filterIndexed { i, _ -> i % 2 == 0 }
+        val gaps = values.filterIndexed { i, _ -> i % 2 == 1 }
+        val coverage = marks.sum() / values.sum()
+        val grain = marks.sum() / marks.size + gaps.sum() / gaps.size
+        return Pair(coverage, grain)
+    }
+
+    /** The paper's tooth at two scales, read along the path. Roughly 0..1. */
+    fun contactField(t: Double, seed: Long): Double =
+        0.62 * valueNoise1d(t, seed) + 0.38 * valueNoise1d(t * 2.7 + 13.1, seed + 977L)
+
+    // Paper-contact decisions share the SVG's six-decimal length lattice. A libm ULP is far
+    // below this precision, but before engine 29 it could add a sample, move the
+    // sample-derived quantile, and replace a whole fragment. What is rounded is the
+    // counting, not the coordinates: rounding where the ink goes would move the drawing.
+    internal const val CONTACT_LENGTH_QUANTUM = 6
+
+    /**
+     * Round to [CONTACT_LENGTH_QUANTUM] decimals the way the server's `round(value, 6)`
+     * does -- half-to-even on the exact binary value, not on its printed form.
+     * `Math.round(value * 1e6) / 1e6` is half-away-from-zero and disagrees; BigDecimal
+     * over the exact double reproduces CPython bit for bit (measured over 4,000 values
+     * spanning the ranges this sees, 0 mismatches).
+     */
+    fun quantiseContactLength(value: Double): Double =
+        java.math.BigDecimal(value)
+            .setScale(CONTACT_LENGTH_QUANTUM, java.math.RoundingMode.HALF_EVEN)
+            .toDouble()
+
+    /**
+     * Walk a polyline and emit a point every `step` px of arc length.
+     *
+     * `resamplePoints` picks by index, which is even only when the source vertices are.
+     * The contact field is read against distance on the paper, so it needs a walk that is
+     * even in length.
+     */
+    fun resampleByLength(
+        points: List<Pair<Double, Double>>,
+        step: Double,
+        closed: Boolean
+    ): List<Pair<Double, Double>> {
+        val quantisedStep = quantiseContactLength(step)
+        if (quantisedStep <= 0.0 || points.size < 2) return points.toList()
+        val path = if (closed) points + listOf(points[0]) else points
+        val out = mutableListOf(path[0])
+        var carry = 0.0
+        for (i in 0 until path.size - 1) {
+            val (ax, ay) = path[i]
+            val (bx, by) = path[i + 1]
+            val seg = quantiseContactLength(Math.hypot(bx - ax, by - ay))
+            if (seg <= 1e-9) continue
+            var travelled = quantisedStep - carry
+            while (travelled <= seg) {
+                val f = travelled / seg
+                out.add(Pair(ax + (bx - ax) * f, ay + (by - ay) * f))
+                travelled += quantisedStep
+            }
+            carry = (carry + seg) % quantisedStep
+        }
+        return out
+    }
+
+    /**
+     * The pieces of an outline where the tool actually met the paper.
+     *
+     * A dasharray repeats. However long the pattern, a long contour walks through it
+     * several times and the eye finds the cadence -- and the material layer is not a dotted
+     * line, it is where a tool dragged across a grain and kept losing the paper. So
+     * presence is a smooth noise field read along the arc length, and the outline exists
+     * where the field clears a threshold.
+     *
+     * The threshold is the (1 - coverage) quantile of the field's own samples, not a
+     * constant: that way each tool keeps the share of the path its dash pattern used to
+     * mark, while nothing about the spacing repeats. Fragments come back with a weight, so
+     * the thinly-touching ones are fainter than the ones the tool bore down on.
+     */
+    fun contactFragments(
+        points: List<Pair<Double, Double>>,
+        coverage: Double,
+        grainPx: Double,
+        seed: Long,
+        closed: Boolean
+    ): List<Pair<List<Pair<Double, Double>>, Double>> {
+        if (points.size < 2) return emptyList()
+        if (grainPx <= 0.0 || coverage >= 0.999) return listOf(Pair(points.toList(), 1.0))
+
+        val ring = if (closed) points.drop(1) + listOf(points[0]) else points.drop(1)
+        var sum = 0.0
+        for (i in ring.indices) {
+            val a = points[i]
+            val b = ring[i]
+            sum += quantiseContactLength(Math.hypot(b.first - a.first, b.second - a.second))
+        }
+        val total = quantiseContactLength(sum)
+        if (total <= 1e-6) return emptyList()
+        val grain = quantiseContactLength(grainPx)
+        // Three samples per grain resolves a skip; the cap keeps a long contour from
+        // turning into thousands of SVG vertices.
+        val step = quantiseContactLength(max(max(grain / 3.0, total / 600.0), 0.8))
+        val walk = resampleByLength(points, step, closed)
+        if (walk.size < 3) return listOf(Pair(points.toList(), 1.0))
+
+        val field = DoubleArray(walk.size) { contactField(it * step / grain, seed) }
+        val ordered = field.sortedArray()
+        val index = kotlin.math.min(ordered.size - 1, max(0, ((1.0 - coverage) * ordered.size).toInt()))
+        val threshold = ordered[index]
+        val span = max(1e-6, ordered[ordered.size - 1] - threshold)
+
+        val runs = mutableListOf<MutableList<Int>>()
+        var current = mutableListOf<Int>()
+        for (i in field.indices) {
+            if (field[i] >= threshold) {
+                current.add(i)
+            } else if (current.isNotEmpty()) {
+                runs.add(current)
+                current = mutableListOf()
+            }
+        }
+        if (current.isNotEmpty()) runs.add(current)
+        // On a closed path the seam is not an end: a run that touches both ends is one
+        // fragment that happens to be written in two halves.
+        if (closed && runs.size > 1 && runs[0][0] == 0 && runs[runs.size - 1].last() == field.size - 1) {
+            val merged = (runs[runs.size - 1] + runs[0]).toMutableList()
+            runs[0] = merged
+            runs.removeAt(runs.size - 1)
+        }
+
+        /**
+         * Where the field crosses the threshold between two samples. Without this the ends
+         * of every fragment land on a sample, so every length is a multiple of `step` and
+         * the lengths themselves become the cadence -- the regularity comes back through
+         * the sampling instead of through the pattern.
+         */
+        fun crossing(outside: Int, inside: Int): Pair<Double, Double> {
+            val fOut = field[outside]
+            val fIn = field[inside]
+            if (kotlin.math.abs(fIn - fOut) < 1e-9) return walk[inside]
+            val f = kotlin.math.min(1.0, max(0.0, (threshold - fOut) / (fIn - fOut)))
+            val (ax, ay) = walk[outside]
+            val (bx, by) = walk[inside]
+            return Pair(ax + (bx - ax) * f, ay + (by - ay) * f)
+        }
+
+        val fragments = mutableListOf<Pair<List<Pair<Double, Double>>, Double>>()
+        for (run in runs) {
+            val piece = mutableListOf<Pair<Double, Double>>()
+            run.forEach { piece.add(walk[it]) }
+            if (run[0] - 1 >= 0) piece.add(0, crossing(run[0] - 1, run[0]))
+            if (run.last() + 1 < field.size) piece.add(crossing(run.last() + 1, run.last()))
+            if (piece.size < 2) continue
+            var pieceSum = 0.0
+            for (i in 0 until piece.size - 1) {
+                pieceSum += quantiseContactLength(
+                    Math.hypot(piece[i + 1].first - piece[i].first, piece[i + 1].second - piece[i].second)
+                )
+            }
+            val length = quantiseContactLength(pieceSum)
+            if (length < 0.6) continue
+            val margin = run.sumOf { field[it] - threshold } / run.size
+            val weight = kotlin.math.min(1.0, 0.55 + 0.75 * (margin / span))
+            fragments.add(Pair(piece.toList(), weight))
+        }
+        return fragments
+    }
+
     fun offsetPolyline(
         points: List<Pair<Double, Double>>,
         amount: Double,
@@ -109,19 +344,6 @@ internal object ServerRendererMaterial {
         return out
     }
 
-    fun variedDashPattern(dashUnits: Double, mark: Double, gap: Double, seed: Long): String {
-        val period = Math.max(1.0, mark + gap)
-        val count = Math.max(6, Math.min(28, (dashUnits / period).toInt() + 3))
-        val vals = mutableListOf<String>()
-        for (i in 0 until count) {
-            val m = mark * (0.5 + 1.3 * hash01(i, seed, "dash-mark"))
-            val g = gap * (0.45 + 1.5 * hash01(i, seed, "dash-gap"))
-            vals.add(java.lang.String.format(java.util.Locale.US, "%.3f", m))
-            vals.add(java.lang.String.format(java.util.Locale.US, "%.3f", g))
-        }
-        return vals.joinToString(",")
-    }
-
     fun lineGroup(
         ins: JSONObject,
         attrs: SvgAttrs,
@@ -145,7 +367,6 @@ internal object ServerRendererMaterial {
         val offsetGain = OUTLINE_OFFSET_GAIN
         val opacityGain = OUTLINE_OPACITY_GAIN
         val lineLen = Math.hypot(x2 - x1, y2 - y1)
-        val dashUnits = lineLen / Math.max(1e-6, scale)
 
         val path = if (!centerline.isNullOrEmpty()) centerline else listOf(Pair(x1, y1), Pair(x2, y2))
         val out = StringBuilder()
@@ -153,15 +374,33 @@ internal object ServerRendererMaterial {
         fun layerOpacity(v: Double): Double = outlineOpacity(v * opacityGain)
         fun layerOffset(amount: Double): Double = outlineOffsetPx(amount * scale * offsetGain, unit)
 
+        // Each stratum gets its own seed, so its weave and its contact are out of step
+        // with the others.
+        //
+        // engine 28: the dasharray is gone. Its pattern was long, but a pattern still
+        // repeats, and this layer is the tool losing the paper's grain -- not a dotted
+        // line (author's ruling, 2026-08-09). `mark` and `gap` now say what share of the
+        // line the tool held and at what wavelength, and the contact field decides where.
         fun emitLayer(amount: Double, layerAttrs: SvgAttrs, mark: Double, gap: Double, k: Int) {
             val offPx = layerOffset(amount)
             val layerSeed = seedInt + k * 7919L
-            val wander = 0.35 * Math.abs(offPx) + 0.6 * scale
-            val pts = offsetPolyline(path, offPx, wander = wander, wanderPeriod = 60.0 * scale, seed = layerSeed)
-            val ptsStr = pts.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
-            val dashPattern = scaleDash(variedDashPattern(dashUnits, mark, gap, layerSeed), scale)
-            val la = layerAttrs.copy(dash = dashPattern)
-            out.append("""<polyline points="$ptsStr" fill="none" ${la.toSvgAttributes(includeFill = false)} class="material-outline"/>""")
+            val pts = offsetPolyline(
+                path, offPx,
+                wander = outlineWanderPx(offPx, unit),
+                wanderPeriod = 60.0 * scale,
+                seed = layerSeed
+            )
+            // Same reason as `outlineAttrs`: the tool's own texture dash would cut the
+            // fragments a second time, on a fixed cadence.
+            val la = layerAttrs.copy(dash = null)
+            val baseOpacity = la.strokeOpacity
+            for ((piece, fragmentWeight) in contactFragments(
+                pts, mark / max(1e-6, mark + gap), (mark + gap) * scale, layerSeed, closed = false
+            )) {
+                val ptsStr = piece.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
+                val frag = la.copy(strokeOpacity = baseOpacity * fragmentWeight)
+                out.append("""<polyline points="$ptsStr" fill="none" ${frag.toSvgAttributes(includeFill = false)} class="material-outline stratum-$k"/>""")
+            }
         }
 
         if (includeBase) {
@@ -297,11 +536,25 @@ internal object ServerRendererMaterial {
         return out.toString()
     }
 
+    /**
+     * Offset the performed centreline along its normal by `offset`; positive is outward.
+     *
+     * The normal's sign flips with the contour's winding (a circle points inward, an arc
+     * outward), so it is settled once by a vote against the figure's centre, which is what
+     * lines the strata up with the geometric helpers' `r + offset`.
+     *
+     * `wander` adds a low-frequency drift to the offset along the arc length, the same way
+     * [offsetPolyline] does it for the straight tools: strata that stay exactly parallel
+     * read as engraved rails rather than as a tool's own edges.
+     */
     fun offsetPerformedPath(
         path: List<Pair<Double, Double>>,
         offset: Double,
         closed: Boolean,
-        center: Pair<Double, Double>
+        center: Pair<Double, Double>,
+        wander: Double = 0.0,
+        wanderPeriod: Double = 1.0,
+        seed: Long = 0L
     ): List<Pair<Double, Double>> {
         val normals = ServerStrokeEngine.centerlineNormals(path, closed)
         var votes = 0
@@ -311,11 +564,21 @@ internal object ServerRendererMaterial {
             if (nx * (x - center.first) + ny * (y - center.second) >= 0.0) votes++ else votes--
         }
         val sign = if (votes >= 0) 1.0 else -1.0
-        return path.indices.map { i ->
+        val out = mutableListOf<Pair<Double, Double>>()
+        var arc = 0.0
+        for (i in path.indices) {
             val (x, y) = path[i]
             val (nx, ny) = normals[i]
-            Pair(x + nx * offset * sign, y + ny * offset * sign)
+            var off = offset
+            if (wander != 0.0) {
+                off += wander * (valueNoise1d(arc / max(1e-6, wanderPeriod), seed) * 2.0 - 1.0)
+            }
+            out.add(Pair(x + nx * off * sign, y + ny * off * sign))
+            if (i + 1 < path.size) {
+                arc += Math.hypot(path[i + 1].first - x, path[i + 1].second - y)
+            }
         }
+        return out
     }
 
     fun performedOutline(
@@ -335,14 +598,29 @@ internal object ServerRendererMaterial {
         val weight = ins.optString("weight", "pen")
         val seedStr = instructionSeed
             ?: java.lang.Long.toUnsignedString(ServerRendererGeometry.seedForInstruction(ins, renderSeed))
+        val seedLong = seedStr.toULongOrNull()?.toLong() ?: 0L
+        val scale = unit / 1000.0
         val out = StringBuilder()
-        materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }).forEach { (offset, width, opacity, dash) ->
-            val pts = offsetPerformedPath(path, offset, closed, center)
-            val ptsStr = pts.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
-            val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity, dash)
-            val tag = if (closed) "polygon" else "polyline"
-            out.append("""<$tag points="$ptsStr" ${outline.toSvgAttributes()} class="material-outline"/>""")
-        }
+        materialOutlineProfile(weight, unit, ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale })
+            .forEachIndexed { k, (offset, width, opacity, dash) ->
+                val layerSeed = seedLong + k * 7919L
+                val (coverage, grain) = dashSpecStats(dash)
+                val pts = offsetPerformedPath(
+                    path, offset, closed, center,
+                    wander = outlineWanderPx(offset, unit),
+                    wanderPeriod = 60.0 * scale,
+                    seed = layerSeed
+                )
+                // engine 28: the dasharray is gone. Its pattern was long, but a pattern
+                // still repeats, and this layer is the tool losing the paper's grain --
+                // not a dotted line. The dash spec now says what share of the path the
+                // tool held and at what wavelength, and the contact field decides where.
+                for ((piece, fragmentWeight) in contactFragments(pts, coverage, grain * scale, layerSeed, closed)) {
+                    val ptsStr = piece.joinToString(" ") { "${ServerRendererGeometry.fmt(it.first)},${ServerRendererGeometry.fmt(it.second)}" }
+                    val outline = ServerRendererStyle.outlineAttrs(attrs, width, opacity * fragmentWeight, null)
+                    out.append("""<polyline points="$ptsStr" ${outline.toSvgAttributes()} class="material-outline stratum-$k"/>""")
+                }
+            }
         val spec = speckProfile(weight, pathLenPx, unit)
         if (spec != null && spec.count > 0 && path.isNotEmpty()) {
             val resampled = (0 until spec.count).map { idx ->
@@ -354,55 +632,40 @@ internal object ServerRendererMaterial {
     }
 
 
+    /**
+     * A stratum's (offset, width, opacity, dasharray). All unit-relative.
+     *
+     * A line drawn thin wears a material layer that thins with it, so the base is the
+     * instruction's own width: pinning it to the nominal one would thin the ink alone and
+     * leave the material behind.
+     */
     internal fun materialOutlineProfile(weight: String, unit: Double, thinness: String? = null): List<OutlineProfile> {
+        val spec = MATERIAL_OUTLINE_SPECS[weight] ?: return emptyList()
         val scale = unit / 1000.0
         val baseWidth = ServerRendererStyle.strokeWidth(weight, unit, thinness)
-        val offsetGain = OUTLINE_OFFSET_GAIN
-        val opacityGain = OUTLINE_OPACITY_GAIN
-        val offsetFloor = OUTLINE_OFFSET_FLOOR_RATIO * unit
-        val opacityFloor = 0.50
-
-        fun calcOffset(raw: Double): Double {
-            val v = raw * scale * offsetGain
-            if (offsetFloor <= 0.0) return v
-            return if (kotlin.math.abs(v) >= offsetFloor) v else (if (v < 0) -offsetFloor else offsetFloor)
+        val nominalWidth = ServerRendererStyle.strokeWidth(weight, unit)
+        val half = baseWidth / 2.0
+        return spec.map { s ->
+            // engine 28: both of these are read against the tool's own mark now. While the
+            // layer sat on the ideal geometry its distance to the band was incidental, so
+            // the table could carry absolute numbers and nobody saw what they came to
+            // beside the ink. Riding the band, two of them showed.
+            //
+            // The cap reads the tool's NOMINAL stroke, not the thinned one: how wide the
+            // tone is belongs to the tool's own grain, and paper tooth and powder do not
+            // get finer because the line was drawn finer. Where it SITS is a different
+            // question, and that one is asked of the actual mark -- which is why `half`
+            // below comes from `baseWidth` and the cap here comes from `nominalWidth`.
+            val width = kotlin.math.min(
+                s.absWidth * scale + baseWidth * s.widthRatio,
+                nominalWidth * MATERIAL_OUTLINE_MAX_WIDTH_RATIO
+            )
+            // A stratum centred inside the mark cannot be tone beside it; it only thickens
+            // the mark. Put it on the edge and let the wander take it out.
+            val raw = outlineOffsetPx(s.offset * scale * OUTLINE_OFFSET_GAIN, unit)
+            val placed = java.lang.Math.copySign(max(kotlin.math.abs(raw), half), raw)
+            OutlineProfile(placed, width, outlineOpacity(s.opacity * OUTLINE_OPACITY_GAIN), scaleDash(s.dash, scale))
         }
-
-        fun calcOpacity(raw: Double): Double {
-            return kotlin.math.max(opacityFloor, kotlin.math.min(1.0, raw * opacityGain))
-        }
-
-        val rawProfiles = when (weight) {
-            "pencil" -> listOf(
-                OutlineProfile(calcOffset(-1.0), 0.45 * scale, calcOpacity(0.24), scaleDash("1,7", scale)),
-                OutlineProfile(calcOffset(1.2), 0.50 * scale, calcOpacity(0.20), scaleDash("1,5", scale))
-            )
-            "chalk" -> listOf(
-                OutlineProfile(calcOffset(-3.2), 1.20 * scale, calcOpacity(0.30), scaleDash("8,12,1,8", scale)),
-                OutlineProfile(calcOffset(3.6), 1.00 * scale, calcOpacity(0.24), scaleDash("5,10,1,6", scale))
-            )
-            "brush_thin" -> listOf(
-                OutlineProfile(calcOffset(-1.6), 1.00 * scale, calcOpacity(0.32), scaleDash("22,9", scale)),
-                OutlineProfile(calcOffset(1.8), 1.40 * scale, calcOpacity(0.28), scaleDash("14,8", scale))
-            )
-            "brush_thick" -> listOf(
-                OutlineProfile(calcOffset(-4.0), baseWidth * 0.28, calcOpacity(0.36), scaleDash("18,7,3,11", scale)),
-                OutlineProfile(calcOffset(3.2), baseWidth * 0.22, calcOpacity(0.28), scaleDash("11,9", scale))
-            )
-            "crayon" -> listOf(
-                OutlineProfile(calcOffset(-3.4), baseWidth * 0.24, calcOpacity(0.24), scaleDash("2,5,9,7", scale)),
-                OutlineProfile(calcOffset(-1.5), baseWidth * 0.20, calcOpacity(0.20), scaleDash("4,8", scale)),
-                OutlineProfile(calcOffset(2.4), baseWidth * 0.22, calcOpacity(0.22), scaleDash("2,5,9,7", scale))
-            )
-            // engine 15: the most used tool in production stops being a bare one. The trace
-            // is the two tines of a split nib, running just outside the band edge at +/-1.0px.
-            "pen" -> listOf(
-                OutlineProfile(calcOffset(-1.40), 0.38 * scale, calcOpacity(0.24), scaleDash("14,3", scale)),
-                OutlineProfile(calcOffset(1.40), 0.34 * scale, calcOpacity(0.20), scaleDash("12,4", scale))
-            )
-            else -> emptyList()
-        }
-        return rawProfiles
     }
 
     fun speckCount(baseCount: Int, pathLengthPx: Double, unit: Double): Int {

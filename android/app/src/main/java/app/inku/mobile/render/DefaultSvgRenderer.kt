@@ -195,7 +195,13 @@ class DefaultSvgRenderer(
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
+                        // engine 28: every drawing rides the ink, not only the wild ones.
+                        // While this was gated on wild, the strata sat on the ideal geometry
+                        // and the ink wandered out from under them -- a dashed ghost beside
+                        // the mark. The geometric helper below stays as a guard: every tool
+                        // that owns a material layer is a hand-stroke tool, so `performed` is
+                        // never empty where it is reached.
+                        if (performed.isNotEmpty()) {
                             ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * Math.PI * r, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialCircleOutline(ins, attrs, cx, cy, r, unit)
@@ -222,8 +228,9 @@ class DefaultSvgRenderer(
                 val size = ins.optJSONArray("size")
                 val cx = px(center?.optDouble(0, 0.5) ?: 0.5, width)
                 val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
-                val rx = px((size?.optDouble(0, 0.26) ?: 0.26) / 2.0, width)
-                val ry = px((size?.optDouble(1, 0.16) ?: 0.16) / 2.0, height)
+                val (sizeW, sizeH) = ServerRendererGeometry.sizePx(size?.optDouble(0, 0.26) ?: 0.26, size?.optDouble(1, 0.16) ?: 0.16, width, height, unit)
+                val rx = sizeW / 2.0
+                val ry = sizeH / 2.0
                 val variation = ins.optJSONObject("variation")
                 if (usesHandStroke(weight)) {
                     val approxPerimeter = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
@@ -239,7 +246,13 @@ class DefaultSvgRenderer(
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, emptySet(), unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
+                        // engine 28: every drawing rides the ink, not only the wild ones.
+                        // While this was gated on wild, the strata sat on the ideal geometry
+                        // and the ink wandered out from under them -- a dashed ghost beside
+                        // the mark. The geometric helper below stays as a guard: every tool
+                        // that owns a material layer is a hand-stroke tool, so `performed` is
+                        // never empty where it is reached.
+                        if (performed.isNotEmpty()) {
                             ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = approxPerimeter, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialEllipseOutline(ins, attrs, cx, cy, rx, ry, unit)
@@ -265,8 +278,7 @@ class DefaultSvgRenderer(
                 val size = ins.optJSONArray("size")
                 val x = px(pos?.optDouble(0, 0.38) ?: 0.38, width)
                 val y = px(pos?.optDouble(1, 0.38) ?: 0.38, height)
-                val w = px(size?.optDouble(0, 0.24) ?: 0.24, width)
-                val h = px(size?.optDouble(1, 0.24) ?: 0.24, height)
+                val (w, h) = ServerRendererGeometry.sizePx(size?.optDouble(0, 0.24) ?: 0.24, size?.optDouble(1, 0.24) ?: 0.24, width, height, unit)
                 val variation = ins.optJSONObject("variation")
                 val corners = listOf(x to y, (x + w) to y, (x + w) to (y + h), x to (y + h))
                 if (usesHandStroke(weight)) {
@@ -284,7 +296,13 @@ class DefaultSvgRenderer(
                     val surfaceGroup = renderSurfaceVectors(ins, attrs, colors, width, height, unit, renderSeed, wild)
                     val (band, performed) = renderContourHandStroke(ins, attrs, contour, anchors, unit, width, height, renderSeed, wild)
                     val outline = if (usesMaterialOutline(weight)) {
-                        if (wild && performed.isNotEmpty()) {
+                        // engine 28: every drawing rides the ink, not only the wild ones.
+                        // While this was gated on wild, the strata sat on the ideal geometry
+                        // and the ink wandered out from under them -- a dashed ghost beside
+                        // the mark. The geometric helper below stays as a guard: every tool
+                        // that owns a material layer is a hand-stroke tool, so `performed` is
+                        // never empty where it is reached.
+                        if (performed.isNotEmpty()) {
                             ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = true, pathLenPx = 2.0 * (w + h), center = (x + w / 2.0) to (y + h / 2.0), renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed))
                         } else {
                             materialRectOutline(ins, attrs, x, y, w, h, unit)
@@ -307,7 +325,7 @@ class DefaultSvgRenderer(
                 }
             }
             "triangle" -> {
-                val points = trianglePoints(ins, width, height)
+                val points = trianglePoints(ins, width, height, unit)
                 val variation = ins.optJSONObject("variation")
                 if (usesHandStroke(weight)) {
                     val seedStr = seedForInstruction(ins, renderSeed)
@@ -429,8 +447,7 @@ class DefaultSvgRenderer(
                 val size = ins.optJSONArray("size")
                 val cx = px(center?.optDouble(0, 0.5) ?: 0.5, width)
                 val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
-                val sw = px(size?.optDouble(0, 0.5) ?: 0.5, width)
-                val sh = px(size?.optDouble(1, 0.34) ?: 0.34, height)
+                val (sw, sh) = ServerRendererGeometry.sizePx(size?.optDouble(0, 0.5) ?: 0.5, size?.optDouble(1, 0.34) ?: 0.34, width, height, unit)
                 val contour = ServerRendererGeometry.generateCloudformContour(
                     center = cx to cy,
                     size = sw to sh,
@@ -995,8 +1012,8 @@ class DefaultSvgRenderer(
         return ServerRendererGeometry.pointsForRegular(ins, sides, width, height)
     }
 
-    private fun trianglePoints(ins: JSONObject, width: Double, height: Double): List<Pair<Double, Double>> {
-        return ServerRendererGeometry.trianglePoints(ins, width, height)
+    private fun trianglePoints(ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return ServerRendererGeometry.trianglePoints(ins, width, height, unit)
     }
 
     private fun usesHandStroke(weight: String): Boolean {
@@ -2337,14 +2354,13 @@ class DefaultSvgRenderer(
         }
 
         if (usesMaterialOutline(weight)) {
-            if (wild) {
-                val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
-                val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
-                val performed = stroke.samples.map { it.x to it.y }
-                sb.append(ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = false, pathLenPx = arcLen, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed)))
-            } else {
-                sb.append(materialArcOutline(ins, attrs, cx, cy, r, startDeg, endDeg, unit))
-            }
+            // engine 28: the band's own samples, not the ideal arc. The geometric helper
+            // stayed on `r + offset` and was left behind whenever the ink wandered, which
+            // is the ghost the author saw beside the mark.
+            val deltaDeg = ((endDeg - startDeg) % 360.0 + 360.0) % 360.0
+            val arcLen = 2.0 * Math.PI * r * (deltaDeg / 360.0)
+            val performed = stroke.samples.map { it.x to it.y }
+            sb.append(ServerRendererMaterial.performedOutline(ins, attrs, performed, unit, closed = false, pathLenPx = arcLen, center = cx to cy, renderSeed = renderSeed, instructionSeed = seedForInstruction(ins, renderSeed)))
         }
 
         sb.append("</g>")

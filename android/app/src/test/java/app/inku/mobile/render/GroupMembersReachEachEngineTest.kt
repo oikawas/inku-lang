@@ -165,8 +165,14 @@ class GroupMembersReachEachEngineTest {
                 turns.size,
                 turns.filterNotNull().toSet().size
             )
-            // +/-12 degrees, and nothing outside it.
-            assertTrue("$name: within the ruled band", turns.filterNotNull().all { kotlin.math.abs(it) <= 12.0 })
+            // +/-27 degrees since engine 27, and nothing outside it. The literal
+            // is written out here and bound to production on the next line, the
+            // way the server's `test_the_amplitude_is_the_one_that_was_ruled_on`
+            // does it: a check that only reads the constant would follow the
+            // constant anywhere it went.
+            val amplitude = 27.0
+            assertEquals("the ruled band is the one production swings", amplitude, HAND_GROUP_ROT, 0.0)
+            assertTrue("$name: within the ruled band", turns.filterNotNull().all { kotlin.math.abs(it) <= amplitude })
             assertEquals(
                 "$name: the drawing turns each member",
                 turns.size,

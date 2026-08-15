@@ -19,6 +19,23 @@ internal object ServerRendererGeometry {
 
     fun px(value: Double, scale: Double): Double = min(max(value, 0.0), 1.0) * scale
 
+    /**
+     * A mark's extents in px. Both follow the short edge, so a mark keeps the proportion
+     * the description gave it: a square stays square, and a 2:1 ellipse stays 2:1 on any
+     * canvas. Before engine 30 the two extents were stretched separately, so `size
+     * [0.4, 0.2]` -- a wide ellipse -- came out taller than it was wide on a pillar.
+     *
+     * The aspect decides where a mark SITS, not what shape it IS: placement still goes
+     * through [px], which keeps using width and height. `width` and `height` are taken
+     * here because the server's `_size_px` takes the whole canvas, and because a caller
+     * should not have to know which of the three this reads.
+     *
+     * No clamp, unlike [px]: the server's `_size_px` has none, and a client that clamps
+     * where the server does not sends `size` outside 0..1 down a different road.
+     */
+    fun sizePx(sizeW: Double, sizeH: Double, width: Double, height: Double, unit: Double): Pair<Double, Double> =
+        Pair(sizeW * unit, sizeH * unit)
+
     fun fmt(value: Double): String {
         val text = "%.${MASTER_GRID_DECIMALS}f".format(java.util.Locale.US, value)
         return if (text.startsWith("-") && text.toDouble() == 0.0) text.substring(1) else text
@@ -110,14 +127,14 @@ internal object ServerRendererGeometry {
         }
         if (p == "ellipse" && ins.has("size")) {
             val size = ins.getJSONArray("size")
-            val rx = size.getDouble(0) * width / 2.0
-            val ry = size.getDouble(1) * height / 2.0
+            val (w, h) = sizePx(size.getDouble(0), size.getDouble(1), width, height, unit)
+            val rx = w / 2.0
+            val ry = h / 2.0
             return kotlin.math.sqrt(kotlin.math.max(0.0, rx * ry))
         }
         if (p in listOf("square", "triangle", "cloudform") && ins.has("size")) {
             val size = ins.getJSONArray("size")
-            val w = size.getDouble(0) * width
-            val h = size.getDouble(1) * height
+            val (w, h) = sizePx(size.getDouble(0), size.getDouble(1), width, height, unit)
             return kotlin.math.min(w, h) / 2.0
         }
         if (p == "line") {
@@ -136,15 +153,28 @@ internal object ServerRendererGeometry {
         return kotlin.math.max(representativeSizePx(ins, width, height, unit), unit * 0.02)
     }
 
+    // The wander, unlike the bleed, is measured in stroke widths (engine 28).
+    // It is a property of the tool meeting the paper, not of how big the figure
+    // is: scaling it by the figure made a large arc leave its own line by eleven
+    // widths while a small one stayed on it, because the same 8% of a radius is
+    // invisible under a brush and a different line under a pencil. The
+    // vocabulary is unchanged (fine/medium/broad); only the ruler moved.
+    // `PRIMITIVE_AMP_GAIN` is the server's per-primitive calibration hook and is
+    // empty there, so every primitive multiplies by 1.0.
+    internal val amplitudeWidths = mapOf("fine" to 0.35, "medium" to 0.6, "broad" to 2.0)
+
     fun amplitudePx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {
+        val strokeWidthPx = ServerRendererStyle.strokeWidth(
+            ins.optString("weight", "pen"),
+            unit,
+            ins.optString("thinness").takeIf { it in ServerRendererStyle.thinnessToWidthScale }
+        )
         val rep = clampedRepresentativePx(ins, width, height, unit)
         val ampStr = variation.optString("amplitude", "medium")
-        val ratio = when (ampStr) {
-            "fine" -> 0.025
-            "broad" -> 0.18
-            else -> 0.08
-        }
-        return kotlin.math.min(ratio * rep, 0.40 * rep)
+        val amp = amplitudeWidths[ampStr] ?: amplitudeWidths.getValue("medium")
+        // The representative-size clamp stays: it is the safety valve that keeps
+        // a figure smaller than its own mark from wandering further than it is wide.
+        return kotlin.math.min(amp * strokeWidthPx, 0.40 * rep)
     }
 
     fun blurStdPx(variation: JSONObject, ins: JSONObject, width: Double, height: Double, unit: Double): Double {
@@ -253,13 +283,12 @@ internal object ServerRendererGeometry {
         }
     }
 
-    fun trianglePoints(ins: JSONObject, width: Double, height: Double): List<Pair<Double, Double>> {
+    fun trianglePoints(ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
         val pos = ins.optJSONArray("position")
         val size = ins.optJSONArray("size")
         val x = px(pos?.optDouble(0, 0.35) ?: 0.35, width)
         val y = px(pos?.optDouble(1, 0.35) ?: 0.35, height)
-        val w = px(size?.optDouble(0, 0.30) ?: 0.30, width)
-        val h = px(size?.optDouble(1, 0.30) ?: 0.30, height)
+        val (w, h) = sizePx(size?.optDouble(0, 0.30) ?: 0.30, size?.optDouble(1, 0.30) ?: 0.30, width, height, unit)
         return listOf((x + w / 2.0) to y, x to (y + h), (x + w) to (y + h))
     }
 
@@ -569,8 +598,7 @@ internal object ServerRendererGeometry {
                 val size = ins.optJSONArray("size")
                 val cx = (center?.optDouble(0, 0.5) ?: 0.5) * width
                 val cy = (center?.optDouble(1, 0.5) ?: 0.5) * height
-                val w = (size?.optDouble(0, 0.26) ?: 0.26) * width
-                val h = (size?.optDouble(1, 0.16) ?: 0.16) * height
+                val (w, h) = sizePx(size?.optDouble(0, 0.26) ?: 0.26, size?.optDouble(1, 0.16) ?: 0.16, width, height, unit)
                 doubleArrayOf(cx - w / 2.0, cy - h / 2.0, w, h)
             }
             "square", "triangle" -> {
@@ -578,8 +606,7 @@ internal object ServerRendererGeometry {
                 val size = ins.optJSONArray("size")
                 val x = (pos?.optDouble(0, 0.38) ?: 0.38) * width
                 val y = (pos?.optDouble(1, 0.38) ?: 0.38) * height
-                val w = (size?.optDouble(0, 0.24) ?: 0.24) * width
-                val h = (size?.optDouble(1, 0.24) ?: 0.24) * height
+                val (w, h) = sizePx(size?.optDouble(0, 0.24) ?: 0.24, size?.optDouble(1, 0.24) ?: 0.24, width, height, unit)
                 doubleArrayOf(x, y, w, h)
             }
             "polygon" -> {

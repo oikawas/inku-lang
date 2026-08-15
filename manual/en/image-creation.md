@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.20 (Web Build 907). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+This guide covers work creation with the Web UI and CLI in inku v2.13.21 (Web Build 908). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -390,7 +390,9 @@ From history management the order is oldest to newest; from the lineage it runs 
 
 While it runs, the current line, progress, elapsed time, token counts, and the instructions in flight are shown. Failed lines can be inspected in the report, and successful works are saved to history. Each work records the batch run ID and the line number.
 
-Descriptions used before can be restored from `Batch description history`.
+Descriptions used before can be restored from `Batch description history`. The last fifty are kept (v2.13.21; twenty before that). The list reaches half the window height at most and scrolls when it does not fit. Clicking outside it or pressing `Esc` closes it.
+
+A batch that stopped part-way can be carried on with `Resume where it stopped`, which appears to the left of `Paint` (v2.13.21). Pressing it paints only the lines that have no work yet, keeping the line numbers of the original description. The button appears only when the last batch work painted is not the last line of the newest description in `Batch description history`. The models, color catalog, sketch, wild and canvas used for the resume follow the record of the last work painted. A setting with no record is left as it is now.
 
 Set `Batch retry` in the settings to one or more and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 

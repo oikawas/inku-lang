@@ -6608,3 +6608,64 @@ any client that only knows the boolean).
   `ServerScoreCoercer.kt` allowlist and the Score schema in `ServerScoreSchemaJson.kt`), **[I-250]**
   (`sync_android_prompts.py` measures the main checkout even when run from a worktree, printing a false
   green), and **[I-251]** (`texture_for_surface()` has no reader yet; `carriage.py` is the natural one).
+
+### v2.13.21 — A batch that stopped part-way carries on from where it stopped (Build 908, 2026-08-15, ledger I-257)
+
+**Three items, each pointed at in turn by the author.** The branch is three commits and **has not been
+folded**. **⚠ Nothing in this round was seen on screen** — the browser extension answered "not connected"
+all three times, so the button's position, the list's height, its scrollbar and the numbering after a resume
+have passed no one's eyes.
+
+- **Batch description history now keeps fifty** (it kept twenty). **The limit lives on the server** and cut
+  on both the read and the write, so raising it in the web alone never arrived. **Lowering it again drops
+  the tail that was already saved.**
+- **The dropdown was replaced by a list of our own.** A native `<select>` **cannot be given a popup height
+  in CSS** (the browser decides), so it could not satisfy "at most half the window, scroll if it does not
+  fit". It is now a `role="listbox"` list that **closes on an outside click and on Escape**.
+- **`Resume where it stopped` sits to the left of `Paint`.** Pressing it paints **only the lines that have
+  no work yet**, **keeping the line numbers of the original text**. It is **not "everything after the last
+  line painted"** — a line that failed mid-run would make that repaint the finished ones behind it. **The
+  button appears only when the newest batch work is not the last line of the newest saved description.** The
+  match is made on **both the number and the description** (the number alone calls an unrelated run
+  "unfinished" once the description has been shortened).
+- **The conditions for a resume are read from the last work actually painted** (models, color catalog,
+  sketch, wild, canvas). **A condition with no record is not invented** — a work without `render_wild` is
+  not "wild was off" but **older than that flag**, and writing `false` would resume under different
+  conditions.
+- **[I-257]: a work now records how its color catalog was asked for** (`history.catalog_mode`). **Until now
+  the row kept only the resolved id**, and whether the run had asked for `choose from the description` was
+  **recorded nowhere** — resuming a batch that ran on `auto` pinned it to whatever catalog the last line
+  happened to resolve. **⚠ It is not part of the render hash** — putting it there would rebuild the identity
+  of every saved work. **Existing rows stay NULL, and that is correct** (NULL means "not recorded", not "was
+  not `auto`").
+- **⚠ Two senders that save without writing `catalog_mode` remain**: `cli refine save` and the web's demo
+  save. **Both write NULL.** The batch resume path goes through neither.
+
+**API surface:** **no route added, removed or renamed; no operation moved.** Two schemas changed
+(`HistoryItem` and `HistoryPostBody` each gained `catalog_mode`; optional and null by default, so **clients
+that do not send it pass as before, and the key disappears from the response when it is null**). The
+database gained one column, `history.catalog_mode` (VARCHAR, nullable), through **the existing migration
+that runs at startup**.
+
+**Checks:** **web 357 passed / 0 failed** (+25), **cli 225 passed**, **server 3,193 passed / 31 skipped**
+(+3), **ruff clean**, **`npm run check` 260 FILES 0 ERRORS 2 WARNINGS** (the two warnings are the existing
+a11y pair, unchanged in place and in count), **`lint:i18n` 1058 / 47 / 0 / 0**, **`lint:models` 68 checks
+passed**. **Seventeen perturbations** were applied (eleven for stages 1 and 2, all of which fired; six for
+stage 3). **⚠ A5 in stage 3 was a miss** — it changed **only the whitespace** in the column declaration, and
+the acceptance's regular expression is tolerant of whitespace, so it passed through in letter and in
+meaning. **That tolerance is itself right** (formatting should not redden anything), but it left the line's
+discriminating power unmeasured, so **A6 (removing the column itself) was added with its prediction frozen
+first**, and it reddened as predicted.
+
+- **What acceptance measured** (the implementation was the same Opus 5, so numbers already measured on the
+  branch were not re-measured): **the branch tree and the merged tree are byte-identical** (`dfa266b8`);
+  **`api-surface-baseline.json` differs by three lines** (two schemas and the digest — **no route and no
+  operation moved**); and **the three frozen guards were declared to, not regenerated**
+  (`test_the_card_only_adds_one_route.py`, `test_the_acl_only_adds_to_the_api_surface.py`,
+  `test_the_groups_decide_what_you_may_do.py` — **their claim that nothing else moved by a single byte still
+  stands**).
+- **⚠ The `server/` line was crossed twice** (the contract listed it as untouched). **Both crossings were
+  reported before the work and ruled on by the author** — one constant in stage 1, one column and eight
+  places across five files in stage 3.
+- **One ledger entry, resolved in the same round:** **[I-257]** (filed by acceptance; the author chose
+  option B and stage 3 implemented it).

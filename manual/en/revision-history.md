@@ -2,6 +2,16 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-08-15 — v2.13.21 unreleased baseline (Web Build 908)
+
+Updated the 13 places that name a version to v2.13.21 / Build 908. **Two batch operations changed, so the matching sections of "Creating Images" were added to.**
+
+- **Batch description history now keeps fifty entries** (twenty before that). The list is no longer a `<select>`: it uses up to half the window height and scrolls when it does not fit. Clicking outside it or pressing `Esc` closes it.
+- **`Resume where it stopped` now sits to the left of `Paint`.** A batch that stopped part-way can be carried on, painting only the lines that have no work yet and keeping the line numbers of the original description. The button appears only when the last batch work painted is not the last line of the newest description in the history.
+- **The models, color catalog, sketch, wild and canvas for a resume follow the record of the last work painted.** A setting with no record is left as it is now.
+- **A batch painted with `From the description` resumes with `From the description`.** Until now the row kept only the resolved catalog, so whether the automatic choice had been asked for could not be read, and the resume pinned itself to whatever catalog the last line chose. **Works older than this record carry no value** (no value means "not recorded", not "was not automatic").
+- No environment variable or CLI flag changed.
+
 ## 2026-08-14 — v2.13.20 unreleased baseline (Web Build 907)
 
 Updated the 13 places that name a version to v2.13.20 / Build 907.

@@ -3081,7 +3081,24 @@ shows a mascot of its own.**
 The batch panel accepts multiple instruction lines.  During execution, the
 active line is highlighted and the current DDL interpretation is displayed
 read-only.  Batch execution keeps failure reports until the next batch run, and
-stores batch prompt history per user.
+stores batch prompt history per user.  **The history keeps fifty entries
+(v2.13.21; twenty before that).  The limit belongs to the server, which cuts on
+both the read and the write.**  The list is capped at half the window height and
+scrolls when it does not fit.
+
+**A batch that stopped part-way can be carried on from where it stopped
+(v2.13.21).**  A resume paints **only the lines that have no work yet**, keeping
+**the line numbers of the original description**.  It is not "everything after
+the last line painted": a line that failed mid-run would make that repaint the
+finished ones behind it.  Whether a resume is offered is decided by **whether
+the newest batch work is the last line of the newest saved description**, and
+the match is made on **both the line number and the description** (the number
+alone reads an unrelated run as unfinished once the description has been
+shortened).  The conditions for the resume — models, color catalog, sketch,
+wild, canvas — are read from **the last work actually painted**, and **a
+condition with no record is not invented**: a missing record means "older than
+that record", not "that setting was off", so inventing a default would resume
+under different conditions.
 
 Letting the server choose a color catalog by reading each line is **not a batch
 option but the catalog selection itself** (below). **Until v2.9.39 the batch tab
@@ -3095,7 +3112,14 @@ request sets `catalog_mode` to `auto` and carries the default catalog as
 `catalog_id`, which is the fallback the server keeps when the model is
 unreachable or names a catalog that does not exist).  History records store the
 catalog that was actually used, so **refinement and redrawing do not inherit the
-automatic choice: they draw with the work's own catalog**.
+automatic choice: they draw with the work's own catalog**.  **Beside the
+resolved catalog, a history record also stores how it was asked for
+(`catalog_mode`, v2.13.21)** — the resolved id alone cannot say whether the
+automatic choice was asked for or a catalog was named.  **Only the batch resume
+reads it, so a run that asked for the automatic choice carries on with the
+automatic choice**; refinement and redrawing are unchanged.  **Works older than
+this record carry no value, and the absence of a value means "not recorded", not
+"was not automatic".**
 
 **The catalog selection is stored per user on the server**
 (`model_settings.color_catalog_id`).  Drawing needs a session, so a browser-wide

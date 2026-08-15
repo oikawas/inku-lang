@@ -12,6 +12,7 @@
 	import RunStatus from './RunStatus.svelte';
 	import VariationLanes from './VariationLanes.svelte';
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
+	import { measureSvgWeight } from '$lib/svgWeight';
 	import ModelMetaCard from './ModelMetaCard.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -504,8 +505,13 @@
 	const detailElapsedMs = $derived(statusHistoryItem?.elapsed_ms ?? result?.elapsed_total_ms ?? null);
 	const detailTokensIn = $derived(statusHistoryItem?.tokens_in ?? ((result?.tokens_in_stage1 ?? 0) + (result?.tokens_in_stage2 ?? 0) || null));
 	const detailTokensOut = $derived(statusHistoryItem?.tokens_out ?? ((result?.tokens_out_stage1 ?? 0) + (result?.tokens_out_stage2 ?? 0) || null));
-	// SVG のデータ量。演奏そのものの重さを示す指標として詳細タブに並べる。
-	const detailSvgBytes = $derived(result?.svg ? new TextEncoder().encode(result.svg).length : null);
+	// How heavy the performance is, in three quantities that do not stand in for
+	// one another: bytes, objects, points. Counted by the same function the trend
+	// report uses (see $lib/svgWeight), so the number here and the number there
+	// are the same quantity. HistoryItem carries no `svg`, so this reads `result`
+	// rather than the `statusHistoryItem ?? result` shape the other rows use.
+	const detailSvgWeight = $derived(result?.svg ? measureSvgWeight(result.svg) : null);
+	const detailSvgBytes = $derived(detailSvgWeight?.bytes ?? null);
 	const formatBytes = (bytes: number | null) => {
 		if (bytes == null) return '-';
 		if (bytes < 1024) return `${bytes} B`;
@@ -1191,6 +1197,8 @@
 								{@render term(isJapanese ? 'キャンバス' : 'Canvas', t().provenanceHintCanvas)}<dd>{statusCanvasName}</dd>
 								{@render term(t().provenanceLabelCanvasRatio, t().provenanceHintCanvasRatio)}<dd>{detailCanvasRatio == null ? '-' : detailCanvasRatio.toFixed(3)}</dd>
 								{@render term(isJapanese ? 'SVG サイズ' : 'SVG size', t().provenanceHintSvgSize)}<dd>{formatBytes(detailSvgBytes)}</dd>
+								{@render term(isJapanese ? 'SVG オブジェクト数' : 'SVG objects', t().provenanceHintSvgObjects)}<dd>{detailSvgWeight?.objects ?? '-'}</dd>
+								{@render term(isJapanese ? 'SVG 点数' : 'SVG points', t().provenanceHintSvgPoints)}<dd>{detailSvgWeight?.points ?? '-'}</dd>
 							</dl>
 						</section>
 						<section class="detail-group">

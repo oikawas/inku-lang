@@ -88,6 +88,7 @@ npm run check              # 型と鍵の欠落（LangPack）
 | 筆致制限 | **Stroke limit** | 暴れるトグルの見出し語。何を切り替えるかを名指す | ~~Brush limit~~ |
 | 制限値 | **Limits** | 設定タブ名。一枚が持てる墨の数を決める九つの数。`limit` 系で筆致制限と揃う | ~~Caps~~・~~Quotas~~・~~Thresholds~~ |
 | 生成情報 | **provenance** | 名詞。モデル・seed・版数のドロワー | ~~Generation Info~~ |
+| SVG オブジェクト数／SVG 点数 | **SVG objects** / **SVG points** | 名詞句。生成情報の重さ 3 行のうち「SVG サイズ」以外の 2 つ。**数え方の正本は `$lib/svgWeight` と `no-git-sync/scripts/svg_weight.py` の対**で、表示語が変わっても定義は変えない | ~~elements~~・~~nodes~~（DOM の量に読める。数えるのは文字列で、`<defs>` の中も数え、除くのは 5 タグだけ）、~~vertices~~（多角形に限る語） |
 | 履歴 | **history** | 名詞 | — |
 | ごみ箱 | **trash** | 名詞 | — |
 | 起点（新規作成） | **origin**（動作は **New**） | 名詞 | — |

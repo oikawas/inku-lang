@@ -228,8 +228,9 @@ class DefaultSvgRenderer(
                 val size = ins.optJSONArray("size")
                 val cx = px(center?.optDouble(0, 0.5) ?: 0.5, width)
                 val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
-                val rx = px((size?.optDouble(0, 0.26) ?: 0.26) / 2.0, width)
-                val ry = px((size?.optDouble(1, 0.16) ?: 0.16) / 2.0, height)
+                val (sizeW, sizeH) = ServerRendererGeometry.sizePx(size?.optDouble(0, 0.26) ?: 0.26, size?.optDouble(1, 0.16) ?: 0.16, width, height, unit)
+                val rx = sizeW / 2.0
+                val ry = sizeH / 2.0
                 val variation = ins.optJSONObject("variation")
                 if (usesHandStroke(weight)) {
                     val approxPerimeter = Math.PI * (3.0 * (rx + ry) - sqrt((3.0 * rx + ry) * (rx + 3.0 * ry)))
@@ -277,8 +278,7 @@ class DefaultSvgRenderer(
                 val size = ins.optJSONArray("size")
                 val x = px(pos?.optDouble(0, 0.38) ?: 0.38, width)
                 val y = px(pos?.optDouble(1, 0.38) ?: 0.38, height)
-                val w = px(size?.optDouble(0, 0.24) ?: 0.24, width)
-                val h = px(size?.optDouble(1, 0.24) ?: 0.24, height)
+                val (w, h) = ServerRendererGeometry.sizePx(size?.optDouble(0, 0.24) ?: 0.24, size?.optDouble(1, 0.24) ?: 0.24, width, height, unit)
                 val variation = ins.optJSONObject("variation")
                 val corners = listOf(x to y, (x + w) to y, (x + w) to (y + h), x to (y + h))
                 if (usesHandStroke(weight)) {
@@ -325,7 +325,7 @@ class DefaultSvgRenderer(
                 }
             }
             "triangle" -> {
-                val points = trianglePoints(ins, width, height)
+                val points = trianglePoints(ins, width, height, unit)
                 val variation = ins.optJSONObject("variation")
                 if (usesHandStroke(weight)) {
                     val seedStr = seedForInstruction(ins, renderSeed)
@@ -447,8 +447,7 @@ class DefaultSvgRenderer(
                 val size = ins.optJSONArray("size")
                 val cx = px(center?.optDouble(0, 0.5) ?: 0.5, width)
                 val cy = px(center?.optDouble(1, 0.5) ?: 0.5, height)
-                val sw = px(size?.optDouble(0, 0.5) ?: 0.5, width)
-                val sh = px(size?.optDouble(1, 0.34) ?: 0.34, height)
+                val (sw, sh) = ServerRendererGeometry.sizePx(size?.optDouble(0, 0.5) ?: 0.5, size?.optDouble(1, 0.34) ?: 0.34, width, height, unit)
                 val contour = ServerRendererGeometry.generateCloudformContour(
                     center = cx to cy,
                     size = sw to sh,
@@ -1013,8 +1012,8 @@ class DefaultSvgRenderer(
         return ServerRendererGeometry.pointsForRegular(ins, sides, width, height)
     }
 
-    private fun trianglePoints(ins: JSONObject, width: Double, height: Double): List<Pair<Double, Double>> {
-        return ServerRendererGeometry.trianglePoints(ins, width, height)
+    private fun trianglePoints(ins: JSONObject, width: Double, height: Double, unit: Double): List<Pair<Double, Double>> {
+        return ServerRendererGeometry.trianglePoints(ins, width, height, unit)
     }
 
     private fun usesHandStroke(weight: String): Boolean {

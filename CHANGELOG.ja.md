@@ -6180,3 +6180,56 @@ DB は `history.catalog_mode`（VARCHAR・nullable）が 1 列増え、**migrati
   `npm run check` **261 FILES / 0 ERRORS / 2 WARNINGS**（+1 FILES = 新規 `svgWeight.ts`。
   既知の a11y 2 件は起点と同数）、`npm run lint:i18n` **1,062 strings / 47 exceptions / 0 warnings / 0 errors**（+4）。
   **`server/` `cli/` `shared/` `android/` の差分は 0 で、その満点は測っていない。**
+
+---
+
+### Android — 移植が、痕を server と同じ物差しで測る（android `2.1.4-android.31`、2026-08-16・[I-177] [I-217]・render engine 26 → 30）
+
+**移植が痕の大きさと揺れを「何と比べて」決めるかは、server と 4 版ぶん違っていた。**
+遅れていたのは fixture ではなく**読む側の版数**で、`ReferenceCorpus` が版ごとのディレクトリを引くため
+**遅れたままでも赤くならない**。本版は定数を 1 段ずつ上げ、各段でその版の機構を移した。
+
+- **engine 27 — 手はもっと大きく振れる。** 成員ごとの大きさ ±25% → **±35%**、向き ±12° → **±27°**
+  （`HAND_GROUP_SIZE` / `HAND_GROUP_ROT`）。**規則も除外も 1 行も動かしていない。**
+- **engine 28 — 痕は自分の線の上に残る。** 揺らぎの物差しを**図形の代表寸法から線幅へ**
+  （`AMPLITUDE_WIDTHS` fine 0.35 / medium 0.6 / broad 2.0。代表寸法の 0.40 というクランプは残した）、
+  材質輪郭のオフセットを**意図した幾何ではなく演奏された墨から**、掠れを **`stroke-dasharray` から接触の場へ**、
+  層の太さに**公称線幅の 0.33 倍**という上限を置いた。
+- **engine 29 — 同じ紙の目を、どの機械でも同じだけ数える。** 接触判定が読む 5 つの量を**小数 6 桁の px 格子**へ。
+- **engine 30 — どのキャンバスでも、痕は記述が述べた形を保つ。** `size` を**短辺基準の 1 つの口**（`sizePx`）へ通した。
+  **置き場所の計算は 1 バイトも触っていない** —— 座標は従来どおり幅と高さに比例する。
+- **⚠⚠ 段 2 が 1 件赤くなり、段 3 で消えた。** `23_square_filled_wild` の stratum-1 だけが食い違い、
+  **`java.lang.Math.hypot` と CPython の `math.hypot` が同じ 80 点の総和で 1 ULP 違う**ことが原因だった
+  （`1600.646920448216` 対 `1600.6469204482157`）。**その層だけ歩幅が `total/600` で決まっており、
+  標本が 1 本増え、標本自身の分位点である閾値が別の値へ飛んだ。**
+  **engine 29 が塞ぐ当の欠陥そのものなので、CPython の hypot を書き写さず段 3 の格子へ吸収させた。**
+- **⚠ `renderEngineVersion` は `"30"` で止めた**（作者裁定 2026-08-15）。
+  **`render-engine-31`〜`-34` は `-30` と `manifest.json` 以外バイト同一**なので、
+  **定数だけ 34 にすると持っていない機構を名乗ることになる**（31 と 32 は [I-233] が負う）。
+- **⚠ 台帳と本書の断定が 2 件とも誤りだった** —— **[I-177] と本書の engine 28 節が言う
+  「移植は 27 を解決し続けている」は偽**で、定数の全履歴は **1 → 16 → 17 → 19 → 21 → 26**、
+  **27 だったことは一度も無い**。**[I-217] の「`size` を読む 13 箇所」は発行日に 15 だった**
+  （`render/` 全体では 22 で、短辺基準の口へ通したのは **8**、通さなかった 14 の内訳はレポートが持つ）。
+- **手写しの期待値を持っていた検査 3 本を、機構と同じ commit で据え直した** ——
+  `CornerShapeMaterialLayerTest` の sha256 リテラル 4 本を**版ごとのコーパス読みへ**（同じ instruction・
+  同じ seed の作品が `31_triangle_pencil` と `32_polygon_brush_thin` に在る）、
+  `testMaterialProportionalWiring` を engine 28 で到達不能になった `r=` の主張から**肯定と否定の対へ**、
+  `testEachMemberOfATurningGroupFindsItsOwnAngle` の `±12` を**リテラルと定数の結びつきを主張する形へ**。
+- **⚠ コーパス照合は線幅に対して盲である**（摂動 P-4 で実測）——
+  51 枚の照合が比べるのは `d` / `points` / `stroke-dasharray` と class・要素数だけで、
+  **`stroke-width` を動かす改修では 1 枚も赤くならない**。層の上限を守っているのは
+  `renderer_proportional.json` を読む検査と本契約が足した受入の **2 本**である。
+- **摂動 10 本・空振り 0 本**（実装が実測。予測 54 に対し**実測 39**）。
+  **P-8 は正方形で必ず空振りし、P-10 が恒等を壊して受入を捕まえた** —— 契約が対で据えた 2 本が、
+  **それぞれ別の摂動でしか赤くならないことを実測した**。
+- **検証（受け入れ側がマージ後の木で測り直した）:** **Android JVM 295 passed / 0 failed / 0 skipped**
+  （起点 289・**+6 = 本契約の受入**。`testDebugUnitTest` 単独の数で二重計上は無い）、
+  **`test_android_reference_fixtures_are_current.py` 4 passed**。
+  **参照 fixture は 1 バイトも焼き直していない**（読む側の版数だけを動かした）。
+- **触ったのは `android/` の 11 ファイルだけ。** `APP_VERSION` / `web/BUILD_NUMBER` は動かしておらず、
+  **pentala へも送っていない**（`android/` は全同期経路から恒久除外）。
+- **台帳へ 3 件起票した**（ID は未採番）—— **`shapeBbox` に cloudform の枝が無く雲形の面が描かれない**・
+  **弧長が角度差を 360 で正規化している**・**`testMaterialOutlinePointsAndDashArrayExactParity` が
+  engine 28 以降、層の断片を 1 本も見ていない**（正規表現が `class="material-outline"` の完全一致を求めており、
+  コーパスの engine 30 には**完全一致 0 本・`stratum-N` つき 3,867 本**。受け入れ側で検算した）。
+  **3 件とも凍結コーパスでは赤くならない。**

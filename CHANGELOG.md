@@ -6768,3 +6768,66 @@ two rows to the drawer and prints **three quantities side by side: bytes, object
   acceptance**), `npm run check` **261 FILES / 0 ERRORS / 2 WARNINGS** (+1 file, the two known a11y
   warnings unchanged), `npm run lint:i18n` **1,062 strings / 47 exceptions / 0 warnings / 0 errors**.
   **`server/`, `cli/`, `shared/` and `android/` are untouched, and their suites were not run.**
+
+---
+
+### Android — the port measures a mark the way the server does (android `2.1.4-android.31`, 2026-08-16, ledger I-177, I-217, render engine 26 → 30)
+
+**What the port measured a mark's size and wander *against* had been four engine versions behind the
+server.** What lagged was not the fixtures but the version the port reads: `ReferenceCorpus` resolves a
+fixture through a version-keyed directory, so **falling behind never turns anything red**. This version
+raises the constant one step at a time, porting that step's mechanism in the same commit.
+
+- **engine 27 — the hand swings wider.** Per-member size ±25% → **±35%**, per-member turn ±12° →
+  **±27°** (`HAND_GROUP_SIZE` / `HAND_GROUP_ROT`). **Not one rule or exclusion moved.**
+- **engine 28 — a mark stays on its own line.** The wander is measured against the **stroke width**
+  rather than the figure's representative size (`AMPLITUDE_WIDTHS` fine 0.35 / medium 0.6 / broad 2.0;
+  the 0.40 × representative clamp stays as the safety valve for figures smaller than their own mark),
+  the material outline takes its offset from the **performed ink** rather than the intended geometry,
+  the skip stops being a **`stroke-dasharray`** and becomes the contact field crossing a threshold, and
+  a stratum is capped at **0.33 × the nominal stroke width**.
+- **engine 29 — count the paper's grain on the same lattice everywhere.** The five lengths the contact
+  test reads now sit on the **same six-decimal pixel lattice the SVG is written on**.
+- **engine 30 — a mark keeps the shape the description gave it.** `size` goes through **one short-side
+  door** (`sizePx`). **Placement arithmetic was not touched** — coordinates still scale with width and
+  height, so the aspect ratio decides where a mark sits and no longer what shape it is.
+- **⚠⚠ Stage 2 left one test red, and stage 3 removed it.** Only stratum-1 of
+  `23_square_filled_wild` disagreed, because **`java.lang.Math.hypot` and CPython's `math.hypot`
+  differ by 1 ULP on the same sum of eighty segments** (`1600.646920448216` against
+  `1600.6469204482157`). That stratum alone takes its step from `total/600`, so one extra sample was
+  drawn, **and the threshold — a quantile of the samples themselves — jumped to another value.**
+  **This is precisely the defect engine 29 exists to close**, so it was absorbed by stage 3's lattice
+  rather than chased by transcribing CPython's `hypot` into Kotlin.
+- **⚠ `renderEngineVersion` stops at `"30"`** (author's ruling, 2026-08-15). **`render-engine-31`
+  through `-34` are byte-identical to `-30` apart from `manifest.json`**, so moving the constant to 34
+  would name mechanisms the port does not hold (31 and 32 are owed by ledger I-233).
+- **⚠ Two assertions — one in the ledger, one in this file — were measured false.** **Ledger I-177 and
+  this file's engine 28 entry both say the port "still resolves 27".** It does not: the constant's full
+  history is **1 → 16 → 17 → 19 → 21 → 26**, and **it was never 27**. **I-217's "13 sites that read
+  `size`" was 15 on the day of issue** (22 across `render/`; **8** were routed through the short-side
+  door, and the completion report enumerates the 14 that were not and why).
+- **Three tests that held hand-copied expectations were re-seated in the same commit as the mechanism**
+  — `CornerShapeMaterialLayerTest`'s four sha256 literals became **reads of the version-keyed corpus**
+  (`31_triangle_pencil` and `32_polygon_brush_thin` hold exactly those two cases at the same seed),
+  `testMaterialProportionalWiring`'s claim about an `r=` that engine 28 made unreachable became a
+  **positive/negative pair**, and `testEachMemberOfATurningGroupFindsItsOwnAngle`'s `±12` became a
+  literal **bound to the production constant on the next line**.
+- **⚠ The corpus parity checks are blind to stroke width** (measured by perturbation P-4) — the 51
+  drawings are compared on `d` / `points` / `stroke-dasharray` and on class and element count, so
+  **a change that moves `stroke-width` reddens none of them.** The stratum cap is held by the check
+  that reads `renderer_proportional.json` and by this contract's own acceptance — **two tests.**
+- **Ten perturbations, none of them a miss** (measured by the implementer; 39 red against a prediction
+  of 54). **P-8 is necessarily vacuous on a square canvas and P-10 breaks the identity instead** — the
+  two gates the contract seated as a pair were shown to redden under different perturbations.
+- **Verification (re-run by the accepting side on the merged tree):** **Android JVM 295 passed /
+  0 failed / 0 skipped** (289 at the base, **+6 = this contract's acceptance**; `testDebugUnitTest`
+  alone, so nothing is double-counted) and **`test_android_reference_fixtures_are_current.py`
+  4 passed**. **Not one reference fixture was rebaked** — only the side that reads them moved.
+- **Eleven files, all under `android/`.** `APP_VERSION` and `web/BUILD_NUMBER` did not move and
+  **nothing was sent to pentala** (`android/` is permanently excluded from every sync path).
+- **Three ledger entries were filed** (unnumbered) — **`shapeBbox` has no cloudform branch, so a
+  cloudform carrying a surface draws no texture on Android**; **arc length normalises the angle span by
+  360 where the server does not**; and **`testMaterialOutlinePointsAndDashArrayExactParity` has seen no
+  strata since engine 28** (its regex demands an exact `class="material-outline"`, and the engine 30
+  corpus holds **zero** exact matches against **3,867** `stratum-N` ones — verified by the accepting
+  side). **None of the three reddens anything in the frozen corpus.**

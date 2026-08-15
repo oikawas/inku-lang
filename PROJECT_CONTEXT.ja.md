@@ -275,7 +275,10 @@ UI は日英で、切替は設定画面から行う（既定は `ja`）。
 **② ローカル専用の材料**（`cli/bench/leaf` を使う 9 件と `cairosvg` の 1 件）、
 **③ darwin で焼いた凍結物と照合する 2 件**（Android の参照 fixture の焼き直しと、
 platform 安定性の対のテスト。**linux で焼くと違う値になるので CI では外してある**）、
-**④ Android の JVM テスト**（gradle wrapper が無いため未搭載）、
+**④ Android の JVM テスト**（`checks.yml` の job は `server` / `cli` / `web` / `docs` の 4 つで、
+**回す job が無い**。**⚠ 2026-08-16 訂正: 旧記載の「gradle wrapper が無いため」は誤り** ——
+`android/gradlew` と `android/gradle/wrapper/` は追跡されている。
+なお `reference-corpus.yml` には `android-design-preview` job が在るので、**Android が CI に 1 つも無いわけではない**）、
 **⑤ `no-git-sync/` の運用スクリプト**（git が追跡しないので CI から見えない）。
 **手元の全走とは母集団が違う。**
 

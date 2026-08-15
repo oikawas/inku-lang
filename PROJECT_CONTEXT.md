@@ -346,7 +346,10 @@ and the published documents (`check_docs.py`).**
 **(2) local-only material** — nine tests that use `cli/bench/leaf`, and one that wants `cairosvg`;
 **(3) two comparisons against bytes baked on darwin** — the Android reference fixtures and the
 platform-stability pair test, **which read the Linux bake as a defect and are deselected there**;
-**(4) the Android JVM tests**, which are not on CI because there is no gradle wrapper;
+**(4) the Android JVM tests**, for which `checks.yml` simply has no job — its four are `server`,
+`cli`, `web` and `docs` (**⚠ corrected 2026-08-16: the previous reason, "there is no gradle
+wrapper", was false** — `android/gradlew` and `android/gradle/wrapper/` are tracked. Android is not
+entirely absent from CI either: `reference-corpus.yml` carries an `android-design-preview` job);
 **(5) the operational scripts under `no-git-sync/`**, which git does not track.
 **The population is not the same as a full local run.**
 

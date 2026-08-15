@@ -234,9 +234,15 @@ def test_t7_the_paperless_digests_are_the_frozen_ones():
     other eight). What this test is about -- that a body naming no paper carries
     no support block -- is untouched; the digests move because the Stage 2 body
     and the tool schema moved beneath it. The 2026-08-13 pair was
-    e5ebae81b0b41055 / e25a01dc97e8a608."""
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "10e063b6cc175427"
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "7aee944049dbc058"
+    e5ebae81b0b41055 / e25a01dc97e8a608.
+
+    Re-measured again 2026-08-14 (ddl-engine 19: the ground is a support you can
+    name). Same reason a third time -- the body gained five ground lines and four
+    examples in each language, and `GroundMaterial` gained two values in the tool
+    schema. The claim here still holds: a body naming no paper carries no support
+    block. The engine-18 pair was 10e063b6cc175427 / 7aee944049dbc058."""
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "3069d521d7cf90a5"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT_EN) == "228075a1e9b07192"
 
 
 # The senders. A request that never names `canvas_aspect` gets `None`, and `None`

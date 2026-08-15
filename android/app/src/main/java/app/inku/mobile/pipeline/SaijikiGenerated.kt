@@ -55,6 +55,13 @@ object SaijikiGenerated {
             wordsEn = listOf("empty", "flat", "pale ink wash", "grain", "stipple", "hatch", "crosshatch", "bleeding", "aquatint", "dense", "faint"),
         ),
         Category(
+            key = "ji",
+            nameJa = "じ",
+            nameEn = "grounds",
+            wordsJa = listOf("紙", "和紙", "薄墨地", "木炭地", "カンバス", "画用紙", "メゾチント"),
+            wordsEn = listOf("paper", "washi", "ink wash ground", "charcoal ground", "canvas", "drawing paper", "mezzotint"),
+        ),
+        Category(
             key = "iro",
             nameJa = "いろ",
             nameEn = "colors",

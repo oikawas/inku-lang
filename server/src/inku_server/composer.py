@@ -274,7 +274,8 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 - **面の質感は instruction.surface へ入れる。点=texture="stipple"、平行線=texture="hatch"、交差線=texture="crosshatch"、アクアチント=texture="aquatint"、粒/粒立つ/かすれ=texture="grain"、薄墨/水彩=texture="wash"、にじみ/端が滲む=texture="bleed"。質感を理由に独立 instruction を追加しない**
 - **「面: 塗り」は texture="solid"。面の語はすべて surface.texture へ入る。「面: 空」は既定なので surface を出さない**
 - **「面: 濃い」は surface.density=0.60, surface.opacity=0.50。「面: 薄い」は surface.density=0.20, surface.opacity=0.15 (既定は density=0.35, opacity=0.28)。濃い・薄いは相対の語で、質感の語に添えられたときはその質感の濃さを動かす。「面: 薄墨（濃い）」は texture="wash" のまま density と opacity を上げる**
-- **紙目・生成りの紙・和紙・薄墨の地は canvas.ground へ入れる。canvas は {"aspect":"square","ground":{...}} 形式にしてよい。地は background ではなく支持体の質感であり、座標系を変えない**
+- **支持体は canvas.ground へ入れる。canvas は {"aspect":"square","ground":{...}} 形式にしてよい。地は background ではなく支持体の質感であり、座標系を変えない**
+- **「地: ...」の 7 つの固定句は material の 7 値と 1 対 1 に対応する。「生成りの紙、細かい紙目」=material="paper"、「和紙」=material="washi"、「薄墨」=material="ink_wash"、「木炭地」=material="charcoal_ground"、「カンバス」=material="canvas"、「画用紙」=material="drawing_paper"、「黒いメゾチント地」=material="mezzotint"。名指された支持体をいちばん近い別の値へ寄せない**
 - **「地: ...」の文は canvas.ground へだけ変換し、その文から instruction を追加しない。「面: ...」の文は直前に指定された主図形の surface に入れる。一つの質感要求を複数の質感付き instruction に複製しない**
 - **正規化DDL に「地: ...」の文が無い場合、canvas.ground を出力しない。雰囲気や情景からの推測で ground を追加しない**
 - **「地: 黒いメゾチント地。」だけを canvas.ground.material="mezzotint", tone="black" へ変換する。情景から推測しない**
@@ -401,6 +402,18 @@ _SYSTEM_PROMPT_TEMPLATE = """あなたは inku DDL の第二段階コンパイ�
 
 入力: 黒い縦線を横に三本並べる。地: 薄墨。
 出力: {"canvas":{"aspect":"square","ground":{"material":"ink_wash","tone":"gray","density":0.25,"opacity":0.14}},"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"black","arrangement":{"count":3,"layout":"horizontal"}}]}
+
+入力: 黒い円を中央に置く。半径は0.2。地: 和紙。
+出力: {"canvas":{"aspect":"square","ground":{"material":"washi","tone":"off_white","grain":"fine","density":0.2,"opacity":0.12}},"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"black"}]}
+
+入力: 白い弧を右上に置く。地: 木炭地。
+出力: {"canvas":{"aspect":"square","ground":{"material":"charcoal_ground","tone":"gray","grain":"coarse","density":0.3,"opacity":0.16}},"instructions":[{"primitive":"arc","center":[0.72,0.28],"radius":0.16,"angle_start":20.0,"angle_end":250.0,"color":"white"}]}
+
+入力: 赤い四角を中央に置く。地: カンバス。
+出力: {"canvas":{"aspect":"square","ground":{"material":"canvas","tone":"off_white","grain":"medium","density":0.25,"opacity":0.13}},"instructions":[{"primitive":"square","position":[0.35,0.35],"size":[0.3,0.3],"color":"red"}]}
+
+入力: 青い細い線を中央に一本引く。地: 画用紙。
+出力: {"canvas":{"aspect":"square","ground":{"material":"drawing_paper","tone":"white","grain":"medium","density":0.22,"opacity":0.12}},"instructions":[{"primitive":"line","from":[0.5,0.25],"to":[0.5,0.75],"color":"blue","weight":"pen"}]}
 
 入力: （支持体が pillar・縦に長い・比 1:5 と告げられている場合）黒い細い線を中心へひとつ置く。
 出力: {"canvas":{"aspect":"pillar"},"instructions":[{"primitive":"line","from":[0.5,0.08],"to":[0.5,0.92],"color":"black","weight":"pen"}]}
@@ -673,7 +686,8 @@ If "original text" is provided, use normalized DDL as primary; use original text
 - **Surface texture belongs in instruction.surface. stipple → texture="stipple"; hatch → texture="hatch"; crosshatch → texture="crosshatch"; aquatint → texture="aquatint"; grain/grainy/rough/scuffed → texture="grain"; pale ink wash/watercolor wash → texture="wash"; bleeding → texture="bleed". Do not turn texture into independent helper instructions**
 - **"Surface: flat" is texture="solid". Every surface word goes into surface.texture. "Surface: empty" is the default, so emit no surface**
 - **"Surface: dense" is surface.density=0.60, surface.opacity=0.50. "Surface: faint" is surface.density=0.20, surface.opacity=0.15 (defaults are density=0.35, opacity=0.28). Dense and faint are relative words: attached to a texture word they move how dense that texture is, so "Surface: pale ink wash (dense)" keeps texture="wash" and raises density and opacity**
-- **Paper grain, off-white paper, washi, and ink-wash ground belong in canvas.ground. Use canvas={"aspect":"square","ground":{...}} when needed. Ground is support texture, not a coordinate or composition change**
+- **The support belongs in canvas.ground. Use canvas={"aspect":"square","ground":{...}} when needed. Ground is support texture, not a coordinate or composition change**
+- **The seven fixed "Ground: ..." phrases map one to one onto the seven material values. "off-white paper, fine paper grain" is material="paper"; "washi" is material="washi"; "ink wash" is material="ink_wash"; "charcoal ground" is material="charcoal_ground"; "canvas" is material="canvas"; "drawing paper" is material="drawing_paper"; "black mezzotint" is material="mezzotint". Never move a named support to the nearest other value**
 - **A "Ground: ..." sentence maps only to canvas.ground; do not add any instruction from it. A "Surface: ..." sentence goes into the surface of the main shape it follows. Never duplicate one texture request across multiple textured instructions**
 - **Do not emit canvas.ground unless the normalized DDL contains a "Ground: ..." sentence. Never add ground from mood or scene inference**
 - **Only "Ground: black mezzotint." maps to canvas.ground.material="mezzotint", tone="black". Never infer it from a scene**
@@ -801,6 +815,18 @@ Output: {"canvas":{"aspect":"square","ground":{"material":"paper","tone":"off_wh
 
 Input: Line up three vertical black lines horizontally. Ground: ink wash.
 Output: {"canvas":{"aspect":"square","ground":{"material":"ink_wash","tone":"gray","density":0.25,"opacity":0.14}},"instructions":[{"primitive":"line","from":[0.5,0.0],"to":[0.5,1.0],"color":"black","arrangement":{"count":3,"layout":"horizontal"}}]}
+
+Input: Place a black circle at center. Radius 0.2. Ground: washi.
+Output: {"canvas":{"aspect":"square","ground":{"material":"washi","tone":"off_white","grain":"fine","density":0.2,"opacity":0.12}},"instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.2,"color":"black"}]}
+
+Input: Place a white arc in the upper right. Ground: charcoal ground.
+Output: {"canvas":{"aspect":"square","ground":{"material":"charcoal_ground","tone":"gray","grain":"coarse","density":0.3,"opacity":0.16}},"instructions":[{"primitive":"arc","center":[0.72,0.28],"radius":0.16,"angle_start":20.0,"angle_end":250.0,"color":"white"}]}
+
+Input: Place a red square at center. Ground: canvas.
+Output: {"canvas":{"aspect":"square","ground":{"material":"canvas","tone":"off_white","grain":"medium","density":0.25,"opacity":0.13}},"instructions":[{"primitive":"square","position":[0.35,0.35],"size":[0.3,0.3],"color":"red"}]}
+
+Input: Draw one thin blue line at center. Ground: drawing paper.
+Output: {"canvas":{"aspect":"square","ground":{"material":"drawing_paper","tone":"white","grain":"medium","density":0.22,"opacity":0.12}},"instructions":[{"primitive":"line","from":[0.5,0.25],"to":[0.5,0.75],"color":"blue","weight":"pen"}]}
 
 Input: (when the support announced is pillar -- taller than wide, ratio 1:5) Place one thin black line at center.
 Output: {"canvas":{"aspect":"pillar"},"instructions":[{"primitive":"line","from":[0.5,0.08],"to":[0.5,0.92],"color":"black","weight":"pen"}]}

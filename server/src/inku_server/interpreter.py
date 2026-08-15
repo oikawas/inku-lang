@@ -150,9 +150,14 @@ _SYSTEM_PROMPT_PREFIX_TEMPLATE = ("""あなたは inku DDL の第一段階イン
 
 質感は補助図形を増やす理由にしない。対象が図形の中身なら「面: ...」、キャンバスそのものなら「地: ...」として短く残す。
 
-- 紙目を残す、生成りの紙、和紙 → 「地: 生成りの紙、細かい紙目。」
+- 紙、紙目を残す、生成りの紙、画仙紙 → 「地: 生成りの紙、細かい紙目。」
+- 和紙、楮、簀の目 → 「地: 和紙。」
 - 薄墨の地、墨を含んだ紙 → 「地: 薄墨。」
+- 木炭紙、木炭地、筋の入った紙 → 「地: 木炭地。」
+- カンバス、キャンバス、画布、canvas、麻布に描く → 「地: カンバス。」
+- 画用紙、中目の紙、ケント紙 → 「地: 画用紙。」
 - 入力が支持体を「〜の地」「〜を地に」「〜の紙に」と明示した場合は、必ず「地: ...」として残し、「背景...」へ言い換えない。
+- 支持体の語は上の 7 つの固定句のいずれかへ寄せる。和紙を「紙」へ、木炭地を「薄墨」へ潰さない。
 - 塗る、塗りつぶす、ベタ、中を塗る、面で満たす → 「面: 塗り。」
 - 点で埋める、点描の面 → 「面: 点。」
 - 斜線で埋める、ハッチ → 「面: 平行線。」
@@ -691,6 +696,17 @@ EXAMPLE_POOL: list[dict] = [
         "input": "生成りの紙に、墨の細い横線を一本引く",
         "output": "細筆の細い横線を中央に引く。地: 生成りの紙、細かい紙目。",
     },
+    # 支持体は 7 つ。名指された支持体は、いちばん近い紙へ潰さずそのまま残す。
+    {
+        "keywords": ["和紙", "楮", "簀の目", "木炭紙", "木炭地"],
+        "input": "和紙に、墨の円をひとつ置く",
+        "output": "黒い円を中央に置く。半径は0.2。地: 和紙。",
+    },
+    {
+        "keywords": ["カンバス", "キャンバス", "画布", "画用紙", "中目"],
+        "input": "カンバスに、赤い四角をひとつ置く",
+        "output": "赤い四角を中央に置く。地: カンバス。",
+    },
 ]
 
 EXAMPLE_POOL_EN: list[dict] = [
@@ -966,6 +982,18 @@ EXAMPLE_POOL_EN: list[dict] = [
         "input": "A thin ink line on off-white paper",
         "output": "Draw a thin fine-brush horizontal line at center. Ground: off-white paper, fine paper grain.",
     },
+    # There are seven supports. A support the input names is kept as itself,
+    # never flattened into the nearest sheet.
+    {
+        "keywords": ["washi", "kozo", "laid lines", "charcoal paper", "charcoal ground"],
+        "input": "An ink circle on washi",
+        "output": "Place a black circle at center. Radius 0.2. Ground: washi.",
+    },
+    {
+        "keywords": ["canvas", "linen", "drawing paper", "cartridge paper", "tooth"],
+        "input": "A red square on canvas",
+        "output": "Place a red square at center. Ground: canvas.",
+    },
 ]
 
 _SYSTEM_PROMPT_PREFIX_EN_TEMPLATE = ("""You are the Stage 1 interpreter of inku DDL.
@@ -1013,9 +1041,14 @@ Preserve all explicitly stated attributes in the input:
 
 Texture must not create extra helper shapes. If it belongs to a shape interior, write "Surface: ...". If it belongs to the canvas support, write "Ground: ...".
 
-- paper grain, off-white paper, washi → "Ground: off-white paper, fine paper grain."
+- paper, paper grain, off-white paper, drawing sheet → "Ground: off-white paper, fine paper grain."
+- washi, kozo, laid lines → "Ground: washi."
 - ink-wash ground → "Ground: ink wash."
+- charcoal paper, charcoal ground, ridged paper → "Ground: charcoal ground."
+- canvas, linen, on cloth → "Ground: canvas."
+- drawing paper, cartridge paper, medium tooth → "Ground: drawing paper."
 - If the input explicitly names the support as "... ground", "on ... paper", or "with ... as the ground", always preserve it as "Ground: ..."; never rewrite it as "Fill background ...".
+- Every support word goes to one of the seven fixed phrases above. Never flatten washi into paper, or charcoal ground into ink wash.
 - fill, paint, solid fill, filled interior → "Surface: flat."
 - stippled or dotted fill → "Surface: stipple."
 - hatch, hatched, hatching → "Surface: hatch."

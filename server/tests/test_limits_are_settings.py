@@ -290,22 +290,22 @@ def test_t4_digests_hold_at_the_defaults_and_move_under_a_setting():
     _, base_ja = interpreter._build_system_prompt_parts(
         "入力文は不変部へ入らない。", lang="ja", limits=DEFAULT_LIMITS
     )
-    assert _digest16(base_ja) == "0c03e4dfb10715eb"
-    assert len(base_ja.encode("utf-8")) == 19_584
+    assert _digest16(base_ja) == "6fdf17cbf2268a42"
+    assert len(base_ja.encode("utf-8")) == 20_116
 
     altered = Limits(**{**limits_as_dict(DEFAULT_LIMITS), "ddl_count_max": 1500})
     _, base_alt = interpreter._build_system_prompt_parts(
         "入力文は不変部へ入らない。", lang="ja", limits=altered
     )
-    assert _digest16(base_alt) != "0c03e4dfb10715eb"
+    assert _digest16(base_alt) != "6fdf17cbf2268a42"
     assert "1〜1500 の振れ幅" in base_alt
 
     # Stage 2 the same way: identical at the defaults, moved by the setting.
-    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "10e063b6cc175427"
+    assert composer._stage2_prompt_digest(composer.SYSTEM_PROMPT) == "3069d521d7cf90a5"
     raised = Limits(**{**limits_as_dict(DEFAULT_LIMITS), **RAISED})
     assert (
         composer._stage2_prompt_digest(composer.build_system_prompt("ja", raised))
-        != "10e063b6cc175427"
+        != "3069d521d7cf90a5"
     )
 
 

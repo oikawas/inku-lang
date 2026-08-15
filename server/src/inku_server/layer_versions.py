@@ -1,5 +1,21 @@
 """Independent versions for deterministic DDL layers and the DDL language."""
 
+# 19 (2026-08-14): the ground is a support you can name. The field held six
+# values and only three of them ever arrived: Stage 1 rewrote 和紙 as 紙 on its
+# very first ground line, `charcoal_ground` appeared in neither prompt nor
+# example, and production carried 0 works on washi out of 3,086 and 0 on a
+# charcoal ground while `paper` carried 127. Two supports join the enum (canvas
+# and drawing paper -- the two most basic ones, author's ruling), the saijiki
+# gains an eleventh category 「じ」 holding the seven supports that draw
+# something, and Stage 1 and Stage 2 both gain a fixed phrase and an example per
+# support in Japanese and English. `plain` is deliberately not a word: asking
+# for no ground is not asking for a ground. **This corpus does not move.** The
+# layer frozen here holds no prompt -- it is the expander, coerce, and the
+# plugin closure -- and the new category carries `marker_class=None`, so the
+# closure never quotes it. The empty `changed_from_previous` is the whole
+# explanation of what this version did, the same way engine 3 and engine 5 said
+# it: what moved is what the model is offered, and the frozen record of that
+# lives in the Android prompt fixtures keyed by this number.
 # 18 (2026-08-14): a fill is a surface word like the other eight. SPEC §3.1 calls
 # the interior of a closed shape by nine quality words, and eight of them landed
 # in `surface.texture` while 塗り alone landed in the boolean `filled`. Measured
@@ -211,7 +227,7 @@
 # last declaration slot back to `surface`. The deterministic layers behave exactly
 # as before -- this is the declaration-order condition, the one the frozen corpora
 # cannot catch, so ddl-engine-5 is byte-identical to ddl-engine-4 by design.
-DDL_ENGINE_VERSION = "18"
+DDL_ENGINE_VERSION = "19"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

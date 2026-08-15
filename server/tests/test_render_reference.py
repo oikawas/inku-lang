@@ -27,6 +27,7 @@ MANIFEST_PATH = CORPUS_DIR / "manifest.json"
 ENGINE_18_MANIFEST = SERVER_ROOT / "reference" / "render-engine-18" / "manifest.json"
 ENGINE_19_MANIFEST = SERVER_ROOT / "reference" / "render-engine-19" / "manifest.json"
 ENGINE_32_MANIFEST = SERVER_ROOT / "reference" / "render-engine-32" / "manifest.json"
+ENGINE_33_MANIFEST = SERVER_ROOT / "reference" / "render-engine-33" / "manifest.json"
 
 
 def _generator():
@@ -88,11 +89,16 @@ def test_render_reference_case_counts() -> None:
     # more than one mark -- could not be stated in this corpus at all. Three
     # state a span and `H-pair-scatter-plain` is the control: the same two
     # instructions with no span, which is the picture engine 32 drew.
-    assert len(cases) == 586
+    # Engine 34 added two to C: `canvas` and `drawing_paper`, the two supports
+    # the ground field gained. The ground cases are read from `GroundMaterial`
+    # now rather than listed in the generator, so a support that joins the enum
+    # and is never baked cannot happen; what can happen is a support joining
+    # without anyone deciding to re-freeze, and this count is what stops it.
+    assert len(cases) == 588
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
         for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
-    } == {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
+    } == {"A": 88, "B": 72, "C": 66, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
@@ -256,8 +262,8 @@ def test_engine_33_moves_only_its_own_composite_cases() -> None:
     版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
     いる実装ではなく別の実装の記録になる。
     """
-    manifest = _manifest()
-    assert manifest["engine_version"] == "33" == current_render_engine().version
+    manifest = json.loads(ENGINE_33_MANIFEST.read_text(encoding="utf-8"))
+    assert manifest["engine_version"] == "33"
     assert set(manifest["changed_from_previous"]) == {
         "H-pair-cycle-unit",
         "H-pair-radial-unit",
@@ -273,6 +279,55 @@ def test_engine_33_moves_only_its_own_composite_cases() -> None:
         assert case["digest"] == previous[case_id]["digest"], case_id
         carried += 1
     assert carried == 582
+
+
+# 地の 13 件。うち 2 件は新規 ID で、11 件は素材を持つ既存 case である。
+# `C-ground-plain` はここに入らない —— 地を頼まないことは地ではない。
+ENGINE_34_GROUND_CASES = {
+    "C-ground-canvas",
+    "C-ground-charcoal_ground",
+    "C-ground-drawing_paper",
+    "C-ground-field-density",
+    "C-ground-field-opacity",
+    "C-ground-ink_wash",
+    "C-ground-mezzotint",
+    "C-ground-paper",
+    "C-ground-washi",
+    "C-groundseed-auto-coarse",
+    "C-groundseed-auto-paper",
+    "C-groundseed-auto-paper-opacity",
+    "C-groundseed-auto-washi",
+}
+
+
+def test_engine_34_moves_only_the_ground_cases() -> None:
+    """engine 34 が動かしたのは、地を持つ 13 件だけである。
+
+    地の機構を profile ごとの作り分けから `<pattern>` へ入れ替えた版なので、
+    **地を持たない 575 件はバイト一致するのが正しい**。1 件でも動いていたら、
+    地の層以外へ手が伸びている。
+
+    ⚠ `C-ground-plain` が **changed に入っていないこと**が、この版の主張の片方で
+    ある —— 素材が `plain` の Score には地の層そのものが出ない。新規 ID は
+    すべて changed に数えられるので、判別力を持つのは残りの 11 件と、
+    動かなかった 575 件のほうである。
+
+    版の一致もここで見る。`default.py` と manifest がずれると、コーパスは走って
+    いる実装ではなく別の実装の記録になる。
+    """
+    manifest = _manifest()
+    assert manifest["engine_version"] == "34" == current_render_engine().version
+    assert set(manifest["changed_from_previous"]) == ENGINE_34_GROUND_CASES
+    assert "C-ground-plain" not in ENGINE_34_GROUND_CASES
+    previous = json.loads(ENGINE_33_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    carried = 0
+    for case_id, case in manifest["cases"].items():
+        if case_id in ENGINE_34_GROUND_CASES:
+            continue
+        assert case_id in previous, case_id
+        assert case["digest"] == previous[case_id]["digest"], case_id
+        carried += 1
+    assert carried == 575
 
 
 def test_engine_32_cases_match_the_current_renderer() -> None:

@@ -125,8 +125,13 @@ test('T-5: the English phrases fire too, and each name is listed once', () => {
 // vocabulary growing, not of the plugin-name index this contract added. The
 // fixture is declared, not rebaked: unwinding this one substitution has to
 // reproduce the frozen bytes exactly, so any other drift still fails.
+// 2026-08-14, ddl-engine 19: the saijiki gained じ / grounds, and `paper` is
+// one of its seven words. Same shape as 薄墨 above -- the vocabulary grew, the
+// plugin-name index did not move -- and declared the same way rather than
+// rebaked, so any drift that is not this substitution still fails.
 const DECLARED_SUBSTITUTIONS: readonly [RegExp, string][] = [
-	[/<span class="ddl-token ddl-token-word">薄墨<\/span>/g, '薄墨']
+	[/<span class="ddl-token ddl-token-word">薄墨<\/span>/g, '薄墨'],
+	[/<span class="ddl-token ddl-token-word">paper<\/span>/g, 'paper']
 ];
 
 test('T-7: without the index the output is byte-identical to the branch point', () => {
@@ -146,7 +151,7 @@ test('T-7: without the index the output is byte-identical to the branch point', 
 		assert.equal(unwound, expected, `changed for ${key}`);
 		declared += 1;
 	}
-	assert.equal(declared, 4, 'the declared substitution covers four cases, no more and no fewer');
+	assert.equal(declared, 8, 'the declared substitutions cover eight cases, no more and no fewer');
 });
 
 test('T-7: the four callers pass no index, and the editor passes one', () => {

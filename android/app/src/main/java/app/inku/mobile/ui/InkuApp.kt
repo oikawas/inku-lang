@@ -375,6 +375,10 @@ private val saijikiGroupColors = listOf(
     // `[index % size]`, so a list one short takes the first colour again
     // instead of failing.
     SaijikiGroupShell,
+    // The twelfth, for じ / grounds (ddl-engine 19). Same reason -- and this is
+    // the case the comment above was written for: the category was added and
+    // the pill for it came out the colour of かたち until this line existed.
+    SaijikiGroupMist,
 )
 
 /**

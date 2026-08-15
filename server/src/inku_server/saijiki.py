@@ -199,6 +199,29 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         ),
     ),
     SaijikiCategory(
+        key="ji",
+        name_ja="じ",
+        name_en="grounds",
+        # No closure markers, for the same reason おもて has none: this category
+        # says how the support is, not what to place on it, so the plugin
+        # closure never quotes it.
+        marker_class=None,
+        words=(
+            # `plain` is deliberately absent. Asking for no ground is not a word
+            # you can say -- it is what you get by saying nothing.
+            _w("紙", "paper", score_value="paper"),
+            _w("和紙", "washi", score_value="washi"),
+            _w("薄墨地", "ink wash ground", score_value="ink_wash"),
+            _w("木炭地", "charcoal ground", score_value="charcoal_ground"),
+            # 「カンバス」, not 「キャンバス」: the web already spells the sheet's
+            # own proportion キャンバス, and one screen must not use one word for
+            # two things.
+            _w("カンバス", "canvas", score_value="canvas"),
+            _w("画用紙", "drawing paper", score_value="drawing_paper"),
+            _w("メゾチント", "mezzotint", score_value="mezzotint"),
+        ),
+    ),
+    SaijikiCategory(
         key="iro",
         name_ja="いろ",
         name_en="colors",

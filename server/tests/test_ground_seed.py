@@ -50,14 +50,31 @@ def _score(ground: dict, **instruction_changes) -> Score:
     )
 
 
+_PATTERN = re.compile(r'<pattern id="gp\d+".*?</pattern>', re.S)
+_GRADIENT = re.compile(
+    r'<(?:linear|radial)Gradient id="gg\d+".*?</(?:linear|radial)Gradient>', re.S
+)
+
+
 def _ground_layer(score: Score, *, render_seed: int | None = RENDER_SEED) -> str:
-    """地の層だけを取り出す。粒ループを通す editable プロファイルで演奏する。"""
+    """地の層だけを取り出す。
+
+    ⚠ engine 34 で地は `<pattern>` になった。**タイルの中身は `<defs>` にあり、
+    層のグループに残るのはそれを塗る矩形だけである。**グループだけを見ていた
+    ころの抽出のままだと、粒がどう動いてもこのファイルの全検査が一致してしまう
+    (実測: `grain` を変えても `density` を上げても層は完全一致した)。定義と
+    グループの両方を取る。
+
+    profile は 3 つとも同じものを出すので、どれで演奏しても同じ文字列になる。
+    """
     svg = render(score, svg_profile="editable", render_seed=render_seed)
     start = svg.index(f'<g id="{GROUND_LAYER_ID}"')
     end = svg.index("</g>", start) + len("</g>")
-    layer = svg[start:end]
-    assert "<g" not in layer[2:], "地の層に入れ子の g がある: 抽出範囲を見直すこと"
-    return layer
+    return (
+        svg[start:end]
+        + "".join(_GRADIENT.findall(svg))
+        + "".join(_PATTERN.findall(svg))
+    )
 
 
 def _without_opacity(layer: str) -> str:
@@ -134,15 +151,23 @@ def test_p7_opacity_changes_only_the_opacity() -> None:
 
 
 def test_p7b_density_keeps_the_leading_grains() -> None:
-    """P-7 の系: `density` を上げても先頭の粒は動かず、粒が足されるだけ。"""
+    """P-7 の系: `density` を上げても先頭の粒は動かず、粒が足されるだけ。
+
+    ⚠ engine 34 では層が 7 枚あるので、**細かい地のタイル 1 枚の中で測る**。
+    層を全部つないだ文字列で数えると、細かい地が伸びたぶんだけ粗い粒が後ろへ
+    ずれ、位置の一致が「動いた」に見える —— 動いていないことは下の 6 枚が
+    バイト一致することで別に測る。
+    """
     sparse = _ground_layer(_score(_ground(density=0.45)))
     dense = _ground_layer(_score(_ground(density=0.85)))
     assert sparse != dense
     marks = re.compile(r"<(?:circle|line)\b[^>]*/>")
-    sparse_marks = marks.findall(sparse)
-    dense_marks = marks.findall(dense)
+    sparse_marks = marks.findall(_PATTERN.findall(sparse)[0])
+    dense_marks = marks.findall(_PATTERN.findall(dense)[0])
     assert len(dense_marks) > len(sparse_marks)
     assert dense_marks[: len(sparse_marks)] == sparse_marks
+    # 同じ紙が濃くなる: 粗い粒の 6 枚は 1 バイトも動かない。
+    assert _PATTERN.findall(sparse)[1:] == _PATTERN.findall(dense)[1:]
 
 
 # --- 明示 seed の分岐が残っていること ---------------------------------------
@@ -187,28 +212,30 @@ def test_material_changes_the_marks_not_only_the_seed(material: str) -> None:
     ) != _ground_layer(_score(_ground(material="paper", seed=13579)))
 
 
-def test_material_changes_the_filter_not_only_the_grains() -> None:
-    """display プロファイルでは粒ループを通らない。差は filter の中にある。"""
-    def _filter(material: str) -> str:
-        svg = render(_score(_ground(material=material)), svg_profile="display", render_seed=RENDER_SEED)
-        return re.search(r"<filter\b.*?</filter>", svg, re.S).group(0)
+def test_the_profile_does_not_decide_the_ground(material: str = "washi") -> None:
+    """engine 34: **profile で作り分けない。**3 つとも同じ地が出る。
 
-    paper = _filter("paper")
-    assert "feBlend" in _filter("washi"), "washi は直交する二枚を交差させる"
-    assert "feGaussianBlur" in _filter("ink_wash"), "ink_wash は横へぼかす"
-    assert "feBlend" not in paper and "feGaussianBlur" not in paper
-
-
-@pytest.mark.parametrize("material", ["washi", "ink_wash"])
-def test_material_does_not_add_elements(material: str) -> None:
-    """**支持体は描くものではない。** 粒の形は変わっても、数は増えない。
-
-    繊維を 38 本引いた最初の版では、地だけで絵全体の 46% を占めた。
-    DDL が明示した図形は 2 つしかなかった。
+    engine 33 まで `display` は `feTurbulence` の矩形・他の 2 つは点を撒く実装で、
+    「支持体は雑音の性格である」という主張はその filter の中身で測られていた
+    (`feBlend` が washi・`feGaussianBlur` が ink_wash)。**その機構ごと無くなった**
+    ので、ここで測るのは filter の中身ではなく **filter を 1 つも使わないこと**
+    である。素材ごとの描き分けそのものは
+    `test_the_ground_is_a_support_you_can_name.py` の T-5 / T-7 が持つ。
     """
-    paper = len(_ground_marks(_ground_layer(_score(_ground(material="paper", seed=13579)))))
-    other = len(_ground_marks(_ground_layer(_score(_ground(material=material, seed=13579)))))
-    assert other <= paper, f"{material} が地の要素を {paper} から {other} へ増やしている"
+    for profile in ("display", "editable", "compat"):
+        svg = render(
+            _score(_ground(material=material)), svg_profile=profile, render_seed=RENDER_SEED
+        )
+        start = svg.index(f'<g id="{GROUND_LAYER_ID}"')
+        end = svg.index("</g>", start) + len("</g>")
+        assert "filter" not in svg[start:end], profile
+
+
+# 「支持体は雑音の性格であって、描くものではない」という engine 15 の規則は
+# engine 34 で失効した —— 繊維を 38 本引いて地が絵全体の 46% を占めたのは、
+# 要素をキャンバスへ直接積んでいたからである。タイルの中の 80 本は画面に 1 度
+# しか書かれない。**費用の歯止めは要素数ではなくバイトになった**（24 KB・
+# 作者裁定 2026-08-14）。その受入は上記ファイルの T-6 が持つ。
 
 
 # --- absorbency の退役 -------------------------------------------------------

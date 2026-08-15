@@ -35,11 +35,11 @@ class SaijikiIsGeneratedTest {
 
     /** T1: what the screen builds, in either language, is the server's table. */
     @Test
-    fun testScreenShowsElevenCategoriesAndEightyFourWordsInBothLanguages() {
+    fun testScreenShowsTwelveCategoriesAndNinetyOneWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
-            assertEquals("$lang: display categories", 11, groups.size)
-            assertEquals("$lang: display words", 84, groups.sumOf { it.words.size })
+            assertEquals("$lang: display categories", 12, groups.size)
+            assertEquals("$lang: display words", 91, groups.sumOf { it.words.size })
         }
     }
 
@@ -132,7 +132,7 @@ class SaijikiIsGeneratedTest {
             val words = saijikiDetectionWords(lang).map { it.first }.toSet()
             assertTrue("$lang: does not recognise the Japanese 円", "円" in words)
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
-            assertEquals("$lang: detection surfaces", 168, words.size)
+            assertEquals("$lang: detection surfaces", 182, words.size)
         }
     }
 

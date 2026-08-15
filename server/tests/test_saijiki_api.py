@@ -106,6 +106,15 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("にじみ", "bleeding"), ("アクアチント", "aquatint"),
         ("濃い", "dense"), ("薄い", "faint"),
     ),
+    # じ (2026-08-14, ddl-engine 19). Seven supports and no `plain`: asking for
+    # no ground is not a word you can say. 「カンバス」 and not 「キャンバス」 --
+    # the web already spells the sheet's own proportion キャンバス, and one screen
+    # must not use one word for two things.
+    "ji": (
+        ("紙", "paper"), ("和紙", "washi"), ("薄墨地", "ink wash ground"),
+        ("木炭地", "charcoal ground"), ("カンバス", "canvas"),
+        ("画用紙", "drawing paper"), ("メゾチント", "mezzotint"),
+    ),
     "iro": (
         ("白", "white"), ("黒", "black"), ("青", "blue"),
         ("赤", "red"), ("緑", "green"), ("灰", "gray"),

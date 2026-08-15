@@ -33,6 +33,12 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['空', '塗り', '薄墨', '粒', '点', '平行線', '交差線', 'にじみ', 'アクアチント', '濃い', '薄い']
 	},
 	{
+		key: 'ji',
+		label: 'じ',
+		en: 'grounds',
+		words: ['紙', '和紙', '薄墨地', '木炭地', 'カンバス', '画用紙', 'メゾチント']
+	},
+	{
 		key: 'iro',
 		label: 'いろ',
 		en: 'colors',
@@ -100,6 +106,12 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		label: 'おもて',
 		en: 'surfaces',
 		words: ['empty', 'flat', 'pale ink wash', 'grain', 'stipple', 'hatch', 'crosshatch', 'bleeding', 'aquatint', 'dense', 'faint']
+	},
+	{
+		key: 'ji',
+		label: 'じ',
+		en: 'grounds',
+		words: ['paper', 'washi', 'ink wash ground', 'charcoal ground', 'canvas', 'drawing paper', 'mezzotint']
 	},
 	{
 		key: 'iro',

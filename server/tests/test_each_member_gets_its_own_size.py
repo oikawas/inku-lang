@@ -624,6 +624,21 @@ def test_a_score_with_no_arrangement_is_byte_identical(monkeypatch):
     assert len({w for w in weights if GRAMMARS[w].group_hand > 0}) >= 4, weights
     # Engine 29 resnaps the live side after contact-length stabilisation.
     latest = _manifest("29")["cases"]
+    # ⚠ engine 34 replaced the ground mechanism with tiled patterns, so a case
+    # that names a support IS supposed to have moved since engine 29. What this
+    # half measures is that the live renderer has not started scaling scores
+    # with no arrangement, so the ground cases come out of the sample -- that
+    # they moved, and that exactly thirteen of them did, is measured by the
+    # engine-34 attribution check in test_render_reference.py.
+    sample = [
+        case_id
+        for case_id in sample
+        if (previous[case_id]["input"]["score"]["canvas"].get("ground") or {}).get(
+            "material", "plain"
+        )
+        == "plain"
+    ]
+    assert len(sample) >= 10
     for case_id in sample:
         assert (
             generator._normalized_digest(

@@ -92,8 +92,19 @@ SurfaceTexture = Literal[
 SurfaceDirection = Literal[
     "none", "horizontal", "vertical", "diagonal_rising", "diagonal_falling"
 ]
+# The supports a work can be made on. `plain` is the absence of one, which is
+# why it is the default and why the saijiki has no word for it: asking for no
+# ground is not asking for a ground. The other eight are named in the `ji`
+# category and each one is drawn from what that support physically is.
 GroundMaterial = Literal[
-    "plain", "paper", "washi", "ink_wash", "charcoal_ground", "mezzotint"
+    "plain",
+    "paper",
+    "washi",
+    "ink_wash",
+    "charcoal_ground",
+    "canvas",
+    "drawing_paper",
+    "mezzotint",
 ]
 GroundTone = Literal["white", "off_white", "warm", "cool", "gray", "black"]
 GroundGrain = Literal["none", "fine", "medium", "coarse"]
@@ -187,7 +198,7 @@ class CanvasGroundSpec(BaseModel):
 
     material: GroundMaterial = Field(
         default="plain",
-        description="地の素材: plain=無地 / paper=紙 / washi=和紙 / ink_wash=薄墨地 / charcoal_ground=木炭地 / mezzotint=目立てした黒地",
+        description="地の素材: plain=無地 / paper=紙 / washi=和紙 / ink_wash=薄墨地 / charcoal_ground=木炭地 / canvas=カンバス / drawing_paper=画用紙 / mezzotint=目立てした黒地",
     )
     tone: GroundTone = Field(default="white", description="地の色調")
     grain: GroundGrain = Field(default="none", description="紙目・粒の粗さ")

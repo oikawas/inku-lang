@@ -86,6 +86,10 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
         "てざわり",
         "つらなり",
         "おもて",
+        # ddl-engine 19: the support a work is made on. It stands beside おもて
+        # for the reason おもて stands beside つらなり -- one says how the inside
+        # of a shape is, the other how the sheet under it is.
+        "じ",
         "いろ",
         "ゆらぎ",
         "ばしょ",

@@ -17,13 +17,13 @@ import re
 import shutil
 import subprocess
 import tempfile
-from typing import Any
+from typing import Any, get_args
 
 from inku_server import renderer
 from inku_server.color_catalogs import COLOR_CATALOGS, render_color_map_for_catalog
 from inku_server.render_engines import current_render_engine
 from inku_server.renderer import render
-from inku_server.schema import Instruction, Score
+from inku_server.schema import GroundMaterial, Instruction, Score
 
 REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 ENGINE = current_render_engine()
@@ -33,26 +33,26 @@ MANIFEST_PATH = OUTPUT_DIR / "manifest.json"
 
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.1.0"
-FROZEN_AT = "2026-08-13"
+FROZEN_AT = "2026-08-14"
 REASON = (
-    "a repeated unit can be more than one mark. Every arrangement this engine "
-    "could perform repeated a single instruction, so a pair -- an arc and the "
-    "arc touching it at both ends -- had to be handed over as every resolved "
-    "pair in full, and each follower then resolved its `touching` against "
-    "whichever instruction happened to precede it rather than against its own "
-    "head. `Arrangement.group_size` names the span, and the engine copies the "
-    "whole span first and resolves each copy's relations inside it second, "
-    "which is the order that makes the relation local. A member is carried by "
-    "the transform its head received: the rotation delta about the head's "
-    "anchor, the scale its extent was given, and the cycled color where the "
-    "head has a cycle. Four `H-pair-*` cases are new and are the whole of "
-    "`changed_from_previous`, because no case above them holds a score of more "
-    "than one instruction -- freezing this version without them would record a "
-    "vocabulary the corpus never speaks, and the 582 carried-over cases are "
-    "byte-identical, `group_size=1` being excluded from serialization. Three of "
-    "the four state a span and one is the control: `H-pair-scatter-plain` is "
-    "the same two instructions with no span, which is the picture engine 32 "
-    "drew, and it must not move."
+    "the ground is a support you can name. The support a work is made on was "
+    "drawn by a mechanism chosen by profile -- a `feTurbulence` rectangle for "
+    "`display`, a scatter of nine dots for `editable` and `compat` -- so the "
+    "same work came out on a different sheet depending on which file you "
+    "exported, and the six materials differed only in the shape of that noise. "
+    "All seven supports are now tiled `<pattern>` layers built from what the "
+    "support physically is: kozo fibre and the marks of the su for washi, the "
+    "passes of a brush and their tide lines for an ink wash, ridges and the "
+    "charcoal caught on them, a plain weave with its slubs for canvas, an even "
+    "tooth and the formation clouds for drawing paper, and the rocker's "
+    "criss-crossing lattices on a black plate for mezzotint. A pattern is "
+    "neither a filter nor a clip path, so all three profiles carry the same one "
+    "and the ground layer is byte-identical across them. `canvas` and "
+    "`drawing_paper` are new values, and the two `C-ground-*` cases holding them "
+    "are new; the eleven ground cases that carried a material other than `plain` "
+    "all move because the mechanism under them was replaced. `C-ground-plain` "
+    "does not move and must not: asking for no ground is not asking for a "
+    "ground, and every case in this corpus without a ground is byte-identical."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345
@@ -302,7 +302,11 @@ def build_inputs() -> dict[str, dict[str, Any]]:
               _instruction("square", weight="pen", filled=False, surface=surface),
               svg_profile="display")
 
-    for material in ("plain", "paper", "washi", "ink_wash", "charcoal_ground", "mezzotint"):
+    # Read from the enum rather than listed here: a support added to the schema
+    # and not to this list would be a value the frozen record never holds, and
+    # the version that added it would freeze with an empty diff that reads as
+    # "nothing moved".
+    for material in get_args(GroundMaterial):
         ground = copy.deepcopy(BASE_GROUND)
         ground["material"] = material
         _case(cases, f"C-ground-{material}", _instruction("line", weight="pen"), ground=ground)
@@ -714,10 +718,14 @@ def build_inputs() -> dict[str, dict[str, Any]]:
     _pair("H-pair-cycle-unit", group_size=2, count=4,
           color_cycle=["red", "blue"])
 
-    expected = {"A": 88, "B": 72, "C": 64, "D": 61, "E": 119, "F": 128,
+    # C gained two with `canvas` and `drawing_paper`. The count stays written
+    # out by hand on purpose: the ground cases are read from the enum now, so
+    # this line is what makes adding a support a deliberate re-bake instead of a
+    # corpus that quietly grew.
+    expected = {"A": 88, "B": 72, "C": 66, "D": 61, "E": 119, "F": 128,
                 "G": 50, "H": 4}
     actual = {prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases) for prefix in expected}
-    if actual != expected or len(cases) != 586:
+    if actual != expected or len(cases) != 588:
         raise AssertionError(f"case count mismatch: {actual}, total={len(cases)}")
     return cases
 

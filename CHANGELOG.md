@@ -6877,3 +6877,62 @@ This version **clips only the ends of each row** to the outline.
   **frozen corpora byte-identical**, **Android JVM 295 passed / 0 failed**.
 - **The Android reference fixtures gained the 64 files of `render-engine-35/` and no Kotlin source
   moved** (`android/VERSION` is unchanged). The port reads the directory for the version it declares.
+
+---
+
+### Android — a surface keeps to the shape that holds it, and a spread keeps its form on any paper (android `2.1.4-android.32`, 2026-08-16, ledger I-233, render engine 30 → 35)
+
+**The port was four engine versions behind.** Of those, **engine 33 (a repeating unit is not always one
+mark) was already in**, and **engine 34 (the ground as a support you can name) is still not**, so this
+version moves three: **31, 32 and 35**.
+
+- **engine 35 — a surface belongs to the shape that carries it.** Hatch rows ran the bounding box's
+  diagonal and did not stop at the outline. **Only the two ends of a row are cut now** — the angle, the
+  pitch, `spacing_gradient`, the per-row jitter and the 80-row ceiling are all untouched. The cut happens
+  in the coordinate maths before anything is drawn, so **no `clipPath` is used at all**; a concave form
+  gives several spans and each is drawn on its own, never crossing the void. **Surface paths went from 41
+  to 31** (rows that miss the contour draw nothing). The port had no equivalent of `surfaceContour`, so
+  building the outline was part of the work.
+- **engine 31 — the ring and `at.region` go on the short side.** A ring's radius and a region's extent
+  are each one length, yet x bought pixels through the paper's width and y through its height. **A
+  region's centre stays proportional** and only its half-extents move — "upper right" is the upper right
+  of any paper.
+- **engine 32 — a path's cross-axis swing and a cluster's band go on the short side.** `margin` and
+  `span` do not move. **The cluster's band is scaled after the rotation, not before** — scaling first
+  turns the rotation itself into a shear. **⚠ The `pathPosition` call that resolves a cluster's centre is
+  deliberately not given the paper** (R3); giving it one would make "the middle cluster sits above the
+  others" mean something different on paper of another shape.
+- **⚠ Two callers the compiler cannot see went red at stage 1** — `CompositeRepetitionTest` and
+  `ServerRendererCloudformAndRelationsTest` reach `resolvePerformanceScore` **by reflection**, so adding
+  a parameter does not fail the build.
+- **⚠ Three measurements in the issued contract disagreed with the code** (not because the code moved
+  after issue): ① `expandArrangement` and `expandArrangementLayout` **already took the paper** — the
+  wiring was missing in three places, not five (`pathPosition`, `clusteredPosition`, `resolveAtRegion`);
+  ② "nothing gates `21_hatch_computer.svg`" was false — **the parity test that walks all 51 cases sees
+  it**, though it stops at the first mismatch and 21's breakage was therefore always reported as "06
+  broke" (this version separates them); ③ the `wash` and `stipple` named as controls **are not drawn by
+  this port at all** (the surface layer answers only `hatch` and `crosshatch`).
+- **⚠ The rows the contract said to compare as `<line>` were compared as `path`** — `computer` is a
+  hand-stroke weight, so rows go through the material engine. **No `<line>` exists in the fixtures or in
+  the output.**
+- **13 perturbations** (one of the contract's 14 could not be applied in a single line and was measured
+  by reading the code instead). **27 reddenings against a predicted 29, with three misses**: **P-1** was
+  the contract's own error (both hatch cases in the corpus are unrotated squares, where the bounding box
+  and the contour coincide); **P-3** came from the implementation reading `computer` as a non-hand
+  weight; and **P-8** (dropping the square-canvas early return) **hit nothing** — a region's `y0` does
+  move by one ULP, but **this port quantises anchors to six decimals** and the rounding absorbs it.
+  **The early return was kept** (there is no reason to drop what the server has, and it starts mattering
+  the day quantisation goes).
+- **Carried forward, untouched here** — the surface layer passes 0, 0 to `surfaceSeed` instead of the
+  real indices; the ellipse perimeter exists in two forms (Ramanujan's first approximation in the drawing
+  branch, the second — matching the server one-for-one — in the surface contour); and
+  `renderEngineVersion` declares `"35"` while engine 34 is not in.
+- **Verification (re-measured by the accepting side on the merged tree):** **Android JVM 55 classes /
+  305 passed / 0 failed / 0 errors / 0 skipped** (295 at the branch point, **+10 = this contract's
+  acceptance**; nothing deleted or renamed),
+  **`test_android_reference_fixtures_are_current.py` 4 passed**, **reference fixtures byte-identical**.
+  **`server/`, `web/`, `cli/` and `shared/` are untouched, and their suites were not run.**
+  **⚠ `cycle.sh accept` counts no Android file in its test-inventory diff** (it reads `server/tests`,
+  `cli/tests` and `web/src` only), so the inventory was counted by hand.
+- **⚠ Neither `APP_VERSION` nor `web/BUILD_NUMBER` moved.** `android/` is permanently excluded from every
+  sync path, so this cycle sends nothing to pentala.

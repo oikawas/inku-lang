@@ -89,7 +89,7 @@ class DefaultSvgRenderer(
             renderSeed,
             canvas,
         )
-        val resolvedInstructions = resolvePerformanceScore(compositeInstructions, renderSeed)
+        val resolvedInstructions = resolvePerformanceScore(compositeInstructions, renderSeed, canvas)
         val structured = request.svgProfile == "editable"
         body.append("""<rect x="0" y="0" width="${canvas.width}" height="${canvas.height}" fill="$background"/>""")
         body.append("""<g clip-path="url(#canvas-clip)">""")
@@ -778,9 +778,10 @@ class DefaultSvgRenderer(
                     preserveSpace = preserveSpace,
                     seed = seed,
                     rhythmSpacing = rhythmSpacing,
+                    canvas = canvas,
                 )
             } else if (path != "none") {
-                pathPosition(i, count, margin, path, seed, rhythmSpacing)
+                pathPosition(i, count, margin, path, seed, rhythmSpacing, canvas)
             } else {
                 when (layout) {
                     "vertical" -> margin to (margin + t * (1.0 - margin * 2.0))
@@ -925,7 +926,22 @@ class DefaultSvgRenderer(
         }
     }
 
-    private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String, rhythmSpacing: String = "none"): Pair<Double, Double> {
+    /**
+     * Where member `i` of a path-following group lands, in normalized space.
+     *
+     * engine 32: the cross-axis spread goes on the short side. A path has two
+     * quantities and they are not the same kind. Along its line,
+     * `margin + t * span` says how much of the paper the group uses -- that is
+     * the paper's own length and stays proportional. Across it, the wave's swing
+     * and the jitter are the shape of the path, and written straight they became
+     * `0.22 * width` across and `0.22 * height` down, so the same wave came out
+     * with a swing of 220px on the square canvas and 44px on the pillar. Only
+     * the second is levelled here; `margin` and `span` are untouched.
+     *
+     * `canvas` is stated by every caller on purpose -- a default would let a new
+     * call site keep the old behaviour without saying so.
+     */
+    private fun pathPosition(i: Int, count: Int, margin: Double, path: String, seed: String, rhythmSpacing: String, canvas: CanvasSize?): Pair<Double, Double> {
         val span = 1.0 - 2.0 * margin
         val t = rhythmT(i, count, seed, rhythmSpacing)
         val jitterA = hash01(i, seed, "a") - 0.5
@@ -957,7 +973,8 @@ class DefaultSvgRenderer(
         density: String,
         preserveSpace: Boolean,
         seed: String,
-        rhythmSpacing: String = "none",
+        rhythmSpacing: String,
+        canvas: CanvasSize?,
     ): Pair<Double, Double> {
         val nClusters = clusterCount.coerceIn(1, count)
         val clusterIndex = i % nClusters
@@ -967,7 +984,12 @@ class DefaultSvgRenderer(
         val center = if (path == "none") {
             scatterPosition(clusterIndex, centerMargin, seedForCluster(seed))
         } else {
-            pathPosition(clusterIndex, nClusters, centerMargin, path, seedForCluster(seed), rhythmSpacing)
+            // R3 (author, 2026-08-12): where the cluster sits is not a shape, so
+            // the canvas is deliberately NOT forwarded to this one call.
+            // Forwarding it would level the centres too, and "the middle cluster
+            // is above the others" would stop meaning the same thing on paper of
+            // a different shape.
+            pathPosition(clusterIndex, nClusters, centerMargin, path, seedForCluster(seed), rhythmSpacing, null)
         }
         val axisAngle = when (path) {
             "diagonal" -> -Math.PI / 4.0
@@ -2480,7 +2502,7 @@ class DefaultSvgRenderer(
             }
             var preparedHead = copyJsonObject(head)
             if (performanceSeed != null) {
-                preparedHead = resolveAtRegion(preparedHead, performanceSeed, index)
+                preparedHead = resolveAtRegion(preparedHead, performanceSeed, index, canvas)
             }
             val copies = expandArrangement(preparedHead, placementSeed, canvas, performanceSeed)
             val sourceAnchor = anchor(preparedHead)
@@ -2511,7 +2533,7 @@ class DefaultSvgRenderer(
         return result
     }
 
-    private fun resolvePerformanceScore(instructions: JSONArray, renderSeed: Long?): JSONArray {
+    private fun resolvePerformanceScore(instructions: JSONArray, renderSeed: Long?, canvas: CanvasSize?): JSONArray {
         if (renderSeed == null) return instructions
         val result = JSONArray()
         val resolved = mutableListOf<JSONObject>()
@@ -2522,7 +2544,7 @@ class DefaultSvgRenderer(
             if (arr != null && arr.optString("layout") == "grid") {
                 ins.remove("relation")
             } else {
-                ins = resolveAtRegion(ins, renderSeed, i)
+                ins = resolveAtRegion(ins, renderSeed, i, canvas)
                 ins = resolveRelation(ins, resolved, renderSeed, i)
             }
             resolved.add(ins)
@@ -2531,7 +2553,7 @@ class DefaultSvgRenderer(
         return result
     }
 
-    private fun resolveAtRegion(ins: JSONObject, seed: Long, index: Int): JSONObject {
+    internal fun resolveAtRegion(ins: JSONObject, seed: Long, index: Int, canvas: CanvasSize?): JSONObject {
         val at = ins.optJSONObject("at") ?: return ins
         val region = at.optJSONArray("region") ?: return ins
         if (region.length() < 4) return ins

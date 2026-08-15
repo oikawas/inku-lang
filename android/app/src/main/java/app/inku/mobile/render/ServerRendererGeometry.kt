@@ -1,5 +1,6 @@
 package app.inku.mobile.render
 
+import app.inku.mobile.data.model.CanvasSize
 import java.security.MessageDigest
 import kotlin.math.cos
 import kotlin.math.floor
@@ -491,6 +492,26 @@ internal object ServerRendererGeometry {
         }
         return sb.toString()
     }
+
+    /**
+     * Per-axis factors that put a normalized extent on the short edge.
+     *
+     * Engine 30 did this for a mark's own size; engine 31 does it for what the
+     * arrangement layer spreads -- the ring and the region -- and engine 32 for
+     * the cluster's band and a path's cross-axis spread. A normalized extent
+     * becomes pixels through the canvas width on x and the canvas height on y,
+     * so on a non-square canvas the same number means a different number of
+     * pixels per axis. Scaling each axis by `unit / that axis` makes both come
+     * out `unit` pixels, which is what keeps a ring round and a square region
+     * square.
+     */
+    fun shortSideScales(canvas: CanvasSize?): Pair<Double, Double> {
+        if (canvas == null) return 1.0 to 1.0
+        return shortSideScales(canvas.width.toDouble(), canvas.height.toDouble(), canvas.unit.toDouble())
+    }
+
+    fun shortSideScales(width: Double, height: Double, unit: Double): Pair<Double, Double> =
+        (unit / width) to (unit / height)
 
     fun fillScanAngle(seed: Any): Double {
         return hash01(0, seed, "fill-angle") * Math.PI

@@ -417,13 +417,22 @@ def test_engine_35_leaves_the_wash_cases_alone() -> None:
     上の検査に含まれてはいるが、**裁定 1（薄墨は縞に見える）が別契約である**
     ことをここで明示的に留める。薄墨に同じ切り方を当てた実装は、579 件の中に
     紛れずにこの 1 本で落ちる。
+
+    ⚠ **凍結どうしの比較だけでは薄墨を守れない。** 実測で確かめた —— 薄墨の枝の
+    濃度を動かす摂動を当てても、manifest どうしの比較は緑のままだった（凍結物は
+    renderer が動いても動かない）。**そこで前の版との一致と、いまの木が描くものと
+    の一致を 2 つとも見る。**
     """
+    generator = _generator()
     manifest = _manifest()
+    inputs = generator.build_inputs()
     previous = json.loads(ENGINE_34_MANIFEST.read_text(encoding="utf-8"))["cases"]
     checked = 0
     for case_id in sorted(ENGINE_35_WASH_CASES):
         assert case_id in manifest["cases"], case_id
         assert manifest["cases"][case_id]["digest"] == previous[case_id]["digest"], case_id
+        svg = generator.render_case(inputs[case_id])
+        assert generator._normalized_digest(svg) == previous[case_id]["digest"], case_id
         checked += 1
     assert checked == 6
     assert not ENGINE_35_WASH_CASES & ENGINE_35_HATCH_CASES
